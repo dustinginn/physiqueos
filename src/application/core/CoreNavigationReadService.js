@@ -1073,12 +1073,26 @@ export function projectConfirmedHealthKitLogProvenance(log, runtime = {}) {
     loggedToday: Object.freeze({
       ...log.loggedToday,
       rows: Object.freeze(log.loggedToday.rows.map((row) => {
+        if (row.id !== "training") return row;
+        const withAppleHealth = (summary) => /Apple Health/i.test(String(summary ?? ""))
+          ? summary
+          : `${String(summary ?? "Workout").replace(/ logged$/i, "")} · Apple Health`;
+        // A Training row with Cardio carries one line per modality: only the
+        // Logger (Strength) line's provenance changes when its workout is confirmed.
+        if (Array.isArray(row.lines) && row.lines.length > 0) {
+          const logger = row.lines.find((line) => line.kind === "logger");
+          const confirmed = logger && (logger.recordId ? attachments.has(String(logger.recordId)) : confirmedTrainingToday);
+          if (!confirmed) return row;
+          const lines = Object.freeze(row.lines.map((line) => line === logger
+            ? Object.freeze({ ...line, summary: withAppleHealth(line.summary) })
+            : line));
+          return Object.freeze({ ...row, lines, summary: lines.map((line) => line.summary).join(", ") });
+        }
         const confirmed = row.recordId
           ? attachments.has(String(row.recordId))
           : confirmedTrainingToday;
-        if (row.id !== "training" || !confirmed || /Apple Health/i.test(String(row.summary ?? ""))) return row;
-        const base = String(row.summary ?? "Workout").replace(/ logged$/i, "");
-        return Object.freeze({ ...row, summary: `${base} · Apple Health` });
+        if (!confirmed) return row;
+        return Object.freeze({ ...row, summary: withAppleHealth(row.summary) });
       })),
     }),
   });

@@ -82,9 +82,30 @@ export function compareHealthKitDailySnapshotPrecedence(current, incoming) {
     return Number(incoming.sourceRevision ?? 0) - Number(current.sourceRevision ?? 0);
   }
   // Equal coverage from a different delivery device cannot be ordered by a
-  // device-scoped revision. Deterministic rule: the existing canonical day is
-  // kept and the newcomer stays raw (never a silent overwrite).
-  return 0;
+  // device-scoped revision (a re-paired phone gets a new delivery identity and
+  // simply continues the same Apple Health day). A day's totals only grow, so
+  // the newcomer is taken only when it cumulatively dominates the current
+  // snapshot: every total the current one has is present and not lower, and
+  // at least one is higher. Otherwise the existing canonical day is kept and
+  // the newcomer stays raw: a lagging device never regresses the day and two
+  // devices never flip-flop.
+  return cumulativelyDominates(incoming, current) ? 1 : 0;
+}
+
+function cumulativeTotalsOf(snapshot) {
+  const values = snapshot?.values ?? {};
+  const totals = values.dailyActivity ?? values.dailyTotals ?? {};
+  const fields = values.dailyActivity ? HEALTHKIT_CANONICAL_ACTIVITY_METRICS : HEALTHKIT_CANONICAL_NUTRITION_FIELDS;
+  return Object.fromEntries(fields.filter((field) => finite(totals[field])).map((field) => [field, Number(totals[field])]));
+}
+
+function cumulativelyDominates(incoming, current) {
+  const next = cumulativeTotalsOf(incoming);
+  const prior = cumulativeTotalsOf(current);
+  const fields = Object.keys(prior);
+  if (fields.length === 0) return false;
+  if (fields.some((field) => !(field in next) || next[field] < prior[field])) return false;
+  return fields.some((field) => next[field] > prior[field]);
 }
 
 /**
@@ -160,7 +181,9 @@ export function reconcileHealthKitCanonicalDay({
     action: "update",
     reason: coverageRank(incoming.coverage) > coverageRank(current.coverage)
       ? "higher_coverage_snapshot"
-      : "newer_device_revision",
+      : sameDevice(current, incoming)
+        ? "newer_device_revision"
+        : "cross_device_cumulative_advance",
     record: buildRecord({
       domain, localDate, ownerUserId, at, activation, coexistence: coexistenceFor(incoming),
       current: incoming,

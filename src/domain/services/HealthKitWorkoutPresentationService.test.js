@@ -140,6 +140,7 @@ describe("confirmed HealthKit workout presentation", () => {
       code: "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY",
       dailyActiveCalories: 300,
       workoutActiveCalories: 410,
+      provisional: false,
     });
   });
 
@@ -272,6 +273,29 @@ describe("confirmed HealthKit workout presentation", () => {
       healthKitWorkoutLinkClaims: fixture.workoutLinkClaims,
     });
     expect(unconfirmed.loggedToday.rows[0].summary).toBe("Strength Training logged");
+  });
+
+  it("credits Apple Health on the Strength line only when the row also carries Cardio lines", () => {
+    const fixture = createSep23StrengthPresentationFixture();
+    const lines = [
+      { id: "training:logger", kind: "logger", summary: "Strength Training · 50 min", href: "/x", recordId: fixture.ids.session },
+      { id: "training:cardio:outdoor-walk", kind: "cardio", summary: "2 Outdoor Walks · 32 min", href: "/progress/training", recordId: null },
+    ];
+    const log = { localDate: fixture.day, loggedToday: { dateKey: fixture.day, rows: [
+      { id: "training", summary: "Strength Training · 50 min, 2 Outdoor Walks · 32 min", context: null, recordId: null, lines },
+    ] }, pendingEvidenceReviews: [] };
+    const runtime = {
+      canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
+      healthKitCanonicalWorkouts: fixture.canonicalWorkouts,
+      healthKitWorkoutLinks: fixture.workoutLinks,
+      healthKitWorkoutLinkClaims: fixture.workoutLinkClaims,
+    };
+    const row = projectConfirmedHealthKitLogProvenance(log, runtime).loggedToday.rows[0];
+    expect(row.lines.map((line) => line.summary)).toEqual(["Strength Training · 50 min · Apple Health", "2 Outdoor Walks · 32 min"]);
+    expect(row.summary).toBe("Strength Training · 50 min · Apple Health, 2 Outdoor Walks · 32 min");
+    // Idempotent: projecting again changes nothing.
+    const again = projectConfirmedHealthKitLogProvenance({ ...log, loggedToday: { ...log.loggedToday, rows: [row] } }, runtime);
+    expect(again.loggedToday.rows[0].summary).toBe(row.summary);
   });
 
   it("preserves HealthKit provenance on an aggregate Log row with multiple Training sessions", () => {
@@ -424,7 +448,10 @@ describe("HK telemetry presentation for an unconfirmed Logger session (September
     // Unconfirmed: accounting must not count this workout's energy, and the
     // confidence/eligibility machinery is untouched by this presentation fix.
     expect(day.workoutEnergyAttribution.confirmedHealthKitWorkoutCount).toBe(0);
-    expect(day.linkedTrainingSessionCount).toBe(1);
+    // "Linked Workouts" counts the day's workouts as Training Day does: the
+    // unconfirmed Strength session and the two eligible Cardio walks.
+    expect(day.linkedTrainingSessionCount).toBe(3);
+    expect(day.linkedWorkoutCount).toBe(3);
 
     const entry = report.linkedTrainingContext.find((item) => item.id === fixture.ids.session);
     expect(entry).toMatchObject({
@@ -595,6 +622,7 @@ describe("Part E: whole-day HealthKit workout-calorie attribution", () => {
     expect(day.energyAnomaly).toEqual({
       code: "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY",
       dailyActiveCalories: 100,
+      provisional: false,
       workoutActiveCalories: 300,
     });
   });
@@ -654,5 +682,45 @@ describe("Part E: whole-day HealthKit workout-calorie attribution", () => {
     // Never collapsed to the family or to the generic (unspecific) type.
     expect(day.contributingWorkouts[0].canonicalType).not.toBe("cardio");
     expect(day.contributingWorkouts[0].canonicalType).not.toBe("walking");
+  });
+});
+
+describe("same-day Activity truthfulness (Sep 28)", () => {
+  function partialDay(fixture) {
+    fixture.canonicalEvidenceObjects[0].payload.metadata = { coverage: "partial_day" };
+    return fixture;
+  }
+
+  it("presents a partial Apple Health day as 'so far' and its energy gap as provisional", () => {
+    const fixture = partialDay(createCardioWholeDayAttributionFixture({ dailyActiveCalories: 171, cardioActiveCalories: 211 }));
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+    expect(day.isPartialDay).toBe(true);
+    expect(day.coverage).toBe("partial_day");
+    expect(day.value).toBe("171 active cal / 30 min so far");
+    expect(day.energyAnomaly).toMatchObject({ code: "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY", provisional: true });
+    // Workout energy stays descriptive: never added, and the remainder never negative.
+    expect(day.nonWorkoutActiveCalories).toBe(0);
+  });
+
+  it("a complete day carries no 'so far' and a non-provisional anomaly", () => {
+    const fixture = createCardioWholeDayAttributionFixture({ dailyActiveCalories: 100, cardioActiveCalories: 300 });
+    fixture.canonicalEvidenceObjects[0].payload.metadata = { coverage: "complete_day" };
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+    expect(day.isPartialDay).toBe(false);
+    expect(day.value).toBe("100 active cal / 30 min");
+    expect(day.energyAnomaly.provisional).toBe(false);
+  });
+
+  it("an ordinary partial day with workout energy inside the total shows no anomaly", () => {
+    const fixture = partialDay(createCardioWholeDayAttributionFixture({ dailyActiveCalories: 828, cardioActiveCalories: 211 }));
+    const day = createProviderActivityEvidenceReport(fixture).latestActivityDay;
+    expect(day.energyAnomaly).toBeNull();
+    expect(day.nonWorkoutActiveCalories).toBe(617);
+  });
+
+  it("counts one Cardio-only day's workout as linked (was 0: only Logger sessions counted)", () => {
+    const day = createProviderActivityEvidenceReport(createCardioWholeDayAttributionFixture()).latestActivityDay;
+    expect(day.linkedWorkoutCount).toBe(1);
+    expect(day.detail).toContain("1 workout linked");
   });
 });

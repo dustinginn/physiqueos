@@ -1754,6 +1754,11 @@ function createTrainingBackedActivityDay({
   const confirmedHealthKitWorkoutCount = new Set(trainingSessions
     .map((session) => confirmedHealthKitWorkoutsBySession.get(trainingSessionIdentity(session))?.canonicalWorkoutId)
     .filter(Boolean)).size;
+  // The day's workouts, counted as Training Day counts them: every eligible
+  // canonical workout (confirmed Strength, eligible Cardio) plus every Logger
+  // session that has no confirmed canonical workout of its own.
+  const unattachedLoggerSessionCount = trainingSessions.filter((session) =>
+    !confirmedHealthKitWorkoutsBySession.get(trainingSessionIdentity(session))?.canonicalWorkoutId).length;
 
   return {
     id: `activity_training_partial_${date}`,
@@ -1792,6 +1797,7 @@ function createTrainingBackedActivityDay({
       healthkit_eligible_workout_count: energy.eligibleWorkoutCount,
       healthkit_eligible_workouts: energy.contributingWorkouts,
       healthkit_workout_energy_incomplete: energy.incomplete,
+      workouts_linked: energy.eligibleWorkoutCount + unattachedLoggerSessionCount,
     },
     references: {
       training_session_ids: trainingSessionIds,
@@ -1972,6 +1978,9 @@ function mergeActivityDayWithTrainingAggregate(activityDay = {}, aggregate = {})
       healthkit_workout_energy_incomplete:
         aggregate.derived_metrics?.healthkit_workout_energy_incomplete ??
         activityDay.derived_metrics?.healthkit_workout_energy_incomplete ?? false,
+      workouts_linked:
+        aggregate.derived_metrics?.workouts_linked ??
+        activityDay.derived_metrics?.workouts_linked ?? trainingSessionIds.length,
     },
     references: {
       ...(activityDay.references ?? {}),
@@ -1984,13 +1993,23 @@ function createActivityDayRecord(activityDay = {}) {
   const dateKey = getDateKey(activityDay.observed_at);
   const activeCalories = finiteNumberOrNull(activityDay.daily_activity?.move_calories);
   const workoutActiveCalories = finiteNumberOrNull(activityDay.derived_metrics?.workout_active_calories);
+  const partialDay = isPartialActivityDay(activityDay);
   const energyAnomaly = activeCalories !== null && workoutActiveCalories !== null && workoutActiveCalories > activeCalories
     ? Object.freeze({
         code: "WORKOUT_ENERGY_EXCEEDS_DAILY_ACTIVE_ENERGY",
         dailyActiveCalories: activeCalories,
         workoutActiveCalories,
+        // A partial day's total is "so far": the gap is expected to close as
+        // Apple Health finishes the day, not a conflict in the data.
+        provisional: partialDay,
       })
     : null;
+  const linkedWorkoutCount = Number(
+    activityDay.derived_metrics?.workouts_linked ??
+    activityDay.derived_metrics?.training_sessions_referenced ??
+    activityDay.references?.training_session_ids?.length ??
+    0
+  );
 
   return {
       id: activityDay.id,
@@ -2010,10 +2029,11 @@ function createActivityDayRecord(activityDay = {}) {
       workoutActiveCalories,
       nonWorkoutActiveCalories:
         activityDay.derived_metrics?.non_workout_active_calories ?? null,
-      linkedTrainingSessionCount:
-        activityDay.derived_metrics?.training_sessions_referenced ??
-        activityDay.references?.training_session_ids?.length ??
-        0,
+      // Shown as "Linked Workouts": the same workout set Training Day shows.
+      linkedTrainingSessionCount: linkedWorkoutCount,
+      linkedWorkoutCount,
+      coverage: activityDay.metadata?.coverage ?? null,
+      isPartialDay: partialDay,
       workoutEnergyAttribution: Object.freeze({
         policy: "workout_energy_is_descriptive_never_additive",
         confirmedHealthKitWorkoutCount: Number(activityDay.derived_metrics?.confirmed_healthkit_workouts_referenced ?? 0),
@@ -2895,16 +2915,26 @@ function isResistanceTrainingSession(session = {}) {
   );
 }
 
+function pluralize(count, noun) {
+  return `${formatWholeNumber(count)} ${noun}${Number(count) === 1 ? "" : "s"}`;
+}
+
+// Apple Health's summary for a day still in progress is a "so far" total.
+function isPartialActivityDay(activityDay) {
+  return activityDay?.metadata?.coverage === "partial_day";
+}
+
 function formatActivityDayValue(activityDay) {
   const dailyActivity = activityDay.daily_activity ?? {};
   const move = dailyActivity.move_calories;
   const exercise = dailyActivity.exercise_minutes;
+  const soFar = isPartialActivityDay(activityDay) ? " so far" : "";
 
   if (Number.isFinite(move) && Number.isFinite(exercise)) {
-    return `${formatWholeNumber(move)} active cal / ${formatWholeNumber(exercise)} min`;
+    return `${formatWholeNumber(move)} active cal / ${formatWholeNumber(exercise)} min${soFar}`;
   }
 
-  if (Number.isFinite(move)) return `${formatWholeNumber(move)} active cal`;
+  if (Number.isFinite(move)) return `${formatWholeNumber(move)} active cal${soFar}`;
   if (Number.isFinite(exercise)) return `${formatWholeNumber(exercise)} exercise min`;
 
   return formatDate(activityDay.observed_at);
@@ -2917,8 +2947,8 @@ function formatActivityDayDetail(activityDay) {
     Number.isFinite(dailyActivity.total_calories_burned)
       ? `${formatWholeNumber(dailyActivity.total_calories_burned)} total calories`
       : null,
-    Number.isFinite(derived.training_sessions_referenced)
-      ? `${derived.training_sessions_referenced} workouts linked`
+    Number.isFinite(derived.workouts_linked ?? derived.training_sessions_referenced)
+      ? pluralize(derived.workouts_linked ?? derived.training_sessions_referenced, "workout") + " linked"
       : null,
     Number.isFinite(derived.non_workout_active_calories)
       ? `${formatWholeNumber(derived.non_workout_active_calories)} non-workout active cal`

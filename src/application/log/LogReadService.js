@@ -57,7 +57,7 @@ export function projectPendingReviews(reviews = []) {
         date: formatPendingReviewDate(review.localDate),
         localDate: review.localDate,
         title: presentation.title,
-        summary: `${review.candidates?.length ?? 0} possible Logger sessions`,
+        summary: `${review.candidates?.length ?? 0} possible Logger session${(review.candidates?.length ?? 0) === 1 ? "" : "s"}`,
         likelyDuplicate: false,
         href: `/evidence/review/${encodeURIComponent(review.id)}`,
         version: String(review.version ?? "1"),

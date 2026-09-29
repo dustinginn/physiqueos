@@ -38,6 +38,16 @@ describe("Log accepted-processing evidence semantics", () => {
     })]);
   });
 
+  it("counts one candidate as one possible Logger session (singular)", () => {
+    const review = (candidates) => projectPendingReviews([{
+      schemaVersion: "healthkit-workout-reconciliation-v1", reviewKind: "healthkit_workout_reconciliation",
+      id: "healthkit_workout_reconciliation_one", status: "pending", localDate: "2026-09-28",
+      createdAt: "2026-09-29T02:58:03.704Z", version: 1, candidates,
+    }])[0].summary;
+    expect(review([{ loggerSessionCanonicalId: "a" }])).toBe("1 possible Logger session");
+    expect(review([])).toBe("0 possible Logger sessions");
+  });
+
   it("keeps only Founder-actionable reviews in Ready to Review", () => {
     const reviews = [
       nutritionReview("pending"),

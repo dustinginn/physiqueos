@@ -177,9 +177,14 @@ describe("LoggedTodayService", () => {
       },
     });
 
+    // Strength and the day's two canonical walks, one line per modality.
     expect(result.rows[0]).toMatchObject({
-      summary: "Strength Training · 28 min",
-      recordId: fixture.ids.session,
+      summary: "Strength Training · 28 min, 2 Walks · 33 min",
+      href: "/progress/training",
+      lines: [
+        { kind: "logger", summary: "Strength Training · 28 min", recordId: fixture.ids.session },
+        { kind: "cardio", summary: "2 Walks · 33 min", recordId: null },
+      ],
     });
   });
 
@@ -229,6 +234,68 @@ describe("LoggedTodayService", () => {
     expect(result.rows[0].recordId).toBe("local-25");
     expect(list).toHaveBeenCalledOnce();
     expect(repositories.canonicalEvidence.upsertCanonicalEvidenceObjects).not.toHaveBeenCalled();
+  });
+});
+
+describe("Logged Today: Strength and Cardio together (Sep 28)", () => {
+  const strength = () => training("strength-28", "Traditional Strength Training", { duration_seconds: 3000 });
+  const cardio = (id, type, minutes, start) => ({
+    id, _canonicalId: id, evidence_type: "training", observed_at: dateKey,
+    captured_at: `${dateKey}T${start}:00-07:00`,
+    metadata: { activity_type: type, duration_seconds: minutes * 60 },
+  });
+  const trainingRow = (canonicalObjects, cardioWorkouts) =>
+    composeLoggedTodaySummary({ canonicalObjects, dateKey, cardioWorkouts }).rows[0];
+
+  it("one Strength session and two same-type walks: one line each, walks grouped", () => {
+    const row = trainingRow([strength()], [cardio("walk-1", "Outdoor Walk", 17, "08:05"), cardio("walk-2", "Outdoor Walk", 15, "09:12")]);
+    expect(row.lines.map((line) => line.summary)).toEqual(["Strength Training · 50 min", "2 Outdoor Walks · 32 min"]);
+    expect(row.summary).toBe("Strength Training · 50 min, 2 Outdoor Walks · 32 min");
+    expect(row.href).toBe("/progress/training");
+    expect(row.lines[0]).toMatchObject({ kind: "logger", href: "/progress/training/session/strength-28", recordId: "strength-28" });
+    expect(row.lines[1]).toMatchObject({ kind: "cardio", recordId: null });
+  });
+
+  it("one Strength and one Cardio", () => {
+    const row = trainingRow([strength()], [cardio("run-1", "Outdoor Run", 25, "07:00")]);
+    expect(row.lines.map((line) => line.summary)).toEqual(["Strength Training · 50 min", "Outdoor Run · 25 min"]);
+    expect(row.lines[1].recordId).toBe("run-1");
+  });
+
+  it("several Cardio types: one line per type, ordered by first start", () => {
+    const row = trainingRow([], [
+      cardio("cycle-1", "Indoor Cycle", 30, "18:00"),
+      cardio("walk-1", "Outdoor Walk", 20, "07:30"),
+      cardio("walk-2", "Outdoor Walk", 10, "12:00"),
+    ]);
+    expect(row.lines.map((line) => line.summary)).toEqual(["2 Outdoor Walks · 30 min", "Indoor Cycle · 30 min"]);
+    expect(row.context).toBe("Apple Health");
+  });
+
+  it("Cardio only: the row exists, credits Apple Health, and opens Training Day", () => {
+    const row = trainingRow([], [cardio("walk-1", "Outdoor Walk", 17, "08:05")]);
+    expect(row).toMatchObject({ summary: "Outdoor Walk · 17 min", context: "Apple Health", href: "/progress/training", recordId: null });
+  });
+
+  it("Strength only is unchanged: its own summary, context, destination and record", () => {
+    const row = trainingRow([strength()], []);
+    expect(row).toMatchObject({ summary: "Strength Training · 50 min", context: "Movements not added",
+      href: "/progress/training/session/strength-28", recordId: "strength-28" });
+    expect(row.lines).toHaveLength(1);
+  });
+
+  it("no training: the neutral empty row, no lines", () => {
+    const row = trainingRow([], []);
+    expect(row.summary).toBe("Nothing logged yet");
+    expect(row.lines).toBeUndefined();
+  });
+
+  it("a partial Apple Health day reads 'so far'; a complete one does not", () => {
+    const activity = (coverage) => composeLoggedTodaySummary({ dateKey, canonicalObjects: [canonical("activity-28", {
+      id: "activity-28", evidence_type: "activity_day", observed_at: dateKey,
+      daily_activity: { move_calories: 171.405 }, metadata: { coverage } })] }).rows[2];
+    expect(activity("partial_day").summary).toBe("171 active calories so far");
+    expect(activity("complete_day").summary).toBe("171 active calories");
   });
 });
 

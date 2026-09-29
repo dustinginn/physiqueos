@@ -7,6 +7,7 @@ import {
 } from "./CanonicalNutritionDayService";
 import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayService";
 import { projectHealthKitStrengthWorkoutPresentationBySession } from "./HealthKitWorkoutPresentationService.js";
+import { projectHealthKitCardioTrainingRecords } from "./HealthKitCardioTrainingPresentation.js";
 
 const EMPTY_SUMMARY = "Nothing logged yet";
 
@@ -46,10 +47,23 @@ export function createLoggedTodayService({
           })
         : new Map();
 
+      const dateKey = getLocalDateKey(now(), resolvedTimeZone);
+      // Today's canonical Cardio workouts, exactly as Training Day presents
+      // them (same eligibility and duplicate suppression), so Logged Today and
+      // Training Day never disagree about which workouts exist.
+      const cardioWorkouts = healthKitRelationshipState
+        ? projectHealthKitCardioTrainingRecords({
+            canonicalWorkouts: healthKitRelationshipState.canonicalWorkouts ?? [],
+            date: dateKey,
+            existingEvidenceObjects: canonicalObjects,
+          }).map(unwrapCanonicalObject)
+        : [];
+
       return composeLoggedTodaySummary({
         canonicalObjects,
-        dateKey: getLocalDateKey(now(), resolvedTimeZone),
+        dateKey,
         healthKitStrengthPresentationBySession,
+        cardioWorkouts,
       });
     },
   };
@@ -59,6 +73,7 @@ export function composeLoggedTodaySummary({
   canonicalObjects = [],
   dateKey,
   healthKitStrengthPresentationBySession = new Map(),
+  cardioWorkouts = [],
 } = {}) {
   const activeNonNutrition = canonicalObjects
     .filter((object) => object?.quality?.status !== "superseded")
@@ -92,6 +107,7 @@ export function composeLoggedTodaySummary({
       composeTrainingRow(
         activeNonNutrition.filter((record) => record.evidence_type === "training"),
         healthKitStrengthPresentationBySession,
+        cardioWorkouts,
       ),
       composeNutritionRow(nutrition),
       composeActivityRow(activity),
@@ -99,24 +115,34 @@ export function composeLoggedTodaySummary({
   });
 }
 
-// Part E/F decision: a canonicalized Cardio workout deliberately gets NO Log
-// row of its own here. This Training row is keyed entirely off a Training
-// Logger `evidence_type: "training"` session -- and Cardio structurally
-// never has one (see HealthKitWorkoutLinkService.js's cardio-coexistence
-// branch: Cardio has no confirm/deny step and no Logger session to confirm
-// against). Faking a Training row for a canonical Cardio workout would mean
-// inventing a Logger-session identity that does not exist, or repurposing
-// this row for something it was never built to represent. Founder
-// acceptance testing for Cardio's whole-day contribution is served instead
-// by Activity Detail's `contributingWorkouts` list
-// (ProgressReportingService.js's `createActivityDayRecord`), which already
-// shows family/canonicalType/local start-end/duration/energy/provenance per
-// eligible workout -- a strictly more honest surface for data with no
-// Logger session to anchor a Log row to, and adding a second, redundant
-// surface here would be scope creep.
-function composeTrainingRow(sessions, healthKitStrengthPresentationBySession = new Map()) {
-  if (!sessions.length) return emptyRow("training", "Training");
+// Logged Today's Training row summarizes the day's training compactly, one
+// line per modality: the Logger session(s) (Strength) and today's canonical
+// Cardio workouts grouped by type ("2 Outdoor Walks · 32 min"). Cardio lines
+// come from the same canonical projection Training Day uses; nothing here
+// invents a Logger session for Cardio. `summary` stays one string (every
+// line, comma-joined) for clients that render a single line; `lines` carries
+// the same content line by line.
+function composeTrainingRow(sessions, healthKitStrengthPresentationBySession = new Map(), cardioWorkouts = []) {
+  if (!sessions.length && !cardioWorkouts.length) return emptyRow("training", "Training");
 
+  const strength = sessions.length ? composeLoggerSessionLine(sessions, healthKitStrengthPresentationBySession) : null;
+  const cardioLines = composeCardioLines(cardioWorkouts);
+  const lines = [strength, ...cardioLines].filter(Boolean).map(({ id, kind, summary, href, recordId }) =>
+    Object.freeze({ id, kind, summary, href, recordId }));
+  const onlyStrength = strength && cardioLines.length === 0;
+
+  return Object.freeze({
+    id: "training",
+    label: "Training",
+    summary: lines.map((line) => line.summary).join(", "),
+    context: onlyStrength ? strength.context : strength ? null : APPLE_HEALTH_LABEL,
+    href: onlyStrength ? strength.href : "/progress/training",
+    recordId: onlyStrength ? strength.recordId : null,
+    lines: Object.freeze(lines),
+  });
+}
+
+function composeLoggerSessionLine(sessions, healthKitStrengthPresentationBySession) {
   const labels = unique(sessions.map((session) => formatTrainingType(session)));
   const single = sessions.length === 1 ? sessions[0] : null;
   const singleId = single ? String(single._canonicalId ?? single.canonicalId ?? single.id ?? "") : null;
@@ -139,19 +165,50 @@ function composeTrainingRow(sessions, healthKitStrengthPresentationBySession = n
         : labels.length <= 2
           ? labels.join(" · ")
           : `${sessions.length} training sessions`;
+  const recordId = single?._canonicalId ?? single?.canonicalId ?? single?.id ?? null;
 
-  return Object.freeze({
-    id: "training",
-    label: "Training",
+  return {
+    id: "training:logger",
+    kind: "logger",
     summary,
     context: noMovements ? "Movements not added" : null,
-    href: single
-      ? `/progress/training/session/${encodeURIComponent(
-          single._canonicalId ?? single.canonicalId ?? single.id
-        )}`
-      : "/progress/training",
-    recordId: single?._canonicalId ?? single?.canonicalId ?? single?.id ?? null,
-  });
+    href: single ? `/progress/training/session/${encodeURIComponent(recordId)}` : "/progress/training",
+    recordId,
+  };
+}
+
+function composeCardioLines(cardioWorkouts = []) {
+  const groups = new Map();
+  for (const workout of cardioWorkouts) {
+    const label = formatTrainingType(workout);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(workout);
+  }
+  const firstStart = (list) => list.map((workout) => String(workout.captured_at ?? workout.metadata?.start_time ?? "")).sort()[0] ?? "";
+  return [...groups.entries()]
+    .sort(([, left], [, right]) => firstStart(left).localeCompare(firstStart(right)))
+    .map(([label, workouts]) => {
+      const seconds = workouts.reduce((total, workout) => total + (Number(workout.metadata?.duration_seconds) || 0), 0);
+      const duration = formatDuration(seconds);
+      const name = workouts.length === 1 ? label : pluralTrainingLabel(label, workouts.length);
+      const single = workouts.length === 1 ? workouts[0] : null;
+      const recordId = single ? String(single._canonicalId ?? single.canonicalId ?? single.id) : null;
+      return {
+        id: `training:cardio:${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+        kind: "cardio",
+        summary: duration ? `${name} · ${duration}` : name,
+        href: "/progress/training",
+        recordId,
+      };
+    });
+}
+
+// "2 Outdoor Walks"; an activity named as a gerund takes its noun plural
+// ("2 Walks", "2 Rides"), and any other gerund counts its sessions.
+const GERUND_PLURALS = Object.freeze({ Walking: "Walks", Running: "Runs", Cycling: "Rides", Hiking: "Hikes", Swimming: "Swims" });
+function pluralTrainingLabel(label, count) {
+  if (Object.hasOwn(GERUND_PLURALS, label)) return `${count} ${GERUND_PLURALS[label]}`;
+  return /ing$/i.test(label) ? `${label} · ${count} sessions` : `${count} ${label}s`;
 }
 
 function composeNutritionRow(days) {
@@ -193,8 +250,10 @@ function composeActivityRow(days) {
   const latest = days.at(-1);
   const calories = Number(latest.daily_activity?.move_calories);
   const linkedTrainingType = latest.metadata?.activity_type;
+  // Apple Health's summary for a day still in progress is a "so far" total.
+  const soFar = latest.metadata?.coverage === "partial_day" ? " so far" : "";
   const calorieSummary = Number.isFinite(calories)
-    ? `${formatNumber(calories)} active calories`
+    ? `${formatNumber(calories)} active calories${soFar}`
     : "Activity logged";
 
   return Object.freeze({

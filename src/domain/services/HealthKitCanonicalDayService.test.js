@@ -104,10 +104,42 @@ describe("HealthKit canonical Activity days", () => {
     expect(older).toMatchObject({ action: "superseded", reason: "newer_device_revision_already_received" });
   });
 
-  it("keeps the existing day when an equal-coverage snapshot comes from another device", () => {
-    const first = reconcile({ observation: activity({ sourceRevision: 1 }), device: "device-a" });
-    const other = reconcile({ observation: activity({ sourceRevision: 9, moveCalories: 999 }), device: "device-b", existing: first.record });
-    expect(other).toMatchObject({ action: "superseded", reason: "cross_device_equal_coverage_kept_existing" });
+  it("keeps the existing day when an equal-coverage snapshot from another device does not advance every total", () => {
+    const first = reconcile({ observation: activity({ sourceRevision: 1, coverage: "partial_day" }), device: "device-a" });
+    // Lower move calories: a lagging device never regresses the day, whatever its revision.
+    const lagging = reconcile({ observation: activity({ sourceRevision: 9, coverage: "partial_day", moveCalories: 650 }), device: "device-b", existing: first.record });
+    expect(lagging).toMatchObject({ action: "superseded", reason: "cross_device_equal_coverage_kept_existing" });
+    // Mixed: one total higher, another lower.
+    const mixed = reconcile({ observation: activity({ sourceRevision: 9, coverage: "partial_day", moveCalories: 999, exerciseMinutes: 30 }), device: "device-b", existing: first.record });
+    expect(mixed).toMatchObject({ action: "superseded", reason: "cross_device_equal_coverage_kept_existing" });
+    // Identical totals: nothing to advance.
+    const same = reconcile({ observation: activity({ sourceRevision: 9, coverage: "partial_day" }), device: "device-b", existing: first.record });
+    expect(same).toMatchObject({ action: "superseded", reason: "cross_device_equal_coverage_kept_existing" });
+    // Missing a total the current day has.
+    const missing = reconcile({ observation: activity({ sourceRevision: 9, coverage: "partial_day", moveCalories: 999, standHours: null }), device: "device-b", existing: first.record });
+    expect(missing).toMatchObject({ action: "superseded", reason: "cross_device_equal_coverage_kept_existing" });
+  });
+
+  it("follows a re-paired phone: a new delivery identity whose partial day advances every total replaces the frozen one", () => {
+    // Sep 28: revisions 1-10 under the old pairing, then the same phone re-paired mid-day.
+    const before = reconcile({ observation: activity({ sourceRevision: 10, coverage: "partial_day", moveCalories: 171.405, exerciseMinutes: 26, standHours: 2 }), device: "pairing-old" });
+    const after = reconcile({ observation: activity({ sourceRevision: 11, coverage: "partial_day", moveCalories: 186.861, exerciseMinutes: 29, standHours: 2 }), device: "pairing-new", existing: before.record });
+    expect(after).toMatchObject({ action: "update", reason: "cross_device_cumulative_advance" });
+    expect(after.record.current).toMatchObject({ deliveryDeviceId: "pairing-new", sourceRevision: 11, values: { dailyActivity: { move_calories: 186.861 } } });
+    expect(after.record.revision).toBe(2);
+    // From here the new identity orders by its own revisions again.
+    const next = reconcile({ observation: activity({ sourceRevision: 37, coverage: "partial_day", moveCalories: 828.055, exerciseMinutes: 86, standHours: 9 }), device: "pairing-new", existing: after.record });
+    expect(next).toMatchObject({ action: "update", reason: "newer_device_revision" });
+    // A late straggler from the old pairing can no longer regress the day.
+    const straggler = reconcile({ observation: activity({ sourceRevision: 12, coverage: "partial_day", moveCalories: 200, exerciseMinutes: 30, standHours: 3 }), device: "pairing-old", existing: next.record });
+    expect(straggler).toMatchObject({ action: "superseded", reason: "cross_device_equal_coverage_kept_existing" });
+    expect(straggler.record.current.values.dailyActivity.move_calories).toBe(828.055);
+  });
+
+  it("a complete day still outranks any partial day regardless of device", () => {
+    const complete = reconcile({ observation: activity({ coverage: "complete_day", moveCalories: 700 }), device: "device-a" });
+    const bigger = reconcile({ observation: activity({ coverage: "partial_day", sourceRevision: 40, moveCalories: 900 }), device: "device-b", existing: complete.record });
+    expect(bigger).toMatchObject({ action: "superseded", reason: "complete_day_summary_already_received" });
   });
 
   it("does not bump the revision when a coverage-changing snapshot leaves values identical and coverage equal", () => {
@@ -142,6 +174,15 @@ describe("HealthKit canonical Activity days", () => {
 });
 
 describe("HealthKit canonical Nutrition days", () => {
+  it("follows a re-paired phone's advancing partial Nutrition day, never a lower one", () => {
+    const before = reconcile({ observation: nutrition({ coverage: "partial_day", calories: 1138.5, sourceRevision: 3 }), device: "pairing-old" });
+    const lower = reconcile({ observation: nutrition({ coverage: "partial_day", calories: 900, sourceRevision: 4 }), device: "pairing-new", existing: before.record });
+    expect(lower).toMatchObject({ action: "superseded", reason: "cross_device_equal_coverage_kept_existing" });
+    const higher = reconcile({ observation: nutrition({ coverage: "partial_day", calories: 2376.26, sourceRevision: 4 }), device: "pairing-new", existing: before.record });
+    expect(higher).toMatchObject({ action: "update", reason: "cross_device_cumulative_advance" });
+    expect(higher.record.current.values.dailyTotals.calories).toBe(2376.26);
+  });
+
   it("canonicalizes source-neutral daily totals without fabricating meals", () => {
     const observation = nutrition();
     const { record } = reconcile({ observation });
@@ -363,7 +404,7 @@ function source() {
   return { bundleIdentifier: "com.apple.Health", productType: "iPhone17,1" };
 }
 
-function activity({ coverage = "complete_day", moveCalories = 700, sourceRevision = 1, extra = {} } = {}) {
+function activity({ coverage = "complete_day", moveCalories = 700, sourceRevision = 1, exerciseMinutes = 45, standHours = 12, extra = {} } = {}) {
   return {
     observationType: "activity_summary",
     externalId: "activity-summary:2026-09-23",
@@ -373,7 +414,7 @@ function activity({ coverage = "complete_day", moveCalories = 700, sourceRevisio
       aggregationScope: "daily_total_including_workouts",
       coverage,
       sourceRevision,
-      dailyActivity: { move_calories: moveCalories, exercise_minutes: 45, stand_hours: 12, ...extra },
+      dailyActivity: { move_calories: moveCalories, exercise_minutes: exerciseMinutes, ...(standHours === null ? {} : { stand_hours: standHours }), ...extra },
     },
   };
 }
