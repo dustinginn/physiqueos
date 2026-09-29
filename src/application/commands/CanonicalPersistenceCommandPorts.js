@@ -150,6 +150,7 @@ import { buildCoachingUpdatesRequest } from "../../domain/services/CoachingUpdat
 import { resolveCoachingUpdatesReadModel } from "../../domain/services/CoachingUpdatesReadService.js";
 import { createProgressPhotosExecutionHydrationModel } from "../../domain/services/ProgressPhotosExecutionScheduleService.js";
 import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
+import { createSessionPerformanceRecordsReadModel } from "../../domain/services/TrainingLibraryExerciseRecordsService.js";
 
 export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "submitWeight", "submitCheckIn", "createEvidenceIntake", "editEvidenceReview",
@@ -2035,11 +2036,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     // collision) is deferred and never blocks the session. A store failure while
     // writing the events fails the whole command atomically, so the client's
     // idempotent retry re-derives them; a partial event batch is never left.
-    await reconcileCommittedSessionPerformanceEvents(context, {
+    const performanceReconciliation = await reconcileCommittedSessionPerformanceEvents(context, {
       canonicalId,
       evidencePackage: packageAndObject,
       supportingReviewId: supportingReview?.id ?? null,
     });
+    const performanceRecords = sessionPerformanceRecordsResult(performanceReconciliation, canonicalId);
 
     // A legacy caller may still supply an already-interpreted supporting
     // review in the same command. Preserve it as an auditable confirmed
@@ -2095,9 +2097,31 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         exerciseIds: record.payload?.exercises?.map((item) => item.canonicalExerciseId).filter(Boolean) ?? [],
         continuationWorkItemIds: commit.briefingReconciliation?.workItemIds ?? [],
         lowerLevelWorkItemIds: (commit.lowerLevelWork ?? []).map((item) => item.workId).filter(Boolean),
+        performanceRecords,
       },
       outbox: [],
     };
+  }
+
+  // The canonical performance records THIS committed session established, for
+  // Native's Workout Complete presentation. Native never computes records: a
+  // derivation that was deferred or skipped reports that status with no
+  // records, and Native falls back to the `training-session` read.
+  function sessionPerformanceRecordsResult(reconciliation, canonicalId) {
+    const status = reconciliation?.status;
+    if (status !== "completed") {
+      return { status: ["deferred", "skipped"].includes(status) ? status : "failed", records: [] };
+    }
+    try {
+      return {
+        status: "completed",
+        records: createSessionPerformanceRecordsReadModel({
+          events: (reconciliation.events ?? []).filter((event) => event?.sourceCanonicalTrainingId === canonicalId),
+        }),
+      };
+    } catch {
+      return { status: "failed", records: [] };
+    }
   }
 
   function roundedDuration(startedAt) {
@@ -2810,6 +2834,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       status: "completed",
       outcome: reconciliation.persistence.outcome,
       eventIds: reconciliation.events.map((event) => event.id),
+      events: reconciliation.events,
     };
   }
 
