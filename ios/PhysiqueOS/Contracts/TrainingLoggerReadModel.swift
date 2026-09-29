@@ -181,43 +181,6 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
         let existing = Set(exercisePickerExistingExerciseIds ?? [])
         return exercises.filter { !existing.contains($0.id) }.count
     }
-
-    /// Uses only the already strict-matched previous-performance context.
-    /// No achievement is emitted when variant/relationship comparison was unavailable.
-    var performanceAchievementLines: [String] {
-        exercises.compactMap { exercise in
-            guard let previous = exercise.previousPerformance else { return nil }
-            let completed = exercise.sets.filter(\.isCompleted)
-            switch exercise.measurement {
-            case .repsLoad, .bodyweightReps:
-                // Set-level load semantics, not the exercise's default class: reps
-                // only compare at a matched comparison load (bodyweight is the zero
-                // baseline; weighted bodyweight and external loads compare at their
-                // own load), mirroring the Server's `getComparisonLoad`.
-                var priorBestByLoad: [Double: Double] = [:]
-                for set in previous.sets {
-                    let semantics = set.semantics ?? TrainingSetLoadSemantics.classify(
-                        weight: set.weight, weightUnit: set.weightUnit, loadType: set.loadType,
-                        setType: set.setType, defaultLoadType: exercise.defaultLoadType
-                    )
-                    guard let load = semantics.comparisonLoad(weight: set.weight), let reps = set.reps else { continue }
-                    priorBestByLoad[load] = max(priorBestByLoad[load] ?? 0, reps)
-                }
-                let improving = completed.filter { current in
-                    guard let reps = current.reps,
-                          let load = current.loadSemantics(defaultLoadType: exercise.defaultLoadType).comparisonLoad(weight: current.load),
-                          let priorBest = priorBestByLoad[load] else { return false }
-                    return reps > priorBest
-                }
-                guard !improving.isEmpty else { return nil }
-                let onlyBodyweight = improving.allSatisfy { $0.loadSemantics(defaultLoadType: exercise.defaultLoadType) == .bodyweight }
-                return onlyBodyweight ? "\(exercise.name) · bodyweight rep best" : "\(exercise.name) · better reps at matched load"
-            case .duration:
-                guard let priorBest = previous.sets.compactMap(\.durationSeconds).max() else { return nil }
-                return completed.compactMap(\.durationSeconds).max().map { $0 > priorBest } == true ? "\(exercise.name) · duration best" : nil
-            }
-        }
-    }
 }
 
 enum TrainingLoggerSubmissionState: String, Codable, Equatable {
