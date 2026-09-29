@@ -299,6 +299,30 @@ describe("Native production contract boundary", () => {
     expect(result.data.history.map((item) => item.id)).toEqual(["weight-3", "weight-2"]);
   });
 
+  it("returns every weekly average of the selected Goal window on the Weight read", async () => {
+    const current = fixture();
+    const weeklyAverages = Array.from({ length: 12 }, (_, index) => {
+      const sortDate = new Date("2026-09-27T00:00:00.000Z");
+      sortDate.setUTCDate(sortDate.getUTCDate() - index * 7);
+      return {
+        week: `Week ${12 - index}`, sortDate: sortDate.toISOString().slice(0, 10),
+        average: 170 + index, weekOverWeek: index === 11 ? null : -1, entries: 7,
+      };
+    });
+    current.readers.progress.getWeight.mockResolvedValue({
+      timeline: { contextId: "build-lean-mass", type: "active_goal", goalId: "goal-build", phaseId: "phase-2" },
+      report: {
+        current: { id: "weight-1", date: "2026-09-09", value: 170, unit: "lb", revision: 1 },
+        recentWeighIns: [], rollingAverages: {}, weeklyAverages, extrema: { goalRelevant: ["highest"] },
+        chart: { markers: [] }, history: [{ id: "weight-1" }],
+      },
+    });
+    const result = await current.service.read({ request: request(), resource: "weight", input: { context: "build-lean-mass" } });
+    expect(result.data.weeklyAverages).toHaveLength(12);
+    expect(result.data.weeklyAverages.map((week) => week.sortDate)).toEqual(weeklyAverages.map((week) => week.sortDate));
+    expect(result.data.weeklyAverages.map((week) => week.entries)).toEqual(weeklyAverages.map((week) => week.entries));
+  });
+
   it("returns only finished Training Reporting semantics", async () => {
     const result = await fixture().service.read({ request: request(), resource: "training-reporting" });
     expect(result.data.reporting).toMatchObject({ resistance: { title: "Resistance Training" } });

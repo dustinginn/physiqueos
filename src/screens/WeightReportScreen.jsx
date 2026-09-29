@@ -136,7 +136,7 @@ function WeeklyAverageRows({ weeks }) {
       {weeks.map((week) => (
         <div
           className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-[12px] bg-[var(--surface-muted)] p-3"
-          key={week.week}
+          key={week.sortDate ?? week.week}
         >
           <div>
             <p className="text-sm font-extrabold text-slate-950">

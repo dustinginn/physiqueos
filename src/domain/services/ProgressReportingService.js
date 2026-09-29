@@ -3190,6 +3190,9 @@ function formatDurationSet(seconds) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
+// Every calendar-week bucket of the series is returned. The series is already
+// scoped to the selected Goal window (scopeWeightReportContext), so the oldest
+// in-window bucket is the "Base" week and there is no newest-N cap here.
 export function getWeeklyAverages(points) {
   const weeks = new Map();
 
@@ -3220,8 +3223,7 @@ export function getWeeklyAverages(points) {
         weekOverWeek,
         entries: values.length,
       };
-    })
-    .slice(-6);
+    });
 
   return orderWeeklyAveragesNewestFirst(chronologicalWeeks);
 }

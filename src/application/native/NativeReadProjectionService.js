@@ -15,7 +15,9 @@ export function projectNativeWeightRead({ timeline, report, limit = WEIGHT_HISTO
     current: report?.current ?? history[0] ?? null,
     recentWeighIns: Object.freeze((report?.recentWeighIns ?? history).slice(0, 7)),
     rollingAverages: report?.rollingAverages ?? null,
-    weeklyAverages: Object.freeze((report?.weeklyAverages ?? []).slice(0, 6)),
+    // Every weekly bucket of the selected Goal window passes through; only the
+    // newest-first history is bounded by `limit`.
+    weeklyAverages: Object.freeze([...(report?.weeklyAverages ?? [])]),
     extrema: report?.extrema ?? null,
     dexaContext: Object.freeze({
       latest: dexaMarkers[0] ?? null,
