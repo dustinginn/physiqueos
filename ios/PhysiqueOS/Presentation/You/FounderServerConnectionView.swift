@@ -364,6 +364,7 @@ private struct ProductionFounderConnectionView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var pairingCredential = ""
     @State private var isConnected = false
+    @State private var recoveryState: ProductionSessionRecoveryState = .unpaired
     @State private var isWorking = false
     @State private var profile: ProductionResponseEnvelope<ProductionProfileData>?
     @State private var contracts: ProductionContractManifest?
@@ -382,9 +383,29 @@ private struct ProductionFounderConnectionView: View {
                 )
 
                 StatusChip(
-                    text: isConnected ? "Production session available" : "Not connected",
-                    color: isConnected ? .success : .warning
+                    text: recoveryStatusText,
+                    color: recoveryState == .authenticated ? .success : .warning
                 )
+
+                switch recoveryState {
+                case .recoveringSession:
+                    HStack(spacing: 10) {
+                        ProgressView().tint(PhysiqueOSTheme.accent)
+                        Text("Recovering the secure session. No pairing code or approval is needed.")
+                    }
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                case .temporarilyOfflineLastKnown:
+                    Text("Temporarily offline. Last-known content remains available where it is safe to show.")
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                case .reconnectRequired:
+                    Text("This session ended for a security-significant reason. Reconnect this iPhone to continue; canonical data is unchanged.")
+                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                        .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                default:
+                    EmptyView()
+                }
 
                 Button("Notification diagnostics") { showingNotificationDiagnostics = true }
                     .accessibilityIdentifier("founder.notifications.diagnostics")
@@ -479,7 +500,11 @@ private struct ProductionFounderConnectionView: View {
             WorkoutReconciliationDiagnosticsView()
         }
         .task {
-            isConnected = (try? await environment.productionNativeAPI.hasStoredSession()) == true
+            let state = await environment.productionNativeAPI.resolveStoredSession()
+            await MainActor.run {
+                recoveryState = state
+                isConnected = ![.unpaired, .reconnectRequired].contains(state)
+            }
         }
     }
 
@@ -513,6 +538,7 @@ private struct ProductionFounderConnectionView: View {
                 await MainActor.run {
                     pairingCredential = ""
                     isConnected = true
+                    recoveryState = .authenticated
                     environment.selectNativeAuthority(.founderProduction)
                 }
                 await loadReadsAsync()
@@ -546,10 +572,12 @@ private struct ProductionFounderConnectionView: View {
                 isWorking = false
             }
         } catch {
+            let state = await environment.productionNativeAPI.sessionRecoveryState()
             await MainActor.run {
                 message = (error as? LocalizedError)?.errorDescription ?? "Founder Production reads could not be loaded."
                 if case ProductionNativeError.notPaired = error { isConnected = false }
-                if case ProductionNativeError.unauthenticated = error { isConnected = false }
+                if case ProductionNativeError.reconnectRequired = error { isConnected = false }
+                recoveryState = state
                 isWorking = false
             }
         }
@@ -563,6 +591,7 @@ private struct ProductionFounderConnectionView: View {
                 try await environment.productionNativeAPI.revokeCurrentSession()
                 await MainActor.run {
                     isConnected = false
+                    recoveryState = .unpaired
                     profile = nil
                     contracts = nil
                     weight = nil
@@ -575,6 +604,16 @@ private struct ProductionFounderConnectionView: View {
                     isWorking = false
                 }
             }
+        }
+    }
+
+    private var recoveryStatusText: String {
+        switch recoveryState {
+        case .unpaired: "Not connected"
+        case .authenticated: "Production session available"
+        case .recoveringSession: "Recovering session"
+        case .temporarilyOfflineLastKnown: "Temporarily offline"
+        case .reconnectRequired: "Reconnect required"
         }
     }
 }

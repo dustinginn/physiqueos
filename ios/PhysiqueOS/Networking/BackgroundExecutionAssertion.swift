@@ -50,7 +50,7 @@ struct UIKitBackgroundTaskScheduler: BackgroundTaskScheduling {
 /// resource and App Review risk) and never ended twice (a hard UIKit
 /// precondition failure) -- both are guarded by `BackgroundTaskEndGuard`
 /// below regardless of which of those three orderings actually occurs.
-func withBackgroundExecutionAssertion<T>(
+nonisolated(nonsending) func withBackgroundExecutionAssertion<T>(
     named name: String,
     scheduler: any BackgroundTaskScheduling,
     operation: () async throws -> T

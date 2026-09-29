@@ -11,6 +11,16 @@ struct FounderServerSession: Decodable, Sendable, Equatable {
     let refreshCredential: String
     let refreshIdleExpiresAt: String
     let refreshAbsoluteExpiresAt: String?
+    let authProtocol: String?
+    let recovered: Bool?
+}
+
+enum ProductionSessionRecoveryState: Sendable, Equatable {
+    case unpaired
+    case authenticated
+    case recoveringSession
+    case temporarilyOfflineLastKnown
+    case reconnectRequired
 }
 
 /// Backs the isolated Sandbox acceptance proof's own `/weight/summary`
@@ -407,6 +417,9 @@ enum ProductionNativeError: Error, Sendable, Equatable, LocalizedError {
     case resourceMismatch(expected: String, actual: String)
     case authorityMismatch(expected: String, actual: String)
     case unsupportedMediaType(String?)
+    case sessionRecoveryUnavailable
+    case reconnectRequired
+    case secureInstallationKeyUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -422,6 +435,9 @@ enum ProductionNativeError: Error, Sendable, Equatable, LocalizedError {
         case .resourceMismatch: "The Native production resource identity did not match the request."
         case .authorityMismatch: "The response did not come from Founder Production authority."
         case .unsupportedMediaType: "The authenticated media type is not supported."
+        case .sessionRecoveryUnavailable: "Your secure session is still recovering. Check the connection and try again."
+        case .reconnectRequired: "This iPhone must reconnect to Founder Production. Your data remains safe."
+        case .secureInstallationKeyUnavailable: "This iPhone could not access its secure installation key."
         }
     }
 }

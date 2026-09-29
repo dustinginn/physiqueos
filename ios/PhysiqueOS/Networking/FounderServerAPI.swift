@@ -1,4 +1,6 @@
 import Foundation
+import CryptoKit
+import Security
 
 protocol FounderHTTPTransport: Sendable {
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse)
@@ -376,6 +378,9 @@ actor ProductionNativeAPI {
     private let configuration: NativeAPIEnvironment
     private let baseURL: URL
     private let credentialStore: FounderRefreshCredentialStore
+    private let envelopeStore: (any FounderSessionEnvelopeStore)?
+    private let installationSigningKey: (any FounderInstallationSigningKey)?
+    private let backgroundTaskScheduler: any BackgroundTaskScheduling
     private let transport: FounderHTTPTransport
     /// Used by `submitCommand` only -- every other call site (`readResource`,
     /// `readMedia`, auth) keeps using `transport`. See the doc comment on
@@ -390,6 +395,7 @@ actor ProductionNativeAPI {
     private var accessToken: String?
     private var authenticatedDeviceId: String?
     private var refreshTask: Task<String, Error>?
+    private var recoveryState: ProductionSessionRecoveryState = .unpaired
     private struct CachedRead {
         let data: Data
         let storedAt: Date
@@ -421,6 +427,8 @@ actor ProductionNativeAPI {
         configuration: NativeAPIEnvironment = .founderProduction,
         baseURL: URL? = nil,
         credentialStore: FounderRefreshCredentialStore? = nil,
+        installationSigningKey: (any FounderInstallationSigningKey)? = nil,
+        backgroundTaskScheduler: any BackgroundTaskScheduling = UIKitBackgroundTaskScheduler(),
         transport: FounderHTTPTransport = URLSessionFounderHTTPTransport(),
         // `nil` means "commands share the read transport" -- the exact
         // pre-existing behavior, unchanged for every caller that doesn't
@@ -434,26 +442,80 @@ actor ProductionNativeAPI {
         precondition(configuration == .founderProduction, "ProductionNativeAPI requires Founder Production authority.")
         self.configuration = configuration
         self.baseURL = baseURL ?? configuration.baseURL
-        self.credentialStore = credentialStore ?? KeychainFounderCredentialStore(namespace: configuration.credentialNamespace)
+        let resolvedCredentialStore = credentialStore ?? KeychainFounderCredentialStore(namespace: configuration.credentialNamespace)
+        self.credentialStore = resolvedCredentialStore
+        self.envelopeStore = resolvedCredentialStore as? any FounderSessionEnvelopeStore
+        self.installationSigningKey = installationSigningKey
+        self.backgroundTaskScheduler = backgroundTaskScheduler
         self.transport = transport
         self.commandTransport = commandTransport ?? transport
         self.snapshotStore = snapshotStore
     }
 
     func hasStoredSession() throws -> Bool {
-        try credentialStore.loadRefreshCredential() != nil
+        if let envelope = try loadEnvelope() {
+            recoveryState = envelope.pendingRotation == nil ? .authenticated : .recoveringSession
+            return true
+        }
+        recoveryState = .unpaired
+        return false
+    }
+
+    func sessionRecoveryState() -> ProductionSessionRecoveryState {
+        recoveryState
+    }
+
+    @discardableResult
+    func resolveStoredSession() async -> ProductionSessionRecoveryState {
+        do {
+            guard try hasStoredSession() else { return .unpaired }
+            _ = try await validAccessToken()
+            recoveryState = .authenticated
+        } catch let error as ProductionNativeError {
+            switch error {
+            case .networkFailure, .temporaryServer:
+                recoveryState = .temporarilyOfflineLastKnown
+            case .reconnectRequired:
+                recoveryState = .reconnectRequired
+            default:
+                if recoveryState != .reconnectRequired { recoveryState = .recoveringSession }
+            }
+        } catch {
+            if recoveryState != .reconnectRequired { recoveryState = .recoveringSession }
+        }
+        return recoveryState
     }
 
     @discardableResult
     func pair(pairingCredential: String, displayName: String) async throws -> FounderServerSession {
-        let payload = PairRequest(pairingCredential: pairingCredential, platform: "ios", displayName: displayName)
+        let refreshProof: PairRequest.RefreshProof?
+        if let installationSigningKey {
+            do {
+                refreshProof = PairRequest.RefreshProof(
+                    algorithm: "ES256",
+                    publicKeySpki: try installationSigningKey.publicKeySPKIBase64URL()
+                )
+            } catch {
+                recoveryState = .reconnectRequired
+                throw ProductionNativeError.secureInstallationKeyUnavailable
+            }
+        } else {
+            refreshProof = nil
+        }
+        let payload = PairRequest(
+            pairingCredential: pairingCredential,
+            platform: "ios",
+            displayName: displayName,
+            refreshProof: refreshProof
+        )
         let session: FounderServerSession = try await sendJSON(
             path: "\(configuration.routeFamily)/auth/pair",
             method: "POST",
             body: payload,
             bearer: nil
         )
-        try persist(session)
+        try persistPairingSession(session)
+        recoveryState = .authenticated
         retireAllLastKnownSnapshots()
         return session
     }
@@ -466,6 +528,7 @@ actor ProductionNativeAPI {
         guard response.revoked else { throw ProductionNativeError.invalidResponse }
         accessToken = nil
         authenticatedDeviceId = nil
+        recoveryState = .unpaired
         retireAllLastKnownSnapshots()
         try credentialStore.deleteRefreshCredential()
     }
@@ -916,9 +979,14 @@ actor ProductionNativeAPI {
     }
 
     private func rotateRefreshCredential() async throws -> String {
-        guard let refreshCredential = try credentialStore.loadRefreshCredential() else {
+        guard let envelope = try loadEnvelope() else {
+            recoveryState = .unpaired
             throw ProductionNativeError.notPaired
         }
+        if envelope.authProtocol == FounderCredentialEnvelope.senderConstrainedProtocol {
+            return try await rotateSenderConstrainedRefresh(envelope)
+        }
+        let refreshCredential = envelope.currentRefreshCredential
         do {
             let session: FounderServerSession = try await sendJSON(
                 path: "\(configuration.routeFamily)/auth/refresh",
@@ -926,26 +994,171 @@ actor ProductionNativeAPI {
                 body: RefreshRequest(refreshCredential: refreshCredential),
                 bearer: nil
             )
-            try persist(session)
+            try persistPairingSession(session)
+            recoveryState = .authenticated
             return session.accessToken
         } catch {
-            if case ProductionNativeError.unauthenticated = error {
+            if isTerminalRefreshError(error) {
                 accessToken = nil
                 authenticatedDeviceId = nil
                 // A Server-side revocation must not leave this session's
                 // last-known Home on the device.
                 retireAllLastKnownSnapshots()
                 try? credentialStore.deleteRefreshCredential()
+                recoveryState = .reconnectRequired
+                throw ProductionNativeError.reconnectRequired
             }
             throw error
         }
     }
 
-    private func persist(_ session: FounderServerSession) throws {
+    private func rotateSenderConstrainedRefresh(_ storedEnvelope: FounderCredentialEnvelope) async throws -> String {
+        guard let envelopeStore, let installationSigningKey else {
+            recoveryState = .reconnectRequired
+            throw ProductionNativeError.secureInstallationKeyUnavailable
+        }
+        var envelope = storedEnvelope
+        if envelope.pendingRotation == nil {
+            envelope.pendingRotation = FounderCredentialEnvelope.PendingRotation(
+                predecessorRefreshCredential: envelope.currentRefreshCredential,
+                rotationIntentId: try SenderConstrainedRefresh.randomValue(),
+                proposedSuccessorRefreshCredential: try SenderConstrainedRefresh.randomValue(),
+                createdAt: Date()
+            )
+            // This atomic Keychain update is the correctness boundary. No
+            // network call occurs until A/intent/B are durable together.
+            try envelopeStore.saveSessionEnvelope(envelope)
+        }
+        guard let pending = envelope.pendingRotation else { throw ProductionNativeError.invalidResponse }
+        recoveryState = .recoveringSession
+        let commitment = SenderConstrainedRefresh.successorCommitment(
+            pending.proposedSuccessorRefreshCredential
+        )
+
+        do {
+            return try await withBackgroundExecutionAssertion(
+                named: "Founder session rotation",
+                scheduler: backgroundTaskScheduler
+            ) {
+                let challenge: RefreshProofChallenge = try await self.sendJSON(
+                    path: "\(self.configuration.routeFamily)/auth/refresh-challenge",
+                    method: "POST",
+                    body: RefreshProofChallengeRequest(
+                        refreshCredential: pending.predecessorRefreshCredential,
+                        rotationIntentId: pending.rotationIntentId,
+                        successorCommitment: commitment
+                    ),
+                    bearer: nil
+                )
+                guard challenge.proofVersion == 1 else { throw ProductionNativeError.invalidResponse }
+                let proofId = try SenderConstrainedRefresh.randomValue()
+                let message = SenderConstrainedRefresh.proofMessage(
+                    refreshCredential: pending.predecessorRefreshCredential,
+                    rotationIntentId: pending.rotationIntentId,
+                    successorRefreshCredential: pending.proposedSuccessorRefreshCredential,
+                    successorCommitment: commitment,
+                    nonce: challenge.nonce,
+                    proofId: proofId
+                )
+                let signature: String
+                do { signature = try installationSigningKey.sign(message: message) }
+                catch { throw ProductionNativeError.secureInstallationKeyUnavailable }
+                let session: FounderServerSession = try await self.sendJSON(
+                    path: "\(self.configuration.routeFamily)/auth/refresh",
+                    method: "POST",
+                    body: SenderConstrainedRefreshRequest(
+                        refreshCredential: pending.predecessorRefreshCredential,
+                        rotationIntentId: pending.rotationIntentId,
+                        successorRefreshCredential: pending.proposedSuccessorRefreshCredential,
+                        successorCommitment: commitment,
+                        proof: .init(
+                            challengeId: challenge.challengeId,
+                            nonce: challenge.nonce,
+                            proofId: proofId,
+                            signature: signature
+                        )
+                    ),
+                    bearer: nil
+                )
+                guard session.authProtocol == FounderCredentialEnvelope.senderConstrainedProtocol,
+                      session.refreshCredential == pending.proposedSuccessorRefreshCredential
+                else { throw ProductionNativeError.invalidResponse }
+
+                let promoted = FounderCredentialEnvelope(
+                    version: FounderCredentialEnvelope.currentVersion,
+                    authProtocol: FounderCredentialEnvelope.senderConstrainedProtocol,
+                    currentRefreshCredential: pending.proposedSuccessorRefreshCredential,
+                    pendingRotation: nil
+                )
+                // Publish memory state only after atomic Keychain promotion.
+                try envelopeStore.saveSessionEnvelope(promoted)
+                self.accessToken = session.accessToken
+                self.authenticatedDeviceId = session.deviceId
+                self.recoveryState = .authenticated
+                return session.accessToken
+            }
+        } catch {
+            accessToken = nil
+            authenticatedDeviceId = nil
+            if isTerminalRefreshError(error) {
+                retireAllLastKnownSnapshots()
+                try? credentialStore.deleteRefreshCredential()
+                recoveryState = .reconnectRequired
+                throw ProductionNativeError.reconnectRequired
+            }
+            if Task.isCancelled || error is CancellationError {
+                recoveryState = .recoveringSession
+                throw ProductionNativeError.sessionRecoveryUnavailable
+            } else if case ProductionNativeError.networkFailure = error {
+                recoveryState = .temporarilyOfflineLastKnown
+            } else if case ProductionNativeError.temporaryServer = error {
+                recoveryState = .temporarilyOfflineLastKnown
+            } else {
+                recoveryState = .recoveringSession
+            }
+            // A, intent, and B remain in the atomic envelope. A later retry
+            // obtains a fresh nonce/proof and resolves the exact exchange.
+            throw error
+        }
+    }
+
+    private func persistPairingSession(_ session: FounderServerSession) throws {
         guard !session.deviceId.isEmpty else { throw ProductionNativeError.invalidResponse }
-        try credentialStore.saveRefreshCredential(session.refreshCredential)
+        if session.authProtocol == FounderCredentialEnvelope.senderConstrainedProtocol {
+            guard let envelopeStore, installationSigningKey != nil else {
+                throw ProductionNativeError.secureInstallationKeyUnavailable
+            }
+            try envelopeStore.saveSessionEnvelope(FounderCredentialEnvelope(
+                version: FounderCredentialEnvelope.currentVersion,
+                authProtocol: FounderCredentialEnvelope.senderConstrainedProtocol,
+                currentRefreshCredential: session.refreshCredential,
+                pendingRotation: nil
+            ))
+        } else {
+            try credentialStore.saveRefreshCredential(session.refreshCredential)
+        }
         accessToken = session.accessToken
         authenticatedDeviceId = session.deviceId
+    }
+
+    private func loadEnvelope() throws -> FounderCredentialEnvelope? {
+        if let envelopeStore { return try envelopeStore.loadSessionEnvelope() }
+        return try credentialStore.loadRefreshCredential().map(FounderCredentialEnvelope.legacy)
+    }
+
+    private func isTerminalRefreshError(_ error: Error) -> Bool {
+        guard case ProductionNativeError.unauthenticated(let problem) = error,
+              let code = problem?.code else { return error as? ProductionNativeError == .reconnectRequired }
+        return [
+            "REFRESH_CREDENTIAL_REVOKED",
+            "REFRESH_CREDENTIAL_INVALID",
+            "REFRESH_CREDENTIAL_EXPIRED",
+            "REFRESH_REUSE_DETECTED",
+            "SESSION_REAUTHENTICATION_REQUIRED",
+            "DEVICE_PROOF_INVALID",
+            "REFRESH_PROOF_UNAVAILABLE",
+            "CREDENTIAL_MALFORMED",
+        ].contains(code)
     }
 
     private func authenticatedJSON<Response: Decodable>(
@@ -1219,13 +1432,101 @@ extension Data {
 }
 
 private struct PairRequest: Encodable {
+    struct RefreshProof: Encodable {
+        let algorithm: String
+        let publicKeySpki: String
+    }
+
     let pairingCredential: String
     let platform: String
     let displayName: String
+    let refreshProof: RefreshProof?
+
+    init(
+        pairingCredential: String,
+        platform: String,
+        displayName: String,
+        refreshProof: RefreshProof? = nil
+    ) {
+        self.pairingCredential = pairingCredential
+        self.platform = platform
+        self.displayName = displayName
+        self.refreshProof = refreshProof
+    }
 }
 
 private struct RefreshRequest: Encodable {
     let refreshCredential: String
+}
+
+private struct RefreshProofChallengeRequest: Encodable {
+    let refreshCredential: String
+    let rotationIntentId: String
+    let successorCommitment: String
+}
+
+private struct RefreshProofChallenge: Decodable {
+    let proofVersion: Int
+    let challengeId: String
+    let nonce: String
+    let expiresAt: String
+}
+
+private struct SenderConstrainedRefreshRequest: Encodable {
+    struct Proof: Encodable {
+        let challengeId: String
+        let nonce: String
+        let proofId: String
+        let signature: String
+    }
+
+    let refreshCredential: String
+    let rotationIntentId: String
+    let successorRefreshCredential: String
+    let successorCommitment: String
+    let proof: Proof
+}
+
+private enum SenderConstrainedRefresh {
+    static func randomValue() throws -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+            throw ProductionNativeError.secureInstallationKeyUnavailable
+        }
+        return Data(bytes).base64URLEncodedString()
+    }
+
+    static func successorCommitment(_ successor: String) -> String {
+        var data = Data("physiqueos-refresh-successor-v1\0".utf8)
+        data.append(Data(successor.utf8))
+        return Data(SHA256.hash(data: data)).base64URLEncodedString()
+    }
+
+    static func proofMessage(
+        refreshCredential: String,
+        rotationIntentId: String,
+        successorRefreshCredential: String,
+        successorCommitment: String,
+        nonce: String,
+        proofId: String
+    ) -> Data {
+        let body = [
+            "physiqueos-refresh-request-v1",
+            refreshCredential,
+            rotationIntentId,
+            successorRefreshCredential,
+            successorCommitment,
+        ].joined(separator: "\n")
+        let bodyDigest = Data(SHA256.hash(data: Data(body.utf8))).base64URLEncodedString()
+        return Data([
+            "physiqueos-device-proof-v1",
+            "POST",
+            "/api/v1/native/auth/refresh",
+            bodyDigest,
+            nonce,
+            proofId,
+        ].joined(separator: "\n").utf8)
+    }
 }
 
 private struct RevocationResponse: Decodable {
