@@ -2,35 +2,17 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: consolidated Native daily-driver build
+- Task: production deploy of daily-driver Server `faa9151a`
 - Agent: claude
-- Status: **CANDIDATE READY. Not uploaded, not deployed.**
-- Generated (UTC): 2026-09-29T05:00:00Z
+- Status: **DEPLOYED and verified.** Native Build 69 is held for Codex.
+- Generated (UTC): 2026-09-29T04:30:00Z
 
-**Native Build 69 (`c2b43091`)**:
-- Logged Today shows Strength and Cardio together.
-- Activity says "so far" / "Still updating" today instead of warning.
-- Tapping Log opens a workout in progress.
-- "Workout needs review" arrives after the sync, on any tab.
-- Mark Skipped is available in Priority Detail.
-- Monthly: "What it means" replaces "Baseline Read"; Routine and Recovery get their own icons.
+Production now runs `faa9151a` (deployment `76c3d8aa`).
+- **Checks:** health is green, the new code is what's running, and the schema is unchanged.
+- **Data:** no data changed; all 47 collections and every command receipt are identical before and after.
 
-**Server candidate (`faa9151a`), to be deployed separately:**
-- a re-paired phone no longer freezes today's Activity;
-- Linked Workouts matches Training Day;
-- the Logged Today lines;
-- "1 possible Logger session";
-- the skip command.
+**Sep 28 fixed itself:** at 04:19Z, your phone's first sync on the new build unfroze Sep 28 Activity, from 171 to 851 cal. No manual repair was involved.
 
-**Validation:**
-- Server: 0 new test failures.
-- Native: 1485/1485 tests and a clean Release build.
-- Independent review: approved after 4 fixes.
+**Native Build 69 is not uploaded.** I'm waiting at the integration gate for Codex's Workout Complete records celebration report.
 
-**Pending:** the Workout Complete records celebration belongs to Codex. I'll integrate it when its report appears.
-
-**Decisions:** accept Build 69, then authorize the TestFlight upload. Separately, authorize the Server deploy.
-
-**ChatGPT review request:** `agent-handoffs/inbox/review-requests/20260929T051500Z-chatgpt-review-native-build69-candidate.md`
-
-Full report: `agent-handoffs/reports/20260929T050000Z-native-consolidated-daily-driver-candidate-build69.md`
+Full report: `agent-handoffs/reports/20260929T043000Z-daily-driver-server-faa9151a-production-deploy.md`
