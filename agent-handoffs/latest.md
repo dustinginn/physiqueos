@@ -31,4 +31,6 @@ Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
 **Decisions:** accept Build 69, then authorize the TestFlight upload. Separately, authorize the Server deploy.
 
+**ChatGPT review request:** `agent-handoffs/inbox/review-requests/20260929T051500Z-chatgpt-review-native-build69-candidate.md`
+
 Full report: `agent-handoffs/reports/20260929T050000Z-native-consolidated-daily-driver-candidate-build69.md`
