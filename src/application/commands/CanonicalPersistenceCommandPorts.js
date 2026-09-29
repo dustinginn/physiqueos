@@ -33,9 +33,19 @@ import { assertValidDexaScan } from "../../domain/services/DEXAContract.js";
 import { createReminderRepository } from "../../data/repositories/ReminderRepository.js";
 import {
   createPriorityOccurrenceKey,
+  isPrioritySkipSupportedReminder,
   isReminderOccurrenceCompleted,
   resolvePriorityExecutionContract,
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
+import {
+  createPriorityReconciliationCheckIn,
+  createPriorityReconciliationCheckInId,
+  createPriorityReconciliationEntry,
+  findPriorityOccurrenceReconciliation,
+  isPriorityOccurrenceSkipped,
+  normalizeReconciliationNote,
+  upsertPriorityReconciliationEntries,
+} from "../../domain/services/PriorityOccurrenceReconciliation.js";
 import {
   HealthKitObservationError,
   HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
@@ -154,7 +164,7 @@ import { createSessionPerformanceRecordsReadModel } from "../../domain/services/
 
 export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "submitWeight", "submitCheckIn", "createEvidenceIntake", "editEvidenceReview",
-  "confirmEvidenceReview", "disposeEvidenceReview", "completePriority", "reconcilePreviousDay",
+  "confirmEvidenceReview", "disposeEvidenceReview", "completePriority", "skipPriority", "reconcilePreviousDay",
   "editProtocol", "editGoal", "transitionGoal", "createTrainingSession", "correctTrainingSession",
   "completeTrainingLogger", "confirmNutritionEvidence", "confirmPhotoEvidence", "confirmDexaEvidence",
   "upsertNutritionDay", "syncActivityDay", "commitTrainingSession", "upsertActivityDay",
@@ -243,6 +253,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     disposeEvidenceReview,
     resolveWorkoutReconciliation,
     completePriority: completeCanonicalPriority,
+    skipPriority: skipCanonicalPriority,
     reconcilePreviousDay: async (context) => create(context, "dailyCheckIns", `reconciliation:${context.payload.localDate}`, {
       id: `reconciliation:${context.payload.localDate}`, userId: context.ownerUserId,
       localDate: context.payload.localDate, items: context.payload.items, status: "reconciled", provenance: commandProvenance(context),
@@ -1959,6 +1970,30 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         outbox: [],
       };
     }
+    // Terminal state wins: an occurrence already skipped today (the canonical
+    // dated reconciliation entry) is not silently completed on top of the
+    // skip. Returned as a no-op result, like `already_completed`, so a stale
+    // notification action cannot create a double terminal state.
+    const skippedCheckIn = await records.get({
+      ownerUserId: context.ownerUserId,
+      collection: "dailyCheckIns",
+      recordId: createPriorityReconciliationCheckInId(occurrenceDate),
+    });
+    if (isPriorityOccurrenceSkipped(skippedCheckIn, id, occurrenceDate)) {
+      return {
+        status: "committed",
+        result: {
+          status: "already_skipped",
+          priorityId: id,
+          occurrenceDate,
+          occurrenceKey: createPriorityOccurrenceKey(id, occurrenceDate),
+          execution: resolvePriorityExecutionContract({ reminder: current, occurrenceDate }),
+          skippedAt: findPriorityOccurrenceReconciliation(skippedCheckIn, id, occurrenceDate)?.recordedAt ?? null,
+          revision: current.version,
+        },
+        outbox: [],
+      };
+    }
     requireExpectedVersion(context, current, `priority:${id}`);
     const reminders = [structuredClone(current)];
     const repository = createReminderRepository(reminders);
@@ -1993,6 +2028,139 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         execution: resolvePriorityExecutionContract({ reminder: updated, occurrenceDate }),
         completedAt,
         revision: updated.version,
+      },
+      outbox: [],
+    };
+  }
+
+  // `priority.skip.v1`: marks TODAY's occurrence of an ordinary priority as
+  // skipped by writing the SAME dated reconciliation entry Morning Check-In
+  // writes for a prior-day skip (one semantic, one writer helper). The
+  // reminder's `completionHistory` is never touched; the reminder version is
+  // advanced so `If-Match` serializes skip against a concurrent completion.
+  async function skipCanonicalPriority(context) {
+    const id = String(context.payload.priorityId);
+    const occurrenceDate = String(context.payload.occurrenceDate);
+    const occurrenceKey = createPriorityOccurrenceKey(id, occurrenceDate);
+    const [users, current] = await Promise.all([
+      records.list({ ownerUserId: context.ownerUserId, collection: "user" }),
+      ownedRecord(context, "reminders", id),
+    ]);
+    const user = users.find((item) => String(item?.id) === String(context.ownerUserId)) ?? users[0] ?? null;
+    const timeZone = resolveLocalTimeZone(user?.timeZone ?? user?.timezone);
+    const today = getLocalDateKey(now(), timeZone);
+    if (occurrenceDate < today) {
+      throw new ApplicationProblem({
+        status: 422,
+        code: "PRIORITY_SKIP_PAST_OCCURRENCE",
+        title: "Only today's priority can be skipped here.",
+        detail: "Earlier unfinished priorities are resolved in Morning Check-In.",
+        recovery: { today, workflow: "morning_check_in", destination: "/check-in/morning" },
+      });
+    }
+    if (occurrenceDate > today) {
+      throw new ApplicationProblem({
+        status: 422,
+        code: "PRIORITY_SKIP_FUTURE_OCCURRENCE",
+        title: "Only today's priority can be skipped here.",
+        recovery: { today },
+      });
+    }
+    if (!isPrioritySkipSupportedReminder(current)) {
+      throw new ApplicationProblem({
+        status: 422,
+        code: "PRIORITY_SKIP_UNSUPPORTED",
+        title: "This priority cannot be skipped from Priority Detail.",
+        recovery: { workflow: resolvePriorityExecutionContract({ reminder: current, occurrenceDate }).workflow },
+      });
+    }
+    const identity = { priorityId: id, occurrenceDate, occurrenceKey };
+    if (isReminderOccurrenceCompleted(current, { occurrenceDate, timeZone })) {
+      return {
+        status: "committed",
+        result: {
+          status: "already_completed",
+          ...identity,
+          execution: resolvePriorityExecutionContract({ reminder: current, occurrenceDate }),
+          revision: current.version,
+        },
+        outbox: [],
+      };
+    }
+    const checkInId = createPriorityReconciliationCheckInId(occurrenceDate);
+    const existingCheckIn = await records.get({
+      ownerUserId: context.ownerUserId, collection: "dailyCheckIns", recordId: checkInId,
+    });
+    const note = normalizeReconciliationNote(context.payload.note);
+    const existingEntry = findPriorityOccurrenceReconciliation(existingCheckIn, id, occurrenceDate);
+    if (
+      String(existingEntry?.status ?? "").toLowerCase() === "skipped" &&
+      normalizeReconciliationNote(existingEntry.note) === note
+    ) {
+      return {
+        status: "committed",
+        result: {
+          status: "already_skipped",
+          ...identity,
+          execution: resolvePriorityExecutionContract({ reminder: current, occurrenceDate }),
+          note,
+          skippedAt: existingEntry.recordedAt ?? null,
+          revision: current.version,
+        },
+        outbox: [],
+      };
+    }
+    requireExpectedVersion(context, current, `priority:${id}`);
+    const recordedAt = now().toISOString();
+    const updated = await records.put({
+      ownerUserId: context.ownerUserId,
+      collection: "reminders",
+      recordId: id,
+      expectedVersion: current.version,
+      payload: { ...current, provenance: commandProvenance(context) },
+    });
+    const checkIn = upsertPriorityReconciliationEntries(
+      existingCheckIn ?? createPriorityReconciliationCheckIn({
+        date: occurrenceDate, recordedAt, userId: context.ownerUserId,
+      }),
+      [createPriorityReconciliationEntry({
+        priorityId: id, occurrenceDate, disposition: "skipped", note, recordedAt,
+      })],
+      recordedAt,
+    );
+    let storedCheckIn;
+    if (existingCheckIn) {
+      storedCheckIn = await records.put({
+        ownerUserId: context.ownerUserId,
+        collection: "dailyCheckIns",
+        recordId: checkInId,
+        expectedVersion: existingCheckIn.version,
+        payload: checkIn,
+      });
+    } else {
+      const created = await records.putIfAbsent({
+        ownerUserId: context.ownerUserId, collection: "dailyCheckIns", recordId: checkInId, payload: checkIn,
+      });
+      if (!created.created) {
+        throw staleVersionProblem({
+          expectedVersion: "absent",
+          actualVersion: created.record?.version ?? "unknown",
+          resource: `daily-check-in:${occurrenceDate}`,
+        });
+      }
+      storedCheckIn = created.record;
+    }
+    return {
+      status: "committed",
+      result: {
+        status: "skipped",
+        ...identity,
+        execution: resolvePriorityExecutionContract({ reminder: updated, occurrenceDate }),
+        note,
+        skippedAt: recordedAt,
+        revision: updated.version,
+        checkInId,
+        checkInRevision: storedCheckIn?.version ?? null,
       },
       outbox: [],
     };

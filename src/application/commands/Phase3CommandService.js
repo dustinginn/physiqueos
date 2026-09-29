@@ -12,6 +12,7 @@ export const Phase3Command = Object.freeze({
   DISPOSE_EVIDENCE_REVIEW: "evidence-review.dispose.v1",
   RESOLVE_WORKOUT_RECONCILIATION: "workout-reconciliation.resolve.v1",
   COMPLETE_PRIORITY: "priority.complete.v1",
+  SKIP_PRIORITY: "priority.skip.v1",
   RECONCILE_PREVIOUS_DAY: "previous-day.reconcile.v1",
   EDIT_PROTOCOL: "protocol.edit.v1",
   EDIT_GOAL: "goal.edit.v1",
@@ -50,6 +51,7 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.DISPOSE_EVIDENCE_REVIEW]: define("disposeEvidenceReview", ["reviewId", "disposition"], true),
   [Phase3Command.RESOLVE_WORKOUT_RECONCILIATION]: define("resolveWorkoutReconciliation", ["reviewId", "action"], true),
   [Phase3Command.COMPLETE_PRIORITY]: define("completePriority", ["priorityId", "occurrenceDate"], true),
+  [Phase3Command.SKIP_PRIORITY]: define("skipPriority", ["priorityId", "occurrenceDate"], true),
   [Phase3Command.RECONCILE_PREVIOUS_DAY]: define("reconcilePreviousDay", ["localDate", "items"], true),
   [Phase3Command.EDIT_PROTOCOL]: define("editProtocol", ["protocolId"], true),
   [Phase3Command.EDIT_GOAL]: define("editGoal", ["goalId"], true),
@@ -158,6 +160,10 @@ function validatePayload(commandType, payload) {
   }
   if (commandType === Phase3Command.SUBMIT_WEIGHT && (!Number.isFinite(Number(payload.value)) || Number(payload.value) <= 0)) {
     throw validation("value", "Weight must be a positive number.");
+  }
+  if (commandType === Phase3Command.SKIP_PRIORITY && payload.note != null &&
+      (typeof payload.note !== "string" || payload.note.length > 500)) {
+    throw validation("note", "note must be a string of at most 500 characters.");
   }
   if (payload.items != null && !Array.isArray(payload.items)) throw validation("items", "items must be an array.");
   if (payload.observations != null && (!Array.isArray(payload.observations) || payload.observations.length === 0)) throw validation("observations", "observations must be a non-empty array.");

@@ -1,9 +1,13 @@
-import { createDailyCheckIn } from "../models/dailyCheckIn";
 import { getPreviousLocalDayWindow } from "../utils/localDate";
 import {
   getPreviousDayIncompletePrioritySelection,
 } from "./DailyFocusService";
 import { createPriorityOccurrenceKey } from "./ReminderOccurrenceCompletion.js";
+import {
+  createPriorityReconciliationCheckIn,
+  createPriorityReconciliationEntry,
+  upsertPriorityReconciliationEntries,
+} from "./PriorityOccurrenceReconciliation.js";
 import {
   MORNING_RECONCILIATION_ITEM_KINDS,
   createMorningEvidenceRecoverySelection,
@@ -115,37 +119,27 @@ export function createMorningPriorityReconciliationService({
       const existingCheckIn = inputs.checkIns.find(
         (checkIn) => checkIn.date === previousDate
       );
-      const checkIn = existingCheckIn ?? createReconciliationCheckIn({
+      const checkIn = existingCheckIn ?? createPriorityReconciliationCheckIn({
         date: previousDate,
         recordedAt,
         userId,
       });
-      const reconciliationByKey = new Map(
-        (checkIn.reconciliation ?? []).map((item) => [
-          createPriorityOccurrenceKey(
-            item.reminderId,
-            item.occurrenceDate ?? checkIn.date
+
+      await repositories.dailyCheckIns.saveCheckIn(
+        upsertPriorityReconciliationEntries(
+          checkIn,
+          validation.writes.map((submission) =>
+            createPriorityReconciliationEntry({
+              priorityId: submission.priorityId,
+              occurrenceDate: submission.occurrenceDate,
+              disposition: submission.disposition,
+              note: submission.note,
+              recordedAt,
+            })
           ),
-          item,
-        ])
+          recordedAt
+        )
       );
-
-      for (const submission of validation.writes) {
-        reconciliationByKey.set(submission.occurrenceKey, {
-          key: submission.occurrenceKey,
-          reminderId: submission.priorityId,
-          occurrenceDate: submission.occurrenceDate,
-          status: submission.disposition,
-          note: submission.note,
-          recordedAt,
-        });
-      }
-
-      await repositories.dailyCheckIns.saveCheckIn({
-        ...checkIn,
-        reconciliation: [...reconciliationByKey.values()],
-        updatedAt: recordedAt,
-      });
 
       for (const submission of validation.writes) {
         if (submission.disposition === "completed") {
@@ -363,28 +357,6 @@ function composeMorningSelection({
         recoverySelection.executionReconciliationItems.length,
       evidenceRecoveryCount: recoverySelection.evidenceRecoveryItems.length,
     }),
-  });
-}
-
-function createReconciliationCheckIn({ date, recordedAt, userId }) {
-  return createDailyCheckIn({
-    id: `daily_check_in_${date.replaceAll("-", "_")}`,
-    userId,
-    date,
-    source: {
-      type: "manual",
-      name: "Morning Reconciliation",
-      externalId: null,
-      importedAt: null,
-      confidence: "medium",
-      notes: "Founder Alpha morning reconciliation.",
-    },
-    fieldProvenance: {
-      imported: ["reconciliation"],
-      computed: [],
-    },
-    createdAt: recordedAt,
-    updatedAt: recordedAt,
   });
 }
 

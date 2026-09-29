@@ -653,7 +653,7 @@ describe("Native production contract boundary", () => {
     expect(nativeProductionContractManifest.reads.every((item) => item.auth === "founder-device-bearer" && item.authority === "founder-production")).toBe(true);
     expect(nativeProductionContractManifest.writes.every((item) => item.idempotency.includes("Idempotency-Key"))).toBe(true);
     expect(nativeProductionContractManifest.writes.map((item) => item.commandType)).toEqual([
-      "weight.submit.v1", "check-in.submit.v1", "priority.complete.v1",
+      "weight.submit.v1", "check-in.submit.v1", "priority.complete.v1", "priority.skip.v1",
       "training-session.commit.v1", "nutrition-day.upsert.v1", "activity-day.upsert.v1",
       "healthkit.observations.ingest.v1",
       "dexa-review.measurements.v1", "evidence-review.commit.v1", "evidence-review.dispose.v1",

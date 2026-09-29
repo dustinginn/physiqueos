@@ -211,3 +211,44 @@ export function openOnlyNotificationAction({ priorityId, occurrenceDate }) {
     scheduledTime: null,
   });
 }
+
+// Today-only skip from Priority Detail (`priority.skip.v1`). The Server is the
+// single owner of skip eligibility; Native renders `skippable`/`skipCommand`
+// and never re-derives it. Skip is offered only for an ordinary
+// `priority_detail` reminder. Excluded (they own their own workflow or have
+// dose/execution semantics a blind skip must not bypass):
+// - Morning Weigh-in (`morning_check_in` workflow)
+// - Progress Photos (`progress_photos` workflow)
+// - DEXA reminders / appointments (`dexa_evidence` workflow; DEXA
+//   appointment priorities have no reminder at all)
+// - execution-backed Protocol Support reminders — peptide (dose-aware),
+//   recovery, supplement (`protocol_reminder`, `recovery_reminder`,
+//   `supplement_reminder`).
+export const PRIORITY_SKIP_COMMAND_TYPE = "priority.skip.v1";
+const PRIORITY_SKIP_EXCLUDED_REMINDER_TYPES = new Set([
+  "protocol_reminder",
+  "recovery_reminder",
+  "supplement_reminder",
+]);
+
+export function isPrioritySkipSupportedReminder(reminder) {
+  if (!reminder?.id || reminder.active === false) return false;
+  if (PRIORITY_SKIP_EXCLUDED_REMINDER_TYPES.has(reminder.type)) return false;
+  return resolvePriorityExecutionContract({
+    reminder,
+    occurrenceDate: "2000-01-01",
+  }).workflow === "priority_detail";
+}
+
+export function prioritySkipCommand(executionContract) {
+  if (!executionContract || executionContract.expectedVersion === null ||
+      executionContract.expectedVersion === undefined) return null;
+  return Object.freeze({
+    commandType: PRIORITY_SKIP_COMMAND_TYPE,
+    expectedVersion: executionContract.expectedVersion,
+    payload: Object.freeze({
+      priorityId: executionContract.priorityId,
+      occurrenceDate: executionContract.occurrenceDate,
+    }),
+  });
+}
