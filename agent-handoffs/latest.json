@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T20:43:40Z",
+  "generated_at_utc": "2026-09-30T21:03:26Z",
   "task": {
-    "id": "healthkit-sleep-phase-c-historical-validation-and-rollout-20260930",
-    "title": "Sleep Phase C: Native Founder page cleanup committed; waiting for Founder device run",
+    "id": "healthkit-sleep-historical-shape-audit-and-evidence-handoff-20260930",
+    "title": "Sleep historical shape validation: passed with one canonical defect (Oura duplicate copies); Evidence design GO",
     "agent": "claude",
-    "status": "partial"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
-    "final_sha": "a5041eb0",
+    "base_sha": "08aeecdeb9f02e311efa2cd037940fbf0b249bb7",
+    "final_sha": null,
     "production_server_sha": "08aeecde",
     "production_deployment": "1e7d28e6-b142-4d8c-9fac-96dd1498ffd8",
     "native_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
     "native_build": "73"
   },
   "result": {
-    "summary": "Native cleanup a5041eb0 on claude/healthkit-sleep-next-native-20260930: Founder Production page keeps only session status, Disconnect, the authority selector and a temporary Sleep canary; graduated diagnostics and old canary UI removed; automatic behavior preserved. Not built or uploaded. Server state unchanged (window open, prospective OFF).",
+    "summary": "2878 isolated validation samples verified (run hv-2026-10-01-30d, all in window, no duplicates, 0 ordinary Sleep rows, 0 leaks). Oura-only, 30/30 nights staged, Oura primary 30/30. Correctness checks pass; defect: Oura writes duplicate copies of 11/30 nights into one lane and sleep-canon-v1 blends them (asleep total within 2%, awake/deep/REM/core split distorted). Fix = sleep-canon-v2 within-lane copy resolution before stage minutes are used. Runner D0 anchor blocks any D0 other than 2026-10-01; relaxation proposed. Zero writes.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -25,30 +25,35 @@
   },
   "validation": {
     "tests": {
-      "status": "passed",
-      "summary": "Unit tests 1633, 1 known unrelated Peptide failure; new UI test passed."
+      "status": "not_applicable",
+      "summary": "Audit only; scratch probe logic checked on synthetic data locally."
     },
     "review": {
-      "status": "not_run",
-      "summary": "UI-only removal; review before Build 74."
+      "status": "not_applicable",
+      "summary": "Reviewed audit at 08aeecde plus scratch read-only aggregates."
     },
     "zero_write_audit": {
-      "status": "not_applicable",
-      "summary": "No production operations this step."
+      "status": "passed",
+      "summary": "4 READ ONLY probe runs, record-store mutations 0, ordinary Sleep counts 0, prospective OFF, leakage 0."
     }
   },
   "decisions_required": [
-    "Founder: run the Build 73 historical Sleep validation (taps in 20260930T203147Z report) and report the counts.",
-    "Later: authorize Build 74 (cleanup) and a new prospective D0 (the 2026-10-01 floor has passed)."
+    "Authorize a Server candidate: sleep-canon-v2 within-lane duplicate-copy resolution + runner D0-later-than-anchor relaxation (no deploy without separate authorization).",
+    "Optional 1-minute Health app spot check on one affected night (dates in chat).",
+    "New prospective D0 after both fixes deploy."
   ],
   "blockers": [],
-  "unexpected_findings": [],
-  "backlog": [
-    "Prune coordinator/engine canary methods that no longer have a UI caller.",
-    "Remove the Sleep canary card after Sleep graduates."
+  "unexpected_findings": [
+    "Oura writes duplicate/overlapping copies of 11/30 nights into Apple Health; sleep-canon-v1 blends them into distorted stage/awake minutes.",
+    "D0 2026-10-01 floor had not yet passed at audit time (Sep 30 18:00 PDT); the historical run's anchor prevents activating any other D0."
   ],
-  "recommended_next_step": "Founder runs the historical validation on the iPhone and reports the counts.",
-  "full_report_path": "agent-handoffs/reports/20260930T204340Z-healthkit-sleep-native-founder-page-cleanup.md",
+  "backlog": [
+    "sleep-canon-v2 within-lane copy resolution",
+    "Runner: permit D0 later than validation anchor",
+    "Native cleanup a5041eb0 queued for next build"
+  ],
+  "recommended_next_step": "Start the Sleep Evidence design task (published to inbox) in parallel with a Server sleep-canon-v2 candidate.",
+  "full_report_path": "agent-handoffs/reports/20260930T210326Z-healthkit-sleep-historical-shape-validation.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

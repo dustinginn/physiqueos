@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Sleep Phase C: Native Founder page cleanup committed; waiting for Founder device run (`healthkit-sleep-phase-c-historical-validation-and-rollout-20260930`)
+- Task: Sleep historical shape validation: passed with one canonical defect (Oura duplicate copies); Evidence design GO (`healthkit-sleep-historical-shape-audit-and-evidence-handoff-20260930`)
 - Agent: claude
-- Status: partial
-- Generated (UTC): 2026-09-30T20:43:40Z
+- Status: completed
+- Generated (UTC): 2026-09-30T21:03:26Z
 - Success: true
 
-Summary: Native cleanup a5041eb0 on claude/healthkit-sleep-next-native-20260930: Founder Production page keeps only session status, Disconnect, the authority selector and a temporary Sleep canary; graduated diagnostics and old canary UI removed; automatic behavior preserved. Not built or uploaded. Server state unchanged (window open, prospective OFF).
+Summary: 2878 isolated validation samples verified (run hv-2026-10-01-30d, all in window, no duplicates, 0 ordinary Sleep rows, 0 leaks). Oura-only, 30/30 nights staged, Oura primary 30/30. Correctness checks pass; defect: Oura writes duplicate copies of 11/30 nights into one lane and sleep-canon-v1 blends them (asleep total within 2%, awake/deep/REM/core split distorted). Fix = sleep-canon-v2 within-lane copy resolution before stage minutes are used. Runner D0 anchor blocks any D0 other than 2026-10-01; relaxation proposed. Zero writes.
 
-Detailed report: `agent-handoffs/reports/20260930T204340Z-healthkit-sleep-native-founder-page-cleanup.md`
+Detailed report: `agent-handoffs/reports/20260930T210326Z-healthkit-sleep-historical-shape-validation.md`
 
 Protocol: `agent-handoffs/README.md`
