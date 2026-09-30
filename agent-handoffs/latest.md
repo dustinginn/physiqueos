@@ -2,6 +2,7 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Build 71 Native distribution
-- Status: **BLOCKED — disk floor (14.16 GiB free < 15 GiB).** Build 71 commit `71164900210f689480ed277205bf8a43b6d18ead` is pushed (build-number-only diff from `a9251927`); nothing archived/uploaded.
-- Report: `agent-handoffs/reports/20260930T073500Z-build71-distribution-checkpoint-disk-blocked.md`
+- Task: Build 71 disk reclamation + Native distribution
+- Status: **Build 71 UPLOADED and VALID; awaiting Founder acceptance.** Server unchanged; enrollment off.
+- Source `71164900210f689480ed277205bf8a43b6d18ead`; delivery `e5e1d800-1100-4f55-be39-509cece826f8`.
+- Report: `agent-handoffs/reports/20260930T081500Z-build71-disk-reclamation-and-distribution-final.md`

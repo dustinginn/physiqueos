@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T07:35:00Z",
+  "generated_at_utc": "2026-09-30T08:15:00Z",
   "task": {
     "id": "build71-native-distribution-20260930",
-    "title": "Build 71 commit ready (71164900, build-number-only diff); archive/upload BLOCKED on 15 GiB disk floor (14.16 GiB free) \u2014 decision needed",
+    "title": "Build 71 UPLOADED and VALID (Native 71164900); Server unchanged; persistent-pairing gate off; awaiting Founder acceptance",
     "agent": "claude",
-    "status": "blocked"
+    "status": "awaiting_acceptance"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -29,21 +29,25 @@
     "native_build69_delivery_id": "91831873-845e-46af-aa6a-bb9629cf9999",
     "native_build69_processing_status": "VALID",
     "native_build69_dsym_uuid": "A621757F-1B2A-31FF-9D2D-62FD831781E6",
-    "last_uploaded_build": "70",
+    "last_uploaded_build": "71",
     "peptide_server_branch": "claude/peptide-ux-server-20260929",
     "peptide_server_sha": "cc440e16",
     "native_build70_final_sha": "754376c529964eea280e87419ace68a003a9e0fb",
     "native_build70_delivery_id": "7ed9cf4e-b682-4b86-8f18-fdb4464de6a9",
     "native_build70_processing_status": "VALID",
     "native_build70_dsym_uuid": "8CA68E2A-91F1-33E7-9FB4-A4C6610F9EA2",
-    "sender_constrained_enrollment": "OFF (server flag unset; native Info.plist false)"
+    "sender_constrained_enrollment": "OFF (server flag unset; native Info.plist false)",
+    "native_build71_final_sha": "71164900210f689480ed277205bf8a43b6d18ead",
+    "native_build71_delivery_id": "e5e1d800-1100-4f55-be39-509cece826f8",
+    "native_build71_processing_status": "VALID",
+    "native_build71_dsym_uuid": "3263FD34-E4D5-3B9D-920F-B1CFBA09FA05"
   },
   "result": {
-    "summary": "Build 71 commit 71164900 (parent a9251927; 3 files/4 lines, metadata only; pbxproj deterministic) is pushed. Archive/upload not started: free disk 14.16 GiB < 15 GiB floor after cleaning only regenerable output. Server unchanged; enrollment untouched.",
+    "summary": "Build 71 (1.0 (71), source 71164900, build-number-only diff from a9251927) archived with Xcode, signature/dSYM verified, enrollment gate false, uploaded via Xcode-only tool: delivery e5e1d800 VALID. Disk: 14.2 -> 16.3 GiB via authorized cleanup (5 old archives, stale DerivedData, 15 finished pushed worktrees); 25 GiB not reachable \u2014 dominant consumer is 12 GiB macOS swap. Server unchanged.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false,
+    "testflight_uploaded": true,
     "founder_device_operated": false
   },
   "validation": {
@@ -61,11 +65,10 @@
     }
   },
   "decisions_required": [
-    "Authorize archive at ~14.2 GiB free, or free ~1 GiB, or authorize removing my finished pushed worktrees."
+    "Founder acceptance of Build 71 on device.",
+    "Optional: reduce memory pressure / review Codex-owned ~6.9 GiB after Photo Intelligence work ends."
   ],
-  "blockers": [
-    "Disk 14.16 GiB free < 15 GiB floor."
-  ],
+  "blockers": [],
   "unexpected_findings": [
     "Sep 28 Activity is still frozen in production (supersedes continue to 837 cal); self-heals at the next-morning complete_day summary."
   ],
@@ -77,7 +80,7 @@
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
   ],
   "recommended_next_step": "Review the final report; authorize distribution; Founder accepts on device; then start HealthKit Sleep.",
-  "full_report_path": "agent-handoffs/reports/20260930T073500Z-build71-distribution-checkpoint-disk-blocked.md",
+  "full_report_path": "agent-handoffs/reports/20260930T081500Z-build71-disk-reclamation-and-distribution-final.md",
   "related_report_paths": [
     "agent-handoffs/reports/20260930T032500Z-build70-integrated-persistent-pairing-candidate.md",
     "agent-handoffs/reports/20260930T020500Z-peptide-build70-final-candidate-closeout-v2.md",
