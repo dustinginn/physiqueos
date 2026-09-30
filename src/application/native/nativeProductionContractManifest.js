@@ -1,6 +1,10 @@
 import { Phase3Command } from "../commands/Phase3CommandService.js";
 import { describeHealthKitSleepCapability } from "../../domain/services/HealthKitSleepPolicies.js";
 import {
+  HEALTHKIT_SLEEP_VALIDATION_CONTRACT_VERSION,
+  HEALTHKIT_SLEEP_VALIDATION_MAX_DAYS,
+} from "../../domain/services/HealthKitSleepHistoricalValidation.js";
+import {
   HEALTHKIT_SLEEP_MAX_DELETIONS_PER_BATCH,
   HEALTHKIT_SLEEP_MAX_MANIFEST_LIVE_IDS,
   HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH,
@@ -113,6 +117,7 @@ const writes = Object.freeze([
   write(Phase3Command.UPSERT_NUTRITION_DAY, ["localDate", "dailyTotals"], "semantic fingerprint protects replacements; server assigns Goal and Phase"),
   write(Phase3Command.UPSERT_ACTIVITY_DAY, ["localDate", "dailyActivity", "sourceIdentity", "source"], "manual, typed, or screenshot provenance only; direct device-health sync is forbidden"),
   write(Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS, ["batchId", "observations"], "source observations remain separate; Activity and Nutrition daily totals may canonicalize only inside the server-owned activation window into the quarantined HealthKit canonical day store; strategic Evidence eligibility is not decided by ingestion"),
+  write(Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION, ["batchId", "runId", "samples"], "dormant: refused with 409 HEALTHKIT_SLEEP_HISTORICAL_VALIDATION_NOT_ENABLED unless healthKitSleepHistoricalValidation.enabled and runId matches; samples only, each ending inside the advertised window; validation-only collection, never canonical production history, quarantined"),
   write(Phase3Command.INGEST_HEALTHKIT_SLEEP, ["batchId"], "dormant: refused with 409 HEALTHKIT_SLEEP_INGESTION_NOT_ENABLED unless healthKitSleepIngestion.enabled; samples, deletions and a bounded window manifest; per-sample identity conflicts refuse only that sample; canonical sleep days are quarantined"),
   write(Phase3Command.EDIT_DEXA_REVIEW, ["reviewId", "evidenceObjectId", "measurements"], "If-Match required for every edit"),
   write(Phase3Command.COMMIT_EVIDENCE_REVIEW, ["reviewId"], "If-Match required to start the canonical Evidence Review lifecycle"),
@@ -221,6 +226,7 @@ export const nativeProductionContractManifest = Object.freeze({
   // Static Sleep contract. `enabled` here is always false; the served
   // manifest replaces this block per owner via withHealthKitSleepCapability.
   healthKitSleepIngestion: healthKitSleepIngestionContract(null),
+  healthKitSleepHistoricalValidation: healthKitSleepHistoricalValidationContract(null),
   reads,
   writes,
 });
@@ -242,12 +248,33 @@ function healthKitSleepIngestionContract(capability) {
   });
 }
 
+function healthKitSleepHistoricalValidationContract(policy) {
+  const enabled = policy?.enabled === true;
+  return Object.freeze({
+    commandType: Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION,
+    contractVersion: HEALTHKIT_SLEEP_VALIDATION_CONTRACT_VERSION,
+    enabled,
+    runId: enabled ? policy.runId : null,
+    windowStart: enabled ? policy.windowStart : null,
+    windowEnd: enabled ? policy.windowEnd : null,
+    windowStartSleepDay: enabled ? policy.windowStartSleepDay : null,
+    windowEndSleepDay: enabled ? policy.windowEndSleepDay : null,
+    maximumSleepDays: HEALTHKIT_SLEEP_VALIDATION_MAX_DAYS,
+    maximumSamplesPerBatch: HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH,
+    semantics: "Founder-initiated, foreground, bounded historical read: Sleep samples (all sources, all values) whose END lies in [windowStart, windowEnd); same privacy-safe sample fields as healthKitSleepIngestion; samples only; stored for validation/design only, never canonical production history or strategic evidence",
+  });
+}
+
 /**
  * The served manifest: the static contract with the per-owner Sleep
- * capability resolved. A null capability keeps Sleep disabled.
+ * capabilities resolved. Null capabilities keep both lanes disabled.
  */
-export function withHealthKitSleepCapability(manifest, capability) {
-  return Object.freeze({ ...manifest, healthKitSleepIngestion: healthKitSleepIngestionContract(capability) });
+export function withHealthKitSleepCapability(manifest, capability, validationPolicy = null) {
+  return Object.freeze({
+    ...manifest,
+    healthKitSleepIngestion: healthKitSleepIngestionContract(capability),
+    healthKitSleepHistoricalValidation: healthKitSleepHistoricalValidationContract(validationPolicy),
+  });
 }
 
 function read(resource, endpoint, service, extra = {}) {

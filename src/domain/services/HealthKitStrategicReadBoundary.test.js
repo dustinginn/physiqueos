@@ -46,6 +46,12 @@ const ALLOWED = new Set([
   "domain/services/HealthKitSleepCanonicalizer.js",
   "application/commands/HealthKitSleepIngestPort.js",
   "application/native/HealthKitSleepCapabilityReadService.js",
+  // Phase C: isolated historical-validation lane, guarded Sleep policy
+  // runner, and the zero-write Sleep audit.
+  "domain/services/HealthKitSleepHistoricalValidation.js",
+  "application/commands/HealthKitSleepHistoricalValidationPort.js",
+  "platform/operations/HealthKitSleepPolicyRunner.js",
+  "platform/operations/HealthKitSleepAudit.js",
 ]);
 const NEEDLES = [
   "healthKitCanonicalDays", "healthKitObservations", "HEALTHKIT_CANONICAL_DAY_COLLECTION",
@@ -54,6 +60,7 @@ const NEEDLES = [
   "healthKitWorkoutLinkClaims", "HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION",
   "healthKitSleepSamples", "healthKitSleepDays",
   "HEALTHKIT_SLEEP_SAMPLE_COLLECTION", "HEALTHKIT_SLEEP_DAY_COLLECTION",
+  "healthKitSleepValidationSamples", "HEALTHKIT_SLEEP_VALIDATION_SAMPLE_COLLECTION",
 ];
 
 function walk(directory) {

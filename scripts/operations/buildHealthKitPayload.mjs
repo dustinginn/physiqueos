@@ -26,6 +26,11 @@
 //   (strength-auto-confirm) additionally proves the deterministic gate and records inert reconciliation history
 //   node scripts/operations/buildHealthKitPayload.mjs --kind link-reassess --sha <40-hex> \
 //     --start YYYY-MM-DD --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
+//   node scripts/operations/buildHealthKitPayload.mjs --kind sleep-policy --sha <40-hex> \
+//     --action activate-prospective|deactivate-prospective|set-source-preference|open-historical-validation|close-historical-validation \
+//     [--effective <D0 YYYY-MM-DD>] [--sleep-mode validation_only|operational] [--time-zone America/Los_Angeles] \
+//     [--families oura] [--historical-days 30] --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
+//   node scripts/operations/buildHealthKitPayload.mjs --kind sleep-audit --sha <40-hex> --audit-kind dormancy|historical-shape --out <file>
 //   node scripts/operations/buildHealthKitPayload.mjs --kind deferred-workout-reconcile --sha <40-hex> \
 //     --observation-id <exact stored HealthKit observation id> --mode dry-run|apply \
 //     [--authorization-ref <text>] [--expected <json file>] --out <file>
@@ -47,6 +52,7 @@ export async function buildHealthKitPayload({
   openEnded = false, families = "", linkAutoConfirm = null,
   expectedCurrentFamilies = "", expectedCurrentPolicyDigest = "", acknowledgeNarrowing = false,
   observationId = "",
+  sleepMode = "validation_only", timeZone = "America/Los_Angeles", historicalDays = 30, auditKind = "dormancy",
 } = {}) {
   if (!/^[0-9a-f]{40}$/.test(String(sha ?? ""))) throw new Error("--sha must be the 40-hex production commit the payload is authorized for.");
   const suffix = randomBytes(4).toString("hex");
@@ -214,6 +220,44 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
+  if (kind === "sleep-policy" || kind === "sleep-audit") {
+    // Guarded Sleep policy runner and zero-write Sleep audit (healthKitSleepOperation.entry.mjs).
+    const operation = kind === "sleep-policy" ? "policy" : "audit";
+    const sleepActions = ["activate-prospective", "deactivate-prospective", "set-source-preference", "open-historical-validation", "close-historical-validation"];
+    if (operation === "policy") {
+      if (!sleepActions.includes(action)) throw new Error(`--action must be one of ${sleepActions.join(", ")}.`);
+      if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
+      if (["activate-prospective", "open-historical-validation"].includes(action) && !DATE.test(effective)) {
+        throw new Error("--effective must be the YYYY-MM-DD prospective Sleep D0.");
+      }
+      if (!["validation_only", "operational"].includes(sleepMode)) throw new Error("--sleep-mode must be validation_only or operational.");
+      const days = Number(historicalDays);
+      if (!Number.isInteger(days) || days < 1 || days > 30) throw new Error("--historical-days must be an integer from 1 through 30.");
+      if (families && !/^[a-z_]+(,[a-z_]+)*$/.test(families)) throw new Error("--families must be comma-separated source families.");
+      if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
+        throw new Error("apply mode requires --authorization-ref and --expected.");
+      }
+    } else if (!["dormancy", "historical-shape"].includes(auditKind)) {
+      throw new Error("--audit-kind must be dormancy or historical-shape.");
+    }
+    const label = operation === "policy" ? `POLICY_${String(action).toUpperCase().replaceAll("-", "_")}_${mode === "apply" ? "APPLY" : "DRYRUN"}` : `AUDIT_${auditKind.toUpperCase().replaceAll("-", "_")}`;
+    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_SLEEP_${label}_SUCCESS_${suffix}`;
+    const result = await build({
+      entryPoints: [path.join(root, "scripts/operations/healthKitSleepOperation.entry.mjs")],
+      bundle: true, write: false, format: "esm", platform: "node", target: "node22", legalComments: "none", minify: true,
+      external: ["pg"],
+      define: {
+        __EXPECTED_GIT_SHA__: JSON.stringify(sha), __OPERATION__: JSON.stringify(operation),
+        __MODE__: JSON.stringify(operation === "audit" ? "dry-run" : mode), __ACTION__: JSON.stringify(String(action ?? "")),
+        __AUDIT_KIND__: JSON.stringify(auditKind), __EFFECTIVE__: JSON.stringify(String(effective ?? "")),
+        __TIME_ZONE__: JSON.stringify(timeZone), __SLEEP_MODE__: JSON.stringify(sleepMode),
+        __FAMILIES__: JSON.stringify(String(families || "oura")), __HISTORICAL_DAYS__: JSON.stringify(Number(historicalDays)),
+        __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference ?? "")), __EXPECTED_JSON__: JSON.stringify(String(expected ?? "")),
+        __MARKER__: JSON.stringify(successMarker),
+      },
+    });
+    return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
+  }
   if (kind === "training-audit") {
     if (!DATE.test(start)) throw new Error("--start must be the YYYY-MM-DD local date to audit.");
     const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_TRAINING_AUDIT_SUCCESS_${suffix}`;
@@ -225,7 +269,7 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
-  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, deferred-workout-reconcile, or training-audit.");
+  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, deferred-workout-reconcile, training-audit, sleep-policy, or sleep-audit.");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -243,6 +287,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     includeValues: !args["no-values"], openEnded: Boolean(args["open-ended"]), families: args.families ?? "", linkAutoConfirm,
     expectedCurrentFamilies: args["expected-current-families"] ?? "", expectedCurrentPolicyDigest: args["expected-current-policy-digest"] ?? "",
     acknowledgeNarrowing: Boolean(args["acknowledge-narrowing"]), observationId: args["observation-id"] ?? "",
+    sleepMode: args["sleep-mode"] ?? "validation_only", timeZone: args["time-zone"] ?? "America/Los_Angeles",
+    historicalDays: args["historical-days"] ?? 30, auditKind: args["audit-kind"] ?? "dormancy",
   });
   if (!args.out) throw new Error("--out is required.");
   fs.writeFileSync(args.out, code, { mode: 0o600 });

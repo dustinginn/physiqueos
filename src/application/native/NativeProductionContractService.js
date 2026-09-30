@@ -37,6 +37,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.UPSERT_ACTIVITY_DAY,
   Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS,
   Phase3Command.INGEST_HEALTHKIT_SLEEP,
+  Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION,
   Phase3Command.EDIT_DEXA_REVIEW,
   Phase3Command.COMMIT_EVIDENCE_REVIEW,
   Phase3Command.DISPOSE_EVIDENCE_REVIEW,
@@ -95,12 +96,18 @@ export function createNativeProductionContractService({
       // Sleep activation policy is enabled. Absent reader, absent policy, or
       // any read failure advertises Sleep as disabled (fail closed).
       let sleepCapability = null;
+      let validationCapability = null;
       try {
         sleepCapability = await readers.healthKitSleep?.getCapability?.() ?? null;
       } catch {
         sleepCapability = null;
       }
-      return withHealthKitSleepCapability(nativeProductionContractManifest, sleepCapability);
+      try {
+        validationCapability = await readers.healthKitSleep?.getHistoricalValidationCapability?.() ?? null;
+      } catch {
+        validationCapability = null;
+      }
+      return withHealthKitSleepCapability(nativeProductionContractManifest, sleepCapability, validationCapability);
     },
 
     async read({ request, resource, input = {} }) {

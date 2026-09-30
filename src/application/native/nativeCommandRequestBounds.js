@@ -55,6 +55,8 @@ export const HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES = 1.5 * 1024 * 1024;
 const COMMAND_MAXIMUM_REQUEST_BYTES = Object.freeze({
   [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: HEALTHKIT_INGEST_MAXIMUM_REQUEST_BYTES,
   [Phase3Command.INGEST_HEALTHKIT_SLEEP]: HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES,
+  // Samples-only subset of the Sleep request, so the same reviewed bound covers it.
+  [Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION]: HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES,
 });
 
 /** Largest body the route will buffer before it knows the command type. */

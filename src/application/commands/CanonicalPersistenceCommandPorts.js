@@ -140,6 +140,7 @@ import {
 } from "../../domain/services/PeptideExecutionManagementService.js";
 import { createPeptideLifecyclePort } from "./PeptideLifecyclePort.js";
 import { createHealthKitSleepIngestPort } from "./HealthKitSleepIngestPort.js";
+import { createHealthKitSleepHistoricalValidationPort } from "./HealthKitSleepHistoricalValidationPort.js";
 import {
   applyPreparedSupplementSupportTransition,
   prepareSupplementSupportTransition,
@@ -174,6 +175,7 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "upsertNutritionDay", "syncActivityDay", "commitTrainingSession", "upsertActivityDay",
   "ingestHealthKitObservations",
   "ingestHealthKitSleep",
+  "ingestHealthKitSleepHistoricalValidation",
   "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport", "saveNutritionStrategy",
   "resolveWorkoutReconciliation",
   "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
@@ -348,6 +350,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     },
     ingestHealthKitObservations,
     ingestHealthKitSleep: createHealthKitSleepIngestPort({ records, now }),
+    ingestHealthKitSleepHistoricalValidation: createHealthKitSleepHistoricalValidationPort({ records, now }),
     commitTrainingSession,
     editDexaReview,
     requestEvidenceReviewConfirmation,

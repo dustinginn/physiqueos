@@ -29,6 +29,7 @@ export const Phase3Command = Object.freeze({
   UPSERT_ACTIVITY_DAY: "activity-day.upsert.v1",
   INGEST_HEALTHKIT_OBSERVATIONS: "healthkit.observations.ingest.v1",
   INGEST_HEALTHKIT_SLEEP: "healthkit.sleep.ingest.v1",
+  INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION: "healthkit.sleep.historical-validation.ingest.v1",
   EDIT_DEXA_REVIEW: "dexa-review.measurements.v1",
   COMMIT_EVIDENCE_REVIEW: "evidence-review.commit.v1",
   SAVE_RECURRING_SUPPORT: "operating-plan.recurring-support.save.v1",
@@ -70,6 +71,7 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.UPSERT_ACTIVITY_DAY]: define("upsertActivityDay", ["localDate", "dailyActivity", "sourceIdentity", "source"], false),
   [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: define("ingestHealthKitObservations", ["batchId", "observations"], false),
   [Phase3Command.INGEST_HEALTHKIT_SLEEP]: define("ingestHealthKitSleep", ["batchId"], false),
+  [Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION]: define("ingestHealthKitSleepHistoricalValidation", ["batchId", "runId", "samples"], false),
   [Phase3Command.EDIT_DEXA_REVIEW]: define("editDexaReview", ["reviewId", "evidenceObjectId", "measurements"], true),
   [Phase3Command.COMMIT_EVIDENCE_REVIEW]: define("requestEvidenceReviewConfirmation", ["reviewId"], true),
   [Phase3Command.SAVE_RECURRING_SUPPORT]: define(

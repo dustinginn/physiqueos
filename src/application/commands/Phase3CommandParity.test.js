@@ -35,6 +35,7 @@ const payloads = {
   [Phase3Command.UPSERT_ACTIVITY_DAY]: { localDate: "2026-08-11", dailyActivity: { move_calories: 700 }, sourceIdentity: "screenshot-day-2026-08-11", source: { modality: "screenshot", application: "Apple Fitness" } },
   [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: { batchId: "healthkit-batch-2026-08-11", observations: [{ observationType: "workout" }] },
   [Phase3Command.INGEST_HEALTHKIT_SLEEP]: { batchId: "healthkit-sleep-batch-2026-08-11", deletions: [{ externalId: "00000000-0000-4000-8000-000000000001" }] },
+  [Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION]: { batchId: "healthkit-sleep-validation-batch", runId: "hv-2026-10-10-30d", samples: [{ externalId: "00000000-0000-4000-8000-000000000002" }] },
   [Phase3Command.EDIT_DEXA_REVIEW]: { reviewId: "review-dexa", evidenceObjectId: "dexa-one", measurements: { measuredAt: "2026-08-11", totalMass: 180 } },
   [Phase3Command.COMMIT_EVIDENCE_REVIEW]: { reviewId: "review-dexa" },
   [Phase3Command.SAVE_RECURRING_SUPPORT]: {
@@ -177,6 +178,7 @@ function commandPort(commandType) {
     [Phase3Command.COMMIT_TRAINING_SESSION]: "commitTrainingSession", [Phase3Command.UPSERT_ACTIVITY_DAY]: "upsertActivityDay",
     [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: "ingestHealthKitObservations",
     [Phase3Command.INGEST_HEALTHKIT_SLEEP]: "ingestHealthKitSleep",
+    [Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION]: "ingestHealthKitSleepHistoricalValidation",
     [Phase3Command.EDIT_DEXA_REVIEW]: "editDexaReview", [Phase3Command.COMMIT_EVIDENCE_REVIEW]: "requestEvidenceReviewConfirmation",
     [Phase3Command.SAVE_RECURRING_SUPPORT]: "saveRecurringSupport",
     [Phase3Command.SAVE_NUTRITION_STRATEGY]: "saveNutritionStrategy",

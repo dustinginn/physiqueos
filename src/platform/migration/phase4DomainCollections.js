@@ -59,6 +59,9 @@ export const PHASE4_APPLICATION_RECORD_TABLES = Object.freeze({
   // never scan the generic observation collection.
   healthKitSleepSamples: "canonical_training_records",
   healthKitSleepDays: "canonical_training_records",
+  // Bounded historical Sleep validation (Phase C): a structurally separate
+  // collection that no ordinary Sleep or strategic reader references.
+  healthKitSleepValidationSamples: "canonical_training_records",
 });
 
 export const PHASE4_DOMAIN_TABLES = Object.freeze({

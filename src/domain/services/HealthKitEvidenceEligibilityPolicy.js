@@ -36,7 +36,9 @@ export const HEALTHKIT_WORKOUT_RECORD_ID_PREFIXES = Object.freeze(["healthkit_ca
 // HealthKit Sleep samples and canonical sleep days (healthKitSleepSamples,
 // healthKitSleepDays). Quarantined like every other HealthKit record; there is
 // no Sleep graduation scope at all.
-export const HEALTHKIT_SLEEP_RECORD_ID_PREFIXES = Object.freeze(["healthkit_sleep_sample_", "healthkit_sleep_day_"]);
+export const HEALTHKIT_SLEEP_RECORD_ID_PREFIXES = Object.freeze([
+  "healthkit_sleep_sample_", "healthkit_sleep_day_", "healthkit_sleep_validation_sample_",
+]);
 
 /**
  * Whether any HealthKit-derived record may currently be strategic Evidence.

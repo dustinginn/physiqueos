@@ -41,6 +41,11 @@ const SLEEP_ALLOWED = new Set([
   "platform/auth/nativeProductionContractRuntime.js",
   "platform/migration/phase4DomainCollections.js",
   "testSupport/healthKitSleepSynthetic.js",
+  // Phase C isolated historical-validation lane and guarded operations.
+  "domain/services/HealthKitSleepHistoricalValidation.js",
+  "application/commands/HealthKitSleepHistoricalValidationPort.js",
+  "platform/operations/HealthKitSleepPolicyRunner.js",
+  "platform/operations/HealthKitSleepAudit.js",
 ]);
 const STRATEGIC_DIRECTORIES = ["domain/intelligence", "app/briefings", "app/confidence", "application/core", "application/progress", "application/read-models"];
 
