@@ -1,11 +1,11 @@
 {
   "schema_version": 3,
-  "generated_at_utc": "2026-09-29T16:30:00Z",
+  "generated_at_utc": "2026-09-30T15:34:12Z",
   "task": {
-    "id": "photo-intelligence-back-pose-case3-multiview-20260929",
-    "title": "Back Pose Case 3 and additive multi-view Photo Intelligence",
+    "id": "photo-pi-corrected-production-supersession-20260930",
+    "title": "Corrected Photo Intelligence guarded production supersession",
     "agent": "codex",
-    "status": "complete_review_approved"
+    "status": "deployed_verified"
   },
   "repository": "dustinginn/physiqueos",
   "frozen_blind_results": {
@@ -37,6 +37,20 @@
     "human_reference_was_pre_frozen": true,
     "blind_validation": false
   },
+  "production_supersession": {
+    "accepted_candidate": "9a89ff903fd587839c53e5f896d5ae9c08d1aaa0",
+    "frozen_goal_blind_ancestor": "0d0f189e8ccddaf69c5d4b833b8c2a82ce49723b",
+    "production_base": "4a81f5b4cac981f9241e40b556341246b83c3309",
+    "deployed_integration": "372c306ba45ffaa0f93f7bf74e4c0c266070d9a5",
+    "deployment_id": "4dac1b07-8fc6-4ab4-9b8d-7f9c3756ddbb",
+    "deployment_status": "active_9_of_9_verified",
+    "build_id": "physiqueos-372c306b-20260930",
+    "report": "agent-handoffs/reports/20260930T153412Z-photo-pi-corrected-production-supersession-deploy.md",
+    "historical_photo_artifacts_changed": false,
+    "private_image_inference_rerun": false,
+    "persistent_pairing_enrollment": "off_unset",
+    "native_changed": false
+  },
   "calibration": {
     "case_1": "major",
     "case_2": "subtle",
@@ -48,9 +62,9 @@
     "frozen_blind_results_changed": false,
     "contains_photo_bytes": false,
     "contains_local_private_paths": false,
-    "production_mutated": false,
-    "deployed": false,
+    "production_mutated": true,
+    "deployed": true,
     "testflight_uploaded": false
   },
-  "next_step": "Code review is approved; keep undeployed and use future monthly Founder photo sets for prospective production validation."
+  "next_step": "Observe the next natural monthly Founder multi-pose Photo Event prospectively; do not regenerate or backfill historical Photo artifacts."
 }
