@@ -740,7 +740,8 @@ extension AppEnvironment {
             notificationAuthorizationStatus = await PriorityNotificationScheduler.sync(
                 items: home.notificationScheduleItems,
                 calendar: home.notificationCalendar,
-                center: .current()
+                center: .current(),
+                sweepsDeliveredOrphans: home.notificationOccurrences != nil
             )
             canonicalPriorityRefreshGeneration += 1
         } catch {

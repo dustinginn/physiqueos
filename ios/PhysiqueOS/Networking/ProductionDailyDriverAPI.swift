@@ -1105,6 +1105,7 @@ struct ProductionPriorityAPI: PriorityAPI {
             skipExpectedVersion: value.skipCommand?.expectedVersion,
             pausedState: paused,
             pauseContext: value.pauseContext,
+            doseAdjustableState: value.doseAdjustable,
             actionLabel: value.action?.label, completionContext: value.completionContext,
             continueActionDestination: Self.destination(forActionHref: value.action?.href) ?? pausedDestination, attributedScope: nil,
             detailSections: value.sections.map { PrioritySectionReadModel(title: $0.title, items: $0.items.map { PriorityDetailFieldReadModel(label: $0.label, detail: $0.detail) }) },
@@ -1128,6 +1129,8 @@ struct ProductionPriorityAPI: PriorityAPI {
         /// on an older Server, which never pauses a peptide.
         var paused: Bool?
         var pauseContext: PriorityPauseContext?
+        /// Peptide occurrences only (`priority.doseAdjustable`).
+        var doseAdjustable: Bool?
     }
     private struct SkipCommand: Decodable { var commandType: String?; var expectedVersion: Int? }
     private struct ExecutionContract: Decodable { var priorityId: String?; var occurrenceDate: String?; var expectedVersion: Int? }

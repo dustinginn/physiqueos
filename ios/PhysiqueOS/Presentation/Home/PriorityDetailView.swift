@@ -197,13 +197,21 @@ struct PriorityDetailView: View {
                         .foregroundStyle(PhysiqueOSTheme.chartSuccess)
                 }
             } else {
-                let plannedDose = priority.completionContext?.dose
+                // Only a peptide occurrence (the Server's `doseAdjustable`)
+                // offers "Took a different amount?"; a supplement's or a
+                // recovery item's dose text is never editable here.
+                let plannedDose = priority.doseAdjustable ? priority.completionContext?.dose : nil
                 let doseComponents = plannedDose.flatMap(PriorityDoseEntry.components(of:))
+                let amountKey = priority.id + "|" + priority.date + "|" + (plannedDose ?? "")
+                // Until the field is seeded for this dose the planned amount
+                // is the value, so Mark Complete is never disabled on the
+                // first frame.
+                let amountText = amountSeededFor == amountKey ? amountTakenText : (doseComponents?.amount ?? "")
                 let doseOutcome: PriorityDoseEntry.Outcome = plannedDose.map {
-                    PriorityDoseEntry.outcome(text: amountTakenText, plannedDose: $0)
+                    PriorityDoseEntry.outcome(text: amountText, plannedDose: $0)
                 } ?? .unchanged
                 if let doseComponents {
-                    amountTakenCard(unit: doseComponents.unit, seed: doseComponents.amount, outcome: doseOutcome, key: priority.id + "|" + priority.date)
+                    amountTakenCard(unit: doseComponents.unit, seed: doseComponents.amount, outcome: doseOutcome, key: amountKey)
                 }
                 PrimaryActionButton(title: "Mark Complete") {
                     Task {
@@ -302,6 +310,12 @@ struct PriorityDetailView: View {
                 amountSeededFor = key
                 amountTakenText = seed
             }
+        }
+        // The planned dose can change under the same occurrence (a re-read):
+        // re-seed rather than keep a stale amount that reads as an edit.
+        .onChange(of: key) { _, newKey in
+            amountSeededFor = newKey
+            amountTakenText = seed
         }
     }
 

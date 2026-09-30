@@ -48,6 +48,7 @@ struct OperatingPlanPeptideExecutionView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
         }
+        .refreshable { await load() }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
@@ -106,7 +107,16 @@ struct OperatingPlanPeptideExecutionView: View {
             case .loading:
                 ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
             case .failed(let message):
-                OperatingPlanUnavailableView(message: isProduction ? message : PeptideSupportEditorViewModel.unavailableCopy)
+                VStack(spacing: 8) {
+                    OperatingPlanUnavailableView(message: isProduction ? message : PeptideSupportEditorViewModel.unavailableCopy)
+                        .frame(minHeight: 120)
+                    Button("Try again") { Task { await load() } }
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("operatingPlan.peptide.retry")
+                }
+                .frame(maxWidth: .infinity, minHeight: 240)
             case .loaded(let detail):
                 if viewModel.supportsSimpleEditor {
                     simpleScreen(viewModel, detail: detail)
@@ -137,6 +147,15 @@ struct OperatingPlanPeptideExecutionView: View {
 
             advancedDisclosure(viewModel, detail: detail)
         }
+        // The Advanced draft is a snapshot of one revision; a newer read
+        // (a row saved, another device) discards it rather than saving it.
+        .onChange(of: detail.executionRevision) { _, _ in advancedDraft = nil }
+        .onChange(of: viewModel.todayHasScheduledDose) { _, hasDose in
+            if !hasDose { pauseStart = .today }
+        }
+        .onChange(of: viewModel.resultMessage) { _, message in
+            if let message { AccessibilityNotification.Announcement(message).post() }
+        }
     }
 
     private func card(_ viewModel: PeptideSupportEditorViewModel, detail: PeptideSupportDetail) -> some View {
@@ -148,11 +167,7 @@ struct OperatingPlanPeptideExecutionView: View {
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                         .foregroundStyle(PhysiqueOSTheme.textPrimary)
                     Spacer(minLength: 6)
-                    if viewModel.isPaused {
-                        StatusChip(text: "Paused", color: .muted)
-                    } else {
-                        StatusChip(text: "Active", color: .success)
-                    }
+                    StatusChip(text: viewModel.statusChipText, color: viewModel.isPaused ? .muted : .success)
                 }
                 .padding(.bottom, 6)
                 .accessibilityElement(children: .combine)
@@ -173,10 +188,10 @@ struct OperatingPlanPeptideExecutionView: View {
                     readOnlyRow(label: "Planned change", value: planned)
                 }
                 if let since = viewModel.pausedSinceLabel {
-                    readOnlyRow(label: "Paused since", value: since)
+                    readOnlyRow(label: viewModel.pausedRowLabel, value: since)
                 }
                 reminderRow(viewModel)
-                actionRow(label: "Notes", value: detail.notes.isEmpty ? "Add notes" : detail.notes, identifier: "operatingPlan.peptide.row.notes", isSaving: viewModel.isSaving) {
+                actionRow(label: "Notes", value: detail.notes.isEmpty ? "Add notes" : notesPreview(detail.notes), identifier: "operatingPlan.peptide.row.notes", isSaving: viewModel.isSaving) {
                     activeSheet = .notes
                 }
             }
@@ -210,6 +225,12 @@ struct OperatingPlanPeptideExecutionView: View {
             .frame(minHeight: 44)
     }
 
+    /// One line of notes on the card; the full text is in the Notes sheet.
+    private func notesPreview(_ notes: String) -> String {
+        let firstLine = notes.split(whereSeparator: \.isNewline).first.map(String.init) ?? notes
+        return firstLine.count > 80 ? String(firstLine.prefix(80)) + "…" : firstLine
+    }
+
     /// Inline toggle that saves immediately. The switch shows the intended
     /// value while the save is in flight and reverts (with the banner under
     /// the card) when the Server refuses it.
@@ -218,6 +239,7 @@ struct OperatingPlanPeptideExecutionView: View {
             Text("Reminder")
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .accessibilityHidden(true)
             Spacer(minLength: 8)
             Toggle("Reminder", isOn: Binding(
                 get: { reminderOverride ?? viewModel.reminderEnabled },
@@ -244,8 +266,11 @@ struct OperatingPlanPeptideExecutionView: View {
     private func lifecycleControls(_ viewModel: PeptideSupportEditorViewModel, detail: PeptideSupportDetail) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if viewModel.isPaused {
-                PrimaryActionButton(title: "Resume \(detail.name)", isEnabled: !viewModel.isSaving) {
-                    Task { @MainActor in _ = await viewModel.resume() }
+                PrimaryActionButton(title: viewModel.resumeButtonTitle, isEnabled: !viewModel.isSaving) {
+                    Task { @MainActor in
+                        _ = await viewModel.resume()
+                        pauseStart = .today
+                    }
                 }
                 .accessibilityIdentifier("operatingPlan.peptide.resume")
             } else {
@@ -270,10 +295,12 @@ struct OperatingPlanPeptideExecutionView: View {
                                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                                     }
                                 }
+                                .accessibilityLabel("Starting")
+                                .accessibilityValue(pauseStart == .tomorrow ? "Tomorrow" : "Today")
                                 .accessibilityIdentifier("operatingPlan.peptide.pause.start")
                             }
                             .frame(minHeight: 44)
-                            Text("Today's dose is not marked complete; choose Tomorrow if you took it")
+                            Text("Today's dose is still open. Starting today removes it. Choose Tomorrow if you haven't logged it yet.")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -294,7 +321,10 @@ struct OperatingPlanPeptideExecutionView: View {
                         titleVisibility: .visible
                     ) {
                         Button("Pause", role: .destructive) {
-                            Task { @MainActor in _ = await viewModel.pause(effectiveDate: pauseStart) }
+                            Task { @MainActor in
+                                _ = await viewModel.pause(effectiveDate: pauseStart)
+                                pauseStart = .today
+                            }
                         }
                         Button("Cancel", role: .cancel) {}
                     } message: {
@@ -346,6 +376,7 @@ struct OperatingPlanPeptideExecutionView: View {
     @ViewBuilder
     private func advancedContent(_ viewModel: PeptideSupportEditorViewModel, detail: PeptideSupportDetail) -> some View {
         let draft = advancedDraft ?? PeptideSupportEditorViewModel.readModel(from: detail)
+        let isDirty = draft.dosing != detail.dosing
         let rewritesHistory = draft.dosing.pattern != .custom && draft.dosing.startDate < viewModel.today
         VStack(alignment: .leading, spacing: 18) {
             PeptideDosePlanEditor(
@@ -357,10 +388,20 @@ struct OperatingPlanPeptideExecutionView: View {
                         advancedDraft = next
                     }
                 ),
-                today: viewModel.today
+                today: viewModel.today,
+                original: detail.dosing
             )
 
-            if rewritesHistory || viewModel.isManualPlan {
+            if viewModel.isManualPlan || (rewritesHistory && !isDirty) {
+                // An untouched past-dated (or manual) plan: the only offer is
+                // a fresh steady plan from today; nothing to save yet.
+                PrimaryActionButton(title: "Start a new plan from today", isEnabled: !viewModel.isSaving) {
+                    startNewPlan(viewModel, detail: detail)
+                }
+                .accessibilityIdentifier("operatingPlan.peptide.advanced.startNew")
+            } else if rewritesHistory {
+                // Edited a plan that began in the past: replacing it from today
+                // keeps history; saving in place rewrites it (confirmed).
                 PrimaryActionButton(title: "Start a new plan from today", isEnabled: !viewModel.isSaving) {
                     startNewPlan(viewModel, detail: detail)
                 }
@@ -370,7 +411,7 @@ struct OperatingPlanPeptideExecutionView: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)
-                    .disabled(viewModel.isSaving || viewModel.isManualPlan && draft.dosing.pattern == .custom)
+                    .disabled(viewModel.isSaving)
                     .accessibilityIdentifier("operatingPlan.peptide.advanced.save")
                     .confirmationDialog(
                         "Rewrite your dose history?",
@@ -385,7 +426,10 @@ struct OperatingPlanPeptideExecutionView: View {
                         Text("This plan starts \(PeptideSupportPresentation.shortDate(draft.dosing.startDate)), before today. Saving regenerates what your dose history says you took from that date. Choose Start a new plan from today to keep it.")
                     }
             } else {
-                PrimaryActionButton(title: viewModel.isSaving ? "Saving…" : "Save plan", isEnabled: !viewModel.isSaving) {
+                if isDirty {
+                    PeptideSheetCaption(text: "Saving replaces your dose plan from \(PeptideSupportPresentation.shortDate(draft.dosing.startDate)). Doses already taken are kept.")
+                }
+                PrimaryActionButton(title: viewModel.isSaving ? "Saving…" : "Save plan", isEnabled: !viewModel.isSaving && isDirty) {
                     saveAdvanced(viewModel, draft: draft, rewriteHistory: false)
                 }
                 .accessibilityIdentifier("operatingPlan.peptide.advanced.save")
@@ -395,16 +439,17 @@ struct OperatingPlanPeptideExecutionView: View {
         }
     }
 
-    /// Seeds a steady plan from the current dose starting today; the user
-    /// then picks how it changes and saves.
+    /// Seeds a steady plan at the current dose starting today — the safe
+    /// replacement that keeps every past dose. The person then picks a
+    /// different pattern deliberately and saves.
     private func startNewPlan(_ viewModel: PeptideSupportEditorViewModel, detail: PeptideSupportDetail) {
         var next = advancedDraft ?? PeptideSupportEditorViewModel.readModel(from: detail)
         if let dose = detail.currentDose {
             next.dosing.startingDoseAmount = dose.amount
             next.dosing.startingDoseUnit = dose.unit
         }
+        next.dosing.pattern = .stay
         next.dosing.startDate = viewModel.today
-        if next.dosing.pattern == .custom { next.dosing.pattern = .stay }
         next.dosing.endDate = nil
         advancedDraft = next
     }
@@ -530,7 +575,7 @@ struct OperatingPlanPeptideExecutionView: View {
             if let errorMessage = viewModel.errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
             PrimaryActionButton(title: viewModel.isSaving ? "Saving…" : "Save plan", isEnabled: !viewModel.isSaving) {
                 Task { @MainActor in
-                    if await viewModel.advancedSave(draft: draft, rewriteHistory: false) {
+                    if await viewModel.legacySave(draft: draft) {
                         isLegacyEditing = false
                     }
                 }

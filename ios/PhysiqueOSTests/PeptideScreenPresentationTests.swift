@@ -247,13 +247,15 @@ final class PeptideScreenPresentationTests: XCTestCase {
 
     func testResumedCopyNamesTheNextDoseAndMovedPlannedChanges() async throws {
         let plain = await model(try detail(nextDueDate: "2026-10-01", advancedPlan: false, plannedChanges: "[]"))
-        XCTAssertEqual(plain.resumedCopy, "Resumed. Next dose Thu, Oct 1 · 9:45 PM.")
+        XCTAssertEqual(plain.resumedCopy(), "Resumed. Next dose Thu, Oct 1 · 9:45 PM.")
         let shifted = await model(try detail(
             nextDueDate: "2026-10-01", advancedPlan: true,
             plannedChanges: #"[{"startDate":"2026-10-15","dose":{"amount":2,"unit":"mg"},"label":"x"},{"startDate":"2026-10-29","dose":{"amount":2.5,"unit":"mg"},"label":"y"}]"#
         ))
         XCTAssertTrue(shifted.hasAdvancedPlan)
-        XCTAssertEqual(shifted.resumedCopy, "Resumed. Next dose Thu, Oct 1 · 9:45 PM. Planned changes moved to Oct 15 and Oct 29.")
+        XCTAssertEqual(shifted.resumedCopy(), "Resumed. Next dose Thu, Oct 1 · 9:45 PM. Planned changes moved to Oct 15 and Oct 29.")
+        XCTAssertEqual(shifted.resumedCopy(previousChangeDates: ["2026-10-15", "2026-10-29"]), "Resumed. Next dose Thu, Oct 1 · 9:45 PM.", "Unmoved dates are not claimed as moved")
+        XCTAssertEqual(shifted.resumedCopy(previousChangeDates: ["2026-10-08", "2026-10-22"]), "Resumed. Next dose Thu, Oct 1 · 9:45 PM. Planned changes moved to Oct 15 and Oct 29.")
         XCTAssertEqual(shifted.editableModel?.plannedChanges?.count, 2, "The Advanced draft starts from the full read")
         XCTAssertEqual(shifted.editableModel?.executionRevision, 5)
     }

@@ -15,6 +15,10 @@ struct PeptideDosePlanEditor: View {
     /// history-rewrite caption (the Server refuses such a save without an
     /// explicit `rewriteHistory`).
     var today: String? = nil
+    /// The plan as last read. When set, the rewrite caption appears only
+    /// once the draft differs from it, so an untouched past-dated plan
+    /// does not nag.
+    var original: PeptideDosingStrategyReadModel? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -60,7 +64,7 @@ struct PeptideDosePlanEditor: View {
                             get: { OperatingPlanDateValues.date(from: dosing.startDate) },
                             set: { dosing.startDate = OperatingPlanDateValues.dateKey(from: $0) }
                         ), maximumDate: .distantFuture, label: "Plan start date")
-                        if rewritesHistory {
+                        if rewritesHistory, original.map({ $0 != dosing }) ?? true {
                             Text("Rewrites your dose history before today")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                 .foregroundStyle(PhysiqueOSTheme.chartEffort)

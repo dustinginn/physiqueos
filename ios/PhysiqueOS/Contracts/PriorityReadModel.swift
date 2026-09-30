@@ -225,6 +225,10 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     var pausedState: Bool? = nil
     /// `priority.pauseContext` — the Server's canonical `pausedFrom` date.
     var pauseContext: PriorityPauseContext? = nil
+    /// `priority.doseAdjustable` — true only for a peptide occurrence with a
+    /// planned dose; gates the "Took a different amount?" field.
+    var doseAdjustableState: Bool? = nil
+    var doseAdjustable: Bool { doseAdjustableState ?? false }
 
     /// Today's occurrence was marked Skipped (canonical, terminal).
     var skipped: Bool {

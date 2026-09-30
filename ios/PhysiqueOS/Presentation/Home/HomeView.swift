@@ -125,7 +125,8 @@ struct HomeView: View {
         environment.notificationAuthorizationStatus = await PriorityNotificationScheduler.sync(
             items: home.notificationScheduleItems,
             calendar: home.notificationCalendar,
-            center: center
+            center: center,
+            sweepsDeliveredOrphans: home.notificationOccurrences != nil
         )
         await BriefingReadyNotifier.reconcile(cards: home.briefingCards, center: center)
     }

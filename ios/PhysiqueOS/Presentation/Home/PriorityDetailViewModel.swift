@@ -176,7 +176,8 @@ enum PriorityDoseEntry {
     static func outcome(text: String, plannedDose: String) -> Outcome {
         guard let planned = components(of: plannedDose) else { return .unchanged }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let value = Double(trimmed), value > 0, value.isFinite else { return .invalid }
+        // A comma-decimal keyboard ("0,5") is the same amount as "0.5".
+        guard let value = Double(trimmed.replacingOccurrences(of: ",", with: ".")), value > 0, value.isFinite else { return .invalid }
         guard let plannedValue = Double(planned.amount), value != plannedValue else { return .unchanged }
         return .changed("\(format(value)) \(planned.unit)")
     }

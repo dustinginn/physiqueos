@@ -1032,6 +1032,24 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertEqual(PriorityNotificationScheduler.deliveredWithdrawalPlan(items: [], deliveredIdentifiers: [reviewReady]), [])
     }
 
+    func testOrphanSweepLeavesPreviousDaysAndUnreadableIdentifiersAlone() {
+        let openToday = Self.foamRolling(scheduledTime: "07:00", completed: false)
+        let yesterday = PriorityNotificationScheduler.identifier(priorityId: "reminder_tesamorelin", occurrenceDate: "2026-09-12")
+        let yesterdaySnooze = PriorityNotificationScheduler.snoozeIdentifier(priorityId: "reminder_tesamorelin", occurrenceDate: "2026-09-12", attempt: 2)
+        let pausedToday = PriorityNotificationScheduler.identifier(priorityId: "reminder_tesamorelin", occurrenceDate: "2026-09-13")
+        let pausedTodaySnooze = PriorityNotificationScheduler.snoozeIdentifier(priorityId: "reminder_tesamorelin", occurrenceDate: "2026-09-13", attempt: 3)
+        let unreadable = "\(PriorityNotificationScheduler.scheduledPrefix)reminder_tesamorelin.someday"
+        let removed = PriorityNotificationScheduler.deliveredWithdrawalPlan(
+            items: [openToday],
+            deliveredIdentifiers: [yesterday, yesterdaySnooze, pausedToday, pausedTodaySnooze, unreadable],
+            notBefore: "2026-09-13"
+        )
+        XCTAssertEqual(removed, [pausedToday, pausedTodaySnooze].sorted(),
+                       "Build 69 left a never-actioned banner from a previous day alone; only today-or-later orphans are swept")
+        XCTAssertEqual(PriorityNotificationScheduler.occurrenceDate(in: yesterdaySnooze), "2026-09-12")
+        XCTAssertNil(PriorityNotificationScheduler.occurrenceDate(in: unreadable))
+    }
+
     func testAPriorityNoLongerPresentIsTreatedAsStaleAndCancelled() {
         let staleIdentifier = PriorityNotificationScheduler.identifier(priorityId: "reminder_old", occurrenceDate: "2026-09-13")
         let plan = PriorityNotificationScheduler.reconciliationPlan(

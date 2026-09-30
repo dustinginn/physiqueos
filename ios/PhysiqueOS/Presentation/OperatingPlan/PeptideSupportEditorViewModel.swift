@@ -71,7 +71,9 @@ final class PeptideSupportEditorViewModel {
     private let deviceToday: () -> String
 
     static let unavailableCopy = "This peptide protocol is unavailable."
-    static let loadFailureCopy = "This peptide Support plan couldn't be loaded. Pull to refresh or try again."
+    static let loadFailureCopy = "This peptide Support plan couldn't be loaded."
+    /// The write itself succeeded; only the follow-up re-read failed.
+    static let refreshFailureCopy = "Saved. We couldn't refresh this screen. Pull down to refresh."
     static let genericSaveFailureCopy = "The peptide Support plan was not saved. Refresh before retrying."
     static let pastDateCopy = "Choose today or a later date. Doses already taken are kept."
 
@@ -215,7 +217,7 @@ final class PeptideSupportEditorViewModel {
                 }
             } catch {
                 if detail == nil { state = .failed(Self.loadFailureCopy) }
-                errorMessage = Self.loadFailureCopy
+                errorMessage = Self.refreshFailureCopy
             }
         }
     }
@@ -246,7 +248,8 @@ final class PeptideSupportEditorViewModel {
             holdDuration: 1, holdUnit: .weeks,
             decreaseAmount: 0, decreaseInterval: 1, decreaseUnit: .weeks,
             landingDoseAmount: 0,
-            endDate: nil
+            // A steady plan's explicit end date survives a dose change.
+            endDate: detail.dosing.pattern == .stay ? detail.dosing.endDate.flatMap { $0 >= effectiveDate ? $0 : nil } : nil
         )
         return await save(draft, rewriteHistory: false)
     }
@@ -299,7 +302,7 @@ final class PeptideSupportEditorViewModel {
         guard let detail else { errorMessage = Self.unavailableCopy; return false }
         var draft = Draft(detail)
         draft.reminderPreference = enabled ? .remind : .none
-        return await save(draft, rewriteHistory: false)
+        return await save(draft, rewriteHistory: false, context: .toggle)
     }
 
     @discardableResult
@@ -310,18 +313,31 @@ final class PeptideSupportEditorViewModel {
         return await save(draft, rewriteHistory: false)
     }
 
-    /// The Advanced editor's whole-strategy save. `rewriteHistory` is sent
-    /// only after that editor's explicit "Rewrites your dose history before
+    /// The Advanced editor's whole-strategy save. Only the dosing strategy
+    /// comes from the editor's draft; days, time, reminder and notes are
+    /// always the latest read, so a stale Advanced snapshot can never
+    /// revert a change made through a row. `rewriteHistory` is sent only
+    /// after that editor's explicit "Rewrites your dose history before
     /// today" confirmation.
     @discardableResult
     func advancedSave(draft model: OperatingPlanPeptideExecutionReadModel, rewriteHistory: Bool) async -> Bool {
+        guard let detail else { errorMessage = Self.unavailableCopy; return false }
+        var draft = Draft(detail)
+        draft.dosing = model.dosing
+        return await save(draft, rewriteHistory: rewriteHistory)
+    }
+
+    /// Build 69's single-form Save (the legacy fallback): the whole edited
+    /// model goes out at once.
+    @discardableResult
+    func legacySave(draft model: OperatingPlanPeptideExecutionReadModel) async -> Bool {
         guard let detail else { errorMessage = Self.unavailableCopy; return false }
         var draft = Draft(detail)
         draft.supportSchedule = model.supportSchedule
         draft.dosing = model.dosing
         draft.reminderPreference = model.reminderPreference
         draft.notes = model.notes
-        return await save(draft, rewriteHistory: rewriteHistory)
+        return await save(draft, rewriteHistory: false)
     }
 
     /// S3 pause. `effectiveDate` is resolved by the Server on the owner's
@@ -351,7 +367,9 @@ final class PeptideSupportEditorViewModel {
                 // The lifecycle result names the reminder (`priorityId`);
                 // the read's own `priorityId` is the fallback. Withdraw
                 // first, then re-read and reconcile the horizon.
-                if let priorityId = result.priorityId ?? detail.priorityId, !priorityId.isEmpty {
+                // A pause that starts tomorrow leaves tonight's dose (and its
+                // banner) alone; the horizon reconcile below drops tomorrow on.
+                if effectiveDate == .today, let priorityId = result.priorityId ?? detail.priorityId, !priorityId.isEmpty {
                     await withdrawOccurrenceNotifications(priorityId)
                 }
                 await refresh()
@@ -360,7 +378,7 @@ final class PeptideSupportEditorViewModel {
                 resultMessage = effectiveDate == .tomorrow ? "Paused starting tomorrow." : "Paused."
                 return true
             } catch {
-                await handle(error, name: detail.name)
+                await handle(error, name: detail.name, context: .pause)
                 return false
             }
         }
@@ -376,10 +394,12 @@ final class PeptideSupportEditorViewModel {
         defer { isSaving = false }
         switch authority {
         case .sandbox:
+            let wasPending = pauseStartsLater
+            let before = detail.plannedChanges?.map(\.startDate)
             store.setPeptidePaused(protocolId: protocolId, paused: false)
             await load()
             await invalidateSiblingReads()
-            resultMessage = resumedCopy
+            resultMessage = wasPending ? "Pause canceled." : resumedCopy(previousChangeDates: before)
             return true
         case .founderProduction:
             guard let revision = detail.executionRevision else {
@@ -387,14 +407,16 @@ final class PeptideSupportEditorViewModel {
                 return false
             }
             do {
+                let wasPending = pauseStartsLater
+                let before = detail.plannedChanges?.map(\.startDate)
                 _ = try await lifecycleAPI.resume(protocolId: protocolId, expectedRevision: revision)
                 await refresh()
                 await invalidateSiblingReads()
                 await reconcileNotifications()
-                resultMessage = resumedCopy
+                resultMessage = wasPending ? "Pause canceled." : resumedCopy(previousChangeDates: before)
                 return true
             } catch {
-                await handle(error, name: detail.name)
+                await handle(error, name: detail.name, context: .resume)
                 return false
             }
         }
@@ -404,14 +426,15 @@ final class PeptideSupportEditorViewModel {
     /// future changes was frozen across the pause (S3), "Planned changes
     /// moved to Oct 15 and Oct 29." The dates are the Server's own
     /// post-resume `plannedChanges`; Native never shifts them itself.
-    var resumedCopy: String {
+    func resumedCopy(previousChangeDates: [String]? = nil) -> String {
         var lines: [String] = []
         if let next = nextDoseLabel, next != "Paused" {
             lines.append("Resumed. Next dose \(next).")
         } else {
             lines.append("Resumed.")
         }
-        if hasAdvancedPlan, let changes = detail?.plannedChanges, !changes.isEmpty {
+        if hasAdvancedPlan, let changes = detail?.plannedChanges, !changes.isEmpty,
+           previousChangeDates.map({ $0 != changes.map(\.startDate) }) ?? true {
             let dates = PeptideSupportPresentation.joinDates(changes.map(\.startDate))
             lines.append("Planned change\(changes.count == 1 ? "" : "s") moved to \(dates).")
         }
@@ -420,7 +443,7 @@ final class PeptideSupportEditorViewModel {
 
     // MARK: - Save core
 
-    private func save(_ draft: Draft, rewriteHistory: Bool) async -> Bool {
+    private func save(_ draft: Draft, rewriteHistory: Bool, context: FailureContext = .sheetSave) async -> Bool {
         guard let detail else { errorMessage = Self.unavailableCopy; return false }
         guard !isSaving else { return false }
         isSaving = true
@@ -464,7 +487,7 @@ final class PeptideSupportEditorViewModel {
                 await reconcileNotifications()
                 return true
             } catch {
-                await handle(error, name: detail.name)
+                await handle(error, name: detail.name, context: context)
                 return false
             }
         }
@@ -474,15 +497,15 @@ final class PeptideSupportEditorViewModel {
     /// 409 → re-read (the record is not in the expected lifecycle state) and
     /// show the title; network → the transport's own copy; anything else →
     /// the Build 69 copy.
-    private func handle(_ error: Error, name: String) async {
+    private func handle(_ error: Error, name: String, context: FailureContext) async {
         guard let production = error as? ProductionNativeError else {
-            errorMessage = Self.genericSaveFailureCopy
+            errorMessage = Self.genericFailureCopy(name: name, context: context)
             return
         }
         switch production {
         case .failedPrecondition:
             await refresh()
-            errorMessage = Self.updatedElsewhereCopy(name: name)
+            errorMessage = Self.updatedElsewhereCopy(name: name, context: context)
         case .validation(let problem):
             errorMessage = problem.title
         case .conflict(let problem):
@@ -491,12 +514,31 @@ final class PeptideSupportEditorViewModel {
         case .networkFailure:
             errorMessage = production.errorDescription
         default:
-            errorMessage = Self.genericSaveFailureCopy
+            errorMessage = Self.genericFailureCopy(name: name, context: context)
         }
     }
 
-    static func updatedElsewhereCopy(name: String) -> String {
-        "\(name) was updated elsewhere. We refreshed it; check the value and tap Save again."
+    /// Where a failure surfaced, so the copy names a control that exists:
+    /// the sheets have a Save, the switch and the Pause/Resume buttons do not.
+    enum FailureContext: Equatable {
+        case sheetSave, toggle, pause, resume
+    }
+
+    static func updatedElsewhereCopy(name: String, context: FailureContext = .sheetSave) -> String {
+        switch context {
+        case .sheetSave: "\(name) was updated elsewhere. We refreshed it; check the value and tap Save again."
+        case .toggle: "\(name) was updated elsewhere. We refreshed it; try the switch again."
+        case .pause, .resume: "\(name) was updated elsewhere. We refreshed it; try again."
+        }
+    }
+
+    static func genericFailureCopy(name: String, context: FailureContext) -> String {
+        switch context {
+        case .sheetSave: genericSaveFailureCopy
+        case .toggle: "The reminder wasn't changed. Try again."
+        case .pause: "\(name) wasn't paused. Try again."
+        case .resume: "\(name) wasn't resumed. Try again."
+        }
     }
 
     // MARK: - Presentation
@@ -530,7 +572,7 @@ final class PeptideSupportEditorViewModel {
     /// that is present. `nil` hides the row.
     var nextDoseLabel: String? {
         guard let detail else { return nil }
-        if detail.isPaused { return "Paused" }
+        if detail.isPaused, !pauseStartsLater { return "Paused" }
         if let formatted = PeptideSupportPresentation.formatNextDose(date: detail.nextDueDate, time: detail.nextDueTime, today: today) {
             return formatted
         }
@@ -541,6 +583,26 @@ final class PeptideSupportEditorViewModel {
         guard let detail, detail.isPaused, let since = detail.lifecycle?.since else { return nil }
         return PeptideSupportPresentation.shortDate(since)
     }
+
+    /// A pause that starts tomorrow: the Server marks the lifecycle paused
+    /// with `since` in the future and keeps tonight's dose on Home, so the
+    /// screen must not claim the peptide is already paused.
+    var pauseStartsLater: Bool {
+        guard let detail, detail.isPaused, let since = detail.lifecycle?.since else { return false }
+        return since > today
+    }
+
+    /// "Active" / "Paused" / "Pauses Sep 30".
+    var statusChipText: String {
+        guard isPaused else { return "Active" }
+        if pauseStartsLater, let since = detail?.lifecycle?.since { return "Pauses \(PeptideSupportPresentation.shortDate(since))" }
+        return "Paused"
+    }
+
+    var pausedRowLabel: String { pauseStartsLater ? "Pauses on" : "Paused since" }
+
+    /// "Resume" once paused; "Cancel pause" while the pause has not begun.
+    var resumeButtonTitle: String { pauseStartsLater ? "Cancel pause" : "Resume \(name)" }
 
     /// "2.5 mg on Oct 8" — the first future dose change, or nil.
     var plannedChangeLabel: String? {
@@ -568,7 +630,9 @@ final class PeptideSupportEditorViewModel {
         guard let detail else { return "" }
         let pattern: String
         switch detail.dosing.pattern {
-        case .stay: return "Keep this dose since \(PeptideSupportPresentation.shortDate(detail.dosing.startDate))"
+        case .stay:
+            let preposition = detail.dosing.startDate > today ? "from" : "since"
+            return "Keep this dose \(preposition) \(PeptideSupportPresentation.shortDate(detail.dosing.startDate))"
         case .titrateUp: pattern = "Increase step by step"
         case .titrateDown: pattern = "Decrease step by step"
         case .upHoldDown: pattern = "Increase, hold, then decrease"

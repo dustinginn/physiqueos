@@ -444,11 +444,6 @@ struct TrainingCompactActionLabel: View {
     }
 }
 
-/// A local disclosure (collapsed summary / expanded content) matching the
-/// established manual-toggle pattern already used for Log's "Log weigh-in"
-/// disclosure — not SwiftUI's `DisclosureGroup`, whose automatic trailing
-/// chevron doesn't match the web's plain `&lt;details&gt;`/`&lt;summary&gt;`
-/// styling.
 private struct TrainingRecordPreviewRow: View {
     let label: String
     let detail: String

@@ -49,6 +49,7 @@ final class PriorityReadModelTests: XCTestCase {
         XCTAssertEqual(PriorityDoseEntry.outcome(text: "1.25", plannedDose: "1.5 mg"), .changed("1.25 mg"))
         XCTAssertEqual(PriorityDoseEntry.outcome(text: "2", plannedDose: "1.5 mg"), .changed("2 mg"))
         XCTAssertEqual(PriorityDoseEntry.outcome(text: "", plannedDose: "1.5 mg"), .invalid)
+        XCTAssertEqual(PriorityDoseEntry.outcome(text: "1,25", plannedDose: "1.5 mg"), .changed("1.25 mg"), "A comma-decimal keyboard is the same amount")
         XCTAssertEqual(PriorityDoseEntry.outcome(text: "0", plannedDose: "1.5 mg"), .invalid)
         XCTAssertEqual(PriorityDoseEntry.outcome(text: "abc", plannedDose: "1.5 mg"), .invalid)
         XCTAssertEqual(PriorityDoseEntry.outcome(text: "anything", plannedDose: "No dose scheduled"), .unchanged)

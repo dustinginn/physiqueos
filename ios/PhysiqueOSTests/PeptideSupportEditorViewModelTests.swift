@@ -241,7 +241,8 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
     func testPauseAndResumeCallTheLifecycleAPIWithIfMatchThenRefetch() async throws {
         let api = StubSupportAPI(fetchQueue: [
             try detail(revision: 3),
-            try detail(revision: 4, lifecycle: #"{"state":"paused","since":"2026-09-30","history":[{"state":"paused","effectiveDate":"2026-09-30","at":"2026-09-29T20:00:00.000Z"}]}"#, nextDueDate: nil, nextDueTime: nil),
+            // The Server keeps tonight's/next dose while a tomorrow-dated pause is pending.
+            try detail(revision: 4, lifecycle: #"{"state":"paused","since":"2026-09-30","history":[{"state":"paused","effectiveDate":"2026-09-30","at":"2026-09-29T20:00:00.000Z"}]}"#),
             try detail(revision: 5),
         ])
         let lifecycle = StubLifecycleAPI()
@@ -255,9 +256,14 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
         XCTAssertEqual(api.fetchCount, 2, "Pause re-reads peptide-support")
         XCTAssertEqual(model.detail?.executionRevision, 4)
         XCTAssertTrue(model.isPaused)
-        XCTAssertEqual(model.nextDoseLabel, "Paused")
+        XCTAssertTrue(model.pauseStartsLater, "since (Sep 30) is after today (Sep 29)")
+        XCTAssertEqual(model.statusChipText, "Pauses Sep 30")
+        XCTAssertEqual(model.pausedRowLabel, "Pauses on")
+        XCTAssertEqual(model.nextDoseLabel, "Thu, Oct 1 · 9:45 PM", "A pending pause does not hide the next dose")
+        XCTAssertEqual(model.resumeButtonTitle, "Cancel pause")
         XCTAssertEqual(model.pausedSinceLabel, "Sep 30")
         XCTAssertEqual(model.resultMessage, "Paused starting tomorrow.")
+        XCTAssertEqual(reconcile.events, ["reconcile"], "A pause starting tomorrow leaves tonight's notifications alone")
         XCTAssertEqual(reconcile.count, 1)
         XCTAssertTrue(api.saves.isEmpty, "Pause is a lifecycle command, not a save")
 
@@ -267,7 +273,7 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
         XCTAssertEqual(api.fetchCount, 3)
         XCTAssertEqual(model.detail?.executionRevision, 5)
         XCTAssertFalse(model.isPaused)
-        XCTAssertEqual(model.resultMessage, "Resumed. Next dose Thu, Oct 1 · 9:45 PM.")
+        XCTAssertEqual(model.resultMessage, "Pause canceled.", "Resuming before the pause began cancels it")
         XCTAssertEqual(reconcile.count, 2)
     }
 
@@ -348,7 +354,105 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
         XCTAssertFalse(outcome13)
         XCTAssertEqual(api.fetchCount, 2)
         XCTAssertEqual(model.detail?.executionRevision, 6)
-        XCTAssertEqual(model.errorMessage, PeptideSupportEditorViewModel.updatedElsewhereCopy(name: "Retatrutide"))
+        XCTAssertEqual(model.errorMessage, PeptideSupportEditorViewModel.updatedElsewhereCopy(name: "Retatrutide", context: .pause))
+        XCTAssertFalse(model.errorMessage?.contains("Save") ?? true, "Pause has no Save button to tap")
+    }
+
+    func testFailureCopyNamesControlsThatExist() async throws {
+        let stale = try problem(status: 412, code: "STALE_VERSION", title: "The resource changed after it was loaded.")
+        let api = StubSupportAPI(fetchQueue: [try detail(revision: 3), try detail(revision: 5)], saveResult: .failure(ProductionNativeError.failedPrecondition(stale)))
+        let model = makeModel(api: api)
+        await model.load()
+        let toggled = await model.setReminder(false)
+        XCTAssertFalse(toggled)
+        XCTAssertEqual(model.errorMessage, "Retatrutide was updated elsewhere. We refreshed it; try the switch again.")
+
+        let generic = StubSupportAPI(fetchQueue: [try detail()])
+        let lifecycle = StubLifecycleAPI()
+        lifecycle.error = ProductionNativeError.invalidResponse
+        let other = makeModel(api: generic, lifecycle: lifecycle)
+        await other.load()
+        _ = await other.pause(effectiveDate: .today)
+        XCTAssertEqual(other.errorMessage, "Retatrutide wasn't paused. Try again.")
+        _ = await other.resume()
+        XCTAssertEqual(other.errorMessage, "Retatrutide wasn't resumed. Try again.")
+    }
+
+    func testAdvancedSaveSendsOnlyTheDosingFromTheDraft() async throws {
+        let original = try detail(revision: 3)
+        let api = StubSupportAPI(fetchQueue: [original, try detail(revision: 4)])
+        let model = makeModel(api: api)
+        await model.load()
+        // A stale Advanced snapshot: it still carries the old Days, reminder and notes.
+        var stale = try XCTUnwrap(model.editableModel)
+        stale.dosing.targetDoseAmount = 2.5
+        stale.supportSchedule.daysOfWeek = [.monday]
+        stale.reminderPreference = .none
+        stale.notes = "old notes"
+        _ = await model.advancedSave(draft: stale, rewriteHistory: false)
+        let call = try XCTUnwrap(api.saves.first)
+        XCTAssertEqual(call.dosing.targetDoseAmount, 2.5)
+        XCTAssertEqual(call.supportSchedule, original.supportSchedule, "Days come from the latest read")
+        XCTAssertEqual(call.reminderPreference, original.reminderPreference)
+        XCTAssertEqual(call.notes, original.notes)
+    }
+
+    func testLegacySaveSendsTheWholeFormLikeBuild69() async throws {
+        let api = StubSupportAPI(fetchQueue: [try detail(lifecycle: nil, currentDose: nil, nextDueDate: nil, nextDueTime: nil, localDate: nil), try detail(revision: 4)])
+        let model = makeModel(api: api)
+        await model.load()
+        var form = try XCTUnwrap(model.editableModel)
+        form.supportSchedule.daysOfWeek = [.monday]
+        form.notes = "typed"
+        _ = await model.legacySave(draft: form)
+        let call = try XCTUnwrap(api.saves.first)
+        XCTAssertEqual(call.supportSchedule.daysOfWeek, [.monday])
+        XCTAssertEqual(call.notes, "typed")
+        XCTAssertFalse(call.rewriteHistory)
+    }
+
+    func testChangeDoseKeepsAnExplicitStayEndDate() async throws {
+        let json = try detail()
+        var stay = json
+        stay.dosing.pattern = .stay
+        stay.dosing.endDate = "2026-11-30"
+        let api = StubSupportAPI(fetchQueue: [stay, try detail(revision: 4)])
+        let model = makeModel(api: api)
+        await model.load()
+        _ = await model.changeDose(amount: 2, unit: "mg", effectiveDate: "2026-09-29")
+        XCTAssertEqual(api.saves.first?.dosing.endDate, "2026-11-30", "A course's end date survives a dose change")
+        // An end date before the new start is not carried.
+        let short = StubSupportAPI(fetchQueue: [stay, try detail(revision: 4)])
+        let other = makeModel(api: short)
+        await other.load()
+        _ = await other.changeDose(amount: 2, unit: "mg", effectiveDate: "2026-12-01")
+        XCTAssertNil(short.saves.first?.dosing.endDate)
+    }
+
+    func testAFailedRereadAfterASaveSaysItWasSaved() async throws {
+        final class FlakyAPI: PeptideSupportAPI, @unchecked Sendable {
+            var first: PeptideSupportDetail?
+            var reads = 0
+            func fetchSupport(protocolId: String) async throws -> PeptideSupportDetail? {
+                reads += 1
+                if reads == 1 { return first }
+                throw ProductionNativeError.invalidResponse
+            }
+            func save(protocolId: String, expectedRevision: Int?, supportSchedule: OperatingPlanSupportScheduleReadModel, dosing: PeptideDosingStrategyReadModel, timingContext: String, reminderPreference: OperatingPlanReminderPreference, notes: String, rewriteHistory: Bool) async throws -> PeptideSupportSaveResult {
+                .init(status: "updated", protocolId: protocolId, executionId: nil, executionRevision: 4)
+            }
+        }
+        let api = FlakyAPI()
+        api.first = try detail()
+        let model = PeptideSupportEditorViewModel(
+            protocolId: "peptide-protocol", authority: .founderProduction, supportAPI: api, lifecycleAPI: StubLifecycleAPI(),
+            store: OperatingPlanSandboxStore(), deviceToday: { "2026-09-29" }
+        )
+        await model.load()
+        let saved = await model.setNotes("x")
+        XCTAssertTrue(saved)
+        XCTAssertEqual(model.errorMessage, PeptideSupportEditorViewModel.refreshFailureCopy)
+        XCTAssertTrue(model.errorMessage?.hasPrefix("Saved.") ?? false)
     }
 
     func testValidationProblemShowsTheServerTitleVerbatim() async throws {
@@ -400,8 +504,18 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
         let noLifecycle = try detail(lifecycle: nil)
         XCTAssertFalse(noLifecycle.supportsSimpleEditor)
         let noDose = try detail(currentDose: nil)
-        XCTAssertFalse(noDose.supportsSimpleEditor)
+        XCTAssertTrue(noDose.supportsSimpleEditor, "No dose today (ended or not started) is a state of the simple editor, not a reason to fall back")
         XCTAssertTrue(try detail().supportsSimpleEditor)
+    }
+
+    func testAMalformedAdditiveObjectDropsThatFieldNotTheWholeRead() throws {
+        let malformedLifecycle = try detail(lifecycle: #"{"state":5}"#)
+        XCTAssertNil(malformedLifecycle.lifecycle, "One bad additive value must not fail the read")
+        XCTAssertFalse(malformedLifecycle.supportsSimpleEditor, "Without a lifecycle the legacy editor still works")
+        XCTAssertEqual(malformedLifecycle.name, "Retatrutide")
+        let malformedDose = try detail(currentDose: #"{"amount":"lots"}"#)
+        XCTAssertNil(malformedDose.currentDose)
+        XCTAssertTrue(malformedDose.supportsSimpleEditor)
     }
 
     // MARK: - Presentation

@@ -3,8 +3,8 @@ import SwiftUI
 /// A collapsed summary that expands in place — the native counterpart of
 /// the web's plain `<details>`/`<summary>` drawers (`ReportDrawer`,
 /// `ReportingLinks`). Promoted from `TrainingHistoryView`'s private
-/// `TrainingDisclosureRow` so Training, Evidence and the Operating Plan
-/// share one control instead of three private copies.
+/// `TrainingDisclosureRow` so Training and the Operating Plan share one
+/// control (Evidence keeps its own private copy).
 ///
 /// The expand/collapse transition honours Reduce Motion: with it on, the
 /// state flips with no animation (the same branch `HomeView` and

@@ -89,11 +89,13 @@ struct PeptideSupportDetail: Decodable, Equatable, Sendable {
 
     /// Feature detection for the simple editor (design §4 deploy order): the
     /// card, sheets and Pause exist only when the Server projects the
-    /// lifecycle, the current dose and a revision token. Otherwise the
+    /// lifecycle and a revision token. A missing `currentDose` (an ended
+    /// plan, one that has not started) is a state of the simple editor —
+    /// the Dose row reads "Set a dose" — not a reason to fall back. Otherwise the
     /// existing Advanced-style editor path is the only path, so Native can
     /// never send a history-rewriting `stay` to a Server without S1.
     var supportsSimpleEditor: Bool {
-        lifecycle != nil && currentDose != nil && executionRevision != nil
+        lifecycle != nil && executionRevision != nil
     }
 
     var isPaused: Bool { lifecycle?.isPaused ?? false }
@@ -125,10 +127,13 @@ extension PeptideSupportDetail {
         nextDue = try container.decodeIfPresent(String.self, forKey: .nextDue)
         nextDueDate = try container.decodeIfPresent(String.self, forKey: .nextDueDate)
         nextDueTime = try container.decodeIfPresent(String.self, forKey: .nextDueTime)
-        lifecycle = try container.decodeIfPresent(PeptideLifecycleReadModel.self, forKey: .lifecycle)
-        currentDose = try container.decodeIfPresent(PeptideDoseValueReadModel.self, forKey: .currentDose)
+        // The additive objects decode leniently: one malformed value drops
+        // that field (and with `lifecycle` the simple editor), never the
+        // whole read.
+        lifecycle = (try? container.decodeIfPresent(PeptideLifecycleReadModel.self, forKey: .lifecycle)) ?? nil
+        currentDose = (try? container.decodeIfPresent(PeptideDoseValueReadModel.self, forKey: .currentDose)) ?? nil
         currentDoseLabel = try container.decodeIfPresent(String.self, forKey: .currentDoseLabel)
-        currentPhase = try container.decodeIfPresent(PeptideDosePhaseWindowReadModel.self, forKey: .currentPhase)
+        currentPhase = (try? container.decodeIfPresent(PeptideDosePhaseWindowReadModel.self, forKey: .currentPhase)) ?? nil
         plannedChanges = try container.decodeIfPresent(LossyDecodableArray<PeptidePlannedChangeReadModel>.self, forKey: .plannedChanges)?.elements
         dosingHistory = try container.decodeIfPresent(LossyDecodableArray<PeptideDosingHistoryEntryReadModel>.self, forKey: .dosingHistory)?.elements
         dosingMode = try container.decodeIfPresent(String.self, forKey: .dosingMode)
@@ -186,6 +191,10 @@ struct ProductionPeptideSupportAPI: PeptideSupportAPI {
         let envelope = try await api.readResource(
             "operating-plan-peptide-support",
             query: ["protocolId": protocolId],
+            // Always re-read: the record carries the `executionRevision`
+            // If-Match token, and a 412/409 recovery must never be served a
+            // 90 s cached revision.
+            policy: .reload,
             as: PeptideSupportDetail.self
         )
         return envelope.data
@@ -213,7 +222,7 @@ struct ProductionPeptideSupportAPI: PeptideSupportAPI {
                 rewriteHistory: rewriteHistory ? true : nil
             )
         )
-        let signature = ProductionIdempotentSubmission.signature([
+        var signatureParts: [String] = [
             ProductionCommandType.savePeptideSupport,
             protocolId,
             expectedRevision.map(String.init) ?? "unconfigured",
@@ -242,8 +251,11 @@ struct ProductionPeptideSupportAPI: PeptideSupportAPI {
             timingContext,
             reminderPreference.rawValue,
             notes,
-            rewriteHistory ? "rewrite-history" : "",
-        ])
+        ]
+        // Appended only when set, so every non-rewrite save keeps Build
+        // 69's byte-identical signature (a lost-response retry still replays).
+        if rewriteHistory { signatureParts.append("rewrite-history") }
+        let signature = ProductionIdempotentSubmission.signature(signatureParts)
         let outcome: ProductionCommandOutcome<PeptideSupportSaveResult> = try await api.submitCommand(
             ProductionCommandType.savePeptideSupport,
             idempotencyKey: idempotencyStore.resolvedKey(

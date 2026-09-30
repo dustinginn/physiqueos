@@ -12,6 +12,7 @@ import SwiftUI
 /// Cancel except while a save is in flight.
 struct PeptideEditorSheet<Content: View>: View {
     let title: String
+    var saveTitle: String = "Save"
     let isSaving: Bool
     let canSave: Bool
     let errorMessage: String?
@@ -41,13 +42,13 @@ struct PeptideEditorSheet<Content: View>: View {
                         .accessibilityIdentifier("operatingPlan.peptide.sheet.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isSaving ? "Saving…" : "Save", action: onSave)
+                    Button(isSaving ? "Saving…" : saveTitle, action: onSave)
                         .disabled(isSaving || !canSave)
                         .accessibilityIdentifier("operatingPlan.peptide.sheet.save")
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(isSaving)
     }
@@ -150,6 +151,12 @@ struct PeptideChangeDoseSheet: View {
         return effectiveDate >= viewModel.today
     }
 
+    /// "Only the next dose" hands off to the dose that is open right now, so
+    /// it is offered only when that dose is today's.
+    private var offersOnlyNextDose: Bool {
+        viewModel.hasAdvancedPlan && viewModel.todayHasScheduledDose
+    }
+
     private var nextOccurrenceDestination: AppDestination? {
         guard let priorityId = viewModel.detail?.priorityId, let date = viewModel.detail?.nextDueDate else { return nil }
         return .priorityOccurrence(priorityId: priorityId, occurrenceDate: date)
@@ -158,13 +165,14 @@ struct PeptideChangeDoseSheet: View {
     var body: some View {
         PeptideEditorSheet(
             title: "Change dose",
+            saveTitle: scope == .onlyNextDose ? "Open next dose" : "Save",
             isSaving: viewModel.isSaving,
             canSave: canSave,
             errorMessage: viewModel.errorMessage,
             onCancel: { viewModel.errorMessage = nil; onDismiss() },
             onSave: save
         ) {
-            if viewModel.hasAdvancedPlan {
+            if offersOnlyNextDose {
                 HStack(spacing: 8) {
                     OperatingPlanChoicePill(title: "From \(PeptideSupportPresentation.shortDate(effectiveDate)) on", isSelected: scope == .fromDateOn, minHeight: 44) { scope = .fromDateOn }
                     OperatingPlanChoicePill(title: "Only the next dose", isSelected: scope == .onlyNextDose, minHeight: 44) { scope = .onlyNextDose }
@@ -178,7 +186,7 @@ struct PeptideChangeDoseSheet: View {
                         Text("Record what you actually take")
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                             .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        PeptideSheetCaption(text: "Your plan stays as it is. Save opens your next dose\(viewModel.nextDoseLabel.map { " (\($0))" } ?? ""), where you can enter the amount you took when you mark it complete.")
+                        PeptideSheetCaption(text: "Your plan stays as it is. Open next dose\(viewModel.nextDoseLabel.map { " (\($0))" } ?? "") and enter the amount you took when you mark it complete.")
                     }
                 }
             } else {
@@ -221,6 +229,8 @@ struct PeptideChangeDoseSheet: View {
                                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                                 }
                             }
+                            .accessibilityLabel("Starts")
+                            .accessibilityValue(startLabel)
                             .accessibilityIdentifier("operatingPlan.peptide.sheet.dose.starts")
                         }
                         if start == .pickedDate {
@@ -273,6 +283,7 @@ struct PeptideDaysSheet: View {
     @State private var selected: Set<OperatingPlanWeekday>
     @State private var usesInterval: Bool
     @State private var interval: Int
+    @ScaledMetric(relativeTo: .body) private var chipMinimum: CGFloat = 64
 
     init(viewModel: PeptideSupportEditorViewModel, onDismiss: @escaping () -> Void) {
         self.viewModel = viewModel
@@ -280,7 +291,9 @@ struct PeptideDaysSheet: View {
         let schedule = viewModel.detail?.supportSchedule
         _selected = State(initialValue: Set(schedule.map(PeptideSupportPresentation.seedDays(for:)) ?? []))
         _usesInterval = State(initialValue: schedule?.frequency == .everyXDays)
-        _interval = State(initialValue: max(1, schedule?.intervalDays ?? 1))
+        // Switching a weekly schedule to "every N days" opens at 2, not at
+        // the meaningless "every 1 day".
+        _interval = State(initialValue: schedule?.frequency == .everyXDays ? max(1, schedule?.intervalDays ?? 2) : 2)
     }
 
     private var orderedSelection: [OperatingPlanWeekday] {
@@ -315,8 +328,9 @@ struct PeptideDaysSheet: View {
                                 .foregroundStyle(PhysiqueOSTheme.textPrimary)
                         }
                         .accessibilityIdentifier("operatingPlan.peptide.sheet.days.interval")
+                        PeptideSheetCaption(text: "Counting from your next dose.")
                     } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 8)], alignment: .leading, spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: chipMinimum), spacing: 8)], alignment: .leading, spacing: 8) {
                             ForEach(OperatingPlanWeekday.allCases) { day in
                                 OperatingPlanChoicePill(title: day.shortLabel, isSelected: selected.contains(day), minHeight: 44) {
                                     if selected.contains(day) { selected.remove(day) } else { selected.insert(day) }
@@ -363,11 +377,13 @@ struct PeptideTimeSheet: View {
     let onDismiss: () -> Void
 
     @State private var time: Date
+    private let seedTime: String
 
     init(viewModel: PeptideSupportEditorViewModel, onDismiss: @escaping () -> Void) {
         self.viewModel = viewModel
         self.onDismiss = onDismiss
         let seed = viewModel.detail.map { PeptideSupportPresentation.seedTime(for: $0.supportSchedule) } ?? "08:00"
+        seedTime = seed
         _time = State(initialValue: OperatingPlanDateValues.time(from: seed))
     }
 
@@ -382,7 +398,9 @@ struct PeptideTimeSheet: View {
         PeptideEditorSheet(
             title: "Time",
             isSaving: viewModel.isSaving,
-            canSave: true,
+            // Nothing to save until the wheel moves (an untouched bucket such
+            // as "Evening" is never silently rewritten to an exact time).
+            canSave: localTime != seedTime,
             errorMessage: viewModel.errorMessage,
             onCancel: { viewModel.errorMessage = nil; onDismiss() },
             onSave: save
@@ -422,10 +440,12 @@ struct PeptideNotesSheet: View {
     let onDismiss: () -> Void
 
     @State private var notes: String
+    private let originalNotes: String
 
     init(viewModel: PeptideSupportEditorViewModel, onDismiss: @escaping () -> Void) {
         self.viewModel = viewModel
         self.onDismiss = onDismiss
+        originalNotes = viewModel.detail?.notes ?? ""
         _notes = State(initialValue: viewModel.detail?.notes ?? "")
     }
 
@@ -433,7 +453,7 @@ struct PeptideNotesSheet: View {
         PeptideEditorSheet(
             title: "Notes",
             isSaving: viewModel.isSaving,
-            canSave: true,
+            canSave: notes.trimmingCharacters(in: .whitespacesAndNewlines) != originalNotes.trimmingCharacters(in: .whitespacesAndNewlines),
             errorMessage: viewModel.errorMessage,
             onCancel: { viewModel.errorMessage = nil; onDismiss() },
             onSave: save

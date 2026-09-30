@@ -4364,8 +4364,13 @@ final class FounderServerAPITests: XCTestCase {
         let legacy = try await detail(#"{"id":"reminder-peptide","title":"Retatrutide","status":"Open","completable":true,"sections":[],"completionContext":{"occurrenceDate":"2026-10-01","dose":"1.5 mg","protocolId":"peptide-protocol"},"action":{"label":"View Execution","href":"/profile/operating-plan/execution/peptides/peptide-protocol"},"executionProjection":{"executionId":"execution-peptide","protocolRootId":"peptide-protocol"},"executionContract":{"priorityId":"reminder-peptide","occurrenceDate":"2026-10-01","expectedVersion":9}}"#)
         XCTAssertFalse(legacy.paused)
         XCTAssertNil(legacy.pauseContext)
+        XCTAssertFalse(legacy.doseAdjustable, "No flag (older Server, supplement, recovery): no amount field")
         XCTAssertTrue(legacy.completable)
         XCTAssertEqual(legacy.expectedVersion, 9)
+
+        // The Server flags peptide occurrences only.
+        let adjustable = try await detail(#"{"id":"reminder-peptide","title":"Retatrutide","status":"Open","completable":true,"doseAdjustable":true,"sections":[],"completionContext":{"occurrenceDate":"2026-10-01","dose":"1.5 mg","protocolId":"peptide-protocol"},"executionContract":{"priorityId":"reminder-peptide","occurrenceDate":"2026-10-01","expectedVersion":9}}"#)
+        XCTAssertTrue(adjustable.doseAdjustable)
         XCTAssertNil(legacy.continueActionDestination, "Build 69 behaviour: the unmapped href stays nil")
     }
 
@@ -4378,6 +4383,7 @@ final class FounderServerAPITests: XCTestCase {
         var object = try XCTUnwrap(try JSONSerialization.jsonObject(with: JSONEncoder().encode(occurrence)) as? [String: Any])
         object.removeValue(forKey: "pausedState")
         object.removeValue(forKey: "pauseContext")
+        object.removeValue(forKey: "doseAdjustableState")
         let legacy = try JSONDecoder().decode(PriorityOccurrence.self, from: JSONSerialization.data(withJSONObject: object))
         XCTAssertFalse(legacy.paused)
         XCTAssertNil(legacy.pauseContext)
