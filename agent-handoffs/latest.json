@@ -1,94 +1,55 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T08:15:00Z",
+  "generated_at_utc": "2026-09-30T15:30:00Z",
   "task": {
-    "id": "build71-native-distribution-20260930",
-    "title": "Build 71 UPLOADED and VALID (Native 71164900); Server unchanged; persistent-pairing gate off; awaiting Founder acceptance",
+    "id": "healthkit-sleep-discovery-architecture-20260930",
+    "title": "HealthKit Sleep discovery + canonical architecture (read-only); Founder data shape needs D2 authorization",
     "agent": "claude",
-    "status": "awaiting_acceptance"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "production_server_sha": "4a81f5b4cac981f9241e40b556341246b83c3309",
-    "native_build67_final_sha": "8359bdcb",
-    "native_reviewed_candidate_sha": "dc7763e5",
-    "native_build68_final_sha": "537f538b",
-    "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
-    "native_build68_processing_status": "VALID",
-    "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "4a81f5b4cac981f9241e40b556341246b83c3309",
-    "server_candidate_branch": "claude/build70-integrated-server-20260930",
-    "production_deployment_id": "1fa2121a-5729-49c3-9865-a79f1724bb3f",
-    "previous_production_server_sha": "446bc964dc31318ea48261400e8b243cdd1d4ab1",
-    "native_candidate_sha": "71164900210f689480ed277205bf8a43b6d18ead",
-    "native_candidate_branch": "claude/post70-background-reconcile-photo-viewer-20260930",
-    "native_recommended_build": "71",
-    "codex_celebration_branch": "codex/native-workout-complete-record-celebration-20260928",
-    "codex_celebration_sha": "ef54e482",
-    "native_build69_final_sha": "efa65db1",
-    "native_build69_delivery_id": "91831873-845e-46af-aa6a-bb9629cf9999",
-    "native_build69_processing_status": "VALID",
-    "native_build69_dsym_uuid": "A621757F-1B2A-31FF-9D2D-62FD831781E6",
-    "last_uploaded_build": "71",
-    "peptide_server_branch": "claude/peptide-ux-server-20260929",
-    "peptide_server_sha": "cc440e16",
-    "native_build70_final_sha": "754376c529964eea280e87419ace68a003a9e0fb",
-    "native_build70_delivery_id": "7ed9cf4e-b682-4b86-8f18-fdb4464de6a9",
-    "native_build70_processing_status": "VALID",
-    "native_build70_dsym_uuid": "8CA68E2A-91F1-33E7-9FB4-A4C6610F9EA2",
-    "sender_constrained_enrollment": "OFF (server flag unset; native Info.plist false)",
-    "native_build71_final_sha": "71164900210f689480ed277205bf8a43b6d18ead",
-    "native_build71_delivery_id": "e5e1d800-1100-4f55-be39-509cece826f8",
-    "native_build71_processing_status": "VALID",
-    "native_build71_dsym_uuid": "3263FD34-E4D5-3B9D-920F-B1CFBA09FA05"
+    "base_sha": "71164900210f689480ed277205bf8a43b6d18ead",
+    "final_sha": null,
+    "production_server_sha": "372c306b",
+    "production_deployment": "4dac1b07-8fc6-4ab4-9b8d-7f9c3756ddbb",
+    "native_sha": "71164900210f689480ed277205bf8a43b6d18ead",
+    "native_build": "71"
   },
   "result": {
-    "summary": "Build 71 (1.0 (71), source 71164900, build-number-only diff from a9251927) archived with Xcode, signature/dSYM verified, enrollment gate false, uploaded via Xcode-only tool: delivery e5e1d800 VALID. Disk: 14.2 -> 16.3 GiB via authorized cleanup (5 old archives, stale DerivedData, 15 finished pushed worktrees); 25 GiB not reachable \u2014 dominant consumer is 12 GiB macOS swap. Server unchanged.",
+    "summary": "Read-only Sleep architecture: Native already requests Sleep read and has a dormant localOnly stream; Server has no Sleep contract or deletions. Designed sample->episode->wake-date sleep day (18:00 window) canonicalization, episode-level primary-source reconciliation, hourly background sync with activation floor + deletion/window manifest, minimal Evidence UI, privacy allow-list, phases A-E and a 24-case test matrix. Founder data shape not obtainable without a build or Founder action.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": true,
-    "founder_device_operated": false
+    "testflight_uploaded": false
   },
   "validation": {
-    "tests": {
-      "status": "passed",
-      "summary": "Server 0 new vs prod baseline + build; Native 1575/1575 + Release."
-    },
-    "review": {
-      "status": "passed",
-      "summary": "Fresh-context security/integration reviews of exact combined SHAs: no P0/P1; P2s listed in report; Codex review SHIP."
-    },
-    "replay_fidelity": {
-      "status": "passed",
-      "summary": "Read-only production shapes (peptides, Foam Rolling protocol, weight weeks) verified; no production change."
-    }
+    "tests": {"status": "not_applicable", "summary": "Research/architecture only; no code changed. Claims spot-verified against source at Native 71164900 and Server 4a81f5b4 (identical HealthKit files to prod 372c306b)."},
+    "review": {"status": "not_run", "summary": "No code to review; architecture awaits ChatGPT/Founder review."},
+    "zero_write_audit": {"status": "not_applicable", "summary": "No production reads or writes performed."}
   },
   "decisions_required": [
-    "Founder acceptance of Build 71 on device.",
-    "Optional: reduce memory pressure / review Codex-owned ~6.9 GiB after Photo Intelligence work ends."
+    "D1: prospective Sleep start sleep-day D0 (needed before Phase C canary, not before Phase A/B).",
+    "D2: Founder data-shape check - Option A 2-minute Health app look (Sleep > Data Sources & Access; stages/In Bed/naps yes-no), and/or authorize an on-device-only diagnostic probe in the next Native build.",
+    "D3: whether a bounded 14-night validation_only historical read is wanted solely for UI/design validation (never strategic).",
+    "D4: nap presentation (recommended: secondary episodes in night detail, 'Nap' if 09:00-18:00, headline = main sleep)."
   ],
-  "blockers": [],
+  "blockers": [
+    "Founder Sleep data shape cannot be read without a new Native build or Founder action; stopped per prompt."
+  ],
   "unexpected_findings": [
-    "Sep 28 Activity is still frozen in production (supersedes continue to 837 cal); self-heals at the next-morning complete_day summary."
+    "Native Nutrition observer maps to zero HealthKit sample types, so its background-delivery registration is vacuous (foreground/Activity-wake only).",
+    "Per-sample workout uploads send HKSource.name verbatim (Apple Watch device name may contain a personal name); Server stores it as-is.",
+    "Native deferredChanges store is append-only; a queried localOnly stream would grow state files unboundedly (not triggered today).",
+    "Production Server moved to 372c306b (Codex Photo deploy 4dac1b07) since the last handoff recorded 4a81f5b4; no HealthKit file differences."
   ],
   "backlog": [
-    "Workout Complete performance-record celebration: Codex, pending; integrate on its GH report.",
-    "Cross-device freeze residuals: time-based takeover / missing-metric guard / long-supersede alert.",
-    "Duplicate Logger instance guard; skip 412 auto-refetch; prune notifier/celebration keys.",
-    "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
-    "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
+    "Sleep Phase A (Server dormant contracts + canonicalizer + synthetic tests).",
+    "Sleep Phase B (Native dormant read path behind manifest flag).",
+    "Fix Nutrition observer type mapping; normalize workout sourceName; bound deferredChanges."
   ],
-  "recommended_next_step": "Review the final report; authorize distribution; Founder accepts on device; then start HealthKit Sleep.",
-  "full_report_path": "agent-handoffs/reports/20260930T081500Z-build71-disk-reclamation-and-distribution-final.md",
-  "related_report_paths": [
-    "agent-handoffs/reports/20260930T032500Z-build70-integrated-persistent-pairing-candidate.md",
-    "agent-handoffs/reports/20260930T020500Z-peptide-build70-final-candidate-closeout-v2.md",
-    "agent-handoffs/reports/20260930T014500Z-peptide-build70-verification-checkpoint.md",
-    "agent-handoffs/reports/20260929T182500Z-peptide-build70-final-candidate-closeout.md",
-    "agent-handoffs/reports/20260929T083000Z-peptide-protocol-editor-pause-resume-design-map.md",
-    "agent-handoffs/reports/20260929T050000Z-server-98534bf8-and-native-build69-distribution.md"
-  ],
+  "recommended_next_step": "Founder answers D2 Option A (no build) and reviews the architecture; then issue the Sleep Phase A Server-dormant implementation prompt in section 17 of the report.",
+  "full_report_path": "agent-handoffs/reports/20260930T153000Z-healthkit-sleep-discovery-architecture.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
