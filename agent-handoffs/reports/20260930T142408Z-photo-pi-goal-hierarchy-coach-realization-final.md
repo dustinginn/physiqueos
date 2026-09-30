@@ -2,10 +2,14 @@
 
 Status: **PASS — implementation, fresh review, and authorized zero-write production replay complete; exact current-engine UI copy published; not deployed**
 
-Repository: `dustinginn/physiqueos`  
-Branch: `codex/photo-intelligence-guarded-deploy-20260929`  
-Implementation candidate: `9a89ff903fd587839c53e5f896d5ae9c08d1aaa0`  
-Frozen perception candidate: `0d0f189e8ccddaf69c5d4b833b8c2a82ce49723b`  
+Repository: `dustinginn/physiqueos`
+
+Branch: `codex/photo-intelligence-guarded-deploy-20260929`
+
+Implementation candidate: `9a89ff903fd587839c53e5f896d5ae9c08d1aaa0`
+
+Frozen perception candidate: `0d0f189e8ccddaf69c5d4b833b8c2a82ce49723b`
+
 Task: `agent-handoffs/inbox/prompts/20260930T060000Z-photo-pi-goal-hierarchy-coach-realization.md`
 
 ## Decision
