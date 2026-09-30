@@ -7,13 +7,24 @@ import {
 
 export const CANONICAL_PHOTO_PERCEPTION_VERSION = "canonical_photo_perception_v1";
 export const CANONICAL_PHOTO_PERCEPTION_PROMPT_VERSION =
-  "canonical_photo_perception_goal_blind_v1";
+  "canonical_photo_perception_goal_blind_v2";
 export const PHOTO_ONLY_CONTEXT_BOUNDARY =
   "goal_phase_strategy_and_non_photo_evidence_excluded_from_model_input";
+export const PHOTO_ONLY_BOUNDARY_ATTESTATION_VERSION =
+  "canonical_photo_provider_input_typed_v1";
 
 const DEFAULT_MODEL = "gpt-4.1-mini";
 const COMPARABILITY = ["high", "good", "moderate", "limited", "insufficient"];
 const RELIABILITY = ["high", "moderate", "low", "insufficient"];
+const REQUIRED_ORDER = [
+  "classify source view and pose",
+  "assess global capture comparability dimensions",
+  "assess comparability separately for every proposed observation",
+  "choose visible magnitude",
+  "choose direction only if magnitude supports it",
+  "choose confidence and list confounders",
+  "summarize the photo-only result, including stability where appropriate",
+];
 
 /**
  * Prospective source-analysis producer. Its API deliberately has no Goal,
@@ -31,15 +42,23 @@ export async function interpretCanonicalPhotoPerceptionWithVision({
 } = {}) {
   if (!apiKey) throw new Error("Canonical Photo Perception requires OPENAI_API_KEY.");
   if (typeof fetchImpl !== "function") throw new Error("Canonical Photo Perception requires fetch.");
-  const current = photos.map(normalizePhotoInput);
+  const current = photos.map(normalizePhotoInput).filter((photo) => photo.dataUrl);
   const previous = previousPhotoSet
-    ? { ...previousPhotoSet, photos: (previousPhotoSet.photos ?? []).map(normalizePhotoInput) }
+    ? {
+      captureDate: normalizeDate(previousPhotoSet.captureDate),
+      photos: (previousPhotoSet.photos ?? []).map(normalizePhotoInput).filter((photo) => photo.dataUrl),
+    }
     : null;
-  if (!current.length || !current.some((photo) => photo.dataUrl)) {
+  if (!current.length) {
     throw new Error("Canonical Photo Perception requires current image bytes.");
   }
 
-  const comparisonMetadata = createComparisonMetadata({ captureDate, photos: current, previousPhotoSet: previous });
+  const providerInput = createCanonicalPhotoPerceptionProviderInput({
+    captureDate,
+    photos: current,
+    previousPhotoSet: previous,
+  });
+  assertPhotoOnlyProviderInput(providerInput);
   const response = await fetchImpl("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -51,9 +70,9 @@ export async function interpretCanonicalPhotoPerceptionWithVision({
         {
           role: "user",
           content: [
-            { type: "input_text", text: getCanonicalPhotoPerceptionUserPrompt({ captureDate, photoSetId, photos: current, previousPhotoSet: previous, comparisonMetadata }) },
-            ...current.filter((photo) => photo.dataUrl).map((photo) => ({ type: "input_image", image_url: photo.dataUrl })),
-            ...(previous?.photos ?? []).filter((photo) => photo.dataUrl).map((photo) => ({ type: "input_image", image_url: photo.dataUrl })),
+            { type: "input_text", text: JSON.stringify(providerInput, null, 2) },
+            ...current.map((photo) => ({ type: "input_image", image_url: photo.dataUrl })),
+            ...(previous?.photos ?? []).map((photo) => ({ type: "input_image", image_url: photo.dataUrl })),
           ],
         },
       ],
@@ -71,7 +90,8 @@ export async function interpretCanonicalPhotoPerceptionWithVision({
     captureDate,
     photoSetId,
     model,
-    comparisonMetadata,
+    comparisonMetadata: providerInput.comparison_metadata,
+    boundaryAttested: true,
   });
 }
 
@@ -95,36 +115,49 @@ export function getCanonicalPhotoPerceptionSystemPrompt() {
 
 export function getCanonicalPhotoPerceptionUserPrompt({
   captureDate,
-  photoSetId,
   photos,
   previousPhotoSet,
-  comparisonMetadata,
 }) {
-  return JSON.stringify({
+  return JSON.stringify(createCanonicalPhotoPerceptionProviderInput({
+    captureDate,
+    photos,
+    previousPhotoSet,
+  }), null, 2);
+}
+
+export function createCanonicalPhotoPerceptionProviderInput({
+  captureDate,
+  photos = [],
+  previousPhotoSet = null,
+} = {}) {
+  const current = photos.map(normalizePhotoInput);
+  const previous = (previousPhotoSet?.photos ?? []).map(normalizePhotoInput);
+  const currentDate = normalizeDate(captureDate);
+  const previousDate = normalizeDate(previousPhotoSet?.captureDate);
+  const comparisonMetadata = createComparisonMetadata({
+    captureDate: currentDate,
+    photos: current,
+    previousPhotoSet: previousPhotoSet
+      ? { captureDate: previousDate, photos: previous }
+      : null,
+  });
+  const value = {
     task: "Compare like-for-like current and prior progress photos as visual evidence only.",
     context_boundary: PHOTO_ONLY_CONTEXT_BOUNDARY,
-    photo_set_id: photoSetId,
-    capture_date: captureDate,
+    comparison_label: "photo_comparison_1",
+    capture_date: currentDate,
     comparison_metadata: comparisonMetadata,
-    current_photos: photos.map((photo) => stripImageData(normalizePhotoInput(photo))),
+    current_photos: current.map((photo, index) => providerPhotoMetadata(photo, `current_image_${index + 1}`)),
     previous_photo_set: previousPhotoSet
       ? {
-        photoSetId: previousPhotoSet.photoSetId ?? null,
-        captureDate: previousPhotoSet.captureDate ?? null,
-        photos: (previousPhotoSet.photos ?? [])
-          .map((photo) => stripImageData(normalizePhotoInput(photo))),
+        capture_date: previousDate,
+        photos: previous.map((photo, index) => providerPhotoMetadata(photo, `previous_image_${index + 1}`)),
       }
       : null,
-    required_order: [
-      "classify source view and pose",
-      "assess global capture comparability dimensions",
-      "assess comparability separately for every proposed observation",
-      "choose visible magnitude",
-      "choose direction only if magnitude supports it",
-      "choose confidence and list confounders",
-      "summarize the photo-only result, including stability where appropriate",
-    ],
-  }, null, 2);
+    required_order: [...REQUIRED_ORDER],
+  };
+  assertPhotoOnlyProviderInput(value);
+  return deepFreeze(value);
 }
 
 export function normalizeCanonicalPhotoPerception(output, {
@@ -132,6 +165,7 @@ export function normalizeCanonicalPhotoPerception(output, {
   photoSetId,
   model,
   comparisonMetadata,
+  boundaryAttested = false,
 } = {}) {
   const observations = normalizeStructuredPhotoSemantics(
     (output.observations ?? []).map((item) => ({
@@ -160,8 +194,8 @@ export function normalizeCanonicalPhotoPerception(output, {
   }));
   const result = {
     schemaVersion: CANONICAL_PHOTO_PERCEPTION_VERSION,
-    photoSetId: String(output.photo_set_id ?? photoSetId ?? ""),
-    captureDate: output.capture_date ?? captureDate ?? null,
+    photoSetId: String(photoSetId ?? output.photo_set_id ?? ""),
+    captureDate: normalizeDate(captureDate) ?? normalizeDate(output.capture_date),
     comparisonMetadata: structuredClone(output.comparison_metadata ?? comparisonMetadata ?? {}),
     sourceClassification: structuredClone(output.source_classification ?? {}),
     captureComparability: normalizeCaptureComparability(output.capture_comparability),
@@ -179,6 +213,10 @@ export function normalizeCanonicalPhotoPerception(output, {
       goalContextUsed: false,
       nonPhotoEvidenceUsed: false,
       legacyGoalAwareSourceAccepted: false,
+      photoOnlyContextBoundary: boundaryAttested === true,
+      boundaryAttestationVersion: boundaryAttested === true
+        ? PHOTO_ONLY_BOUNDARY_ATTESTATION_VERSION
+        : null,
     },
   };
   assertProspectivePhotoPerceptionSource(result);
@@ -194,7 +232,9 @@ export function assertProspectivePhotoPerceptionSource(perception) {
     provenance.contextBoundary !== PHOTO_ONLY_CONTEXT_BOUNDARY ||
     provenance.goalContextUsed !== false ||
     provenance.nonPhotoEvidenceUsed !== false ||
-    provenance.legacyGoalAwareSourceAccepted !== false
+    provenance.legacyGoalAwareSourceAccepted !== false ||
+    provenance.photoOnlyContextBoundary !== true ||
+    provenance.boundaryAttestationVersion !== PHOTO_ONLY_BOUNDARY_ATTESTATION_VERSION
   ) {
     throw Object.assign(
       new Error("Prospective canonical Photo Intelligence rejects unverified or legacy goal-aware source analysis."),
@@ -269,29 +309,102 @@ export function stablePerceptionProjection(perception) {
 
 function normalizePhotoInput(photo = {}) {
   return {
-    fileName: String(photo.fileName ?? "photo"),
-    dataUrl: photo.dataUrl ?? null,
+    dataUrl: normalizeImageDataUrl(photo.dataUrl),
     view: normalizeView(photo.view),
     pose: normalizePose(photo.pose),
-    capturedAt: photo.capturedAt ?? null,
-    // Conditions are an explicit allow-list of capture facts. Free-form notes
-    // can contain Goal or strategy language and must not cross the boundary.
     conditions: normalizePhotoConditions(photo.conditions),
   };
 }
 
 function normalizePhotoConditions(value = {}) {
-  const allowed = [
-    "morning", "fasted", "postWorkout", "pump", "sameLighting", "lighting",
-    "location", "timeOfDay", "cameraDistance", "framing", "angle", "clothing",
-    "editing",
-  ];
-  return Object.fromEntries(allowed
-    .filter((key) => ["boolean", "string", "number"].includes(typeof value?.[key]))
-    .map((key) => [key, value[key]]));
+  return Object.fromEntries([
+    "morning", "fasted", "postWorkout", "pump", "sameLighting", "edited",
+  ].filter((key) => typeof value?.[key] === "boolean").map((key) => [key, value[key]]));
 }
 
-function stripImageData({ dataUrl: _dataUrl, ...photo }) { return photo; }
+function providerPhotoMetadata(photo, label) {
+  return {
+    label,
+    view: photo.view,
+    pose: photo.pose,
+    conditions: structuredClone(photo.conditions),
+  };
+}
+
+export function assertPhotoOnlyProviderInput(value) {
+  assertExactKeys(value, [
+    "task", "context_boundary", "comparison_label", "capture_date",
+    "comparison_metadata", "current_photos", "previous_photo_set", "required_order",
+  ], "provider input");
+  if (value.task !== "Compare like-for-like current and prior progress photos as visual evidence only." ||
+      value.context_boundary !== PHOTO_ONLY_CONTEXT_BOUNDARY ||
+      value.comparison_label !== "photo_comparison_1") {
+    throw boundaryError("Provider input contains an unrecognized instruction or label.");
+  }
+  assertNormalizedDate(value.capture_date, "capture_date");
+  assertComparisonMetadata(value.comparison_metadata);
+  assertProviderPhotos(value.current_photos, "current_image");
+  if (value.previous_photo_set !== null) {
+    assertExactKeys(value.previous_photo_set, ["capture_date", "photos"], "previous photo set");
+    assertNormalizedDate(value.previous_photo_set.capture_date, "previous capture_date");
+    assertProviderPhotos(value.previous_photo_set.photos, "previous_image");
+  }
+  if (JSON.stringify(value.required_order) !== JSON.stringify(REQUIRED_ORDER)) {
+    throw boundaryError("Provider processing order is invalid.");
+  }
+  return true;
+}
+
+function assertProviderPhotos(photos, prefix) {
+  if (!Array.isArray(photos)) throw boundaryError("Provider photos must be an array.");
+  photos.forEach((photo, index) => {
+    assertExactKeys(photo, ["label", "view", "pose", "conditions"], "provider photo");
+    if (photo.label !== `${prefix}_${index + 1}` ||
+        !["front", "back", "side", "unknown"].includes(photo.view) ||
+        !["relaxed", "flexed", "unknown"].includes(photo.pose)) {
+      throw boundaryError("Provider photo metadata is not normalized.");
+    }
+    assertExactKeys(photo.conditions, ["morning", "fasted", "postWorkout", "pump", "sameLighting", "edited"], "photo conditions", true);
+    if (Object.values(photo.conditions).some((item) => typeof item !== "boolean")) {
+      throw boundaryError("Provider photo conditions must be boolean facts.");
+    }
+  });
+}
+
+function assertComparisonMetadata(value) {
+  assertExactKeys(value, [
+    "current_capture_date", "previous_capture_date", "days_elapsed", "current_view",
+    "current_pose", "previous_view", "previous_pose", "match_status",
+  ], "comparison metadata");
+  assertNormalizedDate(value.current_capture_date, "current comparison date");
+  assertNormalizedDate(value.previous_capture_date, "previous comparison date");
+  if (value.days_elapsed !== null && (!Number.isInteger(value.days_elapsed) || Math.abs(value.days_elapsed) > 36600)) {
+    throw boundaryError("Comparison day interval is invalid.");
+  }
+  if (!["front", "back", "side", "unknown"].includes(value.current_view) ||
+      !["front", "back", "side", "unknown"].includes(value.previous_view) ||
+      !["relaxed", "flexed", "unknown"].includes(value.current_pose) ||
+      !["relaxed", "flexed", "unknown"].includes(value.previous_pose) ||
+      !["exact_match", "mismatch", "baseline"].includes(value.match_status)) {
+    throw boundaryError("Comparison metadata is not normalized.");
+  }
+}
+
+function assertExactKeys(value, allowed, label, subset = false) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw boundaryError(`${label} must be an object.`);
+  const keys = Object.keys(value);
+  if (keys.some((key) => !allowed.includes(key)) || (!subset && allowed.some((key) => !keys.includes(key)))) {
+    throw boundaryError(`${label} has unsupported fields.`);
+  }
+}
+
+function assertNormalizedDate(value, label) {
+  if (value !== null && !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw boundaryError(`${label} is not normalized.`);
+}
+
+function boundaryError(message) {
+  return Object.assign(new Error(message), { code: "PHOTO_PERCEPTION_INPUT_BOUNDARY_VIOLATION" });
+}
 
 function createComparisonMetadata({ captureDate, photos, previousPhotoSet }) {
   const previousDate = previousPhotoSet?.captureDate ?? null;
@@ -314,6 +427,23 @@ function createComparisonMetadata({ captureDate, photos, previousPhotoSet }) {
 function dateDifference(start, end) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(start ?? "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(end ?? ""))) return null;
   return Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000);
+}
+
+function normalizeDate(value) {
+  const text = String(value ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(text)) return null;
+  const date = text.slice(0, 10);
+  const parsed = new Date(`${date}T00:00:00Z`);
+  return Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== date ? null : date;
+}
+
+function normalizeImageDataUrl(value) {
+  if (value == null) return null;
+  const text = String(value);
+  if (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(text)) {
+    throw boundaryError("Photo bytes must use a supported base64 image data URL.");
+  }
+  return text;
 }
 
 function normalizeView(value) {
