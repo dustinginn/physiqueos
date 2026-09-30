@@ -163,9 +163,14 @@ final class PhotoProcessingUXTests: XCTestCase {
         XCTAssertFalse(history.contains("Button { selectedPhotoSet = set } label: {\n                        HStack(alignment: .top, spacing: 14)"))
         let briefing = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Briefings/PhotoBriefingSections.swift"), encoding: .utf8)
         let grid = try XCTUnwrap(briefing.range(of: "private var photoGrid"))
-        let gridSource = String(briefing[grid.lowerBound...].prefix(900))
+        let gridSource = String(briefing[grid.lowerBound...].prefix(1_500))
         XCTAssertFalse(gridSource.contains("Button {"), "the briefing photo grid must not wrap tiles in a Button")
-        XCTAssertTrue(gridSource.contains(".onTapGesture"))
+        // The tap is a gesture on the tile (never a Button around it): the shared
+        // inspection modifier owns it.
+        XCTAssertTrue(gridSource.contains(".inspectsPhoto("))
+        let viewer = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/SharedUI/PhotoInspectionViewer.swift"), encoding: .utf8)
+        XCTAssertTrue(viewer.contains(".onTapGesture"))
+        XCTAssertFalse(viewer.contains("Button { request"), "the viewer's tap target must not be a Button around the tile")
     }
 
     func testReadPhotoBriefingIsGatedOnServerAvailabilityInProduction() throws {

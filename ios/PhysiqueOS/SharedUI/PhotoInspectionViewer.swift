@@ -92,12 +92,17 @@ struct PhotoInspectionViewer: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     let request: PhotoInspectionRequest
+    /// Decoded images supplied by item id, used ahead of the stores. Lets the
+    /// viewer render deterministically (previews, the visual/interaction test)
+    /// without media transport; production callers never set it.
+    var injectedImages: [String: UIImage] = [:]
     @State private var selection: Int
     @State private var dragOffset: CGFloat = 0
     @State private var isZoomed = false
 
-    init(request: PhotoInspectionRequest) {
+    init(request: PhotoInspectionRequest, injectedImages: [String: UIImage] = [:]) {
         self.request = request
+        self.injectedImages = injectedImages
         _selection = State(initialValue: min(max(request.startIndex, 0), max(request.items.count - 1, 0)))
     }
 
@@ -110,7 +115,7 @@ struct PhotoInspectionViewer: View {
             Color.black.ignoresSafeArea()
             TabView(selection: $selection) {
                 ForEach(Array(request.items.enumerated()), id: \.element.id) { index, item in
-                    PhotoInspectionPage(item: item, onZoomChange: { zoomed in
+                    PhotoInspectionPage(item: item, injectedImage: injectedImages[item.id], onZoomChange: { zoomed in
                         if index == selection { isZoomed = zoomed }
                     })
                     .tag(index)
@@ -187,6 +192,7 @@ struct PhotoInspectionViewer: View {
 private struct PhotoInspectionPage: View {
     @Environment(AppEnvironment.self) private var environment
     let item: PhotoInspectionItem
+    var injectedImage: UIImage? = nil
     let onZoomChange: (Bool) -> Void
 
     var body: some View {
@@ -215,6 +221,7 @@ private struct PhotoInspectionPage: View {
     }
 
     private var resolvedState: PageState {
+        if let injectedImage { return .image(injectedImage) }
         switch item.source {
         case .authenticatedProduction(let mediaId):
             let store = environment.founderProductionPhotoMediaStore
@@ -283,7 +290,11 @@ struct ZoomableImageView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(onZoomChange: onZoomChange) }
 
     func makeUIView(context: Context) -> UIScrollView {
-        let scroll = UIScrollView()
+        let scroll = FittingScrollView()
+        // The scroll view has no size until SwiftUI lays it out, and
+        // `updateUIView` is not called again for a plain layout pass, so the
+        // image is fitted from the scroll view's own `layoutSubviews`.
+        scroll.onLayout = { [weak coordinator = context.coordinator] scroll in coordinator?.layoutImage(in: scroll) }
         scroll.delegate = context.coordinator
         scroll.minimumZoomScale = 1
         scroll.maximumZoomScale = maximumZoom
@@ -293,7 +304,7 @@ struct ZoomableImageView: UIViewRepresentable {
         scroll.contentInsetAdjustmentBehavior = .never
         scroll.backgroundColor = .clear
         let imageView = UIImageView(image: image)
-        imageView.contentMode = .scaleAspectFit
+        imageView.contentMode = .scaleToFill
         imageView.isUserInteractionEnabled = true
         scroll.addSubview(imageView)
         context.coordinator.imageView = imageView
@@ -311,6 +322,14 @@ struct ZoomableImageView: UIViewRepresentable {
         context.coordinator.layoutImage(in: scroll)
     }
 
+    final class FittingScrollView: UIScrollView {
+        var onLayout: ((UIScrollView) -> Void)?
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            onLayout?(self)
+        }
+    }
+
     final class Coordinator: NSObject, UIScrollViewDelegate {
         var imageView: UIImageView?
         var onZoomChange: (Bool) -> Void
@@ -323,21 +342,37 @@ struct ZoomableImageView: UIViewRepresentable {
         func layoutImage(in scroll: UIScrollView) {
             guard let imageView, scroll.bounds.size != .zero else { return }
             if scroll.zoomScale == 1 || lastBounds != scroll.bounds.size {
-                imageView.frame = CGRect(origin: .zero, size: scroll.bounds.size)
-                scroll.contentSize = scroll.bounds.size
+                scroll.zoomScale = 1
+                imageView.transform = .identity
+                // The image view is exactly the aspect-fit rect, so zooming and
+                // panning only ever move over photo pixels, never letterbox bars.
+                let fitted = Self.fittedSize(of: imageView.image?.size ?? scroll.bounds.size, in: scroll.bounds.size)
+                imageView.frame = CGRect(origin: .zero, size: fitted)
+                scroll.contentSize = fitted
+                centerImage(in: scroll)
             }
             lastBounds = scroll.bounds.size
         }
 
-        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        static func fittedSize(of image: CGSize, in bounds: CGSize) -> CGSize {
+            guard image.width > 0, image.height > 0, bounds.width > 0, bounds.height > 0 else { return bounds }
+            let scale = min(bounds.width / image.width, bounds.height / image.height)
+            return CGSize(width: image.width * scale, height: image.height * scale)
+        }
+
+        /// Keeps the image centred while it is smaller than the viewport.
+        func centerImage(in scrollView: UIScrollView) {
             guard let imageView else { return }
-            // Keep the (fit) image centred while it is smaller than the viewport.
             let offsetX = max((scrollView.bounds.width - scrollView.contentSize.width) / 2, 0)
             let offsetY = max((scrollView.bounds.height - scrollView.contentSize.height) / 2, 0)
             imageView.center = CGPoint(
                 x: scrollView.contentSize.width / 2 + offsetX,
                 y: scrollView.contentSize.height / 2 + offsetY
             )
+        }
+
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            centerImage(in: scrollView)
             onZoomChange(scrollView.zoomScale > 1.01)
         }
 
