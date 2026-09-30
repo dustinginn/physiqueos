@@ -1,0 +1,226 @@
+{
+  "schemaVersion": "photo_intelligence_goal_bias_invariance_audit_v1",
+  "auditTimestamp": "2026-09-30T03:27:18Z",
+  "authority": {
+    "deployedSha": "446bc964dc31318ea48261400e8b243cdd1d4ab1",
+    "deploymentId": "3e87b8a7-8af6-4280-9cfd-b7437ff5f995",
+    "productionMutated": false,
+    "historicalArtifactsRegenerated": false,
+    "nativeTouched": false,
+    "candidateSha": "1f7709aeee569977c2905978d19695db64b2f566"
+  },
+  "sourcePairs": [
+    {
+      "poseId": "front-relaxed",
+      "previous": { "objectId": "01a054d6-a9c5-700e-8ae9-cb449a0fab36", "sha256": "1f0c12f8e78c4dfd1fdbde9da9e5ee81d7e6c1342217bb9543b5fdcb60ed4c2a" },
+      "current": { "objectId": "01a0bf14-a31b-72f8-95e8-b9fb829018b6", "sha256": "b5dbc454412668656d012e0d379569b1e427de0d22079badaa3ef31553c2d87e" }
+    },
+    {
+      "poseId": "back-relaxed",
+      "previous": { "objectId": "01a054d6-a884-744d-ac0c-307fb604ea52", "sha256": "12438ffb37f07cde9c789354d468604a64ef0e2f423382bf1b18405526b15d5a" },
+      "current": { "objectId": "01a0bf14-9d04-75eb-8287-517e90003a79", "sha256": "35c8f1ab3727bcb96e65df1d3aac4853c769cc2dfe15f7391c1248ec9c7394c8" }
+    },
+    {
+      "poseId": "back-flexed",
+      "previous": { "objectId": "01a054d6-a827-766f-9546-dc4874c6f357", "sha256": "4633c286f2c294350373d94eaa3bb96dc0643f0c1162a8e0ec65eeb45644348c" },
+      "current": { "objectId": "01a0bf14-9f0e-722a-b374-b97e883af143", "sha256": "58b31fedffb4dc8566e01b7e32ace7685d0066421d86a080334bcd8533a46dc7" }
+    },
+    {
+      "poseId": "right-side-relaxed",
+      "previous": { "objectId": "01a054d6-a92d-7160-a2a4-dc63a64ac249", "sha256": "e1eb4d6aec0402b5978597bd8c6679f8153e2ba33a491babb87c851943b73c0e" },
+      "current": { "objectId": "01a0bf14-a130-765d-9727-bb61af16011a", "sha256": "ff486c647f460c5b105cb949d07fdea69fde1937cb9ed92b9b4849fcb01adf00" }
+    },
+    {
+      "poseId": "front-flexed",
+      "previous": { "objectId": "01a054d6-a941-77ce-b8c9-b8d063017a3d", "sha256": "c37b4088724105f2c6e01f6106a03713b7e6451f020798d5d78ccfdd236ed600" },
+      "current": { "objectId": "01a0bf14-9afe-713a-a000-bb9f706cdf22", "sha256": "5b31bd423dc1ad5f3d35bf60bbeff25592c240bf35562bf7af0ce973c752098c" }
+    }
+  ],
+  "legacyProvenance": {
+    "storedSchema": 13,
+    "createdAtRange": ["2026-09-20T17:07:00Z", "2026-09-20T17:09:00Z"],
+    "producer": "PhotoInterpreterService.interpretPhotoSetWithVision",
+    "model": "gpt-4.1-mini",
+    "bestAvailableProducerSourceBlobSha256": "9e18e3085557f9bb4b85626227c478f6ff8bf58d",
+    "bestAvailableProducerSourceCommit": "ebce7b97c31184ea95a7fe7d4b4d9435ae641c6b",
+    "historicalSourceRevisionConfidence": "strong timestamp and code-path attribution, but not cryptographically attestable from the stored schema-13 record",
+    "storedInterpreterVersion": "photo-interpreter-production-v1",
+    "storedModel": null,
+    "storedPromptPolicyVersion": null,
+    "storedPromptHash": null,
+    "goalContextSupplied": "Active primary goal: Build Lean Mass. Active phase: Lean Mass Build. Operating state: calibration. Completed prior goal: Visible abs at rest. Photo evidence date: 2026-09-19.",
+    "promptPolicyFindings": [
+      "Goal context entered the same model request that produced structured visual observations.",
+      "The system prompt asked whether the overall physique appeared meaningfully improved and made conditioning an explicit category.",
+      "The system prompt enumerated abs, waist, softness, leanness and cut-specific heuristics, including During a cut.",
+      "The stored result embeds goal-relative trajectory, strategy and coaching fields alongside source observations.",
+      "The exact request cannot be cryptographically reconstructed because model and prompt-version/hash were not persisted."
+    ]
+  },
+  "goalInvariance": {
+    "method": "Each exact source pair was sent once to the isolated photo-only candidate. The returned perception object was frozen, then the same bytes of canonical perception were reused downstream for A goal-blind, B Visible Abs, and C Build Lean Mass plus guardrail interpretation.",
+    "contexts": {
+      "A": null,
+      "B": { "activeGoal": { "title": "Visible Abs" } },
+      "C": { "activeGoal": { "title": "Build Lean Mass" }, "guardrail": { "bodyFatPercentage": "accepted 8-9% range" } }
+    },
+    "requiredFieldDiff": {
+      "sourceClassification": { "A_equals_B_equals_C": true },
+      "captureComparability": { "A_equals_B_equals_C": true },
+      "observations": { "A_equals_B_equals_C": true },
+      "direction": { "A_equals_B_equals_C": true },
+      "apparentMagnitude": { "A_equals_B_equals_C": true },
+      "confidence": { "A_equals_B_equals_C": true },
+      "confounders": { "A_equals_B_equals_C": true },
+      "overallPhotoOnlyMagnitude": { "A_equals_B_equals_C": true },
+      "photoOnlyReliability": { "A_equals_B_equals_C": true }
+    },
+    "allowedDownstreamDiff": {
+      "A": { "direction": "goal_blind" },
+      "B": { "direction": "neutral", "interpretation": "Leanness appears maintained, with limited further visual fat-loss progress." },
+      "C": { "direction": "neutral", "interpretation": "The photo evidence does not establish a clear build direction." }
+    },
+    "perView": [
+      {
+        "poseId": "front-relaxed",
+        "overallPhotoOnlyMagnitude": "none",
+        "photoOnlyReliability": "moderate",
+        "observations": [
+          "leanness:stable:none:moderate:good",
+          "abdominal_definition:stable:none:low:limited",
+          "muscularity:stable:none:moderate:good",
+          "whole_body_softness:stable:none:high:high",
+          "visual_stability:stable:none:high:high"
+        ]
+      },
+      {
+        "poseId": "back-relaxed",
+        "overallPhotoOnlyMagnitude": "none",
+        "photoOnlyReliability": "moderate",
+        "observations": [
+          "muscularity:stable:none:moderate:high",
+          "whole_body_softness:stable:none:low:moderate",
+          "leanness:stable:none:moderate:high"
+        ]
+      },
+      {
+        "poseId": "back-flexed",
+        "overallPhotoOnlyMagnitude": "none",
+        "photoOnlyReliability": "moderate",
+        "observations": [
+          "leanness:stable:none:moderate:good",
+          "abdominal_definition:stable:none:moderate:limited",
+          "whole_body_softness:stable:none:moderate:good",
+          "muscularity:stable:none:moderate:good",
+          "visual_stability:stable:none:high:high"
+        ]
+      },
+      {
+        "poseId": "right-side-relaxed",
+        "overallPhotoOnlyMagnitude": "none",
+        "photoOnlyReliability": "moderate",
+        "observations": [
+          "leanness:stable:none:moderate:good",
+          "abdominal_definition:stable:none:moderate:good",
+          "whole_body_softness:stable:none:moderate:good",
+          "muscularity:stable:none:moderate:good",
+          "visual_stability:stable:none:high:high"
+        ]
+      },
+      {
+        "poseId": "front-flexed",
+        "overallPhotoOnlyMagnitude": "none",
+        "photoOnlyReliability": "moderate",
+        "observations": [
+          "leanness:stable:none:moderate:good",
+          "abdominal_definition:stable:none:moderate:good",
+          "whole_body_softness:stable:none:moderate:good",
+          "muscularity:stable:none:moderate:good",
+          "visual_stability:stable:none:high:high"
+        ]
+      }
+    ]
+  },
+  "deployedBlankGoalControl": {
+    "meaning": "This is the deployed 446bc964 raw-image producer with goalContext blank. Its system prompt remains cut/leanness oriented, so this is not a valid goal-blind producer.",
+    "perViewDirectionalClaims": {
+      "front-relaxed": ["waist/torso leanness decreased:moderate", "abdominal_definition increased:subtle", "chest/arms muscularity stable:none"],
+      "back-relaxed": ["lower-back/waist leanness increased:subtle", "upper-back muscularity stable:none"],
+      "back-flexed": ["waist/lower-back leanness increased:subtle", "upper-back/shoulder muscularity stable:none"],
+      "right-side-relaxed": ["abdomen/torso leanness increased:subtle", "shoulder/arm muscularity stable:none"],
+      "front-flexed": ["waist/torso leanness increased:moderate", "abdominal_definition increased:subtle", "shoulder/arm muscularity stable:none"]
+    },
+    "additionalSemanticDefect": "The front-relaxed machine direction says leanness decreased while its change text says waist circumference reduced and taper improved. Direction and prose conflict."
+  },
+  "legacyVsGoalBlindVsCurrentSet": [
+    {
+      "poseId": "front-relaxed",
+      "legacyStored": "Shoulder and arm muscularity increased; waist leanness and abdominal definition increased.",
+      "goalBlindRaw": "Leanness, abdominal definition, muscularity, softness and overall visual state stable.",
+      "currentSet": "Reuses the legacy directional findings; no pixel re-analysis."
+    },
+    {
+      "poseId": "back-relaxed",
+      "legacyStored": "Waist leanness increased; conditioning increased; upper-back muscularity stable.",
+      "goalBlindRaw": "Back leanness, upper-back muscularity and whole-body softness stable.",
+      "currentSet": "Reuses the legacy directional findings; no pixel re-analysis."
+    },
+    {
+      "poseId": "back-flexed",
+      "legacyStored": "Back leanness increased pronounced; waist softness decreased moderate; muscularity stable.",
+      "goalBlindRaw": "Leanness, softness and muscularity stable; abdominal-definition claim limited by the rear view.",
+      "currentSet": "Reuses the legacy directional findings; no pixel re-analysis."
+    },
+    {
+      "poseId": "right-side-relaxed",
+      "legacyStored": "Waist leanness increased and softness decreased moderate; shoulder/arm muscularity stable.",
+      "goalBlindRaw": "Leanness, abdominal definition, softness and muscularity stable.",
+      "currentSet": "Reuses the legacy directional findings; no pixel re-analysis."
+    },
+    {
+      "poseId": "front-flexed",
+      "legacyStored": "Waist leanness and abdominal definition increased moderate; chest/shoulder muscularity stable; arm direction insufficient.",
+      "goalBlindRaw": "Leanness, abdominal definition, softness and muscularity stable.",
+      "currentSet": "Reuses the legacy directional findings; no pixel re-analysis."
+    }
+  ],
+  "comparabilityDiagnosis": {
+    "deployedSetBehavior": "canonical_photo_intelligence_set_v1 derives high set comparability from five exact pose/view matches and zero unmatched views. It does not model metric-specific claim applicability.",
+    "legacyBehavior": "Legacy source analyses describe global pose/view comparability and then emit directional observations. Camera scale, lighting, pump and rear arm/scapular geometry are not carried as enforceable observation-specific gates.",
+    "candidateBehavior": "Each observation records rating, applicable claims, compromised claims and rationale. Global capture dimensions remain separate. Small apparent differences must receive more confidence penalty from capture differences.",
+    "importantDistinction": "A pair can support broad stability or no obvious deterioration while remaining limited for subtle waist-width, taper, circumference, definition or muscle-size direction."
+  },
+  "correctiveCandidate": {
+    "sha": "1f7709aeee569977c2905978d19695db64b2f566",
+    "producer": "canonical_photo_perception_service",
+    "producerVersion": "canonical_photo_perception_v1",
+    "promptPolicyVersion": "canonical_photo_perception_goal_blind_v1",
+    "contextBoundary": "goal_phase_strategy_and_non_photo_evidence_excluded_from_model_input",
+    "model": "gpt-4.1-mini",
+    "behavior": [
+      "Prospective canonical confirmation calls a perception API with no Goal parameter.",
+      "Only allow-listed photo capture conditions enter the prompt; free-form notes are stripped.",
+      "Perception is normalized and frozen before Goal interpretation.",
+      "Observation-specific comparability is first-class.",
+      "Prospective inputs reject unverified or legacy goal-aware source provenance.",
+      "Producer, model, prompt policy and explicit context boundary are persisted.",
+      "Existing historical analyses and Photo Briefings are not migrated or rewritten."
+    ]
+  },
+  "privacyAndZeroWrite": {
+    "productionDatabase": "REPEATABLE READ READ ONLY; explicit rollback",
+    "productionObjectStorage": "read-only source resolution; no object mutation",
+    "providerUse": "The ten exact JPEG analysis renditions were sent under explicit Founder authorization solely for this audit.",
+    "providerTemporaryResponsesDeleted": true,
+    "photoBytesOrPrivatePathsCommitted": false
+  },
+  "validation": {
+    "targetedTestFiles": 8,
+    "targetedTests": 144,
+    "targetedTestsPassed": 144,
+    "eslint": "passed",
+    "productionBuild": "passed",
+    "case1FrozenSha256": "52f45d6261b81528873c62575eee40117709fd7d63fdc69e1d9965472aba3a7d",
+    "case2FrozenSha256": "255249d13d49f6e99c261bf283f161ee7cce88a6c5064954d2c0623657899f03"
+  }
+}
