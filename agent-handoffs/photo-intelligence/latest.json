@@ -1,11 +1,11 @@
 {
   "schema_version": 4,
-  "generated_at_utc": "2026-09-30T04:54:50Z",
+  "generated_at_utc": "2026-09-30T05:26:35Z",
   "task": {
-    "id": "photo-perception-boundary-fix-and-sep19-replay-20260930",
-    "title": "Typed perception boundary correction and Sep 19 zero-write replay",
+    "id": "photo-goal-hierarchy-coach-realization-20260930",
+    "title": "Goal-relative hierarchy and Photo Briefing coach realization",
     "agent": "codex",
-    "status": "replay_complete_copy_acceptance_failed"
+    "status": "implementation_complete_replay_privacy_authorization_required"
   },
   "repository": "dustinginn/physiqueos",
   "frozen_blind_results": {
@@ -87,6 +87,30 @@
     },
     "production_changed": false
   },
+  "goal_hierarchy_coach_realization": {
+    "status": "implementation_complete_replay_privacy_authorization_required",
+    "candidate": "9a89ff903fd587839c53e5f896d5ae9c08d1aaa0",
+    "frozen_perception_candidate": "0d0f189e8ccddaf69c5d4b833b8c2a82ce49723b",
+    "report": "agent-handoffs/reports/20260930T052635Z-photo-pi-goal-hierarchy-coach-realization-checkpoint.md",
+    "implemented": [
+      "authoritative Goal target/guardrail projection",
+      "primary-objective/guardrail/supporting/execution evidence hierarchy",
+      "Goal-relative compatibility",
+      "concise nonredundant UI-order realization"
+    ],
+    "validation": {
+      "relevant_available_tests": "78/78 passed across 7 files",
+      "focused_downstream_tests": "43/43 passed across 3 files",
+      "lint": "passed",
+      "build": "passed",
+      "perception_diff_from_frozen_candidate": "empty"
+    },
+    "replay": {
+      "completed": false,
+      "blocker": "explicit authorization required after disclosure that ten private Founder images will be submitted to the configured OpenAI vision provider",
+      "production_mutated": false
+    }
+  },
   "safety": {
     "frozen_blind_results_changed": false,
     "contains_photo_bytes": false,
@@ -95,5 +119,5 @@
     "deployed": true,
     "testflight_uploaded": false
   },
-  "next_step": "Review the exact replay report. Accept the isolated provider-boundary correction, but do not supersede production until a separately authorized narrow Goal-guardrail projection and deterministic copy-realization correction passes review."
+  "next_step": "After explicit privacy authorization for the disclosed private-image transfer to the configured OpenAI vision provider, run the fresh zero-write Sep 19 replay on candidate 9a89ff90, publish exact UI-order copy and provenance, and do not deploy."
 }
