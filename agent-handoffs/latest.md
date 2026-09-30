@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Sleep discovery + canonical architecture (read-only); Founder data shape needs D2 authorization (`healthkit-sleep-discovery-architecture-20260930`)
+- Task: HealthKit Sleep Phase A: dormant Server foundation (candidate; NOT DEPLOYED) (`healthkit-sleep-phase-a-server-foundation-20260930`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-30T15:30:00Z
+- Generated (UTC): 2026-09-30T18:06:53Z
 - Success: true
 
-Summary: Read-only Sleep architecture: Native already requests Sleep read and has a dormant localOnly stream; Server has no Sleep contract or deletions. Designed sample->episode->wake-date sleep day (18:00 window) canonicalization, episode-level primary-source reconciliation, hourly background sync with activation floor + deletion/window manifest, minimal Evidence UI, privacy allow-list, phases A-E and a 24-case test matrix. Founder data shape not obtainable without a build or Founder action.
+Summary: Dormant Sleep Phase A Server foundation on branch claude/healthkit-sleep-phase-a-server-20260930 @ e1e56be6 (base = prod 372c306b): healthkit.sleep.ingest.v1 (samples, deletions/tombstones, bounded window manifest; 409 with nothing stored when the activation policy is absent), privacy-safe sample contract, dedicated healthKitSleepSamples/healthKitSleepDays with scoped occurrence_date reads (existing index, no migration), pure sleep-canon-v1 (18:00 wake-date day, <=60 min episodes, single primary lane, no hybrid totals), fail-closed activation + source-preference policies (Oura preference is a later one-record write, nothing hard-coded), disabled Native manifest capability, structural strategic quarantine. Three fresh-review rounds; no remaining blockers/should-fix. Not deployed; no policy written; no Founder Sleep ingested.
 
-Detailed report: `agent-handoffs/reports/20260930T153000Z-healthkit-sleep-discovery-architecture.md`
+Detailed report: `agent-handoffs/reports/20260930T180653Z-healthkit-sleep-phase-a-server-foundation.md`
 
 Protocol: `agent-handoffs/README.md`

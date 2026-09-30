@@ -1,55 +1,60 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T15:30:00Z",
+  "generated_at_utc": "2026-09-30T18:06:53Z",
   "task": {
-    "id": "healthkit-sleep-discovery-architecture-20260930",
-    "title": "HealthKit Sleep discovery + canonical architecture (read-only); Founder data shape needs D2 authorization",
+    "id": "healthkit-sleep-phase-a-server-foundation-20260930",
+    "title": "HealthKit Sleep Phase A: dormant Server foundation (candidate; NOT DEPLOYED)",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "71164900210f689480ed277205bf8a43b6d18ead",
-    "final_sha": null,
+    "base_sha": "372c306ba45ffaa0f93f7bf74e4c0c266070d9a5",
+    "final_sha": "e1e56be696b558762544cd59fa801d7d749a8b76",
     "production_server_sha": "372c306b",
-    "production_deployment": "4dac1b07-8fc6-4ab4-9b8d-7f9c3756ddbb",
+    "production_deployment": "efd356b0-99ad-4928-90cf-a037024c28eb",
     "native_sha": "71164900210f689480ed277205bf8a43b6d18ead",
     "native_build": "71"
   },
   "result": {
-    "summary": "Read-only Sleep architecture: Native already requests Sleep read and has a dormant localOnly stream; Server has no Sleep contract or deletions. Designed sample->episode->wake-date sleep day (18:00 window) canonicalization, episode-level primary-source reconciliation, hourly background sync with activation floor + deletion/window manifest, minimal Evidence UI, privacy allow-list, phases A-E and a 24-case test matrix. Founder data shape not obtainable without a build or Founder action.",
+    "summary": "Dormant Sleep Phase A Server foundation on branch claude/healthkit-sleep-phase-a-server-20260930 @ e1e56be6 (base = prod 372c306b): healthkit.sleep.ingest.v1 (samples, deletions/tombstones, bounded window manifest; 409 with nothing stored when the activation policy is absent), privacy-safe sample contract, dedicated healthKitSleepSamples/healthKitSleepDays with scoped occurrence_date reads (existing index, no migration), pure sleep-canon-v1 (18:00 wake-date day, <=60 min episodes, single primary lane, no hybrid totals), fail-closed activation + source-preference policies (Oura preference is a later one-record write, nothing hard-coded), disabled Native manifest capability, structural strategic quarantine. Three fresh-review rounds; no remaining blockers/should-fix. Not deployed; no policy written; no Founder Sleep ingested.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
-    "tests": {"status": "not_applicable", "summary": "Research/architecture only; no code changed. Claims spot-verified against source at Native 71164900 and Server 4a81f5b4 (identical HealthKit files to prod 372c306b)."},
-    "review": {"status": "not_run", "summary": "No code to review; architecture awaits ChatGPT/Founder review."},
-    "zero_write_audit": {"status": "not_applicable", "summary": "No production reads or writes performed."}
+    "tests": {
+      "status": "passed",
+      "summary": "81 new tests pass at e1e56be6; full unit suite 304 failed/9460 passed with a failure set identical to base 372c306b (304 pre-existing, environmental); production build exit 0; eslint clean on changed files."
+    },
+    "review": {
+      "status": "approved",
+      "summary": "Independent fresh review, 3 rounds with randomized convergence harness; blocker (zero-length sample) and should-fix items (recompute closure incl. extreme zone skew, device-UUID bundle ids, lenient timestamps) fixed; final fuzz 0/600 failures; no remaining blockers/should-fix."
+    },
+    "zero_write_audit": {
+      "status": "not_applicable",
+      "summary": "Not deployed; no production reads of Founder data and no production writes."
+    }
   },
   "decisions_required": [
-    "D1: prospective Sleep start sleep-day D0 (needed before Phase C canary, not before Phase A/B).",
-    "D2: Founder data-shape check - Option A 2-minute Health app look (Sleep > Data Sources & Access; stages/In Bed/naps yes-no), and/or authorize an on-device-only diagnostic probe in the next Native build.",
-    "D3: whether a bounded 14-night validation_only historical read is wanted solely for UI/design validation (never strategic).",
-    "D4: nap presentation (recommended: secondary episodes in night detail, 'Nap' if 09:00-18:00, headline = main sleep)."
+    "D1: Founder start sleep day D0 + zone + mode (recommended validation_only 2-3 nights then operational) for the Sleep activation policy - needed before Phase C only.",
+    "Authorize writing the Sleep source-preference record (Oura) and a guarded policy runner when Phase C is approved.",
+    "Authorize including this dormant Server code in a future Server deploy."
   ],
-  "blockers": [
-    "Founder Sleep data shape cannot be read without a new Native build or Founder action; stopped per prompt."
-  ],
+  "blockers": [],
   "unexpected_findings": [
-    "Native Nutrition observer maps to zero HealthKit sample types, so its background-delivery registration is vacuous (foreground/Activity-wake only).",
-    "Per-sample workout uploads send HKSource.name verbatim (Apple Watch device name may contain a personal name); Server stores it as-is.",
-    "Native deferredChanges store is append-only; a queried localOnly stream would grow state files unboundedly (not triggered today).",
-    "Production Server moved to 372c306b (Codex Photo deploy 4dac1b07) since the last handoff recorded 4a81f5b4; no HealthKit file differences."
+    "Production ACTIVE deployment is now efd356b0 (app spec update, same code 372c306b), superseding 4dac1b07.",
+    "Pre-existing red unit tests at prod base 372c306b (304, environmental), including HealthKitStrategicReadBoundary (two unrelated Workout files not allowlisted) and phase7bWorkPackage2ReferenceIndex (expects 39 collections, base has 41)."
   ],
   "backlog": [
-    "Sleep Phase A (Server dormant contracts + canonicalizer + synthetic tests).",
-    "Sleep Phase B (Native dormant read path behind manifest flag).",
-    "Fix Nutrition observer type mapping; normalize workout sourceName; bound deferredChanges."
+    "Sleep Phase B: dormant Native read path per report section 13.",
+    "Guarded Sleep activation/preference runner with bounded recompute on preference change.",
+    "Repair pre-existing HealthKitStrategicReadBoundary allowlist baseline.",
+    "Workout sourceName normalization (separate)."
   ],
-  "recommended_next_step": "Founder answers D2 Option A (no build) and reviews the architecture; then issue the Sleep Phase A Server-dormant implementation prompt in section 17 of the report.",
-  "full_report_path": "agent-handoffs/reports/20260930T153000Z-healthkit-sleep-discovery-architecture.md",
+  "recommended_next_step": "Review the Phase A candidate; then issue the Phase B Native dormant Sleep prompt (report section 15). Deploying the dormant Server code needs explicit Founder authorization.",
+  "full_report_path": "agent-handoffs/reports/20260930T180653Z-healthkit-sleep-phase-a-server-foundation.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
