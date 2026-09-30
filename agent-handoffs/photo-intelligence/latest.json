@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
-  "generated_at_utc": "2026-09-29T17:47:24Z",
+  "schema_version": 4,
+  "generated_at_utc": "2026-09-30T03:58:59Z",
   "task": {
     "id": "photo-intelligence-guarded-production-deploy-20260929",
     "title": "Guarded production deployment of canonical Photo Intelligence",
@@ -54,6 +54,15 @@
     "historical_immutability_verified": true,
     "zero_unintended_data_drift": true
   },
+  "goal_blind_correction_review": {
+    "status": "blocked_before_private_replay",
+    "reviewed_candidate": "1f7709aeee569977c2905978d19695db64b2f566",
+    "blocker": "Caller-controlled identifiers, filename, capturedAt, and allow-listed string conditions can still carry Goal/phase/guardrail text into the perception prompt.",
+    "report": "agent-handoffs/reports/20260930T035859Z-photo-intelligence-corrected-sep19-final-replay-blocked.md",
+    "private_replay_run": false,
+    "final_copy_generated": false,
+    "production_changed": false
+  },
   "safety": {
     "frozen_blind_results_changed": false,
     "contains_photo_bytes": false,
@@ -62,5 +71,5 @@
     "deployed": true,
     "testflight_uploaded": false
   },
-  "next_step": "Use future monthly Founder photo sets for prospective production validation; do not regenerate historical briefings."
+  "next_step": "Publish a revised candidate with a strictly typed, internally constructed model-input metadata boundary; repeat independent review before any private Sep 19 acceptance replay."
 }
