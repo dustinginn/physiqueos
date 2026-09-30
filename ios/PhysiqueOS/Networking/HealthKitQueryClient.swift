@@ -682,10 +682,20 @@ final class SystemHealthKitObserverClient: HealthKitObserverClient, @unchecked S
         current.forEach(store.stop)
     }
 
+    /// A Watch/Apple Health Strength workout is the one Founder-facing event
+    /// that is time-sensitive (a reconciliation review + notification hangs
+    /// off it), and `HKWorkoutType` is the type iOS honors `.immediate` for.
+    /// Daily aggregates (Activity, Nutrition) stay `.hourly`: iOS caps
+    /// quantity types at hourly anyway and they are re-derived on every wake.
+    static func backgroundDeliveryFrequency(for stream: HealthKitSynchronizationStream) -> HKUpdateFrequency {
+        stream == .workouts ? .immediate : .hourly
+    }
+
     func enableBackgroundDelivery(for stream: HealthKitSynchronizationStream) async throws {
+        let frequency = Self.backgroundDeliveryFrequency(for: stream)
         for type in observerTypes(for: stream) {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                store.enableBackgroundDelivery(for: type, frequency: .hourly) { completed, error in
+                store.enableBackgroundDelivery(for: type, frequency: frequency) { completed, error in
                     if error != nil || !completed {
                         continuation.resume(throwing: HealthKitSyncError.operational(code: "healthkit_background_delivery_registration_failed"))
                     } else {

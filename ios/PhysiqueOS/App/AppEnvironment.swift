@@ -665,7 +665,8 @@ final class AppEnvironment {
             store: healthKitSynchronizationStore,
             uploader: uploader,
             featureGate: healthKitFeatureGate,
-            workoutActivationFloor: .current
+            workoutActivationFloor: .current,
+            backgroundTaskScheduler: UIKitBackgroundTaskScheduler()
         )
         self.healthKitAutomaticSynchronizationCoordinator = HealthKitAutomaticSynchronizationCoordinator(
             authorization: self.healthKitAuthorizationCoordinator,
@@ -691,6 +692,15 @@ final class AppEnvironment {
             server: productionNativeAPI,
             canonicalizationLedger: canonicalizationLedger
         )
+    }
+
+    /// Process-launch HealthKit observer registration (see
+    /// `HealthKitAutomaticSynchronizationCoordinator.registerObserversForBackgroundLaunch`).
+    /// Founder Production only, like the foreground bootstrap.
+    @MainActor
+    func registerHealthKitObserversForLaunch() async {
+        guard nativeAuthority == .founderProduction else { return }
+        await healthKitAutomaticSynchronizationCoordinator.registerObserversForBackgroundLaunch()
     }
 
     func selectNativeAuthority(_ authority: NativeAPIEnvironment) {

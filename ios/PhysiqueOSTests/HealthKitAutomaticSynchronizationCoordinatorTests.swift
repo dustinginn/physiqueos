@@ -11,6 +11,113 @@ import XCTest
 final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
     private static let allStreams: Set<HealthKitSynchronizationStream> = [.activitySummary, .nutritionDailyTotal, .workouts]
 
+    // MARK: - Background launch (Strength reconciliation notification, Item 1)
+
+    @MainActor
+    func testBackgroundLaunchRegistersObserversAndDeliveryForEveryStreamWithoutSyncingOrCallingTheServer() async {
+        let synchronizer = AutomaticSynchronizerMock()
+        let server = AutomaticServerMock()
+        let harness = AutomaticCoordinatorHarness(
+            synchronizer: synchronizer, server: server, ownerIdentityCache: AutomaticOwnerIdentityCache("user_founder_001")
+        )
+        let outcome = await harness.coordinator.registerObserversForBackgroundLaunch()
+
+        XCTAssertNil(outcome.skippedReason)
+        XCTAssertTrue(outcome.streamErrors.isEmpty)
+        let scopes = await synchronizer.observedScopes()
+        XCTAssertEqual(Set(scopes.map(\.stream)), Self.allStreams)
+        let observeCount = await synchronizer.observeCallCount()
+        let deliveryCount = await synchronizer.backgroundDeliveryCallCount()
+        let syncCount = await synchronizer.syncCallCount()
+        XCTAssertEqual(observeCount, 3)
+        XCTAssertEqual(deliveryCount, 3, "Background delivery is re-enabled for the new process too.")
+        XCTAssertEqual(syncCount, 0, "Launch registration never queries or uploads; observer wakes drive the sync.")
+        for scope in scopes {
+            XCTAssertEqual(scope.ownerIdentity, "user_founder_001")
+            XCTAssertEqual(scope.predicateVersion, HealthKitAutomaticSynchronizationCoordinator.predicateVersion,
+                           "Same legacy scope the foreground bootstrap registers, so a wake runs the same orchestration.")
+        }
+        let ownerCalls = await server.ownerIdentityCallCount()
+        XCTAssertEqual(ownerCalls, 0, "No network before the observers exist: a background launch may have seconds.")
+    }
+
+    @MainActor
+    func testBackgroundLaunchWithoutACachedOwnerDoesNothingAndForegroundBootstrapFillsTheCache() async {
+        let cache = AutomaticOwnerIdentityCache()
+        let synchronizer = AutomaticSynchronizerMock()
+        let harness = AutomaticCoordinatorHarness(synchronizer: synchronizer, ownerIdentityCache: cache)
+        let first = await harness.coordinator.registerObserversForBackgroundLaunch()
+        XCTAssertEqual(first.skippedReason, "owner_identity_unavailable")
+        let none = await synchronizer.observeCallCount()
+        XCTAssertEqual(none, 0)
+
+        _ = await harness.coordinator.bootstrap()
+        XCTAssertEqual(cache.load(), "user_founder_001", "The first foreground bootstrap persists the owner identity for later launches.")
+
+        // A relaunched process (fresh coordinator, server unreachable, same cache) still registers.
+        let relaunchSync = AutomaticSynchronizerMock()
+        let relaunched = AutomaticCoordinatorHarness(
+            synchronizer: relaunchSync,
+            server: AutomaticServerMock(ownerIdentityError: AutomaticCoordinatorTestError.serverUnreachable),
+            ownerIdentityCache: cache
+        )
+        let outcome = await relaunched.coordinator.registerObserversForBackgroundLaunch()
+        XCTAssertNil(outcome.skippedReason)
+        let registered = await relaunchSync.observeCallCount()
+        XCTAssertEqual(registered, 3)
+    }
+
+    @MainActor
+    func testBackgroundLaunchSkipsWhenHealthKitIsUnavailableOrDeviceIdentityIsMissing() async {
+        let unavailable = AutomaticAuthorizationMock()
+        unavailable.outcomeToReturn = .failed(.restrictedOrUnavailable)
+        unavailable.availabilityAfterRequest = .restrictedOrUnavailable
+        let sync1 = AutomaticSynchronizerMock()
+        let a = AutomaticCoordinatorHarness(authorization: unavailable, synchronizer: sync1, ownerIdentityCache: AutomaticOwnerIdentityCache("user_founder_001"))
+        let outcomeA = await a.coordinator.registerObserversForBackgroundLaunch()
+        XCTAssertEqual(outcomeA.skippedReason, "authorization_not_available")
+        let sync2 = AutomaticSynchronizerMock()
+        let b = AutomaticCoordinatorHarness(synchronizer: sync2, deviceIdentityStore: AutomaticDeviceIdentityStore(shouldThrow: true), ownerIdentityCache: AutomaticOwnerIdentityCache("user_founder_001"))
+        let outcomeB = await b.coordinator.registerObserversForBackgroundLaunch()
+        XCTAssertEqual(outcomeB.skippedReason, "device_identity_unavailable")
+        let none1 = await sync1.observeCallCount()
+        let none2 = await sync2.observeCallCount()
+        XCTAssertEqual(none1 + none2, 0)
+    }
+
+    func testOnlyTheWorkoutStreamRequestsImmediateBackgroundDelivery() {
+        XCTAssertEqual(SystemHealthKitObserverClient.backgroundDeliveryFrequency(for: .workouts), .immediate,
+                       "A Strength workout's review notification must not wait up to an hour for iOS.")
+        XCTAssertEqual(SystemHealthKitObserverClient.backgroundDeliveryFrequency(for: .activitySummary), .hourly)
+        XCTAssertEqual(SystemHealthKitObserverClient.backgroundDeliveryFrequency(for: .nutritionDailyTotal), .hourly)
+    }
+
+    func testTheAppRegistersObserversInTheLaunchPathNotOnlyOnSceneActivation() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let app = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/App/PhysiqueOSApp.swift"), encoding: .utf8)
+        let initBody = try XCTUnwrap(app.range(of: "init() {").flatMap { start in
+            app.range(of: "var body: some Scene", range: start.upperBound..<app.endIndex).map { String(app[start.upperBound..<$0.lowerBound]) }
+        })
+        XCTAssertTrue(initBody.contains("registerHealthKitObserversForLaunch()"),
+                      "A HealthKit background launch never activates a scene; registration must be in init.")
+        let environment = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/App/AppEnvironment.swift"), encoding: .utf8)
+        XCTAssertTrue(environment.contains("backgroundTaskScheduler: UIKitBackgroundTaskScheduler()"))
+    }
+
+    func testAnObserverWakeRunsUnderABackgroundAssertionThatIsReleasedOnce() async {
+        let scheduler = AutomaticCountingBackgroundScheduler()
+        let engineHarness = AutomaticWorkoutEngineHarness(
+            floor: nil,
+            additions: [],
+            backgroundTaskScheduler: scheduler
+        )
+        let completions = AutomaticCompletionCounter()
+        await engineHarness.engine.handleObserverWake(scope: engineHarness.scope, completion: { completions.increment() })
+        XCTAssertEqual(scheduler.names, ["healthkit.observer-wake"])
+        XCTAssertEqual(scheduler.endCount, 1)
+        XCTAssertEqual(completions.value, 1, "HealthKit's observer completion is still released exactly once.")
+    }
+
     @MainActor
     func testRequestsAuthorizationOnlyOnceAcrossRepeatedBootstraps() async {
         let harness = AutomaticCoordinatorHarness()
@@ -851,6 +958,31 @@ private actor AutomaticWorkoutQueryMock: HealthKitAnchoredQueryClient {
     func setDelayNanoseconds(_ value: UInt64) { delayNanoseconds = value }
 }
 
+/// In-memory stand-in for the persisted owner-identity cache, so no test
+/// touches (or is polluted by) the real `UserDefaults`.
+private final class AutomaticOwnerIdentityCache: HealthKitOwnerIdentityCache, @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: String?
+    init(_ value: String? = nil) { self.value = value }
+    func load() -> String? { lock.lock(); defer { lock.unlock() }; return value }
+    func save(_ identity: String) { lock.lock(); value = identity; lock.unlock() }
+}
+
+/// Counts assertion begin/end pairs without talking to the OS.
+private final class AutomaticCountingBackgroundScheduler: BackgroundTaskScheduling, @unchecked Sendable {
+    private let lock = NSLock()
+    private var began: [String] = []
+    private var ended: [Int] = []
+    func beginTask(named name: String, expirationHandler: @escaping @Sendable () -> Void) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        began.append(name)
+        return began.count
+    }
+    func endTask(_ identifier: Int) { lock.lock(); ended.append(identifier); lock.unlock() }
+    var names: [String] { lock.lock(); defer { lock.unlock() }; return began }
+    var endCount: Int { lock.lock(); defer { lock.unlock() }; return ended.count }
+}
+
 private final class AutomaticWorkoutObserverMock: HealthKitObserverClient, @unchecked Sendable {
     func register(
         stream: HealthKitSynchronizationStream,
@@ -906,7 +1038,8 @@ private final class AutomaticWorkoutEngineHarness {
         stream: HealthKitSynchronizationStream = .workouts,
         additions: [HealthKitQueryAddition],
         deletions: [HealthKitQueryDeletion] = [],
-        queryTimeout: Duration = .seconds(25)
+        queryTimeout: Duration = .seconds(25),
+        backgroundTaskScheduler: (any BackgroundTaskScheduling)? = nil
     ) {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent("PhysiqueOSAutomaticWorkoutFloorTests-\(UUID().uuidString)", isDirectory: true)
@@ -932,7 +1065,8 @@ private final class AutomaticWorkoutEngineHarness {
             featureGate: .n1Automatic,
             workoutActivationFloor: floor,
             queryTimeout: queryTimeout,
-            now: { HealthKitAutomaticWorkoutFloorEngineTests.now }
+            now: { HealthKitAutomaticWorkoutFloorEngineTests.now },
+            backgroundTaskScheduler: backgroundTaskScheduler
         )
     }
 
@@ -951,6 +1085,7 @@ private struct AutomaticCoordinatorHarness {
         synchronizer: AutomaticSynchronizerMock = AutomaticSynchronizerMock(),
         server: AutomaticServerMock = AutomaticServerMock(),
         deviceIdentityStore: AutomaticDeviceIdentityStore = AutomaticDeviceIdentityStore(),
+        ownerIdentityCache: AutomaticOwnerIdentityCache = AutomaticOwnerIdentityCache(),
         stepTimeout: Duration = .seconds(30)
     ) {
         self.authorization = authorization
@@ -961,6 +1096,7 @@ private struct AutomaticCoordinatorHarness {
             synchronizer: synchronizer,
             server: server,
             deviceIdentityStore: deviceIdentityStore,
+            ownerIdentityCache: ownerIdentityCache,
             stepTimeout: stepTimeout
         )
     }

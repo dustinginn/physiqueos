@@ -15,6 +15,9 @@ struct PhotoSetDetailView: View {
     @State private var selectedViewIndex = 0
     @State private var didApplyInitialPose = false
     @State private var isSourceHistoryExpanded = false
+    /// The shared full-screen inspection viewer (`PhotoInspectionViewer`), the
+    /// same one the Photo Briefing uses.
+    @State private var inspection: PhotoInspectionRequest?
     let setId: String
     let initialPoseId: PhotoPoseID?
 
@@ -31,6 +34,7 @@ struct PhotoSetDetailView: View {
         }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
+        .photoInspection($inspection)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
@@ -156,24 +160,36 @@ struct PhotoSetDetailView: View {
     private func comparisonCard(_ view: PhotoViewRecord) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 10) {
+                let group = Self.inspectionItems(
+                    for: view,
+                    previousSource: view.hasComparisonImage ? previousSource(for: view) : nil,
+                    currentSource: environment.photoMediaSource(for: view),
+                    currentDate: TrainingDateFormatting.short(view.captureDate)
+                )
                 if view.hasComparisonImage {
                     HStack(spacing: 8) {
                         evidencePhoto(
                             role: "Previous",
                             date: view.comparedAgainst,
-                            source: previousSource(for: view)
+                            source: previousSource(for: view),
+                            group: group,
+                            id: "\(view.id):previous"
                         )
                         evidencePhoto(
                             role: "Current",
                             date: TrainingDateFormatting.short(view.captureDate),
-                            source: environment.photoMediaSource(for: view)
+                            source: environment.photoMediaSource(for: view),
+                            group: group,
+                            id: "\(view.id):current"
                         )
                     }
                 } else {
                     evidencePhoto(
                         role: "Current",
                         date: TrainingDateFormatting.short(view.captureDate),
-                        source: environment.photoMediaSource(for: view)
+                        source: environment.photoMediaSource(for: view),
+                        group: group,
+                        id: "\(view.id):current"
                     )
                     Text(view.comparedAgainst)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -183,9 +199,41 @@ struct PhotoSetDetailView: View {
         }
     }
 
-    private func evidencePhoto(role: String, date: String, source: PhotoMediaSource) -> some View {
+    /// Previous (when a comparison exists) then Current, in swipe order.
+    static func inspectionItems(
+        for view: PhotoViewRecord,
+        previousSource: PhotoMediaSource?,
+        currentSource: PhotoMediaSource,
+        currentDate: String
+    ) -> [PhotoInspectionItem] {
+        var items: [PhotoInspectionItem] = []
+        if let previousSource {
+            items.append(PhotoInspectionItem(
+                id: "\(view.id):previous",
+                title: "\(view.poseId.label) · Previous",
+                caption: view.comparedAgainst,
+                source: previousSource
+            ))
+        }
+        items.append(PhotoInspectionItem(
+            id: "\(view.id):current",
+            title: "\(view.poseId.label) · Current",
+            caption: currentDate,
+            source: currentSource
+        ))
+        return items
+    }
+
+    private func evidencePhoto(
+        role: String,
+        date: String,
+        source: PhotoMediaSource,
+        group: [PhotoInspectionItem],
+        id: String
+    ) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             ProgressPhotoTile(roleLabel: role, source: source, showsRoleLabel: false)
+                .inspectsPhoto(group, tapped: id, presenting: $inspection)
             Text(date)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                 .foregroundStyle(PhysiqueOSTheme.textPrimary)

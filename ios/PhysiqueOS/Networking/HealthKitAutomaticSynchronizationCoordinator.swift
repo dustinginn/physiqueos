@@ -4,6 +4,26 @@ import Foundation
 /// automatic bootstrap needs, so it is testable against a fake rather than
 /// the real Apple APIs, matching this codebase's existing canary-coordinator
 /// convention.
+/// The Founder's owner identity, persisted locally (it is an opaque id, not a
+/// credential) so a HealthKit-launched background process can register its
+/// observers immediately, without first waiting on an authenticated network
+/// round trip that iOS may not give it time for.
+protocol HealthKitOwnerIdentityCache: Sendable {
+    func load() -> String?
+    func save(_ identity: String)
+}
+
+struct UserDefaultsHealthKitOwnerIdentityCache: HealthKitOwnerIdentityCache, @unchecked Sendable {
+    private let defaults: UserDefaults
+    private let key = "physiqueos.healthkit.automatic.owner-identity.v1"
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+    func load() -> String? {
+        let value = defaults.string(forKey: key)
+        return (value?.isEmpty ?? true) ? nil : value
+    }
+    func save(_ identity: String) { defaults.set(identity, forKey: key) }
+}
+
 protocol HealthKitAutomaticSynchronizing: Sendable {
     func startObserving(scope: HealthKitCursorScope) async throws
     func enableBackgroundDelivery(scope: HealthKitCursorScope) async throws
@@ -118,6 +138,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     private let server: any HealthKitFounderCanaryServer
     private let deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore
     private let synchronizationStore: (any HealthKitSynchronizationStore)?
+    private let ownerIdentityCache: any HealthKitOwnerIdentityCache
     private let stepTimeout: Duration
     private let calendar: Calendar
     private let now: @Sendable () -> Date
@@ -148,10 +169,12 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         server: any HealthKitFounderCanaryServer,
         deviceIdentityStore: any HealthKitCanaryDeviceIdentityStore = KeychainHealthKitCanaryDeviceIdentityStore(),
         synchronizationStore: (any HealthKitSynchronizationStore)? = nil,
+        ownerIdentityCache: any HealthKitOwnerIdentityCache = UserDefaultsHealthKitOwnerIdentityCache(),
         stepTimeout: Duration = .seconds(30),
         calendar: Calendar = .autoupdatingCurrent,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
+        self.ownerIdentityCache = ownerIdentityCache
         self.authorization = authorization
         self.synchronizer = synchronizer
         self.server = server
@@ -223,6 +246,57 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         return snapshot
     }
 
+    /// Process-launch registration. iOS relaunches a terminated app in the
+    /// background for HealthKit background delivery, but only delivers the
+    /// wake to an `HKObserverQuery` that is registered again by the new
+    /// process. `bootstrap()` runs from `scenePhase == .active`, which never
+    /// happens for a background launch -- so before this existed the wake
+    /// found no observer and a Watch Strength workout waited until the
+    /// Founder next opened the app.
+    ///
+    /// Registers the observers and background delivery ONLY: no query, no
+    /// upload, no permission prompt beyond the silent no-op for an already-
+    /// decided Founder, and no network (the owner identity comes from the
+    /// local cache that `bootstrap()` fills). Observer wakes then drive the
+    /// same sync as foreground. With no cached identity yet (first ever
+    /// launch) it does nothing and the first foreground `bootstrap()` does
+    /// the registration.
+    @MainActor
+    @discardableResult
+    func registerObserversForBackgroundLaunch() async -> HealthKitAutomaticBootstrapOutcome {
+        var outcome = HealthKitAutomaticBootstrapOutcome()
+        if !authorization.authorizationWasRequested {
+            outcome.authorizationOutcome = await authorization.requestAuthorization(for: .initialRead)
+        }
+        guard case .available = authorization.currentAvailability else {
+            outcome.skippedReason = "authorization_not_available"
+            return outcome
+        }
+        guard let ownerIdentity = cachedOwnerIdentity ?? ownerIdentityCache.load() else {
+            outcome.skippedReason = "owner_identity_unavailable"
+            return outcome
+        }
+        guard let deviceIdentity = try? deviceIdentityStore.stableIdentity() else {
+            outcome.skippedReason = "device_identity_unavailable"
+            return outcome
+        }
+        for stream in Self.streams {
+            let scope = HealthKitCursorScope(
+                ownerIdentity: ownerIdentity,
+                enrolledDeviceIdentity: deviceIdentity,
+                stream: stream,
+                predicateVersion: Self.predicateVersion
+            )
+            if case .failed = await boundedStep({ try await self.synchronizer.startObserving(scope: scope) }) {
+                outcome.streamErrors[stream, default: []].append("observer_registration_failed")
+            }
+            if case .failed = await boundedStep({ try await self.synchronizer.enableBackgroundDelivery(scope: scope) }) {
+                outcome.streamErrors[stream, default: []].append("background_delivery_registration_failed")
+            }
+        }
+        return outcome
+    }
+
     @MainActor
     @discardableResult
     func bootstrap() async -> HealthKitAutomaticBootstrapOutcome {
@@ -279,6 +353,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         } else if let fetched = try? await server.founderOwnerIdentity() {
             ownerIdentity = fetched
             cachedOwnerIdentity = fetched
+            ownerIdentityCache.save(fetched)
         } else {
             outcome.skippedReason = "owner_identity_unavailable"
             lastBootstrapOutcome = outcome

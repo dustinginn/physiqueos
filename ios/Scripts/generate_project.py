@@ -337,6 +337,7 @@ peptide_app_files = [
     ("SharedUI", "PhysiqueOSDisclosureRow.swift"),
     ("Presentation/OperatingPlan", "PeptideSupportSheets.swift"),
     ("Presentation/OperatingPlan", "PeptideDosePlanEditor.swift"),
+    ("SharedUI", "PhotoInspectionViewer.swift"),
 ]
 
 late_test_files = [
@@ -354,6 +355,7 @@ n1_test_files = [
 peptide_test_files = [
     ("PhysiqueOSTests", "PeptideSupportEditorViewModelTests.swift"),
     ("PhysiqueOSTests", "PeptideScreenPresentationTests.swift"),
+    ("PhysiqueOSTests", "PhotoInspectionViewerTests.swift"),
 ]
 
 late_reference_only_files = [

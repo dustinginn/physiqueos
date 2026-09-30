@@ -17,6 +17,12 @@ actor HealthKitSynchronizationEngine {
     /// the canary's. The explicit canary paths below never consult it.
     private let workoutActivationFloor: HealthKitWorkoutActivationFloor?
     private var registrations: [HealthKitCursorScope: HealthKitObserverRegistration] = [:]
+    /// When set, an observer wake (which can be the only thing keeping a
+    /// background-launched process alive) runs under an OS background-
+    /// execution assertion, so the staged batch's upload and the follow-up
+    /// review refresh are not torn down the moment the observer completion
+    /// fires. `nil` (tests, the canary engine) means no assertion.
+    private let backgroundTaskScheduler: (any BackgroundTaskScheduling)?
     /// Actor reentrancy means a second call can enter while the first is
     /// awaiting HealthKit or the network. Keep both query/stage work and
     /// delivery single-flight per exact cursor scope so an outer timeout can
@@ -35,8 +41,10 @@ actor HealthKitSynchronizationEngine {
         historicalLookbackDays: Int = 30,
         queryTimeout: Duration = .seconds(25),
         availability: @escaping @Sendable () -> HealthKitAvailability = { .availableAuthorizationNotRequested },
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = Date.init,
+        backgroundTaskScheduler: (any BackgroundTaskScheduling)? = nil
     ) {
+        self.backgroundTaskScheduler = backgroundTaskScheduler
         self.queryClient = queryClient
         self.observerClient = observerClient
         self.store = store
@@ -78,6 +86,22 @@ actor HealthKitSynchronizationEngine {
     func handleObserverWake(
         scope: HealthKitCursorScope,
         errorCode: String? = nil,
+        completion: @escaping @Sendable () -> Void
+    ) async {
+        guard let scheduler = backgroundTaskScheduler else {
+            await performObserverWake(scope: scope, errorCode: errorCode, completion: completion)
+            return
+        }
+        // The assertion is released exactly once by the helper (normal end,
+        // cancellation, or the OS expiration handler).
+        _ = try? await withBackgroundExecutionAssertion(named: "healthkit.observer-wake", scheduler: scheduler) {
+            await self.performObserverWake(scope: scope, errorCode: errorCode, completion: completion)
+        }
+    }
+
+    private func performObserverWake(
+        scope: HealthKitCursorScope,
+        errorCode: String?,
         completion: @escaping @Sendable () -> Void
     ) async {
         let completionGate = HealthKitObserverCompletionGate(completion: completion)

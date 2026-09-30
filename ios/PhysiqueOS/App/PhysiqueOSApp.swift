@@ -25,6 +25,11 @@ struct PhysiqueOSApp: App {
         PriorityNotificationCategoryRegistrar.registerCategories()
         _environment = State(initialValue: environment)
         _notificationDelegate = State(initialValue: notificationDelegate)
+        // HealthKit background delivery relaunches a terminated app WITHOUT
+        // ever activating a scene, so the scenePhase-driven bootstrap below
+        // cannot be what re-registers the observers. Do it here, in the
+        // process-launch path a background launch also runs.
+        Task { @MainActor in await environment.registerHealthKitObserversForLaunch() }
     }
 
     var body: some Scene {

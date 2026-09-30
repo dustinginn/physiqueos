@@ -60,4 +60,51 @@ final class FounderProductionPhotoMediaStore {
         imageStates[mediaId] = .idle
         await loadImage(mediaId: mediaId)
     }
+
+    // MARK: - Inspection (full-screen viewer)
+
+    /// The longest side, in pixels, the inspection viewer decodes to. The grid
+    /// tiles above decode to 1,600 px for memory; the viewer exists to look at
+    /// small physique details, so it re-decodes the SAME server display media
+    /// (a JPEG/HEIC derivative -- the media route never serves RAW/DNG) at a
+    /// larger size. 3,200 px keeps a full 3:4 frame near 30 MB decoded.
+    nonisolated static let inspectionMaxPixelSize = 3_200
+
+    /// Full-resolution decodes are kept apart from `imageStates` so a viewer
+    /// never inflates the grid's memory, and are dropped when it closes.
+    private(set) var inspectionImageStates: [String: ImageState] = [:]
+
+    func loadInspectionImage(mediaId: String) async {
+        switch inspectionImageStates[mediaId] {
+        case .loaded, .loading: return
+        default: break
+        }
+        inspectionImageStates[mediaId] = .loading
+        do {
+            let media = try await api.readMedia(mediaId: mediaId)
+            let maxPixel = Self.inspectionMaxPixelSize
+            let image = try await Task.detached(priority: .userInitiated) {
+                guard let source = CGImageSourceCreateWithData(media.data as CFData, nil),
+                      let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                        kCGImageSourceCreateThumbnailFromImageAlways: true,
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                        kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+                      ] as CFDictionary)
+                else { throw UndecodableImage() }
+                return UIImage(cgImage: image)
+            }.value
+            inspectionImageStates[mediaId] = .loaded(image)
+        } catch {
+            inspectionImageStates[mediaId] = Task.isCancelled ? .idle : Self.failureState(for: error)
+        }
+    }
+
+    func retryInspectionImage(mediaId: String) async {
+        inspectionImageStates[mediaId] = .idle
+        await loadInspectionImage(mediaId: mediaId)
+    }
+
+    func releaseInspectionImages(mediaIds: [String]) {
+        for id in mediaIds { inspectionImageStates[id] = nil }
+    }
 }

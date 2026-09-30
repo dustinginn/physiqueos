@@ -1368,6 +1368,54 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertTrue(WorkoutReconciliationReviewReadyNotifier.plan(reviews: [reconciliationReview("r27"), reconciliationReview("r28")], defaults: defaults).requests.isEmpty)
     }
 
+    /// Item 1 lifecycle: a Watch Strength workout is ingested while Log never
+    /// opens. Each accepted ingest triggers the refresher; the notifier is
+    /// identity-diffed, so one review yields exactly one notification, repeated
+    /// background deliveries add none, no match creates no false alert, and a
+    /// Logger session that only arrives later (reversed ordering) still notifies.
+    @MainActor
+    func testBackgroundIngestLifecycleNotifiesOncePerReviewWithoutLogAndRoutesToTheExactReview() async throws {
+        nonisolated(unsafe) let defaults = isolatedDefaults()
+        _ = WorkoutReconciliationReviewReadyNotifier.plan(reviews: [], defaults: defaults) // seeded earlier
+        let queue = LockedBox<[PendingEvidenceReview]>([])
+        let requests = LockedBox<[UNNotificationRequest]>([])
+        let scheduler = CountingBackgroundScheduler()
+        let refresher = WorkoutReconciliationNotificationRefresher(
+            isEnabled: { true },
+            fetch: { queue.value },
+            deliver: { reviews in
+                await MainActor.run {
+                    requests.mutate { $0.append(contentsOf: WorkoutReconciliationReviewReadyNotifier.plan(reviews: reviews, defaults: defaults).requests) }
+                }
+            },
+            backgroundTaskScheduler: scheduler
+        )
+
+        // Workout ingested, no matching Logger session yet: no false review, no notification.
+        await refresher.requestRefresh()
+        XCTAssertTrue(requests.value.isEmpty)
+
+        // The Logger session arrives later and the Server creates the review.
+        queue.mutate { $0 = [reconciliationReview("r99")] }
+        await refresher.requestRefresh()
+        XCTAssertEqual(requests.value.map(\.identifier), ["evidence.reviewReady.r99"])
+
+        // Repeated background deliveries / foreground transitions never duplicate.
+        for _ in 0..<4 { await refresher.requestRefresh() }
+        XCTAssertEqual(requests.value.count, 1)
+
+        // Tapping it opens exactly that review.
+        let request = try XCTUnwrap(requests.value.first)
+        let json = try XCTUnwrap(request.content.userInfo["destinationJSON"] as? String)
+        let destination = try JSONDecoder().decode(AppDestination.self, from: Data(json.utf8))
+        XCTAssertEqual(destination, .evidenceReview(reviewId: "r99"))
+
+        // Every pass ran under a background assertion that was released.
+        XCTAssertEqual(scheduler.names.count, 6)
+        XCTAssertEqual(Set(scheduler.names), ["workout-reconciliation.refresh"])
+        XCTAssertEqual(scheduler.endCount, 6)
+    }
+
     @MainActor
     func testReconciliationPlanWithdrawsTheAlertOfAResolvedReviewAndNeverNotifiesIt() {
         let defaults = isolatedDefaults()
@@ -1442,4 +1490,19 @@ final class LockedBox<Value>: @unchecked Sendable {
     init(_ value: Value) { stored = value }
     var value: Value { lock.lock(); defer { lock.unlock() }; return stored }
     func mutate(_ change: (inout Value) -> Void) { lock.lock(); change(&stored); lock.unlock() }
+}
+
+
+private final class CountingBackgroundScheduler: BackgroundTaskScheduling, @unchecked Sendable {
+    private let lock = NSLock()
+    private var began: [String] = []
+    private var ended = 0
+    func beginTask(named name: String, expirationHandler: @escaping @Sendable () -> Void) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        began.append(name)
+        return began.count
+    }
+    func endTask(_ identifier: Int) { lock.lock(); ended += 1; lock.unlock() }
+    var names: [String] { lock.lock(); defer { lock.unlock() }; return began }
+    var endCount: Int { lock.lock(); defer { lock.unlock() }; return ended }
 }

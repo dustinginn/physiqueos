@@ -322,14 +322,23 @@ actor WorkoutReconciliationNotificationRefresher {
     private let isEnabled: Permission
     private let fetch: Fetch
     private let deliver: Deliver
+    /// Keeps a background-launched process alive long enough to fetch the
+    /// review queue and hand the notification to iOS.
+    private let backgroundTaskScheduler: (any BackgroundTaskScheduling)?
     private var running = false
     private var rerunRequested = false
     private(set) var passes = 0
 
-    init(isEnabled: @escaping Permission, fetch: @escaping Fetch, deliver: @escaping Deliver) {
+    init(
+        isEnabled: @escaping Permission,
+        fetch: @escaping Fetch,
+        deliver: @escaping Deliver,
+        backgroundTaskScheduler: (any BackgroundTaskScheduling)? = nil
+    ) {
         self.isEnabled = isEnabled
         self.fetch = fetch
         self.deliver = deliver
+        self.backgroundTaskScheduler = backgroundTaskScheduler
     }
 
     /// Request a pass; returns once this request is covered by a pass (or
@@ -349,6 +358,16 @@ actor WorkoutReconciliationNotificationRefresher {
 
     private func runOnce() async {
         passes += 1
+        guard let scheduler = backgroundTaskScheduler else {
+            await refreshReviews()
+            return
+        }
+        _ = try? await withBackgroundExecutionAssertion(named: "workout-reconciliation.refresh", scheduler: scheduler) {
+            await self.refreshReviews()
+        }
+    }
+
+    private func refreshReviews() async {
         guard await isEnabled() else { return }
         guard let reviews = try? await fetch() else { return }
         await deliver(reviews)
@@ -369,7 +388,8 @@ actor WorkoutReconciliationNotificationRefresher {
             fetch: { try await ProductionLogAPI(api: api).fetchPendingReviews() },
             deliver: { reviews in
                 await WorkoutReconciliationReviewReadyNotifier.reconcile(reviews: reviews)
-            }
+            },
+            backgroundTaskScheduler: UIKitBackgroundTaskScheduler()
         )
     }
 }

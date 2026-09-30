@@ -22,6 +22,9 @@ struct PhotoBriefingSections: View {
     @Environment(AppEnvironment.self) private var environment
     let content: PhotoBriefingContent
     var onNavigate: (AppDestination) -> Void = { _ in }
+    /// The shared full-screen inspection viewer (`PhotoInspectionViewer`), the
+    /// same one Progress Photos Evidence uses.
+    @State private var inspection: PhotoInspectionRequest?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 30) {
@@ -34,6 +37,7 @@ struct PhotoBriefingSections: View {
                 completionDecisionCard(experience.decision)
             }
         }
+        .photoInspection($inspection)
         .task(id: environment.nativeAuthority) {
             if environment.nativeAuthority == .sandbox {
                 await environment.founderPhotoMediaStore.loadManifestIfNeeded()
@@ -81,19 +85,24 @@ struct PhotoBriefingSections: View {
     }
 
     private var photoGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+        let items = content.activeViews.map { view in
+            PhotoInspectionItem(
+                id: view.id,
+                title: view.poseId.label,
+                caption: BriefingDateFormatting.shortDate(view.captureDate),
+                source: mediaSource(for: view)
+            )
+        }
+        return LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
             ForEach(content.activeViews) { view in
-                // Not a Button: the tile's own Retry is a Button, and a Button nested in
-                // another Button's label never receives its tap.
+                // The photo is the tap target (the shared viewer); swiping there
+                // pages through the rest of this session's poses.
                 ProgressPhotoTile(
                     roleLabel: view.poseId.label,
                     source: mediaSource(for: view),
                     caption: BriefingDateFormatting.shortDate(view.captureDate)
                 )
-                .contentShape(Rectangle())
-                .onTapGesture { onNavigate(.photoSetDetail(setId: view.setId, poseId: view.poseId)) }
-                .accessibilityLabel("\(view.poseId.label) photo, open in Progress Photos")
-                .accessibilityAddTraits(.isButton)
+                .inspectsPhoto(items, tapped: view.id, presenting: $inspection)
             }
         }
     }
@@ -184,12 +193,6 @@ struct PhotoBriefingSections: View {
                                 .foregroundStyle(PhysiqueOSTheme.textMuted)
                         }
                     }
-                    if Self.expandDestination(for: entry, previous: true) != nil
-                        || Self.expandDestination(for: entry, previous: false) != nil {
-                        Text("Tap a photo to expand")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                    }
                     HStack(spacing: 8) {
                         expandableComparisonTile(entry, previous: true)
                         expandableComparisonTile(entry, previous: false)
@@ -203,36 +206,44 @@ struct PhotoBriefingSections: View {
         }
     }
 
-    /// The enlarged presentation for one comparison image: the same server-owned
-    /// session + pose detail the snapshot grid opens. `nil` when the entry has no
-    /// session for that side (e.g. a new baseline's absent prior), so a tile that
-    /// cannot open never advertises expansion.
-    static func expandDestination(for entry: PhotoComparisonEntry, previous: Bool) -> AppDestination? {
-        let setId = previous ? entry.priorSetId : entry.currentSetId
-        guard let setId, !setId.isEmpty else { return nil }
-        return .photoSetDetail(setId: setId, poseId: entry.poseId)
+    /// The two photos of one comparison, in swipe order (Previous, then
+    /// Current). Only a side with real media can be inspected, so a new
+    /// baseline's absent prior never advertises expansion.
+    static func inspectionItems(
+        for entry: PhotoComparisonEntry,
+        previousSource: PhotoMediaSource,
+        currentSource: PhotoMediaSource
+    ) -> [PhotoInspectionItem] {
+        [
+            PhotoInspectionItem(
+                id: "\(entry.id):previous",
+                title: "\(entry.poseId.label) · Previous",
+                caption: entry.priorDate.map(BriefingDateFormatting.shortDate),
+                source: previousSource
+            ),
+            PhotoInspectionItem(
+                id: "\(entry.id):current",
+                title: "\(entry.poseId.label) · Current",
+                caption: BriefingDateFormatting.shortDate(entry.currentDate),
+                source: currentSource
+            ),
+        ]
     }
 
-    @ViewBuilder
     private func expandableComparisonTile(_ entry: PhotoComparisonEntry, previous: Bool) -> some View {
-        let tile = ProgressPhotoTile(
+        let items = Self.inspectionItems(
+            for: entry,
+            previousSource: comparisonMediaSource(entry, previous: true),
+            currentSource: comparisonMediaSource(entry, previous: false)
+        )
+        return ProgressPhotoTile(
             roleLabel: previous ? "Previous" : "Current",
             source: comparisonMediaSource(entry, previous: previous),
             caption: previous
                 ? entry.priorDate.map(BriefingDateFormatting.shortDate)
                 : BriefingDateFormatting.shortDate(entry.currentDate)
         )
-        if let destination = Self.expandDestination(for: entry, previous: previous) {
-            // Not a Button: the tile's own Retry is a Button, and a Button nested in
-            // another Button's label never receives its tap.
-            tile
-                .contentShape(Rectangle())
-                .onTapGesture { onNavigate(destination) }
-                .accessibilityLabel("\(entry.poseId.label) \(previous ? "previous" : "current") photo, expand")
-                .accessibilityAddTraits(.isButton)
-        } else {
-            tile
-        }
+        .inspectsPhoto(items, tapped: "\(entry.id):\(previous ? "previous" : "current")", presenting: $inspection)
     }
 
     private func mediaSource(for view: PhotoBriefingView) -> PhotoMediaSource {

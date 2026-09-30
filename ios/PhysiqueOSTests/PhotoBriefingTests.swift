@@ -120,9 +120,9 @@ final class PhotoBriefingTests: XCTestCase {
         XCTAssertNotEqual(journey.priorSetId, recent.priorSetId)
     }
 
-    // MARK: - "Tap a photo to expand" is true for every comparison image
+    // MARK: - Photo inspection: every comparison image opens the shared viewer
 
-    func testEveryComparisonImageWithASessionOpensItsOwnSessionAndPose() throws {
+    func testEveryComparisonImageWithMediaIsInspectableInSwipeOrder() throws {
         let store = makeStore()
         for id in [
             "event_briefing_progress_photo_photo-set-fixture-005",
@@ -134,29 +134,42 @@ final class PhotoBriefingTests: XCTestCase {
                 + (photo.completionExperience?.journeyComparisons ?? [])
             XCTAssertFalse(entries.isEmpty)
             for entry in entries {
-                XCTAssertEqual(
-                    PhotoBriefingSections.expandDestination(for: entry, previous: false),
-                    .photoSetDetail(setId: entry.currentSetId, poseId: entry.poseId)
+                let items = PhotoBriefingSections.inspectionItems(
+                    for: entry,
+                    previousSource: .authenticatedProduction(mediaId: "prior-media"),
+                    currentSource: .authenticatedProduction(mediaId: "current-media")
                 )
-                if let priorSetId = entry.priorSetId {
-                    XCTAssertEqual(
-                        PhotoBriefingSections.expandDestination(for: entry, previous: true),
-                        .photoSetDetail(setId: priorSetId, poseId: entry.poseId)
-                    )
-                } else {
-                    XCTAssertNil(PhotoBriefingSections.expandDestination(for: entry, previous: true))
-                }
+                XCTAssertEqual(items.map(\.id), ["\(entry.id):previous", "\(entry.id):current"], "Previous first, then Current")
+                XCTAssertEqual(items.map(\.mediaKey), ["prior-media", "current-media"])
+                XCTAssertTrue(items.allSatisfy(\.isInspectable))
+                XCTAssertEqual(items[1].title, "\(entry.poseId.label) · Current")
             }
         }
     }
 
-    func testComparisonTileWithoutASessionIsNotExpandable() {
+    func testAComparisonSideWithoutMediaIsNotInspectable() throws {
         let entry = PhotoComparisonEntry(
             id: "e", poseId: .frontRelaxed, priorSetId: nil, priorDate: nil,
-            currentSetId: "", currentDate: "2026-09-19", roleLabel: nil, narrative: ""
+            currentSetId: "s", currentDate: "2026-09-19", roleLabel: nil, narrative: ""
         )
-        XCTAssertNil(PhotoBriefingSections.expandDestination(for: entry, previous: true))
-        XCTAssertNil(PhotoBriefingSections.expandDestination(for: entry, previous: false))
+        let items = PhotoBriefingSections.inspectionItems(
+            for: entry, previousSource: .placeholder, currentSource: .authenticatedProduction(mediaId: "m")
+        )
+        XCTAssertFalse(items[0].isInspectable, "A new baseline's absent prior never advertises expansion.")
+        // Tapping the placeholder side opens nothing; tapping the real side opens a viewer without the placeholder.
+        XCTAssertNil(PhotoInspectionRequest.make(items: items, tappedID: "e:previous"))
+        let request = try XCTUnwrap(PhotoInspectionRequest.make(items: items, tappedID: "e:current"))
+        XCTAssertEqual(request.items.map(\.id), ["e:current"])
+        XCTAssertEqual(request.startIndex, 0)
+    }
+
+    func testThePhotoBriefingNoLongerPrintsARepeatedTapToExpandLineAndNoLongerNavigatesAwayFromTheTile() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Briefings/PhotoBriefingSections.swift"), encoding: .utf8)
+        XCTAssertFalse(source.contains("Tap a photo to expand"), "The behavior is the photo itself; no repeated caption under every image.")
+        XCTAssertTrue(source.contains(".inspectsPhoto("))
+        XCTAssertTrue(source.contains(".photoInspection($inspection)"))
+        XCTAssertFalse(source.contains(".onTapGesture { onNavigate(.photoSetDetail"), "A tile opens the viewer, not another screen.")
     }
 
     func testCompletedDecisionMirrorsTheRealProductsInertNextGoalButton() throws {
