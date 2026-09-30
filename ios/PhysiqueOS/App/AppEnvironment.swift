@@ -588,6 +588,9 @@ final class AppEnvironment {
         briefingSandboxStore: BriefingSandboxStore = BriefingSandboxStore(),
         founderServerAPI: FounderServerAPI = FounderServerAPI(),
         productionNativeAPI: ProductionNativeAPI = ProductionNativeAPI(
+            installationSigningKey: SenderConstrainedRefreshRollout.isEnabled
+                ? SecureEnclaveFounderInstallationSigningKey(namespace: .founderProduction)
+                : nil,
             commandTransport: CommandNetworkDiagnosticsTransport.production(),
             snapshotStore: .applicationSupport(namespace: "founder-production")
         ),

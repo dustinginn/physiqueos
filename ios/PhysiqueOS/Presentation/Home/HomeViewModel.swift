@@ -12,6 +12,7 @@ final class HomeViewModel {
         case loading
         case loaded(HomeReadModel)
         case failed(String)
+        case reconnectRequired
     }
 
     private(set) var state: LoadState = .loading
@@ -94,6 +95,12 @@ final class HomeViewModel {
         } catch {
             if isShowingLastKnown {
                 lastKnownRefreshFailed = true
+            } else if error as? ProductionNativeError == .reconnectRequired {
+                state = .reconnectRequired
+            } else if error as? ProductionNativeError == .sessionRecoveryUnavailable {
+                state = .failed("Recovering the secure session. Try again when the connection is available.")
+            } else if error as? ProductionNativeError == .networkFailure {
+                state = .failed("Temporarily offline. Reconnect and pull to refresh.")
             } else {
                 state = .failed("Home could not be loaded.")
             }

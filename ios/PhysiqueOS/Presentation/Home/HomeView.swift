@@ -184,6 +184,17 @@ struct HomeView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
+        case .reconnectRequired:
+            VStack(spacing: 14) {
+                Text("This secure session ended. Reconnect this iPhone to continue; canonical data is unchanged.")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+                PrimaryActionButton(title: "Reconnect this iPhone") {
+                    onNavigate(.founderServerConnection)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let home):
             VStack(alignment: .leading, spacing: 10) {
                 HomeHeaderView(header: home.header)

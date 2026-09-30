@@ -1,10 +1,56 @@
 import Foundation
+import Security
 import XCTest
 import SwiftUI
 import UIKit
 @testable import PhysiqueOS
 
 final class FounderServerAPITests: XCTestCase {
+    func testSenderConstrainedEnrollmentRolloutIsLocallyDisabledByDefault() {
+        XCTAssertFalse(SenderConstrainedRefreshRollout.isEnabled(infoDictionary: [:]))
+        XCTAssertFalse(SenderConstrainedRefreshRollout.isEnabled(infoDictionary: [
+            SenderConstrainedRefreshRollout.infoPlistKey: false,
+        ]))
+        XCTAssertTrue(SenderConstrainedRefreshRollout.isEnabled(infoDictionary: [
+            SenderConstrainedRefreshRollout.infoPlistKey: true,
+        ]))
+    }
+
+    func testSecureEnclaveKeyAttributesAreNonExportableUnattendedAndDeviceOnly() throws {
+        let attributes = SecureEnclaveFounderInstallationSigningKey.privateKeyCreationAttributes(
+            applicationTag: Data("test-key".utf8)
+        )
+        XCTAssertEqual(attributes[kSecAttrTokenID as String] as? String, kSecAttrTokenIDSecureEnclave as String)
+        let privateAttributes = try XCTUnwrap(attributes[kSecPrivateKeyAttrs as String] as? [String: Any])
+        XCTAssertEqual(privateAttributes[kSecAttrIsPermanent as String] as? Bool, true)
+        XCTAssertEqual(
+            privateAttributes[kSecAttrAccessible as String] as? String,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String
+        )
+        XCTAssertNil(privateAttributes[kSecAttrAccessControl as String])
+    }
+
+    func testSwiftProofCanonicalizationMatchesProtocolVector() {
+        let refreshCredential = String(repeating: "a", count: 43)
+        let intent = String(repeating: "i", count: 43)
+        let successor = String(repeating: "b", count: 43)
+        let nonce = String(repeating: "n", count: 43)
+        let proofId = String(repeating: "p", count: 43)
+        let commitment = SenderConstrainedRefresh.successorCommitment(successor)
+        XCTAssertEqual(commitment, "jbaY_8twy8ui3RqbVNnLl36qQwcWwR5c2oS6kokaWEc")
+        XCTAssertEqual(
+            SenderConstrainedRefresh.proofMessage(
+                refreshCredential: refreshCredential,
+                rotationIntentId: intent,
+                successorRefreshCredential: successor,
+                successorCommitment: commitment,
+                nonce: nonce,
+                proofId: proofId
+            ).base64URLEncodedString(),
+            "cGh5c2lxdWVvcy1kZXZpY2UtcHJvb2YtdjEKUE9TVAovYXBpL3YxL25hdGl2ZS9hdXRoL3JlZnJlc2gKUmVhYnRCRWlSams2Y1VOZXdoOUZQT3VCU1VfVWpzWUdTcVdCUUp0Y2tZTQpubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5uCnBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHA"
+        )
+    }
+
     @MainActor
     func testHomeHandsOffNotificationsBeforeSlowSpeculativePrefetch() async throws {
         let model = HomeViewModel(api: FixtureHomeAPI(), priorityStore: LoggingSandboxStore(), goalsSandboxStore: GoalsSandboxStore(), briefingStore: BriefingSandboxStore(), appliesSandboxProjections: false)
@@ -21,6 +67,213 @@ final class FounderServerAPITests: XCTestCase {
         })
         XCTAssertEqual(calls, ["handoff", "prefetch"])
         XCTAssertGreaterThan(clock, fire, "The old prefetch-first sequence would miss this deadline")
+    }
+
+    func testSenderConstrainedPairingAdvertisesInstallationKeyAndPersistsEnvelope() async throws {
+        let store = MemoryEnvelopeCredentialStore()
+        let signer = RecordingInstallationSigningKey()
+        let transport = SenderConstrainedFounderTransport()
+        let api = ProductionNativeAPI(
+            baseURL: testOrigin,
+            credentialStore: store,
+            installationSigningKey: signer,
+            backgroundTaskScheduler: NoopBackgroundTaskScheduler(),
+            transport: transport
+        )
+
+        _ = try await api.pair(
+            pairingCredential: String(repeating: "p", count: 43),
+            displayName: "Founder iPhone"
+        )
+
+        let envelope = try XCTUnwrap(store.currentEnvelope())
+        XCTAssertEqual(envelope.authProtocol, FounderCredentialEnvelope.senderConstrainedProtocol)
+        XCTAssertNil(envelope.pendingRotation)
+        let recorded = await transport.requests()
+        let pairRequest = try XCTUnwrap(recorded.first)
+        let body = try XCTUnwrap(pairRequest.httpBody)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let refreshProof = try XCTUnwrap(object["refreshProof"] as? [String: Any])
+        XCTAssertEqual(refreshProof["algorithm"] as? String, "ES256")
+        XCTAssertEqual(refreshProof["publicKeySpki"] as? String, signer.publicKey)
+    }
+
+    func testLostRefreshResponseSurvivesRelaunchAndRecoversExactSuccessorWithFreshProof() async throws {
+        let store = MemoryEnvelopeCredentialStore()
+        let signer = RecordingInstallationSigningKey()
+        let transport = SenderConstrainedFounderTransport(refreshFailuresBeforeSuccess: 1)
+        let first = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        _ = try await first.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone"
+        )
+
+        let interrupted = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        await XCTAssertThrowsErrorAsync(try await interrupted.readProfile()) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .networkFailure)
+        }
+        let pendingAfterLoss = try XCTUnwrap(store.currentEnvelope()?.pendingRotation)
+        let interruptedState = await interrupted.sessionRecoveryState()
+        XCTAssertEqual(interruptedState, .temporarilyOfflineLastKnown)
+
+        let relaunched = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        _ = try await relaunched.readProfile()
+
+        let promoted = try XCTUnwrap(store.currentEnvelope())
+        XCTAssertNil(promoted.pendingRotation)
+        XCTAssertEqual(promoted.currentRefreshCredential, pendingAfterLoss.proposedSuccessorRefreshCredential)
+        let recoveredState = await relaunched.sessionRecoveryState()
+        XCTAssertEqual(recoveredState, .authenticated)
+        let refreshRequests = try await transport.refreshRequestSnapshots()
+        XCTAssertEqual(refreshRequests.count, 2)
+        XCTAssertEqual(refreshRequests.map(\.rotationIntentId), [
+            pendingAfterLoss.rotationIntentId, pendingAfterLoss.rotationIntentId,
+        ])
+        XCTAssertEqual(refreshRequests.map(\.successorRefreshCredential), [
+            pendingAfterLoss.proposedSuccessorRefreshCredential,
+            pendingAfterLoss.proposedSuccessorRefreshCredential,
+        ])
+        let proofIds = refreshRequests.map(\.proofId)
+        XCTAssertEqual(proofIds.count, 2)
+        XCTAssertNotEqual(proofIds[0], proofIds[1], "A relaunch must create a fresh proof identity")
+        XCTAssertEqual(signer.signedMessages().count, 2)
+    }
+
+    func testAtomicPromotionFailureKeepsPendingEnvelopeAndPublishesNoAccess() async throws {
+        let store = MemoryEnvelopeCredentialStore()
+        let signer = RecordingInstallationSigningKey()
+        let transport = SenderConstrainedFounderTransport()
+        let pairing = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        _ = try await pairing.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone"
+        )
+        store.failNextPromotion()
+
+        let relaunched = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        await XCTAssertThrowsErrorAsync(try await relaunched.readProfile()) { error in
+            XCTAssertTrue(error is MemoryEnvelopeCredentialStore.StoreFailure)
+        }
+
+        XCTAssertNotNil(store.currentEnvelope()?.pendingRotation)
+        let promotionFailureState = await relaunched.sessionRecoveryState()
+        XCTAssertEqual(promotionFailureState, .recoveringSession)
+        let recorded = await transport.requests()
+        let paths = recorded.compactMap(\.url?.path)
+        XCTAssertFalse(paths.contains { $0.hasSuffix("/profile") }, "Access must not publish before Keychain promotion")
+    }
+
+    func testTerminalReplaySignalDeletesEnvelopeAndRequiresReconnect() async throws {
+        let store = MemoryEnvelopeCredentialStore()
+        let signer = RecordingInstallationSigningKey()
+        let transport = SenderConstrainedFounderTransport(refreshProblemCode: "REFRESH_REUSE_DETECTED")
+        let pairing = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        _ = try await pairing.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone"
+        )
+
+        let relaunched = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        await XCTAssertThrowsErrorAsync(try await relaunched.readProfile()) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .reconnectRequired)
+        }
+
+        XCTAssertNil(store.currentEnvelope())
+        let terminalState = await relaunched.sessionRecoveryState()
+        XCTAssertEqual(terminalState, .reconnectRequired)
+    }
+
+    func testUnknownUnauthorizedRefreshDoesNotDeleteDurableRecoveryIntent() async throws {
+        let store = MemoryEnvelopeCredentialStore()
+        let signer = RecordingInstallationSigningKey()
+        let transport = SenderConstrainedFounderTransport(refreshProblemCode: "UNRELATED_POLICY_DENIAL")
+        let pairing = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        _ = try await pairing.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone"
+        )
+
+        let relaunched = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        await XCTAssertThrowsErrorAsync(try await relaunched.readProfile()) { error in
+            guard case ProductionNativeError.unauthenticated(let problem) = error else {
+                return XCTFail("Expected bounded unauthorized response, got \(error)")
+            }
+            XCTAssertEqual(problem?.code, "UNRELATED_POLICY_DENIAL")
+        }
+
+        XCTAssertNotNil(store.currentEnvelope()?.pendingRotation)
+        let policyDenialState = await relaunched.sessionRecoveryState()
+        XCTAssertEqual(policyDenialState, .recoveringSession)
+    }
+
+    func testExpiredOrReplayedProofKeepsPendingIntentAndRecoversWithFreshChallenge() async throws {
+        let store = MemoryEnvelopeCredentialStore()
+        let signer = RecordingInstallationSigningKey()
+        let transport = SenderConstrainedFounderTransport(refreshProblemCodes: ["DEVICE_PROOF_INVALID"])
+        let pairing = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        _ = try await pairing.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone"
+        )
+
+        let interrupted = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        await XCTAssertThrowsErrorAsync(try await interrupted.readProfile()) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .sessionRecoveryUnavailable)
+        }
+        let pending = try XCTUnwrap(store.currentEnvelope()?.pendingRotation)
+        let interruptedState = await interrupted.sessionRecoveryState()
+        XCTAssertEqual(interruptedState, .recoveringSession)
+
+        let relaunched = senderConstrainedAPI(store: store, signer: signer, transport: transport)
+        _ = try await relaunched.readProfile()
+        let promoted = try XCTUnwrap(store.currentEnvelope())
+        XCTAssertNil(promoted.pendingRotation)
+        XCTAssertEqual(promoted.currentRefreshCredential, pending.proposedSuccessorRefreshCredential)
+        let snapshots = try await transport.refreshRequestSnapshots()
+        XCTAssertEqual(snapshots.count, 2)
+        XCTAssertNotEqual(snapshots[0].proofId, snapshots[1].proofId)
+    }
+
+    @MainActor
+    func testHomeRoutesSecuritySignificantSessionEndToReconnect() async {
+        let model = HomeViewModel(
+            api: FailingHomeAPI(error: ProductionNativeError.reconnectRequired),
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+
+        await model.load()
+
+        XCTAssertEqual(model.state, .reconnectRequired)
+    }
+
+    @MainActor
+    func testHomePresentsRetryableProofRejectionAsExplicitSessionRecovery() async {
+        let model = HomeViewModel(
+            api: FailingHomeAPI(error: ProductionNativeError.sessionRecoveryUnavailable),
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+
+        await model.load()
+
+        guard case .failed(let message) = model.state else {
+            return XCTFail("Expected an explicit recovering state")
+        }
+        XCTAssertEqual(message, "Recovering the secure session. Try again when the connection is available.")
+    }
+
+    private func senderConstrainedAPI(
+        store: MemoryEnvelopeCredentialStore,
+        signer: RecordingInstallationSigningKey,
+        transport: SenderConstrainedFounderTransport
+    ) -> ProductionNativeAPI {
+        ProductionNativeAPI(
+            baseURL: testOrigin,
+            credentialStore: store,
+            installationSigningKey: signer,
+            backgroundTaskScheduler: NoopBackgroundTaskScheduler(),
+            transport: transport
+        )
     }
 
     func testProductionHomePreservesAllServerNotificationClassificationsAndFailsClosedOnUnknown() async throws {
@@ -934,7 +1187,9 @@ final class FounderServerAPITests: XCTestCase {
 
     func testRejectedRefreshCredentialRetiresLastKnownHome() async throws {
         let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
-        let transport = SequencedFounderTransport([.problem(401, code: "REFRESH_CREDENTIAL_INVALID")])
+        let transport = SequencedFounderTransport([
+            .json(401, productionProblemJSON(status: 401, code: "REFRESH_CREDENTIAL_INVALID")),
+        ])
         let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: credentials, transport: transport, snapshotStore: store)
         do {
             _ = try await Self.homeAPI(api).fetchHome()
@@ -6502,6 +6757,168 @@ private func sessionJSON(access: Character, refresh: Character) -> String {
     return """
     {"sessionId":"session-1","deviceId":"server-device-1","accessToken":"\(accessToken)","accessExpiresAt":"2026-09-01T12:10:00.000Z","refreshCredential":"\(refreshCredential)","refreshIdleExpiresAt":"2026-10-01T12:00:00.000Z","refreshAbsoluteExpiresAt":"2026-11-30T12:00:00.000Z"}
     """
+}
+
+private func senderConstrainedSessionJSON(accessToken: String, refreshCredential: String, recovered: Bool = false) -> String {
+    """
+    {"sessionId":"session-sender-1","deviceId":"server-device-1","accessToken":"\(accessToken)","accessExpiresAt":"2026-09-29T12:10:00.000Z","refreshCredential":"\(refreshCredential)","refreshIdleExpiresAt":"2026-10-29T12:00:00.000Z","refreshAbsoluteExpiresAt":"2026-11-30T12:00:00.000Z","authProtocol":"sender-constrained-refresh-v1","recovered":\(recovered)}
+    """
+}
+
+private struct FailingHomeAPI: HomeAPI {
+    let error: ProductionNativeError
+    func fetchHome() async throws -> HomeReadModel { throw error }
+}
+
+private final class MemoryEnvelopeCredentialStore: FounderSessionEnvelopeStore, @unchecked Sendable {
+    enum StoreFailure: Error { case simulatedPromotionFailure }
+
+    private let lock = NSLock()
+    private var envelope: FounderCredentialEnvelope?
+    private var shouldFailPromotion = false
+
+    func loadRefreshCredential() throws -> String? { lock.withLock { envelope?.currentRefreshCredential } }
+    func loadSessionEnvelope() throws -> FounderCredentialEnvelope? { lock.withLock { envelope } }
+
+    func saveRefreshCredential(_ credential: String) throws {
+        try saveSessionEnvelope(.legacy(credential))
+    }
+
+    func saveSessionEnvelope(_ value: FounderCredentialEnvelope) throws {
+        try lock.withLock {
+            if shouldFailPromotion, envelope?.pendingRotation != nil, value.pendingRotation == nil {
+                shouldFailPromotion = false
+                throw StoreFailure.simulatedPromotionFailure
+            }
+            envelope = try value.validated()
+        }
+    }
+
+    func deleteRefreshCredential() throws { lock.withLock { envelope = nil } }
+    func currentEnvelope() -> FounderCredentialEnvelope? { lock.withLock { envelope } }
+    func failNextPromotion() { lock.withLock { shouldFailPromotion = true } }
+}
+
+private final class RecordingInstallationSigningKey: FounderInstallationSigningKey, @unchecked Sendable {
+    let publicKey = String(repeating: "k", count: 43)
+    private let lock = NSLock()
+    private var messages: [Data] = []
+
+    func publicKeySPKIBase64URL() throws -> String { publicKey }
+    func sign(message: Data) throws -> String {
+        lock.withLock { messages.append(message) }
+        return String(repeating: "s", count: 86)
+    }
+    func signedMessages() -> [Data] { lock.withLock { messages } }
+}
+
+private struct NoopBackgroundTaskScheduler: BackgroundTaskScheduling {
+    func beginTask(named name: String, expirationHandler: @escaping @Sendable () -> Void) -> Int { 1 }
+    func endTask(_ identifier: Int) {}
+}
+
+private struct RefreshRequestSnapshot: Sendable {
+    let rotationIntentId: String
+    let successorRefreshCredential: String
+    let proofId: String
+}
+
+private actor SenderConstrainedFounderTransport: FounderHTTPTransport {
+    private var recordedRequests: [URLRequest] = []
+    private var remainingRefreshFailures: Int
+    private var refreshProblemCodes: [String]
+    private var challengeCount = 0
+
+    init(refreshFailuresBeforeSuccess: Int = 0, refreshProblemCode: String? = nil) {
+        remainingRefreshFailures = refreshFailuresBeforeSuccess
+        refreshProblemCodes = refreshProblemCode.map { [$0] } ?? []
+    }
+
+    init(refreshFailuresBeforeSuccess: Int = 0, refreshProblemCodes: [String]) {
+        remainingRefreshFailures = refreshFailuresBeforeSuccess
+        self.refreshProblemCodes = refreshProblemCodes
+    }
+
+    func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        recordedRequests.append(request)
+        let path = request.url?.path ?? ""
+        if path.hasSuffix("/auth/pair") {
+            return response(
+                request,
+                status: 200,
+                json: senderConstrainedSessionJSON(
+                    accessToken: String(repeating: "a", count: 43),
+                    refreshCredential: String(repeating: "r", count: 43)
+                )
+            )
+        }
+        if path.hasSuffix("/auth/refresh-challenge") {
+            challengeCount += 1
+            let nonceCharacter = challengeCount.isMultiple(of: 2) ? "n" : "m"
+            return response(
+                request,
+                status: 200,
+                json: """
+                {"proofVersion":1,"challengeId":"\(String(repeating: "c", count: 43))","nonce":"\(String(repeating: nonceCharacter, count: 43))","expiresAt":"2026-09-29T12:01:00.000Z"}
+                """
+            )
+        }
+        if path.hasSuffix("/auth/refresh") {
+            if remainingRefreshFailures > 0 {
+                remainingRefreshFailures -= 1
+                throw URLError(.networkConnectionLost)
+            }
+            if !refreshProblemCodes.isEmpty {
+                let refreshProblemCode = refreshProblemCodes.removeFirst()
+                return response(
+                    request,
+                    status: 401,
+                    json: productionProblemJSON(status: 401, code: refreshProblemCode)
+                )
+            }
+            let body = try XCTUnwrap(request.httpBody)
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let successor = try XCTUnwrap(object["successorRefreshCredential"] as? String)
+            return response(
+                request,
+                status: 200,
+                json: senderConstrainedSessionJSON(
+                    accessToken: String(repeating: "b", count: 43),
+                    refreshCredential: successor,
+                    recovered: challengeCount > 1
+                )
+            )
+        }
+        if path.hasSuffix("/profile") {
+            return response(request, status: 200, json: productionProfileJSON)
+        }
+        throw URLError(.badServerResponse)
+    }
+
+    func requests() -> [URLRequest] { recordedRequests }
+
+    func refreshRequestSnapshots() throws -> [RefreshRequestSnapshot] {
+        try recordedRequests.compactMap { request in
+            guard request.url?.path.hasSuffix("/auth/refresh") == true, let body = request.httpBody else { return nil }
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let proof = try XCTUnwrap(object["proof"] as? [String: Any])
+            return RefreshRequestSnapshot(
+                rotationIntentId: try XCTUnwrap(object["rotationIntentId"] as? String),
+                successorRefreshCredential: try XCTUnwrap(object["successorRefreshCredential"] as? String),
+                proofId: try XCTUnwrap(proof["proofId"] as? String)
+            )
+        }
+    }
+
+    private func response(_ request: URLRequest, status: Int, json: String) -> (Data, HTTPURLResponse) {
+        (
+            Data(json.utf8),
+            HTTPURLResponse(
+                url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": status == 401 ? "application/problem+json" : "application/json"]
+            )!
+        )
+    }
 }
 
 private final class MemoryCredentialStore: FounderRefreshCredentialStore, @unchecked Sendable {
