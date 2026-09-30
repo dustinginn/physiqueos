@@ -407,6 +407,9 @@ export function createCoreNavigationReadService({
           nextDue: formatNextSupportDue(nextDue),
           nextDueDate: nextDue?.date ?? null,
           nextDueTime: nextDue?.time ?? null,
+          // The owner's canonical local date this read was projected for, so
+          // Native's "Today"/"Tomorrow" and past-date guard agree with Home.
+          localDate,
         });
       });
     },

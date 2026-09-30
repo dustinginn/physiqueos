@@ -375,4 +375,13 @@ describe("Execution-backed priority detail honours pause windows (S3)", () => {
       .getPriorityDetail(reminder.id);
     expect(detail).toMatchObject({ status: "Open", paused: false, pauseContext: null, executionContract: { expectedVersion: 7 } });
   });
+
+  it("flags an open peptide dose as adjustable, and never a paused one", async () => {
+    const open = await service({ executionItems: [execution({ timeline: [phase("0.75")] })], protocol, reminderRecord: versioned })
+      .getPriorityDetail(reminder.id);
+    expect(open.doseAdjustable).toBe(true);
+    const held = await service({ executionItems: [paused()], protocol, reminderRecord: versioned })
+      .getPriorityDetail(reminder.id);
+    expect(held.doseAdjustable).toBeUndefined();
+  });
 });

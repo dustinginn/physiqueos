@@ -768,6 +768,7 @@ describe("peptide Support S4 read contract (additive keys)", () => {
       nextDue: "Sep 3, 2026 · 9:45 PM",
       nextDueDate: "2026-09-03",
       nextDueTime: "21:45",
+      localDate: "2026-08-29",
     });
     expect(result.timeline).toHaveLength(1);
     expect(result).not.toHaveProperty("timelineHistory");
