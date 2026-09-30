@@ -24,10 +24,11 @@ const EXPECTED_MIGRATIONS = Object.freeze([
   "000012_evidence_intake_receipts.cjs",
   "000013_native_sandbox_bootstrap_pairing.cjs",
   "000014_evidence_intake_text_provenance.cjs",
+  "000015_sender_constrained_refresh_recovery.cjs",
 ]);
 
 describe("PhysiqueOS programmatic migration discovery", () => {
-  it("discovers only the ordered legitimate migrations through 000014", () => {
+  it("discovers only the ordered legitimate migrations through 000015", () => {
     expect(discoverPhysiqueOSMigrationFiles()).toEqual(EXPECTED_MIGRATIONS);
     expect(EXPECTED_MIGRATIONS.every((name) =>
       PHYSIQUEOS_MIGRATION_FILENAME_PATTERN.test(name))).toBe(true);
@@ -49,7 +50,7 @@ describe("PhysiqueOS programmatic migration discovery", () => {
     ]) {
       expect(nodePgMigrateIgnore.test(name), name).toBe(true);
     }
-    expect(nodePgMigrateIgnore.test("000014_evidence_intake_text_provenance.cjs"))
+    expect(nodePgMigrateIgnore.test("000015_sender_constrained_refresh_recovery.cjs"))
       .toBe(false);
   });
 
