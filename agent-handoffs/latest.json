@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-29T08:30:00Z",
+  "generated_at_utc": "2026-09-29T17:55:00Z",
   "task": {
     "id": "peptide-protocol-native-ux-redesign-next-batch-20260929",
-    "title": "DESIGN PUBLISHED: simplified peptide editor + canonical Pause/Resume (execution-item suspension window) + 3 Build 69 roll-forwards; implementation starting",
+    "title": "CANDIDATE (code complete; Native suite + Release compile pending disk floor): simplified peptide editor + canonical Pause/Resume + Build 69 roll-forwards + weekly averages; Build 70",
     "agent": "claude",
     "status": "in_progress"
   },
@@ -16,24 +16,26 @@
     "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
     "native_build68_processing_status": "VALID",
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "98534bf8",
-    "server_candidate_branch": "claude/server-records-on-prod-20260929",
+    "server_candidate_sha": "b94ab533",
+    "server_candidate_branch": "claude/next-build-server-candidate-20260929",
     "production_deployment_id": "ab7fe481-abd9-4334-bfcd-f224560bb801",
     "previous_production_server_sha": "faa9151a8118acf48fda6541e8e23898f1148246",
-    "native_candidate_sha": "efa65db1",
-    "native_candidate_branch": "claude/native-build69-integrated-20260929",
-    "native_recommended_build": "69",
+    "native_candidate_sha": "0e3a0da8",
+    "native_candidate_branch": "claude/peptide-ux-native-20260929",
+    "native_recommended_build": "70",
     "codex_celebration_branch": "codex/native-workout-complete-record-celebration-20260928",
     "codex_celebration_sha": "ef54e482",
     "native_build69_final_sha": "efa65db1",
     "native_build69_delivery_id": "91831873-845e-46af-aa6a-bb9629cf9999",
     "native_build69_processing_status": "VALID",
     "native_build69_dsym_uuid": "A621757F-1B2A-31FF-9D2D-62FD831781E6",
-    "last_uploaded_build": "69"
+    "last_uploaded_build": "69",
+    "peptide_server_branch": "claude/peptide-ux-server-20260929",
+    "peptide_server_sha": "cc440e16"
   },
   "result": {
-    "summary": "Audit (8 readers + critic + 3-lens adversarial critique) established the execution item as the sole peptide authority (versionless protocol roots; protocol.status must stay active). Design: history-preserving timeline rule (S1), Change dose = steady dose from a date (S2), pause/resume as a dated suspension window on the execution item enforced at the projection choke point plus Priority Detail, nextDue, completion ports and Morning Check-In (S3), additive read keys (S4). Native: one screen, tappable rows + focused sheets, Advanced disclosure, no generator vocabulary. Roll-forwards confirmed Server-only (provenance caption, Foam Rolling skip two layers, Weekly Averages six-week cap).",
-    "success": true,
+    "summary": "Server candidate b94ab533 (peptide Pause/Resume + simplified read contract + 3 roll-forwards + uncapped weekly averages) passed full regression: 9315/9623, 303 baseline failures, 0 new. Native Build 70 candidate 0e3a0da8 (simplified peptide screen, sheets, Advanced disclosure, Pause/Resume, paused Priority Detail) passed three adversarial reviews (no blockers; majors fixed) and typechecks clean; Native full suite and Release compile not yet run because free disk is 14.0 GiB, under the 15 GiB floor. Nothing deployed or uploaded.",
+    "success": false,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
@@ -41,12 +43,12 @@
   },
   "validation": {
     "tests": {
-      "status": "pending",
-      "summary": "Implementation not started at publish time."
+      "status": "partial",
+      "summary": "Server 9315/9623 (0 new vs baseline). Native: swiftc typecheck clean; full xcodebuild suite + Release compile pending disk floor."
     },
     "review": {
       "status": "passed",
-      "summary": "Design critique: 3 lenses, sound-with-changes; blockers folded into the map."
+      "summary": "Three Native adversarial reviews (UX, correctness, Build 69 preservation): no blockers; majors fixed in 0e3a0da8."
     },
     "replay_fidelity": {
       "status": "passed",
@@ -54,10 +56,12 @@
     }
   },
   "decisions_required": [
-    "Optional Founder input (not blocking): should briefings say 'paused' for a paused peptide (today they keep treating it as part of the plan)?",
-    "Optional: include supplement reminders in Mark Skipped (deferred in this build)."
+    "Authorize Native full suite + Release compile + Server production build at ~14 GiB free, or free disk to >=15 GiB.",
+    "Optional: briefings say 'paused' for a paused peptide? Extend Mark Skipped to supplement reminders?"
   ],
-  "blockers": [],
+  "blockers": [
+    "Disk 14.0 GiB free < 15 GiB standing floor; remaining space is Founder audio libraries/system files (nothing deleted)."
+  ],
   "unexpected_findings": [
     "Sep 28 Activity is still frozen in production (supersedes continue to 837 cal); self-heals at the next-morning complete_day summary."
   ],
@@ -68,9 +72,10 @@
     "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
   ],
-  "recommended_next_step": "Claude implements Server (gated) and Native candidates per the map, then publishes the combined candidate for review.",
-  "full_report_path": "agent-handoffs/reports/20260929T083000Z-peptide-protocol-editor-pause-resume-design-map.md",
+  "recommended_next_step": "Founder answers the disk question; Claude runs Native full suite + Release compile, publishes the final candidate report, push-notifies; then Founder/ChatGPT review before any Server deploy or TestFlight upload.",
+  "full_report_path": "agent-handoffs/reports/20260929T175500Z-peptide-build70-candidate-status.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260929T083000Z-peptide-protocol-editor-pause-resume-design-map.md",
     "agent-handoffs/reports/20260929T050000Z-server-98534bf8-and-native-build69-distribution.md",
     "agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md",
     "agent-handoffs/reports/20260929T043000Z-daily-driver-server-faa9151a-production-deploy.md",
