@@ -153,20 +153,18 @@ vi.mock("../../../../application/media/ApplicationUploadService", () => ({
   },
 }));
 
-vi.mock("../../../../domain/interpreters/PhotoInterpreterService", () => ({
-  async interpretPhotoSetWithVision({ photos, previousPhotoSet }) {
+vi.mock("../../../../domain/interpreters/CanonicalPhotoPerceptionService", () => ({
+  async interpretCanonicalPhotoPerceptionWithVision({ photos, previousPhotoSet }) {
     mockState.value.visionCalls.push({
       current: photos.map((photo) => photo.dataUrl.slice(0, 40)),
       prior: (previousPhotoSet?.photos ?? []).map((photo) => photo.dataUrl.slice(0, 40)),
     });
     mockState.value.beforeVision?.(mockState.value.visionCalls.length);
     return {
-      provider: "openai",
-      warning: null,
-      interpretation: {
-        interpreter_version: "test-interpreter",
-        user_facing_summary: "Synthetic interpretation.",
-        structured_observations: [{ region: "midsection", change: "unchanged" }],
+      dominantVisualStory: "Synthetic interpretation.",
+      observations: [{ region: "midsection", change: "unchanged" }],
+      provenance: {
+        producerVersion: "test-interpreter",
       },
     };
   },
@@ -375,10 +373,9 @@ describe("photo analysis continuation memory and ownership contract", () => {
     }
   });
 
-  it("reads the Goal context inside one scoped read instead of four concurrent runtime loads", async () => {
+  it("does not read Goal context into prospective visual perception", async () => {
     await drain();
-    expect(mockState.value.contextReads).toHaveLength(1);
-    expect(mockState.value.contextReads[0]).toMatchObject({ userId: OWNER, evidenceDate: DATE });
+    expect(mockState.value.contextReads).toHaveLength(0);
   });
 
   it("persists the whole session's analyses in one bounded write of only the analyses collection", async () => {

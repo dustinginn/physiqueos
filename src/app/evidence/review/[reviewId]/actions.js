@@ -18,8 +18,9 @@ import {
 } from "../../../../domain/services/DexaAppointmentLifecycleService";
 import { synthesizePhotoSessionObservations } from "../../../../domain/services/PhotoSessionService";
 import { createTrainingPerformanceIntelligenceReport } from "../../../../domain/services/TrainingPerformanceIntelligenceService";
-import { interpretPhotoSetWithVision } from "../../../../domain/interpreters/PhotoInterpreterService";
-import { normalizePhotoInterpretationToStructuredObservations } from "../../../../domain/interpreters/PhotoObservationModel";
+import {
+  interpretCanonicalPhotoPerceptionWithVision,
+} from "../../../../domain/interpreters/CanonicalPhotoPerceptionService";
 import { createDEXAInterpretation } from "../../../../domain/services/DEXAInterpretationService";
 import { GoalEvaluationService } from "../../../../domain/services/GoalEvaluationService";
 import {
@@ -33,9 +34,6 @@ import {
 } from "../../../../application/composition/productionPhotoEventNarrativeComposition";
 import { filterEligibleEventBriefingTypes } from "../../../../domain/services/CoachingUpdatesReadService";
 import { createEvidenceConfirmationReadService } from "../../../../application/read-models/EvidenceConfirmationReadService";
-import {
-  createPhotoInterpreterGoalContext,
-} from "../../../../domain/services/PhotoEventContextService";
 import {
   createConfirmationAnalysisWriter,
   createConfirmationProgressPhotoWriter,
@@ -1296,7 +1294,6 @@ async function runDomainAnalysis({
   confirmationReads, persistAnalyses, assertLease = null,
 }) {
   const created = [];
-  const completionIntent = evidencePackage.review_metadata?.confirmationIntent;
   for (const object of (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed)) {
     if (object.evidence_type === "photo_session") {
       const evidenceDate = resolveCanonicalEvidenceLocalDate(object);
@@ -1308,12 +1305,6 @@ async function runDomainAnalysis({
             .includes(evidencePackage.package_id))) ?? null;
       const sessionId = attributedSession?.canonicalId ??
         getStablePhotoSessionId({ userId: user.id, captureDate: evidenceDate });
-      const photoEventContext = await confirmationReads.readPhotoEventContext({
-        userId: user.id,
-        evidenceDate,
-        evidenceAttribution: attributedSession,
-      });
-      const photoGoalContext = createPhotoInterpreterGoalContext(photoEventContext, completionIntent);
       const perView = [];
       const sessionAnalyses = [];
       for (const photo of (object.photos ?? []).filter((item) => item.active !== false)) {
@@ -1324,12 +1315,10 @@ async function runDomainAnalysis({
         const prior = findPriorCanonicalPhoto(canonical, photo, evidenceDate);
         const currentInput = await photoInterpreterInput(photo, object, loadPhotoAnalysisMedia);
         const priorInput = prior ? await canonicalPhotoInterpreterInput(prior, loadPhotoAnalysisMedia) : null;
-        const interpretationResult = await interpretPhotoSetWithVision({ captureDate: evidenceDate, goalContext: photoGoalContext, photoSetId: canonicalPhotoId, photos: [currentInput], previousPhotoSet: priorInput ? { photoSetId: prior.canonicalId, captureDate: prior.lastObservedAt, photos: [priorInput] } : null });
-        if (interpretationResult.provider !== "openai") throw new Error(`Photo Interpreter provider did not complete canonical analysis for ${canonicalPhotoId}: ${interpretationResult.warning ?? "provider unavailable"}`);
-        const interpretation = interpretationResult.interpretation;
-        const structuredObservations = interpretation.structured_observations ?? normalizePhotoInterpretationToStructuredObservations(interpretation);
-        const interpreterVersion = interpretation.interpreter_version ?? "photo-interpreter-production-v1";
-        const analysis = createAnalysis({ id: stableAnalysisId([canonicalPhotoId, "v1", prior?.canonicalId ?? "baseline", interpreterVersion]), createdAt: new Date().toISOString(), title: `${photo.view} ${photo.pose} interpreted`, summary: interpretation.user_facing_summary, evidenceIds: [canonicalPhotoId], evidenceTypes: ["progress_photo"], findings: structuredObservations.map((item) => ({ title: item.region, detail: item.change })), metadata: { canonicalPhotoId, canonicalVersion: "v1", interpreterVersion, priorComparisonId: prior?.canonicalId ?? null, provider: interpretationResult.provider, warning: interpretationResult.warning, photoInterpretation: interpretation, structuredObservations } });
+        const perception = await interpretCanonicalPhotoPerceptionWithVision({ captureDate: evidenceDate, photoSetId: canonicalPhotoId, photos: [currentInput], previousPhotoSet: priorInput ? { photoSetId: prior.canonicalId, captureDate: prior.lastObservedAt, photos: [priorInput] } : null });
+        const structuredObservations = perception.observations;
+        const interpreterVersion = perception.provenance.producerVersion;
+        const analysis = createAnalysis({ id: stableAnalysisId([canonicalPhotoId, "v1", prior?.canonicalId ?? "baseline", interpreterVersion]), createdAt: new Date().toISOString(), title: `${photo.view} ${photo.pose} interpreted`, summary: perception.dominantVisualStory, evidenceIds: [canonicalPhotoId], evidenceTypes: ["progress_photo"], findings: structuredObservations.map((item) => ({ title: item.region, detail: item.change })), metadata: { canonicalPhotoId, canonicalVersion: "v1", interpreterVersion, priorComparisonId: prior?.canonicalId ?? null, provider: "openai", warning: null, photoPerception: perception, photoInterpretation: { user_facing_summary: perception.dominantVisualStory, structured_observations: structuredObservations }, structuredObservations } });
         sessionAnalyses.push(analysis); created.push(analysis); perView.push({ evidenceIds: analysis.evidenceIds, structuredObservations, analysisId: analysis.id });
       }
       if (perView.length === 0) throw new Error("PhotoSession synthesis requires at least one successful per-view analysis.");
