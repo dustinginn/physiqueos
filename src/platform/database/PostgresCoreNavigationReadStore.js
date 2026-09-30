@@ -4,6 +4,7 @@ import {
   HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION,
   HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
 } from "../../domain/services/HealthKitGraduation.js";
+import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";
 
 // Read models whose Activity / Nutrition rows may show graduated HealthKit days
 // (policy-controlled, OFF by default). Every other model is untouched.
@@ -18,10 +19,6 @@ export function createPostgresCoreNavigationReadStore({
     throw new Error("Core navigation storage requires a PostgreSQL pool and owner.");
   }
 
-  const graduation = createHealthKitGraduationReader({
-    query: (text, values) => pool.query(text, values),
-    ownerUserId,
-  });
   return Object.freeze({
     getOwnerUserId: () => ownerUserId,
     async run(readModel, callback) {
@@ -30,7 +27,17 @@ export function createPostgresCoreNavigationReadStore({
       let payloadBytes = 0;
       let runtimeMetadata = null;
       const startedAt = performance.now();
-      const readCollections = async (collections) => {
+      const graduation = createHealthKitGraduationReader({
+        query: async (text, values) => {
+          queryCount += 1;
+          const result = await pool.query(text, values);
+          rowCount += result.rows.length;
+          payloadBytes += Buffer.byteLength(JSON.stringify(result.rows));
+          return result;
+        },
+        ownerUserId,
+      });
+      const readCollections = async (collections, scope = {}) => {
         const requested = [...new Set(collections ?? [])];
         if (requested.length === 0) return Object.freeze({});
         // The graduation policy row rides in this same query (one provider
@@ -38,7 +45,7 @@ export function createPostgresCoreNavigationReadStore({
         const graduated = requested.includes("canonicalEvidenceObjects") && HEALTHKIT_GRADUATED_READ_MODELS.has(readModel);
         if (graduated) requested.push(HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION);
         const grouped = groupCollectionsByTable(requested);
-        const values = [ownerUserId];
+        const values = [ownerUserId, scope.asOf ?? null, scope.timeZone ?? null];
         const selections = [...grouped].map(([table, names], index) => {
           values.push(names);
           return `SELECT collection_name,source_ordinal,record_id,
@@ -46,7 +53,7 @@ export function createPostgresCoreNavigationReadStore({
               (SELECT json_build_object('revision',revision,'lastCommitId',last_command_id,'updatedAt',updated_at)
                  FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1) AS runtime_metadata` : ""}
             FROM physiqueos.${table}
-            WHERE owner_user_id=$1 AND collection_name=ANY($${index + 2}::text[])
+            WHERE owner_user_id=$1 AND collection_name=ANY($${index + 4}::text[])
               ${canonicalEvidencePredicate(readModel)}`;
         });
         queryCount += 1;
@@ -69,7 +76,14 @@ export function createPostgresCoreNavigationReadStore({
           const before = output.canonicalEvidenceObjects;
           // The operating plan reads Activity only; Log reads both.
           const domains = readModel === "core.navigation.operating-plan" ? ["activity"] : ["activity", "nutrition"];
-          output.canonicalEvidenceObjects = await graduation.overlay(before, { policyRecord, domains });
+          const user = output.user?.at(-1) ?? null;
+          const timeZone = resolveLocalTimeZone(scope.timeZone ?? user?.timeZone ?? user?.timezone);
+          const localDate = getLocalDateKey(scope.asOf ? new Date(scope.asOf) : new Date(), timeZone);
+          output.canonicalEvidenceObjects = await graduation.overlay(before, {
+            policyRecord,
+            domains,
+            dateWindow: { startDate: localDate, endDate: localDate },
+          });
         }
         return Object.freeze(output);
       };
@@ -97,7 +111,9 @@ export function createPostgresCoreNavigationReadStore({
           queryCount,
           rowCount,
           payloadBytes,
+          materializedBytes: payloadBytes,
           compatibilityRuntimeLoadCount: 0,
+          projection: projectionName(readModel),
           elapsedMs: Math.round(performance.now() - startedAt),
           pool: {
             totalCount: pool.totalCount,
@@ -171,6 +187,29 @@ function graduationPolicyPredicate(readModel) {
 }
 
 function evidenceTypePredicate(readModel) {
+  if (readModel === "core.navigation.log") {
+    return `AND (
+      (collection_name='evidenceReviews' AND status IN ('pending','commit_failed','partially_committed','committing')) OR
+      (collection_name IN ('canonicalEvidenceObjects','healthKitCanonicalWorkouts') AND
+        COALESCE(
+          occurrence_date::text,
+          payload->>'localDate',payload->>'date',
+          payload#>>'{payload,localDate}',payload#>>'{payload,date}',
+          left(COALESCE(payload->>'observed_at',payload->>'observedAt',payload#>>'{payload,observed_at}',payload#>>'{payload,observedAt}'),10)
+        ) = timezone(
+          COALESCE(
+            NULLIF($3,''),
+            (SELECT COALESCE(identity.payload->>'timeZone',identity.payload->>'timezone')
+               FROM physiqueos.canonical_user_records identity
+              WHERE identity.owner_user_id=$1 AND identity.collection_name='user'
+              ORDER BY identity.source_ordinal DESC LIMIT 1),
+            'UTC'
+          ),
+          COALESCE($2::timestamptz,now())
+        )::date::text) OR
+      collection_name NOT IN ('evidenceReviews','canonicalEvidenceObjects','healthKitCanonicalWorkouts')
+    )`;
+  }
   if (["core.navigation.home", "core.navigation.goals", "core.navigation.training-logger", "core.navigation.training-my-library"].includes(readModel)) {
     return `AND (collection_name<>'canonicalEvidenceObjects' OR
       COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')='training')`;
@@ -201,9 +240,26 @@ function analysisPayloadExpression() {
     'importedAt',payload->'importedAt',
     'evidenceTypes',payload->'evidenceTypes',
     'metadata',CASE WHEN payload#>'{metadata,structuredObservations}' IS NOT NULL
-      THEN jsonb_build_object('structuredObservations',payload#>'{metadata,structuredObservations}') END,
-    'structuredObservations',payload->'structuredObservations'
+      THEN jsonb_build_object('structuredObservations',${compactObservationArray("payload#>'{metadata,structuredObservations}'")}) END,
+    'structuredObservations',CASE WHEN payload->'structuredObservations' IS NOT NULL
+      THEN ${compactObservationArray("payload->'structuredObservations'")} END
   ))`;
+}
+
+function compactObservationArray(expression) {
+  return `(SELECT COALESCE(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+    'type',observation->'type',
+    'region',observation->'region',
+    'confidence',observation->'confidence',
+    'supportsGoal',observation->'supportsGoal'
+  ))),'[]'::jsonb)
+    FROM jsonb_array_elements(CASE WHEN jsonb_typeof(${expression})='array' THEN ${expression} ELSE '[]'::jsonb END) observation)`;
+}
+
+function projectionName(readModel) {
+  if (["core.navigation.home", "core.navigation.goals"].includes(readModel)) return "phase1_compact_analysis";
+  if (readModel === "core.navigation.log") return "phase1_today_pending";
+  return "canonical_collection";
 }
 
 function briefingPayloadExpression() {

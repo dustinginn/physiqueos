@@ -102,6 +102,63 @@ describe("authority-gated worker", () => {
     expect(runOnce).toHaveBeenCalledOnce();
   });
 
+  it("bounds paused authority reads while idle and refreshes on expiry or clock rollback", async () => {
+    let now = new Date("2026-09-30T20:00:00.000Z");
+    const read = vi.fn(async () => ({ state: windowsState() }));
+    const runOnce = vi.fn();
+    const gated = createAuthorityGatedWorker({
+      worker: { runOnce, markStopping: vi.fn(), isStopping: () => false },
+      authorityStore: { read },
+      now: () => now,
+      authorityRefreshIntervalMs: 15_000,
+    });
+    await gated.runOnce();
+    now = new Date(now.getTime() + 14_999);
+    await gated.runOnce();
+    expect(read).toHaveBeenCalledTimes(1);
+    now = new Date(now.getTime() + 1);
+    await gated.runOnce();
+    expect(read).toHaveBeenCalledTimes(2);
+    await gated.runOnce();
+    expect(read).toHaveBeenCalledTimes(2);
+    now = new Date(now.getTime() - 60_000);
+    await gated.runOnce();
+    expect(read).toHaveBeenCalledTimes(3);
+    expect(runOnce).not.toHaveBeenCalled();
+  });
+
+  it("never caches positive provider authority across a possible claim", async () => {
+    const read = vi.fn(async () => ({ state: providerState() }));
+    const runOnce = vi.fn(async () => ({ outcome: "idle" }));
+    const gated = createAuthorityGatedWorker({
+      worker: { runOnce, markStopping: vi.fn(), isStopping: () => false },
+      authorityStore: { read },
+    });
+    await gated.runOnce();
+    await gated.runOnce();
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(runOnce).toHaveBeenCalledTimes(2);
+  });
+
+  it("throttles paused-authority heartbeats independently from authority checks", async () => {
+    let now = new Date("2026-09-30T20:00:00.000Z");
+    const heartbeat = vi.fn();
+    const gated = createAuthorityGatedWorker({
+      worker: { runOnce: vi.fn(), markStopping: vi.fn(), isStopping: () => false },
+      authorityStore: { read: async () => ({ state: windowsState() }) },
+      heartbeat,
+      now: () => now,
+      authorityRefreshIntervalMs: 15_000,
+      heartbeatIntervalMs: 30_000,
+    });
+    await gated.runOnce();
+    now = new Date(now.getTime() + 15_000);
+    await gated.runOnce();
+    now = new Date(now.getTime() + 15_000);
+    await gated.runOnce();
+    expect(heartbeat).toHaveBeenCalledTimes(2);
+  });
+
   it("remains paused in recovery-required even after the boundary was crossed", async () => {
     const runOnce = vi.fn();
     const gated = createAuthorityGatedWorker({

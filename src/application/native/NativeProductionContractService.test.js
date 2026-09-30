@@ -100,10 +100,28 @@ function fixture(overrides = {}) {
     evidenceIntake,
     openMedia,
     now: () => new Date("2026-09-09T12:00:00.000Z"),
+    logger: overrides.logger ?? null,
+    performanceClock: overrides.performanceClock,
   });
   return { confirmEvidenceReview, evidenceIntake, executeCommand, openMedia, readers, service };
 }
 describe("Native production contract boundary", () => {
+  it("emits privacy-safe read completion and failure telemetry", async () => {
+    const events = [];
+    let tick = 10;
+    const logger = {
+      info: (event, fields) => events.push({ event, fields }),
+      warn: (event, fields) => events.push({ event, fields }),
+    };
+    const current = fixture({ logger, performanceClock: () => tick++ });
+    await current.service.read({ request: request({ "x-request-id": "request-safe-1" }), resource: "home" });
+    await expect(current.service.read({ request: request(), resource: "unknown" })).rejects.toMatchObject({ status: 404 });
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ event: "native.read.completed", fields: expect.objectContaining({ resource: "home", status: 200, responseBytes: expect.any(Number), correlationHash: expect.stringMatching(/^[0-9a-f]{16}$/) }) }),
+      expect.objectContaining({ event: "native.read.failed", fields: expect.objectContaining({ resource: "unknown", status: 404, errorClass: "not_found" }) }),
+    ]));
+    expect(JSON.stringify(events)).not.toMatch(/Bearer|user_founder|device-native|session-native|request-safe-1/);
+  });
   it("enforces owner-scoped bounded HealthKit canary diagnostics", async () => {
     const current = fixture();
     const result = await current.service.read({
@@ -722,8 +740,8 @@ describe("Native production contract boundary", () => {
   });
 });
 
-function request() {
-  return new Request("https://physiqueos.example/api/v1/native/read/home", { headers: { authorization: `Bearer ${"x".repeat(43)}` } });
+function request(headers = {}) {
+  return new Request("https://physiqueos.example/api/v1/native/read/home", { headers: { authorization: `Bearer ${"x".repeat(43)}`, ...headers } });
 }
 
 describe("Native daily-driver local day (travel)", () => {

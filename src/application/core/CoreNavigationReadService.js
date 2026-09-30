@@ -114,9 +114,10 @@ export function createCoreNavigationReadService({
     // user's current local day. It never changes the stored user zone or any
     // record's canonical localDate.
     getLog({ timeZone = null } = {}) {
+      const at = now();
       return withContext("core.navigation.log", "log", async ({ ownerUserId, principal, repositories, runtime }) => {
         const user = runtime.user?.id === ownerUserId ? runtime.user : null;
-        const log = await createLogReadService({ repositories, now }).getLog({
+        const log = await createLogReadService({ repositories, now: () => at }).getLog({
           principal,
           timeZone: timeZone ?? user?.timeZone ?? user?.timezone,
           healthKitRelationshipState: {
@@ -126,7 +127,7 @@ export function createCoreNavigationReadService({
           },
         });
         return projectConfirmedHealthKitLogProvenance(log, runtime);
-      });
+      }, { asOf: at.toISOString(), timeZone });
     },
     async getGoals() {
       await ensureCanonicalExerciseRegistry();
@@ -692,11 +693,11 @@ export function createCoreNavigationReadService({
       : listCanonicalTrainingExerciseIdentities();
   }
 
-  function withContext(readModel, surface, callback) {
+  function withContext(readModel, surface, callback, readScope = {}) {
     return store.run(readModel, async ({ readCollections, readRuntimeMetadata }) => {
       const ownerUserId = store.getOwnerUserId();
       if (!ownerUserId) throw new Error("Core navigation owner is unavailable.");
-      const collections = await readCollections(CORE_NAVIGATION_COLLECTIONS[surface]);
+      const collections = await readCollections(CORE_NAVIGATION_COLLECTIONS[surface], readScope);
       const runtime = createCompactRuntime(collections, surface);
       if (surface === "coachingUpdates") {
         if (!readRuntimeMetadata) throw new Error("Canonical Coaching Updates revision authority is unavailable.");
@@ -752,6 +753,14 @@ function projectCollection(name, values, surface) {
 }
 
 function projectAnalysis(analysis = {}) {
+  const projectObservations = (observations) => Array.isArray(observations)
+    ? observations.map((observation) => compactObject({
+        type: observation?.type,
+        region: observation?.region,
+        confidence: observation?.confidence,
+        supportsGoal: observation?.supportsGoal,
+      }))
+    : undefined;
   const output = compactObject({
     id: analysis.id,
     createdAt: analysis.createdAt,
@@ -760,9 +769,9 @@ function projectAnalysis(analysis = {}) {
     importedAt: analysis.importedAt,
     evidenceTypes: analysis.evidenceTypes,
     metadata: analysis.metadata?.structuredObservations
-      ? { structuredObservations: analysis.metadata.structuredObservations }
+      ? { structuredObservations: projectObservations(analysis.metadata.structuredObservations) }
       : undefined,
-    structuredObservations: analysis.structuredObservations,
+    structuredObservations: projectObservations(analysis.structuredObservations),
   });
   return Object.freeze(output);
 }

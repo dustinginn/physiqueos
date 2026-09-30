@@ -2,6 +2,30 @@ import { describe, expect, it, vi } from "vitest";
 import { createDurableOutboxWorker } from "./DurableOutboxWorker";
 
 describe("durable outbox worker", () => {
+  it("decouples a bounded heartbeat cadence from idle claim attempts", async () => {
+    const store = durableStore([]);
+    let now = at(0);
+    const telemetry = [];
+    const worker = createDurableOutboxWorker({
+      store,
+      handlers: {},
+      workerId: "worker",
+      buildId: "build",
+      clock: () => now,
+      heartbeatIntervalMs: 30_000,
+      onTelemetry: (event) => telemetry.push(event),
+    });
+    await worker.runOnce();
+    now = new Date(at(0).getTime() + 29_999);
+    await worker.runOnce();
+    now = new Date(at(0).getTime() + 30_000);
+    await worker.runOnce();
+    now = new Date(at(0).getTime() - 1);
+    await worker.runOnce();
+    expect(store.heartbeats).toHaveLength(3);
+    expect(telemetry.filter(({ event }) => event === "worker.heartbeat")).toHaveLength(3);
+  });
+
   it("prevents simultaneous duplicate claims", async () => {
     const store = durableStore([message()]);
     const first = await store.claimNext({ workerId: "worker-a", now: at(0), leaseExpiresAt: at(60) });

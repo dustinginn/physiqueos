@@ -215,6 +215,7 @@ const handlers = Object.freeze({
     }),
   } : {}),
 });
+const emitWorkerTelemetry = ({ event, ...fields }) => logger.info(event, fields);
 const worker = createDurableOutboxWorker({
   store: adapters.outbox,
   handlers,
@@ -222,6 +223,7 @@ const worker = createDurableOutboxWorker({
   buildId: buildIdentity.buildId,
   logger,
   maximumAttempts: readMaximumAttempts(process.env.PHYSIQUEOS_WORKER_MAX_ATTEMPTS),
+  onTelemetry: emitWorkerTelemetry,
 });
 const effectiveWorker = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
   ? createAuthorityGatedWorker({
@@ -234,6 +236,7 @@ const effectiveWorker = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
       compatibilityMode,
       compatibilityEnvironment: authorityEnvironment,
       compatibilityDatabaseName,
+      onTelemetry: emitWorkerTelemetry,
     })
   : worker;
 
@@ -253,12 +256,13 @@ if (workerBootProbe) {
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => controller.abort());
   try {
     const loops = [
-      runWorkerLoop({ worker: effectiveWorker, signal: controller.signal }),
+      runWorkerLoop({ worker: effectiveWorker, signal: controller.signal, onTelemetry: emitWorkerTelemetry }),
     ];
     if (nativeSandboxWorker) {
       loops.push(runWorkerLoop({
         worker: nativeSandboxWorker,
         signal: controller.signal,
+        onTelemetry: emitWorkerTelemetry,
       }));
     }
     if (process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1") {

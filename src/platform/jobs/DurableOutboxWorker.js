@@ -2,16 +2,32 @@ import { createUuidV7 } from "../../contracts/v1/identifiers.js";
 
 const DEFAULT_MAX_ATTEMPTS = 8;
 const DEFAULT_LEASE_MS = 60_000;
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
 
-export function createDurableOutboxWorker({ store, handlers, workerId = createUuidV7(), buildId, clock = () => new Date(), logger, maximumAttempts = DEFAULT_MAX_ATTEMPTS, leaseMs = DEFAULT_LEASE_MS, deadHookAttempts = 3, deadHookRetryDelayMs = 1_000 }) {
+export function createDurableOutboxWorker({ store, handlers, workerId = createUuidV7(), buildId, clock = () => new Date(), logger, maximumAttempts = DEFAULT_MAX_ATTEMPTS, leaseMs = DEFAULT_LEASE_MS, heartbeatIntervalMs = DEFAULT_HEARTBEAT_INTERVAL_MS, onTelemetry = null, deadHookAttempts = 3, deadHookRetryDelayMs = 1_000 }) {
   if (!store?.claimNext || !store?.acknowledge || !store?.fail) throw new Error("A durable outbox store is required.");
   if (!buildId) throw new Error("A worker build identity is required.");
+  if (!Number.isFinite(heartbeatIntervalMs) || heartbeatIntervalMs <= 0) throw new Error("Worker heartbeat interval must be positive.");
   let stopping = false;
+  let lastHeartbeatAtMs = null;
+  let lastHeartbeatSignature = null;
+
+  async function heartbeatIfDue({ status, details, observedAt = clock(), force = false }) {
+    const observedAtMs = observedAt.getTime();
+    const signature = JSON.stringify({ status, details });
+    const elapsedMs = lastHeartbeatAtMs === null ? null : observedAtMs - lastHeartbeatAtMs;
+    if (!force && signature === lastHeartbeatSignature && elapsedMs !== null && elapsedMs >= 0 && elapsedMs < heartbeatIntervalMs) return false;
+    await store.heartbeat({ workerId, buildId, status, observedAt, details });
+    lastHeartbeatAtMs = observedAtMs;
+    lastHeartbeatSignature = signature;
+    onTelemetry?.(Object.freeze({ event: "worker.heartbeat", status, intervalMs: heartbeatIntervalMs }));
+    return true;
+  }
 
   async function runOnce({ allowedTopics = null, heartbeatStatus = "healthy", heartbeatDetails = null } = {}) {
     if (stopping) return Object.freeze({ outcome: "stopping" });
     const now = clock();
-    await store.heartbeat({ workerId, buildId, status: heartbeatStatus, observedAt: now, details: heartbeatDetails });
+    await heartbeatIfDue({ status: heartbeatStatus, details: heartbeatDetails, observedAt: now });
     const message = await store.claimNext({ workerId, now, leaseExpiresAt: new Date(now.getTime() + leaseMs), allowedTopics });
     if (!message) return Object.freeze({ outcome: "idle" });
     const handler = handlers[message.topic];
@@ -111,7 +127,7 @@ export function createDurableOutboxWorker({ store, handlers, workerId = createUu
 
   async function markStopping() {
     stopping = true;
-    await store.heartbeat({ workerId, buildId, status: "stopping", observedAt: clock(), details: null });
+    await heartbeatIfDue({ status: "stopping", details: null, force: true });
   }
 
   return Object.freeze({ workerId, runOnce, markStopping, isStopping: () => stopping });

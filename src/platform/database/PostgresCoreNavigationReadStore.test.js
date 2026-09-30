@@ -53,6 +53,30 @@ describe("PostgreSQL core navigation read store", () => {
     }));
   });
 
+  it("scopes Log to actionable reviews and the requested local day", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    const store = createPostgresCoreNavigationReadStore({ pool: { query }, ownerUserId: "owner-one" });
+    await store.run("core.navigation.log", ({ readCollections }) => readCollections(
+      CORE_NAVIGATION_COLLECTIONS.log,
+      { asOf: "2026-09-30T20:00:00.000Z", timeZone: "America/Los_Angeles" }
+    ));
+    const [sql, values] = query.mock.calls[0];
+    expect(sql).toContain("status IN ('pending','commit_failed','partially_committed','committing')");
+    expect(sql).toContain("occurrence_date::text");
+    expect(sql).toContain("canonical_user_records identity");
+    expect(values.slice(0, 3)).toEqual(["owner-one", "2026-09-30T20:00:00.000Z", "America/Los_Angeles"]);
+  });
+
+  it("projects only body-composition analysis observation fields for Home and Goals", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    const store = createPostgresCoreNavigationReadStore({ pool: { query }, ownerUserId: "owner-one" });
+    await store.run("core.navigation.home", ({ readCollections }) => readCollections(["analyses"]));
+    const sql = query.mock.calls[0][0];
+    expect(sql).toContain("jsonb_array_elements");
+    expect(sql).toContain("'supportsGoal',observation->'supportsGoal'");
+    expect(sql).not.toContain("observation->'change'");
+  });
+
   it.each([
     ["core.navigation.home", ["user", "dailyBriefings", "analyses", "canonicalEvidenceObjects"]],
     ["core.navigation.log", ["user", "evidenceReviews", "canonicalEvidenceObjects"]],

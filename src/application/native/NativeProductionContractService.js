@@ -5,6 +5,7 @@ import { ApplicationProblem } from "../../contracts/v1/problem.js";
 import { nativeProductionContractManifest, NativeProductionResource } from "./nativeProductionContractManifest.js";
 import { projectNativeMediaReferences } from "./nativeMediaProjection.js";
 import { createProviderEnergyEvidenceReport } from "../../domain/services/EnergyEvidenceService.js";
+import { readNativeEvidenceHub } from "./NativeEvidenceHubReadService.js";
 import {
   projectNativeNutritionRead,
   projectNativeTrainingLandingRead,
@@ -90,6 +91,9 @@ export function createNativeProductionContractService({
     },
 
     async read({ request, resource, input = {} }) {
+      const readStartedAt = performanceClock();
+      const correlationHash = safeCorrelationHash(request?.headers?.get?.("x-request-id"));
+      try {
       const principal = await authorize(request);
       if (!RESOURCES.has(resource) || resource === NativeProductionResource.PROFILE) throw unavailableResource();
       const context = CONTEXTS.has(input.context) ? input.context : "all";
@@ -177,6 +181,12 @@ export function createNativeProductionContractService({
           currentDate,
           limit: boundedResourceLimit(input.limit, { fallback: 12, maximum: 50 }),
         }); break;
+        case "evidence-hub": data = await readNativeEvidenceHub({
+          readers,
+          context,
+          currentDate,
+          onTelemetry: (event) => logger?.info?.(event.event, { states: event.states }),
+        }); break;
         case "briefing-history": data = await readers.briefings.listNativeHistory({
           limit: boundedBriefingLimit(input.limit),
           cursor: optional(input.cursor),
@@ -220,7 +230,31 @@ export function createNativeProductionContractService({
         default: throw unavailableResource();
       }
       if (data == null) throw unavailableResource();
-      return envelope(resource, data);
+      const response = envelope(resource, data);
+      logger?.info?.("native.read.completed", {
+        resource,
+        route: `/api/v1/native/read/${resource}`,
+        durationMs: elapsed(performanceClock, readStartedAt),
+        responseBytes: Buffer.byteLength(JSON.stringify(response)),
+        status: 200,
+        cacheState: "uncached",
+        projection: resource === "evidence-hub" ? "server_aggregate_v1" : "resource_projection_v1",
+        correlationHash,
+      });
+      return response;
+      } catch (error) {
+        logger?.warn?.("native.read.failed", {
+          resource: typeof resource === "string" ? resource : "invalid",
+          route: typeof resource === "string" ? `/api/v1/native/read/${resource}` : "/api/v1/native/read/invalid",
+          durationMs: elapsed(performanceClock, readStartedAt),
+          responseBytes: 0,
+          status: Number(error?.status ?? 500),
+          errorClass: safeErrorClass(error),
+          cacheState: "uncached",
+          correlationHash,
+        });
+        throw error;
+      }
     },
 
     async command({ request, commandType, metadata, payload }) {
@@ -450,6 +484,20 @@ function projectLegacyPresentationItem(item, allowedIcons) {
 
 function safeIdentityFingerprint(value) {
   return createHash("sha256").update(String(value ?? "")).digest("hex").slice(0, 16);
+}
+
+function safeCorrelationHash(value) {
+  const candidate = String(value ?? "");
+  return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(candidate)
+    ? createHash("sha256").update(candidate).digest("hex").slice(0, 16)
+    : null;
+}
+
+function safeErrorClass(error) {
+  if (error?.status === 401) return "unauthenticated";
+  if (error?.status === 404) return "not_found";
+  if (error?.status >= 400 && error?.status < 500) return "request_rejected";
+  return "server_failure";
 }
 
 function elapsed(clock, startedAt) {
