@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Sleep Phase B: dormant Native ingestion path (candidate; not uploaded; activation off) (`healthkit-sleep-phase-b-native-dormant-20260930`)
+- Task: HealthKit Sleep Phase C checkpoint: candidates ready; dormant Server deploy blocked by local permission gate (`healthkit-sleep-phase-c-historical-validation-and-rollout-20260930`)
 - Agent: claude
-- Status: completed
-- Generated (UTC): 2026-09-30T18:59:03Z
-- Success: true
+- Status: blocked
+- Generated (UTC): 2026-09-30T19:53:33Z
+- Success: false
 
-Summary: Dormant Native Sleep path on claude/healthkit-sleep-phase-b-native-20260930 @ 62d6b01b (base Build 72 27910310) against Phase A contract healthkit-sleep-ingestion-v1 (Server e1e56be6): fail-closed manifest gate (persisted last-known, 409 latch), Sleep observer (sleepAnalysis, hourly) only when active, floor-bound anchored query on healthkit-automatic-sleep-v1 (predicate + engine), privacy-safe mapping with Server-parity validation, deletions with samples, 12 h fail-closed window manifest, exact 200/409/400 handling, bounded deferredChanges, protectedDataDidBecomeAvailable recovery, deactivation teardown. Not uploaded; activation off; no Server deploy or policy write.
+Summary: Server Phase C candidate 08aeecde (Phase A + isolated historical-validation lane + guarded Sleep policy runner + zero-write Sleep audit) and Native Build 73 source 05912674 (Phase B + Founder-only historical validation diagnostic) are validated and fresh-reviewed (no blockers). The dormant production Server deploy was refused by the local Claude Code auto-mode permission classifier before any command ran; production unchanged at 372c306b. Upload waits for Server dormancy verification.
 
-Detailed report: `agent-handoffs/reports/20260930T185903Z-healthkit-sleep-phase-b-native-dormant.md`
+Detailed report: `agent-handoffs/reports/20260930T195333Z-healthkit-sleep-phase-c-checkpoint-deploy-gate.md`
 
 Protocol: `agent-handoffs/README.md`

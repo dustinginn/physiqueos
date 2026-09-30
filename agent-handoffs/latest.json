@@ -1,59 +1,48 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T18:59:03Z",
+  "generated_at_utc": "2026-09-30T19:53:33Z",
   "task": {
-    "id": "healthkit-sleep-phase-b-native-dormant-20260930",
-    "title": "HealthKit Sleep Phase B: dormant Native ingestion path (candidate; not uploaded; activation off)",
+    "id": "healthkit-sleep-phase-c-historical-validation-and-rollout-20260930",
+    "title": "HealthKit Sleep Phase C checkpoint: candidates ready; dormant Server deploy blocked by local permission gate",
     "agent": "claude",
-    "status": "completed"
+    "status": "blocked"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "279103107f044141aa4c9a7487f281dc6fd19423",
-    "final_sha": "62d6b01be67e4e47e1c68224101b0e799e8714a1",
+    "base_sha": "372c306ba45ffaa0f93f7bf74e4c0c266070d9a5",
+    "final_sha": "08aeecdeb9f02e311efa2cd037940fbf0b249bb7",
     "production_server_sha": "372c306b",
     "production_deployment": "01d9c20f-8b91-4872-a31a-ea9e9276bfcb",
-    "native_sha": "279103107f044141aa4c9a7487f281dc6fd19423",
-    "native_build": "72"
+    "native_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
+    "native_build": "73 (source ready, not uploaded)"
   },
   "result": {
-    "summary": "Dormant Native Sleep path on claude/healthkit-sleep-phase-b-native-20260930 @ 62d6b01b (base Build 72 27910310) against Phase A contract healthkit-sleep-ingestion-v1 (Server e1e56be6): fail-closed manifest gate (persisted last-known, 409 latch), Sleep observer (sleepAnalysis, hourly) only when active, floor-bound anchored query on healthkit-automatic-sleep-v1 (predicate + engine), privacy-safe mapping with Server-parity validation, deletions with samples, 12 h fail-closed window manifest, exact 200/409/400 handling, bounded deferredChanges, protectedDataDidBecomeAvailable recovery, deactivation teardown. Not uploaded; activation off; no Server deploy or policy write.",
-    "success": true,
+    "summary": "Server Phase C candidate 08aeecde (Phase A + isolated historical-validation lane + guarded Sleep policy runner + zero-write Sleep audit) and Native Build 73 source 05912674 (Phase B + Founder-only historical validation diagnostic) are validated and fresh-reviewed (no blockers). The dormant production Server deploy was refused by the local Claude Code auto-mode permission classifier before any command ran; production unchanged at 372c306b. Upload waits for Server dormancy verification.",
+    "success": false,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
-    "tests": {
-      "status": "passed",
-      "summary": "HealthKitSleepIngestionTests 36/36; HealthKit regression suites pass; full PhysiqueOSTests 1625/1626 (single unrelated date-dependent Peptide sandbox test); Release device compile (unsigned) succeeded."
-    },
-    "review": {
-      "status": "approved",
-      "summary": "Fresh review 2 rounds: no blockers; S1-S4 + N1/N6 fixed and verified; Native-Server contract matches Phase A (no Server change needed)."
-    },
-    "zero_write_audit": {
-      "status": "not_applicable",
-      "summary": "No production writes; Sleep inert against production (no manifest block)."
-    }
+    "tests": {"status": "passed", "summary": "Server 08aeecde: full unit suite failure set identical to base (304 pre-existing), production build exit 0. Native 05912674: PhysiqueOSTests 1632/1633 (unrelated date-dependent Peptide test), Release compile succeeded."},
+    "review": {"status": "approved", "summary": "Server fresh review 2 rounds: no remaining blockers/should-fix. Native fresh review: no blockers; should-fix (full-payload batch identity) fixed."},
+    "zero_write_audit": {"status": "not_run", "summary": "Dormancy audit runs after the Server deploy."}
   },
   "decisions_required": [
-    "Authorize dormant Phase A Server deploy (e1e56be6).",
-    "Authorize a Native build/upload including this Phase B path.",
-    "D1: Sleep D0 + mode (+ Oura preference write) for Phase C canary."
+    "Founder: plain chat authorization for the dormant production Server deploy of 08aeecde (the local permission classifier requires it), and for the Build 73 TestFlight upload.",
+    "Later: Sleep D0 (prospective) authorization; the historical window is D0-30..D0-1."
   ],
-  "blockers": [],
+  "blockers": [
+    "Local Claude Code auto-mode classifier denied [Production Deploy] despite the GitHub prompt; needs a Founder chat sentence."
+  ],
   "unexpected_findings": [
-    "Production ACTIVE deployment now 01d9c20f (spec update, same code 372c306b).",
-    "PeptideSupportEditorViewModelTests sandbox pause test fails date-dependently (unrelated, not re-verified on base)."
+    "This Mac's router DNS intermittently NXDOMAINs the production host; production healthy via public resolver."
   ],
   "backlog": [
-    "Phase C: guarded Sleep activation/preference runner (dry-run + zero-write audit).",
-    "Optional: per-device scoping of Server window-manifest retirement.",
-    "Workout sourceName normalization (separate); Nutrition observer zero-types gap (separate)."
+    "After deploy: dormancy acceptance, Build 73 upload, D0 authorization, historical validation run, Evidence-design handoff."
   ],
-  "recommended_next_step": "Founder: authorize Phase A deploy + Phase B build; then Phase C preparation prompt (report section 15).",
-  "full_report_path": "agent-handoffs/reports/20260930T185903Z-healthkit-sleep-phase-b-native-dormant.md",
+  "recommended_next_step": "Founder: say 'Deploy Server 08aeecde dormant to production now and upload Build 73' in the Claude chat; Claude then deploys, verifies dormancy, uploads Build 73, and stops for D0.",
+  "full_report_path": "agent-handoffs/reports/20260930T195333Z-healthkit-sleep-phase-c-checkpoint-deploy-gate.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
