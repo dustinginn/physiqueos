@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T04:30:00Z",
+  "generated_at_utc": "2026-09-30T06:20:00Z",
   "task": {
-    "id": "peptide-protocol-native-ux-redesign-next-batch-20260929",
-    "title": "Build 70 DEPLOYED (Server 4a81f5b4, migration 000015, enrollment OFF) and UPLOADED (Native Build 70 754376c5, VALID); awaiting Founder acceptance",
+    "id": "post70-background-reconciliation-photo-inspection-20260930",
+    "title": "CANDIDATE: HealthKit Strength background trigger fix + reusable photo inspection viewer (Native only; review in flight; not uploaded)",
     "agent": "claude",
-    "status": "awaiting_acceptance"
+    "status": "in_progress"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -20,8 +20,8 @@
     "server_candidate_branch": "claude/build70-integrated-server-20260930",
     "production_deployment_id": "1fa2121a-5729-49c3-9865-a79f1724bb3f",
     "previous_production_server_sha": "446bc964dc31318ea48261400e8b243cdd1d4ab1",
-    "native_candidate_sha": "754376c529964eea280e87419ace68a003a9e0fb",
-    "native_candidate_branch": "claude/build70-integrated-native-20260930",
+    "native_candidate_sha": "cf749295fcbc7035ad6eaedec2256f59832329c5",
+    "native_candidate_branch": "claude/post70-background-reconcile-photo-viewer-20260930",
     "native_recommended_build": "70",
     "codex_celebration_branch": "codex/native-workout-complete-record-celebration-20260928",
     "codex_celebration_sha": "ef54e482",
@@ -39,11 +39,11 @@
     "sender_constrained_enrollment": "OFF (server flag unset; native Info.plist false)"
   },
   "result": {
-    "summary": "Migration 000015 applied (additive, verified), Server 4a81f5b4 deployed (deployment 1fa2121a ACTIVE, web/worker source parity, health 200/200, flag unset). Founder iPhone performed a natural legacy refresh on the new code. Zero unintended data drift. Native Build 70 754376c5 archived and uploaded via Xcode-only guarded tool: delivery 7ed9cf4e VALID. Persistent pairing dormant.",
+    "summary": "Root cause: HealthKit observers registered only on scene activation (a background relaunch never activates a scene) and workouts used hourly delivery; fixed with launch-path registration, immediate workout delivery and background assertions. New shared PhotoInspectionViewer opened from Photo Briefing and Progress Photos Evidence. Full suite 1590/1590, Release compile OK; rendered viewer test caught and fixed two layout bugs. No Server change, no upload.",
     "success": true,
     "production_mutated": false,
-    "deployed": true,
-    "testflight_uploaded": true,
+    "deployed": false,
+    "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
@@ -76,7 +76,7 @@
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
   ],
   "recommended_next_step": "Founder accepts Build 70 per the checklist; then decide on the controlled canary.",
-  "full_report_path": "agent-handoffs/reports/20260930T043000Z-build70-server-deployed-native-uploaded.md",
+  "full_report_path": "agent-handoffs/reports/20260930T062000Z-post70-background-reconcile-photo-inspection-checkpoint.md",
   "related_report_paths": [
     "agent-handoffs/reports/20260930T032500Z-build70-integrated-persistent-pairing-candidate.md",
     "agent-handoffs/reports/20260930T020500Z-peptide-build70-final-candidate-closeout-v2.md",
