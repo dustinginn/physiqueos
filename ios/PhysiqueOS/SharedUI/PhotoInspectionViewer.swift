@@ -115,7 +115,7 @@ struct PhotoInspectionViewer: View {
             Color.black.ignoresSafeArea()
             TabView(selection: $selection) {
                 ForEach(Array(request.items.enumerated()), id: \.element.id) { index, item in
-                    PhotoInspectionPage(item: item, injectedImage: injectedImages[item.id], onZoomChange: { zoomed in
+                    PhotoInspectionPage(item: item, injectedImage: injectedImages[item.id], isSelected: index == selection, onZoomChange: { zoomed in
                         if index == selection { isZoomed = zoomed }
                     })
                     .tag(index)
@@ -134,7 +134,8 @@ struct PhotoInspectionViewer: View {
                         dragOffset = value.translation.height
                     }
                     .onEnded { value in
-                        if !isZoomed, value.translation.height > 140 { dismiss() }
+                        if !isZoomed, value.translation.height > 140,
+                           abs(value.translation.height) > abs(value.translation.width) { dismiss() }
                         withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
                     }
             )
@@ -193,14 +194,28 @@ private struct PhotoInspectionPage: View {
     @Environment(AppEnvironment.self) private var environment
     let item: PhotoInspectionItem
     var injectedImage: UIImage? = nil
+    /// A page that is no longer the selected one drops back to fit, so paging
+    /// away from a zoomed photo and back never leaves it zoomed behind a
+    /// zoom flag that says otherwise.
+    var isSelected: Bool = true
     let onZoomChange: (Bool) -> Void
 
     var body: some View {
         ZStack {
             switch resolvedState {
             case .image(let image):
-                ZoomableImageView(image: image, onZoomChange: onZoomChange)
+                ZoomableImageView(image: image, resetsZoom: !isSelected, onZoomChange: onZoomChange)
                     .ignoresSafeArea()
+                    .overlay(alignment: .bottom) {
+                        if showsLowResolutionNotice {
+                            Button("Full resolution unavailable · Try again") { Task { await retry() } }
+                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12).frame(minHeight: 44)
+                                .background(.black.opacity(0.55), in: Capsule())
+                                .padding(.bottom, 28)
+                        }
+                    }
                     .accessibilityElement()
                     .accessibilityLabel("\(item.title) photo\(item.caption.map { ", \($0)" } ?? "")")
                     .accessibilityHint("Pinch to zoom. Double tap to zoom in or out.")
@@ -218,6 +233,14 @@ private struct PhotoInspectionPage: View {
 
     private enum PageState {
         case image(UIImage), loading, failed, unavailable
+    }
+
+    /// The grid's smaller decode is on screen because the larger one failed.
+    private var showsLowResolutionNotice: Bool {
+        guard injectedImage == nil, case .authenticatedProduction(let mediaId) = item.source else { return false }
+        let store = environment.founderProductionPhotoMediaStore
+        if case .failed = store.inspectionImageStates[mediaId] { return true }
+        return false
     }
 
     private var resolvedState: PageState {
@@ -285,6 +308,7 @@ private struct PhotoInspectionPage: View {
 struct ZoomableImageView: UIViewRepresentable {
     let image: UIImage
     var maximumZoom: CGFloat = 6
+    var resetsZoom: Bool = false
     var onZoomChange: (Bool) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator(onZoomChange: onZoomChange) }
@@ -316,6 +340,7 @@ struct ZoomableImageView: UIViewRepresentable {
 
     func updateUIView(_ scroll: UIScrollView, context: Context) {
         context.coordinator.onZoomChange = onZoomChange
+        if resetsZoom, scroll.zoomScale != 1 { scroll.setZoomScale(1, animated: false) }
         if context.coordinator.imageView?.image !== image {
             context.coordinator.imageView?.image = image
         }

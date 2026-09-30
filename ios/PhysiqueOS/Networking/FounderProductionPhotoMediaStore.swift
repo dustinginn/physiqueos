@@ -93,8 +93,12 @@ final class FounderProductionPhotoMediaStore {
                 else { throw UndecodableImage() }
                 return UIImage(cgImage: image)
             }.value
+            // The viewer may have closed (and released this id) while the detached
+            // decode ran; never re-insert a ~30 MB image nobody is looking at.
+            guard case .loading = inspectionImageStates[mediaId] else { return }
             inspectionImageStates[mediaId] = .loaded(image)
         } catch {
+            guard case .loading = inspectionImageStates[mediaId] else { return }
             inspectionImageStates[mediaId] = Task.isCancelled ? .idle : Self.failureState(for: error)
         }
     }
