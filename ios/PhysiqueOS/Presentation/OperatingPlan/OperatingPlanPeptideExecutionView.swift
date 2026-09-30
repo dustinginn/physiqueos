@@ -392,8 +392,9 @@ struct OperatingPlanPeptideExecutionView: View {
                 original: detail.dosing
             )
 
-            if viewModel.isManualPlan || (rewritesHistory && !isDirty) {
-                // An untouched past-dated (or manual) plan: the only offer is
+            if draft.dosing.pattern == .custom || (viewModel.isManualPlan && !isDirty) || (rewritesHistory && !isDirty) {
+                // An untouched past-dated plan, or a manual plan not yet replaced (judged on the
+                // draft, so once "Start a new plan" seeds a steady plan Save appears): the only offer is
                 // a fresh steady plan from today; nothing to save yet.
                 PrimaryActionButton(title: "Start a new plan from today", isEnabled: !viewModel.isSaving) {
                     startNewPlan(viewModel, detail: detail)
