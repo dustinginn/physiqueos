@@ -412,6 +412,8 @@ enum ProductionNativeError: Error, Sendable, Equatable, LocalizedError {
     case temporaryServer(ProductionProblemDetails?)
     case server(ProductionProblemDetails?)
     case networkFailure
+    case cancelled
+    case timedOut
     case invalidResponse
     case incompatibleContractVersion(expected: String, actual: String)
     case resourceMismatch(expected: String, actual: String)
@@ -430,6 +432,8 @@ enum ProductionNativeError: Error, Sendable, Equatable, LocalizedError {
         case .temporaryServer: "PhysiqueOS is temporarily unavailable."
         case .server(let problem): problem?.title ?? "The Founder Production request failed."
         case .networkFailure: "PhysiqueOS could not be reached. Check the connection and try again."
+        case .cancelled: "The request was cancelled."
+        case .timedOut: "PhysiqueOS took too long to respond. Try again."
         case .invalidResponse: "PhysiqueOS returned an unreadable response."
         case .incompatibleContractVersion: "The Native production contract version is incompatible."
         case .resourceMismatch: "The Native production resource identity did not match the request."

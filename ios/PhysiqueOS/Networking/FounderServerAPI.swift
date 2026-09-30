@@ -604,7 +604,16 @@ actor ProductionNativeAPI {
             data = cached.data
             cacheHit = true
         } else if let active = inFlightReads[key] {
-            data = try await active.task.value
+            do {
+                data = try await active.task.value
+            } catch {
+                NativePerformanceDiagnostics.recordReadFailure(
+                    resource: resource,
+                    milliseconds: Self.elapsedMilliseconds(since: startedAt),
+                    outcome: Self.readFailureOutcome(error)
+                )
+                throw error
+            }
         } else {
             let generation = readCacheGeneration
             generationForStore = generation
@@ -616,6 +625,11 @@ actor ProductionNativeAPI {
                 if inFlightReads[key]?.id == flightId { inFlightReads[key] = nil }
             } catch {
                 if inFlightReads[key]?.id == flightId { inFlightReads[key] = nil }
+                NativePerformanceDiagnostics.recordReadFailure(
+                    resource: resource,
+                    milliseconds: Self.elapsedMilliseconds(since: startedAt),
+                    outcome: Self.readFailureOutcome(error)
+                )
                 throw error
             }
         }
@@ -632,7 +646,6 @@ actor ProductionNativeAPI {
             storeRead(data, for: key)
             if Self.lastKnownSnapshotResources.contains(resource) { snapshotStore?.save(data, for: key) }
         }
-#if DEBUG
         NativePerformanceDiagnostics.recordRead(
             resource: resource,
             milliseconds: Self.elapsedMilliseconds(since: startedAt),
@@ -640,7 +653,6 @@ actor ProductionNativeAPI {
             bytes: data.count,
             cacheHit: cacheHit
         )
-#endif
         return envelope
     }
 
@@ -715,7 +727,8 @@ actor ProductionNativeAPI {
             path: "\(configuration.routeFamily)/read/\(resource)",
             method: "GET",
             query: query,
-            accept: "application/json"
+            accept: "application/json",
+            classifyReadFailures: true
         )
         return data
     }
@@ -727,9 +740,19 @@ actor ProductionNativeAPI {
 
     private func cacheLifetime(for resource: String) -> TimeInterval {
         switch resource {
-        case "home": 30
+        case "home", "evidence-hub": 30
         case "briefing-history", "training-landing", "training-reporting", "training-library": 60
         default: 90
+        }
+    }
+
+    private static func readFailureOutcome(_ error: Error) -> String {
+        switch error as? ProductionNativeError {
+        case .cancelled: "cancelled"
+        case .timedOut: "timed_out"
+        case .invalidResponse, .resourceMismatch, .authorityMismatch, .incompatibleContractVersion: "contract_failed"
+        case .networkFailure: "network_failed"
+        default: "request_failed"
         }
     }
 
@@ -1183,13 +1206,20 @@ actor ProductionNativeAPI {
         path: String,
         method: String,
         query: [String: String] = [:],
-        accept: String
+        accept: String,
+        classifyReadFailures: Bool = false
     ) async throws -> (Data, HTTPURLResponse) {
         let token = try await validAccessToken()
-        var result = try await perform(path: path, method: method, query: query, body: nil, bearer: token, accept: accept)
+        var result = try await perform(
+            path: path, method: method, query: query, body: nil, bearer: token, accept: accept,
+            classifyReadFailures: classifyReadFailures
+        )
         if result.1.statusCode == 401, isRefreshableAuthenticationProblem(data: result.0) {
             let refreshedToken = try await refreshAccessToken()
-            result = try await perform(path: path, method: method, query: query, body: nil, bearer: refreshedToken, accept: accept)
+            result = try await perform(
+                path: path, method: method, query: query, body: nil, bearer: refreshedToken, accept: accept,
+                classifyReadFailures: classifyReadFailures
+            )
         }
         if !(200..<300).contains(result.1.statusCode), path.contains("/read/") {
             NativeReadFailureDiagnostics.recordHTTP(resource: String(path.split(separator: "/").last ?? "read"), status: result.1.statusCode)
@@ -1230,7 +1260,8 @@ actor ProductionNativeAPI {
         timeoutInterval: TimeInterval = 15,
         // `nil` uses `transport` (every read call site). `submitCommand`
         // passes `commandTransport` explicitly.
-        overrideTransport: FounderHTTPTransport? = nil
+        overrideTransport: FounderHTTPTransport? = nil,
+        classifyReadFailures: Bool = false
     ) async throws -> (Data, HTTPURLResponse) {
         let endpoint = baseURL.appending(path: path)
         guard var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
@@ -1250,11 +1281,16 @@ actor ProductionNativeAPI {
         if let bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
         for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
         do { return try await (overrideTransport ?? transport).data(for: request) }
-        catch {
-            // Diagnostic-only: captures the identity `.networkFailure` below
-            // discards (genuine connection failure vs. cooperative task
-            // cancellation vs. timeout vs. an ATS/certificate problem) purely
-            // for later reading. Changes nothing about what is thrown or when.
+        catch is CancellationError {
+            NetworkFailureDiagnostics.record(path: path, error: CancellationError())
+            throw classifyReadFailures ? ProductionNativeError.cancelled : ProductionNativeError.networkFailure
+        } catch let error as URLError where error.code == .cancelled {
+            NetworkFailureDiagnostics.record(path: path, error: error)
+            throw classifyReadFailures ? ProductionNativeError.cancelled : ProductionNativeError.networkFailure
+        } catch let error as URLError where error.code == .timedOut {
+            NetworkFailureDiagnostics.record(path: path, error: error)
+            throw classifyReadFailures ? ProductionNativeError.timedOut : ProductionNativeError.networkFailure
+        } catch {
             NetworkFailureDiagnostics.record(path: path, error: error)
             throw ProductionNativeError.networkFailure
         }

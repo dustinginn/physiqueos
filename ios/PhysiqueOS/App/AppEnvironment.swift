@@ -479,10 +479,8 @@ final class AppEnvironment {
         nativeAuthority == .founderProduction ? ProductionGoalsAPI(api: productionNativeAPI) : sandboxGoalsAPI
     }
 
-    /// The Evidence Hub's summary projection — composed from the same
-    /// production reads each individual Evidence surface already uses
-    /// (see `ProductionEvidenceAPI`'s doc comment) rather than a single
-    /// fixture-only constant that never switched with authority.
+    /// The Evidence Hub's Server-owned fail-soft summary projection. Detail
+    /// screens still use their existing resource-specific APIs.
     var evidenceAPI: EvidenceAPI {
         nativeAuthority == .founderProduction ? ProductionEvidenceAPI(api: productionNativeAPI) : sandboxEvidenceAPI
     }

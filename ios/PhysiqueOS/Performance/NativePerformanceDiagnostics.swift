@@ -63,15 +63,20 @@ enum NativeReadFailureDiagnostics {
     }
 }
 
-/// Development-only timing marks for separating cache, network, decode,
-/// and view-shell costs without introducing production telemetry.
-#if DEBUG
+/// Privacy-safe timing marks for separating cache/network, decode, bytes,
+/// cancellation, and view-shell costs during production-shaped beta tests.
+/// Resource names and bounded outcome labels only; never URLs, query values,
+/// headers, identifiers, response bodies, or exception text.
 enum NativePerformanceDiagnostics {
     private static let logger = Logger(subsystem: "com.physiqueos.native", category: "Performance")
     @MainActor private static var navigationStartedAt: [String: ContinuousClock.Instant] = [:]
 
     static func recordRead(resource: String, milliseconds: Int, decodeMilliseconds: Int, bytes: Int, cacheHit: Bool) {
-        logger.debug("read resource=\(resource, privacy: .public) duration_ms=\(milliseconds) decode_ms=\(decodeMilliseconds) bytes=\(bytes) cache_hit=\(cacheHit)")
+        logger.info("read resource=\(resource, privacy: .public) duration_ms=\(milliseconds) decode_ms=\(decodeMilliseconds) bytes=\(bytes) cache_hit=\(cacheHit) outcome=success")
+    }
+
+    static func recordReadFailure(resource: String, milliseconds: Int, outcome: String) {
+        logger.info("read resource=\(resource, privacy: .public) duration_ms=\(milliseconds) decode_ms=0 bytes=0 cache_hit=false outcome=\(outcome, privacy: .public)")
     }
 
     @MainActor static func recordNavigationInitiated(surface: String) {
@@ -90,4 +95,3 @@ enum NativePerformanceDiagnostics {
         logger.debug("shell surface=\(surface, privacy: .public) duration_ms=\(milliseconds)")
     }
 }
-#endif

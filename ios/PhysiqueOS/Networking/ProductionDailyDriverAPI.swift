@@ -2147,117 +2147,27 @@ struct ProductionDEXAAPI: DEXAAPI {
 
 // MARK: - Evidence Hub summary projection
 
-/// Composes the Evidence Hub's per-stream summary rows from the same
-/// production reads every individual Evidence surface already uses —
-/// Weight, Training, Nutrition, Activity, and Energy — rather than
-/// inventing a new server call the Package 7 native contract doesn't
-/// expose (there is no `evidence`/`progress-hub` read resource). DEXA and
-/// Progress Photos are real product surfaces but are not yet wired to
-/// production reads in this pass (Patch 3 scope, see `AppEnvironment`'s
-/// doc comment); their rows stay an explicit "not yet available" state
-/// rather than the bundled Sandbox fixture values, which would otherwise
-/// misrepresent stale fixture data as Founder Production truth. Recovery
-/// and Health Metrics have no backing resource at all yet, in either
-/// authority, and keep the same "Coming soon" placeholder Sandbox already
-/// shows.
+/// Reads the Server-owned fail-soft aggregate. Each supported vertical is
+/// independently available, empty, or unavailable in that response, so a
+/// single optional source failure no longer blanks the whole Hub or creates
+/// seven Native request waterfalls. Detail destinations remain unchanged.
 struct ProductionEvidenceAPI: EvidenceAPI {
     let api: ProductionNativeAPI
 
     func fetchEvidenceHub() async throws -> EvidenceHubReadModel {
-        // These are independent canonical reads. Actor reentrancy keeps the
-        // one refresh-token boundary safe while allowing healthy requests to
-        // overlap instead of forcing Evidence Hub through seven serial waits.
-        async let weightRead = ProductionWeightEvidenceAPI(api: api).fetchWeightReport(scope: .all)
-        async let trainingRead = ProductionTrainingAPI(api: api).fetchTrainingLanding(scope: .all)
-        async let nutritionRead = ProductionNutritionAPI(api: api).fetchNutritionLanding(scope: .all)
-        async let activityRead = ProductionActivityAPI(api: api).fetchActivityLanding(scope: .all)
-        async let energyRead = ProductionEnergyAPI(api: api).fetchEnergyReport(scope: .all)
-        async let dexaRead = ProductionDEXAAPI(api: api).fetchDEXAReport(scope: .all)
-        async let photosRead = ProductionPhotosAPI(api: api).fetchPhotosLanding(scope: .all)
-        let (weight, training, nutrition, activity, energy, dexa, photos) = try await (
-            weightRead, trainingRead, nutritionRead, activityRead, energyRead, dexaRead, photosRead
+        let envelope: ProductionResponseEnvelope<EvidenceHubReadModel> = try await api.readResource(
+            "evidence-hub", query: ["context": "all"], as: EvidenceHubReadModel.self
         )
-
-        let streams: [EvidenceStreamSummary] = [
-            trainingStream(training),
-            nutritionStream(nutrition),
-            weightStream(weight),
-            photosStream(photos),
-            dexaStream(dexa),
-            activityStream(activity),
-            energyStream(energy),
+        let streams = envelope.data.streams + [
             timelineStream(),
             comingSoonStream(id: "recovery", title: "Recovery", tone: .primary),
             comingSoonStream(id: "health-metrics", title: "Health Metrics", tone: .primary),
         ]
 
         return EvidenceHubReadModel(
-            title: "Evidence Hub",
-            subtitle: "PhysiqueOS organizes what it knows about your body, progress, and routines.",
+            title: envelope.data.title,
+            subtitle: envelope.data.subtitle,
             streams: streams
-        )
-    }
-
-    private func trainingStream(_ landing: TrainingLandingReadModel) -> EvidenceStreamSummary {
-        EvidenceStreamSummary(
-            id: "training", title: "Training",
-            metric: landing.latestTrainingDay?.daySummary ?? "No training recorded",
-            trend: landing.latestTrainingDay?.daySummary ?? "No training recorded",
-            lastUpdated: landing.latestTrainingDay?.date,
-            status: landing.latestTrainingDay != nil ? .available : .placeholder,
-            tone: .primary,
-            destination: .progressStream(streamId: "training")
-        )
-    }
-
-    private func nutritionStream(_ landing: NutritionLandingReadModel) -> EvidenceStreamSummary {
-        EvidenceStreamSummary(
-            id: "nutrition", title: "Nutrition",
-            metric: landing.latestNutritionDay?.value ?? "No nutrition recorded",
-            trend: landing.latestNutritionDay?.detail ?? "No nutrition recorded",
-            lastUpdated: landing.latestNutritionDay?.date,
-            status: landing.latestNutritionDay != nil ? .available : .placeholder,
-            tone: .primary,
-            destination: .progressStream(streamId: "nutrition")
-        )
-    }
-
-    private func weightStream(_ report: WeightReportReadModel) -> EvidenceStreamSummary {
-        let latest = report.history.first
-        return EvidenceStreamSummary(
-            id: "weight", title: "Weight",
-            metric: latest?.value ?? "No weight recorded",
-            trend: latest?.detail ?? "No weight recorded",
-            lastUpdated: latest?.date,
-            status: latest != nil ? .available : .placeholder,
-            tone: .evidence,
-            destination: .progressStream(streamId: "weight")
-        )
-    }
-
-    private func dexaStream(_ report: DEXAReportReadModel) -> EvidenceStreamSummary {
-        let latest = report.latestScan
-        return EvidenceStreamSummary(
-            id: "dexa", title: "DEXA",
-            metric: report.summary.first(where: { $0.label == "Body Fat" })?.value ?? "No scan recorded",
-            trend: latest != nil ? "Last scan \(latest!.date)" : "No scan recorded",
-            lastUpdated: latest?.date,
-            status: latest != nil ? .available : .placeholder,
-            tone: .success,
-            destination: .progressStream(streamId: "dexa")
-        )
-    }
-
-    private func photosStream(_ landing: PhotosLandingReadModel) -> EvidenceStreamSummary {
-        let latest = landing.latestSet
-        return EvidenceStreamSummary(
-            id: "photos", title: "Progress Photos",
-            metric: latest != nil ? "\(latest!.views.count) views" : "No sessions recorded",
-            trend: latest != nil ? "Last session \(latest!.date)" : "No sessions recorded",
-            lastUpdated: latest?.date,
-            status: latest != nil ? .available : .placeholder,
-            tone: .primary,
-            destination: .progressStream(streamId: "photos")
         )
     }
 
@@ -2270,45 +2180,6 @@ struct ProductionEvidenceAPI: EvidenceAPI {
             status: .available,
             tone: .primary,
             destination: .progressStream(streamId: "timeline")
-        )
-    }
-
-    private func activityStream(_ landing: ActivityLandingReadModel) -> EvidenceStreamSummary {
-        EvidenceStreamSummary(
-            id: "activity", title: "Activity",
-            metric: landing.latestActivityDay?.value ?? "No activity recorded",
-            trend: landing.latestActivityDay?.detail ?? "No activity recorded",
-            lastUpdated: landing.latestActivityDay?.date,
-            status: landing.latestActivityDay != nil ? .available : .placeholder,
-            tone: .primary,
-            destination: .progressStream(streamId: "activity")
-        )
-    }
-
-    private func energyStream(_ report: EnergyReportReadModel) -> EvidenceStreamSummary {
-        let latest = report.dailyHistory.first
-        return EvidenceStreamSummary(
-            id: "energy", title: "Energy",
-            metric: latest?.completeness ?? "No energy evidence recorded",
-            trend: "\(report.summary.completeDays) of \(report.summary.evidenceDays) evidence days complete",
-            lastUpdated: latest?.date,
-            status: latest != nil ? .available : .placeholder,
-            tone: .primary,
-            destination: .progressStream(streamId: "energy")
-        )
-    }
-
-    /// A Patch 3 surface that already exists in Sandbox but has no
-    /// production read wired up yet — honest about being unavailable
-    /// under Founder Production rather than showing the bundled fixture's
-    /// stale values.
-    private func notYetAvailableStream(id: String, title: String, tone: HomeColorToken) -> EvidenceStreamSummary {
-        EvidenceStreamSummary(
-            id: id, title: title,
-            metric: "Not yet available in Founder Production",
-            trend: "Not yet available in Founder Production",
-            lastUpdated: nil, status: .placeholder, tone: tone,
-            destination: .progressStream(streamId: id)
         )
     }
 

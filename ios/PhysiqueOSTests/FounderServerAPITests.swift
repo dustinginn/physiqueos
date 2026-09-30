@@ -2808,28 +2808,15 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(energyPath, "/api/v1/native/read/energy")
     }
 
-    /// The Evidence Hub is not backed by its own native read resource (no
-    /// `evidence`/`progress-hub` entry exists in the Package 7 contract
-    /// manifest) — `ProductionEvidenceAPI` composes it from the same
-    /// per-domain production reads Weight/Training/Nutrition/Activity/
-    /// Energy already use. This is the regression this correction exists
-    /// to add: before it, `AppEnvironment.evidenceAPI` was a constant
-    /// `FixtureEvidenceAPI` that never switched with `nativeAuthority`, so
-    /// Founder Production showed stale Sandbox fixture summaries (e.g.
-    /// Weight "179.4 lb" instead of the real canonical value).
+    /// The Hub uses one Server-owned aggregate request. An unavailable
+    /// optional vertical still decodes and renders beside healthy rows;
+    /// navigation remains the same resource-specific destination.
     @MainActor
     func testProductionEvidenceHubComposesRealPerDomainSummariesNotFixtureValues() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),
             byResource: [
-                "weight": productionWeightJSON(value: 172.4, id: "weight-canonical"),
-                "training-landing": productionTrainingLandingJSON,
-                "training-library": productionEmptyTrainingLibraryJSON,
-                "nutrition": productionNutritionJSON,
-                "activity": productionActivityJSON,
-                "energy": productionEnergyJSON,
-                "dexa": productionDexaJSON,
-                "photos": productionPhotosJSON,
+                "evidence-hub": productionEvidenceHubJSON,
             ]
         )
         let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
@@ -2846,8 +2833,6 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(streamsByID["training"]?.lastUpdated, "2026-09-09")
         XCTAssertEqual(streamsByID["nutrition"]?.lastUpdated, "2026-09-10")
         XCTAssertEqual(streamsByID["nutrition"]?.metric, "2300 calories")
-        XCTAssertEqual(streamsByID["activity"]?.lastUpdated, "2026-09-10")
-        XCTAssertEqual(streamsByID["activity"]?.metric, "650 active cal / 45 min")
         XCTAssertEqual(streamsByID["energy"]?.lastUpdated, "2026-09-10")
 
         // DEXA and Photos are both wired to real production reads (Patch 3
@@ -2858,6 +2843,12 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(streamsByID["dexa"]?.lastUpdated, "2026-09-01")
         XCTAssertEqual(streamsByID["photos"]?.status, .available)
         XCTAssertEqual(streamsByID["photos"]?.lastUpdated, "2026-09-01")
+        XCTAssertEqual(streamsByID["photos"]?.destination, .progressStream(streamId: "photos"))
+
+        // One optional Server read failed, but the aggregate and every other
+        // row remain usable.
+        XCTAssertEqual(streamsByID["activity"]?.status, .placeholder)
+        XCTAssertEqual(streamsByID["activity"]?.metric, "Temporarily unavailable")
 
         // Timeline is a genuinely new Founder Production feature with no
         // Sandbox equivalent — always shown available under Production.
@@ -2868,6 +2859,39 @@ final class FounderServerAPITests: XCTestCase {
         // Sandbox already shows — no regression there either.
         XCTAssertEqual(streamsByID["recovery"]?.metric, "Coming soon")
         XCTAssertEqual(streamsByID["health-metrics"]?.metric, "Coming soon")
+
+        let readPaths = await transport.requests.map { $0.url?.path ?? "" }.filter { $0.contains("/read/") }
+        XCTAssertEqual(readPaths, ["/api/v1/native/read/evidence-hub"])
+    }
+
+    func testProductionReadPreservesCancellationClassification() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.cancelled)),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        await XCTAssertThrowsErrorAsync(
+            try await native.readResource("weight", policy: .reload, as: FounderProductionWeightSummary.self)
+        ) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .cancelled)
+        }
+    }
+
+    func testProductionReadPreservesTimeoutClassification() async throws {
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .failure(URLError(.timedOut)),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        await XCTAssertThrowsErrorAsync(
+            try await native.readResource("weight", policy: .reload, as: FounderProductionWeightSummary.self)
+        ) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .timedOut)
+        }
     }
 
     /// The server already selects/scopes scans before this report is
@@ -6614,6 +6638,8 @@ private let productionWeightRepeatedLabelJSON = productionWeightWindowJSON(
     page: #"{"limit":365,"count":2,"hasMore":false}"#
 )
 
+private let productionEvidenceHubJSON = productionEnvelope(resource: "evidence-hub", data: #"{"schemaVersion":"native_evidence_hub_v1","title":"Evidence Hub","subtitle":"PhysiqueOS organizes what it knows about your body, progress, and routines.","streams":[{"id":"training","title":"Training","metric":"Biceps · Triceps","trend":"Biceps · Triceps","lastUpdated":"2026-09-09","state":"available","status":"available","tone":"primary","destination":{"id":"progress.stream","parameters":{"streamId":"training"}}},{"id":"nutrition","title":"Nutrition","metric":"2300 calories","trend":"180g protein","lastUpdated":"2026-09-10","state":"available","status":"available","tone":"primary","destination":{"id":"progress.stream","parameters":{"streamId":"nutrition"}}},{"id":"weight","title":"Weight","metric":"172.4 lb","trend":"Down 0.4 lb","lastUpdated":"2026-09-10","state":"available","status":"available","tone":"evidence","destination":{"id":"progress.stream","parameters":{"streamId":"weight"}}},{"id":"photos","title":"Progress Photos","metric":"2 views","trend":"Last session 2026-09-01","lastUpdated":"2026-09-01","state":"available","status":"available","tone":"primary","destination":{"id":"progress.stream","parameters":{"streamId":"photos"}}},{"id":"dexa","title":"DEXA","metric":"14.2%","trend":"Last scan 2026-09-01","lastUpdated":"2026-09-01","state":"available","status":"available","tone":"success","destination":{"id":"progress.stream","parameters":{"streamId":"dexa"}}},{"id":"activity","title":"Activity","metric":"Temporarily unavailable","trend":"Other evidence remains available","lastUpdated":null,"state":"unavailable","status":"placeholder","tone":"primary","destination":{"id":"progress.stream","parameters":{"streamId":"activity"}},"failureClass":"read_failed"},{"id":"energy","title":"Energy","metric":"activity-only","trend":"1 of 2 evidence days complete","lastUpdated":"2026-09-10","state":"available","status":"available","tone":"primary","destination":{"id":"progress.stream","parameters":{"streamId":"energy"}}}]}"#)
+
 private let productionPhotosJSON = productionEnvelope(resource: "photos", data: #"{"schemaVersion":"1","context":{"contextId":"build-lean-mass","type":"active_goal","goalId":"goal-canonical","goalRevision":null,"phaseId":"phase-canonical","phaseRevision":null,"startDate":"2026-07-19","endDate":null},"sessions":[{"sessionId":"session-2","revision":1,"intendedCaptureDate":"2026-09-01","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"1/2 poses have prior comparisons","photos":[{"photoId":"photo-front-2","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"comparable","media":{"mediaId":"media-front-2","deliveryPath":"/api/v1/native/media/media-front-2"},"galleryInterpretation":{"summary":"Canonical interpretation.","comparisonBullets":["Waist looks tighter."],"conditionSummary":"Comparable light and distance."},"sourceHistory":"Compared Aug 15 and Sep 1.","prior":{"sessionId":"session-1","photoId":"photo-front-1","poseId":"front-relaxed","intendedCaptureDate":"2026-08-15","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"}}},{"photoId":"photo-backflexed-2","poseId":"back-flexed","pose":{"id":"back-flexed","label":"Back Flexed","view":"back","pose":"flexed"},"intendedCaptureDate":"2026-09-01","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-backflexed-2","deliveryPath":"/api/v1/native/media/media-backflexed-2"},"prior":null}]},{"sessionId":"session-1","revision":1,"intendedCaptureDate":"2026-08-15","goalId":"goal-canonical","phaseId":"phase-canonical","goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"completionStatus":"complete","comparisonStatus":"0/1 poses have prior comparisons","photos":[{"photoId":"photo-front-1","poseId":"front-relaxed","pose":{"id":"front-relaxed","label":"Front Relaxed","view":"front","pose":"relaxed"},"intendedCaptureDate":"2026-08-15","comparisonStatus":"no_prior_matching_pose","media":{"mediaId":"media-front-1","deliveryPath":"/api/v1/native/media/media-front-1"},"prior":null}]}],"page":{"limit":12,"count":2,"hasMore":false}}"#)
 
 private let productionTrainingReportingJSON = productionEnvelope(resource: "training-reporting", data: #"{"schemaVersion":"1","context":{"contextId":"all","type":"all_history","goalId":null,"goalRevision":null,"phaseId":null,"phaseRevision":null,"startDate":null,"endDate":null},"reporting":{"schemaVersion":"1","availableReports":[{"id":"resistance","label":"Resistance Training","detail":"Strength progression, PRs, and category momentum."},{"id":"history","label":"Training History","detail":"Recent canonical training days."},{"id":"cardio","label":"Cardio","detail":"Calories, distance, and heart-rate trends."}],"resistance":{"title":"Resistance Training","summary":"Strength progression, PRs, and category momentum from training history.","statusGroups":[{"status":"improving","label":"Improving","count":1,"exercises":[{"canonicalExerciseId":"bench-press","label":"Bench Press","status":"improving","latestEvidenceDate":"2026-09-08","detail":"Improving · Latest Sep 8, 2026"}]},{"status":"stable","label":"Stable","count":0,"exercises":[]},{"status":"plateauing","label":"Plateauing","count":0,"exercises":[]},{"status":"regressing","label":"Regressing","count":0,"exercises":[]},{"status":"insufficient_data","label":"Needs data","count":0,"exercises":[]}],"recentPrs":[{"canonicalExerciseId":"bench-press","label":"Bench Press","latestEvidenceDate":"2026-09-08","detail":"New reps-at-load PR: 8 reps at 185 lb."}],"highlights":[{"type":"exercise","canonicalExerciseId":"bench-press","label":"Bench Press","detail":"New reps-at-load PR: 8 reps at 185 lb."}],"needsAttention":[],"categories":[{"categoryId":"chest","label":"Chest","status":"improving","latestEvidenceDate":"2026-09-08","exerciseCount":3,"latestKnownSets":9,"latestKnownVolume":1200,"statusCounts":{"improving":2,"stable":1}}],"source":"canonical_training_sessions"},"history":{"title":"Training History","summary":"Recent canonical training days and their session identities.","days":[{"id":"day-2026-09-08","date":"2026-09-08","label":"Sep 8","sessions":[{"sessionId":"session-canonical-1","label":"Push Day","occurrenceDate":"2026-09-08","revision":1}]}]}}}"#)
@@ -7016,12 +7042,7 @@ private actor SequencedFounderTransport: FounderHTTPTransport {
     }
 }
 
-/// Routes by resource name (the last path segment) rather than a strict
-/// request order. `ProductionEvidenceAPI` composes several independent
-/// reads — one of which (`ProductionTrainingAPI.fetchTrainingLanding`)
-/// itself fires two concurrent sub-requests — so a FIFO-sequenced mock
-/// would be flaky: which of two concurrently-issued requests lands first
-/// is not guaranteed. Order-independent routing sidesteps that entirely.
+/// Routes by resource name (the last path segment) rather than request order.
 private actor RoutedFounderTransport: FounderHTTPTransport {
     private(set) var requests: [URLRequest] = []
     private let pairing: String
