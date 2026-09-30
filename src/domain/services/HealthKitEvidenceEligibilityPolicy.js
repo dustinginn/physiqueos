@@ -33,6 +33,10 @@ export const HEALTHKIT_CANONICAL_DAY_ID_PREFIX = "healthkit_canonical_day_";
 export const HEALTHKIT_CANONICAL_WORKOUT_COLLECTION_NAME = "healthKitCanonicalWorkouts";
 export const HEALTHKIT_WORKOUT_LINK_COLLECTION_NAME = "healthKitWorkoutLinks";
 export const HEALTHKIT_WORKOUT_RECORD_ID_PREFIXES = Object.freeze(["healthkit_canonical_workout_", "healthkit_workout_link_", "healthkit_link_claim_"]);
+// HealthKit Sleep samples and canonical sleep days (healthKitSleepSamples,
+// healthKitSleepDays). Quarantined like every other HealthKit record; there is
+// no Sleep graduation scope at all.
+export const HEALTHKIT_SLEEP_RECORD_ID_PREFIXES = Object.freeze(["healthkit_sleep_sample_", "healthkit_sleep_day_"]);
 
 /**
  * Whether any HealthKit-derived record may currently be strategic Evidence.
@@ -76,6 +80,8 @@ export function isHealthKitDerivedRecord(record) {
   const ownId = String(payload.id ?? record?.id ?? "");
   if (ownId.startsWith(HEALTHKIT_OBSERVATION_ID_PREFIX) || ownId.startsWith(HEALTHKIT_CANONICAL_DAY_ID_PREFIX)) return true;
   if (HEALTHKIT_WORKOUT_RECORD_ID_PREFIXES.some((prefix) => ownId.startsWith(prefix))) return true;
+  if (HEALTHKIT_SLEEP_RECORD_ID_PREFIXES.some((prefix) => ownId.startsWith(prefix))) return true;
+  if (String(payload.schemaVersion ?? "").startsWith("healthkit-sleep-")) return true;
   if (payload.observationType && payload.ingestion?.deliveryDeviceId !== undefined &&
     String(payload.schemaVersion ?? "").startsWith("healthkit-")) return true;
   if (typeof source.source_observation_id === "string" &&

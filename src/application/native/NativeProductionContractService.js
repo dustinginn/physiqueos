@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 import { requireScope } from "../auth/principal.js";
 import { projectClientSafeValue } from "../read-models/readModel.js";
 import { ApplicationProblem } from "../../contracts/v1/problem.js";
-import { nativeProductionContractManifest, NativeProductionResource } from "./nativeProductionContractManifest.js";
+import {
+  nativeProductionContractManifest,
+  NativeProductionResource,
+  withHealthKitSleepCapability,
+} from "./nativeProductionContractManifest.js";
 import { projectNativeMediaReferences } from "./nativeMediaProjection.js";
 import { createProviderEnergyEvidenceReport } from "../../domain/services/EnergyEvidenceService.js";
 import {
@@ -32,6 +36,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.UPSERT_NUTRITION_DAY,
   Phase3Command.UPSERT_ACTIVITY_DAY,
   Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS,
+  Phase3Command.INGEST_HEALTHKIT_SLEEP,
   Phase3Command.EDIT_DEXA_REVIEW,
   Phase3Command.COMMIT_EVIDENCE_REVIEW,
   Phase3Command.DISPOSE_EVIDENCE_REVIEW,
@@ -86,7 +91,16 @@ export function createNativeProductionContractService({
 
     async manifest({ request }) {
       await authorize(request);
-      return nativeProductionContractManifest;
+      // The only per-owner value in the manifest: whether the Server-owned
+      // Sleep activation policy is enabled. Absent reader, absent policy, or
+      // any read failure advertises Sleep as disabled (fail closed).
+      let sleepCapability = null;
+      try {
+        sleepCapability = await readers.healthKitSleep?.getCapability?.() ?? null;
+      } catch {
+        sleepCapability = null;
+      }
+      return withHealthKitSleepCapability(nativeProductionContractManifest, sleepCapability);
     },
 
     async read({ request, resource, input = {} }) {

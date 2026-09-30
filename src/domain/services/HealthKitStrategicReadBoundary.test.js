@@ -39,12 +39,21 @@ const ALLOWED = new Set([
   "platform/operations/HealthKitStrengthAutoConfirmAcceptanceRunner.js",
   // Guarded, candidate-only reassessment of one already-canonical workout.
   "platform/operations/HealthKitWorkoutLinkReassessmentRunner.js",
+  // HealthKit Sleep (Phase A, dormant): contract, policies, pure canonicalizer,
+  // the Sleep ingest port, and the one-record manifest capability reader.
+  "domain/services/HealthKitSleepContract.js",
+  "domain/services/HealthKitSleepPolicies.js",
+  "domain/services/HealthKitSleepCanonicalizer.js",
+  "application/commands/HealthKitSleepIngestPort.js",
+  "application/native/HealthKitSleepCapabilityReadService.js",
 ]);
 const NEEDLES = [
   "healthKitCanonicalDays", "healthKitObservations", "HEALTHKIT_CANONICAL_DAY_COLLECTION",
   "healthKitCanonicalWorkouts", "healthKitWorkoutLinks",
   "HEALTHKIT_CANONICAL_WORKOUT_COLLECTION", "HEALTHKIT_WORKOUT_LINK_COLLECTION",
   "healthKitWorkoutLinkClaims", "HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION",
+  "healthKitSleepSamples", "healthKitSleepDays",
+  "HEALTHKIT_SLEEP_SAMPLE_COLLECTION", "HEALTHKIT_SLEEP_DAY_COLLECTION",
 ];
 
 function walk(directory) {

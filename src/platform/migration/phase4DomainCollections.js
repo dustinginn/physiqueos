@@ -54,6 +54,11 @@ export const PHASE4_APPLICATION_RECORD_TABLES = Object.freeze({
   healthKitCanonicalWorkouts: "canonical_training_records",
   healthKitWorkoutLinks: "canonical_training_records",
   healthKitWorkoutLinkClaims: "canonical_training_records",
+  // HealthKit Sleep: dedicated collections so Sleep reads are scoped by
+  // occurrence_date (the existing owner/collection/occurrence_date index) and
+  // never scan the generic observation collection.
+  healthKitSleepSamples: "canonical_training_records",
+  healthKitSleepDays: "canonical_training_records",
 });
 
 export const PHASE4_DOMAIN_TABLES = Object.freeze({

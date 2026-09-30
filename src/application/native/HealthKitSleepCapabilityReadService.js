@@ -1,0 +1,25 @@
+import {
+  HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID,
+  resolveHealthKitSleepActivationPolicy,
+} from "../../domain/services/HealthKitSleepPolicies.js";
+import { HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION } from "../../domain/services/HealthKitSleepContract.js";
+
+/**
+ * Resolves the owner's Sleep activation policy for the Native manifest. One
+ * point read of one configuration record; it never reads Sleep data. The
+ * resolver is fail-closed, so an absent or malformed policy is disabled.
+ */
+export function createHealthKitSleepCapabilityReadService({ records, ownerUserId } = {}) {
+  if (!records?.get || !ownerUserId) {
+    throw new Error("The HealthKit Sleep capability reader requires record storage and owner authority.");
+  }
+  return Object.freeze({
+    async getCapability() {
+      return resolveHealthKitSleepActivationPolicy(await records.get({
+        ownerUserId,
+        collection: HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION,
+        recordId: HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID,
+      }));
+    },
+  });
+}

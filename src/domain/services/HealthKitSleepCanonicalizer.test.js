@@ -1,0 +1,322 @@
+import { describe, expect, it } from "vitest";
+import {
+  HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION,
+  HealthKitSleepPrimaryReason,
+  canonicalizeHealthKitSleep,
+} from "./HealthKitSleepCanonicalizer.js";
+import { HealthKitSleepLifecycle } from "./HealthKitSleepContract.js";
+import { resolveHealthKitSleepSourcePreferencePolicy } from "./HealthKitSleepPolicies.js";
+import { LA, preferring, stored, uuid } from "../../testSupport/healthKitSleepSynthetic.js";
+
+const H = 3600;
+const night = (overrides) => stored({ start: "2026-09-10T23:00:00-07:00", end: "2026-09-11T07:00:00-07:00", ...overrides });
+function only(days, key) {
+  expect([...days.keys()]).toContain(key);
+  return days.get(key);
+}
+function main(day) { return day.episodes[day.mainEpisodeIndex]; }
+
+describe("sleep-canon-v1 attribution, clustering and stages", () => {
+  it("#1 simple overnight unspecified: wake-date day, asleep from instants, stage detail absent", () => {
+    const day = only(canonicalizeHealthKitSleep({ samples: [night({ source: "oura" })] }), "2026-09-11");
+    expect(day.algorithmVersion).toBe(HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION);
+    expect(day.status).toBe("asleep_recorded");
+    expect(day.mainSleep).toMatchObject({ asleepSeconds: 8 * H, unspecifiedSeconds: 8 * H, stageCoverage: 0, inBedSeconds: null });
+    expect(main(day).completeness).toEqual({ asleepData: "present", stageDetail: "stage_detail_absent", sourceBasis: "sensor" });
+    expect(day.windowClosesAt).toBe("2026-09-12T01:00:00.000Z");
+  });
+
+  it("#2 staged Watch night: stage sums equal asleep, awake only between sleep, no inBed", () => {
+    const samples = [
+      ["core", "23:00", "01:00"], ["deep", "01:00", "02:00"], ["awake", "02:00", "02:10"],
+      ["rem", "02:10", "03:00"], ["core", "03:00", "07:00"],
+    ].map(([stage, from, to]) => stored({
+      source: "watch", stage,
+      start: `${from < "12:00" ? "2026-09-11" : "2026-09-10"}T${from}:00-07:00`,
+      end: `${to < "12:00" && to !== "00:00" ? "2026-09-11" : "2026-09-10"}T${to}:00-07:00`,
+    }));
+    const day = only(canonicalizeHealthKitSleep({ samples }), "2026-09-11");
+    const episode = main(day);
+    expect(episode.asleepSeconds).toBe(8 * H - 600);
+    expect(episode.coreSeconds + episode.deepSeconds + episode.remSeconds).toBe(episode.asleepSeconds);
+    expect(episode).toMatchObject({ awakeSeconds: 600, deepSeconds: H, remSeconds: 50 * 60, stageCoverage: 1, inBedSeconds: null });
+    expect(episode.completeness.stageDetail).toBe("staged");
+    expect(episode.timeline.map((segment) => segment.stage)).toEqual(["asleep_core", "asleep_deep", "awake", "asleep_rem", "asleep_core"]);
+  });
+
+  it("#3 unspecified with nested stages in the same lane counts each instant once", () => {
+    const samples = [
+      night({ source: "oura" }),
+      stored({ source: "oura", stage: "deep", start: "2026-09-11T01:00:00-07:00", end: "2026-09-11T02:00:00-07:00" }),
+      stored({ source: "oura", stage: "rem", start: "2026-09-11T04:00:00-07:00", end: "2026-09-11T04:30:00-07:00" }),
+    ];
+    const episode = main(only(canonicalizeHealthKitSleep({ samples }), "2026-09-11"));
+    expect(episode.asleepSeconds).toBe(8 * H);
+    expect(episode.deepSeconds).toBe(H);
+    expect(episode.remSeconds).toBe(30 * 60);
+    expect(episode.unspecifiedSeconds).toBe(8 * H - H - 30 * 60);
+  });
+
+  it("#4 inBed is never asleep; inBed total only when the same lane covers >= 90% of the episode", () => {
+    const withInBed = canonicalizeHealthKitSleep({ samples: [
+      night({ source: "oura" }),
+      stored({ source: "oura", stage: "inBed", start: "2026-09-10T22:30:00-07:00", end: "2026-09-11T07:15:00-07:00" }),
+    ] });
+    expect(main(only(withInBed, "2026-09-11"))).toMatchObject({ asleepSeconds: 8 * H, inBedSeconds: 8 * H + 45 * 60 });
+
+    const otherLaneInBed = canonicalizeHealthKitSleep({ samples: [
+      night({ source: "watch", stage: "core" }),
+      stored({ source: "iphone", stage: "inBed", start: "2026-09-10T22:30:00-07:00", end: "2026-09-11T07:15:00-07:00" }),
+    ] });
+    expect(main(only(otherLaneInBed, "2026-09-11"))).toMatchObject({ asleepSeconds: 8 * H, inBedSeconds: null });
+
+    const partialInBed = canonicalizeHealthKitSleep({ samples: [
+      night({ source: "oura" }),
+      stored({ source: "oura", stage: "inBed", start: "2026-09-10T23:00:00-07:00", end: "2026-09-11T02:00:00-07:00" }),
+    ] });
+    expect(main(only(partialInBed, "2026-09-11")).inBedSeconds).toBeNull();
+  });
+
+  it("#5 awake inside the episode counts as awake; awake at the edge is not counted; never asleep", () => {
+    const samples = [
+      stored({ source: "oura", start: "2026-09-10T23:00:00-07:00", end: "2026-09-11T03:00:00-07:00" }),
+      stored({ source: "oura", stage: "awake", start: "2026-09-11T03:00:00-07:00", end: "2026-09-11T03:30:00-07:00" }),
+      stored({ source: "oura", start: "2026-09-11T03:30:00-07:00", end: "2026-09-11T07:00:00-07:00" }),
+      stored({ source: "oura", stage: "awake", start: "2026-09-11T07:00:00-07:00", end: "2026-09-11T07:20:00-07:00" }),
+      stored({ source: "oura", stage: "awake", start: "2026-09-11T02:00:00-07:00", end: "2026-09-11T02:15:00-07:00" }),
+    ];
+    const episode = main(only(canonicalizeHealthKitSleep({ samples }), "2026-09-11"));
+    // The 02:00 awake overrides overlapping unspecified sleep in the same lane.
+    expect(episode.awakeSeconds).toBe(30 * 60 + 15 * 60);
+    expect(episode.asleepSeconds).toBe(8 * H - 30 * 60 - 15 * 60);
+    expect(episode.end).toBe("2026-09-11T14:00:00.000Z");
+  });
+
+  it("#8 daytime nap is a secondary episode of the same sleep day; main unchanged", () => {
+    const day = only(canonicalizeHealthKitSleep({ samples: [
+      night({ source: "watch", stage: "core" }),
+      stored({ source: "watch", stage: "core", start: "2026-09-11T14:00:00-07:00", end: "2026-09-11T15:10:00-07:00" }),
+    ] }), "2026-09-11");
+    expect(day.episodes.map((episode) => episode.kind)).toEqual(["main", "secondary"]);
+    expect(day.mainSleep.asleepSeconds).toBe(8 * H);
+    expect(day.totalAsleepIncludingSecondarySeconds).toBe(8 * H + 70 * 60);
+  });
+
+  it("#9 evening nap belongs to the next sleep day and stays separate from that night (gap > 60 min)", () => {
+    const days = canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "watch", stage: "core", start: "2026-09-10T19:30:00-07:00", end: "2026-09-10T20:40:00-07:00" }),
+      night({ source: "watch", stage: "core" }),
+    ] });
+    expect([...days.keys()]).toEqual(["2026-09-11"]);
+    const day = days.get("2026-09-11");
+    expect(day.episodes).toHaveLength(2);
+    expect(day.episodes[0]).toMatchObject({ kind: "secondary", asleepSeconds: 70 * 60 });
+    expect(day.episodes[1]).toMatchObject({ kind: "main", asleepSeconds: 8 * H });
+  });
+
+  it("an episode ending exactly at 18:00 local belongs to the next sleep day", () => {
+    const days = canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "watch", stage: "core", start: "2026-09-11T16:30:00-07:00", end: "2026-09-11T18:00:00-07:00" }),
+    ] });
+    expect([...days.keys()]).toEqual(["2026-09-12"]);
+  });
+
+  it("#10 split sleep with a 2 h gap: two episodes, main = larger, total = disjoint sum", () => {
+    const day = only(canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "watch", stage: "core", start: "2026-09-10T23:00:00-07:00", end: "2026-09-11T01:30:00-07:00" }),
+      stored({ source: "watch", stage: "core", start: "2026-09-11T03:30:00-07:00", end: "2026-09-11T07:00:00-07:00" }),
+    ] }), "2026-09-11");
+    expect(day.episodes.map((episode) => [episode.kind, episode.asleepSeconds])).toEqual([["secondary", 2.5 * H], ["main", 3.5 * H]]);
+    expect(day.totalAsleepIncludingSecondarySeconds).toBe(6 * H);
+  });
+
+  it("#11 a gap <= 60 min clusters into one episode, and the gap is not awake", () => {
+    const day = only(canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "watch", stage: "core", start: "2026-09-10T23:00:00-07:00", end: "2026-09-11T02:00:00-07:00" }),
+      stored({ source: "watch", stage: "core", start: "2026-09-11T02:40:00-07:00", end: "2026-09-11T07:00:00-07:00" }),
+    ] }), "2026-09-11");
+    expect(day.episodes).toHaveLength(1);
+    expect(main(day)).toMatchObject({ asleepSeconds: 3 * H + 4 * H + 20 * 60, awakeSeconds: 0 });
+  });
+
+  it("#12 DST spring-forward and fall-back nights use absolute instants", () => {
+    const spring = only(canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "watch", stage: "core", start: "2026-03-07T23:00:00-08:00", end: "2026-03-08T07:00:00-07:00" }),
+    ] }), "2026-03-08");
+    expect(spring.mainSleep.asleepSeconds).toBe(7 * H);
+    const fall = only(canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "watch", stage: "core", start: "2026-10-31T23:00:00-07:00", end: "2026-11-01T07:00:00-08:00" }),
+    ] }), "2026-11-01");
+    expect(fall.mainSleep.asleepSeconds).toBe(9 * H);
+    // The fall-back sleep-day window is 25 wall hours long.
+    expect(fall.windowClosesAt).toBe("2026-11-02T02:00:00.000Z");
+  });
+
+  it("#13 travel: per-episode zone, zone source recorded, shift flagged, no fabricated day", () => {
+    const days = canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "watch", stage: "core", timeZone: "America/New_York", start: "2026-09-10T23:00:00-04:00", end: "2026-09-11T06:00:00-04:00" }),
+      stored({ source: "watch", stage: "core", timeZone: LA, timeZoneSource: "device_at_ingest", start: "2026-09-11T13:00:00-07:00", end: "2026-09-11T14:00:00-07:00" }),
+    ] });
+    expect([...days.keys()]).toEqual(["2026-09-11"]);
+    const day = days.get("2026-09-11");
+    expect(day.timeZoneShift).toBe(true);
+    expect(day.episodes.map((episode) => [episode.timeZone, episode.timeZoneSource]))
+      .toEqual([["America/New_York", "sample_metadata"], [LA, "device_at_ingest"]]);
+    expect(day.timeZone).toBe("America/New_York");
+  });
+
+  it("#23 unknown future stage values are preserved upstream but never asleep and never create a day", () => {
+    const unknownOnly = canonicalizeHealthKitSleep({ samples: [night({ source: "watch", stage: 9 })] });
+    expect(unknownOnly.size).toBe(0);
+    const mixed = only(canonicalizeHealthKitSleep({ samples: [
+      night({ source: "watch", stage: "core" }),
+      stored({ source: "watch", stage: 9, start: "2026-09-11T01:00:00-07:00", end: "2026-09-11T02:00:00-07:00" }),
+    ] }), "2026-09-11");
+    expect(mixed.mainSleep.asleepSeconds).toBe(8 * H);
+  });
+
+  it("#24 inBed-only night: in_bed_only, no sleep total emitted", () => {
+    const day = only(canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "iphone", stage: "inBed", start: "2026-09-10T22:45:00-07:00", end: "2026-09-11T06:45:00-07:00" }),
+    ] }), "2026-09-11");
+    expect(day).toMatchObject({ status: "in_bed_only", mainEpisodeIndex: null, mainSleep: null, totalAsleepIncludingSecondarySeconds: null });
+    expect(day.episodes[0]).toMatchObject({ asleepSeconds: null, inBedSeconds: 8 * H, completeness: { asleepData: "in_bed_only" } });
+  });
+
+  it("deleted and tombstoned samples never count", () => {
+    const deleted = { ...night({ source: "watch", stage: "core" }), lifecycle: { state: HealthKitSleepLifecycle.DELETED } };
+    const tombstone = { id: "healthkit_sleep_sample_x", tombstone: true, lifecycle: { state: HealthKitSleepLifecycle.DELETED } };
+    expect(canonicalizeHealthKitSleep({ samples: [deleted, tombstone] }).size).toBe(0);
+  });
+
+  it("is deterministic: input order never changes content or digest", () => {
+    const samples = [
+      night({ source: "oura" }),
+      night({ source: "watch", stage: "core", start: "2026-09-10T23:10:00-07:00" }),
+      stored({ source: "oura", stage: "deep", start: "2026-09-11T01:00:00-07:00", end: "2026-09-11T02:00:00-07:00" }),
+      stored({ source: "watch", stage: "core", start: "2026-09-11T14:00:00-07:00", end: "2026-09-11T15:00:00-07:00" }),
+    ];
+    const forward = canonicalizeHealthKitSleep({ samples });
+    const reversed = canonicalizeHealthKitSleep({ samples: [...samples].reverse() });
+    expect(JSON.stringify([...reversed])).toBe(JSON.stringify([...forward]));
+  });
+});
+
+describe("sleep-canon-v1 source reconciliation (policy-driven, never hard-coded)", () => {
+  const OURA = preferring("oura");
+  const watchNight = (overrides = {}) => night({ source: "watch", stage: "core", start: "2026-09-10T22:50:00-07:00", end: "2026-09-11T07:10:00-07:00", ...overrides });
+
+  it("Oura preferred + Watch overlap -> Oura primary even when Watch covers more", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({
+      samples: [night({ source: "oura", stage: "core" }), watchNight()], preference: OURA,
+    }), "2026-09-11"));
+    expect(episode.primarySource.sourceFamily).toBe("oura");
+    expect(episode.reconciliation).toMatchObject({ reason: HealthKitSleepPrimaryReason.SOURCE_PREFERENCE, preferenceApplied: true, candidateCount: 2 });
+    expect(episode.asleepSeconds).toBe(8 * H);
+    expect(episode.corroboratingSources).toEqual([expect.objectContaining({ sourceFamily: "apple_watch", asleepSeconds: 8 * H + 20 * 60 })]);
+  });
+
+  it("Oura unspecified + Watch staged -> usable Oura stays primary; Watch secondary; no hybrid totals", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({
+      samples: [night({ source: "oura" }), watchNight({ stage: "deep" })], preference: OURA,
+    }), "2026-09-11"));
+    expect(episode.primarySource.sourceFamily).toBe("oura");
+    expect(episode).toMatchObject({ asleepSeconds: 8 * H, deepSeconds: 0, unspecifiedSeconds: 8 * H, stageCoverage: 0 });
+    expect(episode.completeness.stageDetail).toBe("stage_detail_absent");
+    expect(episode.corroboratingSampleIds).toHaveLength(1);
+  });
+
+  it("Oura missing -> Watch fallback", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({ samples: [watchNight()], preference: OURA }), "2026-09-11"));
+    expect(episode.primarySource.sourceFamily).toBe("apple_watch");
+    expect(episode.reconciliation).toMatchObject({ reason: HealthKitSleepPrimaryReason.ONLY_CANDIDATE, preferenceApplied: false });
+  });
+
+  it("Oura technically insufficient (< 50% of the episode) -> deterministic fallback to Watch", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({
+      samples: [
+        watchNight(),
+        stored({ source: "oura", stage: "core", start: "2026-09-11T01:00:00-07:00", end: "2026-09-11T03:00:00-07:00" }),
+      ],
+      preference: OURA,
+    }), "2026-09-11"));
+    expect(episode.primarySource.sourceFamily).toBe("apple_watch");
+    expect(episode.reconciliation).toMatchObject({ reason: HealthKitSleepPrimaryReason.USABLE_OVER_INSUFFICIENT, preferenceApplied: false });
+    expect(episode.corroboratingSources[0]).toMatchObject({ sourceFamily: "oura", usable: false });
+  });
+
+  it("Oura + historical Sleep Cycle overlap -> Oura", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({
+      samples: [night({ source: "oura" }), night({ source: "sleepCycle", start: "2026-09-10T22:30:00-07:00" })], preference: OURA,
+    }), "2026-09-11"));
+    expect(episode.primarySource.sourceFamily).toBe("oura");
+  });
+
+  it("Sleep Cycle only -> usable sensor fallback", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({ samples: [night({ source: "sleepCycle" })], preference: OURA }), "2026-09-11"));
+    expect(episode.primarySource).toMatchObject({ sourceFamily: "sleep_cycle", sourceClass: "third_party" });
+    expect(episode.completeness.sourceBasis).toBe("sensor");
+  });
+
+  it("#7 manual + Oura -> Oura; manual preserved as coexisting corroboration", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({
+      samples: [night({ source: "manual", start: "2026-09-10T22:00:00-07:00" }), night({ source: "oura" })],
+    }), "2026-09-11"));
+    expect(episode.primarySource.sourceFamily).toBe("oura");
+    expect(episode.reconciliation.reason).toBe(HealthKitSleepPrimaryReason.USABLE_SENSOR_OVER_MANUAL);
+    expect(episode.corroboratingSources[0]).toMatchObject({ sourceClass: "user_entered", sourceFamily: "manual" });
+  });
+
+  it("#7 manual only -> manual_only", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({ samples: [night({ source: "manual" })] }), "2026-09-11"));
+    expect(episode.completeness.sourceBasis).toBe("manual_only");
+    expect(episode.primarySource.sourceClass).toBe("user_entered");
+  });
+
+  it("no preference -> generic deterministic ranking (staged beats coverage, then class tie-break)", () => {
+    const generic = resolveHealthKitSleepSourcePreferencePolicy(null);
+    const stagedWins = main(only(canonicalizeHealthKitSleep({
+      samples: [night({ source: "oura", start: "2026-09-10T22:00:00-07:00" }), night({ source: "watch", stage: "core" })], preference: generic,
+    }), "2026-09-11"));
+    expect(stagedWins.primarySource.sourceFamily).toBe("apple_watch");
+    expect(stagedWins.reconciliation.reason).toBe(HealthKitSleepPrimaryReason.STAGE_DETAIL);
+
+    const exactTie = main(only(canonicalizeHealthKitSleep({
+      samples: [night({ source: "oura", stage: "core" }), night({ source: "watch", stage: "core" })],
+    }), "2026-09-11"));
+    expect(exactTie.primarySource.sourceFamily).toBe("apple_watch");
+    expect(exactTie.reconciliation.reason).toBe(HealthKitSleepPrimaryReason.TIE_BREAK);
+
+    const coverage = main(only(canonicalizeHealthKitSleep({
+      samples: [night({ source: "oura", stage: "core", start: "2026-09-10T22:00:00-07:00" }), night({ source: "watch", stage: "core" })],
+    }), "2026-09-11"));
+    expect(coverage.primarySource.sourceFamily).toBe("oura");
+    expect(coverage.reconciliation.reason).toBe(HealthKitSleepPrimaryReason.COVERAGE);
+  });
+
+  it("a preference can name any source (Watch or a bundle) — nothing is Oura-specific", () => {
+    const byFamily = main(only(canonicalizeHealthKitSleep({
+      samples: [night({ source: "oura", stage: "core", start: "2026-09-10T22:00:00-07:00" }), night({ source: "watch", stage: "core" })],
+      preference: preferring("apple_watch"),
+    }), "2026-09-11"));
+    expect(byFamily.primarySource.sourceFamily).toBe("apple_watch");
+    const byBundle = main(only(canonicalizeHealthKitSleep({
+      samples: [night({ source: "oura", stage: "core" }), night({ source: "sleepCycle", stage: "core", start: "2026-09-10T22:00:00-07:00" })],
+      preference: preferring({ bundleIdentifier: "com.lexwarelabs.goodmorning" }),
+    }), "2026-09-11"));
+    expect(byBundle.primarySource.sourceFamily).toBe("sleep_cycle");
+  });
+
+  it("a preference change changes the digest but never drops secondary observations", () => {
+    const samples = [night({ source: "oura", stage: "core" }), watchNight()];
+    const generic = only(canonicalizeHealthKitSleep({ samples }), "2026-09-11");
+    const preferred = only(canonicalizeHealthKitSleep({ samples, preference: OURA }), "2026-09-11");
+    expect(preferred.inputDigest).not.toBe(generic.inputDigest);
+    expect([...preferred.inputSampleIds]).toEqual([...generic.inputSampleIds]);
+    expect(preferred.inputSampleIds).toHaveLength(2);
+  });
+});
+
+it("synthetic ids are unique", () => {
+  expect(uuid(1)).not.toBe(uuid(2));
+});

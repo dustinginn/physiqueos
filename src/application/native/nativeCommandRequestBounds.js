@@ -8,6 +8,17 @@ import {
   HEALTHKIT_MAX_TEXT_LENGTH,
   HEALTHKIT_MAX_TIMESTAMP_LENGTH,
 } from "../../domain/services/HealthKitObservationService.js";
+import {
+  HEALTHKIT_SLEEP_MAX_DELETIONS_PER_BATCH,
+  HEALTHKIT_SLEEP_MAX_EXTERNAL_ID_LENGTH,
+  HEALTHKIT_SLEEP_MAX_MANIFEST_LIVE_IDS,
+  HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH,
+  HEALTHKIT_SLEEP_MAX_TEXT_LENGTH,
+  HEALTHKIT_SLEEP_MAX_TIMESTAMP_LENGTH,
+  SLEEP_DELETION_WIRE_FIELDS,
+  SLEEP_MANIFEST_WIRE_FIELDS,
+  SLEEP_SAMPLE_WIRE_FIELDS,
+} from "../../domain/services/HealthKitSleepContract.js";
 
 /**
  * HTTP request-body bounds for POST /api/v1/native/commands.
@@ -33,8 +44,17 @@ export const NATIVE_COMMAND_DEFAULT_MAXIMUM_REQUEST_BYTES = 4 * 1024;
  */
 export const HEALTHKIT_INGEST_MAXIMUM_REQUEST_BYTES = 5 * 1024 * 1024;
 
+/**
+ * Maximum HTTP body for healthkit.sleep.ingest.v1 (healthkit-sleep-ingestion-v1).
+ * Reviewed constant; NativeCommandRequestBounds.test.js checks it against
+ * computeHealthKitSleepIngestMaximumRequestBytes() the same way (about 1.4 MiB,
+ * deliberately pessimistic). A realistic 100-sample Sleep batch is about 35 KB.
+ */
+export const HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES = 1.5 * 1024 * 1024;
+
 const COMMAND_MAXIMUM_REQUEST_BYTES = Object.freeze({
   [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: HEALTHKIT_INGEST_MAXIMUM_REQUEST_BYTES,
+  [Phase3Command.INGEST_HEALTHKIT_SLEEP]: HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES,
 });
 
 /** Largest body the route will buffer before it knows the command type. */
@@ -163,4 +183,37 @@ export function computeHealthKitIngestMaximumRequestBytes() {
     HEALTHKIT_MAX_OBSERVATIONS_PER_BATCH * largestObservation +
     (HEALTHKIT_MAX_OBSERVATIONS_PER_BATCH - 1) + // array commas
     "[]".length;
+}
+
+/**
+ * Largest JSON body a valid healthkit-sleep-ingestion-v1 request can occupy:
+ * the maximum samples, deletions and manifest identifiers, every bounded
+ * string at its maximum length fully escaped, plus the command envelope.
+ * Built only from the Sleep wire-field tables, like the observation bound.
+ */
+export function computeHealthKitSleepIngestMaximumRequestBytes() {
+  const units = (count) => CONTROL_UNIT.repeat(count);
+  const valueOf = (kind) => {
+    if (kind === "text") return units(HEALTHKIT_SLEEP_MAX_TEXT_LENGTH);
+    if (kind === "timestamp") return units(HEALTHKIT_SLEEP_MAX_TIMESTAMP_LENGTH);
+    // A UUID is validated against a fixed ASCII pattern after trimming, but
+    // the raw value may carry up to the bounded length of whitespace padding.
+    if (kind === "external_id") return units(HEALTHKIT_SLEEP_MAX_EXTERNAL_ID_LENGTH);
+    if (kind === "integer") return 1000;
+    if (kind === "boolean") return false;
+    if (kind === "external_id_list") {
+      return Array.from({ length: HEALTHKIT_SLEEP_MAX_MANIFEST_LIVE_IDS }, () => units(HEALTHKIT_SLEEP_MAX_EXTERNAL_ID_LENGTH));
+    }
+    throw new Error(`Unknown HealthKit Sleep wire field kind: ${JSON.stringify(kind)}`);
+  };
+  const section = (fields) => Object.fromEntries(Object.entries(fields).map(([name, kind]) => [name, valueOf(kind)]));
+  const encodedBytes = (value) => JSON.stringify(value).length;
+  const sample = { ...section(SLEEP_SAMPLE_WIRE_FIELDS.sample), source: section(SLEEP_SAMPLE_WIRE_FIELDS.source) };
+  const deletion = section(SLEEP_DELETION_WIRE_FIELDS);
+  return WORST_CASE_ENVELOPE_BYTES + encodedBytes({
+    batchId: units(HEALTHKIT_SLEEP_MAX_TEXT_LENGTH),
+    samples: Array.from({ length: HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH }, () => sample),
+    deletions: Array.from({ length: HEALTHKIT_SLEEP_MAX_DELETIONS_PER_BATCH }, () => deletion),
+    windowManifest: section(SLEEP_MANIFEST_WIRE_FIELDS),
+  });
 }

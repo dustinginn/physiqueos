@@ -49,6 +49,22 @@ export function createPhase4CanonicalRecordStore({ query }) {
       );
       return result.rows.map(mapRecord);
     },
+    // Scoped read over the (owner_user_id, collection_name, occurrence_date,
+    // observed_at) index. Inclusive YYYY-MM-DD bounds; rows without an
+    // occurrence date are never returned.
+    async listByOccurrenceDateRange({ ownerUserId, collection, startDate, endDate }) {
+      const table = assertKnownPhase4Collection(collection);
+      const start = calendarDate(startDate);
+      const end = calendarDate(endDate);
+      if (!start || !end || end < start) throw new Error("A scoped record read requires an inclusive YYYY-MM-DD range.");
+      const result = await query(
+        `SELECT payload,version FROM physiqueos.${table}
+         WHERE owner_user_id=$1 AND collection_name=$2 AND occurrence_date BETWEEN $3::date AND $4::date
+         ORDER BY record_id`,
+        [ownerUserId, collection, start, end]
+      );
+      return result.rows.map(mapRecord);
+    },
     async listStorageMetadata({ ownerUserId, collection }) {
       const table = assertKnownPhase4Collection(collection);
       const result = await query(
@@ -164,6 +180,18 @@ export function createInMemoryCanonicalRecordStore(collections, {
     },
     async get({ collection, recordId }) { return clone(maps.get(collection)?.get(recordId)); },
     async list({ collection }) { return [...(maps.get(collection)?.values() ?? [])].map(clone); },
+    async listByOccurrenceDateRange({ collection, startDate, endDate }) {
+      const start = calendarDate(startDate);
+      const end = calendarDate(endDate);
+      if (!start || !end || end < start) throw new Error("A scoped record read requires an inclusive YYYY-MM-DD range.");
+      return [...(maps.get(collection)?.entries() ?? [])]
+        .filter(([, record]) => {
+          const date = calendarDate(record.occurrenceDate ?? record.localDate ?? record.date);
+          return date !== null && date >= start && date <= end;
+        })
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([, record]) => clone(record));
+    },
     async listStorageMetadata({ collection }) {
       return (storageMetadataByCollection.get(collection) ?? []).map(clone);
     },

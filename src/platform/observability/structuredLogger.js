@@ -1,4 +1,4 @@
-const SENSITIVE_KEY = /(authorization|cookie|token|secret|password|pin|credential|objectkey|presigned|evidence|health|content|bytes|buffer)/i;
+const SENSITIVE_KEY = /(authorization|cookie|token|secret|password|pin|credential|objectkey|presigned|evidence|health|content|bytes|buffer|sleep|sourcename|devicename)/i;
 
 export function redactStructuredValue(value, key = "root") {
   if (key !== "root" && SENSITIVE_KEY.test(key)) return "[REDACTED]";

@@ -1,4 +1,10 @@
 import { Phase3Command } from "../commands/Phase3CommandService.js";
+import { describeHealthKitSleepCapability } from "../../domain/services/HealthKitSleepPolicies.js";
+import {
+  HEALTHKIT_SLEEP_MAX_DELETIONS_PER_BATCH,
+  HEALTHKIT_SLEEP_MAX_MANIFEST_LIVE_IDS,
+  HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH,
+} from "../../domain/services/HealthKitSleepContract.js";
 import { getProgressPhotoPoseContract } from "../../domain/models/progressPhotoPoseVocabulary.js";
 import { ANALYSIS_DERIVATIVE_REQUIRED_MIME_TYPES, PHOTO_CONTAINER_MIME_TYPES } from "../../domain/services/ImageContainerDetection.js";
 import {
@@ -107,6 +113,7 @@ const writes = Object.freeze([
   write(Phase3Command.UPSERT_NUTRITION_DAY, ["localDate", "dailyTotals"], "semantic fingerprint protects replacements; server assigns Goal and Phase"),
   write(Phase3Command.UPSERT_ACTIVITY_DAY, ["localDate", "dailyActivity", "sourceIdentity", "source"], "manual, typed, or screenshot provenance only; direct device-health sync is forbidden"),
   write(Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS, ["batchId", "observations"], "source observations remain separate; Activity and Nutrition daily totals may canonicalize only inside the server-owned activation window into the quarantined HealthKit canonical day store; strategic Evidence eligibility is not decided by ingestion"),
+  write(Phase3Command.INGEST_HEALTHKIT_SLEEP, ["batchId"], "dormant: refused with 409 HEALTHKIT_SLEEP_INGESTION_NOT_ENABLED unless healthKitSleepIngestion.enabled; samples, deletions and a bounded window manifest; per-sample identity conflicts refuse only that sample; canonical sleep days are quarantined"),
   write(Phase3Command.EDIT_DEXA_REVIEW, ["reviewId", "evidenceObjectId", "measurements"], "If-Match required for every edit"),
   write(Phase3Command.COMMIT_EVIDENCE_REVIEW, ["reviewId"], "If-Match required to start the canonical Evidence Review lifecycle"),
   write(Phase3Command.DISPOSE_EVIDENCE_REVIEW, ["reviewId", "disposition"], "If-Match required; disposition must be discarded"),
@@ -211,9 +218,37 @@ export const nativeProductionContractManifest = Object.freeze({
     evidenceEligibility: "not assessed by ingestion",
     queryCursor: "device-owned and never accepted or advanced by the server contract",
   }),
+  // Static Sleep contract. `enabled` here is always false; the served
+  // manifest replaces this block per owner via withHealthKitSleepCapability.
+  healthKitSleepIngestion: healthKitSleepIngestionContract(null),
   reads,
   writes,
 });
+
+function healthKitSleepIngestionContract(capability) {
+  return Object.freeze({
+    ...describeHealthKitSleepCapability(capability, { commandType: Phase3Command.INGEST_HEALTHKIT_SLEEP }),
+    maximumSamplesPerBatch: HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH,
+    maximumDeletionsPerBatch: HEALTHKIT_SLEEP_MAX_DELETIONS_PER_BATCH,
+    maximumManifestLiveIds: HEALTHKIT_SLEEP_MAX_MANIFEST_LIVE_IDS,
+    maximumManifestWindowHours: 96,
+    sampleFields: "externalId (HealthKit UUID), categoryValue (raw HKCategoryValueSleepAnalysis), startedAt, endedAt, timeZone, timeZoneSource (sample_metadata|device_at_ingest), wasUserEntered, source{bundleIdentifier, sourceVersion, productType}",
+    privacy: "source names, device names, local/UDI identifiers, firmware and metadata are refused (400 HEALTHKIT_SLEEP_PRIVATE_FIELD_REJECTED)",
+    deletion: "deletions[] of HealthKit UUIDs; unknown UUIDs are tombstoned so a late add stays deleted",
+    windowManifest: "optional {windowStart, windowEnd, liveExternalIds}; live samples ending inside the window, at or after the activation floor, and not listed are marked deleted(window_manifest)",
+    activationFloorSemantics: "prospective only: samples ending before activationFloor are refused and never stored; no backfill",
+    disabledResponse: "409 HEALTHKIT_SLEEP_INGESTION_NOT_ENABLED: nothing stored; keep changes on device and re-check this manifest",
+    strategicEvidenceEligibility: "quarantined: canonical Sleep never feeds V3, Confidence, Narrative, briefings, Goal or Strategy confidence, or recommendations",
+  });
+}
+
+/**
+ * The served manifest: the static contract with the per-owner Sleep
+ * capability resolved. A null capability keeps Sleep disabled.
+ */
+export function withHealthKitSleepCapability(manifest, capability) {
+  return Object.freeze({ ...manifest, healthKitSleepIngestion: healthKitSleepIngestionContract(capability) });
+}
 
 function read(resource, endpoint, service, extra = {}) {
   return Object.freeze({

@@ -25,6 +25,7 @@ import { readDatabaseConfig } from "../../platform/database/config.js";
 import { createPostgresPool } from "../../platform/database/pool.js";
 import { createPhase4CanonicalRecordStore } from "../../platform/database/Phase4CanonicalRecordStore.js";
 import { createHealthKitCanaryDiagnosticReadService } from "../native/HealthKitCanaryDiagnosticReadService.js";
+import { createHealthKitSleepCapabilityReadService } from "../native/HealthKitSleepCapabilityReadService.js";
 import { createPostgresProviderReadinessProbe } from "../../platform/database/ProviderReadinessProbe.js";
 import { readSpacesConfig } from "../../platform/object-storage/spacesConfig.js";
 import { createSpacesPrivateObjectProvider } from "../../platform/object-storage/SpacesPrivateObjectProvider.js";
@@ -168,6 +169,17 @@ export function getProductionHealthKitCanaryDiagnosticReadService(env = process.
     ownerUserId: runtime.ownerUserId,
     records: createPhase4CanonicalRecordStore({ query: (text, values) => runtime.pool.query(text, values) }),
     buildIdentity: readBuildIdentity(env),
+  });
+}
+
+export function getProductionHealthKitSleepCapabilityReadService(env = process.env) {
+  if (env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME !== "1" || env.NEXT_PHASE === "phase-production-build") {
+    throw providerBuildAccessError();
+  }
+  const runtime = getOrCreateProviderRuntime(env);
+  return createHealthKitSleepCapabilityReadService({
+    ownerUserId: runtime.ownerUserId,
+    records: createPhase4CanonicalRecordStore({ query: (text, values) => runtime.pool.query(text, values) }),
   });
 }
 
