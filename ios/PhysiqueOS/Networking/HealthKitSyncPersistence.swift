@@ -53,6 +53,16 @@ protocol HealthKitSynchronizationStore: Sendable {
 /// anchors and replayable batches. Every mutation rewrites one owner/device/
 /// stream envelope atomically; UserDefaults is intentionally not involved.
 actor FileHealthKitSynchronizationStore: HealthKitSynchronizationStore {
+    /// Upper bound on retained local-only deferred changes per envelope.
+    /// Deferred changes are things the Server contract cannot accept (e.g.
+    /// Activity/Workout deletions); the cursor has already moved past them and
+    /// they are never uploaded. Before this bound the list was append-only, so
+    /// a stream that keeps producing them grew its protected state file
+    /// without limit. Oldest entries are retired first and every retirement is
+    /// counted in diagnostics, so nothing disappears silently. Unsent
+    /// Server-required data never lives here: it stays a pending batch.
+    static let maximumRetainedDeferredChanges = 32
+
     private struct Envelope: Codable {
         var schemaVersion: Int
         var scope: HealthKitCursorScope
@@ -419,6 +429,13 @@ actor FileHealthKitSynchronizationStore: HealthKitSynchronizationStore {
                     envelope.deferredChanges.append(deferred)
                 }
             }
+        }
+        let overflow = envelope.deferredChanges.count - Self.maximumRetainedDeferredChanges
+        if overflow > 0 {
+            envelope.deferredChanges.removeFirst(overflow)
+            envelope.diagnostics.deferredChangesRetiredCount =
+                (envelope.diagnostics.deferredChangesRetiredCount ?? 0) + overflow
+            envelope.diagnostics.lastDeferredChangesRetiredAt = batch.createdAt
         }
         envelope.authoritativeCursor = batch.proposedCursor
         var floors = envelope.dailyRevisionFloors ?? [:]

@@ -160,7 +160,8 @@ final class HealthKitFounderCanaryTests: XCTestCase {
         XCTAssertFalse(gate.allows(.healthKitWrite))
         XCTAssertEqual(HealthKitSynchronizationStream.nutritionEnergy.deliveryCapability, .s1(observationType: .quantitySample))
         XCTAssertEqual(HealthKitSynchronizationStream.workouts.deliveryCapability, .s1(observationType: .workout))
-        XCTAssertEqual(HealthKitSynchronizationStream.sleepAnalysis.deliveryCapability, .localOnly(reason: "server_sleep_contract_deferred"))
+        // Sleep has its own dormant, manifest-gated command lane.
+        XCTAssertEqual(HealthKitSynchronizationStream.sleepAnalysis.deliveryCapability, .sleepV1)
     }
 
     func testActivityCanaryFiltersOutsideWindowAndUploadsOnlyValidationPurpose() async throws {

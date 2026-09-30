@@ -315,6 +315,8 @@ n1_app_files = [
     ("Contracts", "HealthKitSynchronizationModels.swift"),
     ("Contracts", "HealthKitFounderCanaryModels.swift"),
     ("Networking", "HealthKitSyncPersistence.swift"),
+    ("Networking", "ProtectedDataRecoveryTrigger.swift"),
+    ("Contracts", "HealthKitSleepModels.swift"),
     ("Networking", "HealthKitQueryClient.swift"),
     ("Networking", "HealthKitObservationNormalizer.swift"),
     ("Networking", "HealthKitServerUploader.swift"),
@@ -346,6 +348,7 @@ late_test_files = [
 
 n1_test_files = [
     ("PhysiqueOSTests", "HealthKitSynchronizationTests.swift"),
+    ("PhysiqueOSTests", "HealthKitSleepIngestionTests.swift"),
     ("PhysiqueOSTests", "HealthKitFounderCanaryTests.swift"),
     ("PhysiqueOSTests", "HealthKitAutomaticSynchronizationCoordinatorTests.swift"),
     ("PhysiqueOSTests", "HealthKitQueryClientDefaultBoundsTests.swift"),

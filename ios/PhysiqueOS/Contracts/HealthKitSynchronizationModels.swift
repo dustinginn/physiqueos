@@ -63,7 +63,8 @@ enum HealthKitSynchronizationStream: String, CaseIterable, Codable, Hashable, Se
         case .activitySummary: .s1(observationType: .activitySummary)
         case .nutritionDailyTotal: .s1(observationType: .nutritionDailyTotal)
         case .workouts: .s1(observationType: .workout)
-        case .sleepAnalysis: .localOnly(reason: "server_sleep_contract_deferred")
+        // Delivered only through the dormant, manifest-gated Sleep command.
+        case .sleepAnalysis: .sleepV1
         default: .s1(observationType: .quantitySample)
         }
     }
@@ -78,6 +79,8 @@ enum HealthKitS1ObservationType: String, Codable, Sendable {
 
 enum HealthKitStreamDeliveryCapability: Equatable, Codable, Sendable {
     case s1(observationType: HealthKitS1ObservationType)
+    /// `healthkit.sleep.ingest.v1`: samples and deletions in one partition.
+    case sleepV1
     case localOnly(reason: String)
 }
 
@@ -187,7 +190,15 @@ struct HealthKitQueryNutritionDailyTotal: Equatable, Codable, Sendable {
 }
 
 struct HealthKitQuerySleep: Equatable, Codable, Sendable {
+    /// Raw `HKCategoryValueSleepAnalysis`, passed through unchanged (a future
+    /// value is forwarded; the Server maps it to `unknown`).
     let stageValue: Int
+    /// `sample_metadata` when the sample carried `HKMetadataKeyTimeZone`,
+    /// `device_at_ingest` when the device zone was substituted. Optional so
+    /// any older staged envelope still decodes.
+    var timeZoneSource: String? = nil
+    /// `HKMetadataKeyWasUserEntered`; `nil` when absent (sent as `false`).
+    var wasUserEntered: Bool? = nil
 }
 
 enum HealthKitQueryPayload: Equatable, Codable, Sendable {
@@ -322,6 +333,11 @@ struct HealthKitStreamDiagnostics: Equatable, Codable, Sendable {
     var lastDailyRevisionRecoveryCode: String? = nil
     var lastDailyRevisionRecoveryLocalDate: String? = nil
     var lastDailyRevisionNextExpected: UInt64? = nil
+    /// Local-only deferred changes retired by the bounded retention policy
+    /// (`FileHealthKitSynchronizationStore.maximumRetainedDeferredChanges`).
+    /// Optional for decoding envelopes written before the bound existed.
+    var deferredChangesRetiredCount: Int? = nil
+    var lastDeferredChangesRetiredAt: Date? = nil
 }
 
 enum HealthKitSyncError: Error, Equatable, Sendable {

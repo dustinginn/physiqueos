@@ -598,8 +598,10 @@ final class AppEnvironment {
         healthKitFeatureGate: HealthKitFeatureGate = .n0Disabled,
         healthKitService: any HealthKitService = SystemHealthKitService(),
         healthKitQueryClient: any HealthKitAnchoredQueryClient = SystemHealthKitQueryClient(
-            workoutFloor: HealthKitWorkoutActivationFloor.current.startOfDay
+            workoutFloor: HealthKitWorkoutActivationFloor.current.startOfDay,
+            sleepActivation: .production
         ),
+        healthKitSleepActivation: HealthKitSleepActivationGate = .production,
         healthKitObserverClient: any HealthKitObserverClient = SystemHealthKitObserverClient(),
         healthKitSynchronizationStore: any HealthKitSynchronizationStore = FileHealthKitSynchronizationStore(),
         healthKitObservationUploader: (any HealthKitObservationUploader)? = nil,
@@ -653,7 +655,8 @@ final class AppEnvironment {
             ?? ProductionHealthKitObservationUploader(
                 api: productionNativeAPI,
                 ledger: canonicalizationLedger,
-                onDurablyAccepted: { Task { await reconciliationRefresher.requestRefresh() } }
+                onDurablyAccepted: { Task { await reconciliationRefresher.requestRefresh() } },
+                onSleepIngestionDisabled: { healthKitSleepActivation.markServerDisabled(at: Date()) }
             )
         // The automatic engine alone carries the Workout activation floor
         // (second line of defense behind the query client's predicate); the
@@ -666,13 +669,27 @@ final class AppEnvironment {
             uploader: uploader,
             featureGate: healthKitFeatureGate,
             workoutActivationFloor: .current,
+            sleepActivation: healthKitSleepActivation,
             backgroundTaskScheduler: UIKitBackgroundTaskScheduler()
         )
+        // Dormant Sleep lane: inert unless the Server manifest enables it.
+        let sleepManifestSender: HealthKitSleepWindowManifestSender?
+        if let reader = healthKitQueryClient as? any HealthKitSleepWindowReader,
+           let submitter = uploader as? any HealthKitSleepManifestSubmitting {
+            sleepManifestSender = HealthKitSleepWindowManifestSender(
+                gate: healthKitSleepActivation, reader: reader, submitter: submitter
+            )
+        } else {
+            sleepManifestSender = nil
+        }
         self.healthKitAutomaticSynchronizationCoordinator = HealthKitAutomaticSynchronizationCoordinator(
             authorization: self.healthKitAuthorizationCoordinator,
             synchronizer: self.healthKitSynchronizationEngine,
             server: productionNativeAPI,
-            synchronizationStore: healthKitSynchronizationStore
+            synchronizationStore: healthKitSynchronizationStore,
+            sleepActivation: healthKitSleepActivation,
+            sleepCapabilitySource: productionNativeAPI,
+            sleepManifestSender: sleepManifestSender
         )
         let canaryGate = HealthKitFeatureGate.founderActivityValidation
         let canaryAuthorization = HealthKitAuthorizationCoordinator(
@@ -701,6 +718,18 @@ final class AppEnvironment {
     func registerHealthKitObserversForLaunch() async {
         guard nativeAuthority == .founderProduction else { return }
         await healthKitAutomaticSynchronizationCoordinator.registerObserversForBackgroundLaunch()
+    }
+
+    /// Locked-device recovery. A HealthKit wake while the device is locked
+    /// fails early (protected state files, Keychain, and credentials require
+    /// first unlock) and releases its observer completion without advancing
+    /// anything. When protected data becomes available again this runs one
+    /// coalesced bootstrap, so recovery does not wait for the next foreground.
+    /// Founder Production only. File protection is never relaxed.
+    @MainActor
+    func recoverHealthKitAfterProtectedDataAvailable() async {
+        guard nativeAuthority == .founderProduction else { return }
+        await healthKitAutomaticSynchronizationCoordinator.bootstrap()
     }
 
     func selectNativeAuthority(_ authority: NativeAPIEnvironment) {

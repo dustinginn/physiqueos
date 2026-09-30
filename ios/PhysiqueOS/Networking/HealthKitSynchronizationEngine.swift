@@ -16,6 +16,9 @@ actor HealthKitSynchronizationEngine {
     /// in, which `AppEnvironment` does for the automatic engine and not for
     /// the canary's. The explicit canary paths below never consult it.
     private let workoutActivationFloor: HealthKitWorkoutActivationFloor?
+    /// The manifest-gated Sleep switch. `nil` (the canary engine, tests that
+    /// do not opt in) means Sleep is never observed, queried, or delivered.
+    private let sleepActivation: HealthKitSleepActivationGate?
     private var registrations: [HealthKitCursorScope: HealthKitObserverRegistration] = [:]
     /// When set, an observer wake (which can be the only thing keeping a
     /// background-launched process alive) runs under an OS background-
@@ -38,6 +41,7 @@ actor HealthKitSynchronizationEngine {
         featureGate: HealthKitFeatureGate = .n0Disabled,
         batchBuilder: HealthKitBatchBuilder = HealthKitBatchBuilder(),
         workoutActivationFloor: HealthKitWorkoutActivationFloor? = nil,
+        sleepActivation: HealthKitSleepActivationGate? = nil,
         historicalLookbackDays: Int = 30,
         queryTimeout: Duration = .seconds(25),
         availability: @escaping @Sendable () -> HealthKitAvailability = { .availableAuthorizationNotRequested },
@@ -52,6 +56,7 @@ actor HealthKitSynchronizationEngine {
         self.featureGate = featureGate
         self.batchBuilder = batchBuilder
         self.workoutActivationFloor = workoutActivationFloor
+        self.sleepActivation = sleepActivation
         self.historicalLookbackDays = historicalLookbackDays
         self.queryTimeout = queryTimeout
         self.availability = availability
@@ -63,6 +68,7 @@ actor HealthKitSynchronizationEngine {
         guard featureGate.allows(.backgroundDelivery), featureGate.allows(.observationQuery) else {
             throw HealthKitSyncError.featureDisabled
         }
+        try requireSleepActivationIfSleep(scope)
         guard registrations[scope] == nil else { return }
         let registration = try observerClient.register(stream: scope.stream) { [weak self] errorCode, completion in
             guard let self else { completion(); return }
@@ -80,6 +86,7 @@ actor HealthKitSynchronizationEngine {
     /// because `.backgroundDelivery` is disabled.
     func enableBackgroundDelivery(scope: HealthKitCursorScope) async throws {
         guard featureGate.allows(.backgroundDelivery) else { throw HealthKitSyncError.featureDisabled }
+        try requireSleepActivationIfSleep(scope)
         try await observerClient.enableBackgroundDelivery(for: scope.stream)
     }
 
@@ -247,6 +254,10 @@ actor HealthKitSynchronizationEngine {
         stagingCompletion: (@Sendable () -> Void)? = nil
     ) async throws {
         guard featureGate.allows(.observationQuery) else { throw HealthKitSyncError.featureDisabled }
+        // Before pending delivery as well as before any query: an inactive
+        // Sleep gate keeps staged Sleep exactly as it is (no upload that the
+        // Server would 409, no HealthKit read at all).
+        let sleepFloor = try requireSleepActivationIfSleep(scope)
         guard activeSynchronizations.insert(scope).inserted else {
             throw HealthKitSyncError.operational(code: "healthkit_sync_in_progress")
         }
@@ -287,7 +298,10 @@ actor HealthKitSynchronizationEngine {
             throw error
         }
         try Task.checkCancellation()
-        let result = applyWorkoutActivationFloor(to: raw, scope: scope)
+        let result = applySleepActivationFloor(
+            to: applyWorkoutActivationFloor(to: raw, scope: scope),
+            floor: sleepFloor
+        )
         try await store.recordSuccessfulQuery(for: scope, at: result.completedAt)
         let batch = try batchBuilder.build(
             scope: scope,
@@ -402,6 +416,41 @@ actor HealthKitSynchronizationEngine {
     ) -> HealthKitAnchoredQueryResult {
         guard scope.stream == .workouts, let floor = workoutActivationFloor else { return result }
         let admitted = result.additions.filter { floor.admits(endedAt: $0.occurrence.endedAt) }
+        guard admitted.count != result.additions.count else { return result }
+        return HealthKitAnchoredQueryResult(
+            additions: admitted,
+            deletions: result.deletions,
+            proposedAnchorData: result.proposedAnchorData,
+            completedAt: result.completedAt
+        )
+    }
+
+    /// Sleep is legal only on its dedicated automatic scope and only while the
+    /// manifest-gated capability is active. Returns the prospective floor for
+    /// a Sleep scope, `nil` for every other stream.
+    @discardableResult
+    private func requireSleepActivationIfSleep(_ scope: HealthKitCursorScope) throws -> Date? {
+        guard scope.stream == .sleepAnalysis else { return nil }
+        guard scope.predicateVersion == HealthKitSleepIngestionContract.predicateVersion,
+              let floor = sleepActivation?.activeFloor(at: now())
+        else { throw HealthKitSyncError.operational(code: HealthKitSleepIngestionContract.notActivatedDiagnosticCode) }
+        return floor
+    }
+
+    /// Second line of defense behind the query predicate: a Sleep sample that
+    /// ENDED before the prospective floor is never staged. A sample that
+    /// started before the floor but ends at/after it is kept (Phase A
+    /// semantics). Deletions carry only a UUID and are forwarded: the Server
+    /// tombstones an unknown UUID, which is harmless and idempotent.
+    private func applySleepActivationFloor(
+        to result: HealthKitAnchoredQueryResult,
+        floor: Date?
+    ) -> HealthKitAnchoredQueryResult {
+        guard let floor else { return result }
+        let admitted = result.additions.filter { addition in
+            guard let endedAt = addition.occurrence.endedAt else { return false }
+            return endedAt >= floor
+        }
         guard admitted.count != result.additions.count else { return result }
         return HealthKitAnchoredQueryResult(
             additions: admitted,
@@ -845,6 +894,7 @@ actor HealthKitSynchronizationEngine {
     /// never reruns an anchored query while a batch is unresolved.
     func resumePending(scope: HealthKitCursorScope) async throws {
         guard featureGate.allows(.serverUpload) else { throw HealthKitSyncError.featureDisabled }
+        try requireSleepActivationIfSleep(scope)
         try Task.checkCancellation()
         try await deliverPending(scope: scope)
     }

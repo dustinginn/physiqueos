@@ -122,13 +122,19 @@ final class HealthKitQueryClientDefaultBoundsTests: XCTestCase {
             SystemHealthKitQueryClient.samplePredicateDecision(stream: .workouts, requested: nil, workoutFloor: floor),
             .workoutFloor(floor)
         )
-        for other in [HealthKitSynchronizationStream.heartRate, .activeEnergy, .sleepAnalysis, .stepCount] {
+        for other in [HealthKitSynchronizationStream.heartRate, .activeEnergy, .stepCount] {
             XCTAssertEqual(
                 SystemHealthKitQueryClient.samplePredicateDecision(stream: other, requested: nil, workoutFloor: floor),
                 .unbounded,
                 "\(other)"
             )
         }
+        // Sleep is never unbounded: without an active manifest floor it is
+        // refused outright (see HealthKitSleepIngestionTests).
+        XCTAssertEqual(
+            SystemHealthKitQueryClient.samplePredicateDecision(stream: .sleepAnalysis, requested: nil, workoutFloor: floor),
+            .refused
+        )
     }
 
     /// The Founder's exact-day Workout canary always passes explicit bounds,

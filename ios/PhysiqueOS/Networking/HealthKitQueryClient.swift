@@ -40,18 +40,24 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
     /// does not opt in. Consulted only by the per-sample branch of `execute`,
     /// only for `.workouts`, and only when the caller passed no bounds.
     private let workoutFloor: Date?
+    /// The manifest-gated Sleep switch. `nil` (tests, the canary client) or an
+    /// inactive gate means a Sleep query is refused outright -- Sleep never
+    /// has an unbounded, anchor-less first run.
+    private let sleepActivation: HealthKitSleepActivationGate?
 
     init(
         store: HKHealthStore = HKHealthStore(),
         calendar: Calendar = .autoupdatingCurrent,
         activityLookbackDays: Int = 30,
         workoutFloor: Date? = nil,
+        sleepActivation: HealthKitSleepActivationGate? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.store = store
         self.calendar = calendar
         self.activityLookbackDays = activityLookbackDays
         self.workoutFloor = workoutFloor
+        self.sleepActivation = sleepActivation
         self.now = now
     }
 
@@ -82,9 +88,16 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
             throw HealthKitSyncError.corruptCursor
         }
 
-        let predicate = Self.samplePredicate(
-            for: Self.samplePredicateDecision(stream: stream, requested: bounds, workoutFloor: workoutFloor)
+        let decision = Self.samplePredicateDecision(
+            stream: stream,
+            requested: bounds,
+            workoutFloor: workoutFloor,
+            sleepFloor: sleepActivation?.activeFloor(at: now())
         )
+        if case .refused = decision {
+            throw HealthKitSyncError.operational(code: HealthKitSleepIngestionContract.notActivatedDiagnosticCode)
+        }
+        let predicate = Self.samplePredicate(for: decision)
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKAnchoredObjectQuery(
                 type: sampleType,
@@ -145,13 +158,26 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         /// floor and ended after it is still delivered; the Server decides
         /// its local day.
         case workoutFloor(Date)
+        /// `.sleepAnalysis`, always: `[activationFloor, +inf)` by END date
+        /// (`.strictEndDate`), all category values. A sample that started
+        /// before the floor but ends at/after it is kept, matching the
+        /// Server's Phase A floor semantics exactly.
+        case sleepFloor(Date)
+        /// Sleep without an active manifest capability: no query at all.
+        case refused
     }
 
     static func samplePredicateDecision(
         stream: HealthKitSynchronizationStream,
         requested: HealthKitQueryBounds?,
-        workoutFloor: Date?
+        workoutFloor: Date?,
+        sleepFloor: Date? = nil
     ) -> SamplePredicateDecision {
+        // Sleep ignores caller bounds: its only legal predicate is the floor.
+        if stream == .sleepAnalysis {
+            guard let sleepFloor else { return .refused }
+            return .sleepFloor(sleepFloor)
+        }
         if let requested { return .explicit(requested) }
         if stream == .workouts, let workoutFloor { return .workoutFloor(workoutFloor) }
         return .unbounded
@@ -167,8 +193,11 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                 end: bounds.endDateExclusive,
                 options: [.strictStartDate]
             )
-        case let .workoutFloor(floor):
+        case let .workoutFloor(floor), let .sleepFloor(floor):
             HKQuery.predicateForSamples(withStart: floor, end: nil, options: [.strictEndDate])
+        case .refused:
+            // Unreachable: `execute` throws before building a predicate.
+            HKQuery.predicateForSamples(withStart: .distantFuture, end: .distantFuture, options: [.strictEndDate])
         }
     }
 
@@ -492,7 +521,8 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         stream: HealthKitSynchronizationStream,
         calendar: Calendar
     ) throws -> HealthKitQueryAddition {
-        let zone = timeZone(for: sample) ?? calendar.timeZone
+        let sampleZone = timeZone(for: sample)
+        let zone = sampleZone ?? calendar.timeZone
         var localCalendar = calendar
         localCalendar.timeZone = zone
         let dayStart = localCalendar.startOfDay(for: sample.startDate)
@@ -507,6 +537,31 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
             localDayStartedAt: dayStart,
             localDayEndedAt: dayEnd
         )
+        if let category = sample as? HKCategorySample, stream == .sleepAnalysis {
+            // Sleep keeps only the Phase A privacy-safe source fields, even in
+            // protected local staging: no source display name (it is often a
+            // person's device name), no HKDevice, no metadata dictionary.
+            return HealthKitQueryAddition(
+                healthKitUUID: sample.uuid,
+                objectTypeIdentifier: sample.sampleType.identifier,
+                source: HealthKitQuerySource(
+                    bundleIdentifier: sample.sourceRevision.source.bundleIdentifier,
+                    sourceName: "",
+                    sourceRevision: sample.sourceRevision.version,
+                    productType: sample.sourceRevision.productType,
+                    privacySafeDeviceProvenance: nil
+                ),
+                occurrence: occurrence,
+                payload: .sleep(HealthKitQuerySleep(
+                    stageValue: category.value,
+                    timeZoneSource: sampleZone == nil
+                        ? HealthKitSleepIngestionContract.deviceTimeZoneSource
+                        : HealthKitSleepIngestionContract.sampleTimeZoneSource,
+                    wasUserEntered: wasUserEnteredFlag(sample.metadata)
+                )),
+                allowlistedMetadata: [:]
+            )
+        }
         let source = HealthKitQuerySource(
             bundleIdentifier: sample.sourceRevision.source.bundleIdentifier,
             sourceName: sample.sourceRevision.source.name,
@@ -551,8 +606,6 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                 ],
                 isIndoorWorkout: indoorWorkoutFlag(workout.metadata)
             ))
-        } else if let category = sample as? HKCategorySample, stream == .sleepAnalysis {
-            payload = .sleep(HealthKitQuerySleep(stageValue: category.value))
         } else {
             throw HealthKitSyncError.operational(code: "healthkit_sample_shape_unsupported")
         }
@@ -618,6 +671,13 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         return nil
     }
 
+    static func wasUserEnteredFlag(_ metadata: [String: Any]?) -> Bool? {
+        guard let value = metadata?[HKMetadataKeyWasUserEntered] else { return nil }
+        if let value = value as? Bool { return value }
+        if let value = value as? NSNumber { return value.boolValue }
+        return nil
+    }
+
     private static func allowlistedMetadata(_ metadata: [String: Any]?) -> [String: String] {
         let allowed = ["HKWasUserEntered", "HKExternalUUID", "HKFoodType"]
         return allowed.reduce(into: [:]) { result, key in
@@ -643,6 +703,38 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
         let raw = String(digest.prefix(32))
         let formatted = "\(raw.prefix(8))-\(raw.dropFirst(8).prefix(4))-\(raw.dropFirst(12).prefix(4))-\(raw.dropFirst(16).prefix(4))-\(raw.dropFirst(20).prefix(12))"
         return UUID(uuidString: formatted)
+    }
+}
+
+extension SystemHealthKitQueryClient: HealthKitSleepWindowReader {
+    /// Plain (non-anchored) read of every Sleep sample, from every source,
+    /// whose end lies in `[start, end]`. Returns UUIDs only. Refused unless
+    /// the Sleep gate is active, and the range never starts before the floor.
+    func liveSleepSampleIdentifiers(endingFrom start: Date, to end: Date) async throws -> [UUID] {
+        guard let floor = sleepActivation?.activeFloor(at: now()),
+              let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)
+        else { throw HealthKitSyncError.operational(code: HealthKitSleepIngestionContract.notActivatedDiagnosticCode) }
+        let lower = max(start, floor.addingTimeInterval(-HealthKitSleepWindowManifestPlan.readSlack))
+        guard lower < end else { return [] }
+        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            HKQuery.predicateForSamples(withStart: lower, end: nil, options: [.strictEndDate]),
+            HKQuery.predicateForSamples(withStart: nil, end: end, options: [.strictEndDate]),
+        ])
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: predicate,
+                limit: HealthKitSleepIngestionContract.maximumManifestLiveIDs + 1,
+                sortDescriptors: nil
+            ) { _, samples, error in
+                if error != nil {
+                    continuation.resume(throwing: HealthKitSyncError.operational(code: "healthkit_sleep_window_query_failed"))
+                    return
+                }
+                continuation.resume(returning: (samples ?? []).map(\.uuid))
+            }
+            store.execute(query)
+        }
     }
 }
 
@@ -707,6 +799,13 @@ final class SystemHealthKitObserverClient: HealthKitObserverClient, @unchecked S
     }
 
     private func observerTypes(for stream: HealthKitSynchronizationStream) -> [HKSampleType] {
+        Self.observerTypes(for: stream)
+    }
+
+    /// Concrete HealthKit types an observer registers for a stream. Internal so
+    /// tests can prove Sleep maps to exactly `HKCategoryTypeIdentifierSleepAnalysis`
+    /// (never zero types, the Nutrition daily-total observer gap).
+    static func observerTypes(for stream: HealthKitSynchronizationStream) -> [HKSampleType] {
         if stream == .activitySummary {
             return [
                 HKObjectType.quantityType(forIdentifier: .activeEnergyBurned),

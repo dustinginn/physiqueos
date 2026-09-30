@@ -121,6 +121,47 @@ struct HealthKitBatchBuilder: Sendable {
                     initialState: .deferredByCapability(reason: deferredReason)
                 ))
             }
+        case .sleepV1:
+            // Samples and deletions travel together (Phase A accepts at most
+            // 100 of each per request). The engine only reaches this for an
+            // active, manifest-gated Sleep scope.
+            let deliverable = additions.filter { HealthKitSleepWireMapper.canDeliver($0) }
+            let undeliverable = additions.filter { !HealthKitSleepWireMapper.canDeliver($0) }
+            let partitionCount = max(
+                Int(ceil(Double(deliverable.count) / Double(HealthKitSleepIngestionContract.maximumSamplesPerBatch))),
+                Int(ceil(Double(deletions.count) / Double(HealthKitSleepIngestionContract.maximumDeletionsPerBatch)))
+            )
+            for index in 0..<partitionCount {
+                partitions.append(try partition(
+                    batchID: batchID,
+                    index: partitions.count,
+                    ingestionPurpose: ingestionPurpose,
+                    disposition: .serverRequired,
+                    additions: deliverable.safeSlice(
+                        from: index * HealthKitSleepIngestionContract.maximumSamplesPerBatch,
+                        count: HealthKitSleepIngestionContract.maximumSamplesPerBatch
+                    ),
+                    deletions: deletions.safeSlice(
+                        from: index * HealthKitSleepIngestionContract.maximumDeletionsPerBatch,
+                        count: HealthKitSleepIngestionContract.maximumDeletionsPerBatch
+                    ),
+                    initialState: .pending
+                ))
+            }
+            // A sample the contract cannot represent (no UUID or end) is kept
+            // locally and visible in diagnostics; it is never guessed at.
+            let reason = "healthkit_sleep_sample_shape_invalid"
+            for chunk in undeliverable.chunks(of: maximumPartitionSize) {
+                partitions.append(try partition(
+                    batchID: batchID,
+                    index: partitions.count,
+                    ingestionPurpose: ingestionPurpose,
+                    disposition: .localDeferred(reason: reason),
+                    additions: chunk,
+                    deletions: [],
+                    initialState: .deferredByCapability(reason: reason)
+                ))
+            }
         case let .localOnly(reason):
             let count = max(additions.count, deletions.count)
             if count > 0 {

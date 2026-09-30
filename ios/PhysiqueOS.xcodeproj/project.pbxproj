@@ -327,27 +327,30 @@
 		0000000000000000000012B9 /* HealthKitSynchronizationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B8 /* HealthKitSynchronizationModels.swift */; };
 		0000000000000000000012BB /* HealthKitFounderCanaryModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012BA /* HealthKitFounderCanaryModels.swift */; };
 		0000000000000000000012BD /* HealthKitSyncPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012BC /* HealthKitSyncPersistence.swift */; };
-		0000000000000000000012BF /* HealthKitQueryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012BE /* HealthKitQueryClient.swift */; };
-		0000000000000000000012C1 /* HealthKitObservationNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C0 /* HealthKitObservationNormalizer.swift */; };
-		0000000000000000000012C3 /* HealthKitServerUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C2 /* HealthKitServerUploader.swift */; };
-		0000000000000000000012C5 /* HealthKitSynchronizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C4 /* HealthKitSynchronizationEngine.swift */; };
-		0000000000000000000012C7 /* HealthKitFounderCanaryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C6 /* HealthKitFounderCanaryCoordinator.swift */; };
-		0000000000000000000012C9 /* HealthKitAutomaticSynchronizationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C8 /* HealthKitAutomaticSynchronizationCoordinator.swift */; };
-		0000000000000000000012CB /* HealthKitFounderCanaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012CA /* HealthKitFounderCanaryView.swift */; };
-		0000000000000000000012D7 /* DailyDriverLocalDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D6 /* DailyDriverLocalDay.swift */; };
-		0000000000000000000012D9 /* PeptideSupportEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D8 /* PeptideSupportEditorViewModel.swift */; };
-		0000000000000000000012DB /* PhysiqueOSDisclosureRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DA /* PhysiqueOSDisclosureRow.swift */; };
-		0000000000000000000012DD /* PeptideSupportSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DC /* PeptideSupportSheets.swift */; };
-		0000000000000000000012DF /* PeptideDosePlanEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DE /* PeptideDosePlanEditor.swift */; };
-		0000000000000000000012E1 /* PhotoInspectionViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E0 /* PhotoInspectionViewer.swift */; };
-		0000000000000000000012CD /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012CC /* HealthKitSynchronizationTests.swift */; };
-		0000000000000000000012CF /* HealthKitFounderCanaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012CE /* HealthKitFounderCanaryTests.swift */; };
-		0000000000000000000012D1 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D0 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift */; };
-		0000000000000000000012D3 /* HealthKitQueryClientDefaultBoundsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D2 /* HealthKitQueryClientDefaultBoundsTests.swift */; };
-		0000000000000000000012D5 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D4 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift */; };
-		0000000000000000000012E3 /* PeptideSupportEditorViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E2 /* PeptideSupportEditorViewModelTests.swift */; };
-		0000000000000000000012E5 /* PeptideScreenPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E4 /* PeptideScreenPresentationTests.swift */; };
-		0000000000000000000012E7 /* PhotoInspectionViewerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E6 /* PhotoInspectionViewerTests.swift */; };
+		0000000000000000000012BF /* ProtectedDataRecoveryTrigger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012BE /* ProtectedDataRecoveryTrigger.swift */; };
+		0000000000000000000012C1 /* HealthKitSleepModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C0 /* HealthKitSleepModels.swift */; };
+		0000000000000000000012C3 /* HealthKitQueryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C2 /* HealthKitQueryClient.swift */; };
+		0000000000000000000012C5 /* HealthKitObservationNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C4 /* HealthKitObservationNormalizer.swift */; };
+		0000000000000000000012C7 /* HealthKitServerUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C6 /* HealthKitServerUploader.swift */; };
+		0000000000000000000012C9 /* HealthKitSynchronizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012C8 /* HealthKitSynchronizationEngine.swift */; };
+		0000000000000000000012CB /* HealthKitFounderCanaryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012CA /* HealthKitFounderCanaryCoordinator.swift */; };
+		0000000000000000000012CD /* HealthKitAutomaticSynchronizationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012CC /* HealthKitAutomaticSynchronizationCoordinator.swift */; };
+		0000000000000000000012CF /* HealthKitFounderCanaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012CE /* HealthKitFounderCanaryView.swift */; };
+		0000000000000000000012DD /* DailyDriverLocalDay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DC /* DailyDriverLocalDay.swift */; };
+		0000000000000000000012DF /* PeptideSupportEditorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DE /* PeptideSupportEditorViewModel.swift */; };
+		0000000000000000000012E1 /* PhysiqueOSDisclosureRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E0 /* PhysiqueOSDisclosureRow.swift */; };
+		0000000000000000000012E3 /* PeptideSupportSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E2 /* PeptideSupportSheets.swift */; };
+		0000000000000000000012E5 /* PeptideDosePlanEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E4 /* PeptideDosePlanEditor.swift */; };
+		0000000000000000000012E7 /* PhotoInspectionViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E6 /* PhotoInspectionViewer.swift */; };
+		0000000000000000000012D1 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D0 /* HealthKitSynchronizationTests.swift */; };
+		0000000000000000000012D3 /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D2 /* HealthKitSleepIngestionTests.swift */; };
+		0000000000000000000012D5 /* HealthKitFounderCanaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D4 /* HealthKitFounderCanaryTests.swift */; };
+		0000000000000000000012D7 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D6 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift */; };
+		0000000000000000000012D9 /* HealthKitQueryClientDefaultBoundsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D8 /* HealthKitQueryClientDefaultBoundsTests.swift */; };
+		0000000000000000000012DB /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DA /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift */; };
+		0000000000000000000012E9 /* PeptideSupportEditorViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E8 /* PeptideSupportEditorViewModelTests.swift */; };
+		0000000000000000000012EB /* PeptideScreenPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012EA /* PeptideScreenPresentationTests.swift */; };
+		0000000000000000000012ED /* PhotoInspectionViewerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012EC /* PhotoInspectionViewerTests.swift */; };
 		0000000000000000000012B7 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B6 /* HealthKit.framework */; };
 /* End PBXBuildFile section */
 
@@ -621,19 +624,21 @@
 		0000000000000000000012B8 /* HealthKitSynchronizationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitSynchronizationModels.swift"; sourceTree = "<group>"; };
 		0000000000000000000012BA /* HealthKitFounderCanaryModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitFounderCanaryModels.swift"; sourceTree = "<group>"; };
 		0000000000000000000012BC /* HealthKitSyncPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitSyncPersistence.swift"; sourceTree = "<group>"; };
-		0000000000000000000012BE /* HealthKitQueryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitQueryClient.swift"; sourceTree = "<group>"; };
-		0000000000000000000012C0 /* HealthKitObservationNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitObservationNormalizer.swift"; sourceTree = "<group>"; };
-		0000000000000000000012C2 /* HealthKitServerUploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitServerUploader.swift"; sourceTree = "<group>"; };
-		0000000000000000000012C4 /* HealthKitSynchronizationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitSynchronizationEngine.swift"; sourceTree = "<group>"; };
-		0000000000000000000012C6 /* HealthKitFounderCanaryCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitFounderCanaryCoordinator.swift"; sourceTree = "<group>"; };
-		0000000000000000000012C8 /* HealthKitAutomaticSynchronizationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitAutomaticSynchronizationCoordinator.swift"; sourceTree = "<group>"; };
-		0000000000000000000012CA /* HealthKitFounderCanaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitFounderCanaryView.swift"; sourceTree = "<group>"; };
-		0000000000000000000012D6 /* DailyDriverLocalDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyDriverLocalDay.swift"; sourceTree = "<group>"; };
-		0000000000000000000012D8 /* PeptideSupportEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideSupportEditorViewModel.swift"; sourceTree = "<group>"; };
-		0000000000000000000012DA /* PhysiqueOSDisclosureRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSDisclosureRow.swift"; sourceTree = "<group>"; };
-		0000000000000000000012DC /* PeptideSupportSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideSupportSheets.swift"; sourceTree = "<group>"; };
-		0000000000000000000012DE /* PeptideDosePlanEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideDosePlanEditor.swift"; sourceTree = "<group>"; };
-		0000000000000000000012E0 /* PhotoInspectionViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoInspectionViewer.swift"; sourceTree = "<group>"; };
+		0000000000000000000012BE /* ProtectedDataRecoveryTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProtectedDataRecoveryTrigger.swift"; sourceTree = "<group>"; };
+		0000000000000000000012C0 /* HealthKitSleepModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitSleepModels.swift"; sourceTree = "<group>"; };
+		0000000000000000000012C2 /* HealthKitQueryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitQueryClient.swift"; sourceTree = "<group>"; };
+		0000000000000000000012C4 /* HealthKitObservationNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitObservationNormalizer.swift"; sourceTree = "<group>"; };
+		0000000000000000000012C6 /* HealthKitServerUploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitServerUploader.swift"; sourceTree = "<group>"; };
+		0000000000000000000012C8 /* HealthKitSynchronizationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitSynchronizationEngine.swift"; sourceTree = "<group>"; };
+		0000000000000000000012CA /* HealthKitFounderCanaryCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitFounderCanaryCoordinator.swift"; sourceTree = "<group>"; };
+		0000000000000000000012CC /* HealthKitAutomaticSynchronizationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitAutomaticSynchronizationCoordinator.swift"; sourceTree = "<group>"; };
+		0000000000000000000012CE /* HealthKitFounderCanaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitFounderCanaryView.swift"; sourceTree = "<group>"; };
+		0000000000000000000012DC /* DailyDriverLocalDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyDriverLocalDay.swift"; sourceTree = "<group>"; };
+		0000000000000000000012DE /* PeptideSupportEditorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideSupportEditorViewModel.swift"; sourceTree = "<group>"; };
+		0000000000000000000012E0 /* PhysiqueOSDisclosureRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSDisclosureRow.swift"; sourceTree = "<group>"; };
+		0000000000000000000012E2 /* PeptideSupportSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideSupportSheets.swift"; sourceTree = "<group>"; };
+		0000000000000000000012E4 /* PeptideDosePlanEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideDosePlanEditor.swift"; sourceTree = "<group>"; };
+		0000000000000000000012E6 /* PhotoInspectionViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoInspectionViewer.swift"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011ED /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EF /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
@@ -702,14 +707,15 @@
 		000000000000000000001268 /* TrainingLoadSemanticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingLoadSemanticsTests.swift"; sourceTree = "<group>"; };
 		00000000000000000000126A /* PhotoProcessingUXTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoProcessingUXTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012B3 /* HealthKitCapabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitCapabilityTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000012CC /* HealthKitSynchronizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitSynchronizationTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000012CE /* HealthKitFounderCanaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitFounderCanaryTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000012D0 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitAutomaticSynchronizationCoordinatorTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000012D2 /* HealthKitQueryClientDefaultBoundsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitQueryClientDefaultBoundsTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000012D4 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitWorkoutIndoorOutdoorFidelityTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000012E2 /* PeptideSupportEditorViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideSupportEditorViewModelTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000012E4 /* PeptideScreenPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideScreenPresentationTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000012E6 /* PhotoInspectionViewerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoInspectionViewerTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012D0 /* HealthKitSynchronizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitSynchronizationTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012D2 /* HealthKitSleepIngestionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitSleepIngestionTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012D4 /* HealthKitFounderCanaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitFounderCanaryTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012D6 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitAutomaticSynchronizationCoordinatorTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012D8 /* HealthKitQueryClientDefaultBoundsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitQueryClientDefaultBoundsTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012DA /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitWorkoutIndoorOutdoorFidelityTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012E8 /* PeptideSupportEditorViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideSupportEditorViewModelTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012EA /* PeptideScreenPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideScreenPresentationTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000012EC /* PhotoInspectionViewerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoInspectionViewerTests.swift"; sourceTree = "<group>"; };
 		00000000000000000000129A /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		00000000000000000000129C /* GoalsAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012B6 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
@@ -819,7 +825,8 @@
 				0000000000000000000012AB /* HealthKitCapabilityModels.swift */,
 				0000000000000000000012B8 /* HealthKitSynchronizationModels.swift */,
 				0000000000000000000012BA /* HealthKitFounderCanaryModels.swift */,
-				0000000000000000000012D6 /* DailyDriverLocalDay.swift */,
+				0000000000000000000012C0 /* HealthKitSleepModels.swift */,
+				0000000000000000000012DC /* DailyDriverLocalDay.swift */,
 			);
 			path = Contracts;
 			sourceTree = "<group>";
@@ -892,12 +899,13 @@
 				0000000000000000000012AF /* HealthKitService.swift */,
 				0000000000000000000012B1 /* HealthKitAuthorizationCoordinator.swift */,
 				0000000000000000000012BC /* HealthKitSyncPersistence.swift */,
-				0000000000000000000012BE /* HealthKitQueryClient.swift */,
-				0000000000000000000012C0 /* HealthKitObservationNormalizer.swift */,
-				0000000000000000000012C2 /* HealthKitServerUploader.swift */,
-				0000000000000000000012C4 /* HealthKitSynchronizationEngine.swift */,
-				0000000000000000000012C6 /* HealthKitFounderCanaryCoordinator.swift */,
-				0000000000000000000012C8 /* HealthKitAutomaticSynchronizationCoordinator.swift */,
+				0000000000000000000012BE /* ProtectedDataRecoveryTrigger.swift */,
+				0000000000000000000012C2 /* HealthKitQueryClient.swift */,
+				0000000000000000000012C4 /* HealthKitObservationNormalizer.swift */,
+				0000000000000000000012C6 /* HealthKitServerUploader.swift */,
+				0000000000000000000012C8 /* HealthKitSynchronizationEngine.swift */,
+				0000000000000000000012CA /* HealthKitFounderCanaryCoordinator.swift */,
+				0000000000000000000012CC /* HealthKitAutomaticSynchronizationCoordinator.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -981,8 +989,8 @@
 				000000000000000000001107 /* EvidenceScopeAttributionChip.swift */,
 				000000000000000000001109 /* ChartInteraction.swift */,
 				00000000000000000000110B /* BriefingPresentation.swift */,
-				0000000000000000000012DA /* PhysiqueOSDisclosureRow.swift */,
-				0000000000000000000012E0 /* PhotoInspectionViewer.swift */,
+				0000000000000000000012E0 /* PhysiqueOSDisclosureRow.swift */,
+				0000000000000000000012E6 /* PhotoInspectionViewer.swift */,
 			);
 			path = SharedUI;
 			sourceTree = "<group>";
@@ -1129,9 +1137,9 @@
 				000000000000000000001177 /* OperatingPlanDexaAppointmentView.swift */,
 				000000000000000000001179 /* ProtocolBuilderShell.swift */,
 				00000000000000000000117B /* OperatingPlanTrainingProtocolBuilderView.swift */,
-				0000000000000000000012D8 /* PeptideSupportEditorViewModel.swift */,
-				0000000000000000000012DC /* PeptideSupportSheets.swift */,
-				0000000000000000000012DE /* PeptideDosePlanEditor.swift */,
+				0000000000000000000012DE /* PeptideSupportEditorViewModel.swift */,
+				0000000000000000000012E2 /* PeptideSupportSheets.swift */,
+				0000000000000000000012E4 /* PeptideDosePlanEditor.swift */,
 			);
 			path = OperatingPlan;
 			sourceTree = "<group>";
@@ -1183,7 +1191,7 @@
 				00000000000000000000117D /* YouPlaceholderView.swift */,
 				00000000000000000000117F /* FounderServerConnectionView.swift */,
 				000000000000000000001181 /* WorkoutReconciliationDiagnosticsView.swift */,
-				0000000000000000000012CA /* HealthKitFounderCanaryView.swift */,
+				0000000000000000000012CE /* HealthKitFounderCanaryView.swift */,
 			);
 			path = You;
 			sourceTree = "<group>";
@@ -1247,14 +1255,15 @@
 				000000000000000000001268 /* TrainingLoadSemanticsTests.swift */,
 				00000000000000000000126A /* PhotoProcessingUXTests.swift */,
 				0000000000000000000012B3 /* HealthKitCapabilityTests.swift */,
-				0000000000000000000012CC /* HealthKitSynchronizationTests.swift */,
-				0000000000000000000012CE /* HealthKitFounderCanaryTests.swift */,
-				0000000000000000000012D0 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift */,
-				0000000000000000000012D2 /* HealthKitQueryClientDefaultBoundsTests.swift */,
-				0000000000000000000012D4 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift */,
-				0000000000000000000012E2 /* PeptideSupportEditorViewModelTests.swift */,
-				0000000000000000000012E4 /* PeptideScreenPresentationTests.swift */,
-				0000000000000000000012E6 /* PhotoInspectionViewerTests.swift */,
+				0000000000000000000012D0 /* HealthKitSynchronizationTests.swift */,
+				0000000000000000000012D2 /* HealthKitSleepIngestionTests.swift */,
+				0000000000000000000012D4 /* HealthKitFounderCanaryTests.swift */,
+				0000000000000000000012D6 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift */,
+				0000000000000000000012D8 /* HealthKitQueryClientDefaultBoundsTests.swift */,
+				0000000000000000000012DA /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift */,
+				0000000000000000000012E8 /* PeptideSupportEditorViewModelTests.swift */,
+				0000000000000000000012EA /* PeptideScreenPresentationTests.swift */,
+				0000000000000000000012EC /* PhotoInspectionViewerTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1687,19 +1696,21 @@
 				0000000000000000000012B9 /* HealthKitSynchronizationModels.swift in Sources */,
 				0000000000000000000012BB /* HealthKitFounderCanaryModels.swift in Sources */,
 				0000000000000000000012BD /* HealthKitSyncPersistence.swift in Sources */,
-				0000000000000000000012BF /* HealthKitQueryClient.swift in Sources */,
-				0000000000000000000012C1 /* HealthKitObservationNormalizer.swift in Sources */,
-				0000000000000000000012C3 /* HealthKitServerUploader.swift in Sources */,
-				0000000000000000000012C5 /* HealthKitSynchronizationEngine.swift in Sources */,
-				0000000000000000000012C7 /* HealthKitFounderCanaryCoordinator.swift in Sources */,
-				0000000000000000000012C9 /* HealthKitAutomaticSynchronizationCoordinator.swift in Sources */,
-				0000000000000000000012CB /* HealthKitFounderCanaryView.swift in Sources */,
-				0000000000000000000012D7 /* DailyDriverLocalDay.swift in Sources */,
-				0000000000000000000012D9 /* PeptideSupportEditorViewModel.swift in Sources */,
-				0000000000000000000012DB /* PhysiqueOSDisclosureRow.swift in Sources */,
-				0000000000000000000012DD /* PeptideSupportSheets.swift in Sources */,
-				0000000000000000000012DF /* PeptideDosePlanEditor.swift in Sources */,
-				0000000000000000000012E1 /* PhotoInspectionViewer.swift in Sources */,
+				0000000000000000000012BF /* ProtectedDataRecoveryTrigger.swift in Sources */,
+				0000000000000000000012C1 /* HealthKitSleepModels.swift in Sources */,
+				0000000000000000000012C3 /* HealthKitQueryClient.swift in Sources */,
+				0000000000000000000012C5 /* HealthKitObservationNormalizer.swift in Sources */,
+				0000000000000000000012C7 /* HealthKitServerUploader.swift in Sources */,
+				0000000000000000000012C9 /* HealthKitSynchronizationEngine.swift in Sources */,
+				0000000000000000000012CB /* HealthKitFounderCanaryCoordinator.swift in Sources */,
+				0000000000000000000012CD /* HealthKitAutomaticSynchronizationCoordinator.swift in Sources */,
+				0000000000000000000012CF /* HealthKitFounderCanaryView.swift in Sources */,
+				0000000000000000000012DD /* DailyDriverLocalDay.swift in Sources */,
+				0000000000000000000012DF /* PeptideSupportEditorViewModel.swift in Sources */,
+				0000000000000000000012E1 /* PhysiqueOSDisclosureRow.swift in Sources */,
+				0000000000000000000012E3 /* PeptideSupportSheets.swift in Sources */,
+				0000000000000000000012E5 /* PeptideDosePlanEditor.swift in Sources */,
+				0000000000000000000012E7 /* PhotoInspectionViewer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1754,14 +1765,15 @@
 				000000000000000000001269 /* TrainingLoadSemanticsTests.swift in Sources */,
 				00000000000000000000126B /* PhotoProcessingUXTests.swift in Sources */,
 				0000000000000000000012B4 /* HealthKitCapabilityTests.swift in Sources */,
-				0000000000000000000012CD /* HealthKitSynchronizationTests.swift in Sources */,
-				0000000000000000000012CF /* HealthKitFounderCanaryTests.swift in Sources */,
-				0000000000000000000012D1 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift in Sources */,
-				0000000000000000000012D3 /* HealthKitQueryClientDefaultBoundsTests.swift in Sources */,
-				0000000000000000000012D5 /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift in Sources */,
-				0000000000000000000012E3 /* PeptideSupportEditorViewModelTests.swift in Sources */,
-				0000000000000000000012E5 /* PeptideScreenPresentationTests.swift in Sources */,
-				0000000000000000000012E7 /* PhotoInspectionViewerTests.swift in Sources */,
+				0000000000000000000012D1 /* HealthKitSynchronizationTests.swift in Sources */,
+				0000000000000000000012D3 /* HealthKitSleepIngestionTests.swift in Sources */,
+				0000000000000000000012D5 /* HealthKitFounderCanaryTests.swift in Sources */,
+				0000000000000000000012D7 /* HealthKitAutomaticSynchronizationCoordinatorTests.swift in Sources */,
+				0000000000000000000012D9 /* HealthKitQueryClientDefaultBoundsTests.swift in Sources */,
+				0000000000000000000012DB /* HealthKitWorkoutIndoorOutdoorFidelityTests.swift in Sources */,
+				0000000000000000000012E9 /* PeptideSupportEditorViewModelTests.swift in Sources */,
+				0000000000000000000012EB /* PeptideScreenPresentationTests.swift in Sources */,
+				0000000000000000000012ED /* PhotoInspectionViewerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

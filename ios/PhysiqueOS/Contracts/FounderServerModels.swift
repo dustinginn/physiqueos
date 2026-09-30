@@ -336,6 +336,10 @@ struct ProductionContractManifest: Decodable, Sendable, Equatable {
     let reads: [Read]
     let writes: [Command]
     let healthKitIngestion: HealthKitIngestion?
+    /// Phase A Sleep capability, kept raw so a malformed or future block can
+    /// never fail decoding of the whole manifest. Resolved fail-closed by
+    /// `HealthKitSleepCapability.resolve`. Absent on older Servers.
+    let healthKitSleepIngestion: ProductionJSONValue?
 }
 
 indirect enum ProductionJSONValue: Codable, Sendable, Equatable {

@@ -142,6 +142,12 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     private let stepTimeout: Duration
     private let calendar: Calendar
     private let now: @Sendable () -> Date
+    /// Dormant Sleep lane. All three are `nil` unless the app wires them, and
+    /// even then nothing Sleep-related runs unless the Server manifest's
+    /// `healthKitSleepIngestion` capability is enabled with a valid floor.
+    private let sleepActivation: HealthKitSleepActivationGate?
+    private let sleepCapabilitySource: (any HealthKitSleepCapabilitySource)?
+    private let sleepManifestSender: HealthKitSleepWindowManifestSender?
 
     private(set) var lastBootstrapOutcome: HealthKitAutomaticBootstrapOutcome?
     /// The Founder's owner identity almost never changes within one signed-in
@@ -172,8 +178,14 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         ownerIdentityCache: any HealthKitOwnerIdentityCache = UserDefaultsHealthKitOwnerIdentityCache(),
         stepTimeout: Duration = .seconds(30),
         calendar: Calendar = .autoupdatingCurrent,
-        now: @escaping @Sendable () -> Date = Date.init
+        now: @escaping @Sendable () -> Date = Date.init,
+        sleepActivation: HealthKitSleepActivationGate? = nil,
+        sleepCapabilitySource: (any HealthKitSleepCapabilitySource)? = nil,
+        sleepManifestSender: HealthKitSleepWindowManifestSender? = nil
     ) {
+        self.sleepActivation = sleepActivation
+        self.sleepCapabilitySource = sleepCapabilitySource
+        self.sleepManifestSender = sleepManifestSender
         self.ownerIdentityCache = ownerIdentityCache
         self.authorization = authorization
         self.synchronizer = synchronizer
@@ -294,7 +306,73 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
                 outcome.streamErrors[stream, default: []].append("background_delivery_registration_failed")
             }
         }
+        // Sleep registers only from the persisted last-known capability (a
+        // background launch has no network). Inactive -> no Sleep observer.
+        if sleepActivation?.activeFloor(at: now()) != nil {
+            let scope = Self.sleepScope(ownerIdentity: ownerIdentity, deviceIdentity: deviceIdentity)
+            outcome.sleepActive = true
+            if case .failed = await boundedStep({ try await self.synchronizer.startObserving(scope: scope) }) {
+                outcome.streamErrors[.sleepAnalysis, default: []].append("observer_registration_failed")
+            }
+            if case .failed = await boundedStep({ try await self.synchronizer.enableBackgroundDelivery(scope: scope) }) {
+                outcome.streamErrors[.sleepAnalysis, default: []].append("background_delivery_registration_failed")
+            }
+        }
         return outcome
+    }
+
+    /// The dedicated Sleep cursor scope (`healthkit-automatic-sleep-v1`).
+    static func sleepScope(ownerIdentity: String, deviceIdentity: String) -> HealthKitCursorScope {
+        HealthKitCursorScope(
+            ownerIdentity: ownerIdentity,
+            enrolledDeviceIdentity: deviceIdentity,
+            stream: .sleepAnalysis,
+            predicateVersion: HealthKitSleepIngestionContract.predicateVersion
+        )
+    }
+
+    /// Foreground Sleep step: re-read the manifest capability (a failed read
+    /// keeps the last-known state; an absent or malformed block disables),
+    /// then -- only if active -- register, catch up, and send the recent-window
+    /// manifest at its cadence.
+    @MainActor
+    private func runSleepLane(
+        ownerIdentity: String,
+        deviceIdentity: String,
+        outcome: inout HealthKitAutomaticBootstrapOutcome
+    ) async {
+        guard let sleepActivation else { return }
+        if let source = sleepCapabilitySource {
+            let now = self.now
+            switch await boundedStep({
+                let block = try await source.healthKitSleepCapabilityBlock()
+                sleepActivation.update(HealthKitSleepCapability.resolve(manifestBlock: block, at: now()))
+            }) {
+            case .succeeded: break
+            case .failed, .timedOut:
+                outcome.streamErrors[.sleepAnalysis, default: []].append("sleep_capability_refresh_failed")
+            }
+        }
+        guard sleepActivation.activeFloor(at: now()) != nil else { return }
+        outcome.sleepActive = true
+        let scope = Self.sleepScope(ownerIdentity: ownerIdentity, deviceIdentity: deviceIdentity)
+        if case .failed = await boundedStep({ try await self.synchronizer.startObserving(scope: scope) }) {
+            outcome.streamErrors[.sleepAnalysis, default: []].append("observer_registration_failed")
+        }
+        if case .failed = await boundedStep({ try await self.synchronizer.enableBackgroundDelivery(scope: scope) }) {
+            outcome.streamErrors[.sleepAnalysis, default: []].append("background_delivery_registration_failed")
+        }
+        switch await boundedStep({ try await self.synchronizer.synchronize(scope: scope, stagingCompletion: nil) }) {
+        case .succeeded:
+            outcome.caughtUpStreams.insert(.sleepAnalysis)
+        case let .failed(code):
+            outcome.streamErrors[.sleepAnalysis, default: []].append(code ?? "catch_up_sync_failed")
+        case .timedOut:
+            outcome.streamErrors[.sleepAnalysis, default: []].append("catch_up_sync_timed_out")
+        }
+        if let sleepManifestSender {
+            outcome.sleepManifest = await sleepManifestSender.sendIfDue()
+        }
     }
 
     @MainActor
@@ -436,6 +514,8 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
                 outcome.streamErrors[.workouts, default: []].append("catch_up_sync_timed_out")
             }
         }
+
+        await runSleepLane(ownerIdentity: ownerIdentity, deviceIdentity: deviceIdentity, outcome: &outcome)
 
         // Historical recovery is best-effort after all current work. A
         // historical failure remains visible but never revokes current-day
@@ -597,4 +677,7 @@ struct HealthKitAutomaticBootstrapOutcome: Equatable {
     var skippedReason: String?
     var caughtUpStreams: Set<HealthKitSynchronizationStream> = []
     var streamErrors: [HealthKitSynchronizationStream: [String]] = [:]
+    /// Whether the dormant Sleep lane found an active capability this pass.
+    var sleepActive = false
+    var sleepManifest: HealthKitSleepManifestOutcome?
 }

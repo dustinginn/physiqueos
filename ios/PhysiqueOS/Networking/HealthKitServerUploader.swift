@@ -143,6 +143,9 @@ struct ProductionHealthKitObservationUploader: HealthKitObservationUploader, Hea
     /// in-window workouts on the Server, so any of them can make a Strength
     /// reconciliation review ready. Must not block: it only schedules work.
     var onDurablyAccepted: (@Sendable () -> Void)? = nil
+    /// Called when the Server answers 409 `HEALTHKIT_SLEEP_INGESTION_NOT_ENABLED`
+    /// so the shared Sleep gate latches off until the next manifest read.
+    var onSleepIngestionDisabled: (@Sendable () -> Void)? = nil
 
     func healthKitAuthenticatedDeviceIdentity() async throws -> String {
         try await api.authenticatedServerDeviceIdentity()
@@ -158,6 +161,9 @@ struct ProductionHealthKitObservationUploader: HealthKitObservationUploader, Hea
     }
 
     func upload(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult {
+        if HealthKitSleepWireMapper.isSleepPartition(partition) {
+            return await uploadSleep(partition)
+        }
         do {
             let payload = try HealthKitS1WireMapper.payload(for: partition)
             let outcome: ProductionCommandOutcome<Result> = try await api.submitCommand(
@@ -204,6 +210,107 @@ struct ProductionHealthKitObservationUploader: HealthKitObservationUploader, Hea
             return .rejected(code: error.diagnosticCode)
         } catch {
             return .transientFailure(code: "healthkit_server_upload_failed")
+        }
+    }
+}
+
+// MARK: - Sleep (healthkit.sleep.ingest.v1)
+
+/// Exact Phase A response semantics, shared by staged partitions and the
+/// window manifest so both classify a Server answer identically.
+enum HealthKitSleepResponseClassification: Equatable, Sendable {
+    /// 200 with a result that acknowledges every submitted identity. Per-sample
+    /// refusals (`refused_identity_conflict`, `refused_before_activation_floor`,
+    /// `refused_after_activation_window`) and `deleted_before_arrival` are
+    /// durable Server decisions, so the partition is acknowledged.
+    case acknowledged
+    /// 409 `HEALTHKIT_SLEEP_INGESTION_NOT_ENABLED`: temporary. Keep the staged
+    /// batch, do not advance the cursor, re-check the manifest later.
+    case disabled
+    /// 400 (private field / contract invalid) and other permanent problems: an
+    /// implementation bug. Fail closed; only the problem code is kept.
+    case rejected(code: String)
+    case transient(code: String)
+
+    static func classify(_ error: Error) -> HealthKitSleepResponseClassification {
+        guard let error = error as? ProductionNativeError else {
+            if let error = error as? HealthKitSyncError { return .rejected(code: error.diagnosticCode) }
+            return .transient(code: "healthkit_sleep_upload_failed")
+        }
+        switch error {
+        case let .conflict(problem) where problem.code == HealthKitSleepIngestionContract.disabledProblemCode:
+            return .disabled
+        case let .validation(problem), let .failedPrecondition(problem),
+             let .preconditionRequired(problem), let .conflict(problem):
+            return .rejected(code: problem.code)
+        case .incompatibleContractVersion:
+            return .rejected(code: "healthkit_server_contract_incompatible")
+        case .authorityMismatch, .resourceMismatch:
+            return .rejected(code: "healthkit_server_authority_invalid")
+        default:
+            return .transient(code: "healthkit_sleep_upload_unavailable")
+        }
+    }
+}
+
+extension ProductionHealthKitObservationUploader: HealthKitSleepManifestSubmitting {
+    func uploadSleep(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult {
+        let payload: HealthKitSleepWirePayload
+        do { payload = try HealthKitSleepWireMapper.payload(for: partition) }
+        catch { return .rejected(code: "healthkit_partition_not_sleep_deliverable") }
+        do {
+            let outcome: ProductionCommandOutcome<HealthKitSleepIngestResult> = try await api.submitCommand(
+                HealthKitSleepIngestionContract.commandType,
+                idempotencyKey: partition.identity,
+                payload: payload
+            )
+            guard outcome.outcome != .pending else { return .transientFailure(code: "healthkit_server_receipt_pending") }
+            guard let result = outcome.receipt.result, result.acknowledges(payload) else {
+                return .transientFailure(code: "healthkit_sleep_acknowledgement_invalid")
+            }
+            let receipt = outcome.receipt.commandId ?? outcome.receipt.operationId ?? "receipt:\(partition.identity)"
+            return .durablyAccepted(batchID: result.batchId, receiptIdentity: receipt)
+        } catch {
+            switch HealthKitSleepResponseClassification.classify(error) {
+            case .acknowledged:
+                return .transientFailure(code: "healthkit_sleep_acknowledgement_invalid")
+            case .disabled:
+                onSleepIngestionDisabled?()
+                return .transientFailure(code: HealthKitSleepIngestionContract.disabledDiagnosticCode)
+            case let .rejected(code):
+                return .rejected(code: code)
+            case let .transient(code):
+                return .transientFailure(code: code)
+            }
+        }
+    }
+
+    func submitSleepWindowManifest(_ manifest: HealthKitSleepWireWindowManifest) async -> HealthKitSleepManifestSubmitResult {
+        let material = ([manifest.windowStart, manifest.windowEnd] + manifest.liveExternalIds).joined(separator: "\u{0}")
+        let batchID = "healthkit_sleep_manifest_\(HealthKitStableDigest.hex(material))"
+        let payload = HealthKitSleepWirePayload(batchId: batchID, samples: nil, deletions: nil, windowManifest: manifest)
+        do {
+            let outcome: ProductionCommandOutcome<HealthKitSleepIngestResult> = try await api.submitCommand(
+                HealthKitSleepIngestionContract.commandType,
+                idempotencyKey: batchID,
+                payload: payload
+            )
+            guard outcome.outcome != .pending,
+                  let result = outcome.receipt.result,
+                  result.acknowledges(payload),
+                  let window = result.windowManifest
+            else { return .failed(code: "healthkit_sleep_manifest_acknowledgement_invalid") }
+            return .accepted(markedDeleted: window.markedDeleted)
+        } catch {
+            switch HealthKitSleepResponseClassification.classify(error) {
+            case .disabled:
+                onSleepIngestionDisabled?()
+                return .disabled
+            case let .rejected(code), let .transient(code):
+                return .failed(code: code)
+            case .acknowledged:
+                return .failed(code: "healthkit_sleep_manifest_acknowledgement_invalid")
+            }
         }
     }
 }

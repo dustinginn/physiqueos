@@ -1320,21 +1320,28 @@ final class HealthKitSynchronizationTests: XCTestCase {
         XCTAssertFalse(encoded.contains("reps"))
     }
 
-    func testSleepIsObservedAndDurablyDeferredWithoutServerDelivery() async throws {
+    /// Phase B: Sleep is dormant unless the manifest gate is active. An engine
+    /// without a Sleep gate never queries, stages, or uploads Sleep.
+    func testSleepWithoutActiveGateNeverQueriesStagesOrUploads() async throws {
         let result = HealthKitAnchoredQueryResult(
             additions: [Self.sleepAddition()], deletions: [], proposedAnchorData: Data("sleep-anchor".utf8), completedAt: Self.now
         )
         let harness = try Harness(stream: .sleepAnalysis, gate: .enabled, queryResults: [result])
-        try await harness.engine.synchronize(scope: harness.scope)
+        do {
+            try await harness.engine.synchronize(scope: harness.scope)
+            XCTFail("Sleep must be refused without an active capability")
+        } catch let error as HealthKitSyncError {
+            XCTAssertEqual(error.diagnosticCode, HealthKitSleepIngestionContract.notActivatedDiagnosticCode)
+        }
 
         let queryCount = await harness.query.callCount()
         let uploadCount = await harness.uploader.receivedCount()
         let cursor = try await harness.store.authoritativeCursor(for: harness.scope)
-        let deferred = try await harness.store.deferredChanges(for: harness.scope)
-        XCTAssertEqual(queryCount, 1)
+        let pending = try await harness.store.pendingBatches(for: harness.scope)
+        XCTAssertEqual(queryCount, 0)
         XCTAssertEqual(uploadCount, 0)
-        XCTAssertNotNil(cursor)
-        XCTAssertEqual(deferred.first?.additions.count, 1)
+        XCTAssertNil(cursor)
+        XCTAssertTrue(pending.isEmpty)
     }
 
     func testDeletionSurvivesRestartAndDoesNotDeadlockCursor() async throws {

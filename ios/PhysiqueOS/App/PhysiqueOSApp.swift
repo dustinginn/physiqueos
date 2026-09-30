@@ -30,6 +30,14 @@ struct PhysiqueOSApp: App {
         // cannot be what re-registers the observers. Do it here, in the
         // process-launch path a background launch also runs.
         Task { @MainActor in await environment.registerHealthKitObserversForLaunch() }
+        // Installed at process launch (not on a view) so a background-launched
+        // process with no scene still recovers after the device unlocks.
+        // The environment is only ever touched on the main actor (the Task
+        // below hops there), exactly like the launch registration above.
+        nonisolated(unsafe) let recoveryEnvironment = environment
+        ProtectedDataRecoveryTrigger.install {
+            Task { @MainActor in await recoveryEnvironment.recoverHealthKitAfterProtectedDataAvailable() }
+        }
     }
 
     var body: some Scene {
