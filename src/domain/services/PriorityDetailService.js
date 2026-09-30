@@ -165,7 +165,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                   projection,
                   protocol,
                 });
-          return withPausedOccurrence(withProtocolSupportNotificationAction(
+          return withDoseAdjustable(withPausedOccurrence(withProtocolSupportNotificationAction(
             withExecutionContract(detail, reminder, projection.localDate),
             {
               category: protocol.category,
@@ -173,7 +173,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
               occurrenceDate: projection.localDate,
               timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
             }
-          ), projection);
+          ), projection), protocol.category);
         }
 
         return withProtocolSupportNotificationAction(
@@ -240,6 +240,14 @@ function withSkipDefaults(detail) {
     paused: detail.paused === true,
     pauseContext: detail.paused === true ? detail.pauseContext ?? null : null,
   };
+}
+
+// Peptide occurrences let the person record the amount actually taken
+// (`effectiveDose`); supplements and recovery items do not. Native reads
+// this flag rather than inferring the category from a dose string.
+function withDoseAdjustable(detail, category) {
+  if (!detail || category !== "peptide" || !detail.completionContext?.dose) return detail;
+  return { ...detail, doseAdjustable: true };
 }
 
 // An execution-backed occurrence inside a suspension window (a paused peptide)
