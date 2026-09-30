@@ -4,6 +4,8 @@ import {
   resolvePeptideDose,
 } from "./ExecutionPhaseResolver.js";
 import { formatSupplementSupportSummary } from "./SupplementSupportManagementService.js";
+import { resolvePeptideLifecycleState } from "./PeptideExecutionManagementService.js";
+import { isDateSuspended } from "../models/PeptideDosingStrategyModel.js";
 
 export const STRATEGY_DOMAIN_PRESENTATION = Object.freeze({
   recovery: Object.freeze({
@@ -77,16 +79,25 @@ export function buildStrategyDomainModel({
 function buildSupportMethod({ category, executionItem, goalReference, localDate, protocol, version }) {
   if (category === "peptide") {
     const current = resolvePeptideDose(executionItem, localDate).current;
+    // A peptide's pause lives on its execution item (scheduleSuspensions), not
+    // on the protocol root: `lifecycleState` stays the root status while
+    // `executionLifecycle` carries the record-level suspension state (paused
+    // since pausedFrom, even when the window starts tomorrow). The dose card
+    // reads "Paused" only while today is inside the window, so a pause dated
+    // tomorrow still shows tonight's dose.
+    const lifecycle = resolvePeptideLifecycleState(executionItem);
+    const suspendedToday = isDateSuspended(executionItem?.scheduleSuspensions, localDate);
     return Object.freeze({
       id: protocol.id,
       protocolId: protocol.id,
       lifecycleState: protocol.status,
+      executionLifecycle: Object.freeze({ state: lifecycle.state, since: lifecycle.since }),
       currentVersionId: protocol.currentVersionId ?? null,
       executionId: executionItem?.id ?? null,
       name: protocol.name,
       purpose: peptideStrategicRole(protocol, goalReference),
       supportSummary: formatPeptideExecutionSummary(executionItem, localDate),
-      currentDose: current ? formatPeptideDose(current.dose) : "No active phase",
+      currentDose: suspendedToday ? "Paused" : current ? formatPeptideDose(current.dose) : "No active phase",
       currentSchedule: formatPeptideSchedule(executionItem, localDate),
       editSupportHref: `/profile/operating-plan/execution/peptides/${encodeURIComponent(protocol.id)}?edit=1`,
     });

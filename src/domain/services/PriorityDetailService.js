@@ -178,7 +178,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                   projection,
                   protocol,
                 });
-          const supportDetail = withProtocolSupportNotificationAction(
+          const supportDetail = withPausedOccurrence(withProtocolSupportNotificationAction(
             withExecutionContract(detail, reminder, projection.localDate),
             {
               category: protocol.category,
@@ -186,7 +186,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
               occurrenceDate: projection.localDate,
               timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
             }
-          );
+          ), projection);
           if (protocol.category !== "recovery") return supportDetail;
           // `completable` is already false for a completed, skipped, setup
           // required (missing Execution) or inactive occurrence, so none of
@@ -275,6 +275,40 @@ function withSkipDefaults(detail) {
     skippable: detail.skippable === true,
     skipCommand: detail.skippable === true ? detail.skipCommand ?? null : null,
     skipContext: detail.skipContext ?? null,
+    paused: detail.paused === true,
+    pauseContext: detail.paused === true ? detail.pauseContext ?? null : null,
+  };
+}
+
+// An execution-backed occurrence inside a suspension window (a paused peptide)
+// is never completable: the execution contract keeps its identity
+// (priorityId/occurrenceDate/occurrenceKey/workflow/destination, which Build 69
+// needs to route the detail) but carries `expectedVersion: null`, the
+// notification action keeps its workflow, scheduled time and destination but
+// is open-only (no completion command), and the detail is marked `paused`
+// with the window's start. A completed occurrence wins over the pause: it
+// stays Completed and untouched.
+function withPausedOccurrence(detail, projection) {
+  if (!detail) return null;
+  const paused = projection?.operationalState === ExecutionPriorityOperationalState.PAUSED &&
+    projection.occurrenceCompleted !== true;
+  if (!paused) return detail;
+  const executionContract = detail.executionContract
+    ? Object.freeze({ ...detail.executionContract, expectedVersion: null })
+    : null;
+  return {
+    ...detail,
+    completable: false,
+    completionContext: null,
+    executionContract,
+    notificationAction: detail.notificationAction
+      ? Object.freeze({ ...detail.notificationAction, classification: "open_only", completionCommand: null })
+      : openOnlyNotificationAction({
+          priorityId: projection.priorityId,
+          occurrenceDate: projection.localDate,
+        }),
+    paused: true,
+    pauseContext: { pausedFrom: projection.pauseContext?.pausedFrom ?? null },
   };
 }
 
@@ -327,6 +361,10 @@ function createExecutionPriorityDetail({
   const actionable = !completed &&
     projection.operationalState ===
     ExecutionPriorityOperationalState.ACTIONABLE;
+  // Completed wins over Paused; a paused occurrence is neither actionable nor
+  // a setup problem, it is simply suspended until the plan is resumed.
+  const paused = !completed &&
+    projection.operationalState === ExecutionPriorityOperationalState.PAUSED;
   const setupRequired = [
     ExecutionPriorityOperationalState.MISSING_EXECUTION,
     ExecutionPriorityOperationalState.SETUP_REQUIRED,
@@ -355,6 +393,8 @@ function createExecutionPriorityDetail({
     subtitle: projection.timeOfDayLabel,
     status: completed
       ? "Completed"
+      : paused
+        ? "Paused"
       : actionable
       ? "Open"
       : setupRequired
@@ -380,10 +420,16 @@ function createExecutionPriorityDetail({
         title: "What",
         items: [
           {
-            label: actionable ? projection.title : setupCopy,
+            label: actionable
+              ? projection.title
+              : paused
+                ? `${projection.title} is paused`
+                : setupCopy,
             detail: actionable
               ? "Complete the scheduled Execution action."
-              : "Review the canonical Execution plan before recording a dose.",
+              : paused
+                ? "Resume it from the Operating Plan to record doses again."
+                : "Review the canonical Execution plan before recording a dose.",
           },
         ],
       },

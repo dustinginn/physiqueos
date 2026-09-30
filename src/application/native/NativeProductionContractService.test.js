@@ -455,6 +455,22 @@ describe("Native production contract boundary", () => {
     expect(current.executeCommand).toHaveBeenCalledWith(expect.objectContaining({ principal, commandType: "priority.complete.v1" }));
   });
 
+  it("routes the peptide lifecycle command with its If-Match executionRevision to the canonical command service", async () => {
+    const current = fixture();
+    const result = await current.service.command({
+      request: request(),
+      commandType: "operating-plan.peptide-lifecycle.change.v1",
+      metadata: { idempotencyKey: "native-peptide-pause-20260909", expectedVersion: "4" },
+      payload: { protocolId: "peptide-protocol", operation: "pause", effectiveDate: "tomorrow" },
+    });
+    expect(result.outcome).toBe("committed");
+    expect(current.executeCommand).toHaveBeenCalledWith(expect.objectContaining({
+      principal, commandType: "operating-plan.peptide-lifecycle.change.v1",
+      metadata: expect.objectContaining({ expectedVersion: "4" }),
+      payload: { protocolId: "peptide-protocol", operation: "pause", effectiveDate: "tomorrow" },
+    }));
+  });
+
   it("rejects legacy or inert write aliases at the Native boundary", async () => {
     const current = fixture();
     await expect(current.service.command({
@@ -689,6 +705,7 @@ describe("Native production contract boundary", () => {
       "operating-plan.supplement-support.save.v1",
       "operating-plan.supplement-strategy.save.v1",
       "operating-plan.supplement-lifecycle.change.v1",
+      "operating-plan.peptide-lifecycle.change.v1",
       "operating-plan.coaching-updates.save.v1",
     ]);
     expect(nativeProductionContractManifest.healthKitIngestion).toMatchObject({

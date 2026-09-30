@@ -20,6 +20,8 @@ import {
   PeptideExecutionState,
 } from "../../domain/services/PeptideExecutionManagementService.js";
 import { formatSupportScheduleSummary } from "../../domain/models/SupportScheduleModel.js";
+import { isDateSuspended, normalizeScheduleSuspensions } from "../../domain/models/PeptideDosingStrategyModel.js";
+import { formatPeptideDose, resolveExecutionPhase } from "../../domain/services/ExecutionPhaseResolver.js";
 import { ReminderType } from "../../domain/models/reminder.js";
 import { composeOperatingPlanStrategyDetail } from "../../domain/services/OperatingPlanStrategyDetailService.js";
 import { createStrategyEditorModel, TRAINING_AREAS } from "../../domain/services/StrategyEditorService.js";
@@ -175,6 +177,10 @@ export function createCoreNavigationReadService({
             supportSummary: method.supportSummary,
             currentDose: method.currentDose ?? null,
             currentSchedule: method.currentSchedule ?? null,
+            // Additive: the peptide execution's own pause state. `lifecycleState`
+            // above stays the protocol status (`active` for peptides) so Build 69
+            // keeps its Edit entry point while paused.
+            executionLifecycle: method.executionLifecycle ?? null,
             reminderEnabled: projectMethodReminderEnabled({
               category: model.category, method, ownerUserId, runtime,
             }),
@@ -358,20 +364,49 @@ export function createCoreNavigationReadService({
         const reminder = reminders[0] ?? null;
         const hydration = createPeptideSupportHydrationModel({ executionItem, protocol, reminder });
         const localDate = getLocalDateKey(now(), resolveLocalTimeZone(runtime.user?.timeZone ?? runtime.user?.timezone));
+        const dosing = projectPeptideDosingStrategy(hydration.dosingStrategy);
+        // S4 (additive): the dose summary is derived from the FULL stored
+        // timeline (history-preserving saves keep frozen phases), never from
+        // the generated tail. The lifecycle reads `paused` from the record
+        // (since = pausedFrom, even when the window starts tomorrow); next
+        // due skips suspended dates and is null only while today is inside
+        // the window, so tonight's still-eligible dose shows until it starts.
+        const summary = projectPeptideDosingSummary({
+          timeline: hydration.legacyTimeline, localDate, dosingMode: hydration.dosingMode, pattern: dosing.pattern,
+        });
+        const nextDue = resolveNextSupportDue({
+          schedule: hydration.supportSchedule, reminder, localDate,
+          suspensions: hydration.scheduleSuspensions,
+        });
         return Object.freeze({
           protocolId: protocol.id,
           executionId: executionItem?.id ?? null,
           executionRevision: hydration.executionRevision,
+          priorityId: reminder?.id ?? null,
           name: protocol.name ?? executionItem?.title ?? "Peptide Support",
           purpose: protocol.purpose ?? protocol.description ?? executionItem?.description ?? "",
           state: classification.state.toUpperCase(),
+          lifecycle: Object.freeze({
+            state: hydration.lifecycle.state,
+            since: hydration.lifecycle.since,
+            history: Object.freeze(hydration.lifecycle.history.map((entry) => Object.freeze({ ...entry }))),
+          }),
           supportSchedule: hydration.supportSchedule,
-          dosing: projectPeptideDosingStrategy(hydration.dosingStrategy),
+          dosing,
+          dosingMode: hydration.dosingMode,
+          currentDose: summary.currentDose,
+          currentDoseLabel: summary.currentDoseLabel,
+          currentPhase: summary.currentPhase,
+          plannedChanges: summary.plannedChanges,
+          dosingHistory: summary.dosingHistory,
+          advancedPlan: summary.advancedPlan,
           timeline: projectPeptideTimeline(hydration.legacyTimeline, localDate, executionItem?.id ?? protocol.id),
           reminderPreference: hydration.reminderPreference,
           timingContext: hydration.timingContext,
           notes: hydration.notes,
-          nextDue: projectNextSupportDue({ schedule: hydration.supportSchedule, reminder, localDate }),
+          nextDue: formatNextSupportDue(nextDue),
+          nextDueDate: nextDue?.date ?? null,
+          nextDueTime: nextDue?.time ?? null,
         });
       });
     },
@@ -930,6 +965,51 @@ function formatPeptideDate(value) {
   });
 }
 
+function formatPeptideShortDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return String(value ?? "");
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/// S4 dose summary from the full stored timeline: the phase covering
+/// `localDate` is the current dose; later phases are planned changes; phases
+/// that have started (current included) are the dose history, newest first.
+/// `advancedPlan` is true only for a generator plan (not `stay`) that still
+/// has changes ahead, so a future-dated simple dose change never reads as a
+/// titration.
+function projectPeptideDosingSummary({ timeline = [], localDate, dosingMode, pattern }) {
+  const phases = (Array.isArray(timeline) ? timeline : []).filter((phase) => phase && !phase.malformed);
+  const { current } = resolveExecutionPhase({ timeline: phases }, localDate);
+  const dose = (phase) => Object.freeze({
+    amount: Number.isFinite(Number(phase.dose?.amount)) ? Number(phase.dose.amount) : 0,
+    unit: phase.dose?.unit ?? "",
+  });
+  const plannedChanges = Object.freeze(phases
+    .filter((phase) => phase.startDate > localDate)
+    .map((phase) => Object.freeze({
+      startDate: phase.startDate,
+      dose: dose(phase),
+      label: `${formatPeptideDose(phase.dose)} on ${formatPeptideShortDate(phase.startDate)}`,
+    })));
+  const dosingHistory = Object.freeze(phases
+    .filter((phase) => phase.startDate <= localDate)
+    .slice()
+    .reverse()
+    .map((phase) => Object.freeze({
+      startDate: phase.startDate,
+      endDate: phase.endDate ?? null,
+      dose: dose(phase),
+      label: `${formatPeptideDose(phase.dose)} · ${formatPeptideShortDate(phase.startDate)} – ${phase.endDate ? formatPeptideShortDate(phase.endDate) : "Ongoing"}`,
+    })));
+  return Object.freeze({
+    currentDose: current ? dose(current) : null,
+    currentDoseLabel: current ? formatPeptideDose(current.dose) : null,
+    currentPhase: current ? Object.freeze({ startDate: current.startDate, endDate: current.endDate ?? null }) : null,
+    plannedChanges,
+    dosingHistory,
+    advancedPlan: dosingMode === "structured" && pattern !== "stay" && plannedChanges.length > 0,
+  });
+}
+
 function hasAmbiguousDomainExecution(protocol, executionItems) {
   const matches = executionItems.filter((item) => {
     if (item.active !== true) return false;
@@ -986,12 +1066,29 @@ function projectMethodReminderEnabled({ category, method, ownerUserId, runtime }
     .reminderPreference === "remind";
 }
 
-function projectNextSupportDue({ schedule, reminder, localDate }) {
+function projectNextSupportDue(input) {
+  return formatNextSupportDue(resolveNextSupportDue(input));
+}
+
+function formatNextSupportDue(due) {
+  if (!due) return null;
+  const date = new Intl.DateTimeFormat("en-US", {
+    month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+  }).format(new Date(`${due.date}T12:00:00Z`));
+  return `${date}${due.time ? ` · ${formatClock(due.time)}` : ""}`;
+}
+
+function resolveNextSupportDue({ schedule, reminder, localDate, suspensions = [] }) {
   // "Next due" belongs to the canonical execution schedule, not to iOS
   // reminder delivery. Turning reminders off must hide the bell without
   // erasing when the Support itself is next due. Completion history still
-  // comes from the reminder occurrence anchor when one exists.
+  // comes from the reminder occurrence anchor when one exists. A suspended
+  // execution (peptide pause window) has no next due while today is inside
+  // a window; dates inside any window (a pause dated tomorrow included) are
+  // skipped, not shifted, so a pause starting tomorrow keeps tonight's dose.
   if (!schedule || !localDate) return null;
+  const windows = normalizeScheduleSuspensions(suspensions);
+  if (isDateSuspended(windows, localDate)) return null;
   const start = /^\d{4}-\d{2}-\d{2}$/.test(schedule.startDate ?? "") ? schedule.startDate : localDate;
   const end = /^\d{4}-\d{2}-\d{2}$/.test(schedule.endDate ?? "") ? schedule.endDate : null;
   for (let offset = 0; offset <= 370; offset += 1) {
@@ -999,12 +1096,10 @@ function projectNextSupportDue({ schedule, reminder, localDate }) {
     if (candidate < start) continue;
     if (end && candidate > end) return null;
     if (!supportScheduleIncludesDate(schedule, candidate, start)) continue;
+    if (isDateSuspended(windows, candidate)) continue;
     if (offset === 0 && isReminderOccurrenceCompleted(reminder, { occurrenceDate: candidate })) continue;
     const time = resolveScheduledTime(schedule.timing === "specific" ? schedule.specificTime : schedule.timing);
-    const date = new Intl.DateTimeFormat("en-US", {
-      month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
-    }).format(new Date(`${candidate}T12:00:00Z`));
-    return `${date}${time ? ` · ${formatClock(time)}` : ""}`;
+    return Object.freeze({ date: candidate, time: /^\d{2}:\d{2}$/.test(time ?? "") ? time : null });
   }
   return null;
 }

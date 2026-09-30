@@ -120,6 +120,7 @@ const writes = Object.freeze([
   write(Phase3Command.SAVE_SUPPLEMENT_SUPPORT, ["protocolId", "supplementVersionId", "draft"], "supplementVersionId protects the active strategy version; If-Match carries executionRevision when Support is configured"),
   write(Phase3Command.SAVE_SUPPLEMENT_STRATEGY, ["operation", "draft"], "create is idempotent by command identity; edit uses expectedCurrentVersionId inside the canonical successor transition"),
   write(Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE, ["protocolId", "operation", "expectedCurrentVersionId"], "pause/restore require the protocol's authoritative currentVersionId"),
+  write(Phase3Command.CHANGE_PEPTIDE_LIFECYCLE, ["protocolId", "operation"], "If-Match required; compares against the execution item's executionRevision; pause when already paused → 409 PEPTIDE_LIFECYCLE_NOT_ACTIVE, resume when active → 409 PEPTIDE_LIFECYCLE_NOT_PAUSED; effectiveDate today|tomorrow (pause only) resolves in the user's canonical local zone"),
   write(Phase3Command.SAVE_COACHING_UPDATES, ["protocolId", "expectedCurrentVersionId", "expectedSemanticDigest", "photoExpectedCurrentVersionId", "photoExpectedSemanticDigest", "dexaExpectedRevision", "draft"], "atomic composite save; If-Match carries global runtime revision alongside scoped semantic digest, both protocol versions, and DEXA executionRevision"),
 ]);
 

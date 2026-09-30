@@ -375,3 +375,41 @@ describe("Morning priority reconciliation server boundary", () => {
     ]);
   });
 });
+
+describe("Morning priority reconciliation honours pause windows (S3)", () => {
+  function pausedFixture(scheduleSuspensions) {
+    const base = fixture({
+      reminders: [reminder("one"), reminder("reminder_peptide", { linkedEntityId: "protocol_peptide" })],
+      protocols: [{ id: "protocol_peptide", userId: "user", category: "peptide", status: "active", name: "Peptide" }],
+    });
+    base.repositories.executionItems = {
+      listExecutionItems: vi.fn(async () => [{
+        id: "execution_peptide", userId: "user", type: "peptide", protocolRootId: "protocol_peptide", active: true,
+        ...(scheduleSuspensions === undefined ? {} : { scheduleSuspensions }),
+      }]),
+    };
+    return base;
+  }
+
+  it("excludes the paused peptide occurrence from the selection with reason execution_paused", async () => {
+    const { service } = pausedFixture([{ pausedFrom: "2026-07-28", resumedOn: null }]);
+    const selection = await service.getSelection({ userId: "user", timeZone: TIME_ZONE });
+    expect(selection.items.map((item) => item.id)).toEqual(["one"]);
+    expect(selection.diagnostics.exclusions).toContainEqual({ priorityId: "reminder_peptide", reason: "execution_paused" });
+  });
+
+  it("refuses to reconcile (and never completes) a paused occurrence, while resumed and absent windows stay eligible", async () => {
+    const paused = pausedFixture([{ pausedFrom: "2026-07-28", resumedOn: null }]);
+    await expect(paused.service.save({
+      userId: "user", timeZone: TIME_ZONE,
+      submissions: [submission("one"), submission("reminder_peptide", { disposition: "completed" })],
+    })).rejects.toMatchObject({ code: "ineligible_occurrence" });
+    expect(paused.reminderWrites).not.toHaveBeenCalled();
+
+    for (const windows of [[{ pausedFrom: "2026-07-20", resumedOn: "2026-07-28" }], undefined]) {
+      const { service } = pausedFixture(windows);
+      const selection = await service.getSelection({ userId: "user", timeZone: TIME_ZONE });
+      expect(selection.items.map((item) => item.id)).toEqual(["one", "reminder_peptide"]);
+    }
+  });
+});

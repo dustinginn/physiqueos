@@ -39,6 +39,7 @@ export const Phase3Command = Object.freeze({
   SAVE_SUPPLEMENT_SUPPORT: "operating-plan.supplement-support.save.v1",
   SAVE_SUPPLEMENT_STRATEGY: "operating-plan.supplement-strategy.save.v1",
   CHANGE_SUPPLEMENT_LIFECYCLE: "operating-plan.supplement-lifecycle.change.v1",
+  CHANGE_PEPTIDE_LIFECYCLE: "operating-plan.peptide-lifecycle.change.v1",
   SAVE_COACHING_UPDATES: "operating-plan.coaching-updates.save.v1",
 });
 
@@ -93,6 +94,9 @@ const DEFINITIONS = Object.freeze({
   ),
   [Phase3Command.CHANGE_SUPPLEMENT_LIFECYCLE]: define(
     "changeSupplementLifecycle", ["protocolId", "operation", "expectedCurrentVersionId"], false
+  ),
+  [Phase3Command.CHANGE_PEPTIDE_LIFECYCLE]: define(
+    "changePeptideLifecycle", ["protocolId", "operation"], true
   ),
   [Phase3Command.SAVE_COACHING_UPDATES]: define(
     "saveCoachingUpdates", ["protocolId", "expectedCurrentVersionId", "expectedSemanticDigest", "photoExpectedCurrentVersionId", "photoExpectedSemanticDigest", "dexaExpectedRevision", "draft"], true

@@ -23,7 +23,7 @@ describe("PriorityCompletionService", () => {
     ]);
     expect(mutateCanonicalRuntime).toHaveBeenCalledWith(expect.objectContaining({
       allowedCollections: ["reminders"],
-      readCollections: ["reminders"],
+      readCollections: ["reminders", "executionItems"],
       readApplicationContext: false,
       readImportMetadata: false,
     }));
@@ -171,5 +171,69 @@ describe("PriorityCompletionService", () => {
       "completed",
     ]);
     expect(state.reminders[0].completionHistory).toHaveLength(1);
+  });
+});
+
+describe("PriorityCompletionService honours peptide pause windows (S3)", () => {
+  function candidateWith(scheduleSuspensions) {
+    return {
+      reminders: [{ id: "reminder", type: "protocol_reminder", linkedEntityId: "protocol", active: true }],
+      executionItems: [{
+        id: "execution", type: "peptide", protocolRootId: "protocol", active: true,
+        ...(scheduleSuspensions === undefined ? {} : { scheduleSuspensions }),
+      }],
+    };
+  }
+
+  it("refuses a paused occurrence with PRIORITY_OCCURRENCE_PAUSED (422) before touching the reminder", async () => {
+    const candidate = candidateWith([{ pausedFrom: "2026-08-31", resumedOn: null }]);
+    const before = JSON.stringify(candidate);
+    const mutateCanonicalRuntime = vi.fn(async (options) => ({ result: await options.mutate(candidate), changedCollections: [] }));
+    await expect(createPriorityCompletionService({
+      mutateCanonicalRuntime, now: () => new Date("2026-08-31T16:00:00Z"),
+    }).complete({ priorityId: "reminder", occurrenceDate: "2026-08-31", dose: "0.25 mg", protocolId: "protocol" }))
+      .rejects.toMatchObject({ code: "PRIORITY_OCCURRENCE_PAUSED", status: 422, pausedFrom: "2026-08-31" });
+    expect(JSON.stringify(candidate)).toBe(before);
+    expect(mutateCanonicalRuntime).toHaveBeenCalledWith(expect.objectContaining({
+      allowedCollections: ["reminders"],
+      readCollections: ["reminders", "executionItems"],
+    }));
+  });
+
+  it("resolves the execution by protocol root or linked protocol id (the projection's rule) and skips the check for other reminder types", async () => {
+    const linked = candidateWith([{ pausedFrom: "2026-08-31", resumedOn: null }]);
+    linked.executionItems[0] = { ...linked.executionItems[0], protocolRootId: undefined, linkedProtocolId: "protocol" };
+    await expect(createPriorityCompletionService({
+      mutateCanonicalRuntime: async (options) => ({ result: await options.mutate(linked), changedCollections: [] }),
+      now: () => new Date("2026-08-31T16:00:00Z"),
+    }).complete({ priorityId: "reminder", occurrenceDate: "2026-08-31", dose: "0.25 mg", protocolId: "protocol" }))
+      .rejects.toMatchObject({ code: "PRIORITY_OCCURRENCE_PAUSED" });
+
+    const plain = candidateWith([{ pausedFrom: "2026-08-31", resumedOn: null }]);
+    plain.reminders[0] = { ...plain.reminders[0], type: "reminder" };
+    let executionItemsRead = false;
+    Object.defineProperty(plain, "executionItems", { get() { executionItemsRead = true; return []; } });
+    const result = await createPriorityCompletionService({
+      mutateCanonicalRuntime: async (options) => ({ result: await options.mutate(plain), changedCollections: ["reminders"] }),
+      now: () => new Date("2026-08-31T16:00:00Z"),
+    }).complete({ priorityId: "reminder", occurrenceDate: "2026-08-31" });
+    expect(result.status).toBe("completed");
+    expect(executionItemsRead).toBe(false);
+  });
+
+  it("completes outside the window, on the resumedOn day, and when the record carries no windows", async () => {
+    for (const [windows, date] of [
+      [[{ pausedFrom: "2026-09-01", resumedOn: null }], "2026-08-31"],
+      [[{ pausedFrom: "2026-08-20", resumedOn: "2026-08-31" }], "2026-08-31"],
+      [undefined, "2026-08-31"],
+    ]) {
+      const candidate = candidateWith(windows);
+      const result = await createPriorityCompletionService({
+        mutateCanonicalRuntime: async (options) => ({ result: await options.mutate(candidate), changedCollections: ["reminders"] }),
+        now: () => new Date("2026-08-31T16:00:00Z"),
+      }).complete({ priorityId: "reminder", occurrenceDate: date, dose: "0.25 mg", protocolId: "protocol" });
+      expect(result.status).toBe("completed");
+      expect(candidate.reminders[0].completionHistory).toEqual([expect.objectContaining({ id: `reminder:${date}` })]);
+    }
   });
 });

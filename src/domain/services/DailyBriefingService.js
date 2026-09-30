@@ -30,6 +30,7 @@ import {
 import {
   canonicalConfidenceExplanation,
 } from "./CanonicalConfidencePresentationInvariant";
+import { resolveLocalTimeZone } from "../utils/localDate";
 
 const PRIMARY_GOAL_ID = "goal_visible_abs_at_rest";
 const DAILY_BRIEFING_VERSION = "daily-briefing-v29-voice-calibration";
@@ -72,6 +73,7 @@ export function createDailyBriefingService({
       analyses,
       latestStoredBriefing,
       canonicalEvidenceObjects,
+      executionItems,
     ] = await Promise.all([
       repositories.goals.listGoals(resolvedUserId),
       repositories.goals.getActiveGoal(resolvedUserId),
@@ -87,6 +89,7 @@ export function createDailyBriefingService({
       repositories.analyses.listAnalyses?.() ?? [],
       memorySource,
       repositories.canonicalEvidence?.listCanonicalEvidenceObjects(resolvedUserId) ?? [],
+      repositories.executionItems?.listExecutionItems?.(resolvedUserId) ?? [],
     ]);
     const evidenceWindow = options.evidenceWindow ?? null;
     const sortedWeights = sortByDate(weights.filter((item) => isRecordAvailableByWindow(item, evidenceWindow, ["measuredAt"])), "measuredAt");
@@ -167,12 +170,18 @@ export function createDailyBriefingService({
       latestDEXA,
       latestPhotos,
     });
+    // The briefing's focus projection sees the same execution items Home
+    // does, so a paused execution (suspension window) is dropped here too.
     const todayPriorities = DailyFocusService.getDailyFocus({
+      checkIns: windowCheckIns,
+      executionItems: Array.isArray(executionItems) ? executionItems : [],
       latestWeight,
       weightEntries: sortedWeights,
       protocols,
       progressPhotos: sortedPhotos,
       reminders,
+      now: now(),
+      timeZone: resolveLocalTimeZone(user?.timeZone ?? user?.timezone),
     });
     const briefingMemory = getDailyBriefingMemory(latestStoredBriefing);
     const trainingPerformanceSignal = getTrainingPerformanceBriefingSignal({
