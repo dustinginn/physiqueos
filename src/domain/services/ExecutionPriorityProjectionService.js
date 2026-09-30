@@ -5,18 +5,21 @@ import {
 } from "../utils/localDate";
 import { resolveExecutionPhase } from "./ExecutionPhaseResolver";
 import { isReminderOccurrenceCompleted } from "./ReminderOccurrenceCompletion.js";
+import { normalizeScheduleSuspensions } from "../models/PeptideDosingStrategyModel";
 
 export const ExecutionPriorityOperationalState = Object.freeze({
   ACTIONABLE: "actionable",
   INACTIVE: "inactive",
   MISSING_EXECUTION: "missing_execution",
   NOT_SCHEDULED_TODAY: "not_scheduled_today",
+  PAUSED: "paused",
   SETUP_REQUIRED: "setup_required",
 });
 
 export const ExecutionPriorityOperationalReason = Object.freeze({
   ACTIVE_PHASE: "active_phase",
   EXECUTION_INACTIVE: "execution_inactive",
+  EXECUTION_PAUSED: "execution_paused",
   MISSING_ACTIVE_PHASE: "missing_active_phase",
   MISSING_EXECUTION: "missing_execution",
   MISSING_HISTORY_ANCHOR: "missing_history_anchor",
@@ -106,6 +109,14 @@ export function projectExecutionPriority({
     executionItem.cadence
   );
 
+  // A dated suspension window ([pausedFrom, resumedOn) or open-ended) is the
+  // single choke point for "paused": Home, the notification horizon, Priority
+  // Detail and completion all read this state. An absent
+  // `scheduleSuspensions` field is an empty list. The window outranks the
+  // schedule so a paused record reads PAUSED on every date inside it; an
+  // inactive execution stays INACTIVE but still reports the paused lifecycle.
+  const pauseContext = findSuspensionWindow(executionItem, resolvedLocalDate);
+
   if (executionItem.active === false) {
     return createProjection({
       executionItem,
@@ -116,6 +127,40 @@ export function projectExecutionPriority({
       occurrenceCompleted,
       operationalReason: ExecutionPriorityOperationalReason.EXECUTION_INACTIVE,
       operationalState: ExecutionPriorityOperationalState.INACTIVE,
+      pauseContext,
+      priorityId,
+      protocolRootId,
+      reminder,
+      schedule,
+      timeZone: resolvedTimeZone,
+      title,
+    });
+  }
+
+  // The phase is resolved before the PAUSED early return so a paused Priority
+  // Detail keeps its dose/phase rows; eligibility and completability stay off.
+  const phaseResolution = resolveExecutionPhase(
+    executionItem,
+    resolvedLocalDate
+  );
+  const phaseDose = normalizeDose(phaseResolution.current?.dose);
+  const directDose = normalizeDose(executionItem.dose);
+  const currentDose = phaseDose ?? directDose;
+
+  if (pauseContext) {
+    return createProjection({
+      activePhase: phaseResolution.current,
+      currentDose,
+      executionItem,
+      executionHref,
+      historyAnchorId,
+      localDate: resolvedLocalDate,
+      nextPhase: phaseResolution.next,
+      occurrenceEligible: false,
+      occurrenceCompleted,
+      operationalReason: ExecutionPriorityOperationalReason.EXECUTION_PAUSED,
+      operationalState: ExecutionPriorityOperationalState.PAUSED,
+      pauseContext,
       priorityId,
       protocolRootId,
       reminder,
@@ -146,13 +191,6 @@ export function projectExecutionPriority({
     });
   }
 
-  const phaseResolution = resolveExecutionPhase(
-    executionItem,
-    resolvedLocalDate
-  );
-  const phaseDose = normalizeDose(phaseResolution.current?.dose);
-  const directDose = normalizeDose(executionItem.dose);
-  const currentDose = phaseDose ?? directDose;
   const requiresActivePhase = executionItem.type === "peptide";
   const missingRequiredPhase = requiresActivePhase && !phaseResolution.current;
   const missingHistoryAnchor = !historyAnchorId;
@@ -220,6 +258,18 @@ export function scheduleAppliesOnDate(
   return days.includes(getWeekday(localDate));
 }
 
+/// The suspension window containing `localDate`, or null. Only the date-only
+/// window matters here: pause and resume are recorded as the user's local
+/// date, so a pause taken at 23:30 local suspends that local day.
+export function findSuspensionWindow(executionItem, localDate) {
+  const day = String(localDate ?? "");
+  if (!executionItem || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const window = normalizeScheduleSuspensions(executionItem).find(
+    (entry) => entry.pausedFrom <= day && (entry.resumedOn === null || day < entry.resumedOn)
+  );
+  return window ? { pausedFrom: window.pausedFrom, resumedOn: window.resumedOn } : null;
+}
+
 export function formatExecutionDose(dose) {
   if (!dose?.amount || !dose?.unit) return null;
   const amount = String(dose.amount).replace(/^(-?)\./, "$10.");
@@ -252,6 +302,7 @@ function createProjection({
   occurrenceCompleted = false,
   operationalReason,
   operationalState,
+  pauseContext = null,
   priorityId,
   protocolRootId,
   reminder,
@@ -284,6 +335,8 @@ function createProjection({
     transitionEffectiveToday,
     operationalState,
     operationalReason,
+    lifecycleState: executionItem ? (pauseContext ? "paused" : "active") : null,
+    pauseContext,
     localDate,
     timeZone,
     executionHref,

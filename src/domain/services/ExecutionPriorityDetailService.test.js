@@ -287,3 +287,101 @@ function phase(amount) {
     notes: "",
   };
 }
+
+describe("Execution-backed priority detail honours pause windows (S3)", () => {
+  const versioned = { ...reminder, version: 7 };
+  const paused = () => execution({
+    timeline: [phase("0.75")],
+    scheduleSuspensions: [{ pausedFrom: "2026-07-23", resumedOn: null, pausedAt: "2026-07-23T18:00:00Z" }],
+  });
+
+  it("renders a paused occurrence as Paused, non-completable, with an identity-only execution contract", async () => {
+    const detail = await service({ executionItems: [paused()], protocol, reminderRecord: versioned })
+      .getPriorityDetail(reminder.id);
+
+    expect(detail).toMatchObject({
+      status: "Paused",
+      completable: false,
+      completionContext: null,
+      paused: true,
+      pauseContext: { pausedFrom: "2026-07-23" },
+      skippable: false,
+      skipCommand: null,
+      executionContract: {
+        priorityId: reminder.id,
+        occurrenceDate: "2026-07-30",
+        occurrenceKey: `${reminder.id}:2026-07-30`,
+        expectedVersion: null,
+        workflow: "priority_detail",
+        destination: `/priorities/${reminder.id}`,
+      },
+      // Open-only, but the workflow, scheduled time and destination survive
+      // so a delivered notification still routes to the same detail.
+      notificationAction: {
+        classification: "open_only",
+        completionCommand: null,
+        workflow: "peptide_protocol",
+        scheduledTime: "21:45",
+        destination: { priorityId: reminder.id, occurrenceDate: "2026-07-30" },
+      },
+      action: { label: "View Execution" },
+      executionProjection: { operationalState: "paused", lifecycleState: "paused", currentDose: "0.75", doseUnit: "mg" },
+    });
+    expect(section(detail, "What").items[0]).toEqual({
+      label: "Shared Peptide is paused",
+      detail: "Resume it from the Operating Plan to record doses again.",
+    });
+    // The dose/phase rows stay on a paused detail; only eligibility is off.
+    expect(section(detail, "Dose").items[0]).toEqual({
+      label: "0.75 mg",
+      detail: "2026-07-01 – Until changed",
+    });
+    expect(section(detail, "When").items[0].label).toBe("Thu · 9:45 PM");
+    expect(section(detail, "Completion")).toBeUndefined();
+  });
+
+  it("lets Completed win over Paused", async () => {
+    const detail = await service({
+      executionItems: [paused()],
+      protocol,
+      reminderRecord: { ...versioned, completedAt: "2026-07-30T19:15:00Z" },
+    }).getPriorityDetail(reminder.id);
+
+    expect(detail).toMatchObject({ status: "Completed", completable: false, paused: false, pauseContext: null });
+  });
+
+  it("reads the resumedOn day as Open again with the full contract", async () => {
+    const detail = await service({
+      executionItems: [execution({
+        timeline: [phase("0.75")],
+        scheduleSuspensions: [{ pausedFrom: "2026-07-23", resumedOn: "2026-07-30" }],
+      })],
+      protocol,
+      reminderRecord: versioned,
+    }).getPriorityDetail(reminder.id);
+
+    expect(detail).toMatchObject({
+      status: "Open",
+      completable: true,
+      paused: false,
+      pauseContext: null,
+      executionContract: { expectedVersion: 7 },
+      notificationAction: { workflow: "peptide_protocol", completionCommand: { expectedVersion: 7 } },
+    });
+  });
+
+  it("treats an absent scheduleSuspensions field as active", async () => {
+    const detail = await service({ executionItems: [execution({ timeline: [phase("0.75")] })], protocol, reminderRecord: versioned })
+      .getPriorityDetail(reminder.id);
+    expect(detail).toMatchObject({ status: "Open", paused: false, pauseContext: null, executionContract: { expectedVersion: 7 } });
+  });
+
+  it("flags an open peptide dose as adjustable, and never a paused one", async () => {
+    const open = await service({ executionItems: [execution({ timeline: [phase("0.75")] })], protocol, reminderRecord: versioned })
+      .getPriorityDetail(reminder.id);
+    expect(open.doseAdjustable).toBe(true);
+    const held = await service({ executionItems: [paused()], protocol, reminderRecord: versioned })
+      .getPriorityDetail(reminder.id);
+    expect(held.doseAdjustable).toBeUndefined();
+  });
+});

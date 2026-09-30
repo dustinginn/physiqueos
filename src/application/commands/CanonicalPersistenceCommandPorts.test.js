@@ -1009,14 +1009,18 @@ function recurringSupportFixture() {
   });
 }
 
-function peptideSupportDraft({ specificTime = "21:45", pattern = "stay", startingDose = "0.5", endDate = null, notes = "Updated Support" } = {}) {
+/// Legacy full-plan drafts dated 2026-05-21 (before the fixture's "today",
+/// 2026-08-11): they rewrite the stored history on purpose, which the S1 guard
+/// only allows with an explicit `rewriteHistory`.
+function peptideSupportDraft({ specificTime = "21:45", pattern = "stay", startingDose = "0.5", endDate = null, notes = "Updated Support", rewriteHistory = true, startDate = "2026-05-21" } = {}) {
   return {
+    rewriteHistory,
     supportSchedule: {
       frequency: "weekly", daysOfWeek: ["thursday"], intervalDays: 1,
       timing: "specific", specificTime, startDate: "2026-05-21", endDate,
     },
     dosingStrategy: {
-      pattern, startingDose: { amount: startingDose, unit: "mg" }, startDate: "2026-05-21",
+      pattern, startingDose: { amount: startingDose, unit: "mg" }, startDate,
       stepAmount: "0.5", stepInterval: 1, stepUnit: "weeks", targetDose: "1.5",
       holdDuration: 1, holdUnit: "weeks", decreaseAmount: "0.5", decreaseInterval: 1,
       decreaseUnit: "weeks", landingDose: "0.5", endDate,
@@ -1055,3 +1059,249 @@ function peptideSupportFixture() {
     canonicalExerciseLibrary: [], piEnergyConfidenceWorkItems: [], piTrainingConfidenceWorkItems: [],
   });
 }
+
+describe("priority.complete.v1 honours peptide pause windows (S3)", () => {
+  function pausedFixture(scheduleSuspensions, reminderOverrides = {}) {
+    return createInMemoryCanonicalRecordStore({
+      user: [{ id: ownerUserId, timeZone: "America/Los_Angeles", version: 1 }],
+      protocols: [{ id: "protocol-peptide", userId: ownerUserId, category: "peptide", status: "active", name: "Peptide", version: 1 }],
+      executionItems: [{
+        id: "execution-peptide", userId: ownerUserId, type: "peptide", protocolRootId: "protocol-peptide", active: true,
+        timeline: [{ startDate: "2026-08-01", endDate: null, dose: { amount: "0.25", unit: "mg" }, notes: "" }],
+        ...(scheduleSuspensions === undefined ? {} : { scheduleSuspensions }),
+        version: 1,
+      }],
+      reminders: [{
+        id: "priority-peptide", userId: ownerUserId, type: "protocol_reminder", linkedEntityId: "protocol-peptide",
+        title: "Peptide", active: true, completionHistory: [], version: 1, ...reminderOverrides,
+      }],
+      dailyCheckIns: [],
+    });
+  }
+  const complete = (records, occurrenceDate, commandId) =>
+    createCanonicalPersistenceCommandPorts({ records, now }).completePriority(commandContext({
+      priorityId: "priority-peptide", occurrenceDate, dose: "0.25 mg", protocolId: "protocol-peptide",
+    }, "1", commandId));
+
+  it("refuses an occurrence inside an open or closed window with 422 PRIORITY_OCCURRENCE_PAUSED and writes nothing", async () => {
+    for (const [windows, date] of [
+      [[{ pausedFrom: "2026-08-11", resumedOn: null }], "2026-08-11"],
+      [[{ pausedFrom: "2026-08-01", resumedOn: "2026-08-12" }], "2026-08-11"],
+    ]) {
+      const records = pausedFixture(windows);
+      await expect(complete(records, date, `paused-${date}`)).rejects.toMatchObject({
+        status: 422, code: "PRIORITY_OCCURRENCE_PAUSED",
+        recovery: { pausedFrom: windows[0].pausedFrom, protocolId: "protocol-peptide" },
+      });
+      expect(records.snapshot().reminders[0]).toMatchObject({ completionHistory: [], version: 1 });
+    }
+  });
+
+  it("completes normally before the pause, on the resumedOn day, and when no window or no execution exists", async () => {
+    for (const [windows, date] of [
+      [[{ pausedFrom: "2026-08-12", resumedOn: null }], "2026-08-11"],
+      [[{ pausedFrom: "2026-08-01", resumedOn: "2026-08-11" }], "2026-08-11"],
+      [undefined, "2026-08-11"],
+      [null, "2026-08-11"],
+    ]) {
+      const result = await complete(pausedFixture(windows), date, `ok-${JSON.stringify(windows)}`);
+      expect(result.result).toMatchObject({ status: "completed", occurrenceDate: date, revision: 2 });
+    }
+    const unlinked = pausedFixture([{ pausedFrom: "2026-08-11", resumedOn: null }], { linkedEntityId: "protocol-other" });
+    expect((await complete(unlinked, "2026-08-11", "unlinked")).result.status).toBe("completed");
+  });
+
+  it("keeps an already completed occurrence idempotent even inside a window (Completed wins)", async () => {
+    const records = pausedFixture([{ pausedFrom: "2026-08-11", resumedOn: null }], {
+      completionHistory: [{ id: "priority-peptide:2026-08-11", occurrenceDate: "2026-08-11", completedAt: "2026-08-11T20:00:00.000Z" }],
+    });
+    expect((await complete(records, "2026-08-11", "already")).result.status).toBe("already_completed");
+  });
+
+  it("never reads the execution items for a reminder that is not a protocol_reminder", async () => {
+    const records = pausedFixture([{ pausedFrom: "2026-08-11", resumedOn: null }], { type: "reminder" });
+    const reads = [];
+    const spied = { ...records, list: async (query) => { reads.push(query.collection); return records.list(query); } };
+    const result = await createCanonicalPersistenceCommandPorts({ records: spied, now }).completePriority(commandContext({
+      priorityId: "priority-peptide", occurrenceDate: "2026-08-11",
+    }, "1", "plain-reminder"));
+    expect(result.result.status).toBe("completed");
+    expect(reads).not.toContain("executionItems");
+  });
+
+  const reconcile = (records, localDate, items, commandId) =>
+    createCanonicalPersistenceCommandPorts({ records, now }).reconcilePreviousDay(commandContext({ localDate, items }, null, commandId));
+
+  it("previous-day.reconcile.v1 refuses an item whose occurrence falls inside a peptide pause window with 422 PRIORITY_OCCURRENCE_PAUSED and writes nothing", async () => {
+    for (const [windows, localDate] of [
+      [[{ pausedFrom: "2026-08-10", resumedOn: null }], "2026-08-10"],
+      [[{ pausedFrom: "2026-08-01", resumedOn: "2026-08-11" }], "2026-08-10"],
+    ]) {
+      const records = pausedFixture(windows);
+      await expect(reconcile(records, localDate, [{ id: "priority-peptide", complete: true }], `reconcile-${localDate}-${windows[0].resumedOn}`))
+        .rejects.toMatchObject({ status: 422, code: "PRIORITY_OCCURRENCE_PAUSED", recovery: { pausedFrom: windows[0].pausedFrom, protocolId: "protocol-peptide" } });
+      expect(records.snapshot().dailyCheckIns ?? []).toEqual([]);
+    }
+    // An item's own occurrence date is honoured over the reconciled day.
+    const records = pausedFixture([{ pausedFrom: "2026-08-10", resumedOn: null }]);
+    await expect(reconcile(records, "2026-08-09", [{ priorityId: "priority-peptide", occurrenceDate: "2026-08-10", complete: false }], "reconcile-own-date"))
+      .rejects.toMatchObject({ code: "PRIORITY_OCCURRENCE_PAUSED" });
+  });
+
+  it("previous-day.reconcile.v1 writes the reconciliation when the occurrence is outside every window, unlinked, or not a protocol_reminder", async () => {
+    for (const [windows, localDate, overrides] of [
+      [[{ pausedFrom: "2026-08-11", resumedOn: null }], "2026-08-10", {}],
+      [[{ pausedFrom: "2026-08-01", resumedOn: "2026-08-10" }], "2026-08-10", {}],
+      [undefined, "2026-08-10", {}],
+      [[{ pausedFrom: "2026-08-10", resumedOn: null }], "2026-08-10", { linkedEntityId: "protocol-other" }],
+      [[{ pausedFrom: "2026-08-10", resumedOn: null }], "2026-08-10", { type: "reminder" }],
+    ]) {
+      const records = pausedFixture(windows, overrides);
+      const result = await reconcile(records, localDate, [{ id: "priority-peptide", complete: true }, { id: "unknown-priority", complete: false }], `reconcile-ok-${JSON.stringify([windows, overrides])}`);
+      expect(result.result).toMatchObject({ status: "committed", record: { id: `reconciliation:${localDate}`, localDate, status: "reconciled" } });
+      expect(records.snapshot().dailyCheckIns).toHaveLength(1);
+    }
+  });
+});
+
+describe("operating-plan.peptide-lifecycle.change.v1 (S3 pause/resume port)", () => {
+  // now() is 2026-08-11T12:00Z = 2026-08-11 05:00 America/Los_Angeles; the plan is Thursdays.
+  const lifecycleContext = (payload, expectedVersion, commandId) => commandContext(payload, expectedVersion, commandId);
+
+  it("pauses from today, bumps executionRevision, keeps the reminder and timeline, and reports lifecycle + priorityId", async () => {
+    const records = peptideSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const before = records.snapshot();
+    const result = await ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "peptide-protocol", operation: "pause", reason: "  Travel week  ",
+    }, "1", "peptide-lifecycle-pause"));
+    expect(result).toMatchObject({
+      status: "committed",
+      result: {
+        status: "paused", operation: "pause", protocolId: "peptide-protocol", executionId: "execution-peptide",
+        executionRevision: 2, priorityId: "reminder-peptide",
+        lifecycle: { state: "paused", since: "2026-08-11", history: [{ state: "paused", effectiveDate: "2026-08-11", reason: "Travel week" }] },
+      },
+    });
+    const after = records.snapshot();
+    expect(after.executionItems[0]).toMatchObject({
+      executionRevision: 2,
+      scheduleSuspensions: [{
+        pausedFrom: "2026-08-11", resumedOn: null, pausedAt: "2026-08-11T12:00:00.000Z", resumedAt: null,
+        reason: "Travel week", pausedExecutionRevision: 1, resumedExecutionRevision: null,
+      }],
+    });
+    expect(after.executionItems[0].timeline).toEqual(before.executionItems[0].timeline);
+    expect(after.executionItems[0].active).toBe(true);
+    expect(after.reminders).toEqual(before.reminders);
+    expect(after.protocols).toEqual(before.protocols);
+  });
+
+  it("pauses starting tomorrow in the user's local zone and resumes today with an empty window", async () => {
+    const records = peptideSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "peptide-protocol", operation: "pause", effectiveDate: "tomorrow",
+    }, "1", "peptide-lifecycle-pause-tomorrow"));
+    expect(records.snapshot().executionItems[0].scheduleSuspensions).toEqual([
+      expect.objectContaining({ pausedFrom: "2026-08-12", resumedOn: null }),
+    ]);
+    const resumed = await ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "peptide-protocol", operation: "resume",
+    }, "2", "peptide-lifecycle-resume-early"));
+    expect(resumed.result).toMatchObject({ status: "resumed", operation: "resume", executionRevision: 3, lifecycle: { state: "active", since: "2026-08-12" } });
+    expect(records.snapshot().executionItems[0].scheduleSuspensions).toEqual([
+      expect.objectContaining({ pausedFrom: "2026-08-12", resumedOn: "2026-08-12", resumedExecutionRevision: 2 }),
+    ]);
+    await expect(ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "peptide-protocol", operation: "resume", effectiveDate: "tomorrow",
+    }, "3", "peptide-lifecycle-resume-tomorrow"))).rejects.toMatchObject({ status: 400, code: "PEPTIDE_LIFECYCLE_INVALID" });
+    await expect(ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "peptide-protocol", operation: "pause", effectiveDate: "next-week",
+    }, "3", "peptide-lifecycle-bad-date"))).rejects.toMatchObject({ status: 400, code: "PEPTIDE_LIFECYCLE_INVALID" });
+    await expect(ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "peptide-protocol", operation: "restore",
+    }, "3", "peptide-lifecycle-bad-op"))).rejects.toMatchObject({ status: 400, code: "PEPTIDE_LIFECYCLE_INVALID" });
+  });
+
+  it("returns 409 for a repeated pause or a resume while active, 412 for a stale revision and 404 without an execution", async () => {
+    const records = peptideSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await expect(ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "peptide-protocol", operation: "resume",
+    }, "1", "peptide-lifecycle-resume-active"))).rejects.toMatchObject({ status: 409, code: "PEPTIDE_LIFECYCLE_NOT_PAUSED" });
+    await ports.changePeptideLifecycle(lifecycleContext({ protocolId: "peptide-protocol", operation: "pause" }, "1", "peptide-lifecycle-pause-1"));
+    const paused = structuredClone(records.snapshot());
+    await expect(ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "peptide-protocol", operation: "pause",
+    }, "2", "peptide-lifecycle-pause-again"))).rejects.toMatchObject({ status: 409, code: "PEPTIDE_LIFECYCLE_NOT_ACTIVE" });
+    await expect(ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "peptide-protocol", operation: "resume",
+    }, "1", "peptide-lifecycle-stale"))).rejects.toMatchObject({
+      status: 412, code: "STALE_VERSION",
+      recovery: expect.objectContaining({ resource: "peptide-execution:peptide-protocol", actualVersion: "2" }),
+    });
+    await expect(ports.changePeptideLifecycle(lifecycleContext({
+      protocolId: "missing-peptide", operation: "pause",
+    }, "1", "peptide-lifecycle-missing"))).rejects.toMatchObject({ status: 404, code: "PEPTIDE_LIFECYCLE_UNAVAILABLE" });
+    expect(records.snapshot()).toEqual(paused);
+  });
+
+  it("replays the same lifecycle command idempotently through the Phase 3 service and requires If-Match", async () => {
+    const records = peptideSupportFixture();
+    const service = createPhase3CommandService({
+      transactionRunner: createInMemoryFoundationTransactionStore(),
+      ports: createCanonicalPersistenceCommandPorts({ records, now }),
+    });
+    const input = {
+      commandType: Phase3Command.CHANGE_PEPTIDE_LIFECYCLE,
+      principal,
+      metadata: { idempotencyKey: "peptide-lifecycle-idempotent", expectedVersion: "1" },
+      payload: { protocolId: "peptide-protocol", operation: "pause" },
+    };
+    await expect(service.execute({ ...input, metadata: { idempotencyKey: "peptide-lifecycle-no-version" } }))
+      .rejects.toMatchObject({ status: 400, code: "CONTRACT_VALIDATION_FAILED" });
+    const first = await service.execute(input);
+    expect(first.outcome).toBe("committed");
+    expect(first.receipt.result).toMatchObject({ status: "paused", executionRevision: 2, priorityId: "reminder-peptide" });
+    expect((await service.execute(input)).outcome).toBe("replayed");
+    expect(records.snapshot().executionItems[0]).toMatchObject({ executionRevision: 2 });
+    expect(records.snapshot().executionItems[0].scheduleSuspensions).toHaveLength(1);
+  });
+
+  it("allows saves while paused and preserves suspensions through an old-shape save", async () => {
+    const records = peptideSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    await ports.changePeptideLifecycle(lifecycleContext({ protocolId: "peptide-protocol", operation: "pause" }, "1", "peptide-lifecycle-pause-2"));
+    const windows = structuredClone(records.snapshot().executionItems[0].scheduleSuspensions);
+    // Old-shape full save (no lifecycle awareness, past-dated plan rewrite).
+    const saved = await ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol", draft: peptideSupportDraft({ specificTime: "20:30", notes: "Paused edit" }),
+    }, "2", "peptide-support-while-paused"));
+    expect(saved.result).toMatchObject({ status: "updated", executionRevision: 3 });
+    expect(records.snapshot().executionItems[0]).toMatchObject({
+      executionRevision: 3, notes: "Paused edit", preferredSchedule: { timeOfDay: "20:30" }, scheduleSuspensions: windows,
+    });
+    const resumed = await ports.changePeptideLifecycle(lifecycleContext({ protocolId: "peptide-protocol", operation: "resume" }, "3", "peptide-lifecycle-resume-2"));
+    expect(resumed.result).toMatchObject({ status: "resumed", executionRevision: 4, lifecycle: { state: "active", since: "2026-08-11" } });
+  });
+
+  it("refuses a past-dated plan that rewrites history unless the draft confirms it, and accepts a stay from today", async () => {
+    const records = peptideSupportFixture();
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const before = structuredClone(records.snapshot());
+    await expect(ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol", draft: peptideSupportDraft({ startingDose: "0.75", rewriteHistory: false }),
+    }, "1", "peptide-support-rewrite-refused"))).rejects.toMatchObject({ status: 400, code: "PEPTIDE_PLAN_REWRITES_HISTORY" });
+    expect(records.snapshot()).toEqual(before);
+    const saved = await ports.savePeptideSupport(commandContext({
+      protocolId: "peptide-protocol",
+      draft: peptideSupportDraft({ startingDose: "0.75", rewriteHistory: false, startDate: "2026-08-11", notes: "Original Support" }),
+    }, "1", "peptide-support-stay-from-today"));
+    expect(saved.result).toMatchObject({ status: "updated", executionRevision: 2 });
+    expect(records.snapshot().executionItems[0].timeline).toEqual([
+      { startDate: "2026-05-21", endDate: "2026-08-10", dose: { amount: "0.5", unit: "mg" }, notes: "Original" },
+      { startDate: "2026-08-11", endDate: null, dose: { amount: "0.75", unit: "mg" }, notes: "" },
+    ]);
+  });
+});

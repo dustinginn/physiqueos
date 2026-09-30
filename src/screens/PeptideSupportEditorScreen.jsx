@@ -20,7 +20,12 @@ export default function PeptideSupportEditorScreen({ action, hydration, protocol
   const [schedule, setSchedule] = useState(hydration.supportSchedule);
   const [strategy, setStrategy] = useState(hydration.dosingStrategy);
   const [reminder, setReminder] = useState(hydration.reminderPreference);
-  const dosingPreview = useMemo(() => formatDosingStrategyPreview(strategy, hydration.legacyTimeline), [strategy, hydration.legacyTimeline]);
+  // The preview reproduces the Server's generator, including the record's
+  // closed pause windows, so what the Founder sees is what will be stored.
+  const dosingPreview = useMemo(
+    () => formatDosingStrategyPreview(strategy, hydration.legacyTimeline, { suspensions: hydration.scheduleSuspensions }),
+    [strategy, hydration.legacyTimeline, hydration.scheduleSuspensions]
+  );
   const scheduleReady = isSupportScheduleReady(schedule);
   const dosingReady = strategy.pattern === "custom" ? hydration.legacyTimeline.length > 0 : Boolean(strategy.startDate && strategy.startingDose.amount && strategy.startingDose.unit);
   const setDose = (key, value) => setStrategy((current) => ({ ...current, [key]: value }));

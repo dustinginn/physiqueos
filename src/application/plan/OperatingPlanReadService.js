@@ -3,6 +3,7 @@ import { createTrainingProtocolBuilderService } from "../../domain/services/Trai
 import { createOperatingPlanEnergyStrategyService } from "../../domain/services/OperatingPlanEnergyStrategyService.js";
 import { getOperatingPlanStrategyHref } from "../../domain/services/OperatingPlanStrategyDetailService.js";
 import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
+import { resolvePeptideLifecycleState } from "../../domain/services/PeptideExecutionManagementService.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
 import { describeEnergyStrategyIdentity } from "../../domain/presentation/strategyIdentityPresentation.js";
 import { scopeRepositoryReadService } from "../read-models/RepositoryReadScope.js";
@@ -56,6 +57,10 @@ export function buildOperatingPlan({ energyStrategy, executionItems = [], nutrit
   const pausedSupplements = supplements.filter((protocol) => protocol.status === "paused");
   const recovery = byCategory("recovery");
   const peptides = byCategory("peptide");
+  // A paused peptide keeps its protocol root active (S3); the pause is a
+  // suspension window on its execution item, so the landing chip reads it
+  // from there, mirroring the supplement subtitle.
+  const pausedPeptides = peptides.filter((protocol) => isPeptideExecutionPaused(protocol, executionItems));
   const coaching = active.find((protocol) => protocol.category === "briefings");
   const weighIn = resolveMorningWeighInSupport({ executionItems, protocols: active, reminders });
   const sections = [
@@ -63,7 +68,7 @@ export function buildOperatingPlan({ energyStrategy, executionItems = [], nutrit
     section("nutrition", "primary", "Nutrition", "Manual context", [{ id: "nutrition-calorie-range", title: nutritionContext?.calibrationStrategy ? "Calorie Calibration" : "Calorie Range", detail: calorieRange(nutritionContext), href: getOperatingPlanStrategyHref("nutrition", nutritionContext?.activeProtocolId), status: "Active" }]),
     section("training", "effort", "Training", trainingProtocol ? "Active protocol" : "Protocol not defined", [buildTrainingPlanItem(trainingProtocol)]),
     section("recovery", "success", "Recovery", recovery.length ? `${recovery.length} current method` : "Strategy coming soon", recovery.length ? [protocolItem("recovery-strategy", "Recovery Strategy", recovery)] : [{ id: "recovery-coming-soon", title: "Recovery", detail: "A dedicated recovery strategy will complete this layer", href: null, status: "Coming Soon" }]),
-    section("peptide", "effort", "Peptides", `${peptides.length} current peptide${peptides.length === 1 ? "" : "s"}`, peptides.length ? [protocolItem("peptide-strategy", "Peptide Strategy", peptides)] : []),
+    section("peptide", "effort", "Peptides", pausedPeptides.length ? `${peptides.length - pausedPeptides.length} active · ${pausedPeptides.length} paused` : `${peptides.length} current peptide${peptides.length === 1 ? "" : "s"}`, peptides.length ? [{ ...protocolItem("peptide-strategy", "Peptide Strategy", peptides), status: pausedPeptides.length === peptides.length ? "Paused" : "Active" }] : []),
     section("supplement", "success", "Supplements", pausedSupplements.length ? `${supplements.length - pausedSupplements.length} active · ${pausedSupplements.length} paused` : `${supplements.length} current supplement${supplements.length === 1 ? "" : "s"}`, supplements.length ? [{ ...protocolItem("supplement-strategy", "Supplement Strategy", supplements), status: supplements.every((protocol) => protocol.status === "paused") ? "Paused" : "Active" }] : [], { supplements: true }),
     section("tracking", "evidence", "Tracking", "Recurring measurements", [{ id: "tracking", title: "Tracking", detail: weighIn?.supportSummary ?? "Morning Weigh-In Support", href: "/profile/operating-plan/tracking", status: weighIn ? "Active" : "Review" }]),
     ...(coaching ? [section("coaching", "primary", "Coaching Updates", "Wednesday and Sunday", [{ id: coaching.id, title: "Coaching Updates", detail: "Midweek calibration and weekly synthesis", href: getOperatingPlanStrategyHref("briefings", coaching.id), status: "Active" }])] : []),
@@ -91,6 +96,13 @@ function section(iconKey, tone, title, subtitle, items, extra = {}) {
     }))),
     ...extra,
   });
+}
+function isPeptideExecutionPaused(protocol, executionItems) {
+  const executions = executionItems.filter((item) =>
+    item?.active === true && ["peptide", "protocol"].includes(item.type) &&
+    [item.protocolRootId, item.linkedProtocolId].includes(protocol.id)
+  );
+  return executions.length === 1 && resolvePeptideLifecycleState(executions[0]).state === "paused";
 }
 function protocolItem(id, title, protocols) { return { id, title, detail: protocols.map((item) => item.name).join(", "), href: `/profile/protocols/${protocols[0].id}?from=operating-plan`, status: "Active" }; }
 function energyItem(link) {

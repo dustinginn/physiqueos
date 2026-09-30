@@ -31,6 +31,7 @@ import {
 import { applyDexaReviewMeasurements } from "../../domain/services/DexaPdfIntakeService.js";
 import { assertValidDexaScan } from "../../domain/services/DEXAContract.js";
 import { createReminderRepository } from "../../data/repositories/ReminderRepository.js";
+import { findExecutionForProtocol, findSuspensionWindow } from "../../domain/services/ExecutionPriorityProjectionService.js";
 import {
   createPriorityOccurrenceKey,
   isPrioritySkipSupportedReminder,
@@ -133,9 +134,11 @@ import {
   buildPeptideSupportDraft,
   classifyPeptideExecutionState,
   PeptideExecutionOutcome,
+  PeptideExecutionRejectionCode,
   preparePeptideExecutionTransition,
   verifyPreparedPeptideExecutionTransition,
 } from "../../domain/services/PeptideExecutionManagementService.js";
+import { createPeptideLifecyclePort } from "./PeptideLifecyclePort.js";
 import {
   applyPreparedSupplementSupportTransition,
   prepareSupplementSupportTransition,
@@ -173,7 +176,7 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "resolveWorkoutReconciliation",
   "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
   "saveSupplementSupport",
-  "saveSupplementStrategy", "changeSupplementLifecycle",
+  "saveSupplementStrategy", "changeSupplementLifecycle", "changePeptideLifecycle",
   "saveCoachingUpdates",
 ]);
 
@@ -254,10 +257,13 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     resolveWorkoutReconciliation,
     completePriority: completeCanonicalPriority,
     skipPriority: skipCanonicalPriority,
-    reconcilePreviousDay: async (context) => create(context, "dailyCheckIns", `reconciliation:${context.payload.localDate}`, {
-      id: `reconciliation:${context.payload.localDate}`, userId: context.ownerUserId,
-      localDate: context.payload.localDate, items: context.payload.items, status: "reconciled", provenance: commandProvenance(context),
-    }),
+    reconcilePreviousDay: async (context) => {
+      await assertReconciledOccurrencesNotPaused(context);
+      return create(context, "dailyCheckIns", `reconciliation:${context.payload.localDate}`, {
+        id: `reconciliation:${context.payload.localDate}`, userId: context.ownerUserId,
+        localDate: context.payload.localDate, items: context.payload.items, status: "reconciled", provenance: commandProvenance(context),
+      });
+    },
     editProtocol: edit("protocols", "protocolId"),
     editGoal: edit("goals", "goalId"),
     transitionGoal: async (context) => mutateExisting(context, "goals", context.payload.goalId, {
@@ -351,6 +357,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     saveSupplementSupport,
     saveSupplementStrategy,
     changeSupplementLifecycle,
+    changePeptideLifecycle: createPeptideLifecyclePort({ now, loadCandidate, persistCandidateCollections }),
     saveCoachingUpdates,
   });
 
@@ -1456,17 +1463,26 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
   async function savePeptideSupport(context) {
     const { candidate, before } = await loadCandidate(PEPTIDE_SUPPORT_READ_COLLECTIONS, context.ownerUserId);
     const requested = context.payload.draft ?? {};
+    const peptideProtocol = (candidate.protocols ?? []).find((item) => item.id === context.payload.protocolId) ?? null;
+    const existingExecution = peptideProtocol
+      ? classifyPeptideExecutionState({ protocol: peptideProtocol, executionItems: candidate.executionItems ?? [] }).record
+      : null;
     const draft = buildPeptideSupportDraft({
       supportSchedule: requested.supportSchedule,
       dosingStrategy: requested.dosingStrategy,
       timingContext: requested.timingContext,
       reminderPreference: requested.reminderPreference,
       notes: requested.notes,
+      rewriteHistory: requested.rewriteHistory === true,
+      scheduleSuspensions: existingExecution?.scheduleSuspensions ?? [],
     });
     const prepared = preparePeptideExecutionTransition(candidate, {
       protocolId: context.payload.protocolId,
       userId: context.ownerUserId,
       expectedRevision: context.metadata.expectedVersion,
+      // S1 guard: a plan dated before the user's local today is refused unless
+      // the draft explicitly rewrites history (only the Advanced editor does).
+      today: getLocalDateKey(now(), resolveLocalTimeZone(candidate.user?.timeZone ?? candidate.user?.timezone)),
       draft,
       author: {
         type: "user",
@@ -1507,6 +1523,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           },
           outbox: [],
         };
+      }
+      if (prepared.code === PeptideExecutionRejectionCode.PLAN_REWRITES_HISTORY) {
+        throw problem(400, PeptideExecutionRejectionCode.PLAN_REWRITES_HISTORY, prepared.reason);
       }
       throw problem(400, "PEPTIDE_SUPPORT_INVALID", prepared.reason ?? "This peptide Support plan is invalid.");
     }
@@ -1994,6 +2013,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         outbox: [],
       };
     }
+    await assertPriorityOccurrenceNotPaused(context, current, occurrenceDate);
     requireExpectedVersion(context, current, `priority:${id}`);
     const reminders = [structuredClone(current)];
     const repository = createReminderRepository(reminders);
@@ -2031,6 +2051,45 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       },
       outbox: [],
     };
+  }
+
+  // A peptide execution suspended on the occurrence date (a dated pause
+  // window on the execution item) refuses the completion. Only a dose-aware
+  // `protocol_reminder` can be execution-backed, so any other reminder never
+  // reads the execution items; the execution is resolved with the same rule
+  // the projection uses (findExecutionForProtocol). Reminders with no
+  // execution, or executions without suspensions, are unaffected.
+  async function assertPriorityOccurrenceNotPaused(context, reminder, occurrenceDate, executionItems = null) {
+    if (reminder?.type !== "protocol_reminder" || !reminder.linkedEntityId) return;
+    const items = executionItems ?? await records.list({ ownerUserId: context.ownerUserId, collection: "executionItems" });
+    const window = findSuspensionWindow(findExecutionForProtocol(items, reminder.linkedEntityId).executionItem, occurrenceDate);
+    if (!window) return;
+    throw new ApplicationProblem({
+      status: 422,
+      code: "PRIORITY_OCCURRENCE_PAUSED",
+      title: "This priority is paused.",
+      detail: "Resume it from the Operating Plan to record doses again.",
+      recovery: { pausedFrom: window.pausedFrom, protocolId: reminder.linkedEntityId, workflow: "peptide_protocol" },
+    });
+  }
+
+  // `previous-day.reconcile.v1` carries the same guard: an item whose
+  // occurrence (its own date, else the reconciled day) falls inside a peptide
+  // execution's pause window is refused before the reconciliation is written.
+  async function assertReconciledOccurrencesNotPaused(context) {
+    const items = Array.isArray(context.payload.items) ? context.payload.items : [];
+    const ids = [...new Set(items.map((item) => String(item?.priorityId ?? item?.reminderId ?? item?.id ?? "")).filter(Boolean))];
+    if (!ids.length) return;
+    const reminders = await records.list({ ownerUserId: context.ownerUserId, collection: "reminders" });
+    let executionItems = null;
+    for (const item of items) {
+      const id = String(item?.priorityId ?? item?.reminderId ?? item?.id ?? "");
+      const reminder = reminders.find((candidate) => String(candidate?.id) === id) ?? null;
+      if (reminder?.type !== "protocol_reminder") continue;
+      executionItems ??= await records.list({ ownerUserId: context.ownerUserId, collection: "executionItems" });
+      const occurrenceDate = /^\d{4}-\d{2}-\d{2}$/.test(String(item?.occurrenceDate ?? "")) ? String(item.occurrenceDate) : String(context.payload.localDate);
+      await assertPriorityOccurrenceNotPaused(context, reminder, occurrenceDate, executionItems);
+    }
   }
 
   // `priority.skip.v1`: marks TODAY's occurrence of an ordinary priority as

@@ -299,6 +299,30 @@ describe("Native production contract boundary", () => {
     expect(result.data.history.map((item) => item.id)).toEqual(["weight-3", "weight-2"]);
   });
 
+  it("returns every weekly average of the selected Goal window on the Weight read", async () => {
+    const current = fixture();
+    const weeklyAverages = Array.from({ length: 12 }, (_, index) => {
+      const sortDate = new Date("2026-09-27T00:00:00.000Z");
+      sortDate.setUTCDate(sortDate.getUTCDate() - index * 7);
+      return {
+        week: `Week ${12 - index}`, sortDate: sortDate.toISOString().slice(0, 10),
+        average: 170 + index, weekOverWeek: index === 11 ? null : -1, entries: 7,
+      };
+    });
+    current.readers.progress.getWeight.mockResolvedValue({
+      timeline: { contextId: "build-lean-mass", type: "active_goal", goalId: "goal-build", phaseId: "phase-2" },
+      report: {
+        current: { id: "weight-1", date: "2026-09-09", value: 170, unit: "lb", revision: 1 },
+        recentWeighIns: [], rollingAverages: {}, weeklyAverages, extrema: { goalRelevant: ["highest"] },
+        chart: { markers: [] }, history: [{ id: "weight-1" }],
+      },
+    });
+    const result = await current.service.read({ request: request(), resource: "weight", input: { context: "build-lean-mass" } });
+    expect(result.data.weeklyAverages).toHaveLength(12);
+    expect(result.data.weeklyAverages.map((week) => week.sortDate)).toEqual(weeklyAverages.map((week) => week.sortDate));
+    expect(result.data.weeklyAverages.map((week) => week.entries)).toEqual(weeklyAverages.map((week) => week.entries));
+  });
+
   it("returns only finished Training Reporting semantics", async () => {
     const result = await fixture().service.read({ request: request(), resource: "training-reporting" });
     expect(result.data.reporting).toMatchObject({ resistance: { title: "Resistance Training" } });
@@ -429,6 +453,22 @@ describe("Native production contract boundary", () => {
     });
     expect(result.outcome).toBe("committed");
     expect(current.executeCommand).toHaveBeenCalledWith(expect.objectContaining({ principal, commandType: "priority.complete.v1" }));
+  });
+
+  it("routes the peptide lifecycle command with its If-Match executionRevision to the canonical command service", async () => {
+    const current = fixture();
+    const result = await current.service.command({
+      request: request(),
+      commandType: "operating-plan.peptide-lifecycle.change.v1",
+      metadata: { idempotencyKey: "native-peptide-pause-20260909", expectedVersion: "4" },
+      payload: { protocolId: "peptide-protocol", operation: "pause", effectiveDate: "tomorrow" },
+    });
+    expect(result.outcome).toBe("committed");
+    expect(current.executeCommand).toHaveBeenCalledWith(expect.objectContaining({
+      principal, commandType: "operating-plan.peptide-lifecycle.change.v1",
+      metadata: expect.objectContaining({ expectedVersion: "4" }),
+      payload: { protocolId: "peptide-protocol", operation: "pause", effectiveDate: "tomorrow" },
+    }));
   });
 
   it("rejects legacy or inert write aliases at the Native boundary", async () => {
@@ -665,6 +705,7 @@ describe("Native production contract boundary", () => {
       "operating-plan.supplement-support.save.v1",
       "operating-plan.supplement-strategy.save.v1",
       "operating-plan.supplement-lifecycle.change.v1",
+      "operating-plan.peptide-lifecycle.change.v1",
       "operating-plan.coaching-updates.save.v1",
     ]);
     expect(nativeProductionContractManifest.healthKitIngestion).toMatchObject({

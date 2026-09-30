@@ -11,6 +11,13 @@ import { projectClientSafeValue } from "../read-models/readModel.js";
 
 const mediaId = "media-1fadfe2c43970a9c6268b3b9f3ef4c3f-62a670131e57";
 
+// Sunday week starts counting back from 2026-09-27 (index 0 is the newest).
+function weekStart(index) {
+  const date = new Date("2026-09-27T00:00:00.000Z");
+  date.setUTCDate(date.getUTCDate() - index * 7);
+  return date.toISOString().slice(0, 10);
+}
+
 describe("Native finished read projections", () => {
   it("bounds canonical newest-first Weight history while preserving revision, trend, extrema, DEXA, Goal, and Phase context", () => {
     const history = [3, 2, 1].map((revision) => ({
@@ -37,6 +44,20 @@ describe("Native finished read projections", () => {
       page: { limit: 2, count: 2, hasMore: true },
     });
     expect(result.history.map((item) => item.id)).toEqual(["weight-3", "weight-2"]);
+  });
+
+  it("passes every weekly average through in the report's newest-first order", () => {
+    const weeklyAverages = Array.from({ length: 12 }, (_, index) => ({
+      week: `Week ${12 - index}`, sortDate: weekStart(index), average: 170 + index * 0.1,
+      weekOverWeek: index === 11 ? null : -0.1, entries: 7,
+    }));
+    const result = projectNativeWeightRead({
+      timeline: { contextId: "build-lean-mass", type: "active_goal", goalId: "goal-1", phaseId: "phase-2" },
+      report: { history: [], weeklyAverages },
+    });
+    expect(result.weeklyAverages).toHaveLength(12);
+    expect(result.weeklyAverages).toEqual(weeklyAverages);
+    expect(result.weeklyAverages.map((week) => week.sortDate)).toEqual(weeklyAverages.map((week) => week.sortDate));
   });
 
   it("returns only canonical Photo comparison fields and media references", () => {

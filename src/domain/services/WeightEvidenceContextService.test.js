@@ -187,6 +187,38 @@ describe("Weight Evidence Context", () => {
     ]);
   });
 
+  it("returns every calendar-week bucket of the scoped series, not only the six newest", () => {
+    const points = Array.from({ length: 71 }, (_, index) => ({
+      date: shiftDate("2026-07-19", index),
+      value: 160 + (index % 3),
+    }));
+    const weeks = getWeeklyAverages(points);
+
+    expect(weeks).toHaveLength(11);
+    expect(weeks[0].sortDate).toBe("2026-09-27");
+    expect(weeks.at(-1)).toMatchObject({
+      sortDate: "2026-07-19",
+      weekOverWeek: null,
+      entries: 7,
+    });
+    expect(weeks.slice(0, -1).every((week) => week.weekOverWeek !== null)).toBe(true);
+    expect(weeks.reduce((sum, week) => sum + week.entries, 0)).toBe(71);
+  });
+
+  it("keeps sparse weeks and skips calendar weeks without observations instead of synthesizing them", () => {
+    const weeks = getWeeklyAverages([
+      { date: "2026-07-19", value: 160 },
+      { date: "2026-07-21", value: 162 },
+      { date: "2026-07-23", value: 164 },
+      { date: "2026-08-05", value: 165 },
+    ]);
+
+    expect(weeks).toEqual([
+      { week: "Aug 2", sortDate: "2026-08-02", average: 165, weekOverWeek: 3, entries: 1 },
+      { week: "Jul 19", sortDate: "2026-07-19", average: 162, weekOverWeek: null, entries: 3 },
+    ]);
+  });
+
   it(
     "keeps every time-dependent surface empty when the scoped dataset is empty",
     async () => {
@@ -284,4 +316,10 @@ function weight(id, measuredAt, value) {
     measuredAt,
     weight: { unit: "lb", value },
   };
+}
+
+function shiftDate(date, days) {
+  const next = new Date(`${date}T00:00:00.000Z`);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
 }

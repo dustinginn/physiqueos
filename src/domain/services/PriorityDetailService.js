@@ -142,6 +142,18 @@ export function createPriorityDetailService({ repositories, now = () => new Date
             timeZone,
           });
 
+          // Recovery Support (e.g. Foam Rolling) is an ordinary manual
+          // completion with no dose, so today's canonical skip applies to it
+          // exactly as it does to a plain reminder: read the dated
+          // reconciliation entry (completed wins over a skip) so a skipped
+          // occurrence never re-reads as Open/completable, and offer the
+          // Server-owned skip contract for today's open occurrence. Peptide
+          // (dose-aware) and supplement (deferred) Support stay unchanged.
+          const recoverySkipEntry = protocol.category === "recovery" &&
+            projection.occurrenceCompleted !== true &&
+            isPriorityOccurrenceSkipped(occurrenceCheckIn, reminder.id, projection.localDate)
+              ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, reminder.id, projection.localDate)
+              : null;
           const detail = protocol.category === "recovery"
             ? createNonDosingSupportPriorityDetail({
                 executionItem: match.executionItem,
@@ -149,6 +161,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                 operatingPlan,
                 projection,
                 protocol,
+                skipEntry: recoverySkipEntry,
               })
             : protocol.category === "supplement"
               ? createSupplementSupportPriorityDetail({
@@ -165,7 +178,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                   projection,
                   protocol,
                 });
-          return withProtocolSupportNotificationAction(
+          const supportDetail = withDoseAdjustable(withPausedOccurrence(withProtocolSupportNotificationAction(
             withExecutionContract(detail, reminder, projection.localDate),
             {
               category: protocol.category,
@@ -173,9 +186,22 @@ export function createPriorityDetailService({ repositories, now = () => new Date
               occurrenceDate: projection.localDate,
               timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
             }
-          );
+          ), projection), protocol.category);
+          if (protocol.category !== "recovery") return supportDetail;
+          // `completable` is already false for a completed, skipped, setup
+          // required (missing Execution) or inactive occurrence, so none of
+          // those can be offered a skip.
+          return withSkipContract(supportDetail, {
+            reminder,
+            occurrenceDate: projection.localDate,
+            today,
+            open: supportDetail?.completable === true,
+          });
         }
 
+        // The linked protocol may not resolve (deleted, re-keyed, or a
+        // non-Support category); the legacy builder then yields null, and
+        // the notification occurrence must not throw on `protocol.category`.
         return withProtocolSupportNotificationAction(
           withExecutionContract(createLegacyReminderOnlyProtocolPriorityDetail({
             reminder,
@@ -186,7 +212,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
             occurrenceDate,
             timeZone,
           }), reminder, occurrenceDate),
-          { category: protocol.category, priorityId: reminder.id, occurrenceDate, timeOfDay: reminder.schedule?.timeOfDay }
+          { category: protocol?.category ?? null, priorityId: reminder.id, occurrenceDate, timeOfDay: reminder.schedule?.timeOfDay }
         );
       }
 
@@ -208,28 +234,40 @@ export function createPriorityDetailService({ repositories, now = () => new Date
             ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, reminder.id, occurrenceDate)
             : null;
         const open = !completed && !skipEntry;
-        const detail = withExecutionContractAndNotificationAction(createReminderPriorityDetail({
+        return withSkipContract(withExecutionContractAndNotificationAction(createReminderPriorityDetail({
           reminder,
           goals,
           operatingPlan,
           occurrenceDate,
           completed,
           skipEntry,
-        }), reminder, occurrenceDate, open);
-        const skippable = open &&
-          occurrenceDate === today &&
-          detail.executionContract.workflow === "priority_detail" &&
-          isPrioritySkipSupportedReminder(reminder);
-        const skipCommand = skippable ? prioritySkipCommand(detail.executionContract) : null;
-        return { ...detail, skippable: Boolean(skipCommand), skipCommand };
+        }), reminder, occurrenceDate, open), { reminder, occurrenceDate, today, open });
       }
 
       return createFallbackPriorityDetail(priorityId, goals, occurrenceDate);
   }
 }
 
+// The Server-owned skip contract (`skippable` / `skipCommand`) for a detail
+// that already carries its `executionContract`. `open` is the caller's
+// verdict that the occurrence is neither completed nor skipped nor otherwise
+// non-actionable; on top of that a skip is offered only for today's
+// occurrence of a `priority_detail` reminder the shared eligibility rule
+// (`isPrioritySkipSupportedReminder`) accepts — the same rule
+// `priority.skip.v1` enforces on the write side.
+function withSkipContract(detail, { reminder, occurrenceDate, today, open }) {
+  if (!detail) return null;
+  const skippable = open === true &&
+    occurrenceDate === today &&
+    detail.executionContract?.workflow === "priority_detail" &&
+    isPrioritySkipSupportedReminder(reminder);
+  const skipCommand = skippable ? prioritySkipCommand(detail.executionContract) : null;
+  return { ...detail, skippable: Boolean(skipCommand), skipCommand };
+}
+
 // Every Priority Detail carries the Server-owned skip contract. Only the
-// ordinary reminder path above can ever set `skippable: true`.
+// paths that run `withSkipContract` above — an ordinary reminder and an
+// execution-backed recovery Support reminder — can ever set `skippable: true`.
 function withSkipDefaults(detail) {
   if (!detail) return detail;
   return {
@@ -237,6 +275,48 @@ function withSkipDefaults(detail) {
     skippable: detail.skippable === true,
     skipCommand: detail.skippable === true ? detail.skipCommand ?? null : null,
     skipContext: detail.skipContext ?? null,
+    paused: detail.paused === true,
+    pauseContext: detail.paused === true ? detail.pauseContext ?? null : null,
+  };
+}
+
+// Peptide occurrences let the person record the amount actually taken
+// (`effectiveDose`); supplements and recovery items do not. Native reads
+// this flag rather than inferring the category from a dose string.
+function withDoseAdjustable(detail, category) {
+  if (!detail || category !== "peptide" || !detail.completionContext?.dose) return detail;
+  return { ...detail, doseAdjustable: true };
+}
+
+// An execution-backed occurrence inside a suspension window (a paused peptide)
+// is never completable: the execution contract keeps its identity
+// (priorityId/occurrenceDate/occurrenceKey/workflow/destination, which Build 69
+// needs to route the detail) but carries `expectedVersion: null`, the
+// notification action keeps its workflow, scheduled time and destination but
+// is open-only (no completion command), and the detail is marked `paused`
+// with the window's start. A completed occurrence wins over the pause: it
+// stays Completed and untouched.
+function withPausedOccurrence(detail, projection) {
+  if (!detail) return null;
+  const paused = projection?.operationalState === ExecutionPriorityOperationalState.PAUSED &&
+    projection.occurrenceCompleted !== true;
+  if (!paused) return detail;
+  const executionContract = detail.executionContract
+    ? Object.freeze({ ...detail.executionContract, expectedVersion: null })
+    : null;
+  return {
+    ...detail,
+    completable: false,
+    completionContext: null,
+    executionContract,
+    notificationAction: detail.notificationAction
+      ? Object.freeze({ ...detail.notificationAction, classification: "open_only", completionCommand: null })
+      : openOnlyNotificationAction({
+          priorityId: projection.priorityId,
+          occurrenceDate: projection.localDate,
+        }),
+    paused: true,
+    pauseContext: { pausedFrom: projection.pauseContext?.pausedFrom ?? null },
   };
 }
 
@@ -289,6 +369,10 @@ function createExecutionPriorityDetail({
   const actionable = !completed &&
     projection.operationalState ===
     ExecutionPriorityOperationalState.ACTIONABLE;
+  // Completed wins over Paused; a paused occurrence is neither actionable nor
+  // a setup problem, it is simply suspended until the plan is resumed.
+  const paused = !completed &&
+    projection.operationalState === ExecutionPriorityOperationalState.PAUSED;
   const setupRequired = [
     ExecutionPriorityOperationalState.MISSING_EXECUTION,
     ExecutionPriorityOperationalState.SETUP_REQUIRED,
@@ -317,6 +401,8 @@ function createExecutionPriorityDetail({
     subtitle: projection.timeOfDayLabel,
     status: completed
       ? "Completed"
+      : paused
+        ? "Paused"
       : actionable
       ? "Open"
       : setupRequired
@@ -342,10 +428,16 @@ function createExecutionPriorityDetail({
         title: "What",
         items: [
           {
-            label: actionable ? projection.title : setupCopy,
+            label: actionable
+              ? projection.title
+              : paused
+                ? `${projection.title} is paused`
+                : setupCopy,
             detail: actionable
               ? "Complete the scheduled Execution action."
-              : "Review the canonical Execution plan before recording a dose.",
+              : paused
+                ? "Resume it from the Operating Plan to record doses again."
+                : "Review the canonical Execution plan before recording a dose.",
           },
         ],
       },
@@ -420,16 +512,22 @@ function createExecutionPriorityDetail({
   };
 }
 
+// `skipEntry` is today's canonical dated reconciliation entry for this
+// occurrence when it was skipped (`priority.skip.v1`, or Morning Check-In for
+// a prior day). Completed wins over a skip; either is terminal, so a skipped
+// occurrence reads as Skipped, non-completable, and offers no Completion.
 function createNonDosingSupportPriorityDetail({
   executionItem,
   goals,
   operatingPlan,
   projection,
   protocol,
+  skipEntry = null,
 }) {
   if (!protocol || !projection) return null;
   const completed = projection.occurrenceCompleted === true;
-  const actionable = !completed &&
+  const skipped = !completed && Boolean(skipEntry);
+  const actionable = !completed && !skipped &&
     projection.operationalState === ExecutionPriorityOperationalState.ACTIONABLE;
   const setupRequired = [
     ExecutionPriorityOperationalState.MISSING_EXECUTION,
@@ -441,7 +539,11 @@ function createNonDosingSupportPriorityDetail({
     title: projection.title,
     eyebrow: "Priority Detail",
     subtitle: projection.timeOfDayLabel,
-    status: completed ? "Completed" : actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
+    status: completed
+      ? "Completed"
+      : skipped
+        ? "Skipped"
+        : actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
     completable: actionable && projection.completable,
     completionContext:
       actionable && projection.completable
@@ -451,6 +553,13 @@ function createNonDosingSupportPriorityDetail({
             protocolId: projection.protocolRootId,
           }
         : null,
+    skipContext: skipped
+      ? {
+          occurrenceDate: projection.localDate,
+          note: skipEntry.note ?? null,
+          skippedAt: skipEntry.recordedAt ?? null,
+        }
+      : null,
     action: {
       label: setupRequired ? "Review Support" : "View Support",
       href: projection.executionHref,
@@ -461,10 +570,12 @@ function createNonDosingSupportPriorityDetail({
       {
         title: "What",
         items: [{
-          label: actionable ? projection.title : "Support setup required",
+          label: actionable || skipped ? projection.title : "Support setup required",
           detail: actionable
             ? "Complete the scheduled recovery support."
-            : "Review the saved Support schedule before recording completion.",
+            : skipped
+              ? "Skipped for this occurrence."
+              : "Review the saved Support schedule before recording completion.",
         }],
       },
       {

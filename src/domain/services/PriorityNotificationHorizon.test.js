@@ -152,3 +152,55 @@ function priorityId(item) {
 function find(items, id, date) {
   return items.find((item) => priorityId(item) === id && item.occurrenceDate === date);
 }
+
+describe("canonical priority notification horizon honours pause windows (S3)", () => {
+  const peptideProtocol = {
+    id: "protocol_peptide", userId: "founder", category: "peptide", status: "active", name: "Daily Peptide",
+  };
+  function peptideFixture(scheduleSuspensions) {
+    const data = fixture();
+    data.protocols.push(peptideProtocol);
+    data.executionItems.push({
+      id: "execution_peptide", userId: "founder", type: "peptide", title: "Daily Peptide", active: true,
+      protocolRootId: peptideProtocol.id, cadence: { type: "daily" },
+      preferredSchedule: { daysOfWeek: [], timeOfDay: "21:45", startDate: "2026-09-01", endDate: null },
+      timeline: [{ startDate: "2026-09-01", endDate: null, dose: { amount: "0.25", unit: "mg" }, notes: "" }],
+      reminderPreference: "remind",
+      ...(scheduleSuspensions === undefined ? {} : { scheduleSuspensions }),
+    });
+    data.reminders.push({
+      id: "reminder_peptide", userId: "founder", type: "protocol_reminder", title: "Daily Peptide",
+      linkedEntityId: peptideProtocol.id, active: true, version: 2,
+      schedule: { type: "daily", timeOfDay: "21:45", startDate: "2026-09-01" },
+      completionHistory: [],
+    });
+    return data;
+  }
+  const dates = (occurrences) => occurrences
+    .filter((item) => priorityId(item) === "reminder_peptide")
+    .map((item) => item.occurrenceDate);
+
+  it("projects every day of the horizon when the record carries no windows", () => {
+    expect(dates(service().getNotificationOccurrences(peptideFixture(undefined))))
+      .toEqual(["2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20", "2026-09-21", "2026-09-22"]);
+  });
+
+  it("drops the paused dates and restores occurrences from resumedOn", () => {
+    expect(dates(service().getNotificationOccurrences(peptideFixture([
+      { pausedFrom: "2026-09-18", resumedOn: "2026-09-20" },
+    ])))).toEqual(["2026-09-16", "2026-09-17", "2026-09-20", "2026-09-21", "2026-09-22"]);
+    expect(dates(service().getNotificationOccurrences(peptideFixture([
+      { pausedFrom: "2026-09-17", resumedOn: null },
+    ])))).toEqual(["2026-09-16"]);
+  });
+
+  it("uses the local pause date, so a pause recorded at 23:30 local withdraws that local day", () => {
+    // 2026-09-17T06:30Z is 23:30 on 2026-09-16 in America/Los_Angeles.
+    const occurrences = service().getNotificationOccurrences(peptideFixture([
+      { pausedFrom: "2026-09-16", pausedAt: "2026-09-17T06:30:00.000Z", resumedOn: null },
+    ]));
+    expect(dates(occurrences)).toEqual([]);
+    expect(find(occurrences, "reminder_morning_weight", "2026-09-17")).toBeDefined();
+    expect(find(occurrences, "reminder_fadogia", "2026-09-17")).toBeDefined();
+  });
+});

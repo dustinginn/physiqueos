@@ -20,6 +20,8 @@ import {
   PeptideExecutionState,
 } from "../../domain/services/PeptideExecutionManagementService.js";
 import { formatSupportScheduleSummary } from "../../domain/models/SupportScheduleModel.js";
+import { isDateSuspended, normalizeScheduleSuspensions } from "../../domain/models/PeptideDosingStrategyModel.js";
+import { formatPeptideDose, resolveExecutionPhase } from "../../domain/services/ExecutionPhaseResolver.js";
 import { ReminderType } from "../../domain/models/reminder.js";
 import { composeOperatingPlanStrategyDetail } from "../../domain/services/OperatingPlanStrategyDetailService.js";
 import { createStrategyEditorModel, TRAINING_AREAS } from "../../domain/services/StrategyEditorService.js";
@@ -175,6 +177,10 @@ export function createCoreNavigationReadService({
             supportSummary: method.supportSummary,
             currentDose: method.currentDose ?? null,
             currentSchedule: method.currentSchedule ?? null,
+            // Additive: the peptide execution's own pause state. `lifecycleState`
+            // above stays the protocol status (`active` for peptides) so Build 69
+            // keeps its Edit entry point while paused.
+            executionLifecycle: method.executionLifecycle ?? null,
             reminderEnabled: projectMethodReminderEnabled({
               category: model.category, method, ownerUserId, runtime,
             }),
@@ -358,20 +364,52 @@ export function createCoreNavigationReadService({
         const reminder = reminders[0] ?? null;
         const hydration = createPeptideSupportHydrationModel({ executionItem, protocol, reminder });
         const localDate = getLocalDateKey(now(), resolveLocalTimeZone(runtime.user?.timeZone ?? runtime.user?.timezone));
+        const dosing = projectPeptideDosingStrategy(hydration.dosingStrategy);
+        // S4 (additive): the dose summary is derived from the FULL stored
+        // timeline (history-preserving saves keep frozen phases), never from
+        // the generated tail. The lifecycle reads `paused` from the record
+        // (since = pausedFrom, even when the window starts tomorrow); next
+        // due skips suspended dates and is null only while today is inside
+        // the window, so tonight's still-eligible dose shows until it starts.
+        const summary = projectPeptideDosingSummary({
+          timeline: hydration.legacyTimeline, localDate, dosingMode: hydration.dosingMode, pattern: dosing.pattern,
+        });
+        const nextDue = resolveNextSupportDue({
+          schedule: hydration.supportSchedule, reminder, localDate,
+          suspensions: hydration.scheduleSuspensions,
+        });
         return Object.freeze({
           protocolId: protocol.id,
           executionId: executionItem?.id ?? null,
           executionRevision: hydration.executionRevision,
+          priorityId: reminder?.id ?? null,
           name: protocol.name ?? executionItem?.title ?? "Peptide Support",
           purpose: protocol.purpose ?? protocol.description ?? executionItem?.description ?? "",
           state: classification.state.toUpperCase(),
+          lifecycle: Object.freeze({
+            state: hydration.lifecycle.state,
+            since: hydration.lifecycle.since,
+            history: Object.freeze(hydration.lifecycle.history.map((entry) => Object.freeze({ ...entry }))),
+          }),
           supportSchedule: hydration.supportSchedule,
-          dosing: projectPeptideDosingStrategy(hydration.dosingStrategy),
+          dosing,
+          dosingMode: hydration.dosingMode,
+          currentDose: summary.currentDose,
+          currentDoseLabel: summary.currentDoseLabel,
+          currentPhase: summary.currentPhase,
+          plannedChanges: summary.plannedChanges,
+          dosingHistory: summary.dosingHistory,
+          advancedPlan: summary.advancedPlan,
           timeline: projectPeptideTimeline(hydration.legacyTimeline, localDate, executionItem?.id ?? protocol.id),
           reminderPreference: hydration.reminderPreference,
           timingContext: hydration.timingContext,
           notes: hydration.notes,
-          nextDue: projectNextSupportDue({ schedule: hydration.supportSchedule, reminder, localDate }),
+          nextDue: formatNextSupportDue(nextDue),
+          nextDueDate: nextDue?.date ?? null,
+          nextDueTime: nextDue?.time ?? null,
+          // The owner's canonical local date this read was projected for, so
+          // Native's "Today"/"Tomorrow" and past-date guard agree with Home.
+          localDate,
         });
       });
     },
@@ -930,6 +968,51 @@ function formatPeptideDate(value) {
   });
 }
 
+function formatPeptideShortDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) return String(value ?? "");
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/// S4 dose summary from the full stored timeline: the phase covering
+/// `localDate` is the current dose; later phases are planned changes; phases
+/// that have started (current included) are the dose history, newest first.
+/// `advancedPlan` is true only for a generator plan (not `stay`) that still
+/// has changes ahead, so a future-dated simple dose change never reads as a
+/// titration.
+function projectPeptideDosingSummary({ timeline = [], localDate, dosingMode, pattern }) {
+  const phases = (Array.isArray(timeline) ? timeline : []).filter((phase) => phase && !phase.malformed);
+  const { current } = resolveExecutionPhase({ timeline: phases }, localDate);
+  const dose = (phase) => Object.freeze({
+    amount: Number.isFinite(Number(phase.dose?.amount)) ? Number(phase.dose.amount) : 0,
+    unit: phase.dose?.unit ?? "",
+  });
+  const plannedChanges = Object.freeze(phases
+    .filter((phase) => phase.startDate > localDate)
+    .map((phase) => Object.freeze({
+      startDate: phase.startDate,
+      dose: dose(phase),
+      label: `${formatPeptideDose(phase.dose)} on ${formatPeptideShortDate(phase.startDate)}`,
+    })));
+  const dosingHistory = Object.freeze(phases
+    .filter((phase) => phase.startDate <= localDate)
+    .slice()
+    .reverse()
+    .map((phase) => Object.freeze({
+      startDate: phase.startDate,
+      endDate: phase.endDate ?? null,
+      dose: dose(phase),
+      label: `${formatPeptideDose(phase.dose)} · ${formatPeptideShortDate(phase.startDate)} – ${phase.endDate ? formatPeptideShortDate(phase.endDate) : "Ongoing"}`,
+    })));
+  return Object.freeze({
+    currentDose: current ? dose(current) : null,
+    currentDoseLabel: current ? formatPeptideDose(current.dose) : null,
+    currentPhase: current ? Object.freeze({ startDate: current.startDate, endDate: current.endDate ?? null }) : null,
+    plannedChanges,
+    dosingHistory,
+    advancedPlan: dosingMode === "structured" && pattern !== "stay" && plannedChanges.length > 0,
+  });
+}
+
 function hasAmbiguousDomainExecution(protocol, executionItems) {
   const matches = executionItems.filter((item) => {
     if (item.active !== true) return false;
@@ -986,12 +1069,29 @@ function projectMethodReminderEnabled({ category, method, ownerUserId, runtime }
     .reminderPreference === "remind";
 }
 
-function projectNextSupportDue({ schedule, reminder, localDate }) {
+function projectNextSupportDue(input) {
+  return formatNextSupportDue(resolveNextSupportDue(input));
+}
+
+function formatNextSupportDue(due) {
+  if (!due) return null;
+  const date = new Intl.DateTimeFormat("en-US", {
+    month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+  }).format(new Date(`${due.date}T12:00:00Z`));
+  return `${date}${due.time ? ` · ${formatClock(due.time)}` : ""}`;
+}
+
+function resolveNextSupportDue({ schedule, reminder, localDate, suspensions = [] }) {
   // "Next due" belongs to the canonical execution schedule, not to iOS
   // reminder delivery. Turning reminders off must hide the bell without
   // erasing when the Support itself is next due. Completion history still
-  // comes from the reminder occurrence anchor when one exists.
+  // comes from the reminder occurrence anchor when one exists. A suspended
+  // execution (peptide pause window) has no next due while today is inside
+  // a window; dates inside any window (a pause dated tomorrow included) are
+  // skipped, not shifted, so a pause starting tomorrow keeps tonight's dose.
   if (!schedule || !localDate) return null;
+  const windows = normalizeScheduleSuspensions(suspensions);
+  if (isDateSuspended(windows, localDate)) return null;
   const start = /^\d{4}-\d{2}-\d{2}$/.test(schedule.startDate ?? "") ? schedule.startDate : localDate;
   const end = /^\d{4}-\d{2}-\d{2}$/.test(schedule.endDate ?? "") ? schedule.endDate : null;
   for (let offset = 0; offset <= 370; offset += 1) {
@@ -999,12 +1099,10 @@ function projectNextSupportDue({ schedule, reminder, localDate }) {
     if (candidate < start) continue;
     if (end && candidate > end) return null;
     if (!supportScheduleIncludesDate(schedule, candidate, start)) continue;
+    if (isDateSuspended(windows, candidate)) continue;
     if (offset === 0 && isReminderOccurrenceCompleted(reminder, { occurrenceDate: candidate })) continue;
     const time = resolveScheduledTime(schedule.timing === "specific" ? schedule.specificTime : schedule.timing);
-    const date = new Intl.DateTimeFormat("en-US", {
-      month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
-    }).format(new Date(`${candidate}T12:00:00Z`));
-    return `${date}${time ? ` · ${formatClock(time)}` : ""}`;
+    return Object.freeze({ date: candidate, time: /^\d{2}:\d{2}$/.test(time ?? "") ? time : null });
   }
   return null;
 }
@@ -1074,28 +1172,42 @@ export function projectConfirmedHealthKitLogProvenance(log, runtime = {}) {
       ...log.loggedToday,
       rows: Object.freeze(log.loggedToday.rows.map((row) => {
         if (row.id !== "training") return row;
-        const withAppleHealth = (summary) => /Apple Health/i.test(String(summary ?? ""))
-          ? summary
-          : `${String(summary ?? "Workout").replace(/ logged$/i, "")} · Apple Health`;
-        // A Training row with Cardio carries one line per modality: only the
-        // Logger (Strength) line's provenance changes when its workout is confirmed.
+        // Apple Health provenance is a caption under the whole Training group
+        // (`row.context`), the same convention Nutrition and Activity use and
+        // the only channel native Build 69 renders: it draws `lines` and then
+        // `context` once under the group, and its LossyLines decoder drops any
+        // per-line extra field. So this projection never suffixes a line or
+        // the summary -- `summary` and `lines` stay byte-identical to the
+        // domain composer's output -- and it only sets the caption when every
+        // presented line is Apple-Health-backed. Cardio lines always are (they
+        // come from canonical HealthKit workouts); the Logger (Strength) line
+        // is only once its session has a CONFIRMED HealthKit link.
+        //
+        // Deliberate product decision: a Strength line whose link is still a
+        // candidate (or absent) leaves the row untouched -- no caption, no
+        // suffix -- even when Cardio lines sit beside it, because a caption
+        // under the group would claim the unconfirmed Strength line too.
+        const loggerConfirmed = (recordId) => recordId ? attachments.has(String(recordId)) : confirmedTrainingToday;
         if (Array.isArray(row.lines) && row.lines.length > 0) {
           const logger = row.lines.find((line) => line.kind === "logger");
-          const confirmed = logger && (logger.recordId ? attachments.has(String(logger.recordId)) : confirmedTrainingToday);
-          if (!confirmed) return row;
-          const lines = Object.freeze(row.lines.map((line) => line === logger
-            ? Object.freeze({ ...line, summary: withAppleHealth(line.summary) })
-            : line));
-          return Object.freeze({ ...row, lines, summary: lines.map((line) => line.summary).join(", ") });
+          if (logger && !loggerConfirmed(logger.recordId)) return row;
+          return Object.freeze({ ...row, context: joinAppleHealth(row.context) });
         }
-        const confirmed = row.recordId
-          ? attachments.has(String(row.recordId))
-          : confirmedTrainingToday;
-        if (!confirmed) return row;
-        return Object.freeze({ ...row, summary: withAppleHealth(row.summary) });
+        // Legacy single-summary row (no lines): the summary is the whole group.
+        if (!loggerConfirmed(row.recordId)) return row;
+        return Object.freeze({ ...row, context: joinAppleHealth(row.context) });
       })),
     }),
   });
+}
+
+// Appends the Apple Health caption to a row's context ("Movements not added"
+// -> "Movements not added · Apple Health"); idempotent, so re-projecting an
+// already-captioned row (or a Cardio-only row the domain already captioned)
+// never doubles it.
+function joinAppleHealth(context) {
+  if (/Apple Health/.test(String(context ?? ""))) return context;
+  return [context, "Apple Health"].filter(Boolean).join(" · ");
 }
 
 function createReadPrincipal(userId) {

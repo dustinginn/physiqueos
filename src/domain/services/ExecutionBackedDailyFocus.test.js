@@ -387,3 +387,38 @@ function phase(amount) {
     notes: "",
   };
 }
+
+describe("Execution-backed Daily Focus honours pause windows (S3)", () => {
+  const priorThursday = new Date("2026-07-23T19:00:00.000Z");
+  const nextThursday = new Date("2026-08-06T19:00:00.000Z");
+
+  it("hides the peptide from pausedFrom and keeps the occurrence before the pause", () => {
+    const paused = execution({ scheduleSuspensions: [{ pausedFrom: "2026-07-30", resumedOn: null }] });
+    expect(priority(focus({ executionItems: [paused], now: thursday }))).toBeUndefined();
+    expect(priority(focus({ executionItems: [paused], now: nextThursday }))).toBeUndefined();
+    expect(priority(focus({ executionItems: [paused], now: priorThursday }))).toMatchObject({
+      id: reminder.id, completable: true, occurrenceDate: "2026-07-23",
+    });
+  });
+
+  it("restores the peptide from resumedOn without backfilling the paused weeks", () => {
+    const resumed = execution({
+      scheduleSuspensions: [{ pausedFrom: "2026-07-24", resumedOn: "2026-08-06", pausedAt: "2026-07-25T02:00:00Z" }],
+    });
+    expect(priority(focus({ executionItems: [resumed], now: thursday }))).toBeUndefined();
+    expect(priority(focus({ executionItems: [resumed], now: nextThursday }))).toMatchObject({
+      id: reminder.id, completable: true, occurrenceDate: "2026-08-06", metadata: expect.stringContaining("1 mg"),
+    });
+    expect(priority(focus({ executionItems: [resumed], now: priorThursday }))).toMatchObject({ occurrenceDate: "2026-07-23" });
+  });
+
+  it("leaves completion history untouched and treats an absent field as no pause", () => {
+    const history = [{ occurrenceDate: "2026-07-23", completedAt: "2026-07-24T04:50:00Z" }];
+    const withHistory = { ...reminder, completionHistory: structuredClone(history) };
+    const paused = execution({ scheduleSuspensions: [{ pausedFrom: "2026-07-30", resumedOn: null }] });
+    expect(priority(focus({ executionItems: [paused], reminders: [withHistory], now: thursday }))).toBeUndefined();
+    expect(withHistory.completionHistory).toEqual(history);
+    expect(priority(focus({ executionItems: [execution({ scheduleSuspensions: null })], now: thursday })))
+      .toMatchObject({ completable: true });
+  });
+});
