@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T18:06:53Z",
+  "generated_at_utc": "2026-09-30T18:59:03Z",
   "task": {
-    "id": "healthkit-sleep-phase-a-server-foundation-20260930",
-    "title": "HealthKit Sleep Phase A: dormant Server foundation (candidate; NOT DEPLOYED)",
+    "id": "healthkit-sleep-phase-b-native-dormant-20260930",
+    "title": "HealthKit Sleep Phase B: dormant Native ingestion path (candidate; not uploaded; activation off)",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "372c306ba45ffaa0f93f7bf74e4c0c266070d9a5",
-    "final_sha": "e1e56be696b558762544cd59fa801d7d749a8b76",
+    "base_sha": "279103107f044141aa4c9a7487f281dc6fd19423",
+    "final_sha": "62d6b01be67e4e47e1c68224101b0e799e8714a1",
     "production_server_sha": "372c306b",
-    "production_deployment": "efd356b0-99ad-4928-90cf-a037024c28eb",
-    "native_sha": "71164900210f689480ed277205bf8a43b6d18ead",
-    "native_build": "71"
+    "production_deployment": "01d9c20f-8b91-4872-a31a-ea9e9276bfcb",
+    "native_sha": "279103107f044141aa4c9a7487f281dc6fd19423",
+    "native_build": "72"
   },
   "result": {
-    "summary": "Dormant Sleep Phase A Server foundation on branch claude/healthkit-sleep-phase-a-server-20260930 @ e1e56be6 (base = prod 372c306b): healthkit.sleep.ingest.v1 (samples, deletions/tombstones, bounded window manifest; 409 with nothing stored when the activation policy is absent), privacy-safe sample contract, dedicated healthKitSleepSamples/healthKitSleepDays with scoped occurrence_date reads (existing index, no migration), pure sleep-canon-v1 (18:00 wake-date day, <=60 min episodes, single primary lane, no hybrid totals), fail-closed activation + source-preference policies (Oura preference is a later one-record write, nothing hard-coded), disabled Native manifest capability, structural strategic quarantine. Three fresh-review rounds; no remaining blockers/should-fix. Not deployed; no policy written; no Founder Sleep ingested.",
+    "summary": "Dormant Native Sleep path on claude/healthkit-sleep-phase-b-native-20260930 @ 62d6b01b (base Build 72 27910310) against Phase A contract healthkit-sleep-ingestion-v1 (Server e1e56be6): fail-closed manifest gate (persisted last-known, 409 latch), Sleep observer (sleepAnalysis, hourly) only when active, floor-bound anchored query on healthkit-automatic-sleep-v1 (predicate + engine), privacy-safe mapping with Server-parity validation, deletions with samples, 12 h fail-closed window manifest, exact 200/409/400 handling, bounded deferredChanges, protectedDataDidBecomeAvailable recovery, deactivation teardown. Not uploaded; activation off; no Server deploy or policy write.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,35 +26,34 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "81 new tests pass at e1e56be6; full unit suite 304 failed/9460 passed with a failure set identical to base 372c306b (304 pre-existing, environmental); production build exit 0; eslint clean on changed files."
+      "summary": "HealthKitSleepIngestionTests 36/36; HealthKit regression suites pass; full PhysiqueOSTests 1625/1626 (single unrelated date-dependent Peptide sandbox test); Release device compile (unsigned) succeeded."
     },
     "review": {
       "status": "approved",
-      "summary": "Independent fresh review, 3 rounds with randomized convergence harness; blocker (zero-length sample) and should-fix items (recompute closure incl. extreme zone skew, device-UUID bundle ids, lenient timestamps) fixed; final fuzz 0/600 failures; no remaining blockers/should-fix."
+      "summary": "Fresh review 2 rounds: no blockers; S1-S4 + N1/N6 fixed and verified; Native-Server contract matches Phase A (no Server change needed)."
     },
     "zero_write_audit": {
       "status": "not_applicable",
-      "summary": "Not deployed; no production reads of Founder data and no production writes."
+      "summary": "No production writes; Sleep inert against production (no manifest block)."
     }
   },
   "decisions_required": [
-    "D1: Founder start sleep day D0 + zone + mode (recommended validation_only 2-3 nights then operational) for the Sleep activation policy - needed before Phase C only.",
-    "Authorize writing the Sleep source-preference record (Oura) and a guarded policy runner when Phase C is approved.",
-    "Authorize including this dormant Server code in a future Server deploy."
+    "Authorize dormant Phase A Server deploy (e1e56be6).",
+    "Authorize a Native build/upload including this Phase B path.",
+    "D1: Sleep D0 + mode (+ Oura preference write) for Phase C canary."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Production ACTIVE deployment is now efd356b0 (app spec update, same code 372c306b), superseding 4dac1b07.",
-    "Pre-existing red unit tests at prod base 372c306b (304, environmental), including HealthKitStrategicReadBoundary (two unrelated Workout files not allowlisted) and phase7bWorkPackage2ReferenceIndex (expects 39 collections, base has 41)."
+    "Production ACTIVE deployment now 01d9c20f (spec update, same code 372c306b).",
+    "PeptideSupportEditorViewModelTests sandbox pause test fails date-dependently (unrelated, not re-verified on base)."
   ],
   "backlog": [
-    "Sleep Phase B: dormant Native read path per report section 13.",
-    "Guarded Sleep activation/preference runner with bounded recompute on preference change.",
-    "Repair pre-existing HealthKitStrategicReadBoundary allowlist baseline.",
-    "Workout sourceName normalization (separate)."
+    "Phase C: guarded Sleep activation/preference runner (dry-run + zero-write audit).",
+    "Optional: per-device scoping of Server window-manifest retirement.",
+    "Workout sourceName normalization (separate); Nutrition observer zero-types gap (separate)."
   ],
-  "recommended_next_step": "Review the Phase A candidate; then issue the Phase B Native dormant Sleep prompt (report section 15). Deploying the dormant Server code needs explicit Founder authorization.",
-  "full_report_path": "agent-handoffs/reports/20260930T180653Z-healthkit-sleep-phase-a-server-foundation.md",
+  "recommended_next_step": "Founder: authorize Phase A deploy + Phase B build; then Phase C preparation prompt (report section 15).",
+  "full_report_path": "agent-handoffs/reports/20260930T185903Z-healthkit-sleep-phase-b-native-dormant.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Sleep Phase A: dormant Server foundation (candidate; NOT DEPLOYED) (`healthkit-sleep-phase-a-server-foundation-20260930`)
+- Task: HealthKit Sleep Phase B: dormant Native ingestion path (candidate; not uploaded; activation off) (`healthkit-sleep-phase-b-native-dormant-20260930`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-30T18:06:53Z
+- Generated (UTC): 2026-09-30T18:59:03Z
 - Success: true
 
-Summary: Dormant Sleep Phase A Server foundation on branch claude/healthkit-sleep-phase-a-server-20260930 @ e1e56be6 (base = prod 372c306b): healthkit.sleep.ingest.v1 (samples, deletions/tombstones, bounded window manifest; 409 with nothing stored when the activation policy is absent), privacy-safe sample contract, dedicated healthKitSleepSamples/healthKitSleepDays with scoped occurrence_date reads (existing index, no migration), pure sleep-canon-v1 (18:00 wake-date day, <=60 min episodes, single primary lane, no hybrid totals), fail-closed activation + source-preference policies (Oura preference is a later one-record write, nothing hard-coded), disabled Native manifest capability, structural strategic quarantine. Three fresh-review rounds; no remaining blockers/should-fix. Not deployed; no policy written; no Founder Sleep ingested.
+Summary: Dormant Native Sleep path on claude/healthkit-sleep-phase-b-native-20260930 @ 62d6b01b (base Build 72 27910310) against Phase A contract healthkit-sleep-ingestion-v1 (Server e1e56be6): fail-closed manifest gate (persisted last-known, 409 latch), Sleep observer (sleepAnalysis, hourly) only when active, floor-bound anchored query on healthkit-automatic-sleep-v1 (predicate + engine), privacy-safe mapping with Server-parity validation, deletions with samples, 12 h fail-closed window manifest, exact 200/409/400 handling, bounded deferredChanges, protectedDataDidBecomeAvailable recovery, deactivation teardown. Not uploaded; activation off; no Server deploy or policy write.
 
-Detailed report: `agent-handoffs/reports/20260930T180653Z-healthkit-sleep-phase-a-server-foundation.md`
+Detailed report: `agent-handoffs/reports/20260930T185903Z-healthkit-sleep-phase-b-native-dormant.md`
 
 Protocol: `agent-handoffs/README.md`
