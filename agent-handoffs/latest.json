@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T03:25:00Z",
+  "generated_at_utc": "2026-09-30T04:30:00Z",
   "task": {
     "id": "peptide-protocol-native-ux-redesign-next-batch-20260929",
-    "title": "CONSOLIDATED Build 70 integrated candidate: peptide/Pause-Resume + roll-forwards + persistent pairing (gates OFF); all gates passed; not deployed/uploaded",
+    "title": "Build 70 DEPLOYED (Server 4a81f5b4, migration 000015, enrollment OFF) and UPLOADED (Native Build 70 754376c5, VALID); awaiting Founder acceptance",
     "agent": "claude",
-    "status": "awaiting_review"
+    "status": "awaiting_acceptance"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "production_server_sha": "446bc964dc31318ea48261400e8b243cdd1d4ab1",
+    "production_server_sha": "4a81f5b4cac981f9241e40b556341246b83c3309",
     "native_build67_final_sha": "8359bdcb",
     "native_reviewed_candidate_sha": "dc7763e5",
     "native_build68_final_sha": "537f538b",
@@ -18,8 +18,8 @@
     "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
     "server_candidate_sha": "4a81f5b4cac981f9241e40b556341246b83c3309",
     "server_candidate_branch": "claude/build70-integrated-server-20260930",
-    "production_deployment_id": "3e87b8a7-8af6-4280-9cfd-b7437ff5f995",
-    "previous_production_server_sha": "faa9151a8118acf48fda6541e8e23898f1148246",
+    "production_deployment_id": "1fa2121a-5729-49c3-9865-a79f1724bb3f",
+    "previous_production_server_sha": "446bc964dc31318ea48261400e8b243cdd1d4ab1",
     "native_candidate_sha": "754376c529964eea280e87419ace68a003a9e0fb",
     "native_candidate_branch": "claude/build70-integrated-native-20260930",
     "native_recommended_build": "70",
@@ -29,16 +29,21 @@
     "native_build69_delivery_id": "91831873-845e-46af-aa6a-bb9629cf9999",
     "native_build69_processing_status": "VALID",
     "native_build69_dsym_uuid": "A621757F-1B2A-31FF-9D2D-62FD831781E6",
-    "last_uploaded_build": "69",
+    "last_uploaded_build": "70",
     "peptide_server_branch": "claude/peptide-ux-server-20260929",
-    "peptide_server_sha": "cc440e16"
+    "peptide_server_sha": "cc440e16",
+    "native_build70_final_sha": "754376c529964eea280e87419ace68a003a9e0fb",
+    "native_build70_delivery_id": "7ed9cf4e-b682-4b86-8f18-fdb4464de6a9",
+    "native_build70_processing_status": "VALID",
+    "native_build70_dsym_uuid": "8CA68E2A-91F1-33E7-9FB4-A4C6610F9EA2",
+    "sender_constrained_enrollment": "OFF (server flag unset; native Info.plist false)"
   },
   "result": {
-    "summary": "Integrated Server 4a81f5b4 (prod 446bc964 + Claude b94ab533 + Codex 5f51dc4d, migration 000015, enrollment env unset) and Native 754376c5 (Claude 4c93d9f5 + Codex 05554855, Info.plist gate false). Server regression 9365/9674 = baseline 304 failures, 0 new; auth/migration suites pass; production build ok. Native 1575/1575 + Release compile. Fresh reviews: no P0/P1. Not deployed/uploaded.",
+    "summary": "Migration 000015 applied (additive, verified), Server 4a81f5b4 deployed (deployment 1fa2121a ACTIVE, web/worker source parity, health 200/200, flag unset). Founder iPhone performed a natural legacy refresh on the new code. Zero unintended data drift. Native Build 70 754376c5 archived and uploaded via Xcode-only guarded tool: delivery 7ed9cf4e VALID. Persistent pairing dormant.",
     "success": true,
     "production_mutated": false,
-    "deployed": false,
-    "testflight_uploaded": false,
+    "deployed": true,
+    "testflight_uploaded": true,
     "founder_device_operated": false
   },
   "validation": {
@@ -56,7 +61,8 @@
     }
   },
   "decisions_required": [
-    "Founder/ChatGPT review; then authorize deploy order: migration 000015 + Server 4a81f5b4 (enrollment env unset), then Native Build 70 upload (gate false)."
+    "Founder acceptance of Build 70 on device.",
+    "Separate decision later for the controlled sender-constrained enrollment canary."
   ],
   "blockers": [],
   "unexpected_findings": [
@@ -69,16 +75,15 @@
     "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
   ],
-  "recommended_next_step": "Review the consolidated report; authorize Server deploy first (gates off), verify Build 69 refresh, then upload Build 70.",
-  "full_report_path": "agent-handoffs/reports/20260930T032500Z-build70-integrated-persistent-pairing-candidate.md",
+  "recommended_next_step": "Founder accepts Build 70 per the checklist; then decide on the controlled canary.",
+  "full_report_path": "agent-handoffs/reports/20260930T043000Z-build70-server-deployed-native-uploaded.md",
   "related_report_paths": [
+    "agent-handoffs/reports/20260930T032500Z-build70-integrated-persistent-pairing-candidate.md",
     "agent-handoffs/reports/20260930T020500Z-peptide-build70-final-candidate-closeout-v2.md",
     "agent-handoffs/reports/20260930T014500Z-peptide-build70-verification-checkpoint.md",
     "agent-handoffs/reports/20260929T182500Z-peptide-build70-final-candidate-closeout.md",
     "agent-handoffs/reports/20260929T083000Z-peptide-protocol-editor-pause-resume-design-map.md",
-    "agent-handoffs/reports/20260929T050000Z-server-98534bf8-and-native-build69-distribution.md",
-    "agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md",
-    "agent-handoffs/reports/20260929T043000Z-daily-driver-server-faa9151a-production-deploy.md"
+    "agent-handoffs/reports/20260929T050000Z-server-98534bf8-and-native-build69-distribution.md"
   ],
   "safety": {
     "contains_secrets": false,

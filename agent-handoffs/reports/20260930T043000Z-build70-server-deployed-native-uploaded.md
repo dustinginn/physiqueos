@@ -1,0 +1,40 @@
+# Build 70 rollout: integrated Server `4a81f5b4` DEPLOYED and verified; Native Build 70 `754376c5` UPLOADED (VALID). Persistent-pairing enrollment OFF.
+
+Authorization: `agent-handoffs/inbox/decisions/20260930T040500Z-build70-deploy-and-testflight.md`. Candidate report: `20260930T032500Z-build70-integrated-persistent-pairing-candidate.md`. Status: **deployed + distributed; awaiting Founder acceptance.**
+
+## Predeploy production authority (reverified, read-only)
+Web+worker `446bc964dc31318ea48261400e8b243cdd1d4ab1`, deployment `3e87b8a7-8af6-4280-9cfd-b7437ff5f995` ACTIVE, nothing pending/in-progress, branch `combined-app-platform-cutover` = `446bc964`, `/live`+`/ready` 200. Candidate `4a81f5b4` descends from `446bc964` (fast-forward). Flag `PHYSIQUEOS_SENDER_CONSTRAINED_REFRESH_ENROLLMENT` unset (checked inside the running component). Migration 000015 not present: migration table listed 000001–000014, none of the 4 new tables / 4 new columns existed. No already-passed long suites were repeated (no authority/code change since the candidate report).
+
+## Migration 000015 — applied BEFORE the code deploy
+Ordering rationale: the new code updates `access_credentials.first_used_at` on every authenticated request, so the additive schema had to exist first; the old code ignores it. The reviewed migration SQL (UP_SQL SHA-256 `7037f2215988b557d58580e92e5ade3fa320b20f532256b4f3a2e70394606b4a`) was run as a bounded payload through the accepted console runner inside the production `web` component: identity gates (runtime SHA `446bc964`, flag unset), advisory lock, `lock_timeout 5s`, precondition (exactly 14 recorded migrations ending 000014), migration + `physiqueos_schema_migrations` row `000015_sender_constrained_refresh_recovery`, in-transaction verification (row counts unchanged: sessions 45, devices 45, access 621, refresh 621; 4 tables + 4 columns present; all 45 sessions `refresh_proof_version=0` with NULL key; all devices capability 0), COMMIT. A dry run (same transaction, ROLLBACK) passed first and left nothing behind. Result: **applied**; last migrations `000015…`, `000014…`. Zero installation keys, challenges or exchanges exist.
+
+## Server deploy
+Branch fast-forwarded `446bc964 → 4a81f5b4cac981f9241e40b556341246b83c3309`; spec changed only the 4 stamps (`PHYSIQUEOS_GIT_SHA`, `PHYSIQUEOS_BUILD_ID=physiqueos-4a81f5b4-20260930` on web and worker); the automatic spec deployment `b3f68cca` was CANCELED in favour of `create-deployment --force-rebuild` → **deployment `1fa2121a-5729-49c3-9865-a79f1724bb3f` ACTIVE 9/9** (prior `3e87b8a7` SUPERSEDED). Verified: control-plane `source_commit_hash` = `4a81f5b4…` for BOTH web and worker; stamps match; `/live` 200 (buildId `physiqueos-4a81f5b4-20260930`); `/ready` 200 with all checks ready (schema check `PROVIDER_MIGRATION_000014_APPLIED`, runtime authority ready); flag still unset (checked in-component after deploy); nothing pending.
+
+## Post-deploy verification
+- **Legacy strict refresh with the real Build 69 device:** the Founder iPhone performed a natural legacy refresh on the NEW code at 04:15:06Z (new refresh credential created 04:15:06.445, `first_used_at` set 04:15:06.538). All 45 sessions remain `refresh_proof_version=0`; 6 active / 39 revoked unchanged; no re-pair. No secrets were read.
+- **Bogus-credential probes (unauthenticated):** `/native/auth/refresh` → 401 `REFRESH_CREDENTIAL_INVALID`; `/native/auth/refresh-challenge` → 401 `CREDENTIAL_MALFORMED` (route present, no 500).
+- **Contract markers inside the running build:** `operating-plan.peptide-lifecycle.change.v1` 2, `PRIORITY_OCCURRENCE_PAUSED` 4, `PEPTIDE_LIFECYCLE_NOT_ACTIVE` 3, `scheduleSuspensions` 5, `doseAdjustable` 2, `refresh-challenge` route compiled, `sender-constrained-refresh-v1` 1, `legacy-refresh-v1` 1, `priority.skip.v1` 3, `PRIORITY_SKIP_UNSUPPORTED` 2, Apple Health provenance strings 12. Photo Intelligence: the integrated diff vs `446bc964` touches no Photo Intelligence files (reviewed); Photo/holistic briefing strings present in the build (`holistic` 18, `PhotoIntelligence` 1).
+- **Not verifiable without a Founder session (stated honestly):** a live authenticated peptide-support read (localDate/doseAdjustable in a real response), Pause/Resume round-trip, Logged Today provenance, Foam Rolling skip and weekly-range output against production data were NOT exercised; they are covered by the exact-SHA test suites and the in-build markers, and are the first items of Founder acceptance. I did not create or mutate any peptide state.
+- **Data drift:** read-only snapshots of all 47 collections + command-receipt types before/after: identical except natural HealthKit ingest from the phone at 04:00:03Z (`healthKitCanonicalDays`, `healthKitObservations` +1, one `healthkit.observations.ingest.v1` receipt) — that sync occurred before the new code went live. No Founder data was repaired or otherwise changed.
+- Runtime logs: only my own two bogus-credential probes logged 401 warnings; no 5xx.
+
+## Native Build 70 upload (Xcode only)
+Source `754376c529964eea280e87419ace68a003a9e0fb` (`claude/build70-integrated-native-20260930`, worktree clean). Archived with Xcode: `~/Library/Developer/Xcode/Archives/2026-09-30/PhysiqueOS-Build70.xcarchive` (retained), version 1.0 (70), bundle `com.physiqueos.native.dev`, team 33GMTRM6G9, dSYM UUID `8CA68E2A-91F1-33E7-9FB4-A4C6610F9EA2`. Built app Info.plist confirms `PHYSIQUEOSSenderConstrainedRefreshEnrollment = false`. The guarded upload tool's dry run passed every check (archive identity, deep strict signature, dSYM UUID, 70 > 69) → real upload via `xcodebuild -exportArchive` (API-key auth; no browser, no Xcode re-authentication needed): **delivery `7ed9cf4e-b682-4b86-8f18-fdb4464de6a9`, processing VALID (import VALID), `is-on-app-store-connect: True`**, uploaded 9/29/26 9:22 PM PDT; receipt `~/.physiqueos-release/logs/receipt-b70.json`; `last-uploaded-build` = 70. No source modified after validation.
+
+## Persistent pairing state
+Dormant: Server enrollment flag unset; Native gate false in the shipped archive; no key/challenge/exchange rows; no forced reconnect, no enrollment ceremony, no bearer grace.
+
+## Founder acceptance checklist (changed workflows only)
+1. Install Build 70 from TestFlight: existing connection survives with no re-pair and no Face ID prompt; Home loads.
+2. Peptide screen: Dose/Days/Time/Reminder/Notes rows; change dose; Pause (today/tomorrow), Cancel pause, Resume; next-dose correctness; Advanced planned-dose flow only when needed; a custom/manual plan can be replaced and saved.
+3. Foam Rolling Priority shows Mark Skipped. 4. Logged Today Apple Health caption on the Training group. 5. Weight Weekly Averages cover the full selected Goal range (e.g. 11 weeks back to Jul 19).
+6. Logger quick navigation, Workout Complete records/confetti, Activity/HealthKit daily-driver behavior unchanged.
+Known/not fixed: HealthKit Strength reconciliation notification still waits until Log opens (follow-up, out of scope).
+
+## Rollback notes
+Server: push `446bc964` to `combined-app-platform-cutover`, restore the 4 stamps (`physiqueos-446bc964-20260929`), `create-deployment --force-rebuild`. **Keep migration 000015** (additive; never drop while any proof-bound state could exist — none exists now). Peptide records edited by Build 70 read as Custom on the old code and a Server rollback silently un-pauses paused peptides. Native: Build 69 remains installable but Build 70's one-way Keychain envelope migration means a re-pair after downgrading.
+
+## Blockers / follow-ups
+None. Follow-ups: controlled canary decision for sender-constrained enrollment (separate authorization); P2 items from the candidate report (retention job for challenge/exchange rows, refresh-challenge in the bootstrap manifest, malformed-proof 500→400); HealthKit reconciliation-notification timing.
+Local-only state: none (private Founder harness only in the local job dir; migration/probe payloads contain no secrets and were not pushed). Photo Intelligence audit untouched. Disk 17.6 GiB free (regenerable build output only cleaned).
