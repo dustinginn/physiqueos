@@ -2,15 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: peptide protocol editor redesign + Pause/Resume (+ Build 69 follow-ups + Weekly Averages addendum)
+- Task: peptide protocol editor redesign + Pause/Resume + Build 69 roll-forwards + Weekly Averages addendum
 - Agent: claude
-- Status: **CANDIDATE code complete; Native full suite + Release compile pending (disk floor).** Nothing deployed or uploaded.
-- Generated (UTC): 2026-09-29T17:55:00Z
-- Full report: `agent-handoffs/reports/20260929T175500Z-peptide-build70-candidate-status.md`
-- Design map: `agent-handoffs/reports/20260929T083000Z-peptide-protocol-editor-pause-resume-design-map.md`
+- Status: **FINAL CANDIDATE — all gates passed; awaiting Founder/ChatGPT review. Nothing deployed or uploaded.**
+- Generated (UTC): 2026-09-29T18:25:00Z
+- Closeout: `agent-handoffs/reports/20260929T182500Z-peptide-build70-final-candidate-closeout.md`
 
-**Candidate:** Server `b94ab533` (`claude/next-build-server-candidate-20260929`) — full regression 9315/9623, 303 baseline failures, 0 new. Native Build 70 `0e3a0da8` (`claude/peptide-ux-native-20260929`) — three adversarial reviews, no blockers, majors fixed, typechecks clean; full suite and Release compile not yet run.
+**Exact SHAs:** Server `b94ab533c19821a1f4276e4167c5dc080b86f4d0` (`claude/next-build-server-candidate-20260929`); Native Build 70 `bf7ba1e73e41869084ee24bd979c329ecbed42b3` (`claude/peptide-ux-native-20260929`).
 
-**Blocked:** free disk is 14.0 GiB, under the 15 GiB standing floor; the Founder was asked to authorize running at ~14 GiB or free space.
+**Gates:** Server regression 9315/9623 (0 new vs baseline) + production build OK; Native unit suite 1564/1564 + Release compile OK.
 
-**Next:** Founder answers; Claude runs the Native suite + Release compile, publishes the final report, push-notifies. No Server deploy or TestFlight upload until the Founder/ChatGPT review.
+**Deploy order (not authorized):** Server first, then Native Build 70 upload. Founder acceptance scope is limited to the changed peptide/Pause/Resume, Logged Today caption, Foam Rolling skip, and weekly-average flows.
