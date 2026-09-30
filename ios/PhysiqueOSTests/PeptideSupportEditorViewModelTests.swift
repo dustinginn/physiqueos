@@ -483,7 +483,7 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
         let api = StubSupportAPI(fetchQueue: [try detail()], saveResult: .failure(ProductionNativeError.invalidResponse))
         let model = makeModel(api: api)
         await model.load()
-        let outcome16 = await model.setReminder(false)
+        let outcome16 = await model.setNotes("x")
         XCTAssertFalse(outcome16)
         XCTAssertEqual(model.errorMessage, PeptideSupportEditorViewModel.genericSaveFailureCopy)
     }

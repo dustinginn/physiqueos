@@ -52,11 +52,11 @@ final class PeptideScreenPresentationTests: XCTestCase {
     func testPeptideScreenKeepsTheDesignChromeAndCopy() throws {
         let view = try source("PhysiqueOS/Presentation/OperatingPlan/OperatingPlanPeptideExecutionView.swift")
         for required in [
-            "\"Peptides\"", "eyebrow: \"Peptide\"", "StatusChip(text: \"Paused\"", "StatusChip(text: \"Active\"",
-            "\"Set a dose\"", "\"Add notes\"", "\"Planned change\"", "\"Paused since\"", "\"Next dose\"",
-            "\"Pause \\(detail.name)\"", "\"Resume \\(detail.name)\"", "\"Pause \\(detail.name)?\"",
+            "\"Peptides\"", "eyebrow: \"Peptide\"", "StatusChip(text: viewModel.statusChipText",
+            "\"Set a dose\"", "\"Add notes\"", "\"Planned change\"", "viewModel.pausedRowLabel", "\"Next dose\"",
+            "\"Pause \\(detail.name)\"", "viewModel.resumeButtonTitle", "\"Try again\"", ".refreshable", "\"Pause \\(detail.name)?\"",
             "Upcoming doses and reminders stop until you resume. Your dose history is kept.",
-            "Today's dose is not marked complete; choose Tomorrow if you took it",
+            "Today's dose is still open. Starting today removes it. Choose Tomorrow if you haven't logged it yet.",
             "\"Advanced · dose plan\"", "\"Start a new plan from today\"", "\"Dose history\"", "\"Show all\"",
             "Rewrite your dose history?", "confirmationDialog", "PhysiqueOSDisclosureRow", "PrimaryActionButton",
             "accessibilityHint(\"Double tap to change\")", ".accessibilityElement(children: .combine)", "minHeight: 44",
@@ -78,7 +78,7 @@ final class PeptideScreenPresentationTests: XCTestCase {
     func testSheetsUseAMediumDetentCancelSaveAndKeepTheValueOnFailure() throws {
         let sheets = try source("PhysiqueOS/Presentation/OperatingPlan/PeptideSupportSheets.swift")
         for required in [
-            "presentationDetents([.medium])", "interactiveDismissDisabled(isSaving)", "\"Saving…\"", "\"Cancel\"",
+            "presentationDetents([.medium, .large])", "interactiveDismissDisabled(isSaving)", "\"Saving…\"", "\"Cancel\"",
             "OperatingPlanEditorErrorBanner", "\"operatingPlan.peptide.sheet.save\"", "viewModel.errorMessage = nil",
             "NumericEditField", "step: 0.25", "accessibilityLabel(\"Dose\")", "\"Pick a date…\"", "\"Today\"",
             "\"Only the next dose\"", ".priorityOccurrence(priorityId:", "datePickerStyle(.wheel)", "labelsHidden()",
