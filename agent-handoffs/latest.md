@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Sleep Phase C: dormant Server 08aeecde deployed + dormancy passed; Build 73 VALID; stopped before D0 (`healthkit-sleep-phase-c-historical-validation-and-rollout-20260930`)
+- Task: Sleep Phase C: Oura preference + Sep 1-30 historical window open; waiting for Founder device run (`healthkit-sleep-phase-c-historical-validation-and-rollout-20260930`)
 - Agent: claude
 - Status: partial
-- Generated (UTC): 2026-09-30T20:12:51Z
+- Generated (UTC): 2026-09-30T20:31:47Z
 - Success: true
 
-Summary: Founder-authorized dormant Server deploy of 08aeecde (deployment 1e7d28e6; web/worker source + log SHA parity). Dormancy acceptance passed: live/ready 200, both Sleep capabilities disabled, operational and historical-validation ingest refused 409, 0 Sleep samples/days/validation samples, 0 strategic leaks, 0 mutations. Native Build 73 (05912674) archived with Xcode and uploaded, delivery 32e7ff54 VALID. Stopped before D0: no activation, no Oura preference, no validation window, no Founder Sleep read.
+Summary: Guarded dry-run/apply: Oura source preference (generic record) and historical validation window hv-2026-10-01-30d (sleep days 2026-09-01..2026-09-30, ends at the D0 2026-10-01 floor). Prospective activation absent/OFF. Read-only verification: validation capability enabled for exact window; prospective capability disabled; operational ingest 409; Sleep samples/days/validation samples 0; strategic leakage 0. Founder tap sequence published.
 
-Detailed report: `agent-handoffs/reports/20260930T201251Z-healthkit-sleep-phase-c-dormant-deploy-build73.md`
+Detailed report: `agent-handoffs/reports/20260930T203147Z-healthkit-sleep-phase-c-historical-window-open.md`
 
 Protocol: `agent-handoffs/README.md`

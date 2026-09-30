@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T20:12:51Z",
+  "generated_at_utc": "2026-09-30T20:31:47Z",
   "task": {
     "id": "healthkit-sleep-phase-c-historical-validation-and-rollout-20260930",
-    "title": "HealthKit Sleep Phase C: dormant Server 08aeecde deployed + dormancy passed; Build 73 VALID; stopped before D0",
+    "title": "Sleep Phase C: Oura preference + Sep 1-30 historical window open; waiting for Founder device run",
     "agent": "claude",
     "status": "partial"
   },
@@ -17,41 +17,38 @@
     "native_build": "73"
   },
   "result": {
-    "summary": "Founder-authorized dormant Server deploy of 08aeecde (deployment 1e7d28e6; web/worker source + log SHA parity). Dormancy acceptance passed: live/ready 200, both Sleep capabilities disabled, operational and historical-validation ingest refused 409, 0 Sleep samples/days/validation samples, 0 strategic leaks, 0 mutations. Native Build 73 (05912674) archived with Xcode and uploaded, delivery 32e7ff54 VALID. Stopped before D0: no activation, no Oura preference, no validation window, no Founder Sleep read.",
+    "summary": "Guarded dry-run/apply: Oura source preference (generic record) and historical validation window hv-2026-10-01-30d (sleep days 2026-09-01..2026-09-30, ends at the D0 2026-10-01 floor). Prospective activation absent/OFF. Read-only verification: validation capability enabled for exact window; prospective capability disabled; operational ingest 409; Sleep samples/days/validation samples 0; strategic leakage 0. Founder tap sequence published.",
     "success": true,
     "production_mutated": true,
-    "deployed": true,
-    "testflight_uploaded": true
+    "deployed": false,
+    "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "passed",
-      "summary": "Server 08aeecde full unit failure set identical to base, build exit 0; Native 1632/1633 (unrelated Peptide date test), Release compile ok."
+      "status": "not_applicable",
+      "summary": "Configuration operations only (reviewed runner at production SHA)."
     },
     "review": {
-      "status": "approved",
-      "summary": "Server and Native fresh reviews: no remaining blockers/should-fix."
+      "status": "not_applicable",
+      "summary": "Runner previously fresh-reviewed at 08aeecde."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Read-only in-database dormancy probe with exact 08aeecde modules: capabilities disabled, both Sleep commands 409, zero Sleep rows, zero strategic leaks, zero mutations."
+      "summary": "Pre and post read-only audits: counts 0, leaks 0, 0 mutations."
     }
   },
   "decisions_required": [
-    "Founder: choose prospective Sleep D0 (America/Los_Angeles); then authorize Oura preference write + historical-validation window open (D0-30..D0-1) and the on-device historical validation run.",
-    "Separately: authorize prospective activation (validation_only) after historical validation."
+    "Founder: run Build 73 Founder canary > SLEEP HISTORICAL VALIDATION (exact taps in report) and report the counts.",
+    "Later: separate authorization for prospective activation (D0 2026-10-01 floor is Sep 30 18:00 PDT; if passed, a new D0 will be proposed)."
   ],
   "blockers": [],
-  "unexpected_findings": [
-    "Local router DNS intermittently NXDOMAINs the production host (production healthy).",
-    "Read-only runner wrapper fails on a local NO_COLOR/FORCE_COLOR stderr warning; run with those env vars unset."
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Historical validation run + sanitized shape audit + Evidence-design handoff after D0.",
-    "Prospective activation acceptance (2-3 nights)."
+    "Historical-shape audit + Evidence-design handoff after the device run.",
+    "Native Founder Production page cleanup (obsolete canary/diagnostic UI) for the next Sleep candidate."
   ],
-  "recommended_next_step": "Founder chooses D0 and authorizes the Oura preference + historical-validation window; Claude runs dry-run/apply, Founder taps the canary validation button, Claude audits the shape and writes the Evidence-design handoff.",
-  "full_report_path": "agent-handoffs/reports/20260930T201251Z-healthkit-sleep-phase-c-dormant-deploy-build73.md",
+  "recommended_next_step": "Founder runs the historical validation on the iPhone using the exact tap sequence, then reports the counts.",
+  "full_report_path": "agent-handoffs/reports/20260930T203147Z-healthkit-sleep-phase-c-historical-window-open.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
