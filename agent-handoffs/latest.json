@@ -1,48 +1,57 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T19:53:33Z",
+  "generated_at_utc": "2026-09-30T20:12:51Z",
   "task": {
     "id": "healthkit-sleep-phase-c-historical-validation-and-rollout-20260930",
-    "title": "HealthKit Sleep Phase C checkpoint: candidates ready; dormant Server deploy blocked by local permission gate",
+    "title": "HealthKit Sleep Phase C: dormant Server 08aeecde deployed + dormancy passed; Build 73 VALID; stopped before D0",
     "agent": "claude",
-    "status": "blocked"
+    "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "372c306ba45ffaa0f93f7bf74e4c0c266070d9a5",
     "final_sha": "08aeecdeb9f02e311efa2cd037940fbf0b249bb7",
-    "production_server_sha": "372c306b",
-    "production_deployment": "01d9c20f-8b91-4872-a31a-ea9e9276bfcb",
+    "production_server_sha": "08aeecde",
+    "production_deployment": "1e7d28e6-b142-4d8c-9fac-96dd1498ffd8",
     "native_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
-    "native_build": "73 (source ready, not uploaded)"
+    "native_build": "73"
   },
   "result": {
-    "summary": "Server Phase C candidate 08aeecde (Phase A + isolated historical-validation lane + guarded Sleep policy runner + zero-write Sleep audit) and Native Build 73 source 05912674 (Phase B + Founder-only historical validation diagnostic) are validated and fresh-reviewed (no blockers). The dormant production Server deploy was refused by the local Claude Code auto-mode permission classifier before any command ran; production unchanged at 372c306b. Upload waits for Server dormancy verification.",
-    "success": false,
-    "production_mutated": false,
-    "deployed": false,
-    "testflight_uploaded": false
+    "summary": "Founder-authorized dormant Server deploy of 08aeecde (deployment 1e7d28e6; web/worker source + log SHA parity). Dormancy acceptance passed: live/ready 200, both Sleep capabilities disabled, operational and historical-validation ingest refused 409, 0 Sleep samples/days/validation samples, 0 strategic leaks, 0 mutations. Native Build 73 (05912674) archived with Xcode and uploaded, delivery 32e7ff54 VALID. Stopped before D0: no activation, no Oura preference, no validation window, no Founder Sleep read.",
+    "success": true,
+    "production_mutated": true,
+    "deployed": true,
+    "testflight_uploaded": true
   },
   "validation": {
-    "tests": {"status": "passed", "summary": "Server 08aeecde: full unit suite failure set identical to base (304 pre-existing), production build exit 0. Native 05912674: PhysiqueOSTests 1632/1633 (unrelated date-dependent Peptide test), Release compile succeeded."},
-    "review": {"status": "approved", "summary": "Server fresh review 2 rounds: no remaining blockers/should-fix. Native fresh review: no blockers; should-fix (full-payload batch identity) fixed."},
-    "zero_write_audit": {"status": "not_run", "summary": "Dormancy audit runs after the Server deploy."}
+    "tests": {
+      "status": "passed",
+      "summary": "Server 08aeecde full unit failure set identical to base, build exit 0; Native 1632/1633 (unrelated Peptide date test), Release compile ok."
+    },
+    "review": {
+      "status": "approved",
+      "summary": "Server and Native fresh reviews: no remaining blockers/should-fix."
+    },
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "Read-only in-database dormancy probe with exact 08aeecde modules: capabilities disabled, both Sleep commands 409, zero Sleep rows, zero strategic leaks, zero mutations."
+    }
   },
   "decisions_required": [
-    "Founder: plain chat authorization for the dormant production Server deploy of 08aeecde (the local permission classifier requires it), and for the Build 73 TestFlight upload.",
-    "Later: Sleep D0 (prospective) authorization; the historical window is D0-30..D0-1."
+    "Founder: choose prospective Sleep D0 (America/Los_Angeles); then authorize Oura preference write + historical-validation window open (D0-30..D0-1) and the on-device historical validation run.",
+    "Separately: authorize prospective activation (validation_only) after historical validation."
   ],
-  "blockers": [
-    "Local Claude Code auto-mode classifier denied [Production Deploy] despite the GitHub prompt; needs a Founder chat sentence."
-  ],
+  "blockers": [],
   "unexpected_findings": [
-    "This Mac's router DNS intermittently NXDOMAINs the production host; production healthy via public resolver."
+    "Local router DNS intermittently NXDOMAINs the production host (production healthy).",
+    "Read-only runner wrapper fails on a local NO_COLOR/FORCE_COLOR stderr warning; run with those env vars unset."
   ],
   "backlog": [
-    "After deploy: dormancy acceptance, Build 73 upload, D0 authorization, historical validation run, Evidence-design handoff."
+    "Historical validation run + sanitized shape audit + Evidence-design handoff after D0.",
+    "Prospective activation acceptance (2-3 nights)."
   ],
-  "recommended_next_step": "Founder: say 'Deploy Server 08aeecde dormant to production now and upload Build 73' in the Claude chat; Claude then deploys, verifies dormancy, uploads Build 73, and stops for D0.",
-  "full_report_path": "agent-handoffs/reports/20260930T195333Z-healthkit-sleep-phase-c-checkpoint-deploy-gate.md",
+  "recommended_next_step": "Founder chooses D0 and authorizes the Oura preference + historical-validation window; Claude runs dry-run/apply, Founder taps the canary validation button, Claude audits the shape and writes the Evidence-design handoff.",
+  "full_report_path": "agent-handoffs/reports/20260930T201251Z-healthkit-sleep-phase-c-dormant-deploy-build73.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
