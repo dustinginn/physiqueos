@@ -137,17 +137,21 @@ export function summarizeHealthKitSleepValidation({ samples = [], preferenceReco
   const mains = nights.map((day) => (day.mainEpisodeIndex === null ? null : day.episodes[day.mainEpisodeIndex]));
   const mainEpisodes = mains.filter(Boolean);
   const reasonsOuraNotPrimary = [];
+  // A night "has Oura" when any live Oura sample belongs to that sleep day,
+  // whether or not it landed in the main episode.
+  const ouraNights = new Set(live.filter((sample) => sample.source?.sourceFamily === "oura")
+    .map((sample) => validationSampleSleepDay(sample)).filter(inWindow));
   let ouraPresentNights = 0;
   let ouraPrimaryWhenPresent = 0;
   let genericDiffers = 0;
   for (const [sleepDay, day] of preferred) {
     const main = day.mainEpisodeIndex === null ? null : day.episodes[day.mainEpisodeIndex];
     if (!main) continue;
-    const families = new Set([main.primarySource.sourceFamily, ...main.corroboratingSources.map((source) => source.sourceFamily)]);
-    if (families.has("oura")) {
+    if (ouraNights.has(sleepDay)) {
       ouraPresentNights += 1;
+      const ouraInMain = main.corroboratingSources.find((source) => source.sourceFamily === "oura");
       if (main.primarySource.sourceFamily === "oura") ouraPrimaryWhenPresent += 1;
-      else reasonsOuraNotPrimary.push(main.corroboratingSources.find((source) => source.sourceFamily === "oura")?.usable ? "oura_usable_but_not_primary" : "oura_insufficient_coverage");
+      else reasonsOuraNotPrimary.push(!ouraInMain ? "oura_outside_main_episode" : ouraInMain.usable ? "oura_usable_but_not_primary" : "oura_insufficient_coverage");
     }
     const genericMain = generic.get(sleepDay);
     const genericPrimary = genericMain?.mainEpisodeIndex === null || !genericMain ? null : genericMain.episodes[genericMain.mainEpisodeIndex].primarySource.sourceFamily;

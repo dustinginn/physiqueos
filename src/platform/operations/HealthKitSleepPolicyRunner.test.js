@@ -53,9 +53,26 @@ describe("guarded Sleep policy runner", () => {
     expect(replay.outcome).toBe("already_applied");
   });
 
-  it("refuses a past D0 (prospective only) and a conflicting D0", async () => {
-    expect(await runHealthKitSleepPolicy({ records: store(), authorization: auth({ effectiveSleepDay: "2026-09-30" }), action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, now: NOW }))
-      .toMatchObject({ outcome: "refused", reason: "effective_sleep_day_not_prospective" });
+  it("refuses a D0 whose floor is not strictly in the future, a conflicting D0, and a conflicting zone", async () => {
+    // NOW = Oct 1 11:00 PDT: D0 = Oct 1 has a floor of Sep 30 18:00 (past).
+    for (const d0 of ["2026-09-30", "2026-10-01"]) {
+      expect(await runHealthKitSleepPolicy({ records: store(), authorization: auth({ effectiveSleepDay: d0 }), action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, now: NOW }))
+        .toMatchObject({ outcome: "refused", reason: "activation_floor_not_in_future" });
+      expect(await runHealthKitSleepPolicy({ records: store(), authorization: auth({ effectiveSleepDay: d0 }), action: HealthKitSleepPolicyAction.OPEN_HISTORICAL_VALIDATION, now: NOW }))
+        .toMatchObject({ outcome: "refused", reason: "activation_floor_not_in_future" });
+    }
+    // After 18:00 local, even tomorrow's floor has passed.
+    expect(await runHealthKitSleepPolicy({ records: store(), authorization: auth({ effectiveSleepDay: "2026-10-02" }), action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, now: () => new Date("2026-10-02T02:00:00Z") }))
+      .toMatchObject({ outcome: "refused", reason: "activation_floor_not_in_future" });
+    const zoned = store();
+    await dryThenApply(zoned, HealthKitSleepPolicyAction.OPEN_HISTORICAL_VALIDATION, auth({ effectiveSleepDay: "2026-10-05" }));
+    expect(await runHealthKitSleepPolicy({ records: zoned, authorization: auth({ effectiveSleepDay: "2026-10-05", timeZone: "America/New_York" }), action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, now: NOW }))
+      .toMatchObject({ outcome: "refused", reason: "historical_validation_anchored_to_different_time_zone" });
+    // A CLOSED run still anchors D0.
+    await dryThenApply(zoned, HealthKitSleepPolicyAction.CLOSE_HISTORICAL_VALIDATION, auth());
+    expect(await runHealthKitSleepPolicy({ records: zoned, authorization: auth({ effectiveSleepDay: "2026-10-03" }), action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, now: NOW }))
+      .toMatchObject({ outcome: "refused", reason: "historical_validation_anchored_to_different_d0" });
+    expect((await dryThenApply(zoned, HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, auth({ effectiveSleepDay: "2026-10-05" }))).outcome).toBe("applied");
     const records = store();
     await dryThenApply(records, HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, auth({ effectiveSleepDay: "2026-10-02" }));
     expect(await runHealthKitSleepPolicy({ records, authorization: auth({ effectiveSleepDay: "2026-10-05" }), action: HealthKitSleepPolicyAction.OPEN_HISTORICAL_VALIDATION, now: NOW }))

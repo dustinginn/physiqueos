@@ -6,6 +6,7 @@ import {
   isCalendarDateKey,
   isValidTimeZone,
   shiftDateKey,
+  sleepDayWindowStartMs,
 } from "../../domain/services/HealthKitSleepContract.js";
 import {
   HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID,
@@ -96,7 +97,17 @@ export async function runHealthKitSleepPolicy({
   const current = { activation: resolveHealthKitSleepActivationPolicy(activationRecord), validation: resolveHealthKitSleepValidationPolicy(validationRecord) };
   const existing = { [HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID]: activationRecord, [HEALTHKIT_SLEEP_SOURCE_PREFERENCE_POLICY_RECORD_ID]: preferenceRecord, [HEALTHKIT_SLEEP_VALIDATION_POLICY_RECORD_ID]: validationRecord }[recordId];
 
-  const plan = planRecord({ action, authorization, current, operationAt, existing });
+  // Anchors that bind the two lanes together: an enabled prospective policy,
+  // and any historical-validation run (enabled OR closed) that still records
+  // its D0 and zone. Both lanes must agree on BOTH, so the stored validation
+  // window always ends exactly at the prospective floor.
+  const anchors = {
+    activation: current.activation.enabled ? { d0: current.activation.effectiveSleepDay, zone: current.activation.timeZone } : null,
+    validation: validationRecord?.runId && validationRecord?.prospectiveEffectiveSleepDay
+      ? { d0: validationRecord.prospectiveEffectiveSleepDay, zone: validationRecord.timeZone }
+      : null,
+  };
+  const plan = planRecord({ action, authorization, current, operationAt, existing, anchors });
   if (plan.refused) return Object.freeze({ outcome: "refused", reason: plan.refused, facts });
   const desired = { ...plan.record, id: recordId, authorizationReference: String(authorization.authorizationReference ?? "") || null };
   const unchanged = existing && recordDigest(stripVolatile(existing)) === recordDigest(stripVolatile(desired));
@@ -124,7 +135,7 @@ export async function runHealthKitSleepPolicy({
     expectedVersion: existing ? existing.version : null,
   });
   const auditId = `${HEALTHKIT_SLEEP_POLICY_AUDIT_PREFIX}${createHash("sha256").update(`${action}\u0000${appliedAt}\u0000${recordId}`).digest("hex").slice(0, 32)}`;
-  await records.put({
+  const audit = await records.putIfAbsent({
     ownerUserId, collection: HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION, recordId: auditId,
     payload: {
       id: auditId, kind: "healthkit_sleep_policy_audit", action, recordId, appliedAt,
@@ -133,25 +144,29 @@ export async function runHealthKitSleepPolicy({
     },
   });
   const reread = await get(recordId);
+  const auditRow = await get(auditId);
   const resolution = plan.resolution(reread);
-  if (!plan.verify(resolution)) {
+  if (!audit.created || auditRow?.afterDigest !== recordDigest(written) || !plan.verify(resolution)) {
     throw Object.assign(new Error("Sleep policy verification failed after write."), { code: "SLEEP_POLICY_VERIFICATION_FAILED" });
   }
   return Object.freeze({ outcome: "applied", action, recordId, auditId, resolution, factsBefore: facts });
 }
 
-function planRecord({ action, authorization, current, operationAt, existing }) {
+function planRecord({ action, authorization, current, operationAt, existing, anchors }) {
   const zone = authorization.timeZone ?? "America/Los_Angeles";
   switch (action) {
     case HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE: {
       const d0 = authorization.effectiveSleepDay;
       if (!isCalendarDateKey(d0)) return { refused: "effective_sleep_day_invalid" };
       if (!isValidTimeZone(zone)) return { refused: "time_zone_invalid" };
-      if (d0 < localDate(operationAt, zone)) return { refused: "effective_sleep_day_not_prospective" };
+      // Prospective means the floor ((D0-1) 18:00 local) is strictly in the future.
+      if (sleepDayWindowStartMs(d0, zone) <= operationAt.getTime()) return { refused: "activation_floor_not_in_future" };
       const mode = authorization.mode ?? "validation_only";
       if (!["validation_only", "operational"].includes(mode)) return { refused: "mode_invalid" };
-      if (current.activation.enabled && current.activation.effectiveSleepDay !== d0) return { refused: "active_policy_has_different_d0" };
-      if (current.validation.enabled && current.validation.prospectiveEffectiveSleepDay !== d0) return { refused: "historical_validation_anchored_to_different_d0" };
+      if (anchors.activation && anchors.activation.d0 !== d0) return { refused: "active_policy_has_different_d0" };
+      if (anchors.activation && anchors.activation.zone !== zone) return { refused: "active_policy_has_different_time_zone" };
+      if (anchors.validation && anchors.validation.d0 !== d0) return { refused: "historical_validation_anchored_to_different_d0" };
+      if (anchors.validation && anchors.validation.zone !== zone) return { refused: "historical_validation_anchored_to_different_time_zone" };
       return {
         record: {
           status: "enabled", schemaVersion: HEALTHKIT_SLEEP_ACTIVATION_POLICY_SCHEMA_VERSION,
@@ -189,8 +204,12 @@ function planRecord({ action, authorization, current, operationAt, existing }) {
       if (!isValidTimeZone(zone)) return { refused: "time_zone_invalid" };
       // Anchored to a prospective D0 only: the window can never reach into
       // days the ordinary prospective stream could already own.
-      if (d0 < localDate(operationAt, zone)) return { refused: "effective_sleep_day_not_prospective" };
-      if (current.activation.enabled && current.activation.effectiveSleepDay !== d0) return { refused: "active_policy_has_different_d0" };
+      if (sleepDayWindowStartMs(d0, zone) <= operationAt.getTime()) return { refused: "activation_floor_not_in_future" };
+      if (anchors.activation && anchors.activation.d0 !== d0) return { refused: "active_policy_has_different_d0" };
+      if (anchors.activation && anchors.activation.zone !== zone) return { refused: "active_policy_has_different_time_zone" };
+      if (anchors.validation && (anchors.validation.d0 !== d0 || anchors.validation.zone !== zone) && existing?.runId) {
+        return { refused: "historical_validation_run_already_anchored" };
+      }
       const runId = `hv-${d0}-${days}d`;
       const record = {
         status: "enabled", schemaVersion: HEALTHKIT_SLEEP_VALIDATION_POLICY_SCHEMA_VERSION,
