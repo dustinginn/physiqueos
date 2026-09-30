@@ -274,8 +274,13 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
       const computed = new Map();
       const expansion = new Set();
       for (const run of contiguousRuns([...affected].sort())) {
-        const low = shiftDateKey(run[0], -1);
-        const high = shiftDateKey(run.at(-1), 1);
+        // Buckets use each sample's own zone, so time-adjacent samples can sit
+        // up to two bucket days apart (zone skew <= ~26 h). Load a 3-day margin
+        // and treat any input within 2 days of the loaded edge as touching it.
+        const low = shiftDateKey(run[0], -LOAD_MARGIN_DAYS);
+        const high = shiftDateKey(run.at(-1), LOAD_MARGIN_DAYS);
+        const lowEdge = shiftDateKey(low, ZONE_SKEW_DAYS);
+        const highEdge = shiftDateKey(high, -ZONE_SKEW_DAYS);
         const samples = await records.listByOccurrenceDateRange({
           ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, startDate: low, endDate: high,
         });
@@ -288,8 +293,10 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
           if (inRun.has(sleepDay)) computed.set(sleepDay, content);
           for (const id of content.inputSampleIds) relevantIds.add(id);
           for (const day of [sleepDay, ...buckets]) if (!affected.has(day)) expansion.add(day);
-          if (buckets.some((bucket) => bucket <= low) && !affected.has(low)) expansion.add(low);
-          if (buckets.some((bucket) => bucket >= high) && !affected.has(high)) expansion.add(high);
+          const before = shiftDateKey(run[0], -1);
+          const after = shiftDateKey(run.at(-1), 1);
+          if (buckets.some((bucket) => bucket <= lowEdge) && !affected.has(before)) expansion.add(before);
+          if (buckets.some((bucket) => bucket >= highEdge) && !affected.has(after)) expansion.add(after);
         }
         // Previously stored days that depended on any relevant sample must be
         // rewritten too, wherever (zone skew) they were stored.
@@ -321,6 +328,8 @@ function assertQuarantined(payload) {
 }
 
 const MAX_RECOMPUTE_PASSES = 8;
+const LOAD_MARGIN_DAYS = 3;
+const ZONE_SKEW_DAYS = 2;
 const MAX_RECOMPUTED_DAYS = 45;
 
 function contiguousRuns(sortedDays) {

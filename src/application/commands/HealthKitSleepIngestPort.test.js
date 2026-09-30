@@ -83,11 +83,11 @@ describe("healthkit.sleep.ingest.v1 storage, idempotency and revision", () => {
     expect(current.reads.some((read) => read.method === "list")).toBe(false);
     const ranges = current.reads.filter((read) => read.method === "listByOccurrenceDateRange");
     expect(ranges.every((read) => ["healthKitSleepSamples", "healthKitSleepDays"].includes(read.collection))).toBe(true);
-    // Touched days 09-09..09-13 (end day 09-11 +-2): samples read +-1 around
-    // them, stored days +-2 more. Bounded, never the whole history.
+    // Touched days 09-09..09-13 (end day 09-11 +-2): samples read +-3 around
+    // them (zone skew margin), stored days +-2 more. Bounded, never the whole history.
     expect(ranges).toEqual([
-      { method: "listByOccurrenceDateRange", collection: "healthKitSleepSamples", startDate: "2026-09-08", endDate: "2026-09-14" },
-      { method: "listByOccurrenceDateRange", collection: "healthKitSleepDays", startDate: "2026-09-06", endDate: "2026-09-16" },
+      { method: "listByOccurrenceDateRange", collection: "healthKitSleepSamples", startDate: "2026-09-06", endDate: "2026-09-16" },
+      { method: "listByOccurrenceDateRange", collection: "healthKitSleepDays", startDate: "2026-09-04", endDate: "2026-09-18" },
     ]);
   });
 
@@ -358,6 +358,8 @@ describe("review regressions", () => {
     for (const [seed, zones] of [
       [7, ["America/Los_Angeles", "Asia/Tokyo"]],
       [11, ["America/Los_Angeles", "Asia/Tokyo"]],
+      [3, ["America/Los_Angeles", "Asia/Tokyo"]],
+      [99, ["America/Los_Angeles", "Pacific/Kiritimati", "Pacific/Pago_Pago", "UTC"]],
       [7, ["America/Los_Angeles", "Pacific/Kiritimati", "Pacific/Pago_Pago", "UTC"]],
       [23, ["America/Los_Angeles", "Pacific/Kiritimati", "Pacific/Pago_Pago", "UTC"]],
     ]) {
