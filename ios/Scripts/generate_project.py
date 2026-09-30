@@ -175,7 +175,6 @@ app_files = [
     ("Presentation/Home", "TodaysFocusCardView.swift"),
     ("Presentation/Home", "PriorityDetailView.swift"),
     ("Presentation/Home", "PriorityDetailViewModel.swift"),
-    ("Presentation/Home", "NotificationDiagnosticsView.swift"),
     ("Presentation/Briefings", "BriefingHistoryView.swift"),
     ("Presentation/Briefings", "BriefingDetailView.swift"),
     ("Presentation/Briefings", "WeeklyBriefingSections.swift"),
@@ -218,7 +217,6 @@ app_files = [
     ("Presentation/OperatingPlan", "OperatingPlanTrainingProtocolBuilderView.swift"),
     ("Presentation/You", "YouPlaceholderView.swift"),
     ("Presentation/You", "FounderServerConnectionView.swift"),
-    ("Presentation/You", "WorkoutReconciliationDiagnosticsView.swift"),
     ("Presentation/Evidence", "EvidenceView.swift"),
     ("Presentation/Evidence", "EvidenceViewModel.swift"),
     ("Presentation/Evidence", "EvidenceHeaderView.swift"),
@@ -324,7 +322,7 @@ n1_app_files = [
     ("Networking", "HealthKitSynchronizationEngine.swift"),
     ("Networking", "HealthKitFounderCanaryCoordinator.swift"),
     ("Networking", "HealthKitAutomaticSynchronizationCoordinator.swift"),
-    ("Presentation/You", "HealthKitFounderCanaryView.swift"),
+    ("Presentation/You", "HealthKitSleepCanaryView.swift"),
     ("Presentation/You", "HealthKitSleepValidationSection.swift"),
 ]
 

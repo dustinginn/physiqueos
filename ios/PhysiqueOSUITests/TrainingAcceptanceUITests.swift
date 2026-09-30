@@ -19,20 +19,18 @@ final class TrainingAcceptanceUITests: XCTestCase {
         openTrainingLanding()
     }
 
-    func testFounderNotificationDiagnosticsAreReachableWithoutHomeGesture() throws {
+    /// Graduated capabilities no longer expose diagnostic or manual-trigger
+    /// UI on the Founder Production page; only session controls (and, while
+    /// connected, the temporary Sleep canary) remain.
+    func testFounderProductionPageCarriesNoObsoleteDiagnostics() throws {
         launchInSandbox()
         app.buttons["You"].tap()
         tapText("Founder device connection")
         app.segmentedControls.buttons["Founder Production"].tap()
-        let diagnostics = app.buttons["founder.notifications.diagnostics"]
-        XCTAssertTrue(diagnostics.waitForExistence(timeout: 5))
-        diagnostics.tap()
-        assertText("Notification Diagnostics")
-        assertText("CAPTURE")
-        assertText("AUTHORIZATION")
-        scrollToText("Only notifications still retained by iOS are visible. An empty list does not prove a request was never scheduled.")
-        scrollToText("RECENT SCHEDULING ACTIVITY")
-        app.buttons["Done"].tap()
+        assertText("Founder Production connection")
+        XCTAssertFalse(app.buttons["founder.notifications.diagnostics"].exists)
+        XCTAssertFalse(app.buttons["founder.workoutReconciliation.diagnostics"].exists)
+        XCTAssertFalse(app.staticTexts["HEALTHKIT FOUNDER CANARY"].exists)
     }
 
     func testDatePickerTodayIsReachableWithoutSavingEvidence() throws {

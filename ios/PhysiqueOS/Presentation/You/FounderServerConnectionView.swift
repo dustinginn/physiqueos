@@ -366,12 +366,7 @@ private struct ProductionFounderConnectionView: View {
     @State private var isConnected = false
     @State private var recoveryState: ProductionSessionRecoveryState = .unpaired
     @State private var isWorking = false
-    @State private var profile: ProductionResponseEnvelope<ProductionProfileData>?
-    @State private var contracts: ProductionContractManifest?
-    @State private var weight: ProductionResponseEnvelope<FounderProductionWeightSummary>?
     @State private var message: String?
-    @State private var showingNotificationDiagnostics = false
-    @State private var showingWorkoutReconciliationDiagnostics = false
 
     var body: some View {
         ScrollView {
@@ -407,16 +402,6 @@ private struct ProductionFounderConnectionView: View {
                     EmptyView()
                 }
 
-                Button("Notification diagnostics") { showingNotificationDiagnostics = true }
-                    .accessibilityIdentifier("founder.notifications.diagnostics")
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-
-                Button("Workout reconciliation diagnostics") { showingWorkoutReconciliationDiagnostics = true }
-                    .accessibilityIdentifier("founder.workoutReconciliation.diagnostics")
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-
                 if !isConnected {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("10-minute production pairing credential")
@@ -436,39 +421,6 @@ private struct ProductionFounderConnectionView: View {
                             connect()
                         }
                     }
-                } else {
-                    PrimaryActionButton(title: "Refresh production reads", isEnabled: !isWorking) {
-                        loadReads()
-                    }
-                }
-
-                if let profile {
-                    readResultCard(
-                        title: "Profile",
-                        value: profile.data.profile.identity?.displayName
-                            ?? profile.data.profile.identity?.firstName
-                            ?? profile.data.profile.identity?.id
-                            ?? "Founder",
-                        detail: "\(profile.data.authority.type) · read \(profile.data.capabilities.read ? "available" : "unavailable")"
-                    )
-                }
-
-                if let contracts {
-                    readResultCard(
-                        title: "Contracts",
-                        value: "v\(contracts.contractVersion)",
-                        detail: "\(contracts.reads.count) reads advertised · bounded Native write guard active"
-                    )
-                }
-
-                if let current = weight?.data.currentWeight {
-                    readResultCard(
-                        title: "Canonical Weight",
-                        value: "\(current.value.formatted(.number.precision(.fractionLength(1)))) \(current.unit)",
-                        detail: "Measured \(current.measurementDate)"
-                    )
-                } else if weight != nil {
-                    readResultCard(title: "Canonical Weight", value: "No measurement", detail: "Founder Production returned an empty current Weight state.")
                 }
 
                 if let message {
@@ -479,7 +431,11 @@ private struct ProductionFounderConnectionView: View {
                 }
 
                 if isConnected {
-                    HealthKitFounderCanaryView()
+                    // Graduated capabilities (Activity, Nutrition, Workouts,
+                    // Strength reconciliation, notifications) run
+                    // automatically and have no controls here. Only the
+                    // temporary Sleep canary remains until Sleep graduates.
+                    HealthKitSleepCanaryView()
 
                     Button("Disconnect this production session", role: .destructive) {
                         revoke()
@@ -493,35 +449,12 @@ private struct ProductionFounderConnectionView: View {
         }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
-        .sheet(isPresented: $showingNotificationDiagnostics) {
-            NotificationDiagnosticsView()
-        }
-        .sheet(isPresented: $showingWorkoutReconciliationDiagnostics) {
-            WorkoutReconciliationDiagnosticsView()
-        }
         .task {
             let state = await environment.productionNativeAPI.resolveStoredSession()
             await MainActor.run {
                 recoveryState = state
                 isConnected = ![.unpaired, .reconnectRequired].contains(state)
             }
-        }
-    }
-
-    private func readResultCard(title: String, value: String, detail: String) -> some View {
-        CardContainer(padding: .md) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(value)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(detail)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -540,45 +473,14 @@ private struct ProductionFounderConnectionView: View {
                     isConnected = true
                     recoveryState = .authenticated
                     environment.selectNativeAuthority(.founderProduction)
+                    message = "Connected to Founder Production."
+                    isWorking = false
                 }
-                await loadReadsAsync()
             } catch {
                 await MainActor.run {
                     message = (error as? LocalizedError)?.errorDescription ?? "This iPhone could not be connected to Founder Production."
                     isWorking = false
                 }
-            }
-        }
-    }
-
-    private func loadReads() {
-        isWorking = true
-        message = nil
-        Task { await loadReadsAsync() }
-    }
-
-    private func loadReadsAsync() async {
-        do {
-            let api = environment.productionNativeAPI
-            async let loadedProfile = api.readProfile()
-            async let loadedContracts = api.readContracts()
-            async let loadedWeight = api.readWeight()
-            let results = try await (loadedProfile, loadedContracts, loadedWeight)
-            await MainActor.run {
-                profile = results.0
-                contracts = results.1
-                weight = results.2
-                message = "Founder Production reads succeeded."
-                isWorking = false
-            }
-        } catch {
-            let state = await environment.productionNativeAPI.sessionRecoveryState()
-            await MainActor.run {
-                message = (error as? LocalizedError)?.errorDescription ?? "Founder Production reads could not be loaded."
-                if case ProductionNativeError.notPaired = error { isConnected = false }
-                if case ProductionNativeError.reconnectRequired = error { isConnected = false }
-                recoveryState = state
-                isWorking = false
             }
         }
     }
@@ -592,9 +494,6 @@ private struct ProductionFounderConnectionView: View {
                 await MainActor.run {
                     isConnected = false
                     recoveryState = .unpaired
-                    profile = nil
-                    contracts = nil
-                    weight = nil
                     message = "Founder Production session revoked on this iPhone."
                     isWorking = false
                 }
