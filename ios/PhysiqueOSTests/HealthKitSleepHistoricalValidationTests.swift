@@ -98,6 +98,23 @@ final class HealthKitSleepHistoricalValidationTests: XCTestCase {
         XCTAssertEqual(payloads[0], payloads[1])
     }
 
+    func testRerunAfterDeviceZoneChangeUsesANewRequestIdentity() async {
+        let first = SleepFixtures.addition(id: 1, start: "2026-09-20T06:00:00Z", end: "2026-09-20T14:00:00Z", zone: "America/Los_Angeles", zoneSource: nil)
+        let second = SleepFixtures.addition(id: 1, start: "2026-09-20T06:00:00Z", end: "2026-09-20T14:00:00Z", zone: "America/New_York", zoneSource: nil)
+        let submitter = ValidationSubmitterMock()
+        for addition in [first, second] {
+            let runner = HealthKitSleepHistoricalValidationRunner(
+                capabilitySource: ValidationCapabilityMock(block: Self.block()),
+                reader: ValidationReaderMock(additions: [addition]), submitter: submitter
+            )
+            _ = await runner.run()
+        }
+        let payloads = await submitter.payloads()
+        XCTAssertEqual(payloads.count, 2)
+        XCTAssertNotEqual(payloads[0].batchId, payloads[1].batchId,
+                          "different bytes must never reuse an Idempotency-Key")
+    }
+
     func testFailsClosedOnReadErrorTooManySamplesAndDisabledServer() async {
         let tooMany = HealthKitSleepHistoricalValidationRunner(
             capabilitySource: ValidationCapabilityMock(block: Self.block()),

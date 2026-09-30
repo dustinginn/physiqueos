@@ -767,7 +767,9 @@ extension SystemHealthKitQueryClient: HealthKitSleepHistoricalReader {
               let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)
         else { throw HealthKitSyncError.operational(code: "healthkit_sleep_validation_window_invalid") }
         let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-            HKQuery.predicateForSamples(withStart: start, end: nil, options: [.strictEndDate]),
+            // One minute of slack below: HealthKit's lower bound can be
+            // exclusive. The runner re-checks [start, end) exactly.
+            HKQuery.predicateForSamples(withStart: start.addingTimeInterval(-60), end: nil, options: [.strictEndDate]),
             HKQuery.predicateForSamples(withStart: nil, end: end, options: [.strictEndDate]),
         ])
         let calendar = self.calendar

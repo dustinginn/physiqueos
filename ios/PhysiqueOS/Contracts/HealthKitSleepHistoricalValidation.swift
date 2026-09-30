@@ -100,8 +100,8 @@ struct ProductionHealthKitSleepValidationSubmitter: HealthKitSleepValidationSubm
                 idempotencyKey: payload.batchId,
                 payload: payload
             )
-            guard outcome.outcome != .pending,
-                  let result = outcome.receipt.result,
+            guard outcome.outcome != .pending else { return .failed(code: "healthkit_sleep_validation_receipt_pending") }
+            guard let result = outcome.receipt.result,
                   result.contractVersion == HealthKitSleepHistoricalValidationContract.contractVersion,
                   result.batchId == payload.batchId,
                   result.runId == payload.runId,
@@ -139,6 +139,11 @@ struct HealthKitSleepValidationRunSummary: Equatable, Sendable {
 /// identities are deterministic in the run and sample UUIDs, and the Server
 /// replays identical samples.
 actor HealthKitSleepHistoricalValidationRunner {
+    private static let identityEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
+    }()
     private let capabilitySource: any HealthKitSleepValidationCapabilitySource
     private let reader: any HealthKitSleepHistoricalReader
     private let submitter: any HealthKitSleepValidationSubmitting
@@ -196,7 +201,10 @@ actor HealthKitSleepHistoricalValidationRunner {
         samples.sort { $0.externalId < $1.externalId }
         for start in stride(from: 0, to: samples.count, by: HealthKitSleepIngestionContract.maximumSamplesPerBatch) {
             let chunk = Array(samples[start..<min(start + HealthKitSleepIngestionContract.maximumSamplesPerBatch, samples.count)])
-            let material = ([capability.runId] + chunk.map { "\($0.externalId)|\($0.categoryValue)|\($0.startedAt)|\($0.endedAt)" }).joined(separator: "\u{0}")
+            // The identity covers the WHOLE encoded chunk (every field the
+            // Server's receipt hash sees), so a re-run after a device zone
+            // change is a new, valid request instead of IDEMPOTENCY_KEY_REUSED.
+            let material = (try? Self.identityEncoder.encode(chunk)).map { Data(capability.runId.utf8) + Data([0]) + $0 } ?? Data()
             let payload = HealthKitSleepValidationWirePayload(
                 batchId: "healthkit_sleep_validation_\(HealthKitStableDigest.hex(material))",
                 runId: capability.runId,
