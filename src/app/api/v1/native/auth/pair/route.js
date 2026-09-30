@@ -12,6 +12,7 @@ export async function POST(request) {
       pairingCredential: payload.pairingCredential,
       platform: payload.platform,
       displayName: payload.displayName,
+      refreshProof: payload.refreshProof,
       requestId,
     });
   }, { buildIdentity: foundationBuildIdentity, logger: foundationLogger });

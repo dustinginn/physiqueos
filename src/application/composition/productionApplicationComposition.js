@@ -135,6 +135,7 @@ export function getProductionFounderAuthService(env = process.env) {
   return createFounderAuthService({
     transactionRunner: createFoundationPostgresTransactionRunner({ pool: runtime.pool }),
     credentialPepper: required(env.PHYSIQUEOS_CREDENTIAL_PEPPER, "PHYSIQUEOS_CREDENTIAL_PEPPER"),
+    allowSenderConstrainedEnrollment: env.PHYSIQUEOS_SENDER_CONSTRAINED_REFRESH_ENROLLMENT === "1",
   });
 }
 

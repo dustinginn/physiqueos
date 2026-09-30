@@ -32,9 +32,10 @@ describe("inactive Founder authentication lifecycle", () => {
   });
 
   it("returns an authenticated principal only for a live access credential", async () => {
-    const identity = baseIdentity({ findAccessCredentialForAuthentication: vi.fn().mockResolvedValue({ user_id: "user", device_id: "device", session_id: "session", expires_at: "2026-08-11T12:05:00.000Z", idle_expires_at: "2026-09-01T00:00:00.000Z", absolute_expires_at: "2026-10-01T00:00:00.000Z", session_status: "active", device_status: "active", revoked_at: null }) });
+    const identity = baseIdentity({ findAccessCredentialForAuthentication: vi.fn().mockResolvedValue({ id: "access", user_id: "user", device_id: "device", session_id: "session", expires_at: "2026-08-11T12:05:00.000Z", idle_expires_at: "2026-09-01T00:00:00.000Z", absolute_expires_at: "2026-10-01T00:00:00.000Z", session_status: "active", device_status: "active", revoked_at: null }) });
     const principal = await serviceFor(identity).authenticateAccessToken("a".repeat(43));
     expect(principal).toMatchObject({ userId: "user", deviceId: "device", sessionId: "session" });
+    expect(identity.markAccessCredentialUsed).toHaveBeenCalledWith({ id: "access", at: NOW });
     expect(identity.updateDeviceSeen).toHaveBeenCalledOnce();
   });
 
@@ -44,13 +45,13 @@ describe("inactive Founder authentication lifecycle", () => {
       pairingCredential: "p".repeat(43), platform: "ios", displayName: "Founder's iPhone",
     });
     expect(identity.consumePairingCredential).toHaveBeenCalledOnce();
-    expect(identity.createDevice).toHaveBeenCalledWith(expect.objectContaining({ userId: "user", platform: "ios" }));
+    expect(identity.createDevice).toHaveBeenCalledWith(expect.objectContaining({ userId: "user", platform: "ios", refreshProofCapability: 0 }));
     expect(identity.createSession).toHaveBeenCalledOnce();
     expect(identity.createAccessCredential).toHaveBeenCalledOnce();
     expect(identity.createRefreshCredential).toHaveBeenCalledOnce();
     expect(identity.recordSecurityEvent).toHaveBeenCalledWith(expect.objectContaining({
       userId: "user", eventType: "native_pairing_credential_consumed", outcome: "accepted",
-      details: { pairingCredentialId: "pairing", platform: "ios" },
+      details: { pairingCredentialId: "pairing", platform: "ios", refreshProofVersion: 0 },
     }));
     expect(result).toMatchObject({
       sessionId: expect.any(String),
@@ -312,9 +313,13 @@ function baseIdentity(overrides = {}) {
   return {
     lockFounderEnrollment: vi.fn().mockResolvedValue(true), createUserProfile: vi.fn(), createRecoveryCredential: vi.fn(), findUser: vi.fn().mockResolvedValue({ id: "user" }),
     createPairingCredential: vi.fn(), createPairingCredentialWithRecoveryIssuer: vi.fn(),
-    consumePairingCredential: vi.fn(), createDevice: vi.fn(), createSession: vi.fn(),
+    consumePairingCredential: vi.fn(), createDevice: vi.fn(), createInstallationSigningKey: vi.fn(), createSession: vi.fn(),
     createAccessCredential: vi.fn(), createRefreshCredential: vi.fn(), findAccessCredentialForAuthentication: vi.fn(),
-    updateDeviceSeen: vi.fn(), lockRefreshCredential: vi.fn(), replaceRefreshCredential: vi.fn(), revokeRefreshFamily: vi.fn(),
+    markAccessCredentialUsed: vi.fn(), updateDeviceSeen: vi.fn(), lockRefreshCredential: vi.fn(), replaceRefreshCredential: vi.fn(), revokeRefreshFamily: vi.fn(),
+    createRefreshProofChallenge: vi.fn(), lockRefreshProofChallenge: vi.fn(), consumeRefreshProofChallenge: vi.fn(),
+    createRefreshExchange: vi.fn(), lockRefreshExchangeByPredecessor: vi.fn(), lockRefreshCredentialById: vi.fn(),
+    linkRefreshExchangeAccessCredential: vi.fn(), lockRefreshExchangeAccessCredentials: vi.fn(),
+    revokeRefreshExchangeAccessCredentials: vi.fn(), incrementRefreshExchangeRecovery: vi.fn(),
     revokeSession: vi.fn(), revokeDevice: vi.fn(), findRecoveryCredentialForUse: vi.fn(), consumeRecoveryCredential: vi.fn(),
     findPairingCredentialByRecoveryCredentialId: vi.fn().mockResolvedValue(null),
     recordSecurityEvent: vi.fn(), revokeAllSessions: vi.fn(), ...overrides,

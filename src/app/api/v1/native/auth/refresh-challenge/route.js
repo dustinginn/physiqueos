@@ -8,6 +8,11 @@ export const runtime = "nodejs";
 export async function POST(request) {
   return executeApiRequest(request, async ({ requestId }) => {
     const payload = await readBoundedJsonRequest(request);
-    return getProductionNativeFounderAuthRuntime().refresh({ request: payload, requestId });
+    return getProductionNativeFounderAuthRuntime().refreshChallenge({
+      refreshCredential: payload.refreshCredential,
+      rotationIntentId: payload.rotationIntentId,
+      successorCommitment: payload.successorCommitment,
+      requestId,
+    });
   }, { buildIdentity: foundationBuildIdentity, logger: foundationLogger });
 }
