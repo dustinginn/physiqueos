@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T06:45:00Z",
+  "generated_at_utc": "2026-09-30T07:35:00Z",
   "task": {
-    "id": "post70-background-reconciliation-photo-inspection-20260930",
-    "title": "FINAL CANDIDATE: HealthKit Strength background trigger fix + reusable photo inspection viewer (Native only; all gates + fresh review; not uploaded)",
+    "id": "build71-native-distribution-20260930",
+    "title": "Build 71 commit ready (71164900, build-number-only diff); archive/upload BLOCKED on 15 GiB disk floor (14.16 GiB free) \u2014 decision needed",
     "agent": "claude",
-    "status": "awaiting_review"
+    "status": "blocked"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -20,9 +20,9 @@
     "server_candidate_branch": "claude/build70-integrated-server-20260930",
     "production_deployment_id": "1fa2121a-5729-49c3-9865-a79f1724bb3f",
     "previous_production_server_sha": "446bc964dc31318ea48261400e8b243cdd1d4ab1",
-    "native_candidate_sha": "a92519276eac2356af8ab7d236c1d2b9c1733c80",
+    "native_candidate_sha": "71164900210f689480ed277205bf8a43b6d18ead",
     "native_candidate_branch": "claude/post70-background-reconcile-photo-viewer-20260930",
-    "native_recommended_build": "70",
+    "native_recommended_build": "71",
     "codex_celebration_branch": "codex/native-workout-complete-record-celebration-20260928",
     "codex_celebration_sha": "ef54e482",
     "native_build69_final_sha": "efa65db1",
@@ -39,7 +39,7 @@
     "sender_constrained_enrollment": "OFF (server flag unset; native Info.plist false)"
   },
   "result": {
-    "summary": "Root cause: HealthKit observers registered only on scene activation (a background relaunch never activates a scene) and workouts used hourly delivery; fixed with launch-path registration, immediate workout delivery and background assertions. New shared PhotoInspectionViewer opened from Photo Briefing and Progress Photos Evidence. Final SHA: full suite 1590/1590, Release compile OK, fresh review findings fixed. No Server change, no upload.",
+    "summary": "Build 71 commit 71164900 (parent a9251927; 3 files/4 lines, metadata only; pbxproj deterministic) is pushed. Archive/upload not started: free disk 14.16 GiB < 15 GiB floor after cleaning only regenerable output. Server unchanged; enrollment untouched.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -61,9 +61,11 @@
     }
   },
   "decisions_required": [
-    "Founder/ChatGPT authorization for a build number and TestFlight upload; then real-device natural-event acceptance."
+    "Authorize archive at ~14.2 GiB free, or free ~1 GiB, or authorize removing my finished pushed worktrees."
   ],
-  "blockers": [],
+  "blockers": [
+    "Disk 14.16 GiB free < 15 GiB floor."
+  ],
   "unexpected_findings": [
     "Sep 28 Activity is still frozen in production (supersedes continue to 837 cal); self-heals at the next-morning complete_day summary."
   ],
@@ -75,7 +77,7 @@
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
   ],
   "recommended_next_step": "Review the final report; authorize distribution; Founder accepts on device; then start HealthKit Sleep.",
-  "full_report_path": "agent-handoffs/reports/20260930T064500Z-post70-background-reconcile-photo-inspection-final.md",
+  "full_report_path": "agent-handoffs/reports/20260930T073500Z-build71-distribution-checkpoint-disk-blocked.md",
   "related_report_paths": [
     "agent-handoffs/reports/20260930T032500Z-build70-integrated-persistent-pairing-candidate.md",
     "agent-handoffs/reports/20260930T020500Z-peptide-build70-final-candidate-closeout-v2.md",
