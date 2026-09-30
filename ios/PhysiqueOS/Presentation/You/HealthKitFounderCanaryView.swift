@@ -102,6 +102,9 @@ struct HealthKitFounderCanaryView: View {
 
             automaticDiagnosticsCard
             september23RepairCard
+            HealthKitSleepValidationSection(
+                isEnabled: canaryEnabled && environment.healthKitFounderCanaryCoordinator.authorizationWasExplicitlyRequested
+            )
             canonicalTestDayCard
             workoutCanaryCard
         }

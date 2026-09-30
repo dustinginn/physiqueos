@@ -317,6 +317,7 @@ n1_app_files = [
     ("Networking", "HealthKitSyncPersistence.swift"),
     ("Networking", "ProtectedDataRecoveryTrigger.swift"),
     ("Contracts", "HealthKitSleepModels.swift"),
+    ("Contracts", "HealthKitSleepHistoricalValidation.swift"),
     ("Networking", "HealthKitQueryClient.swift"),
     ("Networking", "HealthKitObservationNormalizer.swift"),
     ("Networking", "HealthKitServerUploader.swift"),
@@ -324,6 +325,7 @@ n1_app_files = [
     ("Networking", "HealthKitFounderCanaryCoordinator.swift"),
     ("Networking", "HealthKitAutomaticSynchronizationCoordinator.swift"),
     ("Presentation/You", "HealthKitFounderCanaryView.swift"),
+    ("Presentation/You", "HealthKitSleepValidationSection.swift"),
 ]
 
 # Daily-driver local-day authority. Allocated after every established object
@@ -349,6 +351,7 @@ late_test_files = [
 n1_test_files = [
     ("PhysiqueOSTests", "HealthKitSynchronizationTests.swift"),
     ("PhysiqueOSTests", "HealthKitSleepIngestionTests.swift"),
+    ("PhysiqueOSTests", "HealthKitSleepHistoricalValidationTests.swift"),
     ("PhysiqueOSTests", "HealthKitFounderCanaryTests.swift"),
     ("PhysiqueOSTests", "HealthKitAutomaticSynchronizationCoordinatorTests.swift"),
     ("PhysiqueOSTests", "HealthKitQueryClientDefaultBoundsTests.swift"),

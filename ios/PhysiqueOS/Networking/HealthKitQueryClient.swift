@@ -755,6 +755,36 @@ extension SystemHealthKitQueryClient: HealthKitSleepWindowReader {
     }
 }
 
+extension SystemHealthKitQueryClient: HealthKitSleepHistoricalReader {
+    /// Founder-initiated bounded historical read for the validation lane. The
+    /// caller passes the Server-advertised window; this refuses anything wider
+    /// than 31 days so no call can ever become a history sweep. Independent of
+    /// the ordinary Sleep gate, cursor, and staging.
+    func historicalSleepSamples(endingFrom start: Date, before end: Date, limit: Int) async throws -> [HealthKitQueryAddition] {
+        guard start < end,
+              end.timeIntervalSince(start) <= Double(HealthKitSleepHistoricalValidationContract.maximumSleepDays + 1) * 86_400,
+              limit > 0,
+              let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis)
+        else { throw HealthKitSyncError.operational(code: "healthkit_sleep_validation_window_invalid") }
+        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            HKQuery.predicateForSamples(withStart: start, end: nil, options: [.strictEndDate]),
+            HKQuery.predicateForSamples(withStart: nil, end: end, options: [.strictEndDate]),
+        ])
+        let calendar = self.calendar
+        let samples: [HKSample] = try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: limit, sortDescriptors: nil) { _, samples, error in
+                if error != nil {
+                    continuation.resume(throwing: HealthKitSyncError.operational(code: "healthkit_sleep_validation_query_failed"))
+                } else {
+                    continuation.resume(returning: samples ?? [])
+                }
+            }
+            store.execute(query)
+        }
+        return try samples.map { try Self.map($0, stream: .sleepAnalysis, calendar: calendar) }
+    }
+}
+
 final class SystemHealthKitObserverClient: HealthKitObserverClient, @unchecked Sendable {
     private let store: HKHealthStore
     private let lock = NSLock()

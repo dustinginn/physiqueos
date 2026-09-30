@@ -340,6 +340,9 @@ struct ProductionContractManifest: Decodable, Sendable, Equatable {
     /// never fail decoding of the whole manifest. Resolved fail-closed by
     /// `HealthKitSleepCapability.resolve`. Absent on older Servers.
     let healthKitSleepIngestion: ProductionJSONValue?
+    /// Phase C bounded historical-validation window, raw and fail-closed
+    /// (`HealthKitSleepValidationCapability.resolve`). Absent on older Servers.
+    let healthKitSleepHistoricalValidation: ProductionJSONValue?
 }
 
 indirect enum ProductionJSONValue: Codable, Sendable, Equatable {

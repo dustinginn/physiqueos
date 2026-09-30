@@ -276,6 +276,8 @@ final class AppEnvironment {
     /// `healthKitAuthorizationCoordinator` above (this gate), independent of
     /// the diagnostic canary below.
     let healthKitAutomaticSynchronizationCoordinator: HealthKitAutomaticSynchronizationCoordinator
+    /// Phase C Founder-only historical Sleep validation (nil in tests with a mock query client).
+    let healthKitSleepHistoricalValidationRunner: HealthKitSleepHistoricalValidationRunner?
     /// Founder Production diagnostic screen: manual foreground sync and
     /// acceptance-audit tooling. Its own narrower capability shell
     /// (`.founderActivityValidation`) and cursor namespace never overlap
@@ -672,6 +674,16 @@ final class AppEnvironment {
             sleepActivation: healthKitSleepActivation,
             backgroundTaskScheduler: UIKitBackgroundTaskScheduler()
         )
+        // Phase C historical validation: a separate, Founder-initiated lane.
+        if let reader = healthKitQueryClient as? any HealthKitSleepHistoricalReader {
+            self.healthKitSleepHistoricalValidationRunner = HealthKitSleepHistoricalValidationRunner(
+                capabilitySource: productionNativeAPI,
+                reader: reader,
+                submitter: ProductionHealthKitSleepValidationSubmitter(api: productionNativeAPI)
+            )
+        } else {
+            self.healthKitSleepHistoricalValidationRunner = nil
+        }
         // Dormant Sleep lane: inert unless the Server manifest enables it.
         let sleepManifestSender: HealthKitSleepWindowManifestSender?
         if let reader = healthKitQueryClient as? any HealthKitSleepWindowReader,
