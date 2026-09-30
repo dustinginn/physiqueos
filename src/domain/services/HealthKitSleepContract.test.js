@@ -108,6 +108,17 @@ describe("HealthKit Sleep contract review regressions", () => {
     ]) {
       expect(() => normalizeSleepSample(wire({ start, end }))).toThrow(/explicit offset/);
     }
+    for (const [start, end] of [
+      ["2026-02-30T00:00:00Z", "2026-02-30T01:00:00Z"],
+      ["2026-09-10T24:00:00Z", "2026-09-11T01:00:00Z"],
+    ]) {
+      expect(() => normalizeSleepSample(wire({ start, end }))).toThrow(/ISO date-time/);
+    }
+    for (const [start, end] of [
+      ["2026-09-10T23:00:00+0200", "2026-09-11T07:00:00+0200"],
+    ]) {
+      expect(() => normalizeSleepSample(wire({ start, end }))).toThrow(/explicit offset/);
+    }
     expect(normalizeSleepSample(wire({ start: "2026-09-11T06:00:00.123Z", end: "2026-09-11T14:00:00Z" })).startedAt)
       .toBe("2026-09-11T06:00:00.123Z");
   });

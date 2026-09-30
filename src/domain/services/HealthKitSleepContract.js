@@ -468,7 +468,9 @@ function boundedInstant(value, field) {
     throw invalid(field, `${field} must be an ISO-8601 date-time with Z or an explicit offset.`);
   }
   const time = Date.parse(text);
-  if (!Number.isFinite(time)) throw invalid(field, `${field} must be an ISO date-time.`);
+  if (!Number.isFinite(time) || !isCalendarDateKey(text.slice(0, 10)) || Number(text.slice(11, 13)) > 23) {
+    throw invalid(field, `${field} must be an ISO date-time.`);
+  }
   return new Date(time).toISOString();
 }
 function requiredText(value, field) {

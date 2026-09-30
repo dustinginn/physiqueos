@@ -95,8 +95,12 @@ export function canonicalizeHealthKitSleep({ samples = [], preference = null } =
     .map((group, index) => buildAsleepEpisode(group, inBedByGroup[index], preference))
     .filter(Boolean);
 
-  const inBedOnly = cluster(inBed)
-    .filter((group) => !episodes.some((episode) => near(spanOf(group), episode.span)))
+  // An in-bed sample assigned to an asleep group is an input of that episode
+  // (counted only if it is the primary lane's, but always part of the
+  // digest, so its suppression is tracked). Only unassigned in-bed samples can
+  // form an in_bed_only episode.
+  const assignedInBed = new Set(inBedByGroup.flat().map((sample) => sample.id));
+  const inBedOnly = cluster(inBed.filter((sample) => !assignedInBed.has(sample.id)))
     .map((group) => buildInBedOnlyEpisode(group, preference));
 
   const byDay = new Map();
@@ -127,6 +131,7 @@ function toInterval(sample) {
   const sourceClass = sample.source?.sourceClass ?? HealthKitSleepSourceClass.THIRD_PARTY;
   return {
     id: sample.id,
+    bucket: sample.occurrenceDate ?? null,
     stage: sample.stage,
     start,
     end,
@@ -322,7 +327,7 @@ function buildAsleepEpisode(group, assignedInBed, preference) {
     sampleCount: lane.intervals.length,
   }));
   const primaryIds = new Set([...primaryActivity, ...laneInBed].map((sample) => sample.id));
-  const inputs = [...group, ...laneInBed];
+  const inputs = [...group, ...assignedInBed];
   return {
     kind: "asleep",
     span: extent,
@@ -514,6 +519,9 @@ function buildDay(sleepDay, dayEpisodes, preference) {
       : null,
     episodes: Object.freeze(episodes),
     inputSampleIds: Object.freeze(inputs.map((sample) => sample.id)),
+    // Candidate sleep days (storage buckets) of the inputs, so a later
+    // recompute can find every day this record depends on without a scan.
+    inputSampleDays: Object.freeze([...new Set(inputs.map((sample) => sample.bucket).filter(Boolean))].sort()),
   });
 }
 

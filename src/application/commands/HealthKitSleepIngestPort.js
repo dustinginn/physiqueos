@@ -76,14 +76,18 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
     const receivedAt = now().toISOString();
     const deliveryDeviceId = context.principal?.deviceId ?? null;
     const touchedDays = new Set();
-    // A changed sample can affect every sleep day from the one before its
-    // start's day through the one after its end's day.
-    const touch = ({ startedAt, endedAt, timeZone }) => {
+    const changedSampleIds = new Set();
+    // A changed sample can affect every sleep day from its start's day through
+    // its end's day, widened by two days for zone skew (an episode's day uses
+    // the zone of its last primary sample, which may differ by up to ~26 h).
+    const touch = ({ id, startedAt, endedAt, timeZone }) => {
+      if (id) changedSampleIds.add(id);
       const first = deriveHealthKitSleepDay(startedAt, timeZone);
       const last = deriveHealthKitSleepDay(endedAt, timeZone);
       if (!first || !last) return;
-      for (let day = shiftDateKey(first, -1); day <= shiftDateKey(last, 1); day = shiftDateKey(day, 1)) touchedDays.add(day);
+      for (let day = shiftDateKey(first, -2); day <= shiftDateKey(last, 2); day = shiftDateKey(day, 1)) touchedDays.add(day);
     };
+    let recomputeTruncated = false;
 
     const sampleResults = [];
     const seenInBatch = new Map();
@@ -116,7 +120,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
           ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, recordId, payload: record,
         });
         if (stored.created) {
-          touch(sample);
+          touch({ ...sample, id: recordId });
           sampleResults.push(outcome(sample, "stored"));
         } else {
           sampleResults.push(stored.record?.contentFingerprint === sample.contentFingerprint ? outcome(sample, "replayed") : conflict(sample));
@@ -200,6 +204,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
         deletions: Object.freeze(deletionResults),
         windowManifest: manifestResult,
         sleepDays: Object.freeze(recomputed),
+        recomputeTruncated,
         strategicEvidenceEligibility: "quarantined",
       }),
     });
@@ -227,10 +232,17 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
       // pathological chain can never make one batch unbounded.
       let affected = new Set(days);
       let pass = await computePass(affected);
-      for (let iteration = 1; iteration < MAX_RECOMPUTE_PASSES && pass.expansion.size > 0; iteration += 1) {
-        if (affected.size + pass.expansion.size > MAX_RECOMPUTED_DAYS) break;
+      let iteration = 1;
+      while (pass.expansion.size > 0) {
+        if (iteration >= MAX_RECOMPUTE_PASSES || affected.size + pass.expansion.size > MAX_RECOMPUTED_DAYS) {
+          // Bounded work per batch; the days written are still exactly the
+          // ones the final pass computed. Reported so an operator can see it.
+          recomputeTruncated = true;
+          break;
+        }
         affected = new Set([...affected, ...pass.expansion]);
         pass = await computePass(affected);
+        iteration += 1;
       }
       const results = [];
       for (const sleepDay of [...affected].sort()) {
@@ -267,15 +279,28 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
         const samples = await records.listByOccurrenceDateRange({
           ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, startDate: low, endDate: high,
         });
-        const bucketById = new Map(samples.map((sample) => [sample.id, sample.occurrenceDate]));
         const inRun = new Set(run);
+        const relevantIds = new Set(changedSampleIds);
         for (const [sleepDay, content] of canonicalizeHealthKitSleep({ samples, preference })) {
-          const buckets = content.inputSampleIds.map((id) => bucketById.get(id)).filter(Boolean);
-          if (!affected.has(sleepDay) && !buckets.some((bucket) => affected.has(bucket))) continue;
+          const buckets = content.inputSampleDays;
+          if (!affected.has(sleepDay) && !buckets.some((bucket) => affected.has(bucket)) &&
+            !content.inputSampleIds.some((id) => changedSampleIds.has(id))) continue;
           if (inRun.has(sleepDay)) computed.set(sleepDay, content);
+          for (const id of content.inputSampleIds) relevantIds.add(id);
           for (const day of [sleepDay, ...buckets]) if (!affected.has(day)) expansion.add(day);
           if (buckets.some((bucket) => bucket <= low) && !affected.has(low)) expansion.add(low);
           if (buckets.some((bucket) => bucket >= high) && !affected.has(high)) expansion.add(high);
+        }
+        // Previously stored days that depended on any relevant sample must be
+        // rewritten too, wherever (zone skew) they were stored.
+        const storedDays = await records.listByOccurrenceDateRange({
+          ownerUserId, collection: HEALTHKIT_SLEEP_DAY_COLLECTION, startDate: shiftDateKey(low, -2), endDate: shiftDateKey(high, 2),
+        });
+        for (const day of storedDays) {
+          if (!(day.inputSampleIds ?? []).some((id) => relevantIds.has(id))) continue;
+          for (const dependency of [day.sleepDay, ...(day.inputSampleDays ?? [])]) {
+            if (dependency && !affected.has(dependency)) expansion.add(dependency);
+          }
         }
       }
       return { computed, expansion };

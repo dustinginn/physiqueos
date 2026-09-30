@@ -82,8 +82,13 @@ describe("healthkit.sleep.ingest.v1 storage, idempotency and revision", () => {
     expect(current.reads.every((read) => read.collection !== "healthKitObservations")).toBe(true);
     expect(current.reads.some((read) => read.method === "list")).toBe(false);
     const ranges = current.reads.filter((read) => read.method === "listByOccurrenceDateRange");
-    expect(ranges.every((read) => read.collection === "healthKitSleepSamples")).toBe(true);
-    expect(ranges).toEqual([{ method: "listByOccurrenceDateRange", collection: "healthKitSleepSamples", startDate: "2026-09-09", endDate: "2026-09-13" }]);
+    expect(ranges.every((read) => ["healthKitSleepSamples", "healthKitSleepDays"].includes(read.collection))).toBe(true);
+    // Touched days 09-09..09-13 (end day 09-11 +-2): samples read +-1 around
+    // them, stored days +-2 more. Bounded, never the whole history.
+    expect(ranges).toEqual([
+      { method: "listByOccurrenceDateRange", collection: "healthKitSleepSamples", startDate: "2026-09-08", endDate: "2026-09-14" },
+      { method: "listByOccurrenceDateRange", collection: "healthKitSleepDays", startDate: "2026-09-06", endDate: "2026-09-16" },
+    ]);
   });
 
   it("#16 duplicate delivery is a no-op (same batch twice; same sample in two batches)", async () => {
@@ -298,22 +303,23 @@ describe("review regressions", () => {
     expect(current.store.snapshot().healthKitSleepDays.every((day) => day.episodes.length === 0)).toBe(true);
   });
 
-  it("randomized adds, deletions and manifests always converge to a fresh canonicalization (seeded)", async () => {
-    let seed = 20260930;
+  async function convergenceWorlds({ seed: initial, zones, maxSlots, worlds, steps }) {
+    let seed = initial;
     const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
     const sources = ["watch", "oura", "sleepCycle", "manual", "iphone"];
     const stages = ["inBed", "unspecified", "awake", "core", "deep", "rem"];
     let populatedChecks = 0;
-    for (let world = 0; world < 6; world += 1) {
+    for (let world = 0; world < worlds; world += 1) {
       const current = setup();
       const live = [];
-      for (let step = 0; step < 14; step += 1) {
+      let next = 0;
+      for (let step = 0; step < steps; step += 1) {
         const roll = random();
         if (roll < 0.6 || live.length === 0) {
           const samples = Array.from({ length: 1 + Math.floor(random() * 4) }, () => {
             const startMs = Date.parse("2026-09-10T12:00:00Z") + Math.floor(random() * 96) * 30 * 60 * 1000;
-            const durationMs = (1 + Math.floor(random() * 30)) * 20 * 60 * 1000;
-            const id = uuid(1000 + world * 100 + live.length);
+            const durationMs = (1 + Math.floor(random() * maxSlots)) * 20 * 60 * 1000;
+            const id = uuid(100000 + world * 1000 + (next += 1));
             live.push(id);
             return wire({
               id,
@@ -321,7 +327,8 @@ describe("review regressions", () => {
               stage: stages[Math.floor(random() * stages.length)],
               start: new Date(startMs).toISOString(),
               end: new Date(startMs + durationMs).toISOString(),
-              timeZone: random() < 0.2 ? "America/New_York" : "America/Los_Angeles",
+              timeZone: zones[Math.floor(random() * zones.length)],
+              timeZoneSource: random() < 0.5 ? "sample_metadata" : "device_at_ingest",
             });
           });
           await current.run({ batchId: `w${world}-s${step}`, samples });
@@ -339,8 +346,25 @@ describe("review regressions", () => {
         if ((current.store.snapshot().healthKitSleepDays ?? []).some((day) => day.episodes.length > 1)) populatedChecks += 1;
       }
     }
-    expect(populatedChecks).toBeGreaterThan(10);
+    return populatedChecks;
+  }
+
+  it("randomized adds, deletions and manifests converge to a fresh canonicalization (seeded, LA/NY, <=10 h)", async () => {
+    const populated = await convergenceWorlds({ seed: 20260930, zones: ["America/Los_Angeles", "America/New_York"], maxSlots: 30, worlds: 6, steps: 14 });
+    expect(populated).toBeGreaterThan(10);
   });
+
+  it("converges across extreme zone skew and 24 h samples (LA/Tokyo, Kiritimati/Pago Pago/UTC)", async () => {
+    for (const [seed, zones] of [
+      [7, ["America/Los_Angeles", "Asia/Tokyo"]],
+      [11, ["America/Los_Angeles", "Asia/Tokyo"]],
+      [7, ["America/Los_Angeles", "Pacific/Kiritimati", "Pacific/Pago_Pago", "UTC"]],
+      [23, ["America/Los_Angeles", "Pacific/Kiritimati", "Pacific/Pago_Pago", "UTC"]],
+    ]) {
+      const populated = await convergenceWorlds({ seed, zones, maxSlots: 72, worlds: 8, steps: 16 });
+      expect(populated).toBeGreaterThan(2);
+    }
+  }, 120000);
 
   it("an in-batch repeat mirrors the first copy's refusal instead of reporting replayed", async () => {
     const current = setup();
