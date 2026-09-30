@@ -139,6 +139,62 @@ final class WeightReadModelTests: XCTestCase {
         XCTAssertFalse(oldestShown.isBaseWeek)
     }
 
+    // MARK: - Weekly average row identity
+
+    /// Sandbox rows carry no server `sortDate`, so identity falls back to
+    /// the label — safe only because the six-week Sandbox window can never
+    /// repeat one. Production rows key on `sortDate` (covered in
+    /// `FounderServerAPITests`).
+    func testSandboxWeeklyAverageRowsFallBackToTheLabelAsIdentity() async throws {
+        let report = try await api.fetchWeightReport(scope: .all)
+        XCTAssertFalse(report.weeklyAverages.isEmpty)
+        XCTAssertTrue(report.weeklyAverages.allSatisfy { $0.sortDate == nil })
+        XCTAssertEqual(report.weeklyAverages.map(\.id), report.weeklyAverages.map(\.week))
+        XCTAssertEqual(Set(report.weeklyAverages.map(\.id)).count, report.weeklyAverages.count)
+    }
+
+    func testWeeklyAverageIdentityPrefersSortDateOverTheRepeatableLabel() {
+        let thisYear = WeightWeeklyAverage(week: "Jul 19", average: 150.4, weekOverWeek: 0.2, isBaseWeek: false, entryCount: 7, sortDate: "2026-07-19")
+        let lastYear = WeightWeeklyAverage(week: "Jul 19", average: 149.0, weekOverWeek: nil, isBaseWeek: true, entryCount: 5, sortDate: "2025-07-19")
+        let unkeyed = WeightWeeklyAverage(week: "Jul 19", average: 149.0, weekOverWeek: nil, isBaseWeek: true, entryCount: 5)
+
+        XCTAssertEqual(thisYear.id, "2026-07-19")
+        XCTAssertEqual(lastYear.id, "2025-07-19")
+        XCTAssertNotEqual(thisYear.id, lastYear.id)
+        XCTAssertEqual(thisYear.week, lastYear.week)
+        XCTAssertEqual(unkeyed.id, "Jul 19")
+    }
+
+    /// The view model hands the view every weekly-average row the API
+    /// returned — no `prefix`, no re-capping to six. The card's own
+    /// collapsed preview is the only trimming, and expanding it shows the
+    /// full array.
+    @MainActor
+    func testViewModelExposesEveryWeeklyAverageRowWithoutCapping() async throws {
+        let rows = (0..<11).map { index -> WeightWeeklyAverage in
+            let weeksAboveBase = 10 - index
+            let day = String(format: "%02d", 1 + index)
+            return WeightWeeklyAverage(
+                week: "Week \(day)",
+                average: 150.0 + Double(weeksAboveBase) * 0.2,
+                weekOverWeek: weeksAboveBase == 0 ? nil : 0.2,
+                isBaseWeek: weeksAboveBase == 0,
+                entryCount: 7,
+                sortDate: "2026-07-\(day)"
+            )
+        }
+        var report = Self.emptyReport()
+        report.weeklyAverages = rows
+
+        let viewModel = WeightHistoryViewModel(api: StubWeightEvidenceAPI(report: report))
+        await viewModel.load()
+
+        guard case .loaded(let loaded) = viewModel.state else { return XCTFail("Expected loaded state.") }
+        XCTAssertEqual(loaded.weeklyAverages.count, 11)
+        XCTAssertEqual(loaded.weeklyAverages.map(\.id), rows.map(\.id))
+        XCTAssertEqual(loaded.weeklyAverages, rows)
+    }
+
     // MARK: - History ordering (newest first)
 
     func testHistoryIsNewestFirst() async throws {
@@ -447,5 +503,15 @@ final class WeightReadModelTests: XCTestCase {
             value: String(format: "%.1f lb", pounds), revision: revision
         )
         return report
+    }
+}
+
+/// Returns one fixed report for every scope — for view-model tests that
+/// need to control exactly what the API hands back.
+private struct StubWeightEvidenceAPI: WeightEvidenceAPI {
+    let report: WeightReportReadModel
+
+    func fetchWeightReport(scope: EvidenceScopeSelection) async throws -> WeightReportReadModel {
+        report
     }
 }

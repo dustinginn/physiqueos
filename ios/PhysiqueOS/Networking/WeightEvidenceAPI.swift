@@ -114,9 +114,22 @@ struct FixtureWeightEvidenceAPI: WeightEvidenceAPI {
 struct ProductionWeightEvidenceAPI: WeightEvidenceAPI {
     let api: ProductionNativeAPI
 
+    /// The server's bounded maximum `history` page size. Weekly Averages
+    /// cover every calendar week inside the selected Goal window regardless
+    /// of paging, but History and the Native-built Trend chart are both
+    /// derived from the paged `history` array — so without asking for the
+    /// full window, a Goal with more than the default 90 observations would
+    /// show more weeks of averages than it shows weigh-ins or chart points.
+    /// `page.hasMore` still reports honestly when even 365 is not enough.
+    static let historyLimit = "365"
+
     func fetchWeightReport(scope: EvidenceScopeSelection) async throws -> WeightReportReadModel {
         let context = try ProductionContext.value(for: scope)
-        let envelope = try await api.readResource("weight", query: ["context": context], as: Payload.self)
+        let envelope = try await api.readResource(
+            "weight",
+            query: ["context": context, "limit": Self.historyLimit],
+            as: Payload.self
+        )
         return Self.report(from: envelope.data)
     }
 
@@ -219,13 +232,24 @@ struct ProductionWeightEvidenceAPI: WeightEvidenceAPI {
     }
 
     private struct WeeklyAverage: Decodable {
+        /// Display label only (`"Jul 19"`) — never used as row identity.
         var week: String
+        /// `YYYY-MM-DD` week start: the row's stable identity across the
+        /// full Goal window, where year-less labels can repeat.
+        var sortDate: String?
         var average: Double
         var weekOverWeek: Double?
         var entries: Int
 
         var readModel: WeightWeeklyAverage {
-            WeightWeeklyAverage(week: week, average: average, weekOverWeek: weekOverWeek, isBaseWeek: weekOverWeek == nil, entryCount: entries)
+            WeightWeeklyAverage(
+                week: week,
+                average: average,
+                weekOverWeek: weekOverWeek,
+                isBaseWeek: weekOverWeek == nil,
+                entryCount: entries,
+                sortDate: sortDate
+            )
         }
     }
 
