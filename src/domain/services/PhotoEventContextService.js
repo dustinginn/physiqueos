@@ -110,11 +110,41 @@ export function resolvePhotoEventFutureMilestone({
 }
 
 function snapshotGoal(goal) {
-  return goal ? { id: goal.id, title: goal.title, status: goal.status ?? null } : null;
+  if (!goal) return null;
+  return {
+    id: goal.id,
+    title: goal.title,
+    type: goal.type ?? null,
+    status: goal.status ?? null,
+    primary: goal.primary === true,
+    target: cloneOrNull(goal.target),
+    guardrails: cloneArray(goal.guardrails),
+    progressMeasurement: cloneOrNull(goal.progressMeasurement),
+    successCriteria: cloneArray(goal.successCriteria),
+  };
 }
 
 function snapshotPhase(phase) {
-  return phase ? { id: phase.id, name: phase.name ?? phase.title, status: phase.status, startedAt: phase.startedAt ?? phase.startDate ?? null, plannedReviewAt: phase.plannedReviewAt ?? null, reviewState: phase.effectiveReviewState ?? phase.reviewState ?? null } : null;
+  return phase ? {
+    id: phase.id,
+    name: phase.name ?? phase.title,
+    status: phase.status,
+    startedAt: phase.startedAt ?? phase.startDate ?? null,
+    startDate: phase.startDate ?? phase.startedAt ?? null,
+    plannedReviewAt: phase.plannedReviewAt ?? null,
+    reviewState: phase.effectiveReviewState ?? phase.reviewState ?? null,
+    purpose: phase.purpose ?? null,
+    guardrails: cloneArray(phase.guardrails),
+    successCriteria: cloneArray(phase.successCriteria),
+  } : null;
+}
+
+function cloneOrNull(value) {
+  return value == null ? null : structuredClone(value);
+}
+
+function cloneArray(value) {
+  return Array.isArray(value) ? structuredClone(value) : [];
 }
 
 function dateKey(value) {

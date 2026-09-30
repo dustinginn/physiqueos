@@ -42,14 +42,22 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
     priorDexa,
     baselineDexa,
   });
+  const analysisFindingsByViewId = new Map();
   const activeViews = session.views.map((view) => {
     const activeSourceIds=new Set(view.provenance?.sourceIds??[]);
     const synthesisFindings=(session.synthesis?.observations??[]).filter((item)=>(item.sourceEvidenceIds??[]).some((id)=>activeSourceIds.has(id)) && isPublishableStructuredFinding(item)).map((item)=>item.change??item.description).filter(Boolean);
     const structuredFindings=(view.structuredFindings??[]).filter(isPublishableStructuredFinding);
     const legacyObservedChanges=structuredFindings.length || (view.structuredFindings??[]).length ? [] : (view.observedChanges??[]);
     const eligibleFindings=semanticDeduplicate([...synthesisFindings,...structuredFindings.map((item)=>item.change ?? item.description).filter(Boolean), ...legacyObservedChanges]).filter(isNaturalFinding).slice(0,4);
+    analysisFindingsByViewId.set(view.canonicalViewId, eligibleFindings);
     const comparisonMode = view.comparison ? "historical_comparison" : "new_pose_baseline";
     const completionView = goalCompletionHandoff?.visualCriterionStatus === "confirmed" ? confirmedPoseCopy(view) : null;
+    const conciseCaption = realizePoseCaption({
+      poseId: view.poseId,
+      comparisonMode,
+      structuredFindings,
+      eligibleFindings,
+    });
     return ({
     id: view.canonicalViewId,
     poseId: view.poseId,
@@ -58,9 +66,9 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
     previousImageHref: view.previousImageHref,
     previousDate: view.comparison?.previousDate ?? null,
     analysisQuality: classifyPhotoAnalysis(view),
-    findings: classifyPhotoAnalysis(view) === "vision_backed" ? eligibleFindings : [],
-    headline: completionView?.headline ?? poseHeadline(view.poseId,eligibleFindings),
-    supportingObservations: completionView?.observations ?? poseSupportingObservations(view.poseId,eligibleFindings),
+    findings: [],
+    headline: completionView?.headline ?? conciseCaption,
+    supportingObservations: completionView?.observations ?? [],
     comparisonStatus: view.comparisonStatus,
     comparisonMode,
     establishesBaseline: comparisonMode === "new_pose_baseline",
@@ -71,7 +79,7 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
   const comparedViews=activeViews.filter((view)=>!view.establishesBaseline);
   const newBaselineViews=activeViews.filter((view)=>view.establishesBaseline);
   const synthesisFindings=semanticDeduplicate((session.synthesis?.observations??[]).filter(isPublishableStructuredFinding).map((item)=>item.change??item.description).filter(Boolean)).filter(isNaturalFinding);
-  const allFindings = semanticDeduplicate([...synthesisFindings,...activeViews.flatMap((view)=>view.findings)]);
+  const allFindings = semanticDeduplicate([...synthesisFindings,...analysisFindingsByViewId.values()].flat());
   const waistFinding=find(allFindings,/waist|midsection/i);
   const waist = waistFinding ?? find(allFindings,/front shape|front silhouette/i) ?? "No meaningful session-level visual change stands out this week.";
   const stable = find(allFindings,/maintain|stable|preserv|no meaningful/i) ?? "Both rear views remain broadly stable.";
@@ -81,7 +89,7 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
   const narrativeId = `photo_event_narrative_${session.id}`;
   const completionStatus = goalCompletionHandoff?.visualCriterionStatus ?? null;
   const completionCopy = completionEventCopy(completionStatus, { latestDexa, priorDexa, baselineDexa }, goalCompletionHandoff);
-  const ordinaryCopy = ordinaryEventCopy({ goalContext, limitation, milestone });
+  const ordinaryCopy = ordinaryEventCopy({ goalContext, limitation, milestone, holisticSynthesis });
   return {
     id: narrativeId,
     eventId: `event_briefing_progress_photo_${session.id}`,
@@ -107,7 +115,7 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
     holisticSynthesis,
     completion: session.completionLabel,
     activeViews,
-    poseInterpretations: activeViews.map((view)=>({currentViewId:view.id,currentPhotoSessionId:session.id,poseIdentity:session.views.find((item)=>item.canonicalViewId===view.id)?.poseIdentity??{poseId:view.poseId,label:view.label},priorMatchFound:!view.establishesBaseline,priorViewId:session.views.find((item)=>item.canonicalViewId===view.id)?.comparison?.previousCanonicalViewId??null,priorPhotoSessionId:session.views.find((item)=>item.canonicalViewId===view.id)?.comparison?.previousSessionId??null,comparisonMode:view.comparisonMode,goalId:confirmationIntent?.goalId??goal?.id??null,goalRelevance:view.goalRelevance,contributesToGoalValidation:view.contributesToGoalValidation,observations:view.findings,limitingFactors:[],confidence:view.analysisQuality==="vision_backed"?"moderate":"limited",establishesBaseline:view.establishesBaseline})),
+    poseInterpretations: activeViews.map((view)=>({currentViewId:view.id,currentPhotoSessionId:session.id,poseIdentity:session.views.find((item)=>item.canonicalViewId===view.id)?.poseIdentity??{poseId:view.poseId,label:view.label},priorMatchFound:!view.establishesBaseline,priorViewId:session.views.find((item)=>item.canonicalViewId===view.id)?.comparison?.previousCanonicalViewId??null,priorPhotoSessionId:session.views.find((item)=>item.canonicalViewId===view.id)?.comparison?.previousSessionId??null,comparisonMode:view.comparisonMode,goalId:confirmationIntent?.goalId??goal?.id??null,goalRelevance:view.goalRelevance,contributesToGoalValidation:view.contributesToGoalValidation,observations:analysisFindingsByViewId.get(view.id)??[],limitingFactors:[],confidence:view.analysisQuality==="vision_backed"?"moderate":"limited",establishesBaseline:view.establishesBaseline})),
     comparisonGroups:{comparedWithPriorPhotos:comparedViews.map((view)=>view.id),newBaselineViews:newBaselineViews.map((view)=>view.id)},
     previousSessions: [...new Set(activeViews.map((view)=>view.previousDate).filter(Boolean))],
     supportingEvidence: { weight: session.weight, dexa: latestDexa ? formatDexa(latestDexa) : null, ...executionSupport },
@@ -142,8 +150,8 @@ export function composePhotoEventNarrative({ session, goal = null, goalContext =
     cardContent: {
       hero: { id:`${narrativeId}_hero`, title:completionCopy?.title ?? ordinaryCopy.title, body:completionCopy?.summary ?? ordinaryCopy.summary },
       snapshot: { id:`${narrativeId}_snapshot`, title:"This photo session", poses:activeViews.map((view)=>view.label), conditions:describeSessionConditions(session.sessionConditions) },
-      progress: { id:`${narrativeId}_progress`, title:completionCopy ? "The visual journey" : "What visibly changed", body:completionCopy?.progress ?? mixedModeSummary(comparedViews,newBaselineViews), comparisons:comparedViews, newBaselines:newBaselineViews },
-      interpretation: { id:`${narrativeId}_interpretation`, title:completionCopy ? "The result" : "What the complete evidence means", paragraphs:completionCopy?.interpretation ?? [ordinaryCopy.interpretation,holisticSynthesis?.userFacingCopy ?? supportingEvidenceSentence(session.weight,latestDexa,executionSupport),ordinaryCopy.limitation].filter(Boolean), support:[session.weight, latestDexa ? formatDexa(latestDexa) : null, ...Object.values(executionSupport)].filter(Boolean) },
+      progress: { id:`${narrativeId}_progress`, title:completionCopy ? "The visual journey" : "What visibly changed", body:completionCopy?.progress ?? ordinaryCopy.progress ?? mixedModeSummary(comparedViews,newBaselineViews), comparisons:comparedViews, newBaselines:newBaselineViews },
+      interpretation: { id:`${narrativeId}_interpretation`, title:completionCopy ? "The result" : "What the complete evidence means", paragraphs:completionCopy?.interpretation ?? [ordinaryCopy.interpretation].filter(Boolean), support:[session.weight, latestDexa ? formatDexa(latestDexa) : null, ...Object.values(executionSupport)].filter(Boolean) },
       coachInsight: { id:`${narrativeId}_coach`, title:"Coach’s Insight", body:completionCopy?.coach ?? ordinaryCopy.coach },
     },
     evidenceReferences: activeViews.map((view)=>view.id),
@@ -497,8 +505,30 @@ export function derivePhotoConfidenceDomainStates({
 }
 function isNaturalFinding(value){return !/fallback|metadata|persist|repository|evidence|claim|comparable set|confirmed/i.test(value);}
 function isPublishableStructuredFinding(item={}){const hasSemantics=item.direction!=null||item.magnitude!=null||item.confidence!=null;if(!hasSemantics)return true;if(["unknown","insufficient"].includes(item.direction))return false;if(["unknown","low"].includes(item.confidence))return false;if(item.magnitude==="unknown")return false;return true;}
-function poseHeadline(poseId,findings){if(poseId==="front-relaxed")return find(findings,/waist|midsection|front shape|silhouette/i)??"The front shape is the primary at-rest view.";if(poseId==="back-relaxed")return find(findings,/no meaningful|stable|maintain/i)??"Overall rear shape appears stable.";if(poseId==="back-flexed")return find(findings,/no meaningful|stable|maintain|taper/i)??"Back fullness and taper appear stable.";if(poseId.includes("side"))return find(findings,/waist|profile|abdomen|conditioning/i)??"This view adds context on waist profile and side-view conditioning.";if(poseId==="front-flexed")return find(findings,/abdominal|oblique|conditioning|separation/i)??"This view adds context on abdominal separation and overall conditioning.";return find(findings,/.+/)??"This confirmed view establishes useful visual context.";}
-function poseSupportingObservations(poseId,findings){const blocked=poseId==="front-relaxed"?/silhouette|front shape|shoulder.to.waist/i:/overall shape|no meaningful/i;return semanticDeduplicate(findings.filter((value)=>!blocked.test(value))).slice(0,2);}
+function realizePoseCaption({poseId,comparisonMode,structuredFindings=[],eligibleFindings=[]}){
+  if(comparisonMode==="new_pose_baseline")return `This ${getProgressPhotoProseLabel(poseId)} view establishes a new visual baseline.`;
+  const supported=structuredFindings.filter(isPublishableStructuredFinding);
+  const directional=supported.find((item)=>["increased","improved","decreased","reduced","worsened"].includes(item.direction));
+  if(directional){
+    const metric=String(directional.metric??"").replaceAll("_"," ");
+    const magnitude=directional.magnitude&&!["none","unknown"].includes(directional.magnitude)?`${directional.magnitude} `:"";
+    if(["increased","decreased","reduced"].includes(directional.direction)){
+      const direction=directional.direction==="increased"?"increase":"decrease";
+      return `This view suggests a ${magnitude}${direction} in ${metric||"the visible feature"}.`;
+    }
+    return `This view suggests ${metric||"the visible feature"} looks ${magnitude}${directional.direction==="worsened"?"less favorable":"improved"}.`;
+  }
+  const stable=supported.some((item)=>item.direction==="stable") || eligibleFindings.some((item)=>/stable|no (?:visible|meaningful|notable|clear|obvious)|unchanged|consistent/i.test(item));
+  if(stable){
+    if(poseId==="front-relaxed")return "Your front-relaxed shape and waist look broadly unchanged.";
+    if(poseId==="back-relaxed")return "Your rear shape and muscularity look broadly unchanged.";
+    if(poseId==="back-flexed")return "Back size and definition look broadly unchanged.";
+    if(poseId.includes("side"))return "Your side profile and waist look broadly unchanged.";
+    if(poseId==="front-flexed")return "Muscle fullness and definition look broadly unchanged.";
+    return "This matched view looks broadly unchanged.";
+  }
+  return "This matched view does not support a confident visual change claim.";
+}
 function confirmedPoseCopy(view){
   const copies={
     "front-relaxed":{headline:"The final relaxed view supports visible abdominal definition at rest.",observations:["The full journey shows substantially reduced waist softness, clearer abdominal structure, and stronger shoulder-to-waist contrast.","Since Jul 11, the waist and lower midsection show continued refinement rather than a new baseline."]},
@@ -509,7 +539,6 @@ function confirmedPoseCopy(view){
   };
   return copies[view.poseId]??null;
 }
-function supportingEvidenceSentence(weight,dexa,support={}){const parts=[];if(weight&&!/^No /.test(weight))parts.push("the continued weight trend");if(support.training)parts.push("consistent resistance training");if(support.activity)parts.push("sustained activity through the week");if(support.nutrition)parts.push("the available nutrition record");const reinforcement=parts.length?`${joinNarrative(parts)} ${parts.length===1?"reinforces":"reinforce"} the visual pattern`:`The photos remain the clearest current signal`;const sentence=`${reinforcement}${dexa?", with the latest DEXA serving as the body-composition baseline":""}.`;return sentence.charAt(0).toUpperCase()+sentence.slice(1);}
 export function deriveExecutionSupport(canonicalObjects=[],eventDate){const start=new Date(`${eventDate}T12:00:00Z`);start.setUTCDate(start.getUTCDate()-6);const startKey=start.toISOString().slice(0,10);const recent=canonicalObjects.filter((item)=>item.quality?.status!=="superseded"&&String(item.lastObservedAt).slice(0,10)>=startKey&&String(item.lastObservedAt).slice(0,10)<=eventDate);const count=(types)=>recent.filter((item)=>types.includes(item.evidence_type)&&item.payload?.quality?.status!=="incomplete").length;
   // "Resistance training was consistent" is a specific claim: only evidence
   // that is actually resistance/strength training (Logger exercises present,
@@ -521,7 +550,31 @@ export function deriveExecutionSupport(canonicalObjects=[],eventDate){const star
   // including once Cardio ever becomes strategically eligible.
   const training=recent.filter((item)=>item.evidence_type==="training"&&item.payload?.quality?.status!=="incomplete"&&isResistanceTrainingSession(item.payload??item)).length;
   const activity=count(["activity_day"]);const nutrition=count(["nutrition"]);return {...(training>=2?{training:"Resistance training was consistent through the week."}:{}),...(activity>=3?{activity:"Activity remained sustained through the week."}:{}),...(nutrition>=3?{nutrition:"The available nutrition record was consistent through the week."}:{})};}
-function ordinaryEventCopy({goalContext,limitation,milestone}){
+function ordinaryEventCopy({goalContext,limitation,milestone,holisticSynthesis}){
+  const compatibility=holisticSynthesis?.goalRelativeCompatibility;
+  const hierarchy=holisticSynthesis?.goalEvidenceHierarchy;
+  const visualStable=compatibility?.supportingVisualEvidence?.status==="stable";
+  const hasAcceptedGuardrail=(hierarchy?.guardrails?.length??0)>0;
+  const objectiveMetric=String(hierarchy?.primaryObjective?.metric??"primary objective").replaceAll("_"," ");
+  const objectiveDirection=hierarchy?.primaryObjective?.direction==="decrease"?"is moving down":hierarchy?.primaryObjective?.direction==="maintain"?"is holding steady":"is moving up";
+  if(compatibility?.status==="jointly_supportive")return{
+    title:visualStable?`Measured ${objectiveMetric} ${objectiveDirection} before the photos show a clear change.`:"The complete evidence supports continued progress.",
+    summary:`Your primary measurement is moving in the intended direction${hasAcceptedGuardrail?", the accepted guardrail is holding":""}${visualStable?", and the matched views look broadly stable":""}.`,
+    goalMeaning:"The primary objective is progressing, while supporting photo evidence remains stable and does not override the objective measurement.",
+    progress:visualStable?"The matched views show broad visual stability across the full photo set.":"The matched views add supporting visual context to the objective measurement.",
+    interpretation:holisticSynthesis.userFacingCopy,
+    limitation,
+    coach:holisticSynthesis.coachingImplication,
+  };
+  if(compatibility&&compatibility.status!=="insufficient_goal_context")return{
+    title:"This check-in needs a measured, Goal-aware check.",
+    summary:"The objective, accepted guardrails, and supporting photos do not all support continuing unchanged.",
+    goalMeaning:compatibility.rationale,
+    progress:visualStable?"The matched views look broadly stable.":"The matched views add supporting visual context.",
+    interpretation:holisticSynthesis.userFacingCopy,
+    limitation,
+    coach:holisticSynthesis.coachingImplication,
+  };
   const goalTitle=goalContext?.activeGoal?.title??"";
   const phaseName=goalContext?.activePhase?.name??"";
   const operatingState=goalContext?.operatingState?.value??"";
@@ -593,7 +646,6 @@ function completionEventCopy(status,{latestDexa,priorDexa,baselineDexa},result){
     coachingDirection:"Replace the limiting photo rather than extending the cut automatically.",
   };
 }
-function joinNarrative(values){if(values.length===1)return values[0];if(values.length===2)return `${values[0]} and ${values[1]}`;return `${values.slice(0,-1).join(", ")}, and ${values.at(-1)}`;}
 function formatDexa(scan){const bf=scan.bodyFatPercentage?.value??scan.bodyFatPercentage;return bf?`Latest DEXA: ${bf}% body fat`:`Latest DEXA: ${String(scan.measuredAt).slice(0,10)}`;}
 function describeSessionConditions(c={}){const values=[];if(c.postWorkout===true)values.push("after your workout");if(c.fasted===true)values.push("fasted");if(c.fasted===false)values.push("after eating");if(c.morning===true)values.push("in the morning");if(c.morning===false)values.push("later in the day");return values.length?`Taken ${values.join(", ")}.`:"Capture details are limited.";}
 function newBaselineNarrative(poseId){const prose=getProgressPhotoProseLabel(poseId);if(poseId.includes("side"))return `This is your first confirmed ${prose} photo, so there is no same-pose comparison yet. It establishes a useful baseline for abdominal profile and waist projection.`;if(poseId==="front-flexed")return "This front flexed view adds context around abdominal separation, oblique definition, vascularity, and end-of-cut conditioning. It supports but does not prove visible abs at rest.";return `This is your first confirmed ${prose} photo. It establishes a useful new baseline while adding current goal context.`;}
