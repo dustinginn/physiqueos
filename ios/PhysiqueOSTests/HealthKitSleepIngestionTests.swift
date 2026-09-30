@@ -29,6 +29,8 @@ final class HealthKitSleepIngestionTests: XCTestCase {
             SleepFixtures.block(overrides: ["endSleepDay": .number(20261010)]),
             SleepFixtures.block(overrides: ["maximumSamplesPerBatch": .number(500)]),
             SleepFixtures.block(overrides: ["maximumManifestLiveIds": .number(5000)]),
+            SleepFixtures.block(overrides: ["maximumDeletionsPerBatch": .number(250)]),
+            SleepFixtures.block(overrides: ["maximumManifestWindowHours": .number(240)]),
         ]
         for block in malformed {
             let capability = HealthKitSleepCapability.resolve(manifestBlock: block, at: SleepFixtures.now)
@@ -46,8 +48,9 @@ final class HealthKitSleepIngestionTests: XCTestCase {
         )
         XCTAssertEqual(validation.mode, .validationOnly)
         XCTAssertEqual(validation.activeFloor(at: SleepFixtures.now), SleepFixtures.floor)
-        // endSleepDay + 1 day of Server slack, then OFF.
-        XCTAssertNil(validation.activeFloor(at: SleepFixtures.date("2026-10-08T00:00:01Z")))
+        // The device clock never ends a bounded window: late in-window data and
+        // staged batches still flow; the Server refuses after-window samples.
+        XCTAssertEqual(validation.activeFloor(at: SleepFixtures.date("2026-10-20T00:00:00Z")), SleepFixtures.floor)
     }
 
     func testGatePersistsLastKnownStateAndLatchesOffOnServerDisabled() {
@@ -564,6 +567,55 @@ final class HealthKitSleepIngestionTests: XCTestCase {
         XCTAssertEqual(outcome.streamErrors[.sleepAnalysis]?.first, "sleep_capability_refresh_failed")
     }
 
+    // MARK: Review regressions
+
+    func testContractImpossibleSampleIsDeferredLocallyInsteadOfWedgingTheLane() async throws {
+        let result = SleepFixtures.result(additions: [
+            SleepFixtures.addition(id: 1, start: "2026-10-04T00:00:00Z", end: "2026-10-05T06:00:00Z"), // 30 h
+            SleepFixtures.addition(id: 2, zone: "GMT+0500"),
+            SleepFixtures.addition(id: 3),
+        ])
+        let harness = try SleepEngineHarness(gate: SleepFixtures.activeGate(), results: [result])
+        try await harness.engine.synchronize(scope: harness.scope)
+        let payloads = await harness.uploader.payloads()
+        XCTAssertEqual(payloads.count, 1)
+        XCTAssertEqual(payloads.first?.samples?.map(\.externalId), [SleepFixtures.uuid(3)])
+        let cursor = try await harness.store.authoritativeCursor(for: harness.scope)
+        XCTAssertNotNil(cursor, "the valid sample is acknowledged; the lane keeps moving")
+        let deferred = try await harness.store.deferredChanges(for: harness.scope)
+        XCTAssertEqual(deferred.first?.reason, "healthkit_sleep_sample_shape_invalid")
+        XCTAssertEqual(deferred.first?.additions.count, 2)
+    }
+
+    func testNonIANAZoneIsNeverSentAndOnlyNamedZonesAreAccepted() {
+        XCTAssertTrue(HealthKitSleepWireMapper.isIANATimeZone("America/Los_Angeles"))
+        XCTAssertTrue(HealthKitSleepWireMapper.isIANATimeZone("UTC"))
+        XCTAssertFalse(HealthKitSleepWireMapper.isIANATimeZone("GMT+0500"))
+        XCTAssertFalse(HealthKitSleepWireMapper.isIANATimeZone("PST"))
+    }
+
+    @MainActor
+    func testDeactivationTurnsOffSleepDeliveryOnlyIfThisDeviceRegisteredIt() async {
+        // Never activated: no HealthKit teardown call at all.
+        let never = SleepCoordinatorHarness(gate: SleepFixtures.inactiveGate(), capability: .success(nil))
+        let untouched = await never.coordinator.bootstrap()
+        XCTAssertFalse(untouched.sleepDeactivated)
+        let neverDeactivated = await never.synchronizer.deactivatedScopes()
+        XCTAssertTrue(neverDeactivated.isEmpty)
+
+        // Activated once, then the Server turns Sleep off: delivery is torn down once.
+        let gate = SleepFixtures.inactiveGate()
+        let enabledHarness = SleepCoordinatorHarness(gate: gate, capability: .success(SleepFixtures.block()))
+        _ = await enabledHarness.coordinator.bootstrap()
+        let offHarness = SleepCoordinatorHarness(gate: gate, capability: .success(SleepFixtures.block(enabled: false)))
+        let off = await offHarness.coordinator.bootstrap()
+        XCTAssertTrue(off.sleepDeactivated)
+        let deactivated = await offHarness.synchronizer.deactivatedScopes()
+        XCTAssertEqual(deactivated.map(\.predicateVersion), [HealthKitSleepIngestionContract.predicateVersion])
+        let again = await offHarness.coordinator.bootstrap()
+        XCTAssertFalse(again.sleepDeactivated, "teardown happens once")
+    }
+
     // MARK: Helpers
 
     private func assertNotActivated(_ body: () async throws -> Void, file: StaticString = #filePath, line: UInt = #line) async {
@@ -698,8 +750,11 @@ enum SleepFixtures {
 final class InMemorySleepCapabilityStore: HealthKitSleepCapabilityStore, @unchecked Sendable {
     private let lock = NSLock()
     private var value: HealthKitSleepCapability?
+    private var registered = false
     func load() -> HealthKitSleepCapability? { lock.withLock { value } }
     func save(_ capability: HealthKitSleepCapability) { lock.withLock { value = capability } }
+    func loadBackgroundDeliveryRegistered() -> Bool { lock.withLock { registered } }
+    func saveBackgroundDeliveryRegistered(_ value: Bool) { lock.withLock { registered = value } }
 }
 
 private final class SleepCounter: @unchecked Sendable {
@@ -875,6 +930,9 @@ private actor SleepSynchronizerMock: HealthKitAutomaticSynchronizing {
     func synchronize(scope: HealthKitCursorScope, stagingCompletion: (@Sendable () -> Void)?) async throws { synced.append(scope) }
     func synchronizeCurrentDay(scope: HealthKitCursorScope, calendar: Calendar) async throws { synced.append(scope) }
     func synchronizeHistoricalCatchUp(scope: HealthKitCursorScope, calendar: Calendar) async throws { synced.append(scope) }
+    private var deactivated: [HealthKitCursorScope] = []
+    func deactivateSleepObservation(scope: HealthKitCursorScope) async throws { deactivated.append(scope) }
+    func deactivatedScopes() -> [HealthKitCursorScope] { deactivated }
 
     func observedScopes() -> [HealthKitCursorScope] { observed }
     func backgroundDeliveryScopes() -> [HealthKitCursorScope] { background }

@@ -30,6 +30,11 @@ protocol HealthKitAutomaticSynchronizing: Sendable {
     func synchronize(scope: HealthKitCursorScope, stagingCompletion: (@Sendable () -> Void)?) async throws
     func synchronizeCurrentDay(scope: HealthKitCursorScope, calendar: Calendar) async throws
     func synchronizeHistoricalCatchUp(scope: HealthKitCursorScope, calendar: Calendar) async throws
+    func deactivateSleepObservation(scope: HealthKitCursorScope) async throws
+}
+
+extension HealthKitAutomaticSynchronizing {
+    func deactivateSleepObservation(scope: HealthKitCursorScope) async throws {}
 }
 
 extension HealthKitSynchronizationEngine: HealthKitAutomaticSynchronizing {}
@@ -308,17 +313,53 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         }
         // Sleep registers only from the persisted last-known capability (a
         // background launch has no network). Inactive -> no Sleep observer.
-        if sleepActivation?.activeFloor(at: now()) != nil {
+        if let sleepActivation {
             let scope = Self.sleepScope(ownerIdentity: ownerIdentity, deviceIdentity: deviceIdentity)
-            outcome.sleepActive = true
-            if case .failed = await boundedStep({ try await self.synchronizer.startObserving(scope: scope) }) {
-                outcome.streamErrors[.sleepAnalysis, default: []].append("observer_registration_failed")
-            }
-            if case .failed = await boundedStep({ try await self.synchronizer.enableBackgroundDelivery(scope: scope) }) {
-                outcome.streamErrors[.sleepAnalysis, default: []].append("background_delivery_registration_failed")
+            if sleepActivation.activeFloor(at: now()) != nil {
+                outcome.sleepActive = true
+                await registerSleep(scope: scope, gate: sleepActivation, outcome: &outcome)
+            } else {
+                await teardownSleepIfRegistered(scope: scope, gate: sleepActivation, outcome: &outcome)
             }
         }
         return outcome
+    }
+
+    @MainActor
+    private func registerSleep(
+        scope: HealthKitCursorScope,
+        gate: HealthKitSleepActivationGate,
+        outcome: inout HealthKitAutomaticBootstrapOutcome
+    ) async {
+        if case .failed = await boundedStep({ try await self.synchronizer.startObserving(scope: scope) }) {
+            outcome.streamErrors[.sleepAnalysis, default: []].append("observer_registration_failed")
+        }
+        switch await boundedStep({ try await self.synchronizer.enableBackgroundDelivery(scope: scope) }) {
+        case .succeeded:
+            gate.markBackgroundDeliveryRegistered()
+        case .failed, .timedOut:
+            outcome.streamErrors[.sleepAnalysis, default: []].append("background_delivery_registration_failed")
+        }
+    }
+
+    /// When Sleep is (or has become) inactive, turn off any Sleep background
+    /// delivery this device previously registered. A device that never
+    /// activated Sleep has no record and makes no HealthKit call at all.
+    @MainActor
+    private func teardownSleepIfRegistered(
+        scope: HealthKitCursorScope,
+        gate: HealthKitSleepActivationGate,
+        outcome: inout HealthKitAutomaticBootstrapOutcome
+    ) async {
+        guard gate.consumeBackgroundDeliveryRegistration() else { return }
+        switch await boundedStep({ try await self.synchronizer.deactivateSleepObservation(scope: scope) }) {
+        case .succeeded:
+            outcome.sleepDeactivated = true
+        case .failed, .timedOut:
+            // Keep the record so the next pass retries the teardown.
+            gate.markBackgroundDeliveryRegistered()
+            outcome.streamErrors[.sleepAnalysis, default: []].append("sleep_deactivation_failed")
+        }
     }
 
     /// The dedicated Sleep cursor scope (`healthkit-automatic-sleep-v1`).
@@ -353,15 +394,13 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
                 outcome.streamErrors[.sleepAnalysis, default: []].append("sleep_capability_refresh_failed")
             }
         }
-        guard sleepActivation.activeFloor(at: now()) != nil else { return }
-        outcome.sleepActive = true
         let scope = Self.sleepScope(ownerIdentity: ownerIdentity, deviceIdentity: deviceIdentity)
-        if case .failed = await boundedStep({ try await self.synchronizer.startObserving(scope: scope) }) {
-            outcome.streamErrors[.sleepAnalysis, default: []].append("observer_registration_failed")
+        guard sleepActivation.activeFloor(at: now()) != nil else {
+            await teardownSleepIfRegistered(scope: scope, gate: sleepActivation, outcome: &outcome)
+            return
         }
-        if case .failed = await boundedStep({ try await self.synchronizer.enableBackgroundDelivery(scope: scope) }) {
-            outcome.streamErrors[.sleepAnalysis, default: []].append("background_delivery_registration_failed")
-        }
+        outcome.sleepActive = true
+        await registerSleep(scope: scope, gate: sleepActivation, outcome: &outcome)
         switch await boundedStep({ try await self.synchronizer.synchronize(scope: scope, stagingCompletion: nil) }) {
         case .succeeded:
             outcome.caughtUpStreams.insert(.sleepAnalysis)
@@ -371,7 +410,13 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             outcome.streamErrors[.sleepAnalysis, default: []].append("catch_up_sync_timed_out")
         }
         if let sleepManifestSender {
-            outcome.sleepManifest = await sleepManifestSender.sendIfDue()
+            // Bounded like every other step: a hung HealthKit read or network
+            // call can never hold the shared bootstrap task open.
+            let box = HealthKitSleepManifestOutcomeBox()
+            switch await boundedStep({ box.set(await sleepManifestSender.sendIfDue()) }) {
+            case .succeeded: outcome.sleepManifest = box.value
+            case .failed, .timedOut: outcome.sleepManifest = .failed(code: "healthkit_sleep_manifest_timed_out")
+            }
         }
     }
 
@@ -680,5 +725,13 @@ struct HealthKitAutomaticBootstrapOutcome: Equatable {
     var streamErrors: [HealthKitSynchronizationStream: [String]] = [:]
     /// Whether the dormant Sleep lane found an active capability this pass.
     var sleepActive = false
+    var sleepDeactivated = false
     var sleepManifest: HealthKitSleepManifestOutcome?
+}
+
+private final class HealthKitSleepManifestOutcomeBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: HealthKitSleepManifestOutcome?
+    var value: HealthKitSleepManifestOutcome? { lock.withLock { stored } }
+    func set(_ outcome: HealthKitSleepManifestOutcome) { lock.withLock { stored = outcome } }
 }

@@ -91,20 +91,25 @@ struct HealthKitSleepCapability: Equatable, Codable, Sendable {
         if let ids = block["maximumManifestLiveIds"], ids != .number(Double(HealthKitSleepIngestionContract.maximumManifestLiveIDs)) {
             return .disabled(at: date)
         }
+        if let deletions = block["maximumDeletionsPerBatch"], deletions != .number(Double(HealthKitSleepIngestionContract.maximumDeletionsPerBatch)) {
+            return .disabled(at: date)
+        }
+        if let hours = block["maximumManifestWindowHours"], hours != .number(HealthKitSleepIngestionContract.maximumManifestWindow / 3600) {
+            return .disabled(at: date)
+        }
         return HealthKitSleepCapability(
             enabled: true, mode: mode, effectiveSleepDay: effective, endSleepDay: end,
             activationFloor: floor, resolvedAt: date
         )
     }
 
-    /// Whether Sleep may be queried/uploaded at `date`. A bounded policy is
-    /// honored with one day of slack past its last sleep day (the Server
-    /// accepts samples through `endSleepDay + 1`); an open-ended one has no end.
+    /// Whether Sleep may be queried/uploaded, and its floor. Active exactly
+    /// while the Server manifest says `enabled`. A bounded policy's end is NOT
+    /// enforced by the device clock: the Server refuses after-window samples
+    /// individually (`refused_after_activation_window`), and a clock cutoff
+    /// would strand late-arriving in-window data and already-staged batches.
     func activeFloor(at date: Date) -> Date? {
         guard enabled, let activationFloor, mode != nil else { return nil }
-        if let endSleepDay {
-            guard let end = Self.utcDayStart(endSleepDay)?.addingTimeInterval(3 * 86_400), date < end else { return nil }
-        }
         return activationFloor
     }
 
@@ -145,6 +150,8 @@ private extension ProductionJSONValue {
 protocol HealthKitSleepCapabilityStore: Sendable {
     func load() -> HealthKitSleepCapability?
     func save(_ capability: HealthKitSleepCapability)
+    func loadBackgroundDeliveryRegistered() -> Bool
+    func saveBackgroundDeliveryRegistered(_ registered: Bool)
 }
 
 /// The capability holds no health data: an on/off flag, a mode, calendar
@@ -152,6 +159,10 @@ protocol HealthKitSleepCapabilityStore: Sendable {
 struct UserDefaultsHealthKitSleepCapabilityStore: HealthKitSleepCapabilityStore, @unchecked Sendable {
     private let defaults: UserDefaults
     private let key = "physiqueos.healthkit.sleep.capability.v1"
+    private let deliveryKey = "physiqueos.healthkit.sleep.background-delivery-registered.v1"
+
+    func loadBackgroundDeliveryRegistered() -> Bool { defaults.bool(forKey: deliveryKey) }
+    func saveBackgroundDeliveryRegistered(_ registered: Bool) { defaults.set(registered, forKey: deliveryKey) }
 
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 
@@ -207,16 +218,36 @@ final class HealthKitSleepActivationGate: @unchecked Sendable {
 
     /// Replaces the last-known state with a freshly resolved manifest block.
     func update(_ resolved: HealthKitSleepCapability) {
-        lock.withLock { capability = resolved }
-        store.save(resolved)
+        lock.withLock {
+            capability = resolved
+            store.save(resolved)
+        }
     }
 
     /// The Server said Sleep is not enabled. Stop querying and uploading now;
     /// the next successful manifest read decides again.
     func markServerDisabled(at date: Date) {
         let disabled = HealthKitSleepCapability.disabled(at: date)
-        lock.withLock { capability = disabled }
-        store.save(disabled)
+        lock.withLock {
+            capability = disabled
+            store.save(disabled)
+        }
+    }
+
+    /// Durable record that Sleep background delivery was enabled with iOS, so
+    /// a later deactivation knows to turn it off (and a never-activated
+    /// device never touches HealthKit at all).
+    func markBackgroundDeliveryRegistered() {
+        lock.withLock { store.saveBackgroundDeliveryRegistered(true) }
+    }
+
+    /// Returns whether delivery had been registered, clearing the record.
+    func consumeBackgroundDeliveryRegistration() -> Bool {
+        lock.withLock {
+            let registered = store.loadBackgroundDeliveryRegistered()
+            if registered { store.saveBackgroundDeliveryRegistered(false) }
+            return registered
+        }
     }
 }
 
@@ -301,15 +332,26 @@ enum HealthKitSleepWireMapper {
         )
     }
 
+    /// Mirrors every per-sample check the Server applies, so a sample the
+    /// Server would 400 (rejecting the whole request, forever, on replay) is
+    /// deferred locally instead of wedging the Sleep lane.
+    static let maximumTextLength = 300
+    static let maximumSampleDuration: TimeInterval = 24 * 60 * 60
+
     static func sample(_ observation: NormalizedHealthKitObservation) throws -> HealthKitSleepWireSample {
         guard observation.objectTypeIdentifier == sleepObjectTypeIdentifier,
               let uuid = observation.healthKitUUID,
               case let .sleep(sleep) = observation.payload,
+              (0...1000).contains(sleep.stageValue),
               let startedAt = observation.occurrence.startedAt,
               let endedAt = observation.occurrence.endedAt,
               endedAt >= startedAt,
-              !observation.source.bundleIdentifier.isEmpty,
-              TimeZone(identifier: observation.occurrence.timeZoneIdentifier) != nil
+              endedAt.timeIntervalSince(startedAt) <= maximumSampleDuration,
+              !observation.source.bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              observation.source.bundleIdentifier.count <= maximumTextLength,
+              (observation.source.sourceRevision?.count ?? 0) <= maximumTextLength,
+              (observation.source.productType?.count ?? 0) <= maximumTextLength,
+              isIANATimeZone(observation.occurrence.timeZoneIdentifier)
         else { throw HealthKitSyncError.operational(code: "healthkit_sleep_sample_not_deliverable") }
         return HealthKitSleepWireSample(
             externalId: uuid.uuidString.lowercased(),
@@ -325,6 +367,13 @@ enum HealthKitSleepWireMapper {
                 productType: observation.source.productType
             )
         )
+    }
+
+    /// The Server validates zones with ICU/`Intl`; Foundation also accepts
+    /// abbreviations and GMT offsets that it may not. Only a named IANA zone
+    /// (or UTC) is sent.
+    static func isIANATimeZone(_ identifier: String) -> Bool {
+        identifier == "UTC" || TimeZone.knownTimeZoneIdentifiers.contains(identifier)
     }
 
     /// ISO-8601 with an explicit `Z` and millisecond precision (Phase A

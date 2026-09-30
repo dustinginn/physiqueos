@@ -82,6 +82,14 @@ actor HealthKitSynchronizationEngine {
         observerClient.unregister(registration)
     }
 
+    /// Deactivation teardown for the Sleep scope only: stop the in-process
+    /// observer and turn iOS background delivery off. Never queries.
+    func deactivateSleepObservation(scope: HealthKitCursorScope) async throws {
+        guard scope.stream == .sleepAnalysis else { throw HealthKitSyncError.ownerOrDeviceMismatch }
+        stopObserving(scope: scope)
+        try await observerClient.disableBackgroundDelivery(for: .sleepAnalysis)
+    }
+
     /// Registration architecture only. Default N1 behavior cannot reach it
     /// because `.backgroundDelivery` is disabled.
     func enableBackgroundDelivery(scope: HealthKitCursorScope) async throws {

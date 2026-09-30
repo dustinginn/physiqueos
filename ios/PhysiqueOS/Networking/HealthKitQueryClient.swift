@@ -18,6 +18,13 @@ protocol HealthKitObserverClient: Sendable {
     ) throws -> HealthKitObserverRegistration
     func unregister(_ registration: HealthKitObserverRegistration)
     func enableBackgroundDelivery(for stream: HealthKitSynchronizationStream) async throws
+    func disableBackgroundDelivery(for stream: HealthKitSynchronizationStream) async throws
+}
+
+extension HealthKitObserverClient {
+    /// Default no-op keeps existing test doubles source compatible; the
+    /// system client implements it for real.
+    func disableBackgroundDelivery(for stream: HealthKitSynchronizationStream) async throws {}
 }
 
 /// Real HealthKit implementation behind injectable protocols. N1's default
@@ -538,6 +545,16 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
             localDayEndedAt: dayEnd
         )
         if let category = sample as? HKCategorySample, stream == .sleepAnalysis {
+            // Only a named IANA zone from metadata counts as the sample's own
+            // zone; anything else falls back to the device zone, labelled so.
+            let sleepZone = sampleZone.flatMap { HealthKitSleepWireMapper.isIANATimeZone($0.identifier) ? $0 : nil }
+            let sleepOccurrence = sleepZone == nil ? HealthKitQueryOccurrence(
+                startedAt: occurrence.startedAt, endedAt: occurrence.endedAt,
+                localDate: occurrence.localDate, calendarIdentifier: occurrence.calendarIdentifier,
+                timeZoneIdentifier: calendar.timeZone.identifier,
+                utcOffsetSeconds: calendar.timeZone.secondsFromGMT(for: sample.startDate),
+                localDayStartedAt: occurrence.localDayStartedAt, localDayEndedAt: occurrence.localDayEndedAt
+            ) : occurrence
             // Sleep keeps only the Phase A privacy-safe source fields, even in
             // protected local staging: no source display name (it is often a
             // person's device name), no HKDevice, no metadata dictionary.
@@ -551,10 +568,10 @@ final class SystemHealthKitQueryClient: HealthKitAnchoredQueryClient, @unchecked
                     productType: sample.sourceRevision.productType,
                     privacySafeDeviceProvenance: nil
                 ),
-                occurrence: occurrence,
+                occurrence: sleepOccurrence,
                 payload: .sleep(HealthKitQuerySleep(
                     stageValue: category.value,
-                    timeZoneSource: sampleZone == nil
+                    timeZoneSource: sleepZone == nil
                         ? HealthKitSleepIngestionContract.deviceTimeZoneSource
                         : HealthKitSleepIngestionContract.sampleTimeZoneSource,
                     wasUserEntered: wasUserEnteredFlag(sample.metadata)
@@ -781,6 +798,20 @@ final class SystemHealthKitObserverClient: HealthKitObserverClient, @unchecked S
     /// quantity types at hourly anyway and they are re-derived on every wake.
     static func backgroundDeliveryFrequency(for stream: HealthKitSynchronizationStream) -> HKUpdateFrequency {
         stream == .workouts ? .immediate : .hourly
+    }
+
+    func disableBackgroundDelivery(for stream: HealthKitSynchronizationStream) async throws {
+        for type in observerTypes(for: stream) {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                store.disableBackgroundDelivery(for: type) { completed, error in
+                    if error != nil || !completed {
+                        continuation.resume(throwing: HealthKitSyncError.operational(code: "healthkit_background_delivery_disable_failed"))
+                    } else {
+                        continuation.resume(returning: ())
+                    }
+                }
+            }
+        }
     }
 
     func enableBackgroundDelivery(for stream: HealthKitSynchronizationStream) async throws {
