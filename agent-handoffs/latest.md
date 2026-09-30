@@ -3,6 +3,6 @@
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
 - Task: post-Build-70 batch — HealthKit Strength background trigger + photo inspection viewer
-- Status: **CANDIDATE (Native only), fresh review in flight; not deployed/uploaded.**
-- Native branch `claude/post70-background-reconcile-photo-viewer-20260930` @ `cf749295fcbc7035ad6eaedec2256f59832329c5`
-- Report: `agent-handoffs/reports/20260930T062000Z-post70-background-reconcile-photo-inspection-checkpoint.md`
+- Status: **FINAL CANDIDATE (Native only); all gates + fresh review done; not deployed/uploaded.**
+- Native branch `claude/post70-background-reconcile-photo-viewer-20260930` @ `a92519276eac2356af8ab7d236c1d2b9c1733c80`
+- Report: `agent-handoffs/reports/20260930T064500Z-post70-background-reconcile-photo-inspection-final.md`
