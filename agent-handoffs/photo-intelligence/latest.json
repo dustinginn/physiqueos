@@ -1,11 +1,11 @@
 {
   "schema_version": 4,
-  "generated_at_utc": "2026-09-30T03:58:59Z",
+  "generated_at_utc": "2026-09-30T04:27:07Z",
   "task": {
-    "id": "photo-intelligence-guarded-production-deploy-20260929",
-    "title": "Guarded production deployment of canonical Photo Intelligence",
+    "id": "photo-perception-boundary-fix-and-sep19-replay-20260930",
+    "title": "Typed perception boundary correction and Sep 19 zero-write replay",
     "agent": "codex",
-    "status": "deployed_verified"
+    "status": "replay_complete_copy_acceptance_failed"
   },
   "repository": "dustinginn/physiqueos",
   "frozen_blind_results": {
@@ -55,12 +55,34 @@
     "zero_unintended_data_drift": true
   },
   "goal_blind_correction_review": {
-    "status": "blocked_before_private_replay",
-    "reviewed_candidate": "1f7709aeee569977c2905978d19695db64b2f566",
-    "blocker": "Caller-controlled identifiers, filename, capturedAt, and allow-listed string conditions can still carry Goal/phase/guardrail text into the perception prompt.",
-    "report": "agent-handoffs/reports/20260930T035859Z-photo-intelligence-corrected-sep19-final-replay-blocked.md",
-    "private_replay_run": false,
-    "final_copy_generated": false,
+    "status": "boundary_passed_replay_complete_copy_acceptance_failed",
+    "reviewed_candidate": "0d0f189e8ccddaf69c5d4b833b8c2a82ce49723b",
+    "boundary_review": {
+      "result": "PASS",
+      "probes_rejected": 7,
+      "structural_mutations_rejected": 13,
+      "invalid_image_references_rejected": 4,
+      "provider_text_leak_count": 0,
+      "attestation_version": "canonical_photo_provider_input_typed_v1"
+    },
+    "report": "agent-handoffs/reports/20260930T042707Z-photo-intelligence-sep19-corrected-final-replay.md",
+    "private_replay_run": true,
+    "final_copy_generated": true,
+    "visual_result": {
+      "matched_views": 5,
+      "overall_magnitude": "none",
+      "reliability": "moderate",
+      "goal_direction": "uncertain",
+      "invented_visual_improvement": false
+    },
+    "copy_acceptance": {
+      "passed": false,
+      "reasons": [
+        "raw observation concatenation is repetitive and too long",
+        "pose captions contain duplication and awkward phrasing",
+        "accepted 8-9% guardrail is lost from set-level Goal projection"
+      ]
+    },
     "production_changed": false
   },
   "safety": {
@@ -71,5 +93,5 @@
     "deployed": true,
     "testflight_uploaded": false
   },
-  "next_step": "Publish a revised candidate with a strictly typed, internally constructed model-input metadata boundary; repeat independent review before any private Sep 19 acceptance replay."
+  "next_step": "Review the exact replay report. Accept the isolated provider-boundary correction, but do not supersede production until a separately authorized narrow Goal-guardrail projection and deterministic copy-realization correction passes review."
 }
