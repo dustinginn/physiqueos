@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-29T18:25:00Z",
+  "generated_at_utc": "2026-09-30T02:05:00Z",
   "task": {
     "id": "peptide-protocol-native-ux-redesign-next-batch-20260929",
     "title": "FINAL CANDIDATE (all gates passed, not deployed/uploaded): simplified peptide editor + canonical Pause/Resume + roll-forwards + weekly averages; Build 70",
@@ -20,7 +20,7 @@
     "server_candidate_branch": "claude/next-build-server-candidate-20260929",
     "production_deployment_id": "ab7fe481-abd9-4334-bfcd-f224560bb801",
     "previous_production_server_sha": "faa9151a8118acf48fda6541e8e23898f1148246",
-    "native_candidate_sha": "bf7ba1e73e41869084ee24bd979c329ecbed42b3",
+    "native_candidate_sha": "4c93d9f50cd1a44238afb6111c87265d9b9bd903",
     "native_candidate_branch": "claude/peptide-ux-native-20260929",
     "native_recommended_build": "70",
     "codex_celebration_branch": "codex/native-workout-complete-record-celebration-20260928",
@@ -34,7 +34,7 @@
     "peptide_server_sha": "cc440e16"
   },
   "result": {
-    "summary": "Server b94ab533: full regression 9315/9623 (303 baseline failures, 0 new) and production build succeeded. Native Build 70 bf7ba1e7: full unit suite 1564/1564, Release compile succeeded; three adversarial reviews with majors fixed. UI test bundle and simulator tour deliberately not run (risk-scaled); no rendered visual check yet. Nothing deployed or uploaded.",
+    "summary": "Server b94ab533 and Native Build 70 4c93d9f5: all gates passed on exact SHAs (Server 0 new regressions + prod build; Native 1564/1564 + Release compile). Exact-SHA delta review found and fixed one major (manual plan Save gating). Not deployed/uploaded.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -71,9 +71,10 @@
     "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
   ],
   "recommended_next_step": "Review the closeout; if accepted, authorize Server b94ab533 deploy first, then archive/upload Build 70 and run the limited Founder acceptance scope.",
-  "full_report_path": "agent-handoffs/reports/20260929T182500Z-peptide-build70-final-candidate-closeout.md",
+  "full_report_path": "agent-handoffs/reports/20260930T020500Z-peptide-build70-final-candidate-closeout-v2.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260929T175500Z-peptide-build70-candidate-status.md",
+    "agent-handoffs/reports/20260930T014500Z-peptide-build70-verification-checkpoint.md",
+    "agent-handoffs/reports/20260929T182500Z-peptide-build70-final-candidate-closeout.md",
     "agent-handoffs/reports/20260929T083000Z-peptide-protocol-editor-pause-resume-design-map.md",
     "agent-handoffs/reports/20260929T050000Z-server-98534bf8-and-native-build69-distribution.md",
     "agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md",
