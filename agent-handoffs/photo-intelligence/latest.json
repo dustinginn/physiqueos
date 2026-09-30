@@ -93,6 +93,7 @@
     "frozen_perception_candidate": "0d0f189e8ccddaf69c5d4b833b8c2a82ce49723b",
     "report": "agent-handoffs/reports/20260930T142408Z-photo-pi-goal-hierarchy-coach-realization-final.md",
     "prior_checkpoint": "agent-handoffs/reports/20260930T052635Z-photo-pi-goal-hierarchy-coach-realization-checkpoint.md",
+    "review_request": "agent-handoffs/inbox/review-requests/20260930T143036Z-chatgpt-review-photo-goal-hierarchy-coach-realization.md",
     "implemented": [
       "authoritative Goal target/guardrail projection",
       "primary-objective/guardrail/supporting/execution evidence hierarchy",
