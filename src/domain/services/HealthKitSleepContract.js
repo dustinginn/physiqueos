@@ -197,7 +197,7 @@ export function normalizeSleepSample(value, index = 0) {
     throw invalid(`${field}.wasUserEntered`, "wasUserEntered must be a boolean when present.");
   }
   const wasUserEntered = value.wasUserEntered === true;
-  const bundleIdentifier = requiredText(value.source.bundleIdentifier, `${field}.source.bundleIdentifier`);
+  const bundleIdentifier = normalizeSleepBundleIdentifier(requiredText(value.source.bundleIdentifier, `${field}.source.bundleIdentifier`));
   const sourceVersion = optionalText(value.source.sourceVersion, `${field}.source.sourceVersion`);
   const productTypeFamily = classifyProductTypeFamily(optionalText(value.source.productType, `${field}.source.productType`));
   const { sourceClass, sourceFamily } = classifySleepSource({ bundleIdentifier, productTypeFamily, wasUserEntered });
@@ -260,6 +260,18 @@ export function getHealthKitSleepSampleRecordId(ownerUserId, externalId) {
 
 export function getHealthKitSleepDayRecordId(sleepDay) {
   return `${HEALTHKIT_SLEEP_DAY_ID_PREFIX}${sleepDay}`;
+}
+
+/**
+ * Apple Health device sources arrive as `com.apple.health.<device UUID>`. The
+ * suffix is a stable per-device identifier (the same privacy class as a UDI),
+ * so it is dropped before anything is stored, fingerprinted, or ranked.
+ */
+export function normalizeSleepBundleIdentifier(bundleIdentifier) {
+  const text = String(bundleIdentifier ?? "").trim();
+  const lower = text.toLowerCase();
+  if (lower === "com.apple.health" || lower.startsWith("com.apple.health.")) return "com.apple.health";
+  return text;
 }
 
 export function classifyProductTypeFamily(productType) {
@@ -447,9 +459,14 @@ function nonNegativeInteger(value, field) {
   }
   return value;
 }
+// ISO-8601 with an explicit zone designator only: a zone-less or free-form
+// value would be read in the Server's own zone and move the sleep day.
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 function boundedInstant(value, field) {
   const text = String(value ?? "");
-  if (!text || text.length > HEALTHKIT_SLEEP_MAX_TIMESTAMP_LENGTH) throw invalid(field, `${field} must be an ISO date-time.`);
+  if (!text || text.length > HEALTHKIT_SLEEP_MAX_TIMESTAMP_LENGTH || !ISO_INSTANT.test(text)) {
+    throw invalid(field, `${field} must be an ISO-8601 date-time with Z or an explicit offset.`);
+  }
   const time = Date.parse(text);
   if (!Number.isFinite(time)) throw invalid(field, `${field} must be an ISO date-time.`);
   return new Date(time).toISOString();

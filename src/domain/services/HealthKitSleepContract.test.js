@@ -99,6 +99,30 @@ describe("HealthKit Sleep sample contract", () => {
   });
 });
 
+describe("HealthKit Sleep contract review regressions", () => {
+  it("requires ISO-8601 instants with Z or an explicit offset", () => {
+    for (const [start, end] of [
+      ["2026-09-10T23:00:00", "2026-09-11T07:00:00"],
+      ["2026-09-10", "2026-09-11"],
+      ["Sep 10 2026 23:00", "Sep 11 2026 07:00"],
+    ]) {
+      expect(() => normalizeSleepSample(wire({ start, end }))).toThrow(/explicit offset/);
+    }
+    expect(normalizeSleepSample(wire({ start: "2026-09-11T06:00:00.123Z", end: "2026-09-11T14:00:00Z" })).startedAt)
+      .toBe("2026-09-11T06:00:00.123Z");
+  });
+
+  it("drops the per-device suffix of Apple Health bundle identifiers before storing or fingerprinting", () => {
+    const record = stored({ source: "watch", ...base });
+    expect(record.source.bundleIdentifier).toBe("com.apple.health");
+    expect(JSON.stringify(record)).not.toContain("2B7C1E10");
+    const other = wire({ id: uuid(30), source: "watch", ...base });
+    other.source.bundleIdentifier = "com.apple.health.FFFFFFFF-0000-4000-8000-00000000000F";
+    const same = wire({ id: uuid(30), source: "watch", ...base });
+    expect(normalizeSleepSample(other).contentFingerprint).toBe(normalizeSleepSample(same).contentFingerprint);
+  });
+});
+
 describe("sleep-day time arithmetic", () => {
   it("attributes [D-1 18:00, D 18:00) local to D", () => {
     expect(deriveHealthKitSleepDay("2026-09-10T17:59:59-07:00", LA)).toBe("2026-09-10");

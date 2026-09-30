@@ -21,6 +21,7 @@ import { OWNER, stored, uuid } from "../../testSupport/healthKitSleepSynthetic.j
 const ROOT = path.resolve(new URL("../../..", import.meta.url).pathname, "src");
 const SLEEP_NEEDLES = [
   "HealthKitSleep", "healthKitSleepSamples", "healthKitSleepDays", "healthkit_sleep_", "healthkit.sleep.ingest",
+  "HEALTHKIT_SLEEP_", "canonicalizeHealthKitSleep", "INGEST_HEALTHKIT_SLEEP", "healthkit-sleep-",
 ];
 // Every non-test file allowed to mention Sleep ingestion. Composition and the
 // Native contract are transport; none of them is a strategic reader.

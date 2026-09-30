@@ -76,22 +76,34 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
     const receivedAt = now().toISOString();
     const deliveryDeviceId = context.principal?.deviceId ?? null;
     const touchedDays = new Set();
+    // A changed sample can affect every sleep day from the one before its
+    // start's day through the one after its end's day.
+    const touch = ({ startedAt, endedAt, timeZone }) => {
+      const first = deriveHealthKitSleepDay(startedAt, timeZone);
+      const last = deriveHealthKitSleepDay(endedAt, timeZone);
+      if (!first || !last) return;
+      for (let day = shiftDateKey(first, -1); day <= shiftDateKey(last, 1); day = shiftDateKey(day, 1)) touchedDays.add(day);
+    };
 
     const sampleResults = [];
     const seenInBatch = new Map();
     for (const sample of batch.samples) {
       const inBatch = seenInBatch.get(sample.externalId);
       if (inBatch !== undefined) {
-        sampleResults.push(inBatch === sample.contentFingerprint
-          ? outcome(sample, "replayed")
-          : conflict(sample));
+        // A repeat inside one batch mirrors the first copy's fate.
+        if (inBatch.contentFingerprint !== sample.contentFingerprint) sampleResults.push(conflict(sample));
+        else sampleResults.push(outcome(sample, inBatch.outcome === "stored" ? "replayed" : inBatch.outcome));
         continue;
       }
-      seenInBatch.set(sample.externalId, sample.contentFingerprint);
+      const resultIndex = sampleResults.length;
+      const remember = () => seenInBatch.set(sample.externalId, {
+        contentFingerprint: sample.contentFingerprint, outcome: sampleResults[resultIndex]?.outcome,
+      });
       const sampleDay = deriveHealthKitSleepDay(sample.endedAt, sample.timeZone);
       const activation = assessHealthKitSleepSampleActivation({ sample, policy, sampleSleepDay: sampleDay });
       if (!activation.admitted) {
         sampleResults.push(outcome(sample, `refused_${activation.reason}`));
+        remember();
         continue;
       }
       const recordId = getHealthKitSleepSampleRecordId(ownerUserId, sample.externalId);
@@ -104,7 +116,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
           ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, recordId, payload: record,
         });
         if (stored.created) {
-          touchedDays.add(sampleDay);
+          touch(sample);
           sampleResults.push(outcome(sample, "stored"));
         } else {
           sampleResults.push(stored.record?.contentFingerprint === sample.contentFingerprint ? outcome(sample, "replayed") : conflict(sample));
@@ -125,6 +137,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
       } else {
         sampleResults.push(conflict(sample));
       }
+      remember();
     }
 
     const deletionResults = [];
@@ -201,48 +214,71 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
       await records.put({
         ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, recordId: existing.id, payload, expectedVersion: existing.version,
       });
-      if (existing.occurrenceDate) touchedDays.add(existing.occurrenceDate);
+      if (existing.startedAt && existing.endedAt) touch(existing);
     }
 
     async function recomputeSleepDays(days) {
       if (days.size === 0) return [];
-      // A sample can change the day before or after its own bucket (an episode
-      // ends in whichever window holds its last asleep instant), and computing
-      // day X needs samples bucketed X-1..X+1.
-      const affected = [...new Set([...days].flatMap((day) => [shiftDateKey(day, -1), day, shiftDateKey(day, 1)]))].sort();
+      // Fixed-point closure over sleep days. Computing day X reads samples
+      // bucketed X-1..X+1. Any computed day whose inputs touch an affected
+      // bucket joins the affected set together with all of its inputs'
+      // buckets (so a day that lost samples to a merged episode is rewritten),
+      // and inputs reaching the edge of a loaded range widen it. Bounded, so a
+      // pathological chain can never make one batch unbounded.
+      let affected = new Set(days);
+      let pass = await computePass(affected);
+      for (let iteration = 1; iteration < MAX_RECOMPUTE_PASSES && pass.expansion.size > 0; iteration += 1) {
+        if (affected.size + pass.expansion.size > MAX_RECOMPUTED_DAYS) break;
+        affected = new Set([...affected, ...pass.expansion]);
+        pass = await computePass(affected);
+      }
       const results = [];
-      for (const run of contiguousRuns(affected)) {
-        const samples = await records.listByOccurrenceDateRange({
-          ownerUserId,
-          collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION,
-          startDate: shiftDateKey(run[0], -1),
-          endDate: shiftDateKey(run.at(-1), 1),
+      for (const sleepDay of [...affected].sort()) {
+        const recordId = getHealthKitSleepDayRecordId(sleepDay);
+        const existing = await records.get({ ownerUserId, collection: HEALTHKIT_SLEEP_DAY_COLLECTION, recordId });
+        const content = pass.computed.get(sleepDay) ?? (existing ? emptyHealthKitSleepDay(sleepDay, { preference }) : null);
+        if (!content) continue;
+        if (existing?.inputDigest === content.inputDigest) continue;
+        const payload = assertQuarantined({
+          ...content,
+          id: recordId,
+          userId: ownerUserId,
+          occurrenceDate: sleepDay,
+          observedAt: content.windowClosesAt ?? existing?.observedAt ?? null,
+          revision: Number(existing?.revision ?? 0) + 1,
+          computedAt: receivedAt,
+          evidenceEligibility: { state: "quarantined", strategic: false, decidedBy: "healthkit-strategic-evidence-quarantine-v1" },
         });
-        const computed = canonicalizeHealthKitSleep({ samples, preference });
-        for (const sleepDay of run) {
-          const recordId = getHealthKitSleepDayRecordId(sleepDay);
-          const existing = await records.get({ ownerUserId, collection: HEALTHKIT_SLEEP_DAY_COLLECTION, recordId });
-          const content = computed.get(sleepDay) ?? (existing ? emptyHealthKitSleepDay(sleepDay, { preference }) : null);
-          if (!content) continue;
-          if (existing?.inputDigest === content.inputDigest) continue;
-          const payload = assertQuarantined({
-            ...content,
-            id: recordId,
-            userId: ownerUserId,
-            occurrenceDate: sleepDay,
-            observedAt: content.windowClosesAt ?? existing?.observedAt ?? null,
-            revision: Number(existing?.revision ?? 0) + 1,
-            computedAt: receivedAt,
-            evidenceEligibility: { state: "quarantined", strategic: false, decidedBy: "healthkit-strategic-evidence-quarantine-v1" },
-          });
-          await records.put({
-            ownerUserId, collection: HEALTHKIT_SLEEP_DAY_COLLECTION, recordId, payload,
-            expectedVersion: existing ? existing.version : null,
-          });
-          results.push(Object.freeze({ sleepDay, revision: payload.revision }));
-        }
+        await records.put({
+          ownerUserId, collection: HEALTHKIT_SLEEP_DAY_COLLECTION, recordId, payload,
+          expectedVersion: existing ? existing.version : null,
+        });
+        results.push(Object.freeze({ sleepDay, revision: payload.revision }));
       }
       return results;
+    }
+
+    async function computePass(affected) {
+      const computed = new Map();
+      const expansion = new Set();
+      for (const run of contiguousRuns([...affected].sort())) {
+        const low = shiftDateKey(run[0], -1);
+        const high = shiftDateKey(run.at(-1), 1);
+        const samples = await records.listByOccurrenceDateRange({
+          ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, startDate: low, endDate: high,
+        });
+        const bucketById = new Map(samples.map((sample) => [sample.id, sample.occurrenceDate]));
+        const inRun = new Set(run);
+        for (const [sleepDay, content] of canonicalizeHealthKitSleep({ samples, preference })) {
+          const buckets = content.inputSampleIds.map((id) => bucketById.get(id)).filter(Boolean);
+          if (!affected.has(sleepDay) && !buckets.some((bucket) => affected.has(bucket))) continue;
+          if (inRun.has(sleepDay)) computed.set(sleepDay, content);
+          for (const day of [sleepDay, ...buckets]) if (!affected.has(day)) expansion.add(day);
+          if (buckets.some((bucket) => bucket <= low) && !affected.has(low)) expansion.add(low);
+          if (buckets.some((bucket) => bucket >= high) && !affected.has(high)) expansion.add(high);
+        }
+      }
+      return { computed, expansion };
     }
   };
 }
@@ -258,6 +294,9 @@ function assertQuarantined(payload) {
   }
   throw new Error("A HealthKit Sleep day escaped the strategic quarantine detector.");
 }
+
+const MAX_RECOMPUTE_PASSES = 8;
+const MAX_RECOMPUTED_DAYS = 45;
 
 function contiguousRuns(sortedDays) {
   const runs = [];

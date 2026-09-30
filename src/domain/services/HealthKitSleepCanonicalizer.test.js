@@ -320,3 +320,56 @@ describe("sleep-canon-v1 source reconciliation (policy-driven, never hard-coded)
 it("synthetic ids are unique", () => {
   expect(uuid(1)).not.toBe(uuid(2));
 });
+
+describe("sleep-canon-v1 review regressions", () => {
+  it("a zero-length asleep sample never throws and never forms an episode", () => {
+    const instant = "2026-09-11T03:00:00-07:00";
+    expect(canonicalizeHealthKitSleep({ samples: [stored({ source: "watch", stage: "core", start: instant, end: instant })] }).size).toBe(0);
+    expect(canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "watch", stage: "core", start: instant, end: instant }),
+      stored({ source: "watch", stage: "awake", start: "2026-09-11T03:00:00-07:00", end: "2026-09-11T03:10:00-07:00" }),
+    ] }).size).toBe(0);
+    const withNight = only(canonicalizeHealthKitSleep({ samples: [
+      night({ source: "oura" }),
+      stored({ source: "watch", stage: "core", start: instant, end: instant }),
+    ] }), "2026-09-11");
+    expect(main(withNight).reconciliation.candidateCount).toBe(1);
+  });
+
+  it("one in-bed sample is counted in at most one episode of split sleep", () => {
+    const day = only(canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "oura", start: "2026-09-10T23:00:00-07:00", end: "2026-09-11T01:00:00-07:00" }),
+      stored({ source: "oura", start: "2026-09-11T02:10:00-07:00", end: "2026-09-11T03:00:00-07:00" }),
+      stored({ source: "oura", stage: "inBed", start: "2026-09-10T22:55:00-07:00", end: "2026-09-11T01:05:00-07:00" }),
+    ] }), "2026-09-11");
+    expect(day.episodes).toHaveLength(2);
+    const withInBed = day.episodes.filter((episode) => episode.inBedSeconds !== null);
+    expect(withInBed).toHaveLength(1);
+    expect(withInBed[0].asleepSeconds).toBe(2 * H);
+  });
+
+  it("labels an insufficient sensor chosen over an insufficient manual lane honestly", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "watch", stage: "core", start: "2026-09-10T23:00:00-07:00", end: "2026-09-11T01:00:00-07:00" }),
+      stored({ source: "manual", start: "2026-09-11T01:30:00-07:00", end: "2026-09-11T03:00:00-07:00" }),
+      stored({ source: "sleepCycle", start: "2026-09-11T03:30:00-07:00", end: "2026-09-11T05:30:00-07:00" }),
+    ] }), "2026-09-11"));
+    // Three disjoint lanes: none reaches 50% of the all-source union.
+    expect(episode.reconciliation.primaryUsable).toBe(false);
+    expect(episode.primarySource.sourceClass).not.toBe("user_entered");
+    expect(episode.reconciliation.reason).toBe(HealthKitSleepPrimaryReason.STAGE_DETAIL);
+  });
+
+  it("names the tier reason when both top lanes are insufficient", () => {
+    const episode = main(only(canonicalizeHealthKitSleep({ samples: [
+      stored({ source: "sleepCycle", start: "2026-09-10T23:00:00-07:00", end: "2026-09-11T01:00:00-07:00" }),
+      stored({ source: "manual", start: "2026-09-11T01:30:00-07:00", end: "2026-09-11T04:00:00-07:00" }),
+      stored({ source: "manual", start: "2026-09-11T04:30:00-07:00", end: "2026-09-11T04:31:00-07:00" }),
+      stored({ source: "oura", start: "2026-09-11T04:40:00-07:00", end: "2026-09-11T06:30:00-07:00" }),
+    ] }), "2026-09-11"));
+    // Manual has the most coverage (2h31m) but is below 50% of the union too;
+    // an insufficient sensor lane still outranks an insufficient manual lane.
+    expect(episode.primarySource.sourceClass).toBe("third_party");
+    expect(episode.reconciliation.primaryUsable).toBe(false);
+  });
+});

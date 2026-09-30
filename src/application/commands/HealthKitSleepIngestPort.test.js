@@ -7,6 +7,7 @@ import {
   HEALTHKIT_SLEEP_SOURCE_PREFERENCE_SCHEMA_VERSION,
 } from "../../domain/services/HealthKitSleepPolicies.js";
 import { getHealthKitSleepDayRecordId, getHealthKitSleepSampleRecordId } from "../../domain/services/HealthKitSleepContract.js";
+import { canonicalizeHealthKitSleep } from "../../domain/services/HealthKitSleepCanonicalizer.js";
 import { OWNER, activationPolicy, stored, uuid, wire } from "../../testSupport/healthKitSleepSynthetic.js";
 
 const DAY = "2026-09-11";
@@ -237,5 +238,114 @@ describe("#21 recent-window live-ID manifest", () => {
       windowStart: "2026-09-09T00:00:00-07:00", windowEnd: "2026-09-12T00:00:00-07:00", liveExternalIds: [uuid(1)],
     } });
     expect(replay.result).toMatchObject({ windowManifest: { markedDeleted: 0 }, sleepDays: [] });
+  });
+});
+
+// Stored days must always equal a fresh canonicalization of every stored
+// sample: no stale day, no episode counted on two days.
+function expectStoredDaysMatchFreshCanonicalization(current) {
+  const snapshot = current.store.snapshot();
+  const fresh = canonicalizeHealthKitSleep({ samples: snapshot.healthKitSleepSamples ?? [] });
+  const storedDays = (snapshot.healthKitSleepDays ?? []).filter((day) => day.episodes.length > 0);
+  expect(storedDays.map((day) => day.sleepDay).sort()).toEqual([...fresh.keys()].sort());
+  for (const day of storedDays) {
+    expect(day.inputDigest).toBe(fresh.get(day.sleepDay).inputDigest);
+  }
+}
+
+describe("review regressions", () => {
+  it("a zero-length asleep sample commits instead of wedging the batch", async () => {
+    const current = setup();
+    const outcome = await current.run({ batchId: "b1", samples: [
+      wire({ id: uuid(1), source: "watch", stage: "core", start: "2026-09-11T03:00:00-07:00", end: "2026-09-11T03:00:00-07:00" }),
+      wire({ id: uuid(2), source: "watch", stage: "awake", start: "2026-09-11T03:00:00-07:00", end: "2026-09-11T03:10:00-07:00" }),
+    ] });
+    expect(outcome.result.samples.map((item) => item.outcome)).toEqual(["stored", "stored"]);
+    expect(await current.day()).toBeNull();
+    expectStoredDaysMatchFreshCanonicalization(current);
+  });
+
+  it("a long sample that merges into an earlier day's episode rewrites that day (no stale day, no double count)", async () => {
+    const current = setup();
+    await current.run({ batchId: "b1", samples: [
+      wire({ id: uuid(1), source: "watch", stage: "core", start: "2026-09-13T13:00:00-07:00", end: "2026-09-13T17:30:00-07:00" }),
+    ] });
+    expect(await current.day("2026-09-13")).toMatchObject({ mainSleep: { asleepSeconds: 4.5 * H } });
+    await current.run({ batchId: "b2", samples: [
+      wire({ id: uuid(2), source: "watch", stage: "unspecified", start: "2026-09-13T18:15:00-07:00", end: "2026-09-14T18:10:00-07:00" }),
+    ] });
+    expect(await current.day("2026-09-13")).toMatchObject({ status: "no_sleep_recorded", episodes: [], revision: 2 });
+    expect((await current.day("2026-09-15")).episodes).toHaveLength(1);
+    expectStoredDaysMatchFreshCanonicalization(current);
+    // Deleting the bridge restores the earlier day.
+    await current.run({ batchId: "b3", deletions: [{ externalId: uuid(2) }] });
+    expect(await current.day("2026-09-13")).toMatchObject({ mainSleep: { asleepSeconds: 4.5 * H }, revision: 3 });
+    expectStoredDaysMatchFreshCanonicalization(current);
+  });
+
+  it("deleting a bridging sample splits a chained episode across days correctly", async () => {
+    const current = setup();
+    await current.run({ batchId: "b1", samples: [
+      wire({ id: uuid(1), source: "oura", start: "2026-09-12T08:00:00-07:00", end: "2026-09-12T17:00:00-07:00" }),
+      wire({ id: uuid(2), source: "oura", start: "2026-09-12T17:30:00-07:00", end: "2026-09-13T10:00:00-07:00" }),
+      wire({ id: uuid(3), source: "oura", start: "2026-09-13T10:30:00-07:00", end: "2026-09-14T09:00:00-07:00" }),
+    ] });
+    expectStoredDaysMatchFreshCanonicalization(current);
+    await current.run({ batchId: "b2", deletions: [{ externalId: uuid(2) }] });
+    expectStoredDaysMatchFreshCanonicalization(current);
+    await current.run({ batchId: "b3", deletions: [{ externalId: uuid(1) }, { externalId: uuid(3) }] });
+    expectStoredDaysMatchFreshCanonicalization(current);
+    expect(current.store.snapshot().healthKitSleepDays.every((day) => day.episodes.length === 0)).toBe(true);
+  });
+
+  it("randomized adds, deletions and manifests always converge to a fresh canonicalization (seeded)", async () => {
+    let seed = 20260930;
+    const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const sources = ["watch", "oura", "sleepCycle", "manual", "iphone"];
+    const stages = ["inBed", "unspecified", "awake", "core", "deep", "rem"];
+    let populatedChecks = 0;
+    for (let world = 0; world < 6; world += 1) {
+      const current = setup();
+      const live = [];
+      for (let step = 0; step < 14; step += 1) {
+        const roll = random();
+        if (roll < 0.6 || live.length === 0) {
+          const samples = Array.from({ length: 1 + Math.floor(random() * 4) }, () => {
+            const startMs = Date.parse("2026-09-10T12:00:00Z") + Math.floor(random() * 96) * 30 * 60 * 1000;
+            const durationMs = (1 + Math.floor(random() * 30)) * 20 * 60 * 1000;
+            const id = uuid(1000 + world * 100 + live.length);
+            live.push(id);
+            return wire({
+              id,
+              source: sources[Math.floor(random() * sources.length)],
+              stage: stages[Math.floor(random() * stages.length)],
+              start: new Date(startMs).toISOString(),
+              end: new Date(startMs + durationMs).toISOString(),
+              timeZone: random() < 0.2 ? "America/New_York" : "America/Los_Angeles",
+            });
+          });
+          await current.run({ batchId: `w${world}-s${step}`, samples });
+        } else if (roll < 0.85) {
+          const id = live.splice(Math.floor(random() * live.length), 1)[0];
+          await current.run({ batchId: `w${world}-d${step}`, deletions: [{ externalId: id }] });
+        } else {
+          const keep = live.filter(() => random() < 0.7);
+          await current.run({ batchId: `w${world}-m${step}`, windowManifest: {
+            windowStart: "2026-09-10T00:00:00Z", windowEnd: "2026-09-14T00:00:00Z", liveExternalIds: keep,
+          } });
+          live.splice(0, live.length, ...keep);
+        }
+        expectStoredDaysMatchFreshCanonicalization(current);
+        if ((current.store.snapshot().healthKitSleepDays ?? []).some((day) => day.episodes.length > 1)) populatedChecks += 1;
+      }
+    }
+    expect(populatedChecks).toBeGreaterThan(10);
+  });
+
+  it("an in-batch repeat mirrors the first copy's refusal instead of reporting replayed", async () => {
+    const current = setup();
+    const early = wire({ id: uuid(1), source: "watch", stage: "core", start: "2026-09-08T23:00:00-07:00", end: "2026-09-09T07:00:00-07:00" });
+    const outcome = await current.run({ batchId: "b1", samples: [early, early] });
+    expect(outcome.result.samples.map((item) => item.outcome)).toEqual(["refused_before_activation_floor", "refused_before_activation_floor"]);
   });
 });

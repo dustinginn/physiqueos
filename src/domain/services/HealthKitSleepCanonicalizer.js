@@ -22,9 +22,11 @@ import { sleepSourcePreferenceRank } from "./HealthKitSleepPolicies.js";
 //      In-bed intervals near no asleep episode form an in_bed_only episode.
 //   3. One primary source lane (sourceClass + bundle identifier) per episode:
 //        usable sensor > usable manual > insufficient sensor > insufficient manual
-//        > explicit Server preference (only among equally usable lanes)
+//        > explicit Server preference (only within the same tier, so it never
+//          lifts an insufficient lane over a usable one)
 //        > staged over unspecified-only > more asleep coverage
 //        > deterministic class / bundle tie-break.
+//      Zero-length samples carry no time and are preserved but never counted.
 //      "Usable" is technical, not coaching: the lane's own asleep union covers
 //      at least minimumUsableCoverageRatio of the episode's all-source asleep
 //      union. Never "newest writer wins".
@@ -64,6 +66,7 @@ export const HealthKitSleepPrimaryReason = Object.freeze({
   ONLY_CANDIDATE: "only_candidate",
   USABLE_SENSOR_OVER_MANUAL: "usable_sensor_over_manual",
   USABLE_OVER_INSUFFICIENT: "usable_over_insufficient_coverage",
+  SENSOR_OVER_MANUAL: "sensor_over_manual_both_insufficient",
   SOURCE_PREFERENCE: "server_source_preference",
   STAGE_DETAIL: "stage_detail",
   COVERAGE: "greater_asleep_coverage",
@@ -86,9 +89,11 @@ export function canonicalizeHealthKitSleep({ samples = [], preference = null } =
   const activity = live.filter((sample) => ASLEEP.has(sample.stage) || sample.stage === HealthKitSleepStage.AWAKE);
   const inBed = live.filter((sample) => sample.stage === HealthKitSleepStage.IN_BED);
 
-  const episodes = cluster(activity)
-    .filter((group) => group.some((sample) => ASLEEP.has(sample.stage)))
-    .map((group) => buildAsleepEpisode(group, inBed, preference));
+  const groups = cluster(activity).filter((group) => group.some((sample) => ASLEEP.has(sample.stage)));
+  const inBedByGroup = assignInBed(groups, inBed);
+  const episodes = groups
+    .map((group, index) => buildAsleepEpisode(group, inBedByGroup[index], preference))
+    .filter(Boolean);
 
   const inBedOnly = cluster(inBed)
     .filter((group) => !episodes.some((episode) => near(spanOf(group), episode.span)))
@@ -115,7 +120,9 @@ export function emptyHealthKitSleepDay(sleepDay, { preference = null } = {}) {
 function toInterval(sample) {
   const start = Date.parse(sample.startedAt);
   const end = Date.parse(sample.endedAt);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  // A zero-length sample carries no time: it is preserved in the sample store
+  // but can neither form nor extend an episode.
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
   const bundleIdentifier = String(sample.source?.bundleIdentifier ?? "");
   const sourceClass = sample.source?.sourceClass ?? HealthKitSleepSourceClass.THIRD_PARTY;
   return {
@@ -151,6 +158,30 @@ function cluster(intervals) {
     }
   }
   return groups;
+}
+
+// Each in-bed sample belongs to at most ONE asleep episode (greatest overlap,
+// then smallest gap, then earliest episode), so an in-bed total is never
+// counted twice across split sleep.
+function assignInBed(groups, inBedSamples) {
+  const spans = groups.map(spanOf);
+  const assigned = groups.map(() => []);
+  for (const sample of inBedSamples) {
+    let best = -1;
+    let bestKey = null;
+    spans.forEach((span, index) => {
+      if (!near(sample, span)) return;
+      const overlap = Math.max(0, Math.min(sample.end, span.end) - Math.max(sample.start, span.start));
+      const gap = Math.max(0, span.start - sample.end, sample.start - span.end);
+      const key = [-overlap, gap, span.start];
+      if (bestKey === null || key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1] || (key[1] === bestKey[1] && key[2] < bestKey[2])))) {
+        best = index;
+        bestKey = key;
+      }
+    });
+    if (best !== -1) assigned[best].push(sample);
+  }
+  return assigned;
 }
 
 function spanOf(intervals) {
@@ -222,12 +253,10 @@ function rankLanes(candidates) {
   for (const [name, value, reason] of keys) {
     if (value(primary) === value(runnerUp)) continue;
     if (name === "tier") {
-      return {
-        ordered,
-        reason: primary.usable && runnerUp.usable
-          ? HealthKitSleepPrimaryReason.USABLE_SENSOR_OVER_MANUAL
-          : HealthKitSleepPrimaryReason.USABLE_OVER_INSUFFICIENT,
-      };
+      let tierReason = HealthKitSleepPrimaryReason.USABLE_OVER_INSUFFICIENT;
+      if (primary.usable && runnerUp.usable) tierReason = HealthKitSleepPrimaryReason.USABLE_SENSOR_OVER_MANUAL;
+      else if (!primary.usable) tierReason = HealthKitSleepPrimaryReason.SENSOR_OVER_MANUAL;
+      return { ordered, reason: tierReason };
     }
     return { ordered, reason };
   }
@@ -241,7 +270,7 @@ function tierOf({ usable, manual }) {
   return 3;
 }
 
-function buildAsleepEpisode(group, inBedSamples, preference) {
+function buildAsleepEpisode(group, assignedInBed, preference) {
   const asleepAll = group.filter((sample) => ASLEEP.has(sample.stage));
   const episodeAsleepMs = unionMs(asleepAll);
   const candidates = groupLanes(group)
@@ -261,6 +290,9 @@ function buildAsleepEpisode(group, inBedSamples, preference) {
     })
     .filter((lane) => lane.coverageMs > 0)
     .map((lane) => ({ ...lane, tier: tierOf(lane) }));
+  // Defensive: toInterval already drops zero-length samples, so an asleep
+  // group always has a lane with coverage. Never throw inside a batch.
+  if (candidates.length === 0) return null;
   const { ordered, reason } = rankLanes(candidates);
   const primary = ordered[0];
 
@@ -269,7 +301,7 @@ function buildAsleepEpisode(group, inBedSamples, preference) {
   const extent = spanOf(primaryAsleep);
   const resolved = resolveLaneTimeline(primaryActivity, extent);
 
-  const laneInBed = inBedSamples.filter((sample) => sample.laneKey === primary.key && near(sample, extent));
+  const laneInBed = assignedInBed.filter((sample) => sample.laneKey === primary.key && near(sample, extent));
   const inBedUnion = unionMs(laneInBed);
   const extentMs = extent.end - extent.start;
   const inBedDefensible = laneInBed.length > 0 && extentMs > 0 &&

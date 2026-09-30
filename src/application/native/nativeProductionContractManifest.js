@@ -232,7 +232,7 @@ function healthKitSleepIngestionContract(capability) {
     maximumDeletionsPerBatch: HEALTHKIT_SLEEP_MAX_DELETIONS_PER_BATCH,
     maximumManifestLiveIds: HEALTHKIT_SLEEP_MAX_MANIFEST_LIVE_IDS,
     maximumManifestWindowHours: 96,
-    sampleFields: "externalId (HealthKit UUID), categoryValue (raw HKCategoryValueSleepAnalysis), startedAt, endedAt, timeZone, timeZoneSource (sample_metadata|device_at_ingest), wasUserEntered, source{bundleIdentifier, sourceVersion, productType}",
+    sampleFields: "externalId (HealthKit UUID), categoryValue (raw HKCategoryValueSleepAnalysis), startedAt, endedAt (ISO-8601 with Z or an explicit offset), timeZone, timeZoneSource (sample_metadata|device_at_ingest), wasUserEntered, source{bundleIdentifier, sourceVersion, productType}",
     privacy: "source names, device names, local/UDI identifiers, firmware and metadata are refused (400 HEALTHKIT_SLEEP_PRIVATE_FIELD_REJECTED)",
     deletion: "deletions[] of HealthKit UUIDs; unknown UUIDs are tombstoned so a late add stays deleted",
     windowManifest: "optional {windowStart, windowEnd, liveExternalIds}; live samples ending inside the window, at or after the activation floor, and not listed are marked deleted(window_manifest)",
