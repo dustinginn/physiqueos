@@ -1,0 +1,4035 @@
+{
+  "schemaVersion": "photo_intelligence_sep19_final_production_replay_v1",
+  "authority": {
+    "deployedSha": "446bc964dc31318ea48261400e8b243cdd1d4ab1",
+    "runtimeShaVerified": true,
+    "component": "web",
+    "transactionReadOnly": "on"
+  },
+  "event": {
+    "eventId": "event_briefing_progress_photo_photo_session_user_founder_001_2026-09-19",
+    "photoSessionId": "photo_session_user_founder_001_2026-09-19",
+    "observationDate": "2026-09-19",
+    "historicalArtifactId": "event_briefing_progress_photo_photo_session_user_founder_001_2026-09-19",
+    "historicalArtifactGeneratedAt": "2026-09-20T17:51:47.391Z",
+    "historicalNarrativeEvidenceCutoff": null,
+    "replayCutoff": "2026-09-20T17:51:47.391Z",
+    "replayCutoffSemantics": "observation_time_and_canonical_availability_time; unknown_availability_fails_closed",
+    "views": [
+      {
+        "canonicalViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+        "canonicalPhotoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+        "poseId": "front-relaxed",
+        "view": "front",
+        "sourceDate": "2026-09-19",
+        "previousDate": "2026-08-22",
+        "previousSessionId": "photo_session_user_founder_001_2026-08-22",
+        "previousCanonicalViewId": "canonical_photo_user_founder_001_2026-08-22_front_relaxed",
+        "comparisonStatus": "comparable",
+        "analysisMode": "computed",
+        "currentDisplayMediaObjectId": "01a0bf14-a31b-72f8-95e8-b9fb829018b6"
+      },
+      {
+        "canonicalViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+        "canonicalPhotoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+        "poseId": "back-relaxed",
+        "view": "back",
+        "sourceDate": "2026-09-19",
+        "previousDate": "2026-08-22",
+        "previousSessionId": "photo_session_user_founder_001_2026-08-22",
+        "previousCanonicalViewId": "canonical_photo_user_founder_001_2026-08-22_back_relaxed",
+        "comparisonStatus": "comparable",
+        "analysisMode": "computed",
+        "currentDisplayMediaObjectId": "01a0bf14-9d04-75eb-8287-517e90003a79"
+      },
+      {
+        "canonicalViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+        "canonicalPhotoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+        "poseId": "back-flexed",
+        "view": "back",
+        "sourceDate": "2026-09-19",
+        "previousDate": "2026-08-22",
+        "previousSessionId": "photo_session_user_founder_001_2026-08-22",
+        "previousCanonicalViewId": "canonical_photo_user_founder_001_2026-08-22_back_flexed",
+        "comparisonStatus": "comparable",
+        "analysisMode": "computed",
+        "currentDisplayMediaObjectId": "01a0bf14-9f0e-722a-b374-b97e883af143"
+      },
+      {
+        "canonicalViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+        "canonicalPhotoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+        "poseId": "right-side-relaxed",
+        "view": "side",
+        "sourceDate": "2026-09-19",
+        "previousDate": "2026-08-22",
+        "previousSessionId": "photo_session_user_founder_001_2026-08-22",
+        "previousCanonicalViewId": "canonical_photo_user_founder_001_2026-08-22_right_side_relaxed",
+        "comparisonStatus": "comparable",
+        "analysisMode": "computed",
+        "currentDisplayMediaObjectId": "01a0bf14-a130-765d-9727-bb61af16011a"
+      },
+      {
+        "canonicalViewId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+        "canonicalPhotoId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+        "poseId": "front-flexed",
+        "view": "front",
+        "sourceDate": "2026-09-19",
+        "previousDate": "2026-08-22",
+        "previousSessionId": "photo_session_user_founder_001_2026-08-22",
+        "previousCanonicalViewId": "canonical_photo_user_founder_001_2026-08-22_front_flexed",
+        "comparisonStatus": "comparable",
+        "analysisMode": "computed",
+        "currentDisplayMediaObjectId": "01a0bf14-9afe-713a-a000-bb9f706cdf22"
+      }
+    ]
+  },
+  "sourceMedia": {
+    "resolvedObjectCount": 10,
+    "allVerified": true,
+    "objects": [
+      {
+        "objectId": "01a0bf13-e06e-7224-8838-cdc27f8e6e0b",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "canonical_source_original",
+        "contentType": "image/x-adobe-dng",
+        "byteLength": 46247587,
+        "sha256": "dacd482acdd68d73d1c8fb5b20b5d2948ece1f6c959ca686a56897126577d73d",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      },
+      {
+        "objectId": "01a0bf14-08e2-74cf-9da5-c13e9f8d3637",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "canonical_source_original",
+        "contentType": "image/x-adobe-dng",
+        "byteLength": 40019026,
+        "sha256": "458f0410443038055c387195b1a88e7d29995db60e09c9990ed11d5e9fecacac",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      },
+      {
+        "objectId": "01a0bf14-3307-7687-8f94-a8edeac82960",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "canonical_source_original",
+        "contentType": "image/x-adobe-dng",
+        "byteLength": 41235782,
+        "sha256": "a7feaf1a4c5b590b72efd33224541bec65b6b6260564cabd9773fe2ffb9eb280",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      },
+      {
+        "objectId": "01a0bf14-5e00-77f9-b145-bfebc444e323",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "canonical_source_original",
+        "contentType": "image/x-adobe-dng",
+        "byteLength": 40582795,
+        "sha256": "3478395603027e572f2ac5071b379524286d4029687f017df19c679df5a3ee3d",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      },
+      {
+        "objectId": "01a0bf14-87f4-758a-ba09-139ca0ad3094",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "canonical_source_original",
+        "contentType": "image/x-adobe-dng",
+        "byteLength": 41444355,
+        "sha256": "e6bb8002a728d25387c8976dd8ada8ec436157cb2884203a7224d6b261101e7e",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      },
+      {
+        "objectId": "01a0bf14-9afe-713a-a000-bb9f706cdf22",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "display_analysis_derivative",
+        "contentType": "image/jpeg",
+        "byteLength": 648223,
+        "sha256": "5b31bd423dc1ad5f3d35bf60bbeff25592c240bf35562bf7af0ce973c752098c",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      },
+      {
+        "objectId": "01a0bf14-9d04-75eb-8287-517e90003a79",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "display_analysis_derivative",
+        "contentType": "image/jpeg",
+        "byteLength": 611908,
+        "sha256": "35c8f1ab3727bcb96e65df1d3aac4853c769cc2dfe15f7391c1248ec9c7394c8",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      },
+      {
+        "objectId": "01a0bf14-9f0e-722a-b374-b97e883af143",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "display_analysis_derivative",
+        "contentType": "image/jpeg",
+        "byteLength": 625461,
+        "sha256": "58b31fedffb4dc8566e01b7e32ace7685d0066421d86a080334bcd8533a46dc7",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      },
+      {
+        "objectId": "01a0bf14-a130-765d-9727-bb61af16011a",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "display_analysis_derivative",
+        "contentType": "image/jpeg",
+        "byteLength": 592586,
+        "sha256": "ff486c647f460c5b105cb949d07fdea69fde1937cb9ed92b9b4849fcb01adf00",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      },
+      {
+        "objectId": "01a0bf14-a31b-72f8-95e8-b9fb829018b6",
+        "evidenceRecordId": "evidence_intake_B5A63452-E7B0-469C-A634-38A08137716C",
+        "role": "display_analysis_derivative",
+        "contentType": "image/jpeg",
+        "byteLength": 631629,
+        "sha256": "b5dbc454412668656d012e0d379569b1e427de0d22079badaa3ef31553c2d87e",
+        "state": "verified",
+        "objectHeadVerified": true,
+        "identityChecks": {
+          "byteLength": true,
+          "contentType": true,
+          "providerVersion": true,
+          "etag": true
+        }
+      }
+    ],
+    "privatePathsEmitted": false,
+    "photoBytesEmitted": false
+  },
+  "exactStructuredPhotoIntelligence": {
+    "schemaVersion": "canonical_photo_intelligence_set_v1",
+    "resultLabel": "PROSPECTIVE",
+    "comparison": {
+      "caseId": "photo_session_user_founder_001_2026-09-19",
+      "baselineSetId": "photo_session_user_founder_001_2026-08-22",
+      "comparisonSetId": "photo_session_user_founder_001_2026-09-19",
+      "baselineDate": "2026-08-22",
+      "baselineDates": [
+        "2026-08-22"
+      ],
+      "comparisonDate": "2026-09-19",
+      "daysElapsed": 28,
+      "goalContext": {
+        "activeGoal": {
+          "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+          "title": "Build Lean Mass",
+          "type": null,
+          "target": null,
+          "guardrails": []
+        },
+        "activePhase": {
+          "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+          "name": "Lean Mass Build",
+          "status": "active",
+          "startDate": null
+        },
+        "operatingState": {
+          "value": "calibration"
+        }
+      }
+    },
+    "sets": {
+      "baseline": {
+        "id": "photo_session_user_founder_001_2026-08-22",
+        "date": "2026-08-22",
+        "dates": [
+          "2026-08-22"
+        ],
+        "sourceSetIds": [
+          "photo_session_user_founder_001_2026-08-22"
+        ],
+        "identityStatus": "canonical",
+        "cadenceContext": null
+      },
+      "comparison": {
+        "id": "photo_session_user_founder_001_2026-09-19",
+        "date": "2026-09-19",
+        "dates": [
+          "2026-09-19"
+        ],
+        "sourceSetIds": [
+          "photo_session_user_founder_001_2026-09-19"
+        ],
+        "identityStatus": "canonical",
+        "cadenceContext": null
+      }
+    },
+    "viewComparisons": [
+      {
+        "id": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+        "view": "front",
+        "pose": "front-relaxed",
+        "matchStatus": "like_for_like",
+        "baselineImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-08-22_front_relaxed",
+          "setId": "photo_session_user_founder_001_2026-08-22",
+          "date": "2026-08-22",
+          "view": "front",
+          "pose": "front-relaxed",
+          "visibleRegions": [
+            "shoulders",
+            "arms",
+            "waist",
+            "abdomen"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "comparisonImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+          "setId": "photo_session_user_founder_001_2026-09-19",
+          "date": "2026-09-19",
+          "view": "front",
+          "pose": "front-relaxed",
+          "visibleRegions": [
+            "shoulders",
+            "arms",
+            "waist",
+            "abdomen"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "visibleRegions": [
+          "shoulders",
+          "arms",
+          "waist",
+          "abdomen"
+        ],
+        "comparability": {
+          "overall": "high"
+        },
+        "observations": [
+          {
+            "region": "shoulders",
+            "metric": "muscularity",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "high",
+            "observation": "Shoulder muscles appear fuller and more rounded with clearer separation.",
+            "basis": [],
+            "confounders": [
+              "Post-workout pump may exaggerate muscle fullness slightly."
+            ]
+          },
+          {
+            "region": "arms",
+            "metric": "muscularity",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "high",
+            "observation": "Arms show increased fullness and more visible vascularity indicating muscle development.",
+            "basis": [],
+            "confounders": [
+              "Pump and lighting differences may influence vascularity visibility."
+            ]
+          },
+          {
+            "region": "waist",
+            "metric": "leanness",
+            "direction": "increased",
+            "apparentMagnitude": "subtle",
+            "confidence": "moderate",
+            "observation": "Waist line appears slightly more tapered and less soft than before.",
+            "basis": [],
+            "confounders": [
+              "Light and posture differences create some uncertainty."
+            ]
+          },
+          {
+            "region": "abdomen",
+            "metric": "abdominal_definition",
+            "direction": "increased",
+            "apparentMagnitude": "subtle",
+            "confidence": "moderate",
+            "observation": "Upper abdominal muscles and obliques show slightly clearer definition and reduced softness.",
+            "basis": [],
+            "confounders": [
+              "Relaxed pose and lighting differences limit clarity."
+            ]
+          }
+        ],
+        "confidence": {
+          "overallReliability": "moderate",
+          "rationale": "",
+          "limitations": []
+        },
+        "photoIntelligence": {
+          "schemaVersion": "canonical_photo_intelligence_v1",
+          "resultLabel": "PROSPECTIVE",
+          "comparison": {
+            "caseId": "photo_session_user_founder_001_2026-09-19:front-relaxed",
+            "baselineDate": "2026-08-22",
+            "comparisonDate": "2026-09-19",
+            "daysElapsed": 28,
+            "goalContext": {
+              "activeGoal": {
+                "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+                "title": "Build Lean Mass",
+                "type": null,
+                "target": null,
+                "guardrails": []
+              },
+              "activePhase": {
+                "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+                "name": "Lean Mass Build",
+                "status": "active",
+                "startDate": null
+              },
+              "operatingState": {
+                "value": "calibration"
+              }
+            }
+          },
+          "source": {
+            "photoSessionId": "photo_session_user_founder_001_2026-09-19:front-relaxed",
+            "sourceEvidenceIds": [
+              "canonical_photo_user_founder_001_2026-08-22_front_relaxed",
+              "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+              "evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+              "photo_session_user_founder_001_2026-08-22"
+            ],
+            "comparisonDates": [
+              "2026-08-22"
+            ]
+          },
+          "captureAssessment": {
+            "views": [
+              {
+                "poseId": "front-relaxed",
+                "conditionDifferences": []
+              }
+            ]
+          },
+          "comparability": {
+            "overall": "high"
+          },
+          "observations": [
+            {
+              "region": "shoulders",
+              "metric": "muscularity",
+              "direction": "increased",
+              "apparentMagnitude": "moderate",
+              "confidence": "high",
+              "observation": "Shoulder muscles appear fuller and more rounded with clearer separation.",
+              "basis": [],
+              "confounders": [
+                "Post-workout pump may exaggerate muscle fullness slightly."
+              ]
+            },
+            {
+              "region": "arms",
+              "metric": "muscularity",
+              "direction": "increased",
+              "apparentMagnitude": "moderate",
+              "confidence": "high",
+              "observation": "Arms show increased fullness and more visible vascularity indicating muscle development.",
+              "basis": [],
+              "confounders": [
+                "Pump and lighting differences may influence vascularity visibility."
+              ]
+            },
+            {
+              "region": "waist",
+              "metric": "leanness",
+              "direction": "increased",
+              "apparentMagnitude": "subtle",
+              "confidence": "moderate",
+              "observation": "Waist line appears slightly more tapered and less soft than before.",
+              "basis": [],
+              "confounders": [
+                "Light and posture differences create some uncertainty."
+              ]
+            },
+            {
+              "region": "abdomen",
+              "metric": "abdominal_definition",
+              "direction": "increased",
+              "apparentMagnitude": "subtle",
+              "confidence": "moderate",
+              "observation": "Upper abdominal muscles and obliques show slightly clearer definition and reduced softness.",
+              "basis": [],
+              "confounders": [
+                "Relaxed pose and lighting differences limit clarity."
+              ]
+            }
+          ],
+          "dominantVisualStory": "Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Waist line appears slightly more tapered and less soft than before. Upper abdominal muscles and obliques show slightly clearer definition and reduced softness.",
+          "overallMagnitude": "moderate",
+          "magnitudeCalibration": {
+            "magnitude": "moderate",
+            "reportedMagnitude": "moderate",
+            "promotionApplied": false,
+            "rule": "preserve_reported_photo_magnitude",
+            "alignedDirection": "positive",
+            "reliableDirectionalRegionCount": 2,
+            "subtleFindingsCannotPromote": true
+          },
+          "confidence": {
+            "overallReliability": "moderate",
+            "rationale": "",
+            "limitations": []
+          },
+          "goalRelativeInterpretation": {
+            "direction": "supportive",
+            "strength": "moderate_visual_support",
+            "interpretation": "The photo-only direction supports Build Lean Mass. Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Waist line appears slightly more tapered and less soft than before. Upper abdominal muscles and obliques show slightly clearer definition and reduced softness.",
+            "photoOnlyStrategyImplication": "Treat this as photo-only supporting evidence; it does not establish a strategy change without independent evidence."
+          },
+          "unsupportedConclusions": [
+            "exact body-fat percentage or numerical body-composition change",
+            "pounds of fat, lean mass, or muscle gained or lost",
+            "causation by training, nutrition, medication, supplements, or lifestyle",
+            "health status or physiological mechanism"
+          ],
+          "photoOnlyInterpretation": "Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Waist line appears slightly more tapered and less soft than before. Upper abdominal muscles and obliques show slightly clearer definition and reduced softness.",
+          "exactPhotoBriefingCopy": "Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Waist line appears slightly more tapered and less soft than before. Upper abdominal muscles and obliques show slightly clearer definition and reduced softness.",
+          "provenance": {
+            "producer": "canonical_photo_intelligence_service",
+            "producerVersion": "canonical_photo_intelligence_v1",
+            "calibrationVersion": "photo_magnitude_calibration_v2",
+            "evidenceClass": "photo_only",
+            "nonPhotoEvidenceUsed": false,
+            "resultLabel": "PROSPECTIVE"
+          }
+        }
+      },
+      {
+        "id": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+        "view": "back",
+        "pose": "back-relaxed",
+        "matchStatus": "like_for_like",
+        "baselineImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-08-22_back_relaxed",
+          "setId": "photo_session_user_founder_001_2026-08-22",
+          "date": "2026-08-22",
+          "view": "back",
+          "pose": "back-relaxed",
+          "visibleRegions": [
+            "waist",
+            "upper back",
+            "back conditioning"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "comparisonImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+          "setId": "photo_session_user_founder_001_2026-09-19",
+          "date": "2026-09-19",
+          "view": "back",
+          "pose": "back-relaxed",
+          "visibleRegions": [
+            "waist",
+            "upper back",
+            "back conditioning"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "visibleRegions": [
+          "waist",
+          "upper back",
+          "back conditioning"
+        ],
+        "comparability": {
+          "overall": "high"
+        },
+        "observations": [
+          {
+            "region": "waist",
+            "metric": "leanness",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "high",
+            "observation": "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+            "basis": [],
+            "confounders": [
+              "Different lighting conditions",
+              "Post-workout pump in current photo"
+            ]
+          },
+          {
+            "region": "upper back",
+            "metric": "muscularity",
+            "direction": "stable",
+            "apparentMagnitude": "none",
+            "confidence": "high",
+            "observation": "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+            "basis": [],
+            "confounders": [
+              "Posture and arm positioning consistent"
+            ]
+          },
+          {
+            "region": "back conditioning",
+            "metric": "abdominal_definition",
+            "direction": "increased",
+            "apparentMagnitude": "subtle",
+            "confidence": "moderate",
+            "observation": "Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning.",
+            "basis": [],
+            "confounders": [
+              "Lighting variability",
+              "Post-workout pump effect"
+            ]
+          }
+        ],
+        "confidence": {
+          "overallReliability": "moderate",
+          "rationale": "",
+          "limitations": []
+        },
+        "photoIntelligence": {
+          "schemaVersion": "canonical_photo_intelligence_v1",
+          "resultLabel": "PROSPECTIVE",
+          "comparison": {
+            "caseId": "photo_session_user_founder_001_2026-09-19:back-relaxed",
+            "baselineDate": "2026-08-22",
+            "comparisonDate": "2026-09-19",
+            "daysElapsed": 28,
+            "goalContext": {
+              "activeGoal": {
+                "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+                "title": "Build Lean Mass",
+                "type": null,
+                "target": null,
+                "guardrails": []
+              },
+              "activePhase": {
+                "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+                "name": "Lean Mass Build",
+                "status": "active",
+                "startDate": null
+              },
+              "operatingState": {
+                "value": "calibration"
+              }
+            }
+          },
+          "source": {
+            "photoSessionId": "photo_session_user_founder_001_2026-09-19:back-relaxed",
+            "sourceEvidenceIds": [
+              "canonical_photo_user_founder_001_2026-08-22_back_relaxed",
+              "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+              "evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+              "photo_session_user_founder_001_2026-08-22"
+            ],
+            "comparisonDates": [
+              "2026-08-22"
+            ]
+          },
+          "captureAssessment": {
+            "views": [
+              {
+                "poseId": "back-relaxed",
+                "conditionDifferences": []
+              }
+            ]
+          },
+          "comparability": {
+            "overall": "high"
+          },
+          "observations": [
+            {
+              "region": "waist",
+              "metric": "leanness",
+              "direction": "increased",
+              "apparentMagnitude": "moderate",
+              "confidence": "high",
+              "observation": "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+              "basis": [],
+              "confounders": [
+                "Different lighting conditions",
+                "Post-workout pump in current photo"
+              ]
+            },
+            {
+              "region": "upper back",
+              "metric": "muscularity",
+              "direction": "stable",
+              "apparentMagnitude": "none",
+              "confidence": "high",
+              "observation": "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+              "basis": [],
+              "confounders": [
+                "Posture and arm positioning consistent"
+              ]
+            },
+            {
+              "region": "back conditioning",
+              "metric": "abdominal_definition",
+              "direction": "increased",
+              "apparentMagnitude": "subtle",
+              "confidence": "moderate",
+              "observation": "Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning.",
+              "basis": [],
+              "confounders": [
+                "Lighting variability",
+                "Post-workout pump effect"
+              ]
+            }
+          ],
+          "dominantVisualStory": "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose. Shoulder and upper back width maintained with no visible reduction in muscle fullness. Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning.",
+          "overallMagnitude": "moderate",
+          "magnitudeCalibration": {
+            "magnitude": "moderate",
+            "reportedMagnitude": "moderate",
+            "promotionApplied": false,
+            "rule": "preserve_reported_photo_magnitude",
+            "alignedDirection": "positive",
+            "reliableDirectionalRegionCount": 1,
+            "subtleFindingsCannotPromote": true
+          },
+          "confidence": {
+            "overallReliability": "moderate",
+            "rationale": "",
+            "limitations": []
+          },
+          "goalRelativeInterpretation": {
+            "direction": "supportive",
+            "strength": "moderate_visual_support",
+            "interpretation": "The photo-only direction supports Build Lean Mass. Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose. Shoulder and upper back width maintained with no visible reduction in muscle fullness. Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning.",
+            "photoOnlyStrategyImplication": "Treat this as photo-only supporting evidence; it does not establish a strategy change without independent evidence."
+          },
+          "unsupportedConclusions": [
+            "exact body-fat percentage or numerical body-composition change",
+            "pounds of fat, lean mass, or muscle gained or lost",
+            "causation by training, nutrition, medication, supplements, or lifestyle",
+            "health status or physiological mechanism"
+          ],
+          "photoOnlyInterpretation": "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose. Shoulder and upper back width maintained with no visible reduction in muscle fullness. Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning.",
+          "exactPhotoBriefingCopy": "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose. Shoulder and upper back width maintained with no visible reduction in muscle fullness. Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning.",
+          "provenance": {
+            "producer": "canonical_photo_intelligence_service",
+            "producerVersion": "canonical_photo_intelligence_v1",
+            "calibrationVersion": "photo_magnitude_calibration_v2",
+            "evidenceClass": "photo_only",
+            "nonPhotoEvidenceUsed": false,
+            "resultLabel": "PROSPECTIVE"
+          }
+        }
+      },
+      {
+        "id": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+        "view": "back",
+        "pose": "back-flexed",
+        "matchStatus": "like_for_like",
+        "baselineImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-08-22_back_flexed",
+          "setId": "photo_session_user_founder_001_2026-08-22",
+          "date": "2026-08-22",
+          "view": "back",
+          "pose": "back-flexed",
+          "visibleRegions": [
+            "back",
+            "waist"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "comparisonImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+          "setId": "photo_session_user_founder_001_2026-09-19",
+          "date": "2026-09-19",
+          "view": "back",
+          "pose": "back-flexed",
+          "visibleRegions": [
+            "back",
+            "waist"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "visibleRegions": [
+          "back",
+          "waist"
+        ],
+        "comparability": {
+          "overall": "high"
+        },
+        "observations": [
+          {
+            "region": "back",
+            "metric": "leanness",
+            "direction": "increased",
+            "apparentMagnitude": "pronounced",
+            "confidence": "high",
+            "observation": "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+            "basis": [],
+            "confounders": [
+              "Lighting difference and pump status influence contrast and fullness appearance."
+            ]
+          },
+          {
+            "region": "back",
+            "metric": "muscularity",
+            "direction": "stable",
+            "apparentMagnitude": "none",
+            "confidence": "high",
+            "observation": "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.",
+            "basis": [],
+            "confounders": [
+              "Pump in current photo may slightly inflate visual fullness."
+            ]
+          },
+          {
+            "region": "waist",
+            "metric": "whole_body_softness",
+            "direction": "decreased",
+            "apparentMagnitude": "moderate",
+            "confidence": "moderate",
+            "observation": "The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper.",
+            "basis": [],
+            "confounders": [
+              "Waist angle and lighting differ, slightly reducing certainty."
+            ]
+          }
+        ],
+        "confidence": {
+          "overallReliability": "moderate",
+          "rationale": "",
+          "limitations": []
+        },
+        "photoIntelligence": {
+          "schemaVersion": "canonical_photo_intelligence_v1",
+          "resultLabel": "PROSPECTIVE",
+          "comparison": {
+            "caseId": "photo_session_user_founder_001_2026-09-19:back-flexed",
+            "baselineDate": "2026-08-22",
+            "comparisonDate": "2026-09-19",
+            "daysElapsed": 28,
+            "goalContext": {
+              "activeGoal": {
+                "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+                "title": "Build Lean Mass",
+                "type": null,
+                "target": null,
+                "guardrails": []
+              },
+              "activePhase": {
+                "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+                "name": "Lean Mass Build",
+                "status": "active",
+                "startDate": null
+              },
+              "operatingState": {
+                "value": "calibration"
+              }
+            }
+          },
+          "source": {
+            "photoSessionId": "photo_session_user_founder_001_2026-09-19:back-flexed",
+            "sourceEvidenceIds": [
+              "canonical_photo_user_founder_001_2026-08-22_back_flexed",
+              "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+              "evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+              "photo_session_user_founder_001_2026-08-22"
+            ],
+            "comparisonDates": [
+              "2026-08-22"
+            ]
+          },
+          "captureAssessment": {
+            "views": [
+              {
+                "poseId": "back-flexed",
+                "conditionDifferences": []
+              }
+            ]
+          },
+          "comparability": {
+            "overall": "high"
+          },
+          "observations": [
+            {
+              "region": "back",
+              "metric": "leanness",
+              "direction": "increased",
+              "apparentMagnitude": "pronounced",
+              "confidence": "high",
+              "observation": "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+              "basis": [],
+              "confounders": [
+                "Lighting difference and pump status influence contrast and fullness appearance."
+              ]
+            },
+            {
+              "region": "back",
+              "metric": "muscularity",
+              "direction": "stable",
+              "apparentMagnitude": "none",
+              "confidence": "high",
+              "observation": "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.",
+              "basis": [],
+              "confounders": [
+                "Pump in current photo may slightly inflate visual fullness."
+              ]
+            },
+            {
+              "region": "waist",
+              "metric": "whole_body_softness",
+              "direction": "decreased",
+              "apparentMagnitude": "moderate",
+              "confidence": "moderate",
+              "observation": "The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper.",
+              "basis": [],
+              "confounders": [
+                "Waist angle and lighting differ, slightly reducing certainty."
+              ]
+            }
+          ],
+          "dominantVisualStory": "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period. The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper.",
+          "overallMagnitude": "moderate",
+          "magnitudeCalibration": {
+            "magnitude": "moderate",
+            "reportedMagnitude": "pronounced",
+            "promotionApplied": false,
+            "rule": "preserve_reported_photo_magnitude",
+            "alignedDirection": "positive",
+            "reliableDirectionalRegionCount": 2,
+            "subtleFindingsCannotPromote": true
+          },
+          "confidence": {
+            "overallReliability": "moderate",
+            "rationale": "",
+            "limitations": []
+          },
+          "goalRelativeInterpretation": {
+            "direction": "supportive",
+            "strength": "moderate_visual_support",
+            "interpretation": "The photo-only direction supports Build Lean Mass. Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period. The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper.",
+            "photoOnlyStrategyImplication": "Treat this as photo-only supporting evidence; it does not establish a strategy change without independent evidence."
+          },
+          "unsupportedConclusions": [
+            "exact body-fat percentage or numerical body-composition change",
+            "pounds of fat, lean mass, or muscle gained or lost",
+            "causation by training, nutrition, medication, supplements, or lifestyle",
+            "health status or physiological mechanism"
+          ],
+          "photoOnlyInterpretation": "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period. The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper.",
+          "exactPhotoBriefingCopy": "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period. The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper.",
+          "provenance": {
+            "producer": "canonical_photo_intelligence_service",
+            "producerVersion": "canonical_photo_intelligence_v1",
+            "calibrationVersion": "photo_magnitude_calibration_v2",
+            "evidenceClass": "photo_only",
+            "nonPhotoEvidenceUsed": false,
+            "resultLabel": "PROSPECTIVE"
+          }
+        }
+      },
+      {
+        "id": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+        "view": "side",
+        "pose": "right-side-relaxed",
+        "matchStatus": "like_for_like",
+        "baselineImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-08-22_right_side_relaxed",
+          "setId": "photo_session_user_founder_001_2026-08-22",
+          "date": "2026-08-22",
+          "view": "side",
+          "pose": "right-side-relaxed",
+          "visibleRegions": [
+            "waist",
+            "shoulders",
+            "arms"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "comparisonImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+          "setId": "photo_session_user_founder_001_2026-09-19",
+          "date": "2026-09-19",
+          "view": "side",
+          "pose": "right-side-relaxed",
+          "visibleRegions": [
+            "waist",
+            "shoulders",
+            "arms"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "visibleRegions": [
+          "waist",
+          "shoulders",
+          "arms"
+        ],
+        "comparability": {
+          "overall": "high"
+        },
+        "observations": [
+          {
+            "region": "waist",
+            "metric": "leanness",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "high",
+            "observation": "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+            "basis": [],
+            "confounders": [
+              "Lighting difference",
+              "Pump state in current photo may enhance skin tightness perception."
+            ]
+          },
+          {
+            "region": "waist",
+            "metric": "whole_body_softness",
+            "direction": "decreased",
+            "apparentMagnitude": "moderate",
+            "confidence": "high",
+            "observation": "Abdominal and midsection softness visibly reduced, contributing to a leaner appearance.",
+            "basis": [],
+            "confounders": [
+              "Lighting and timing differences."
+            ]
+          },
+          {
+            "region": "shoulders",
+            "metric": "muscularity",
+            "direction": "stable",
+            "apparentMagnitude": "none",
+            "confidence": "high",
+            "observation": "Shoulders maintain size and visible muscle fullness without apparent loss or gain.",
+            "basis": [],
+            "confounders": [
+              "Pump in current photo might enhance fullness but no reduction visible."
+            ]
+          },
+          {
+            "region": "arms",
+            "metric": "muscularity",
+            "direction": "stable",
+            "apparentMagnitude": "none",
+            "confidence": "high",
+            "observation": "Arm muscle fullness and shape are consistent between photos indicating retained muscularity.",
+            "basis": [],
+            "confounders": [
+              "Similar considerations as shoulders."
+            ]
+          }
+        ],
+        "confidence": {
+          "overallReliability": "moderate",
+          "rationale": "",
+          "limitations": []
+        },
+        "photoIntelligence": {
+          "schemaVersion": "canonical_photo_intelligence_v1",
+          "resultLabel": "PROSPECTIVE",
+          "comparison": {
+            "caseId": "photo_session_user_founder_001_2026-09-19:right-side-relaxed",
+            "baselineDate": "2026-08-22",
+            "comparisonDate": "2026-09-19",
+            "daysElapsed": 28,
+            "goalContext": {
+              "activeGoal": {
+                "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+                "title": "Build Lean Mass",
+                "type": null,
+                "target": null,
+                "guardrails": []
+              },
+              "activePhase": {
+                "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+                "name": "Lean Mass Build",
+                "status": "active",
+                "startDate": null
+              },
+              "operatingState": {
+                "value": "calibration"
+              }
+            }
+          },
+          "source": {
+            "photoSessionId": "photo_session_user_founder_001_2026-09-19:right-side-relaxed",
+            "sourceEvidenceIds": [
+              "canonical_photo_user_founder_001_2026-08-22_right_side_relaxed",
+              "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+              "evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+              "photo_session_user_founder_001_2026-08-22"
+            ],
+            "comparisonDates": [
+              "2026-08-22"
+            ]
+          },
+          "captureAssessment": {
+            "views": [
+              {
+                "poseId": "right-side-relaxed",
+                "conditionDifferences": []
+              }
+            ]
+          },
+          "comparability": {
+            "overall": "high"
+          },
+          "observations": [
+            {
+              "region": "waist",
+              "metric": "leanness",
+              "direction": "increased",
+              "apparentMagnitude": "moderate",
+              "confidence": "high",
+              "observation": "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+              "basis": [],
+              "confounders": [
+                "Lighting difference",
+                "Pump state in current photo may enhance skin tightness perception."
+              ]
+            },
+            {
+              "region": "waist",
+              "metric": "whole_body_softness",
+              "direction": "decreased",
+              "apparentMagnitude": "moderate",
+              "confidence": "high",
+              "observation": "Abdominal and midsection softness visibly reduced, contributing to a leaner appearance.",
+              "basis": [],
+              "confounders": [
+                "Lighting and timing differences."
+              ]
+            },
+            {
+              "region": "shoulders",
+              "metric": "muscularity",
+              "direction": "stable",
+              "apparentMagnitude": "none",
+              "confidence": "high",
+              "observation": "Shoulders maintain size and visible muscle fullness without apparent loss or gain.",
+              "basis": [],
+              "confounders": [
+                "Pump in current photo might enhance fullness but no reduction visible."
+              ]
+            },
+            {
+              "region": "arms",
+              "metric": "muscularity",
+              "direction": "stable",
+              "apparentMagnitude": "none",
+              "confidence": "high",
+              "observation": "Arm muscle fullness and shape are consistent between photos indicating retained muscularity.",
+              "basis": [],
+              "confounders": [
+                "Similar considerations as shoulders."
+              ]
+            }
+          ],
+          "dominantVisualStory": "Visible tightening and flattening of waist and lower abdomen compared to prior photo. Abdominal and midsection softness visibly reduced, contributing to a leaner appearance. Shoulders maintain size and visible muscle fullness without apparent loss or gain. Arm muscle fullness and shape are consistent between photos indicating retained muscularity.",
+          "overallMagnitude": "moderate",
+          "magnitudeCalibration": {
+            "magnitude": "moderate",
+            "reportedMagnitude": "moderate",
+            "promotionApplied": false,
+            "rule": "preserve_reported_photo_magnitude",
+            "alignedDirection": "positive",
+            "reliableDirectionalRegionCount": 1,
+            "subtleFindingsCannotPromote": true
+          },
+          "confidence": {
+            "overallReliability": "moderate",
+            "rationale": "",
+            "limitations": []
+          },
+          "goalRelativeInterpretation": {
+            "direction": "supportive",
+            "strength": "moderate_visual_support",
+            "interpretation": "The photo-only direction supports Build Lean Mass. Visible tightening and flattening of waist and lower abdomen compared to prior photo. Abdominal and midsection softness visibly reduced, contributing to a leaner appearance. Shoulders maintain size and visible muscle fullness without apparent loss or gain. Arm muscle fullness and shape are consistent between photos indicating retained muscularity.",
+            "photoOnlyStrategyImplication": "Treat this as photo-only supporting evidence; it does not establish a strategy change without independent evidence."
+          },
+          "unsupportedConclusions": [
+            "exact body-fat percentage or numerical body-composition change",
+            "pounds of fat, lean mass, or muscle gained or lost",
+            "causation by training, nutrition, medication, supplements, or lifestyle",
+            "health status or physiological mechanism"
+          ],
+          "photoOnlyInterpretation": "Visible tightening and flattening of waist and lower abdomen compared to prior photo. Abdominal and midsection softness visibly reduced, contributing to a leaner appearance. Shoulders maintain size and visible muscle fullness without apparent loss or gain. Arm muscle fullness and shape are consistent between photos indicating retained muscularity.",
+          "exactPhotoBriefingCopy": "Visible tightening and flattening of waist and lower abdomen compared to prior photo. Abdominal and midsection softness visibly reduced, contributing to a leaner appearance. Shoulders maintain size and visible muscle fullness without apparent loss or gain. Arm muscle fullness and shape are consistent between photos indicating retained muscularity.",
+          "provenance": {
+            "producer": "canonical_photo_intelligence_service",
+            "producerVersion": "canonical_photo_intelligence_v1",
+            "calibrationVersion": "photo_magnitude_calibration_v2",
+            "evidenceClass": "photo_only",
+            "nonPhotoEvidenceUsed": false,
+            "resultLabel": "PROSPECTIVE"
+          }
+        }
+      },
+      {
+        "id": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+        "view": "front",
+        "pose": "front-flexed",
+        "matchStatus": "like_for_like",
+        "baselineImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-08-22_front_flexed",
+          "setId": "photo_session_user_founder_001_2026-08-22",
+          "date": "2026-08-22",
+          "view": "front",
+          "pose": "front-flexed",
+          "visibleRegions": [
+            "Waist and Midsection",
+            "Abdominals",
+            "Chest and Shoulders",
+            "Arms"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "comparisonImage": {
+          "sourceId": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+          "setId": "photo_session_user_founder_001_2026-09-19",
+          "date": "2026-09-19",
+          "view": "front",
+          "pose": "front-flexed",
+          "visibleRegions": [
+            "Waist and Midsection",
+            "Abdominals",
+            "Chest and Shoulders",
+            "Arms"
+          ],
+          "mimeType": null,
+          "pixelWidth": null,
+          "pixelHeight": null,
+          "provenance": null
+        },
+        "visibleRegions": [
+          "Waist and Midsection",
+          "Abdominals",
+          "Chest and Shoulders",
+          "Arms"
+        ],
+        "comparability": {
+          "overall": "high"
+        },
+        "observations": [
+          {
+            "region": "Waist and Midsection",
+            "metric": "leanness",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "high",
+            "observation": "Waistline appears visibly tighter and less soft compared to previous photo.",
+            "basis": [],
+            "confounders": [
+              "Lighting and minor pose angle differences."
+            ]
+          },
+          {
+            "region": "Abdominals",
+            "metric": "abdominal_definition",
+            "direction": "increased",
+            "apparentMagnitude": "moderate",
+            "confidence": "high",
+            "observation": "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+            "basis": [],
+            "confounders": [
+              "Post-workout pump may affect muscle visibility."
+            ]
+          },
+          {
+            "region": "Chest and Shoulders",
+            "metric": "muscularity",
+            "direction": "stable",
+            "apparentMagnitude": "none",
+            "confidence": "moderate",
+            "observation": "Chest and shoulders maintain muscle fullness and definition without visible loss.",
+            "basis": [],
+            "confounders": [
+              "Pump and lighting differences reduce confidence."
+            ]
+          },
+          {
+            "region": "Arms",
+            "metric": "muscularity",
+            "direction": "insufficient",
+            "apparentMagnitude": "unknown",
+            "confidence": "moderate",
+            "observation": "Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+            "basis": [],
+            "confounders": [
+              "Different lighting and angle.",
+              "Post-workout pump in current photo."
+            ]
+          }
+        ],
+        "confidence": {
+          "overallReliability": "moderate",
+          "rationale": "",
+          "limitations": []
+        },
+        "photoIntelligence": {
+          "schemaVersion": "canonical_photo_intelligence_v1",
+          "resultLabel": "PROSPECTIVE",
+          "comparison": {
+            "caseId": "photo_session_user_founder_001_2026-09-19:front-flexed",
+            "baselineDate": "2026-08-22",
+            "comparisonDate": "2026-09-19",
+            "daysElapsed": 28,
+            "goalContext": {
+              "activeGoal": {
+                "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+                "title": "Build Lean Mass",
+                "type": null,
+                "target": null,
+                "guardrails": []
+              },
+              "activePhase": {
+                "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+                "name": "Lean Mass Build",
+                "status": "active",
+                "startDate": null
+              },
+              "operatingState": {
+                "value": "calibration"
+              }
+            }
+          },
+          "source": {
+            "photoSessionId": "photo_session_user_founder_001_2026-09-19:front-flexed",
+            "sourceEvidenceIds": [
+              "canonical_photo_user_founder_001_2026-08-22_front_flexed",
+              "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+              "evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+              "photo_session_user_founder_001_2026-08-22"
+            ],
+            "comparisonDates": [
+              "2026-08-22"
+            ]
+          },
+          "captureAssessment": {
+            "views": [
+              {
+                "poseId": "front-flexed",
+                "conditionDifferences": []
+              }
+            ]
+          },
+          "comparability": {
+            "overall": "high"
+          },
+          "observations": [
+            {
+              "region": "Waist and Midsection",
+              "metric": "leanness",
+              "direction": "increased",
+              "apparentMagnitude": "moderate",
+              "confidence": "high",
+              "observation": "Waistline appears visibly tighter and less soft compared to previous photo.",
+              "basis": [],
+              "confounders": [
+                "Lighting and minor pose angle differences."
+              ]
+            },
+            {
+              "region": "Abdominals",
+              "metric": "abdominal_definition",
+              "direction": "increased",
+              "apparentMagnitude": "moderate",
+              "confidence": "high",
+              "observation": "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+              "basis": [],
+              "confounders": [
+                "Post-workout pump may affect muscle visibility."
+              ]
+            },
+            {
+              "region": "Chest and Shoulders",
+              "metric": "muscularity",
+              "direction": "stable",
+              "apparentMagnitude": "none",
+              "confidence": "moderate",
+              "observation": "Chest and shoulders maintain muscle fullness and definition without visible loss.",
+              "basis": [],
+              "confounders": [
+                "Pump and lighting differences reduce confidence."
+              ]
+            },
+            {
+              "region": "Arms",
+              "metric": "muscularity",
+              "direction": "insufficient",
+              "apparentMagnitude": "unknown",
+              "confidence": "moderate",
+              "observation": "Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+              "basis": [],
+              "confounders": [
+                "Different lighting and angle.",
+                "Post-workout pump in current photo."
+              ]
+            }
+          ],
+          "dominantVisualStory": "Waistline appears visibly tighter and less soft compared to previous photo. Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging. Chest and shoulders maintain muscle fullness and definition without visible loss. Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+          "overallMagnitude": "moderate",
+          "magnitudeCalibration": {
+            "magnitude": "moderate",
+            "reportedMagnitude": "moderate",
+            "promotionApplied": false,
+            "rule": "preserve_reported_photo_magnitude",
+            "alignedDirection": "positive",
+            "reliableDirectionalRegionCount": 2,
+            "subtleFindingsCannotPromote": true
+          },
+          "confidence": {
+            "overallReliability": "moderate",
+            "rationale": "",
+            "limitations": []
+          },
+          "goalRelativeInterpretation": {
+            "direction": "supportive",
+            "strength": "moderate_visual_support",
+            "interpretation": "The photo-only direction supports Build Lean Mass. Waistline appears visibly tighter and less soft compared to previous photo. Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging. Chest and shoulders maintain muscle fullness and definition without visible loss. Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+            "photoOnlyStrategyImplication": "Treat this as photo-only supporting evidence; it does not establish a strategy change without independent evidence."
+          },
+          "unsupportedConclusions": [
+            "exact body-fat percentage or numerical body-composition change",
+            "pounds of fat, lean mass, or muscle gained or lost",
+            "causation by training, nutrition, medication, supplements, or lifestyle",
+            "health status or physiological mechanism"
+          ],
+          "photoOnlyInterpretation": "Waistline appears visibly tighter and less soft compared to previous photo. Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging. Chest and shoulders maintain muscle fullness and definition without visible loss. Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+          "exactPhotoBriefingCopy": "Waistline appears visibly tighter and less soft compared to previous photo. Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging. Chest and shoulders maintain muscle fullness and definition without visible loss. Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+          "provenance": {
+            "producer": "canonical_photo_intelligence_service",
+            "producerVersion": "canonical_photo_intelligence_v1",
+            "calibrationVersion": "photo_magnitude_calibration_v2",
+            "evidenceClass": "photo_only",
+            "nonPhotoEvidenceUsed": false,
+            "resultLabel": "PROSPECTIVE"
+          }
+        }
+      }
+    ],
+    "unmatchedViews": [],
+    "comparability": {
+      "overall": "high",
+      "matchedViewCount": 5,
+      "unmatchedViewCount": 0,
+      "perView": [
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+          "view": "front",
+          "pose": "front-relaxed",
+          "rating": "high"
+        },
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+          "view": "back",
+          "pose": "back-relaxed",
+          "rating": "high"
+        },
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+          "view": "back",
+          "pose": "back-flexed",
+          "rating": "high"
+        },
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+          "view": "side",
+          "pose": "right-side-relaxed",
+          "rating": "high"
+        },
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+          "view": "front",
+          "pose": "front-flexed",
+          "rating": "high"
+        }
+      ]
+    },
+    "observations": [
+      {
+        "region": "shoulders",
+        "metric": "muscularity",
+        "direction": "increased",
+        "apparentMagnitude": "moderate",
+        "confidence": "high",
+        "observation": "Shoulder muscles appear fuller and more rounded with clearer separation.",
+        "basis": [],
+        "confounders": [
+          "Post-workout pump may exaggerate muscle fullness slightly."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5:0"
+        ]
+      },
+      {
+        "region": "arms",
+        "metric": "muscularity",
+        "direction": "increased",
+        "apparentMagnitude": "moderate",
+        "confidence": "high",
+        "observation": "Arms show increased fullness and more visible vascularity indicating muscle development.",
+        "basis": [],
+        "confounders": [
+          "Pump and lighting differences may influence vascularity visibility."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5:1"
+        ]
+      },
+      {
+        "region": "waist",
+        "metric": "leanness",
+        "direction": "increased",
+        "apparentMagnitude": "subtle",
+        "confidence": "moderate",
+        "observation": "Waist line appears slightly more tapered and less soft than before.",
+        "basis": [],
+        "confounders": [
+          "Light and posture differences create some uncertainty."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5:2"
+        ]
+      },
+      {
+        "region": "abdomen",
+        "metric": "abdominal_definition",
+        "direction": "increased",
+        "apparentMagnitude": "subtle",
+        "confidence": "moderate",
+        "observation": "Upper abdominal muscles and obliques show slightly clearer definition and reduced softness.",
+        "basis": [],
+        "confounders": [
+          "Relaxed pose and lighting differences limit clarity."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5:3"
+        ]
+      },
+      {
+        "region": "waist",
+        "metric": "leanness",
+        "direction": "increased",
+        "apparentMagnitude": "moderate",
+        "confidence": "high",
+        "observation": "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+        "basis": [],
+        "confounders": [
+          "Different lighting conditions",
+          "Post-workout pump in current photo"
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2:0"
+        ]
+      },
+      {
+        "region": "upper back",
+        "metric": "muscularity",
+        "direction": "stable",
+        "apparentMagnitude": "none",
+        "confidence": "high",
+        "observation": "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+        "basis": [],
+        "confounders": [
+          "Posture and arm positioning consistent"
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2:1"
+        ]
+      },
+      {
+        "region": "back conditioning",
+        "metric": "abdominal_definition",
+        "direction": "increased",
+        "apparentMagnitude": "subtle",
+        "confidence": "moderate",
+        "observation": "Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning.",
+        "basis": [],
+        "confounders": [
+          "Lighting variability",
+          "Post-workout pump effect"
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2:2"
+        ]
+      },
+      {
+        "region": "back",
+        "metric": "leanness",
+        "direction": "increased",
+        "apparentMagnitude": "pronounced",
+        "confidence": "high",
+        "observation": "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+        "basis": [],
+        "confounders": [
+          "Lighting difference and pump status influence contrast and fullness appearance."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3:0"
+        ]
+      },
+      {
+        "region": "back",
+        "metric": "muscularity",
+        "direction": "stable",
+        "apparentMagnitude": "none",
+        "confidence": "high",
+        "observation": "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.",
+        "basis": [],
+        "confounders": [
+          "Pump in current photo may slightly inflate visual fullness."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3:1"
+        ]
+      },
+      {
+        "region": "waist",
+        "metric": "whole_body_softness",
+        "direction": "decreased",
+        "apparentMagnitude": "moderate",
+        "confidence": "moderate",
+        "observation": "The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper.",
+        "basis": [],
+        "confounders": [
+          "Waist angle and lighting differ, slightly reducing certainty."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3:2"
+        ]
+      },
+      {
+        "region": "waist",
+        "metric": "leanness",
+        "direction": "increased",
+        "apparentMagnitude": "moderate",
+        "confidence": "high",
+        "observation": "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+        "basis": [],
+        "confounders": [
+          "Lighting difference",
+          "Pump state in current photo may enhance skin tightness perception."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4:0"
+        ]
+      },
+      {
+        "region": "waist",
+        "metric": "whole_body_softness",
+        "direction": "decreased",
+        "apparentMagnitude": "moderate",
+        "confidence": "high",
+        "observation": "Abdominal and midsection softness visibly reduced, contributing to a leaner appearance.",
+        "basis": [],
+        "confounders": [
+          "Lighting and timing differences."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4:1"
+        ]
+      },
+      {
+        "region": "shoulders",
+        "metric": "muscularity",
+        "direction": "stable",
+        "apparentMagnitude": "none",
+        "confidence": "high",
+        "observation": "Shoulders maintain size and visible muscle fullness without apparent loss or gain.",
+        "basis": [],
+        "confounders": [
+          "Pump in current photo might enhance fullness but no reduction visible."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4:2"
+        ]
+      },
+      {
+        "region": "arms",
+        "metric": "muscularity",
+        "direction": "stable",
+        "apparentMagnitude": "none",
+        "confidence": "high",
+        "observation": "Arm muscle fullness and shape are consistent between photos indicating retained muscularity.",
+        "basis": [],
+        "confounders": [
+          "Similar considerations as shoulders."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4:3"
+        ]
+      },
+      {
+        "region": "Waist and Midsection",
+        "metric": "leanness",
+        "direction": "increased",
+        "apparentMagnitude": "moderate",
+        "confidence": "high",
+        "observation": "Waistline appears visibly tighter and less soft compared to previous photo.",
+        "basis": [],
+        "confounders": [
+          "Lighting and minor pose angle differences."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1:0"
+        ]
+      },
+      {
+        "region": "Abdominals",
+        "metric": "abdominal_definition",
+        "direction": "increased",
+        "apparentMagnitude": "moderate",
+        "confidence": "high",
+        "observation": "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+        "basis": [],
+        "confounders": [
+          "Post-workout pump may affect muscle visibility."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1:1"
+        ]
+      },
+      {
+        "region": "Chest and Shoulders",
+        "metric": "muscularity",
+        "direction": "stable",
+        "apparentMagnitude": "none",
+        "confidence": "moderate",
+        "observation": "Chest and shoulders maintain muscle fullness and definition without visible loss.",
+        "basis": [],
+        "confounders": [
+          "Pump and lighting differences reduce confidence."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1:2"
+        ]
+      },
+      {
+        "region": "Arms",
+        "metric": "muscularity",
+        "direction": "insufficient",
+        "apparentMagnitude": "unknown",
+        "confidence": "moderate",
+        "observation": "Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+        "basis": [],
+        "confounders": [
+          "Different lighting and angle.",
+          "Post-workout pump in current photo."
+        ],
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+        ],
+        "sourceObservationRefs": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1:3"
+        ]
+      }
+    ],
+    "dominantVisualStory": "Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Waist line appears slightly more tapered and less soft than before. Upper abdominal muscles and obliques show slightly clearer definition and reduced softness. Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose. Shoulder and upper back width maintained with no visible reduction in muscle fullness. Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning. Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period. The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper. Visible tightening and flattening of waist and lower abdomen compared to prior photo. Abdominal and midsection softness visibly reduced, contributing to a leaner appearance. Shoulders maintain size and visible muscle fullness without apparent loss or gain. Arm muscle fullness and shape are consistent between photos indicating retained muscularity. Waistline appears visibly tighter and less soft compared to previous photo. Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging. Chest and shoulders maintain muscle fullness and definition without visible loss. Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+    "overallMagnitude": "moderate",
+    "magnitudeReconciliation": {
+      "status": "consistent_across_views",
+      "strongestViewMagnitude": "moderate",
+      "viewMagnitudes": [
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+          "magnitude": "moderate"
+        },
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+          "magnitude": "moderate"
+        },
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+          "magnitude": "moderate"
+        },
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+          "magnitude": "moderate"
+        },
+        {
+          "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+          "magnitude": "moderate"
+        }
+      ]
+    },
+    "confidence": {
+      "overallReliability": "moderate",
+      "setInterpretationEffect": "conclusion_scoped_corroboration",
+      "viewConfidenceChanged": false,
+      "globallyStrengthened": false
+    },
+    "goalRelativeInterpretation": {
+      "direction": "supportive",
+      "strength": "cross_view_visual_support",
+      "interpretation": "The photo-only direction supports Build Lean Mass. Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Waist line appears slightly more tapered and less soft than before. Upper abdominal muscles and obliques show slightly clearer definition and reduced softness. The photo-only direction supports Build Lean Mass. Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose. Shoulder and upper back width maintained with no visible reduction in muscle fullness. Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning. The photo-only direction supports Build Lean Mass. Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period. The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper. The photo-only direction supports Build Lean Mass. Visible tightening and flattening of waist and lower abdomen compared to prior photo. Abdominal and midsection softness visibly reduced, contributing to a leaner appearance. Shoulders maintain size and visible muscle fullness without apparent loss or gain. Arm muscle fullness and shape are consistent between photos indicating retained muscularity. The photo-only direction supports Build Lean Mass. Waistline appears visibly tighter and less soft compared to previous photo. Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging. Chest and shoulders maintain muscle fullness and definition without visible loss. Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+      "photoOnlyStrategyImplication": "The reconciled photo set supports the Goal direction, but does not establish a strategy change without independent evidence.",
+      "goalContext": {
+        "activeGoal": {
+          "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+          "title": "Build Lean Mass",
+          "type": null,
+          "target": null,
+          "guardrails": []
+        },
+        "activePhase": {
+          "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+          "name": "Lean Mass Build",
+          "status": "active",
+          "startDate": null
+        },
+        "operatingState": {
+          "value": "calibration"
+        }
+      }
+    },
+    "crossViewCorroboration": [
+      {
+        "underlyingConclusion": "waist:leanness",
+        "metric": "leanness",
+        "regions": [
+          "waist"
+        ],
+        "direction": "positive",
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5"
+        ],
+        "confidenceEffect": "set_interpretation_strengthened",
+        "viewConfidenceChanged": false
+      },
+      {
+        "underlyingConclusion": "waist:whole_body_softness",
+        "metric": "whole_body_softness",
+        "regions": [
+          "waist"
+        ],
+        "direction": "positive",
+        "supportingViewIds": [
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+          "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4"
+        ],
+        "confidenceEffect": "set_interpretation_strengthened",
+        "viewConfidenceChanged": false
+      }
+    ],
+    "crossViewConflicts": [],
+    "unsupportedConclusions": [
+      "exact body-fat percentage or numerical body-composition change",
+      "pounds of fat, lean mass, or muscle gained or lost",
+      "causation by training, nutrition, medication, supplements, or lifestyle",
+      "health status or physiological mechanism"
+    ],
+    "photoOnlyInterpretation": "Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Waist line appears slightly more tapered and less soft than before. Upper abdominal muscles and obliques show slightly clearer definition and reduced softness. Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose. Shoulder and upper back width maintained with no visible reduction in muscle fullness. Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning. Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period. The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper. Visible tightening and flattening of waist and lower abdomen compared to prior photo. Abdominal and midsection softness visibly reduced, contributing to a leaner appearance. Shoulders maintain size and visible muscle fullness without apparent loss or gain. Arm muscle fullness and shape are consistent between photos indicating retained muscularity. Waistline appears visibly tighter and less soft compared to previous photo. Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging. Chest and shoulders maintain muscle fullness and definition without visible loss. Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+    "exactPhotoBriefingCopy": "Across the matched front, back, and side views, Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development.",
+    "provenance": {
+      "producer": "canonical_photo_intelligence_set_service",
+      "producerVersion": "canonical_photo_intelligence_set_v1",
+      "viewProducerVersion": "canonical_photo_intelligence_v1",
+      "evidenceClass": "photo_only",
+      "nonPhotoEvidenceUsed": false,
+      "viewConfidenceChanged": false,
+      "unmatchedViewsTreatedAsNoChange": false,
+      "resultLabel": "PROSPECTIVE"
+    }
+  },
+  "holisticSynthesis": {
+    "schemaVersion": "photo_briefing_holistic_v1",
+    "resultLabel": "PROSPECTIVE",
+    "eventDate": "2026-09-19",
+    "evidenceCutoff": "2026-09-20T17:51:47.391Z",
+    "exactEligibleSelection": [
+      {
+        "id": "dexa_2024_06_10",
+        "type": "dexa_scan",
+        "observedAt": "2024-06-10T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2024_08_18",
+        "type": "dexa_scan",
+        "observedAt": "2024-08-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2025_08_08",
+        "type": "dexa_scan",
+        "observedAt": "2025-08-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2025_09_07",
+        "type": "dexa_scan",
+        "observedAt": "2025-09-07T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2025_10_08",
+        "type": "dexa_scan",
+        "observedAt": "2025-10-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2025_11_09",
+        "type": "dexa_scan",
+        "observedAt": "2025-11-09T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2025_12_10",
+        "type": "dexa_scan",
+        "observedAt": "2025-12-10T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2026_01_16",
+        "type": "dexa_scan",
+        "observedAt": "2026-01-16T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2026_03_04",
+        "type": "dexa_scan",
+        "observedAt": "2026-03-04T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2026_04_05",
+        "type": "dexa_scan",
+        "observedAt": "2026-04-05T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "dexa_2026_04_28",
+        "type": "dexa_scan",
+        "observedAt": "2026-04-28T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "weight_2026_05_21",
+        "type": "weight",
+        "observedAt": "2026-05-21T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "dexa_2026_05_24",
+        "type": "dexa_scan",
+        "observedAt": "2026-05-24T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "weight_2026_05_29",
+        "type": "weight",
+        "observedAt": "2026-05-29T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_01",
+        "type": "weight",
+        "observedAt": "2026-06-01T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_02",
+        "type": "weight",
+        "observedAt": "2026-06-02T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_03",
+        "type": "weight",
+        "observedAt": "2026-06-03T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_04",
+        "type": "weight",
+        "observedAt": "2026-06-04T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_05",
+        "type": "weight",
+        "observedAt": "2026-06-05T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_06",
+        "type": "weight",
+        "observedAt": "2026-06-06T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_07",
+        "type": "weight",
+        "observedAt": "2026-06-07T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_08",
+        "type": "weight",
+        "observedAt": "2026-06-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_09",
+        "type": "weight",
+        "observedAt": "2026-06-09T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_10",
+        "type": "weight",
+        "observedAt": "2026-06-10T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_11",
+        "type": "weight",
+        "observedAt": "2026-06-11T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_12",
+        "type": "weight",
+        "observedAt": "2026-06-12T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_13",
+        "type": "weight",
+        "observedAt": "2026-06-13T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_14",
+        "type": "weight",
+        "observedAt": "2026-06-14T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_15",
+        "type": "weight",
+        "observedAt": "2026-06-15T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_16",
+        "type": "weight",
+        "observedAt": "2026-06-16T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_17",
+        "type": "weight",
+        "observedAt": "2026-06-17T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_18",
+        "type": "weight",
+        "observedAt": "2026-06-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_19",
+        "type": "weight",
+        "observedAt": "2026-06-19T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "dexa_2026_06_20",
+        "type": "dexa_scan",
+        "observedAt": "2026-06-20T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "evidence_submission_20260718144114116_pdf_1_2026_06_20",
+        "type": "dexa_scan",
+        "observedAt": "2026-06-20T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "weight_2026_06_20",
+        "type": "weight",
+        "observedAt": "2026-06-20T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_21",
+        "type": "weight",
+        "observedAt": "2026-06-21T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_22",
+        "type": "weight",
+        "observedAt": "2026-06-22T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_23",
+        "type": "weight",
+        "observedAt": "2026-06-23T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_24",
+        "type": "weight",
+        "observedAt": "2026-06-24T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_25",
+        "type": "weight",
+        "observedAt": "2026-06-25T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_26",
+        "type": "weight",
+        "observedAt": "2026-06-26T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_27",
+        "type": "weight",
+        "observedAt": "2026-06-27T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_28",
+        "type": "weight",
+        "observedAt": "2026-06-28T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_29",
+        "type": "weight",
+        "observedAt": "2026-06-29T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_06_30",
+        "type": "weight",
+        "observedAt": "2026-06-30T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_01",
+        "type": "weight",
+        "observedAt": "2026-07-01T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_02",
+        "type": "weight",
+        "observedAt": "2026-07-02T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_03",
+        "type": "weight",
+        "observedAt": "2026-07-03T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_04",
+        "type": "weight",
+        "observedAt": "2026-07-04T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_05",
+        "type": "weight",
+        "observedAt": "2026-07-05T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_06",
+        "type": "weight",
+        "observedAt": "2026-07-06T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_07",
+        "type": "weight",
+        "observedAt": "2026-07-07T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_08",
+        "type": "weight",
+        "observedAt": "2026-07-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_09",
+        "type": "weight",
+        "observedAt": "2026-07-09T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_10",
+        "type": "weight",
+        "observedAt": "2026-07-10T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_11",
+        "type": "weight",
+        "observedAt": "2026-07-11T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_12",
+        "type": "weight",
+        "observedAt": "2026-07-12T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_13",
+        "type": "weight",
+        "observedAt": "2026-07-13T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_14",
+        "type": "weight",
+        "observedAt": "2026-07-14T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_15",
+        "type": "weight",
+        "observedAt": "2026-07-15T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_16",
+        "type": "weight",
+        "observedAt": "2026-07-16T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_17",
+        "type": "weight",
+        "observedAt": "2026-07-17T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "evidence_submission_20260718144114116_pdf_1_2026_07_18",
+        "type": "dexa_scan",
+        "observedAt": "2026-07-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "weight_2026_07_18",
+        "type": "weight",
+        "observedAt": "2026-07-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_19",
+        "type": "weight",
+        "observedAt": "2026-07-19T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_20",
+        "type": "weight",
+        "observedAt": "2026-07-20T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_21",
+        "type": "weight",
+        "observedAt": "2026-07-21T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_22",
+        "type": "weight",
+        "observedAt": "2026-07-22T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_23",
+        "type": "weight",
+        "observedAt": "2026-07-23T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_24",
+        "type": "weight",
+        "observedAt": "2026-07-24T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_25",
+        "type": "weight",
+        "observedAt": "2026-07-25T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_26",
+        "type": "weight",
+        "observedAt": "2026-07-26T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_27",
+        "type": "weight",
+        "observedAt": "2026-07-27T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_28",
+        "type": "weight",
+        "observedAt": "2026-07-28T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_29",
+        "type": "weight",
+        "observedAt": "2026-07-29T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_30",
+        "type": "weight",
+        "observedAt": "2026-07-30T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_07_31",
+        "type": "weight",
+        "observedAt": "2026-07-31T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_01",
+        "type": "weight",
+        "observedAt": "2026-08-01T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_02",
+        "type": "weight",
+        "observedAt": "2026-08-02T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_03",
+        "type": "weight",
+        "observedAt": "2026-08-03T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_04",
+        "type": "weight",
+        "observedAt": "2026-08-04T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_05",
+        "type": "weight",
+        "observedAt": "2026-08-05T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_06",
+        "type": "weight",
+        "observedAt": "2026-08-06T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_07",
+        "type": "weight",
+        "observedAt": "2026-08-07T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_08",
+        "type": "weight",
+        "observedAt": "2026-08-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_09",
+        "type": "weight",
+        "observedAt": "2026-08-09T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_10",
+        "type": "weight",
+        "observedAt": "2026-08-10T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_11",
+        "type": "weight",
+        "observedAt": "2026-08-11T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_12",
+        "type": "weight",
+        "observedAt": "2026-08-12T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_13",
+        "type": "weight",
+        "observedAt": "2026-08-13T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_14",
+        "type": "weight",
+        "observedAt": "2026-08-14T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+        "type": "dexa_scan",
+        "observedAt": "2026-08-15T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "weight_2026_08_15",
+        "type": "weight",
+        "observedAt": "2026-08-15T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_16",
+        "type": "weight",
+        "observedAt": "2026-08-16T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_17",
+        "type": "weight",
+        "observedAt": "2026-08-17T23:59:59.999Z",
+        "availableAt": "2026-08-30T21:11:44.714Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_18",
+        "type": "weight",
+        "observedAt": "2026-08-18T23:59:59.999Z",
+        "availableAt": "2026-08-30T20:44:28.226Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_19",
+        "type": "weight",
+        "observedAt": "2026-08-19T23:59:59.999Z",
+        "availableAt": "2026-08-30T20:36:18.614Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_20",
+        "type": "weight",
+        "observedAt": "2026-08-20T23:59:59.999Z",
+        "availableAt": "2026-08-30T20:20:34.529Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_21",
+        "type": "weight",
+        "observedAt": "2026-08-21T23:59:59.999Z",
+        "availableAt": "2026-08-30T18:55:14.991Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_22",
+        "type": "weight",
+        "observedAt": "2026-08-22T23:59:59.999Z",
+        "availableAt": "2026-08-30T18:47:52.067Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_23",
+        "type": "weight",
+        "observedAt": "2026-08-23T23:59:59.999Z",
+        "availableAt": "2026-08-30T06:30:06.538Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_24",
+        "type": "weight",
+        "observedAt": "2026-08-24T23:59:59.999Z",
+        "availableAt": "2026-08-30T01:35:20.972Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_25",
+        "type": "weight",
+        "observedAt": "2026-08-25T23:59:59.999Z",
+        "availableAt": "2026-08-30T01:33:52.330Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_26",
+        "type": "weight",
+        "observedAt": "2026-08-26T23:59:59.999Z",
+        "availableAt": "2026-08-29T23:23:23.961Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_27",
+        "type": "weight",
+        "observedAt": "2026-08-27T23:59:59.999Z",
+        "availableAt": "2026-08-29T06:09:10.654Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_28",
+        "type": "weight",
+        "observedAt": "2026-08-28T23:59:59.999Z",
+        "availableAt": "2026-08-29T02:32:58.472Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_29",
+        "type": "weight",
+        "observedAt": "2026-08-29T23:59:59.999Z",
+        "availableAt": "2026-08-29T23:27:19.424Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_30",
+        "type": "weight",
+        "observedAt": "2026-08-30T23:59:59.999Z",
+        "availableAt": "2026-08-30T15:38:01.339Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_08_31",
+        "type": "weight",
+        "observedAt": "2026-08-31T23:59:59.999Z",
+        "availableAt": "2026-08-31T14:00:01.570Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_01",
+        "type": "weight",
+        "observedAt": "2026-09-01T23:59:59.999Z",
+        "availableAt": "2026-09-01T14:12:16.943Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_02",
+        "type": "weight",
+        "observedAt": "2026-09-02T23:59:59.999Z",
+        "availableAt": "2026-09-02T12:44:51.304Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_03",
+        "type": "weight",
+        "observedAt": "2026-09-03T23:59:59.999Z",
+        "availableAt": "2026-09-03T13:08:09.166Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_04",
+        "type": "weight",
+        "observedAt": "2026-09-04T23:59:59.999Z",
+        "availableAt": "2026-09-05T16:56:41.646Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_05",
+        "type": "weight",
+        "observedAt": "2026-09-05T23:59:59.999Z",
+        "availableAt": "2026-09-05T17:06:27.729Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_07",
+        "type": "weight",
+        "observedAt": "2026-09-07T23:59:59.999Z",
+        "availableAt": "2026-09-07T16:29:20.075Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_08",
+        "type": "weight",
+        "observedAt": "2026-09-08T23:59:59.999Z",
+        "availableAt": "2026-09-08T13:52:06.094Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_09",
+        "type": "weight",
+        "observedAt": "2026-09-09T23:59:59.999Z",
+        "availableAt": "2026-09-09T12:43:03.119Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_10",
+        "type": "weight",
+        "observedAt": "2026-09-10T23:59:59.999Z",
+        "availableAt": "2026-09-10T13:15:41.703Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_11",
+        "type": "weight",
+        "observedAt": "2026-09-11T23:59:59.999Z",
+        "availableAt": "2026-09-11T14:11:06.409Z",
+        "lastUpdatedAt": "2026-09-11T14:11:06.409Z"
+      },
+      {
+        "id": "weight_2026_09_12",
+        "type": "weight",
+        "observedAt": "2026-09-12T23:59:59.999Z",
+        "availableAt": "2026-09-12T13:52:24.643Z",
+        "lastUpdatedAt": "2026-09-12T13:52:24.643Z"
+      },
+      {
+        "id": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+        "type": "dexa_scan",
+        "observedAt": "2026-09-12T23:59:59.999Z",
+        "availableAt": "2026-09-13T05:51:54.402Z",
+        "lastUpdatedAt": "2026-09-13T05:51:54.402Z"
+      },
+      {
+        "id": "weight_2026_09_13",
+        "type": "weight",
+        "observedAt": "2026-09-13T23:59:59.999Z",
+        "availableAt": "2026-09-13T16:26:14.715Z",
+        "lastUpdatedAt": "2026-09-13T16:26:14.715Z"
+      },
+      {
+        "id": "weight_2026_09_14",
+        "type": "weight",
+        "observedAt": "2026-09-14T23:59:59.999Z",
+        "availableAt": "2026-09-14T13:21:25.049Z",
+        "lastUpdatedAt": "2026-09-14T13:21:25.049Z"
+      },
+      {
+        "id": "weight_2026_09_15",
+        "type": "weight",
+        "observedAt": "2026-09-15T23:59:59.999Z",
+        "availableAt": "2026-09-15T13:38:08.725Z",
+        "lastUpdatedAt": "2026-09-15T13:38:08.725Z"
+      },
+      {
+        "id": "weight_2026_09_16",
+        "type": "weight",
+        "observedAt": "2026-09-16T23:59:59.999Z",
+        "availableAt": "2026-09-16T12:56:52.761Z",
+        "lastUpdatedAt": "2026-09-16T12:56:52.761Z"
+      },
+      {
+        "id": "weight_2026_09_17",
+        "type": "weight",
+        "observedAt": "2026-09-17T23:59:59.999Z",
+        "availableAt": "2026-09-17T13:31:42.077Z",
+        "lastUpdatedAt": "2026-09-17T13:31:42.077Z"
+      },
+      {
+        "id": "weight_2026_09_18",
+        "type": "weight",
+        "observedAt": "2026-09-18T23:59:59.999Z",
+        "availableAt": "2026-09-18T13:53:09.154Z",
+        "lastUpdatedAt": "2026-09-18T13:53:09.154Z"
+      },
+      {
+        "id": "weight_2026_09_19",
+        "type": "weight",
+        "observedAt": "2026-09-19T23:59:59.999Z",
+        "availableAt": "2026-09-19T14:54:13.271Z",
+        "lastUpdatedAt": "2026-09-19T14:54:13.271Z"
+      }
+    ],
+    "exactExcludedSelection": [
+      {
+        "id": "photo_session|2026-07-06|artifact_evidence_submission_20260706003940855_5|artifact_evidence_submission_20260706003940855_6",
+        "type": "photo_session",
+        "observedAt": "2026-07-06T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session|2026-07-06|artifact_evidence_submission_20260706003940855_openai_recovery_1|artifact_evidence_submission_20260706003940855_openai_recovery_2",
+        "type": "photo_session",
+        "observedAt": "2026-07-06T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session|2026-07-06|artifact_evidence_submission_20260707005811645_1|artifact_evidence_submission_20260707005811645_2",
+        "type": "photo_session",
+        "observedAt": "2026-07-06T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_progress_photo_2026_07_11_back_flexed_1783811845968",
+        "type": "progress_photo",
+        "observedAt": "2026-07-11T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_progress_photo_2026_07_11_back_flexed_1783811959935",
+        "type": "progress_photo",
+        "observedAt": "2026-07-11T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_progress_photo_2026_07_11_back_relaxed_1783811778449",
+        "type": "progress_photo",
+        "observedAt": "2026-07-11T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_progress_photo_2026_07_11_front_relaxed_1783811705734",
+        "type": "progress_photo",
+        "observedAt": "2026-07-11T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session_user_founder_001_2026-07-11",
+        "type": "photo_session",
+        "observedAt": "2026-07-11T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-18_provisional_photo_20260718224124049_0",
+        "type": "progress_photo",
+        "observedAt": "2026-07-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-18_provisional_photo_20260718224124049_1",
+        "type": "progress_photo",
+        "observedAt": "2026-07-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-18_provisional_photo_20260718224124049_2",
+        "type": "progress_photo",
+        "observedAt": "2026-07-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-18_provisional_photo_20260718224124049_3",
+        "type": "progress_photo",
+        "observedAt": "2026-07-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-18_provisional_photo_20260718224124049_4",
+        "type": "progress_photo",
+        "observedAt": "2026-07-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session_user_founder_001_2026-07-18",
+        "type": "photo_session",
+        "observedAt": "2026-07-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session|2026-07-18|private/founder/photos/uploads/2026-07-18-front-relaxed-1784414484063.jpeg|private/founder/photos/uploads/2026-07-18-back-relaxed-1784414484096.jpeg|private/founder/photos/uploads/2026-07-18-back-flexed-1784414484127.jpeg|private/founder/photos/uploads/2026-07-18-right-side-relaxed-1784414484147.jpeg|private/founder/photos/uploads/2026-07-18-front-flexed-1784414484166.jpeg",
+        "type": "photo_session",
+        "observedAt": "2026-07-18T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-25_back_flexed",
+        "type": "progress_photo",
+        "observedAt": "2026-07-25T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-25_back_relaxed",
+        "type": "progress_photo",
+        "observedAt": "2026-07-25T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-25_front_flexed",
+        "type": "progress_photo",
+        "observedAt": "2026-07-25T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-25_front_relaxed",
+        "type": "progress_photo",
+        "observedAt": "2026-07-25T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-07-25_right_side_relaxed",
+        "type": "progress_photo",
+        "observedAt": "2026-07-25T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session_user_founder_001_2026-07-25",
+        "type": "photo_session",
+        "observedAt": "2026-07-25T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session|2026-07-25|artifact_evidence_submission_20260726030857919_1|artifact_evidence_submission_20260726030857919_2|artifact_evidence_submission_20260726030857919_3|artifact_evidence_submission_20260726030857919_4|artifact_evidence_submission_20260726030857919_5",
+        "type": "photo_session",
+        "observedAt": "2026-07-25T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-08_back_flexed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-08_back_relaxed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-08_front_flexed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-08_front_relaxed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-08_right_side_relaxed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session_user_founder_001_2026-08-08",
+        "type": "photo_session",
+        "observedAt": "2026-08-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session|2026-08-08|private/founder/photos/uploads/2026-08-08-front-relaxed-1786323589323.jpeg|private/founder/photos/uploads/2026-08-08-front-flexed-1786323589343.jpeg|private/founder/photos/uploads/2026-08-08-back-flexed-1786323589366.jpeg|private/founder/photos/uploads/2026-08-08-back-relaxed-1786323589387.jpeg|private/founder/photos/uploads/2026-08-08-right_side-relaxed-side_chest-1786323589405.jpeg",
+        "type": "photo_session",
+        "observedAt": "2026-08-08T23:59:59.999Z",
+        "availableAt": "2026-08-27T23:09:23.891Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session|2026-08-22|artifact_evidence_submission_20260830224216601_1|artifact_evidence_submission_20260830224216601_2|artifact_evidence_submission_20260830224216601_3|artifact_evidence_submission_20260830224216601_4|artifact_evidence_submission_20260830224216601_5",
+        "type": "photo_session",
+        "observedAt": "2026-08-22T23:59:59.999Z",
+        "availableAt": "2026-08-30T23:36:17.664Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-22_back_flexed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-22T23:59:59.999Z",
+        "availableAt": "2026-08-30T23:36:26.003Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-22_back_relaxed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-22T23:59:59.999Z",
+        "availableAt": "2026-08-30T23:36:26.003Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-22_front_flexed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-22T23:59:59.999Z",
+        "availableAt": "2026-08-30T23:36:26.003Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-22_front_relaxed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-22T23:59:59.999Z",
+        "availableAt": "2026-08-30T23:36:26.003Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-08-22_right_side_relaxed",
+        "type": "progress_photo",
+        "observedAt": "2026-08-22T23:59:59.999Z",
+        "availableAt": "2026-08-30T23:36:26.003Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session_user_founder_001_2026-08-22",
+        "type": "photo_session",
+        "observedAt": "2026-08-22T23:59:59.999Z",
+        "availableAt": "2026-08-30T23:36:26.003Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "photo_session_user_founder_001_2026-09-19",
+        "type": "photo_session",
+        "observedAt": "2026-09-19T23:59:59.999Z",
+        "availableAt": "2026-09-20T15:17:28.464Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+        "type": "progress_photo",
+        "observedAt": "2026-09-19T23:59:59.999Z",
+        "availableAt": "2026-09-20T15:17:47.842Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+        "type": "progress_photo",
+        "observedAt": "2026-09-19T23:59:59.999Z",
+        "availableAt": "2026-09-20T15:17:47.842Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+        "type": "progress_photo",
+        "observedAt": "2026-09-19T23:59:59.999Z",
+        "availableAt": "2026-09-20T15:17:47.842Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+        "type": "progress_photo",
+        "observedAt": "2026-09-19T23:59:59.999Z",
+        "availableAt": "2026-09-20T15:17:47.842Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+        "type": "progress_photo",
+        "observedAt": "2026-09-19T23:59:59.999Z",
+        "availableAt": "2026-09-20T15:17:47.842Z",
+        "lastUpdatedAt": "2026-09-22T15:39:25.992Z",
+        "exclusionReason": "updated_after_cutoff"
+      },
+      {
+        "id": "weight_2026_09_20",
+        "type": "weight",
+        "observedAt": "2026-09-20T23:59:59.999Z",
+        "availableAt": "2026-09-20T13:53:27.299Z",
+        "lastUpdatedAt": "2026-09-20T13:53:27.299Z",
+        "exclusionReason": "observed_after_event"
+      },
+      {
+        "id": "weight_2026_09_21",
+        "type": "weight",
+        "observedAt": "2026-09-21T23:59:59.999Z",
+        "availableAt": "2026-09-21T13:40:45.363Z",
+        "lastUpdatedAt": "2026-09-21T13:40:45.363Z",
+        "exclusionReason": "available_after_cutoff"
+      },
+      {
+        "id": "weight_2026_09_22",
+        "type": "weight",
+        "observedAt": "2026-09-22T23:59:59.999Z",
+        "availableAt": "2026-09-22T12:55:17.179Z",
+        "lastUpdatedAt": "2026-09-22T12:55:17.179Z",
+        "exclusionReason": "available_after_cutoff"
+      },
+      {
+        "id": "weight_2026_09_23",
+        "type": "weight",
+        "observedAt": "2026-09-23T23:59:59.999Z",
+        "availableAt": "2026-09-23T12:36:52.629Z",
+        "lastUpdatedAt": "2026-09-23T12:36:52.629Z",
+        "exclusionReason": "available_after_cutoff"
+      },
+      {
+        "id": "weight_2026_09_24",
+        "type": "weight",
+        "observedAt": "2026-09-24T23:59:59.999Z",
+        "availableAt": "2026-09-24T14:00:38.731Z",
+        "lastUpdatedAt": "2026-09-24T14:00:38.731Z",
+        "exclusionReason": "available_after_cutoff"
+      },
+      {
+        "id": "weight_2026_09_27",
+        "type": "weight",
+        "observedAt": "2026-09-27T23:59:59.999Z",
+        "availableAt": "2026-09-27T15:36:49.268Z",
+        "lastUpdatedAt": "2026-09-27T15:36:49.268Z",
+        "exclusionReason": "available_after_cutoff"
+      },
+      {
+        "id": "weight_2026_09_28",
+        "type": "weight",
+        "observedAt": "2026-09-28T23:59:59.999Z",
+        "availableAt": "2026-09-28T14:09:30.170Z",
+        "lastUpdatedAt": "2026-09-28T14:09:30.170Z",
+        "exclusionReason": "available_after_cutoff"
+      },
+      {
+        "id": "weight_2026_09_29",
+        "type": "weight",
+        "observedAt": "2026-09-29T23:59:59.999Z",
+        "availableAt": "2026-09-29T12:58:58.251Z",
+        "lastUpdatedAt": "2026-09-29T12:58:58.251Z",
+        "exclusionReason": "available_after_cutoff"
+      }
+    ],
+    "exactEvidenceUsedBySynthesis": [
+      {
+        "id": "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+        "type": "dexa_scan",
+        "measuredAt": "2026-08-15",
+        "leanMass": {
+          "unit": "lb",
+          "value": 148.3
+        },
+        "bodyFatPercentage": 7.6
+      },
+      {
+        "id": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+        "type": "dexa_scan",
+        "measuredAt": "2026-09-12",
+        "leanMass": {
+          "unit": "lb",
+          "value": 153.3
+        },
+        "bodyFatPercentage": 8.1
+      }
+    ],
+    "measuredEvidence": {
+      "sourceId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+      "sourceIds": [
+        "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+        "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+      ],
+      "measuredAt": "2026-09-12T23:59:59.999Z",
+      "availableAt": "2026-09-13T05:51:54.402Z",
+      "leanMassLb": 153.3,
+      "comparisonLeanMassLb": 148.3,
+      "comparisonMeasuredAt": "2026-08-15T23:59:59.999Z",
+      "leanMassChangeLb": 5,
+      "bodyFatPercentage": 8.1,
+      "comparisonBodyFatPercentage": 7.6,
+      "bodyFatPercentageChange": 0.5,
+      "attribution": "DEXA measured these values; photos did not."
+    },
+    "convergence": {
+      "status": "mixed",
+      "confidenceEffect": "none",
+      "visualConfidenceChanged": false,
+      "causalClaim": false
+    },
+    "exactUserFacingCopy": "Across the matched front, back, and side views, Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Your September 12, 2026 DEXA measured +5.0 lb of lean-mass change and 8.1% body fat; some of that supports what is visible in the photos and some does not. Keep the visual and measured findings separate; together they do not support a stronger conclusion or explain what caused the change.",
+    "provenance": {
+      "producer": "photo_briefing_holistic_synthesis_service",
+      "producerVersion": "photo_briefing_holistic_v1",
+      "photoIntelligenceProducerVersion": "canonical_photo_intelligence_set_v1",
+      "evidenceCutoffVersion": "canonical_evidence_cutoff_v1",
+      "visualObservationAttribution": "photos",
+      "measurementAttribution": "DEXA",
+      "synthesisAttribution": "PhysiqueOS"
+    }
+  },
+  "exactCurrentProductionEngineUserFacingCopy": {
+    "holisticPhotoBriefingCopy": "Across the matched front, back, and side views, Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Your September 12, 2026 DEXA measured +5.0 lb of lean-mass change and 8.1% body fat; some of that supports what is visible in the photos and some does not. Keep the visual and measured findings separate; together they do not support a stronger conclusion or explain what caused the change.",
+    "displayOrder": [
+      {
+        "section": "Photo Event",
+        "title": "Today’s photos show your recent condition is holding steady.",
+        "body": "The matched views support maintenance of your recent lean condition and provide an early baseline for the current phase."
+      },
+      {
+        "section": "Snapshot",
+        "title": "This photo session",
+        "fields": [
+          {
+            "label": "Date",
+            "value": "2026-09-19"
+          },
+          {
+            "label": "Set",
+            "value": "5 confirmed views"
+          },
+          {
+            "label": "Weight",
+            "value": "172.7 lb"
+          }
+        ],
+        "poses": [
+          "Front relaxed",
+          "Rear relaxed",
+          "Rear flexed — double biceps",
+          "Right side relaxed",
+          "Front flexed"
+        ],
+        "conditions": "Taken after your workout, after eating."
+      },
+      {
+        "section": "Progress",
+        "title": "What visibly changed",
+        "body": "Matching historical views show what changed and what remained stable.",
+        "comparisons": [
+          {
+            "poseId": "front-relaxed",
+            "poseLabel": "Front relaxed",
+            "previousDate": "2026-08-22",
+            "currentDate": null,
+            "headline": "Waist line appears slightly more tapered and less soft than before.",
+            "supportingObservations": [
+              "Shoulder muscles appear fuller and more rounded with clearer separation.",
+              "Arms show increased fullness and more visible vascularity indicating muscle development."
+            ],
+            "findings": [
+              "Shoulder muscles appear fuller and more rounded with clearer separation.",
+              "Arms show increased fullness and more visible vascularity indicating muscle development.",
+              "Waist line appears slightly more tapered and less soft than before.",
+              "Upper abdominal muscles and obliques show slightly clearer definition and reduced softness."
+            ]
+          },
+          {
+            "poseId": "back-relaxed",
+            "poseLabel": "Rear relaxed",
+            "previousDate": "2026-08-22",
+            "currentDate": null,
+            "headline": "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+            "supportingObservations": [
+              "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+              "Shoulder and upper back width maintained with no visible reduction in muscle fullness."
+            ],
+            "findings": [
+              "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+              "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+              "Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning."
+            ]
+          },
+          {
+            "poseId": "back-flexed",
+            "poseLabel": "Rear flexed — double biceps",
+            "previousDate": "2026-08-22",
+            "currentDate": null,
+            "headline": "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.",
+            "supportingObservations": [
+              "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+              "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+            ],
+            "findings": [
+              "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+              "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+            ]
+          },
+          {
+            "poseId": "right-side-relaxed",
+            "poseLabel": "Right side relaxed",
+            "previousDate": "2026-08-22",
+            "currentDate": null,
+            "headline": "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+            "supportingObservations": [
+              "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+              "Shoulders maintain size and visible muscle fullness without apparent loss or gain."
+            ],
+            "findings": [
+              "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+              "Shoulders maintain size and visible muscle fullness without apparent loss or gain.",
+              "Arm muscle fullness and shape are consistent between photos indicating retained muscularity."
+            ]
+          },
+          {
+            "poseId": "front-flexed",
+            "poseLabel": "Front flexed",
+            "previousDate": "2026-08-22",
+            "currentDate": null,
+            "headline": "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+            "supportingObservations": [
+              "Waistline appears visibly tighter and less soft compared to previous photo.",
+              "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging."
+            ],
+            "findings": [
+              "Waistline appears visibly tighter and less soft compared to previous photo.",
+              "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+              "Chest and shoulders maintain muscle fullness and definition without visible loss."
+            ]
+          }
+        ]
+      },
+      {
+        "section": "Interpretation",
+        "title": "What the complete evidence means",
+        "paragraphs": [
+          "Across the matched views, your current physique remains lean and upper-body muscularity appears maintained. These photos are most useful as an early maintenance and lean-gain baseline, not proof of new tissue gain.",
+          "Across the matched front, back, and side views, Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Your September 12, 2026 DEXA measured +5.0 lb of lean-mass change and 8.1% body fat; some of that supports what is visible in the photos and some does not. Keep the visual and measured findings separate; together they do not support a stronger conclusion or explain what caused the change.",
+          "The matching poses make broad visual changes easier to judge. Interpret small changes cautiously over this short interval. DEXA on Friday, Oct 9 at 7:00 AM will give us the next body-composition comparison."
+        ]
+      },
+      {
+        "section": "Coach’s Insight",
+        "body": "No strategy change is warranted from these photos. Continue the current approach. Reassess alongside DEXA on Friday, Oct 9 at 7:00 AM.",
+        "next": "DEXA on Friday, Oct 9 at 7:00 AM"
+      }
+    ]
+  },
+  "attributionBoundary": {
+    "photosObserved": {
+      "dominantVisualStory": "Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Waist line appears slightly more tapered and less soft than before. Upper abdominal muscles and obliques show slightly clearer definition and reduced softness. Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose. Shoulder and upper back width maintained with no visible reduction in muscle fullness. Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning. Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period. The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper. Visible tightening and flattening of waist and lower abdomen compared to prior photo. Abdominal and midsection softness visibly reduced, contributing to a leaner appearance. Shoulders maintain size and visible muscle fullness without apparent loss or gain. Arm muscle fullness and shape are consistent between photos indicating retained muscularity. Waistline appears visibly tighter and less soft compared to previous photo. Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging. Chest and shoulders maintain muscle fullness and definition without visible loss. Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+      "observations": [
+        {
+          "region": "shoulders",
+          "metric": "muscularity",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "high",
+          "observation": "Shoulder muscles appear fuller and more rounded with clearer separation.",
+          "basis": [],
+          "confounders": [
+            "Post-workout pump may exaggerate muscle fullness slightly."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5:0"
+          ]
+        },
+        {
+          "region": "arms",
+          "metric": "muscularity",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "high",
+          "observation": "Arms show increased fullness and more visible vascularity indicating muscle development.",
+          "basis": [],
+          "confounders": [
+            "Pump and lighting differences may influence vascularity visibility."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5:1"
+          ]
+        },
+        {
+          "region": "waist",
+          "metric": "leanness",
+          "direction": "increased",
+          "apparentMagnitude": "subtle",
+          "confidence": "moderate",
+          "observation": "Waist line appears slightly more tapered and less soft than before.",
+          "basis": [],
+          "confounders": [
+            "Light and posture differences create some uncertainty."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5:2"
+          ]
+        },
+        {
+          "region": "abdomen",
+          "metric": "abdominal_definition",
+          "direction": "increased",
+          "apparentMagnitude": "subtle",
+          "confidence": "moderate",
+          "observation": "Upper abdominal muscles and obliques show slightly clearer definition and reduced softness.",
+          "basis": [],
+          "confounders": [
+            "Relaxed pose and lighting differences limit clarity."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5:3"
+          ]
+        },
+        {
+          "region": "waist",
+          "metric": "leanness",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "high",
+          "observation": "Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose.",
+          "basis": [],
+          "confounders": [
+            "Different lighting conditions",
+            "Post-workout pump in current photo"
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2:0"
+          ]
+        },
+        {
+          "region": "upper back",
+          "metric": "muscularity",
+          "direction": "stable",
+          "apparentMagnitude": "none",
+          "confidence": "high",
+          "observation": "Shoulder and upper back width maintained with no visible reduction in muscle fullness.",
+          "basis": [],
+          "confounders": [
+            "Posture and arm positioning consistent"
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2:1"
+          ]
+        },
+        {
+          "region": "back conditioning",
+          "metric": "abdominal_definition",
+          "direction": "increased",
+          "apparentMagnitude": "subtle",
+          "confidence": "moderate",
+          "observation": "Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning.",
+          "basis": [],
+          "confounders": [
+            "Lighting variability",
+            "Post-workout pump effect"
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2:2"
+          ]
+        },
+        {
+          "region": "back",
+          "metric": "leanness",
+          "direction": "increased",
+          "apparentMagnitude": "pronounced",
+          "confidence": "high",
+          "observation": "Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition.",
+          "basis": [],
+          "confounders": [
+            "Lighting difference and pump status influence contrast and fullness appearance."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3:0"
+          ]
+        },
+        {
+          "region": "back",
+          "metric": "muscularity",
+          "direction": "stable",
+          "apparentMagnitude": "none",
+          "confidence": "high",
+          "observation": "Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.",
+          "basis": [],
+          "confounders": [
+            "Pump in current photo may slightly inflate visual fullness."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3:1"
+          ]
+        },
+        {
+          "region": "waist",
+          "metric": "whole_body_softness",
+          "direction": "decreased",
+          "apparentMagnitude": "moderate",
+          "confidence": "moderate",
+          "observation": "The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper.",
+          "basis": [],
+          "confounders": [
+            "Waist angle and lighting differ, slightly reducing certainty."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3:2"
+          ]
+        },
+        {
+          "region": "waist",
+          "metric": "leanness",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "high",
+          "observation": "Visible tightening and flattening of waist and lower abdomen compared to prior photo.",
+          "basis": [],
+          "confounders": [
+            "Lighting difference",
+            "Pump state in current photo may enhance skin tightness perception."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4:0"
+          ]
+        },
+        {
+          "region": "waist",
+          "metric": "whole_body_softness",
+          "direction": "decreased",
+          "apparentMagnitude": "moderate",
+          "confidence": "high",
+          "observation": "Abdominal and midsection softness visibly reduced, contributing to a leaner appearance.",
+          "basis": [],
+          "confounders": [
+            "Lighting and timing differences."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4:1"
+          ]
+        },
+        {
+          "region": "shoulders",
+          "metric": "muscularity",
+          "direction": "stable",
+          "apparentMagnitude": "none",
+          "confidence": "high",
+          "observation": "Shoulders maintain size and visible muscle fullness without apparent loss or gain.",
+          "basis": [],
+          "confounders": [
+            "Pump in current photo might enhance fullness but no reduction visible."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4:2"
+          ]
+        },
+        {
+          "region": "arms",
+          "metric": "muscularity",
+          "direction": "stable",
+          "apparentMagnitude": "none",
+          "confidence": "high",
+          "observation": "Arm muscle fullness and shape are consistent between photos indicating retained muscularity.",
+          "basis": [],
+          "confounders": [
+            "Similar considerations as shoulders."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4:3"
+          ]
+        },
+        {
+          "region": "Waist and Midsection",
+          "metric": "leanness",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "high",
+          "observation": "Waistline appears visibly tighter and less soft compared to previous photo.",
+          "basis": [],
+          "confounders": [
+            "Lighting and minor pose angle differences."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1:0"
+          ]
+        },
+        {
+          "region": "Abdominals",
+          "metric": "abdominal_definition",
+          "direction": "increased",
+          "apparentMagnitude": "moderate",
+          "confidence": "high",
+          "observation": "Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.",
+          "basis": [],
+          "confounders": [
+            "Post-workout pump may affect muscle visibility."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1:1"
+          ]
+        },
+        {
+          "region": "Chest and Shoulders",
+          "metric": "muscularity",
+          "direction": "stable",
+          "apparentMagnitude": "none",
+          "confidence": "moderate",
+          "observation": "Chest and shoulders maintain muscle fullness and definition without visible loss.",
+          "basis": [],
+          "confounders": [
+            "Pump and lighting differences reduce confidence."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1:2"
+          ]
+        },
+        {
+          "region": "Arms",
+          "metric": "muscularity",
+          "direction": "insufficient",
+          "apparentMagnitude": "unknown",
+          "confidence": "moderate",
+          "observation": "Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+          "basis": [],
+          "confounders": [
+            "Different lighting and angle.",
+            "Post-workout pump in current photo."
+          ],
+          "supportingViewIds": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1"
+          ],
+          "sourceObservationRefs": [
+            "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1:3"
+          ]
+        }
+      ],
+      "magnitude": "moderate",
+      "reliability": {
+        "overallReliability": "moderate",
+        "setInterpretationEffect": "conclusion_scoped_corroboration",
+        "viewConfidenceChanged": false,
+        "globallyStrengthened": false
+      },
+      "comparability": {
+        "overall": "high",
+        "matchedViewCount": 5,
+        "unmatchedViewCount": 0,
+        "perView": [
+          {
+            "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5",
+            "view": "front",
+            "pose": "front-relaxed",
+            "rating": "high"
+          },
+          {
+            "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2",
+            "view": "back",
+            "pose": "back-relaxed",
+            "rating": "high"
+          },
+          {
+            "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3",
+            "view": "back",
+            "pose": "back-flexed",
+            "rating": "high"
+          },
+          {
+            "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4",
+            "view": "side",
+            "pose": "right-side-relaxed",
+            "rating": "high"
+          },
+          {
+            "viewComparisonId": "view_comparison_canonical_photo_user_founder_001_2026-09-19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1",
+            "view": "front",
+            "pose": "front-flexed",
+            "rating": "high"
+          }
+        ]
+      },
+      "goalRelativeDirection": {
+        "direction": "supportive",
+        "strength": "cross_view_visual_support",
+        "interpretation": "The photo-only direction supports Build Lean Mass. Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Waist line appears slightly more tapered and less soft than before. Upper abdominal muscles and obliques show slightly clearer definition and reduced softness. The photo-only direction supports Build Lean Mass. Waist appears visually narrower, creating a cleaner and tighter taper seen from back relaxed pose. Shoulder and upper back width maintained with no visible reduction in muscle fullness. Visible muscle separation and reduced softness in the back indicating subtle improvement in conditioning. The photo-only direction supports Build Lean Mass. Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period. The waist and lower back show a visible reduction in softness with a tighter appearance contributing to a cleaner taper. The photo-only direction supports Build Lean Mass. Visible tightening and flattening of waist and lower abdomen compared to prior photo. Abdominal and midsection softness visibly reduced, contributing to a leaner appearance. Shoulders maintain size and visible muscle fullness without apparent loss or gain. Arm muscle fullness and shape are consistent between photos indicating retained muscularity. The photo-only direction supports Build Lean Mass. Waistline appears visibly tighter and less soft compared to previous photo. Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging. Chest and shoulders maintain muscle fullness and definition without visible loss. Possible slight improvement in definition and vascularity but uncertain due to pump and lighting variance.",
+        "photoOnlyStrategyImplication": "The reconciled photo set supports the Goal direction, but does not establish a strategy change without independent evidence.",
+        "goalContext": {
+          "activeGoal": {
+            "id": "goal_transition_live_goal_visible_abs_at_rest_6353e12e1ef8fbc3_objective_lean_mass",
+            "title": "Build Lean Mass",
+            "type": null,
+            "target": null,
+            "guardrails": []
+          },
+          "activePhase": {
+            "id": "goal_phase_8d7d4fae-084d-44e7-832a-994d5b735f78",
+            "name": "Lean Mass Build",
+            "status": "active",
+            "startDate": null
+          },
+          "operatingState": {
+            "value": "calibration"
+          }
+        }
+      }
+    },
+    "measurementsEstablished": {
+      "sourceId": "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12",
+      "sourceIds": [
+        "dexa_submission_20260815181333895_review_pdf_1_2026_08_15",
+        "evidence_submission_44462ABB3969473DA82FBF2B46A504EF_pdf_1_2026_09_12"
+      ],
+      "measuredAt": "2026-09-12T23:59:59.999Z",
+      "availableAt": "2026-09-13T05:51:54.402Z",
+      "leanMassLb": 153.3,
+      "comparisonLeanMassLb": 148.3,
+      "comparisonMeasuredAt": "2026-08-15T23:59:59.999Z",
+      "leanMassChangeLb": 5,
+      "bodyFatPercentage": 8.1,
+      "comparisonBodyFatPercentage": 7.6,
+      "bodyFatPercentageChange": 0.5,
+      "attribution": "DEXA measured these values; photos did not."
+    },
+    "synthesisConcluded": {
+      "convergence": {
+        "status": "mixed",
+        "confidenceEffect": "none",
+        "visualConfidenceChanged": false,
+        "causalClaim": false
+      },
+      "copy": "Across the matched front, back, and side views, Back muscle separations are visibly sharper, and the waist area appears tighter with less softness, indicating improved leanness and definition. Shoulder muscles appear fuller and more rounded with clearer separation. Arms show increased fullness and more visible vascularity indicating muscle development. Your September 12, 2026 DEXA measured +5.0 lb of lean-mass change and 8.1% body fat; some of that supports what is visible in the photos and some does not. Keep the visual and measured findings separate; together they do not support a stronger conclusion or explain what caused the change."
+    }
+  },
+  "provenance": {
+    "productionArtifactVersion": "photo_event_v4_0_0",
+    "photoIntelligence": {
+      "producer": "canonical_photo_intelligence_set_service",
+      "producerVersion": "canonical_photo_intelligence_set_v1",
+      "viewProducerVersion": "canonical_photo_intelligence_v1",
+      "evidenceClass": "photo_only",
+      "nonPhotoEvidenceUsed": false,
+      "viewConfidenceChanged": false,
+      "unmatchedViewsTreatedAsNoChange": false,
+      "resultLabel": "PROSPECTIVE"
+    },
+    "holistic": {
+      "producer": "photo_briefing_holistic_synthesis_service",
+      "producerVersion": "photo_briefing_holistic_v1",
+      "photoIntelligenceProducerVersion": "canonical_photo_intelligence_set_v1",
+      "evidenceCutoffVersion": "canonical_evidence_cutoff_v1",
+      "visualObservationAttribution": "photos",
+      "measurementAttribution": "DEXA",
+      "synthesisAttribution": "PhysiqueOS"
+    },
+    "canonicalAnalysisProvenance": [
+      {
+        "id": "analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1_v1_canonical_photo_user_founder_001_2026_08_22_front_flexed_photo_interpreter_production_v1",
+        "schemaVersion": 13,
+        "source": {
+          "name": "PhysiqueOS",
+          "type": "computed",
+          "notes": "",
+          "confidence": "medium",
+          "externalId": null,
+          "importedAt": null
+        },
+        "producer": null,
+        "producerVersion": null,
+        "model": null,
+        "promptVersion": null,
+        "analysisMode": null,
+        "createdAt": "2026-09-20T17:07:15.230Z"
+      },
+      {
+        "id": "analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2_v1_canonical_photo_user_founder_001_2026_08_22_back_relaxed_photo_interpreter_production_v1",
+        "schemaVersion": 13,
+        "source": {
+          "name": "PhysiqueOS",
+          "type": "computed",
+          "notes": "",
+          "confidence": "medium",
+          "externalId": null,
+          "importedAt": null
+        },
+        "producer": null,
+        "producerVersion": null,
+        "model": null,
+        "promptVersion": null,
+        "analysisMode": null,
+        "createdAt": "2026-09-20T17:07:45.977Z"
+      },
+      {
+        "id": "analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3_v1_canonical_photo_user_founder_001_2026_08_22_back_flexed_photo_interpreter_production_v1",
+        "schemaVersion": 13,
+        "source": {
+          "name": "PhysiqueOS",
+          "type": "computed",
+          "notes": "",
+          "confidence": "medium",
+          "externalId": null,
+          "importedAt": null
+        },
+        "producer": null,
+        "producerVersion": null,
+        "model": null,
+        "promptVersion": null,
+        "analysisMode": null,
+        "createdAt": "2026-09-20T17:08:20.231Z"
+      },
+      {
+        "id": "analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4_v1_canonical_photo_user_founder_001_2026_08_22_right_side_relaxed_photo_interpreter_production_v1",
+        "schemaVersion": 13,
+        "source": {
+          "name": "PhysiqueOS",
+          "type": "computed",
+          "notes": "",
+          "confidence": "medium",
+          "externalId": null,
+          "importedAt": null
+        },
+        "producer": null,
+        "producerVersion": null,
+        "model": null,
+        "promptVersion": null,
+        "analysisMode": null,
+        "createdAt": "2026-09-20T17:08:50.222Z"
+      },
+      {
+        "id": "analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5_v1_canonical_photo_user_founder_001_2026_08_22_front_relaxed_photo_interpreter_production_v1",
+        "schemaVersion": 13,
+        "source": {
+          "name": "PhysiqueOS",
+          "type": "computed",
+          "notes": "",
+          "confidence": "medium",
+          "externalId": null,
+          "importedAt": null
+        },
+        "producer": null,
+        "producerVersion": null,
+        "model": null,
+        "promptVersion": null,
+        "analysisMode": null,
+        "createdAt": "2026-09-20T17:09:22.589Z"
+      },
+      {
+        "id": "analysis_photo_session_user_founder_001_2026_09_19_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_1_v1_canonical_photo_user_founder_001_2026_08_22_front_flexed_photo_interpreter_production_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_2_v1_canonical_photo_user_founder_001_2026_08_22_back_relaxed_photo_interpreter_production_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_3_v1_canonical_photo_user_founder_001_2026_08_22_back_flexed_photo_interpreter_production_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_4_v1_canonical_photo_user_founder_001_2026_08_22_right_side_relaxed_photo_interpreter_production_v1_analysis_canonical_photo_user_founder_001_2026_09_19_evidence_submission_B5A63452E7B0469CA63438A08137716C_progress_photos_5_v1_canonical_photo_user_founder_001_2026_08_22_front_relaxed_photo_interpreter_production_v1_synthesis_v1",
+        "schemaVersion": 13,
+        "source": {
+          "name": "PhysiqueOS",
+          "type": "computed",
+          "notes": "",
+          "confidence": "medium",
+          "externalId": null,
+          "importedAt": null
+        },
+        "producer": null,
+        "producerVersion": null,
+        "model": null,
+        "promptVersion": null,
+        "analysisMode": null,
+        "createdAt": "2026-09-20T17:09:22.590Z"
+      }
+    ],
+    "model": "none_in_replay_deterministic_production_services_over_canonical_vision_findings",
+    "prompt": "none_in_replay",
+    "policies": {
+      "photoOnlyIsolation": true,
+      "magnitudeCalibrationVersion": "photo_magnitude_calibration_v2",
+      "evidenceCutoffVersion": "canonical_evidence_cutoff_v1"
+    }
+  },
+  "replay": {
+    "executedAt": "2026-09-30T00:07:50.992Z",
+    "mode": "private_preview_ignore_existing",
+    "artifactCreated": false,
+    "publicationInvoked": false,
+    "historicalArtifactMutated": false,
+    "databaseTransaction": "REPEATABLE READ READ ONLY"
+  }
+}
