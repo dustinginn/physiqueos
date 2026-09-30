@@ -1,54 +1,54 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-30T20:31:47Z",
+  "generated_at_utc": "2026-09-30T20:43:40Z",
   "task": {
     "id": "healthkit-sleep-phase-c-historical-validation-and-rollout-20260930",
-    "title": "Sleep Phase C: Oura preference + Sep 1-30 historical window open; waiting for Founder device run",
+    "title": "Sleep Phase C: Native Founder page cleanup committed; waiting for Founder device run",
     "agent": "claude",
     "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "372c306ba45ffaa0f93f7bf74e4c0c266070d9a5",
-    "final_sha": "08aeecdeb9f02e311efa2cd037940fbf0b249bb7",
+    "base_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
+    "final_sha": "a5041eb0",
     "production_server_sha": "08aeecde",
     "production_deployment": "1e7d28e6-b142-4d8c-9fac-96dd1498ffd8",
     "native_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
     "native_build": "73"
   },
   "result": {
-    "summary": "Guarded dry-run/apply: Oura source preference (generic record) and historical validation window hv-2026-10-01-30d (sleep days 2026-09-01..2026-09-30, ends at the D0 2026-10-01 floor). Prospective activation absent/OFF. Read-only verification: validation capability enabled for exact window; prospective capability disabled; operational ingest 409; Sleep samples/days/validation samples 0; strategic leakage 0. Founder tap sequence published.",
+    "summary": "Native cleanup a5041eb0 on claude/healthkit-sleep-next-native-20260930: Founder Production page keeps only session status, Disconnect, the authority selector and a temporary Sleep canary; graduated diagnostics and old canary UI removed; automatic behavior preserved. Not built or uploaded. Server state unchanged (window open, prospective OFF).",
     "success": true,
-    "production_mutated": true,
+    "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "not_applicable",
-      "summary": "Configuration operations only (reviewed runner at production SHA)."
+      "status": "passed",
+      "summary": "Unit tests 1633, 1 known unrelated Peptide failure; new UI test passed."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "Runner previously fresh-reviewed at 08aeecde."
+      "status": "not_run",
+      "summary": "UI-only removal; review before Build 74."
     },
     "zero_write_audit": {
-      "status": "passed",
-      "summary": "Pre and post read-only audits: counts 0, leaks 0, 0 mutations."
+      "status": "not_applicable",
+      "summary": "No production operations this step."
     }
   },
   "decisions_required": [
-    "Founder: run Build 73 Founder canary > SLEEP HISTORICAL VALIDATION (exact taps in report) and report the counts.",
-    "Later: separate authorization for prospective activation (D0 2026-10-01 floor is Sep 30 18:00 PDT; if passed, a new D0 will be proposed)."
+    "Founder: run the Build 73 historical Sleep validation (taps in 20260930T203147Z report) and report the counts.",
+    "Later: authorize Build 74 (cleanup) and a new prospective D0 (the 2026-10-01 floor has passed)."
   ],
   "blockers": [],
   "unexpected_findings": [],
   "backlog": [
-    "Historical-shape audit + Evidence-design handoff after the device run.",
-    "Native Founder Production page cleanup (obsolete canary/diagnostic UI) for the next Sleep candidate."
+    "Prune coordinator/engine canary methods that no longer have a UI caller.",
+    "Remove the Sleep canary card after Sleep graduates."
   ],
-  "recommended_next_step": "Founder runs the historical validation on the iPhone using the exact tap sequence, then reports the counts.",
-  "full_report_path": "agent-handoffs/reports/20260930T203147Z-healthkit-sleep-phase-c-historical-window-open.md",
+  "recommended_next_step": "Founder runs the historical validation on the iPhone and reports the counts.",
+  "full_report_path": "agent-handoffs/reports/20260930T204340Z-healthkit-sleep-native-founder-page-cleanup.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
