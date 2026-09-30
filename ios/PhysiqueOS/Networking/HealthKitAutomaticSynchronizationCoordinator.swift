@@ -515,8 +515,6 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             }
         }
 
-        await runSleepLane(ownerIdentity: ownerIdentity, deviceIdentity: deviceIdentity, outcome: &outcome)
-
         // Historical recovery is best-effort after all current work. A
         // historical failure remains visible but never revokes current-day
         // success or prevents the other scope's current-day attempt.
@@ -532,6 +530,9 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
                 outcome.streamErrors[stream, default: []].append("historical_sync_timed_out")
             }
         }
+        // The dormant Sleep lane runs last, so every pre-existing step keeps
+        // its exact prior ordering and timing whether or not Sleep is active.
+        await runSleepLane(ownerIdentity: ownerIdentity, deviceIdentity: deviceIdentity, outcome: &outcome)
         lastBootstrapOutcome = outcome
         return outcome
     }

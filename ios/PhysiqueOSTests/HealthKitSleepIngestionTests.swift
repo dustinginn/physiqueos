@@ -319,7 +319,9 @@ final class HealthKitSleepIngestionTests: XCTestCase {
         XCTAssertEqual(Set((sample["source"] as? [String: Any] ?? [:]).keys), ["bundleIdentifier", "sourceVersion", "productType"])
         XCTAssertEqual(sample["startedAt"] as? String, "2026-10-04T06:00:00.000Z")
         let text = String(decoding: try JSONEncoder().encode(payload), as: UTF8.self)
-        for forbidden in ["sourceName", "Personal", "deviceName", "localIdentifier", "udi", "firmware", "metadata", "HKDevice"] {
+        // Forbidden keys (the value "sample_metadata" is a legitimate enum).
+        for forbidden in ["\"sourceName\"", "\"name\"", "\"deviceName\"", "\"device\"", "\"localIdentifier\"",
+                          "\"udiDeviceIdentifier\"", "\"firmwareVersion\"", "\"metadata\"", "HKDevice", "Personal"] {
             XCTAssertFalse(text.contains(forbidden), forbidden)
         }
     }
