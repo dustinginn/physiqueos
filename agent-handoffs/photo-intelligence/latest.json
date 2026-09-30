@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "generated_at_utc": "2026-09-30T04:27:07Z",
+  "generated_at_utc": "2026-09-30T04:54:50Z",
   "task": {
     "id": "photo-perception-boundary-fix-and-sep19-replay-20260930",
     "title": "Typed perception boundary correction and Sep 19 zero-write replay",
@@ -65,7 +65,9 @@
       "provider_text_leak_count": 0,
       "attestation_version": "canonical_photo_provider_input_typed_v1"
     },
-    "report": "agent-handoffs/reports/20260930T042707Z-photo-intelligence-sep19-corrected-final-replay.md",
+    "report": "agent-handoffs/reports/20260930T045450Z-photo-pi-boundary-replay-continuation-final.md",
+    "prior_full_report": "agent-handoffs/reports/20260930T042707Z-photo-intelligence-sep19-corrected-final-replay.md",
+    "fresh_continuation_replay_at": "2026-09-30T04:53:32.538Z",
     "private_replay_run": true,
     "final_copy_generated": true,
     "visual_result": {
