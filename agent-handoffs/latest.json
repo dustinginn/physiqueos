@@ -1,59 +1,67 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T05:32:35Z",
+  "generated_at_utc": "2026-10-01T05:58:45Z",
   "task": {
-    "id": "healthkit-sleep-v2-historical-evidence-prospective-20261001",
-    "title": "HealthKit Sleep v2 historical Evidence and prospective preparation",
-    "agent": "codex",
-    "status": "partial"
+    "id": "workout-logger-live-activities-discovery-20261001",
+    "title": "Workout Logger Live Activities discovery, architecture audit, and phased implementation plan",
+    "agent": "claude",
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "133d838eac81b0b02da392d88b28d0eea4779706",
-    "final_sha": "b81c784e5b8a6d5b82ed02a649b5fa3d0edeeff8",
+    "base_sha": "b6d98889a9ebac2fd6755ec126c1b5ba394545fa",
+    "final_sha": null,
     "production_deployment": "8008f928-02b6-46b0-99ab-d403b870499a",
     "production_server_sha": "b81c784e5b8a6d5b82ed02a649b5fa3d0edeeff8",
     "native_sha": "b6d98889",
     "native_build": "74"
   },
   "result": {
-    "summary": "Reviewed Server b81c784e is published and live on deployment 8008f928 with exact web/worker SHA and healthy runtime stamps. The exact 2,878-sample canon-v2 zero-write audit passes, historical collections are 0/0, ordinary Sleep is 0/0, prospective activation is absent, and strategic leakage is zero. PhysiqueOS boundary remains 2026-07-06. Build 74 is uploaded and VALID; Founder installation and its bounded on-device import are now required to establish the first representable Sleep day and populate historical Evidence. A fresh production dry run for D0 2026-10-07 passed in validation_only mode but was not applied. Strategic Sleep is OFF.",
-    "success": false,
-    "production_mutated": true,
-    "deployed": true,
-    "testflight_uploaded": true
+    "summary": "Research/audit/plan only; no application code. A Phase 1 Workout Logger Live Activity is feasible fully local: new Widget Extension (com.physiqueos.native.dev.WorkoutActivity), NSSupportsLiveActivities on the app, shared ActivityAttributes, no App Group, no push entitlement, no Server/HealthKit change. Authority is the persisted TrainingLoggerDraft (UserDefaults via TrainingLoggerDraftStore); the Live Activity is a write-only projection driven from a decorator at the draft-store boundary through an app-scoped coordinator, with explicit lifecycle/orphan/duplicate/suppression rules. No rest timer, current-set cursor, or per-set timestamps exist today: Phase 1 derives current exercise deterministically and ships without rest; Phase 1B adds a Logger rest timer (absolute endsAt, system timer rendering); Phase 2 rest-only controls require an app-scoped session-authority refactor; Phase 3 remote push not recommended. APIs verified against the local iOS 27 SDK plus Apple docs/HIG/WWDC26. Independent of Sleep; Sleep's latest status remains in report 20261001T053235Z.",
+    "success": true,
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "passed",
-      "summary": "Sleep Server 120/120; phase-3 308/309 with one unrelated missing private fixture; Next build; iOS build; historical import and surrounding Native Sleep suites; Build 74 release/archive/upload guards."
+      "status": "not_run",
+      "summary": "No code changed; plan includes a 52-item deterministic test plan and a 17-step physical-device acceptance checklist."
     },
     "review": {
-      "status": "approved",
-      "summary": "Adversarial review fixed exact instant fencing, historical command body bounds, result contract version, and stage-status projection before release preparation."
+      "status": "not_run",
+      "summary": "Subagent audit claims spot-checked directly against source (draft store, view model, activeLiveSession, generator drift, verifier counts, upload appex check) and against SDK swiftinterfaces."
     },
     "zero_write_audit": {
-      "status": "passed",
-      "summary": "Exact b81c784e runtime: 2,878 validation samples, 30 nights, 11/11 affected nights selected/conflict-free/tolerance-correct, prospective OFF, ordinary Sleep 0/0, historical Sleep 0/0, strategic leaks 0, mutations 0; October 7 validation_only dry run passed and rolled back."
+      "status": "not_applicable",
+      "summary": "Read-only production authority check only (deployment 8008f928, b81c784e, health ok)."
     }
   },
   "decisions_required": [
-    "Founder installs TestFlight Build 74, confirms Apple Health Sleep read permission, and taps Import historical Sleep Evidence in the Founder Sleep canary."
+    "D1 (blocking): which iPhone model/iOS will do physical acceptance (Dynamic Island availability).",
+    "D2: build the Logger rest timer (Phase 1B)? auto-start vs manual, default duration, end-of-rest notification.",
+    "D3: add optional per-set completedAt to the draft (recommended).",
+    "D4-D9: stale timeout, Lock Screen privacy toggle, Watch Smart Stack layout, font, Phase 2 rest controls, completion dismissal duration."
   ],
   "blockers": [
-    "The first representable Sleep day on or after 2026-07-06 and actual historical import counts require Founder installation and operation of Build 74."
+    "Project generator is missing three hand-added Sleep files present in the committed pbxproj; any regeneration would drop them. Sleep-lane owner must reconcile before Live Activities implementation.",
+    "verify_release_configuration.py requires CURRENT_PROJECT_VERSION exactly twice; any extension needs a target-aware verifier update.",
+    "First provisioning of a new extension App ID via automatic signing is unproven; if Apple ID re-auth is needed the Founder must do it."
   ],
   "unexpected_findings": [
-    "The week beginning 2026-06-29 still has only three core-daily PhysiqueOS evidence days despite earlier Weight/canonical records; July 6 is the first consistently populated cross-domain boundary.",
-    "The reviewed read model initially inferred stage availability from numeric values rather than canonical completeness; adversarial testing caught and corrected this before deployment."
+    "Generator/pbxproj drift: HealthKitSleepHistoricalEvidence Contracts/Presentation/Tests files are in the pbxproj but not in generate_project.py.",
+    "The physiqueos-audit doctl context returns 401; physiqueos-final-cutover-config still reads.",
+    "The in-app Workout Logger header shows a static 'Started now' regardless of elapsed time.",
+    "Multiple concurrent live drafts are allowed by design; 'active' is a derived selector, so the Live Activity must enforce at most one activity itself."
   ],
   "backlog": [
-    "Founder installs Build 74 and runs bounded historical Sleep Evidence import; record first representable day and sanitized counts/shape.",
-    "Run fresh D0 dry run and, only if all gates pass, activate October 7 prospective validation_only Sleep.",
-    "Design and Founder-approve Recovery Briefing card before any separate future strategic-graduation decision."
+    "Phase 0: Sleep-lane generator reconciliation proving byte-identical regeneration.",
+    "Phase 1: local Live Activity per plan section 10 with tests 1-46 and 52.",
+    "Phase 1B: Logger rest timer authority + rest presentation.",
+    "Phase 2 (optional): TrainingSessionAuthority refactor, then Skip rest / +30 s LiveActivityIntents."
   ],
-  "recommended_next_step": "Founder installs Build 74 and runs the bounded historical import. Then verify sanitized historical counts/shape, September parity, read-model rendering, and zero strategic leakage before reevaluating the still-future October 7 validation_only D0; do not enable strategic Sleep.",
-  "full_report_path": "agent-handoffs/reports/20261001T053235Z-healthkit-sleep-v2-server-deployed-founder-import-gate.md",
+  "recommended_next_step": "Founder answers D1-D9 (D1 blocking); Sleep lane reconciles the generator drift; then a new Claude Remote Control chat (Opus, high reasoning) implements Phase 1 only on a fresh Native worktree, followed by Codex adversarial review and a Founder-authorized TestFlight build for physical-device acceptance.",
+  "full_report_path": "agent-handoffs/reports/20261001T055845Z-workout-logger-live-activities-discovery-plan.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
