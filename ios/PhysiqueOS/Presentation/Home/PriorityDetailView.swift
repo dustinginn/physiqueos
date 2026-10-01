@@ -61,6 +61,7 @@ struct PriorityDetailView: View {
                 authority: environment.nativeAuthority,
                 priorityId: priorityId,
                 occurrenceDate: occurrenceDate,
+                feedback: environment.feedback,
                 notificationCleanup: { priorityId, occurrenceDate in
                     await PriorityNotificationScheduler.cleanupCompletedOccurrence(
                         priorityId: priorityId,

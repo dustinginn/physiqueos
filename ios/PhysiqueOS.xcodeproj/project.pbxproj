@@ -363,6 +363,8 @@
 		000000000000000000001605 /* WorkoutLiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001604 /* WorkoutLiveActivityCoordinator.swift */; };
 		000000000000000000001607 /* WorkoutLiveActivityBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001606 /* WorkoutLiveActivityBridge.swift */; };
 		000000000000000000001609 /* TrainingRestPreferenceMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001608 /* TrainingRestPreferenceMenu.swift */; };
+		000000000000000000001701 /* PriorityOccurrenceCapabilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001700 /* PriorityOccurrenceCapabilities.swift */; };
+		000000000000000000001703 /* PhysiqueOSFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001702 /* PhysiqueOSFeedback.swift */; };
 		0000000000000000000012D1 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D0 /* HealthKitSynchronizationTests.swift */; };
 		0000000000000000000012D3 /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D2 /* HealthKitSleepIngestionTests.swift */; };
 		0000000000000000000012D5 /* HealthKitSleepHistoricalValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D4 /* HealthKitSleepHistoricalValidationTests.swift */; };
@@ -382,6 +384,7 @@
 		00000000000000000000160F /* WorkoutLiveActivityIntentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000160E /* WorkoutLiveActivityIntentTests.swift */; };
 		000000000000000000001611 /* WorkoutLiveActivityViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001610 /* WorkoutLiveActivityViewTests.swift */; };
 		000000000000000000001613 /* TrainingRestPreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001612 /* TrainingRestPreferenceTests.swift */; };
+		000000000000000000001705 /* CompletionFeedbackAndNotificationCapabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001704 /* CompletionFeedbackAndNotificationCapabilityTests.swift */; };
 		0000000000000000000012B3 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
 		000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001614 /* WorkoutActivityAttributes.swift */; };
 		000000000000000000001616 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001614 /* WorkoutActivityAttributes.swift */; };
@@ -721,6 +724,8 @@
 		000000000000000000001604 /* WorkoutLiveActivityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityCoordinator.swift"; sourceTree = "<group>"; };
 		000000000000000000001606 /* WorkoutLiveActivityBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityBridge.swift"; sourceTree = "<group>"; };
 		000000000000000000001608 /* TrainingRestPreferenceMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingRestPreferenceMenu.swift"; sourceTree = "<group>"; };
+		000000000000000000001700 /* PriorityOccurrenceCapabilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PriorityOccurrenceCapabilities.swift"; sourceTree = "<group>"; };
+		000000000000000000001702 /* PhysiqueOSFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSFeedback.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E7 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
@@ -809,6 +814,7 @@
 		00000000000000000000160E /* WorkoutLiveActivityIntentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityIntentTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001610 /* WorkoutLiveActivityViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityViewTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001612 /* TrainingRestPreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingRestPreferenceTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001704 /* CompletionFeedbackAndNotificationCapabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CompletionFeedbackAndNotificationCapabilityTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001296 /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		000000000000000000001298 /* GoalsAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepAcceptanceUITests.swift"; sourceTree = "<group>"; };
@@ -946,6 +952,7 @@
 				000000000000000000001500 /* TrainingSessionState.swift */,
 				000000000000000000001502 /* TrainingSessionLiveProjection.swift */,
 				000000000000000000001600 /* WorkoutActivityContentMapper.swift */,
+				000000000000000000001700 /* PriorityOccurrenceCapabilities.swift */,
 			);
 			path = Contracts;
 			sourceTree = "<group>";
@@ -1116,6 +1123,7 @@
 				00000000000000000000110B /* BriefingPresentation.swift */,
 				0000000000000000000012E2 /* PhysiqueOSDisclosureRow.swift */,
 				0000000000000000000012E8 /* PhotoInspectionViewer.swift */,
+				000000000000000000001702 /* PhysiqueOSFeedback.swift */,
 			);
 			path = SharedUI;
 			sourceTree = "<group>";
@@ -1406,6 +1414,7 @@
 				00000000000000000000160E /* WorkoutLiveActivityIntentTests.swift */,
 				000000000000000000001610 /* WorkoutLiveActivityViewTests.swift */,
 				000000000000000000001612 /* TrainingRestPreferenceTests.swift */,
+				000000000000000000001704 /* CompletionFeedbackAndNotificationCapabilityTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1926,6 +1935,8 @@
 				000000000000000000001605 /* WorkoutLiveActivityCoordinator.swift in Sources */,
 				000000000000000000001607 /* WorkoutLiveActivityBridge.swift in Sources */,
 				000000000000000000001609 /* TrainingRestPreferenceMenu.swift in Sources */,
+				000000000000000000001701 /* PriorityOccurrenceCapabilities.swift in Sources */,
+				000000000000000000001703 /* PhysiqueOSFeedback.swift in Sources */,
 				000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */,
 				000000000000000000001618 /* CompleteWorkoutSetIntent.swift in Sources */,
 				00000000000000000000161B /* WorkoutLiveActivityViews.swift in Sources */,
@@ -2003,6 +2014,7 @@
 				00000000000000000000160F /* WorkoutLiveActivityIntentTests.swift in Sources */,
 				000000000000000000001611 /* WorkoutLiveActivityViewTests.swift in Sources */,
 				000000000000000000001613 /* TrainingRestPreferenceTests.swift in Sources */,
+				000000000000000000001705 /* CompletionFeedbackAndNotificationCapabilityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

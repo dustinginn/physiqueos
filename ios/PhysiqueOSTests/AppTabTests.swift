@@ -90,6 +90,48 @@ final class AppTabTests: XCTestCase {
                      "Completed/abandoned/submitted sessions immediately restore normal Log behavior.")
     }
 
+    func testOnlyExplicitlyPendingCompletionRoutesBackToWorkoutComplete() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        var legacy = draft("legacy-complete", step: .complete, now: now)
+        XCTAssertNil(TrainingLoggerDraft.pendingCompletion(in: [legacy]),
+                     "A historical or legacy completion is never replayed.")
+
+        legacy.completionPresentationPending = true
+        let newer = draft("newer-active", startedMinutesAgo: 5, now: now)
+        XCTAssertEqual(
+            TrainingLoggerDraft.pendingCompletion(in: [newer, legacy])?.id,
+            "legacy-complete",
+            "An unacknowledged durable completion wins over ordinary active-session routing."
+        )
+    }
+
+    /// The Log tab routes into whichever is newer: an unacknowledged durable
+    /// completion, or a live workout started after it.
+    @MainActor
+    func testLogTabRoutingPrefersTheNewerOfPendingCompletionAndLiveSession() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        func stamp(_ minutesAgo: Double) -> String { TrainingSessionClock.string(from: now.addingTimeInterval(-minutesAgo * 60)) }
+        var completion = draft("completion", step: .complete, startedMinutesAgo: 80, now: now)
+        completion.completionPresentationPending = true
+        completion.completionRecordedAt = stamp(30)
+        let olderLive = draft("older-live", startedMinutesAgo: 60, now: now)
+        let newerLive = draft("newer-live", startedMinutesAgo: 10, now: now)
+
+        func target(_ drafts: [TrainingLoggerDraft]) -> String? {
+            TrainingSessionAuthority(store: MemoryTrainingLoggerDraftStore(drafts: drafts), environment: .sandbox, now: { now })
+                .logTabRoutingTarget(at: now)?.id
+        }
+        XCTAssertEqual(target([completion]), "completion")
+        XCTAssertEqual(target([completion, olderLive]), "completion",
+                       "A completion that happened after the live workout started is not lost behind the tab switch.")
+        XCTAssertEqual(target([completion, newerLive]), "newer-live",
+                       "A workout started after the completion is where the Founder lands.")
+
+        var stale = completion
+        stale.completionRecordedAt = stamp(13 * 60)
+        XCTAssertNil(target([stale]), "An unacknowledged presentation older than the in-progress window never routes.")
+    }
+
     func testSaveAndLeaveEndsLogTabRoutingUntilTheWorkoutIsResumed() {
         let now = Date(timeIntervalSince1970: 1_790_000_000)
         var left = draft("left", now: now)
@@ -106,6 +148,7 @@ final class AppTabTests: XCTestCase {
         XCTAssertTrue(tabs.contains("TabView(selection: Binding(get: { selectedTab }, set: selectTab))"))
         // Only when switching INTO Log from another tab with Log at its root: no trap, no bounce.
         XCTAssertTrue(tabs.contains("guard newTab == .log, previous != .log, logPath.isEmpty,"))
+        XCTAssertTrue(tabs.contains(".logTabRoutingTarget()"))
         // Pushed on top of Log (never replacing it), so Back returns to the ordinary Log page.
         XCTAssertTrue(tabs.contains("logPath.append(AppDestination.trainingLogger)"))
         let logger = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"), encoding: .utf8)

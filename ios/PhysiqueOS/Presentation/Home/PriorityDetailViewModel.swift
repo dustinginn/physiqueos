@@ -24,8 +24,9 @@ final class PriorityDetailViewModel {
     private let priorityId: String
     private let occurrenceDate: String?
     private let notificationCleanup: @MainActor (String, String) async -> Void
+    private let feedback: PhysiqueOSFeedbackClient?
 
-    init(api: PriorityAPI, writeAPI: PriorityCompletionWriteAPI = NotAvailablePriorityCompletionWriteAPI(), morningCheckInAPI: MorningCheckInAPI, store: LoggingSandboxStore, authority: NativeAPIEnvironment, priorityId: String, occurrenceDate: String? = nil, notificationCleanup: @escaping @MainActor (String, String) async -> Void = { _, _ in }) {
+    init(api: PriorityAPI, writeAPI: PriorityCompletionWriteAPI = NotAvailablePriorityCompletionWriteAPI(), morningCheckInAPI: MorningCheckInAPI, store: LoggingSandboxStore, authority: NativeAPIEnvironment, priorityId: String, occurrenceDate: String? = nil, feedback: PhysiqueOSFeedbackClient? = nil, notificationCleanup: @escaping @MainActor (String, String) async -> Void = { _, _ in }) {
         self.api = api
         self.writeAPI = writeAPI
         self.morningCheckInAPI = morningCheckInAPI
@@ -34,6 +35,7 @@ final class PriorityDetailViewModel {
         self.priorityId = priorityId
         self.occurrenceDate = occurrenceDate
         self.notificationCleanup = notificationCleanup
+        self.feedback = feedback
     }
 
     func load() async {
@@ -66,6 +68,7 @@ final class PriorityDetailViewModel {
         if authority == .sandbox {
             store.completePriority(occurrenceId: occurrence.id, context: context)
             state = .loaded(store.priorityOccurrence(id: priorityId))
+            feedback?.play(.priorityCompleted)
             return
         }
         guard let version = occurrence.expectedVersion else {
@@ -87,6 +90,7 @@ final class PriorityDetailViewModel {
             acknowledged.completed = true
             acknowledged.completable = false
             state = .loaded(acknowledged)
+            feedback?.play(.priorityCompleted)
             await notificationCleanup(
                 occurrence.routePriorityId ?? occurrence.id,
                 occurrence.date
@@ -133,6 +137,7 @@ final class PriorityDetailViewModel {
             acknowledged.skippable = false
             acknowledged.completable = false
             state = .loaded(acknowledged)
+            feedback?.play(.prioritySkipped)
             // Same cleanup as completion: withdraw this occurrence's local
             // reminder and re-sync Home and the notification horizon.
             await notificationCleanup(occurrence.routePriorityId ?? occurrence.id, occurrence.date)

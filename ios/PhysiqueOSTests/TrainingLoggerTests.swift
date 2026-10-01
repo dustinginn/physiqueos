@@ -945,11 +945,15 @@ final class TrainingLoggerTests: XCTestCase {
             Self.record("b", exerciseId: "back_squat", exercise: "Squat"),
         ]
         let writeAPI = RecordsTrainingWriteAPI(resultRecords: .init(status: "completed", records: records), readBackRecords: nil)
-        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, draftStore: MemoryTrainingLoggerDraftStore(), authority: .founderProduction)
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, draftStore: store, authority: .founderProduction)
         await viewModel.load()
         viewModel.start(mode: .live)
         await viewModel.submit()
         XCTAssertEqual(viewModel.completedPerformanceRecords, records)
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true,
+                       "The presentation survives navigation until the Founder acknowledges it.")
         let readBacks = await writeAPI.readBacks
         XCTAssertEqual(readBacks, 0, "An authoritative commit result needs no read-back.")
     }
@@ -1036,11 +1040,73 @@ final class TrainingLoggerTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
 
-        XCTAssertNil(store.load(), "Canonical durability clears the persisted retry draft.")
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true,
+                       "Canonical durability converts the retry draft into a durable pending presentation.")
         XCTAssertEqual(viewModel.draft?.id, pending.id)
         XCTAssertEqual(viewModel.draft?.step, .complete)
         XCTAssertNil(viewModel.draft?.submissionState)
         XCTAssertEqual(viewModel.completedPerformanceRecords, [record])
+    }
+
+    @MainActor
+    func testAcknowledgingCompletionIsTheOnlyPointThatClearsThePendingPresentation() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let record = Self.record("acknowledged")
+        let viewModel = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: RecordsTrainingWriteAPI(
+                resultRecords: .init(status: "completed", records: [record]),
+                readBackRecords: nil
+            ),
+            draftStore: store,
+            authority: .founderProduction
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        await viewModel.submit()
+
+        XCTAssertNotNil(store.load())
+        viewModel.acknowledgeCompletion()
+
+        XCTAssertNil(store.load())
+        XCTAssertNil(viewModel.draft)
+        XCTAssertTrue(viewModel.completedPerformanceRecords.isEmpty)
+    }
+
+    @MainActor
+    func testPendingCompletionSurvivesViewModelRecreationAndReadsRecordsAgain() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let record = Self.record("after-navigation")
+        let first = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: RecordsTrainingWriteAPI(
+                resultRecords: .init(status: "completed", records: [record]),
+                readBackRecords: [record]
+            ),
+            draftStore: store,
+            authority: .founderProduction
+        )
+        await first.load()
+        first.start(mode: .live)
+        let draftID = try XCTUnwrap(first.draft?.id)
+        await first.submit()
+
+        let recreated = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: RecordsTrainingWriteAPI(resultRecords: nil, readBackRecords: [record]),
+            draftStore: store,
+            authority: .founderProduction
+        )
+        await recreated.load()
+        for _ in 0..<50 where recreated.completedPerformanceRecords.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(recreated.draft?.id, draftID)
+        XCTAssertEqual(recreated.draft?.step, .complete)
+        XCTAssertEqual(recreated.completedPerformanceRecords, [record])
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
     }
 
     /// Integration with the Log-tab routing: a relaunch-recovered completion of
@@ -1226,6 +1292,26 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertFalse(WorkoutCelebrationGate.claim(key: nil, hasRecords: true, reduceMotion: false, defaults: defaults))
     }
 
+    func testHiddenPresentationCannotConsumeTheCelebration() {
+        let suite = "celebration-hidden-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        XCTAssertFalse(
+            WorkoutCelebrationGate.claim(
+                key: "late-record", hasRecords: true, reduceMotion: false,
+                presentationVisible: false, defaults: defaults
+            )
+        )
+        XCTAssertTrue(
+            WorkoutCelebrationGate.claim(
+                key: "late-record", hasRecords: true, reduceMotion: false,
+                presentationVisible: true, defaults: defaults
+            ),
+            "A record arriving while Home/Evidence is visible remains eligible when Workout Complete returns."
+        )
+    }
+
     func testReduceMotionConsumesTheOneShotWithoutAnimatingLater() {
         let suite = "celebration-reduce-motion-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
@@ -1407,12 +1493,12 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(reconciledIDs, [durable.id])
     }
 
-    /// A successful canonical submission must clear the device-only draft —
-    /// there is nothing left to resume once the server holds the canonical
-    /// session. This exercises the exact `submit()` → `completeLocalCapture()`
-    /// → `draftStore.discard()` path in `TrainingLoggerViewModel.swift`.
+    /// A successful canonical submission must replace the writable draft
+    /// with a read-only pending completion. The exact identity remains only
+    /// until the Founder acknowledges Workout Complete, so a navigation or
+    /// process restart cannot lose late-arriving Server records.
     @MainActor
-    func testSuccessfulSubmissionClearsThePersistedDraft() async throws {
+    func testSuccessfulSubmissionPersistsOnlyThePendingCompletion() async throws {
         let store = MemoryTrainingLoggerDraftStore()
         let viewModel = TrainingLoggerViewModel(api: api, writeAPI: StubSucceedingTrainingWriteAPI(), draftStore: store, authority: .founderProduction)
         await viewModel.load()
@@ -1422,8 +1508,9 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load(), "A confirmed canonical submission must clear the local draft.")
-        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
+        XCTAssertNil(viewModel.savedDraft, "A pending presentation is never a resumable saved workout.")
         XCTAssertNil(viewModel.validationMessage)
     }
 
@@ -1504,11 +1591,12 @@ final class TrainingLoggerTests: XCTestCase {
         viewModel.start(mode: .live)
 
         await viewModel.submit()
-        for _ in 0..<100 where store.load() != nil {
+        for _ in 0..<100 where store.load()?.submissionState != nil {
             try? await Task.sleep(for: .milliseconds(10))
         }
 
-        XCTAssertNil(store.load())
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
         let commitCalls = await writeAPI.commitCalls
         XCTAssertEqual(commitCalls, 1, "Readback proof must resolve the accepted command without resubmitting it.")
         XCTAssertEqual(viewModel.draft?.step, .complete)
@@ -1530,8 +1618,12 @@ final class TrainingLoggerTests: XCTestCase {
 
         await reopened.load()
 
-        XCTAssertEqual(store.loadAll().map(\.id), [sibling.id])
-        XCTAssertEqual(reopened.savedDrafts.map(\.id), [sibling.id])
+        XCTAssertEqual(Set(store.loadAll().map(\.id)), Set([pending.id, sibling.id]))
+        XCTAssertEqual(reopened.savedDrafts.map(\.id), [sibling.id],
+                       "The durable draft is no longer an editable session.")
+        XCTAssertEqual(reopened.sessionAuthority.pendingCompletion(id: pending.id)?.step, .complete)
+        XCTAssertEqual(store.loadAll().first(where: { $0.id == pending.id })?.completionPresentationPending, true)
+        XCTAssertEqual(reopened.draft?.id, pending.id, "Workout Complete is presented for the exact recovered draft.")
         let commitCalls = await writeAPI.commitCalls
         XCTAssertEqual(commitCalls, 0)
     }
@@ -1579,8 +1671,9 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load())
-        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
+        XCTAssertNil(viewModel.savedDraft, "A pending presentation is never a resumable saved workout.")
         XCTAssertNil(viewModel.validationMessage)
         XCTAssertNil(viewModel.refreshWarning)
         XCTAssertEqual(viewModel.draft?.step, .complete)
@@ -1603,8 +1696,10 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load(), "A canonically-successful commit must clear the draft even if the refresh afterward fails.")
-        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertEqual(store.load()?.step, .complete,
+                       "A canonically-successful commit must retain only its pending completion if refresh fails.")
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
+        XCTAssertNil(viewModel.savedDraft, "A pending presentation is never a resumable saved workout.")
         XCTAssertNil(viewModel.validationMessage, "A post-success refresh failure must never be reported as a submission failure.")
         XCTAssertEqual(viewModel.draft?.step, .complete)
         XCTAssertNotNil(viewModel.refreshWarning, "The refresh failure must surface as a separate, non-destructive notice.")
@@ -1625,7 +1720,8 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load())
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
         XCTAssertNil(viewModel.validationMessage)
         XCTAssertEqual(viewModel.draft?.step, .complete)
         XCTAssertNotNil(viewModel.refreshWarning)
@@ -1644,7 +1740,8 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load())
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
         XCTAssertNil(viewModel.validationMessage)
         XCTAssertEqual(viewModel.draft?.step, .complete)
         XCTAssertNotNil(viewModel.refreshWarning)
@@ -1694,5 +1791,207 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "77")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
+    }
+}
+
+// MARK: - Build 78: Performance Record celebration lifecycle on the session authority
+
+extension TrainingLoggerTests {
+    @MainActor
+    func testMultipleRecordsSurviveRelaunchFromThePersistedStoreUntilReturnToLog() async throws {
+        let suite = "b78-relaunch-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let key = "b78.drafts"
+        let records = [Self.record("a"), Self.record("b", exerciseId: "back_squat", exercise: "Squat")]
+        let first = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: RecordsTrainingWriteAPI(resultRecords: .init(status: "completed", records: records), readBackRecords: records),
+            draftStore: UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: key),
+            authority: .founderProduction
+        )
+        await first.load()
+        first.start(mode: .live)
+        let id = try XCTUnwrap(first.draft?.id)
+        await first.submit()
+        XCTAssertEqual(first.completedPerformanceRecords, records)
+
+        // A new process: fresh store object, fresh authority, fresh view model.
+        let relaunched = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: RecordsTrainingWriteAPI(resultRecords: nil, readBackRecords: records),
+            draftStore: UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: key),
+            authority: .founderProduction
+        )
+        await relaunched.load()
+        for _ in 0..<50 where relaunched.completedPerformanceRecords.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(relaunched.draft?.id, id)
+        XCTAssertEqual(relaunched.draft?.step, .complete)
+        XCTAssertEqual(relaunched.completedPerformanceRecords, records, "Authoritative records are re-read, never replayed from memory.")
+        XCTAssertTrue(relaunched.savedDrafts.isEmpty, "The durable workout is never an editable session again.")
+        XCTAssertEqual(relaunched.sessionAuthority.logTabRoutingTarget()?.id, id, "Log routes back to the owed Workout Complete.")
+
+        relaunched.acknowledgeCompletion()
+        XCTAssertNil(relaunched.draft)
+        XCTAssertNil(relaunched.sessionAuthority.logTabRoutingTarget())
+        XCTAssertTrue(UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: key).loadAll().isEmpty,
+                      "Return to Log is the cleanup boundary.")
+
+        let afterAcknowledge = TrainingLoggerViewModel(
+            api: api, writeAPI: RecordsTrainingWriteAPI(resultRecords: nil, readBackRecords: records),
+            draftStore: UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: key), authority: .founderProduction
+        )
+        await afterAcknowledge.load()
+        XCTAssertNil(afterAcknowledge.draft, "An acknowledged completion never replays.")
+    }
+
+    @MainActor
+    func testNoRecordCompletionIsStillOwedButHasNothingToCelebrate() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: RecordsTrainingWriteAPI(resultRecords: .init(status: "completed", records: []), readBackRecords: []),
+            draftStore: store, authority: .founderProduction
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        await viewModel.submit()
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+        XCTAssertTrue(viewModel.completedPerformanceRecords.isEmpty)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
+    }
+
+    @MainActor
+    func testLegacyDurableResidueWithoutTheSubmittedLifecycleNeverBecomesAPendingCelebration() async throws {
+        var residue = draft(date: "2026-09-16", areas: ["biceps"])
+        residue.id = "legacy-residue"
+        let store = MemoryTrainingLoggerDraftStore(drafts: [residue])
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: AcceptedTrainingWriteAPI(becomesDurable: true, durableIDs: [residue.id]),
+            draftStore: store, authority: .founderProduction
+        )
+        await viewModel.load()
+        XCTAssertTrue(store.loadAll().isEmpty, "The legacy cleanup contract is preserved.")
+        XCTAssertNil(viewModel.sessionAuthority.pendingCompletion())
+    }
+
+    @MainActor
+    func testDurableCommitEndsTheLiveActivitySessionOnceAndCannotBeResurrected() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let authority = TrainingSessionAuthority(store: store, environment: .founderProduction)
+        var changes: [TrainingSessionChange.Kind] = []
+        let observation = authority.observeChanges { changes.append($0.kind) }
+        defer { observation.cancel() }
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: StubSucceedingTrainingWriteAPI(), sessionAuthority: authority, authority: .founderProduction
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live, date: Date())
+        let id = try XCTUnwrap(viewModel.draft?.id)
+        await viewModel.submit()
+
+        XCTAssertEqual(changes.filter { $0 == .ended(.committed) }.count, 1,
+                       "The Live Activity coordinator still sees exactly one committed end.")
+        XCTAssertNil(authority.draft(id: id))
+        XCTAssertNil(authority.liveActivitySubject(at: Date()), "A pending presentation is never a Live Activity subject.")
+        XCTAssertNil(authority.activeLiveSession())
+        XCTAssertEqual(authority.pendingCompletion()?.id, id)
+        XCTAssertEqual(authority.endCommittedSession(sessionId: id, retainingPresentation: true), .rejected(.sessionEnded),
+                       "A second recovery cannot create a second presentation.")
+
+        var stale = try XCTUnwrap(authority.pendingCompletion(id: id))
+        stale.step = .workout
+        stale.completionPresentationPending = nil
+        XCTAssertEqual(authority.replace(stale), .rejected(.sessionEnded),
+                       "A late whole-draft write never resurrects the committed workout.")
+        let relaunched = TrainingSessionAuthority(store: store, environment: .founderProduction)
+        XCTAssertEqual(relaunched.replace(stale), .rejected(.sessionEnded), "Not after a relaunch either.")
+        XCTAssertTrue(relaunched.drafts.isEmpty)
+    }
+
+    @MainActor
+    func testRoutedResumeOfAPendingCompletionPresentsItAndReloadsRecords() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let record = Self.record("routed")
+        let first = TrainingLoggerViewModel(
+            api: api, writeAPI: RecordsTrainingWriteAPI(resultRecords: .init(status: "completed", records: [record]), readBackRecords: [record]),
+            draftStore: store, authority: .founderProduction
+        )
+        await first.load()
+        first.start(mode: .live)
+        let id = try XCTUnwrap(first.draft?.id)
+        await first.submit()
+
+        // Same authority, a screen that already showed something else.
+        let second = TrainingLoggerViewModel(
+            api: api, writeAPI: RecordsTrainingWriteAPI(resultRecords: nil, readBackRecords: [record]),
+            sessionAuthority: first.sessionAuthority, authority: .founderProduction
+        )
+        second.resume(draftId: id)
+        for _ in 0..<50 where second.completedPerformanceRecords.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(second.draft?.id, id)
+        XCTAssertEqual(second.draft?.step, .complete)
+        XCTAssertEqual(second.completedPerformanceRecords, [record])
+    }
+
+    // MARK: Celebration one-shot + haptic
+
+    @MainActor
+    func testCelebrationHapticPlaysOnceOnlyWhenVisible() {
+        let suite = "b78-celebration-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let feedback = RecordingFeedbackClient()
+        func present(visible: Bool, reduceMotion: Bool = false, hasRecords: Bool = true, key: String? = "session-1") -> Bool {
+            WorkoutCelebrationGate.present(
+                key: key, hasRecords: hasRecords, reduceMotion: reduceMotion,
+                presentationVisible: visible, feedback: feedback, defaults: defaults
+            )
+        }
+
+        XCTAssertFalse(present(visible: false), "A late record read on a hidden tab cannot consume the celebration.")
+        XCTAssertTrue(feedback.events.isEmpty, "No haptic while hidden.")
+        XCTAssertTrue(present(visible: true), "Visible first presentation: confetti.")
+        XCTAssertEqual(feedback.events, [.performanceRecordCelebration])
+        XCTAssertFalse(present(visible: true), "A re-render or revisit never replays.")
+        XCTAssertFalse(present(visible: false))
+        XCTAssertEqual(feedback.events, [.performanceRecordCelebration], "Exactly one haptic per celebration.")
+
+        XCTAssertFalse(present(visible: true, hasRecords: false, key: "no-records"))
+        XCTAssertFalse(present(visible: true, key: nil))
+        XCTAssertEqual(feedback.events.count, 1, "No record, no identity: no celebration.")
+    }
+
+    @MainActor
+    func testReduceMotionSuppressesConfettiButNotTheCelebrationHaptic() {
+        let suite = "b78-reduce-motion-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let feedback = RecordingFeedbackClient()
+        XCTAssertFalse(WorkoutCelebrationGate.present(
+            key: "session-rm", hasRecords: true, reduceMotion: true,
+            presentationVisible: true, feedback: feedback, defaults: defaults
+        ), "No animation under Reduce Motion.")
+        XCTAssertEqual(feedback.events, [.performanceRecordCelebration],
+                       "Haptics follow the system haptic settings, not Reduce Motion.")
+        XCTAssertFalse(WorkoutCelebrationGate.present(
+            key: "session-rm", hasRecords: true, reduceMotion: false,
+            presentationVisible: true, feedback: feedback, defaults: defaults
+        ), "Turning Reduce Motion off later never replays it.")
+        XCTAssertEqual(feedback.events.count, 1)
+    }
+
+    func testWorkoutCompleteWiresTheVisibleSurfaceHapticAndReturnToLogBoundary() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let logger = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"), encoding: .utf8)
+        XCTAssertTrue(logger.contains("isPresentationVisible: isSurfaceVisible"))
+        XCTAssertTrue(logger.contains("feedback: environment.feedback"))
+        XCTAssertTrue(logger.contains("viewModel.acknowledgeCompletion()\n                dismiss()"))
+        XCTAssertFalse(logger.contains("UIImpactFeedbackGenerator") || logger.contains("UINotificationFeedbackGenerator"),
+                       "Haptics go through the feedback client only.")
     }
 }

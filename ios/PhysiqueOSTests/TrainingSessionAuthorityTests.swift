@@ -745,7 +745,9 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(commits.count, 1)
         XCTAssertNotNil(commits.first?.finishedAt, "finishedAt is stamped and persisted before the commit.")
         XCTAssertEqual(viewModel.draft?.step, .complete)
-        XCTAssertTrue(store.drafts.isEmpty)
+        XCTAssertTrue(authority.drafts.isEmpty, "The session is no longer editable.")
+        XCTAssertEqual(store.drafts.map(\.isPendingCompletionPresentation), [true],
+                       "Only the read-only Workout Complete presentation remains until Return to Log.")
         XCTAssertFalse(authority.isSubmitting(sessionId: "session-1"), "The lock is released after a durable commit.")
         XCTAssertEqual(authority.lastChange?.kind, .ended(.committed))
     }
@@ -765,7 +767,8 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         await viewModel.submit()
         let commits = await writeAPI.commits
         XCTAssertEqual(commits.map(\.finishedAt), [stamped, stamped], "A retry reuses the one persisted finish window (same idempotency identity).")
-        XCTAssertTrue(store.drafts.isEmpty)
+        XCTAssertTrue(authority.drafts.isEmpty)
+        XCTAssertEqual(store.drafts.map(\.isPendingCompletionPresentation), [true])
     }
 
     func testAcceptedProcessingPersistsSubmissionStateAndBlocksIntents() async throws {
@@ -891,5 +894,38 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(store.persistCount - before, 201, "Exactly one synchronous local write per accepted edit, no network.")
         XCTAssertEqual(viewModel.draft?.exercises[0].sets[0].isCompleted, true, "Completion is visible synchronously.")
         XCTAssertLessThan(elapsed, 2, "201 local mutations took \(elapsed)s")
+    }
+}
+
+// MARK: - Build 78: pending Workout Complete presentation
+
+extension TrainingSessionAuthorityTests {
+    func testCommittedPresentationIsReadOnlyAcknowledgedOnceAndFailsSoftWhenUnwritable() throws {
+        let store = RecordingStore([finishableSession()])
+        let (authority, _) = makeAuthority(store, environment: .founderProduction)
+        XCTAssertTrue(authority.endCommittedSession(sessionId: "session-1", retainingPresentation: true).isAccepted)
+        XCTAssertEqual(authority.lastChange?.kind, .ended(.committed))
+        let pending = try XCTUnwrap(authority.pendingCompletion(id: "session-1"))
+        XCTAssertEqual(pending.step, .complete)
+        XCTAssertNil(pending.rest, "No rest interval survives the commit.")
+        XCTAssertNil(pending.submissionState)
+        XCTAssertNotNil(pending.completionRecordedAt)
+        XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: pending.exercises[0].id,
+                                             setId: pending.exercises[0].sets[0].id),
+                       .rejected(.sessionEnded), "A Live Activity intent cannot touch a committed workout.")
+
+        let changeBefore = authority.lastChange
+        XCTAssertTrue(authority.acknowledgeCompletion(sessionId: "session-1"))
+        XCTAssertFalse(authority.acknowledgeCompletion(sessionId: "session-1"), "Idempotent.")
+        XCTAssertEqual(authority.lastChange, changeBefore, "Acknowledging publishes no session change.")
+        XCTAssertTrue(store.drafts.isEmpty)
+
+        // A store that cannot write the presentation still ends the session.
+        let failing = RecordingStore([finishableSession()])
+        let (unwritable, _) = makeAuthority(failing, environment: .founderProduction)
+        failing.failPersist = true
+        XCTAssertTrue(unwritable.endCommittedSession(sessionId: "session-1", retainingPresentation: true).isAccepted)
+        XCTAssertNil(unwritable.pendingCompletion())
+        XCTAssertTrue(failing.drafts.isEmpty, "The durable workout is the Server's; only the presentation is lost.")
     }
 }

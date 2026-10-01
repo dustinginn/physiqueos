@@ -119,14 +119,26 @@ final class TrainingLoggerViewModel {
         do {
             configuration = try await api.fetchConfiguration()
             if canWrite { sessionAuthority.reloadFromStore() }
+            // An unacknowledged durable completion (left behind a tab switch
+            // or a relaunch) is presented again and its Server-owned records
+            // re-read. Only the exact pending identity can come back; an
+            // acknowledged or historical workout never replays.
+            var recoveredCompletions: [TrainingLoggerDraft] = canWrite
+                ? sessionAuthority.pendingCompletion().map { [$0] } ?? []
+                : []
             if authority == .founderProduction {
-                var recoveredCompletions: [TrainingLoggerDraft] = []
                 for candidate in savedDrafts {
                     if await writeAPI.isDraftAlreadyDurable(candidate) {
                         // Only the caller that actually ends the session runs
                         // its cleanup, so two screens recovering the same
-                        // draft never reconcile its evidence twice.
-                        guard sessionAuthority.endSession(sessionId: candidate.id, reason: .committed).isAccepted else { continue }
+                        // draft never reconcile its evidence twice. Only a
+                        // draft from the explicit submitted-command lifecycle
+                        // becomes a pending presentation; an older residue
+                        // must not replay as a surprise after an upgrade.
+                        guard sessionAuthority.endCommittedSession(
+                            sessionId: candidate.id,
+                            retainingPresentation: candidate.submissionState != nil
+                        ).isAccepted else { continue }
                         // Exact deterministic identity/fingerprint proof
                         // clears only this residue. Same-date/category sibling
                         // drafts remain independent and untouched. Attached
@@ -146,16 +158,9 @@ final class TrainingLoggerViewModel {
                         scheduleDurabilityRecovery(for: candidate)
                     }
                 }
-                if let recovered = TrainingSessionAuthority.sorted(recoveredCompletions).first {
-                    var completed = recovered
-                    completed.step = .complete
-                    completed.submissionState = nil
-                    completedDraft = completed
-                    selectedDraftId = completed.id
-                    completedPerformanceRecords = []
-                    processingMessage = nil
-                    loadCompletedPerformanceRecords(for: completed, commitResult: nil)
-                }
+            }
+            if let recovered = TrainingSessionAuthority.sorted(recoveredCompletions).first {
+                presentRecoveredCompletion(recovered)
             }
             loadState = .loaded
         } catch {
@@ -178,12 +183,30 @@ final class TrainingLoggerViewModel {
         resume(draftId: savedDraft.id)
     }
 
+    /// Shows Workout Complete for a completion that is already durable and
+    /// re-reads its records from the Server (never from local state).
+    private func presentRecoveredCompletion(_ recovered: TrainingLoggerDraft) {
+        var completed = recovered
+        completed.step = .complete
+        completed.submissionState = nil
+        completedDraft = completed
+        selectedDraftId = completed.id
+        completedPerformanceRecords = []
+        processingMessage = nil
+        loadCompletedPerformanceRecords(for: completed, commitResult: nil)
+    }
+
     func resume(draftId: String) {
         guard canWrite else { return }
+        if completedDraft?.id == draftId { return }
         completedPerformanceRecords = []
         completedDraft = nil
         guard sessionAuthority.draft(id: draftId) != nil else {
             selectedDraftId = nil
+            // The Log tab routes to an unacknowledged completion by its id.
+            if let pending = sessionAuthority.pendingCompletion(id: draftId) {
+                presentRecoveredCompletion(pending)
+            }
             return
         }
         selectedDraftId = draftId
@@ -305,7 +328,7 @@ final class TrainingLoggerViewModel {
         draft.step = .complete
         completedDraft = draft
         selectedDraftId = draft.id
-        let ended = sessionAuthority.endSession(sessionId: draft.id, reason: .committed).isAccepted
+        let ended = sessionAuthority.endCommittedSession(sessionId: draft.id, retainingPresentation: true).isAccepted
         // When supporting evidence is attached, its files stay on disk until
         // `reconcileSupportingEvidenceAfterCommit` (running in the
         // background, after this returns) has read them — it owns deleting
@@ -430,7 +453,7 @@ final class TrainingLoggerViewModel {
         commitResult: TrainingCommitResult? = nil
     ) {
         // Only the caller that actually ends the session owns its cleanup.
-        let ended = sessionAuthority.endSession(sessionId: candidate.id, reason: .committed).isAccepted
+        let ended = sessionAuthority.endCommittedSession(sessionId: candidate.id, retainingPresentation: true).isAccepted
         if ended, candidate.supportingEvidenceAssets.isEmpty {
             attachmentStore.removeAll(draftId: candidate.id)
         }
@@ -448,6 +471,18 @@ final class TrainingLoggerViewModel {
         Task { [writeAPI] in
             await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
         }
+    }
+
+    /// The only local acknowledgement boundary for a durable completion.
+    /// Until this is called, the exact completed draft remains recoverable so
+    /// its authoritative Server records can be re-read after navigation or a
+    /// process restart.
+    func acknowledgeCompletion() {
+        guard canWrite, let completedDraft else { return }
+        sessionAuthority.acknowledgeCompletion(sessionId: completedDraft.id)
+        self.completedDraft = nil
+        selectedDraftId = nil
+        completedPerformanceRecords = []
     }
 
     /// Save & Leave: keep the workout, and stop the Log tab routing into it.

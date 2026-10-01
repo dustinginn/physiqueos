@@ -30,8 +30,15 @@ final class TrainingSessionAuthority {
     /// bring one back.
     @ObservationIgnored private var endedSessionIds: Set<String> = []
 
-    /// Every saved draft for this authority, newest first (store order).
+    /// Every saved (editable) draft for this authority, newest first (store
+    /// order). Pending completion presentations are held separately.
     private(set) var drafts: [TrainingLoggerDraft]
+    /// Durably committed workouts whose Workout Complete presentation the
+    /// Founder has not acknowledged yet (`Return to Log`). Read-only records
+    /// kept in the same store, so the Server-owned performance records can
+    /// be re-read after navigation or a process restart. Never editable,
+    /// never a Live Activity subject.
+    private(set) var pendingCompletions: [TrainingLoggerDraft]
     /// The most recent accepted change.
     private(set) var lastChange: TrainingSessionChange? {
         didSet { if let lastChange { observers.values.forEach { $0(lastChange) } } }
@@ -48,7 +55,9 @@ final class TrainingSessionAuthority {
         self.environment = environment
         self.restPreferences = restPreferences
         self.now = now
-        self.drafts = Self.sorted(store.loadAll())
+        let stored = store.loadAll()
+        self.drafts = Self.sorted(stored.filter { !$0.isPendingCompletionPresentation })
+        self.pendingCompletions = stored.filter(\.isPendingCompletionPresentation)
     }
 
     var canWrite: Bool {
@@ -80,8 +89,69 @@ final class TrainingSessionAuthority {
     /// accepted mutation is written before it is published; this only picks
     /// up writes made outside the authority (older call sites, tests).
     func reloadFromStore() {
-        let stored = Self.sorted(store.loadAll())
+        let all = store.loadAll()
+        let stored = Self.sorted(all.filter { !$0.isPendingCompletionPresentation })
         if stored != drafts { drafts = stored }
+        var completions = all.filter(\.isPendingCompletionPresentation)
+        if canWrite {
+            // An unacknowledged presentation older than the in-progress
+            // window is stale; its workout is long durable on the Server.
+            let expired = completions.filter { !isCurrentPendingCompletion($0) }
+            expired.forEach { store.discard(id: $0.id) }
+            completions.removeAll { expired.contains($0) }
+        }
+        if completions != pendingCompletions { pendingCompletions = completions }
+    }
+
+    // MARK: - Pending completion presentation
+
+    /// The newest unacknowledged durable completion, if it is recent.
+    func pendingCompletion(at date: Date? = nil) -> TrainingLoggerDraft? {
+        let reference = date ?? now()
+        return TrainingLoggerDraft.pendingCompletion(
+            in: pendingCompletions.filter { isCurrentPendingCompletion($0, now: reference) }
+        )
+    }
+
+    func pendingCompletion(id: String) -> TrainingLoggerDraft? {
+        pendingCompletions.first { $0.id == id && isCurrentPendingCompletion($0) }
+    }
+
+    /// Where entering the Log tab routes: whichever is newer of an
+    /// unacknowledged durable completion and the live session in progress.
+    /// A completion that happened after a workout was started wins, so a
+    /// late performance-record read is never lost behind the tab switch; a
+    /// workout started after the completion wins, so the Founder always
+    /// lands in the workout they are doing.
+    func logTabRoutingTarget(at date: Date? = nil) -> TrainingLoggerDraft? {
+        let reference = date ?? now()
+        let active = activeLiveSession(at: reference)
+        guard let completion = pendingCompletion(at: reference) else { return active }
+        guard let active, let started = active.startedAt.flatMap(TrainingSessionClock.date(from:)),
+              let recorded = completion.completionRecordedAt.flatMap(TrainingSessionClock.date(from:))
+        else { return completion }
+        return started > recorded ? active : completion
+    }
+
+    /// `Return to Log`: the only point that clears a pending presentation.
+    /// Idempotent; touches no editable session and publishes no session
+    /// change (the Live Activity already ended with the commit).
+    @discardableResult
+    func acknowledgeCompletion(sessionId: String) -> Bool {
+        guard canWrite, pendingCompletions.contains(where: { $0.id == sessionId }) else { return false }
+        store.discard(id: sessionId)
+        pendingCompletions.removeAll { $0.id == sessionId }
+        return true
+    }
+
+    private func isCurrentPendingCompletion(_ draft: TrainingLoggerDraft, now date: Date? = nil) -> Bool {
+        guard let recorded = draft.completionRecordedAt.flatMap(TrainingSessionClock.date(from:)) else {
+            // Written by the reviewed pre-integration lifecycle without a
+            // timestamp: still exact and unacknowledged, so keep it.
+            return true
+        }
+        let age = (date ?? now()).timeIntervalSince(recorded)
+        return age >= -5 * 60 && age <= TrainingLoggerDraft.activeLiveSessionWindow
     }
 
     // MARK: - Lifecycle
@@ -151,11 +221,43 @@ final class TrainingSessionAuthority {
     /// commit. Attachment files are the caller's concern.
     @discardableResult
     func endSession(sessionId: String, reason: TrainingSessionEndReason) -> TrainingSessionMutationOutcome {
+        endSession(sessionId: sessionId, reason: reason, retainingPresentation: false)
+    }
+
+    /// A durable commit. Ends the session exactly like
+    /// `endSession(.committed)` (same change, so the Live Activity shows
+    /// "Workout saved"), and with `retainingPresentation` keeps a read-only
+    /// copy as a pending Workout Complete presentation until
+    /// `acknowledgeCompletion`. Only the caller this returns accepted to owns
+    /// cleanup; a second caller cannot create a second presentation.
+    @discardableResult
+    func endCommittedSession(sessionId: String, retainingPresentation: Bool) -> TrainingSessionMutationOutcome {
+        endSession(sessionId: sessionId, reason: .committed, retainingPresentation: retainingPresentation)
+    }
+
+    private func endSession(
+        sessionId: String,
+        reason: TrainingSessionEndReason,
+        retainingPresentation: Bool
+    ) -> TrainingSessionMutationOutcome {
         guard canWrite else { return .rejected(.writesNotAuthorized) }
         guard let existing = draft(id: sessionId) else {
             return .rejected(endedSessionIds.contains(sessionId) ? .sessionEnded : .sessionNotFound)
         }
-        store.discard(id: sessionId)
+        var presentation = existing
+        presentation.step = .complete
+        presentation.submissionState = nil
+        presentation.rest = nil
+        presentation.completionPresentationPending = true
+        presentation.completionRecordedAt = TrainingSessionClock.string(from: now())
+        if retainingPresentation, reason == .committed, (try? store.persist(presentation)) != nil {
+            pendingCompletions.removeAll { $0.id == sessionId }
+            pendingCompletions.append(presentation)
+        } else {
+            // A presentation that cannot be written is lost, never the
+            // durable workout; the Server already owns it.
+            store.discard(id: sessionId)
+        }
         submittingSessionIds.remove(sessionId)
         endedSessionIds.insert(sessionId)
         drafts.removeAll { $0.id == sessionId }
@@ -264,7 +366,9 @@ final class TrainingSessionAuthority {
     func replace(_ replacement: TrainingLoggerDraft) -> TrainingSessionMutationOutcome {
         guard canWrite else { return .rejected(.writesNotAuthorized) }
         guard draft(id: replacement.id) != nil else {
-            guard !endedSessionIds.contains(replacement.id) else { return .rejected(.sessionEnded) }
+            guard !endedSessionIds.contains(replacement.id),
+                  !pendingCompletions.contains(where: { $0.id == replacement.id })
+            else { return .rejected(.sessionEnded) }
             var inserted = replacement
             inserted.revision = max(1, replacement.currentRevision)
             do { try store.persist(inserted) } catch { return .rejected(.persistenceFailed) }

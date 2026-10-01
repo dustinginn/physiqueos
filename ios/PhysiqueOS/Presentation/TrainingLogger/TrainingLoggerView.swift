@@ -23,6 +23,9 @@ struct TrainingLoggerView: View {
     /// state, not persisted to the draft, so a mid-read screen rotation
     /// or draft reload never leaves a stuck "reading" row.
     @State private var pendingInterpretationAssetIDs: Set<String> = []
+    /// SwiftUI may keep a tab's hierarchy alive while another tab is visible.
+    /// A late PR read must not consume the one-shot celebration off-screen.
+    @State private var isSurfaceVisible = false
 
     var body: some View {
         Group {
@@ -81,7 +84,11 @@ struct TrainingLoggerView: View {
                 viewModel?.resume(draftId: draftId)
             }
         }
-        .onDisappear { viewModel?.persist() }
+        .onAppear { isSurfaceVisible = true }
+        .onDisappear {
+            isSurfaceVisible = false
+            viewModel?.persist()
+        }
         .onChange(of: focusedNumericFieldID) { isNumericKeyboardVisible = focusedNumericFieldID != nil }
         .photosPicker(isPresented: $isSupportingPhotosPickerPresented, selection: $supportingPhotoItems, matching: .images)
         .onChange(of: supportingPhotoItems) {
@@ -1037,10 +1044,14 @@ struct TrainingLoggerView: View {
             if !viewModel.completedPerformanceRecords.isEmpty {
                 NewPerformanceRecordsCard(
                     records: viewModel.completedPerformanceRecords,
-                    celebrationKey: viewModel.draft.map { "physiqueos.workoutComplete.celebrated.\($0.id)" }
+                    celebrationKey: viewModel.draft.map { "physiqueos.workoutComplete.celebrated.\($0.id)" },
+                    isPresentationVisible: isSurfaceVisible
                 )
             }
-            PrimaryActionButton(title: "Return to Log") { dismiss() }
+            PrimaryActionButton(title: "Return to Log") {
+                viewModel.acknowledgeCompletion()
+                dismiss()
+            }
         }
     }
 
@@ -1051,7 +1062,9 @@ struct TrainingLoggerView: View {
         let records: [TrainingPerformanceRecord]
         /// Per-session key: the confetti plays on the first presentation only.
         let celebrationKey: String?
+        let isPresentationVisible: Bool
         static let visibleLimit = 3
+        @Environment(AppEnvironment.self) private var environment
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @State private var celebrate = false
 
@@ -1096,13 +1109,22 @@ struct TrainingLoggerView: View {
                 if celebrate { ConfettiBurst().allowsHitTesting(false).accessibilityHidden(true) }
             }
             .onAppear {
-                guard WorkoutCelebrationGate.claim(
-                    key: celebrationKey,
-                    hasRecords: !records.isEmpty,
-                    reduceMotion: reduceMotion
-                ) else { return }
-                celebrate = true
+                attemptCelebration()
             }
+            .onChange(of: isPresentationVisible) {
+                attemptCelebration()
+            }
+        }
+
+        private func attemptCelebration() {
+            guard WorkoutCelebrationGate.present(
+                key: celebrationKey,
+                hasRecords: !records.isEmpty,
+                reduceMotion: reduceMotion,
+                presentationVisible: isPresentationVisible,
+                feedback: environment.feedback
+            ) else { return }
+            celebrate = true
         }
     }
 

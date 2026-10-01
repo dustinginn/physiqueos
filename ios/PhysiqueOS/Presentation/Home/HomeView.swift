@@ -238,6 +238,7 @@ struct HomeView: View {
                         Task { @MainActor in
                             if environment.nativeAuthority == .sandbox {
                                 environment.loggingSandboxStore.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
+                                environment.feedback.play(.priorityCompleted)
                                 await settlePriorityCompletion(occurrence.id) { viewModel?.refreshTodaysFocus() }
                                 return
                             }
@@ -253,6 +254,8 @@ struct HomeView: View {
                                     context: occurrence.completionContext,
                                     expectedVersion: version
                                 )
+                                // Confirmed canonical completion only, never the tap.
+                                environment.feedback.play(.priorityCompleted)
                                 await PriorityNotificationScheduler.cleanupCompletedOccurrence(
                                     priorityId: occurrence.routePriorityId ?? occurrence.id,
                                     occurrenceDate: occurrence.date

@@ -915,16 +915,58 @@ struct NewPerformanceRecordsPresentation: Equatable {
 /// session with records (never again on reappearance or a later revisit).
 /// Reduce Motion consumes that first appearance without animating, so turning
 /// the setting off later cannot replay a celebration the Founder already saw.
+/// A hidden surface (a retained tab hierarchy) can never claim it.
 enum WorkoutCelebrationGate {
+    /// What a visible first presentation does: the celebratory haptic always
+    /// plays (Reduce Motion governs animation, not haptics); the confetti
+    /// only without Reduce Motion.
+    struct Claim: Equatable {
+        var animatesConfetti: Bool
+    }
+
+    static func claimPresentation(
+        key: String?,
+        hasRecords: Bool,
+        reduceMotion: Bool,
+        presentationVisible: Bool = true,
+        defaults: UserDefaults = .standard
+    ) -> Claim? {
+        guard presentationVisible, hasRecords, let key, !defaults.bool(forKey: key) else { return nil }
+        defaults.set(true, forKey: key)
+        return Claim(animatesConfetti: !reduceMotion)
+    }
+
+    /// Whether the confetti should play (kept for existing call sites).
     static func claim(
         key: String?,
         hasRecords: Bool,
         reduceMotion: Bool,
+        presentationVisible: Bool = true,
         defaults: UserDefaults = .standard
     ) -> Bool {
-        guard hasRecords, let key, !defaults.bool(forKey: key) else { return false }
-        defaults.set(true, forKey: key)
-        return !reduceMotion
+        claimPresentation(
+            key: key, hasRecords: hasRecords, reduceMotion: reduceMotion,
+            presentationVisible: presentationVisible, defaults: defaults
+        )?.animatesConfetti == true
+    }
+
+    /// Claims the one-shot and plays the celebration haptic exactly once
+    /// per claim. Returns whether the confetti should animate.
+    @MainActor
+    static func present(
+        key: String?,
+        hasRecords: Bool,
+        reduceMotion: Bool,
+        presentationVisible: Bool,
+        feedback: PhysiqueOSFeedbackClient,
+        defaults: UserDefaults = .standard
+    ) -> Bool {
+        guard let claim = claimPresentation(
+            key: key, hasRecords: hasRecords, reduceMotion: reduceMotion,
+            presentationVisible: presentationVisible, defaults: defaults
+        ) else { return false }
+        feedback.play(.performanceRecordCelebration)
+        return claim.animatesConfetti
     }
 }
 

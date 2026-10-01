@@ -1,13 +1,25 @@
 import UserNotifications
 
 /// The notification categories/actions for Actionable Priority
-/// Notifications. Only `directCompletion` carries custom actions — per the
-/// server-owned classification (`PriorityNotificationAction.Classification`),
-/// a specialized or open-only priority must never offer blind direct
-/// completion, so both of those categories intentionally have none: tapping
-/// the notification body itself (the default action) is their only
-/// affordance, which always opens the priority's destination.
+/// Notifications, chosen from `PriorityOccurrenceCapabilities` (derived from
+/// the Server-owned classification), never from Priority names:
+/// - `simpleCompletion`: a simple binary Priority — Complete (check-circle),
+///   Skip, Snooze.
+/// - `specializedActionable`: completion with the Server-planned context
+///   (peptide dose) — Complete, Snooze; never Skip, never plain completion.
+/// - `specializedWorkflow` / `openOnly`: no custom actions; tapping the
+///   notification opens the proper flow (Morning Check-In, Photos, ...).
+/// - `directCompletion`: the pre-Build 78 simple category (Complete,
+///   Snooze). Still registered so already-delivered notifications keep
+///   working; new requests use `simpleCompletion`.
+///
+/// iOS shows custom actions only when a notification is expanded (long
+/// press / pull down on a banner, swipe left > View on the Lock Screen).
+/// Third-party apps cannot put a control on the collapsed banner, so the
+/// closest supported Reminders-style affordance is a first-position
+/// Complete action with a check-circle symbol.
 enum PriorityNotificationCategory {
+    static let simpleCompletion = "priority.simpleCompletion"
     static let directCompletion = "priority.directCompletion"
     static let specializedWorkflow = "priority.specializedWorkflow"
     static let specializedActionable = "priority.specializedActionable"
@@ -23,17 +35,25 @@ enum PriorityNotificationCategory {
     static let briefingReady = "briefing.ready"
 
     static func category(for action: PriorityNotificationAction) -> String {
-        switch action.classification {
-        case .directCompletionAllowed: directCompletion
-        case .specializedWorkflowRequired:
-            action.completionCommand == nil ? specializedWorkflow : specializedActionable
-        case .openOnly: openOnly
+        let capabilities = PriorityOccurrenceCapabilities.resolve(action)
+        switch capabilities.completion {
+        case .plain: return capabilities.skipAllowed ? simpleCompletion : directCompletion
+        case .plannedContext: return specializedActionable
+        case .none:
+            return action.classification == .openOnly ? openOnly : specializedWorkflow
         }
+    }
+
+    /// The categories whose Skip action may reach canonical Skip. A Skip
+    /// response from any other category is refused before any write.
+    static func allowsSkip(_ categoryIdentifier: String) -> Bool {
+        categoryIdentifier == simpleCompletion
     }
 }
 
 enum PriorityNotificationActionIdentifier {
     static let complete = "priority.complete"
+    static let skip = "priority.skip"
     static let snooze = "priority.snooze"
 }
 
@@ -42,6 +62,29 @@ enum PriorityNotificationCategoryRegistrar {
     /// call on every launch; `UNUserNotificationCenter.setNotificationCategories`
     /// replaces the full set each time rather than accumulating duplicates.
     static func registerCategories(center: UNUserNotificationCenter = .current()) {
+        center.setNotificationCategories(categories())
+    }
+
+    /// The registered set, separate from the notification center so tests
+    /// can check every category's exact actions and options.
+    static func categories() -> Set<UNNotificationCategory> {
+        // Background actions (no `.foreground`): they run without opening
+        // the app. `.authenticationRequired` because the canonical write
+        // needs the device unlocked (the refresh credential is a
+        // when-unlocked Keychain item); on a locked phone iOS asks for
+        // Face ID / passcode first.
+        let simpleComplete = UNNotificationAction(
+            identifier: PriorityNotificationActionIdentifier.complete,
+            title: "Complete",
+            options: [.authenticationRequired],
+            icon: UNNotificationActionIcon(systemImageName: "checkmark.circle")
+        )
+        let skip = UNNotificationAction(
+            identifier: PriorityNotificationActionIdentifier.skip,
+            title: "Skip",
+            options: [.authenticationRequired],
+            icon: UNNotificationActionIcon(systemImageName: "forward.end")
+        )
         let complete = UNNotificationAction(
             identifier: PriorityNotificationActionIdentifier.complete,
             title: "Complete",
@@ -50,11 +93,18 @@ enum PriorityNotificationCategoryRegistrar {
         let snooze = UNNotificationAction(
             identifier: PriorityNotificationActionIdentifier.snooze,
             title: "Snooze 1 hour",
+            options: [],
+            icon: UNNotificationActionIcon(systemImageName: "clock")
+        )
+        let simpleCompletion = UNNotificationCategory(
+            identifier: PriorityNotificationCategory.simpleCompletion,
+            actions: [simpleComplete, skip, snooze],
+            intentIdentifiers: [],
             options: []
         )
         let directCompletion = UNNotificationCategory(
             identifier: PriorityNotificationCategory.directCompletion,
-            actions: [complete, snooze],
+            actions: [simpleComplete, snooze],
             intentIdentifiers: [],
             options: []
         )
@@ -88,9 +138,9 @@ enum PriorityNotificationCategoryRegistrar {
             intentIdentifiers: [],
             options: []
         )
-        center.setNotificationCategories([
-            directCompletion, specializedWorkflow, specializedActionable,
+        return [
+            simpleCompletion, directCompletion, specializedWorkflow, specializedActionable,
             openOnly, evidenceReviewReady, briefingReady,
-        ])
+        ]
     }
 }

@@ -165,6 +165,16 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     var restConfiguration: TrainingRestConfiguration? = nil
 
     var currentRevision: Int { revision ?? 0 }
+    /// Set only after this exact draft is proven durable and before the
+    /// Founder explicitly leaves Workout Complete. Keeping that narrow
+    /// acknowledgement boundary durable lets a late PR read survive a tab
+    /// switch or process restart without replaying historical workouts.
+    /// Such a draft is a read-only presentation record held by
+    /// `TrainingSessionAuthority`, never an editable session.
+    var completionPresentationPending: Bool? = nil
+    /// When the durable completion was recorded on this device; bounds how
+    /// long an unacknowledged presentation may still route the Log tab.
+    var completionRecordedAt: String? = nil
 
     static func fresh(mode: TrainingLoggerMode, workoutDate: String, startedAt: String? = nil) -> Self {
         .init(
@@ -228,6 +238,26 @@ extension TrainingLoggerDraft {
             }
             .max { (started($0) ?? .distantPast) < (started($1) ?? .distantPast) }
     }
+
+    /// A completion written by the current Native lifecycle that has not yet
+    /// been acknowledged from Workout Complete. Legacy completed drafts do
+    /// not carry the marker and therefore never become surprise celebrations.
+    static func pendingCompletion(in drafts: [TrainingLoggerDraft]) -> TrainingLoggerDraft? {
+        drafts
+            .filter(\.isPendingCompletionPresentation)
+            .max {
+                let left = $0.completionSortKey, right = $1.completionSortKey
+                return left == right ? $0.id < $1.id : left < right
+            }
+    }
+
+    var isPendingCompletionPresentation: Bool {
+        step == .complete && completionPresentationPending == true
+    }
+
+    /// ISO-8601 strings compare chronologically, so the newest completion
+    /// sorts last.
+    var completionSortKey: String { completionRecordedAt ?? finishedAt ?? startedAt ?? workoutDate }
 }
 
 enum TrainingLoggerSubmissionState: String, Codable, Equatable {

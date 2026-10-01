@@ -255,6 +255,23 @@ final class AppEnvironment {
         restPreferencesStorage = created
         return created
     }
+    /// Targeted haptics (`PhysiqueOSFeedback.swift`). System haptics until a
+    /// test substitutes a recording client.
+    @ObservationIgnored private var feedbackStorage: PhysiqueOSFeedbackClient?
+
+    @MainActor
+    var feedback: PhysiqueOSFeedbackClient {
+        if let feedbackStorage { return feedbackStorage }
+        let created = SystemFeedbackClient.shared
+        feedbackStorage = created
+        return created
+    }
+
+    /// Test seam: substitute a recording feedback client.
+    @MainActor
+    func useFeedbackClient(_ client: PhysiqueOSFeedbackClient) {
+        feedbackStorage = client
+    }
     /// One app-scoped `TrainingSessionAuthority` per Native authority, each
     /// over that authority's own draft store, created on first use. They are
     /// the only writers of those stores, so Sandbox and Founder Production

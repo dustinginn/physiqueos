@@ -115,7 +115,9 @@ final class NotificationDeepLinkCoordinator {
 /// `Complete` submits the exact same `priority.complete.v1` command (same
 /// canonical identity, same `expectedVersion`/If-Match, same idempotency
 /// discipline) the in-app completion path already uses — nothing here
-/// re-derives completion semantics. `Snooze 1 hour` never touches the
+/// re-derives completion semantics. `Skip` (offered only on the
+/// `simpleCompletion` category) submits the same `priority.skip.v1` command
+/// Priority Detail's Mark Skipped uses. `Snooze 1 hour` never touches the
 /// server at all — see `PriorityNotificationScheduler.scheduleSnooze`.
 /// Tapping the notification body (or a category with no custom actions —
 /// specialized/open-only) always opens the exact same `AppDestination`
@@ -222,6 +224,8 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     /// the main actor.
     private let environment: AppEnvironment?
     private let completeActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)?
+    private let skipActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)?
+    private let feedbackHandler: (@MainActor @Sendable (PhysiqueOSFeedbackEvent) -> Void)?
     private let completionCleanup: @MainActor @Sendable (String, String) async -> Void
     private let snoozeHandler: @MainActor @Sendable (PriorityNotificationScheduler.SnoozePayload) async -> PriorityNotificationScheduler.SnoozeResult
     private let postActionReconciliation: (@MainActor @Sendable () async -> Void)?
@@ -238,6 +242,8 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             await PriorityNotificationScheduler.scheduleSnooze(payload: $0)
         },
         completeActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)? = nil,
+        skipActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)? = nil,
+        feedbackHandler: (@MainActor @Sendable (PhysiqueOSFeedbackEvent) -> Void)? = nil,
         openActionHandler: (@MainActor @Sendable (String, AppDestination) async -> Bool)? = nil,
         staleCompletionResolver: (@MainActor @Sendable (CompleteActionPayload) async -> CompleteActionPayload?)? = nil,
         postActionReconciliation: (@MainActor @Sendable () async -> Void)? = nil,
@@ -251,6 +257,8 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     ) {
         self.environment = environment
         self.completeActionHandler = completeActionHandler
+        self.skipActionHandler = skipActionHandler
+        self.feedbackHandler = feedbackHandler
         self.openActionHandler = openActionHandler
         self.completionCleanup = completionCleanup
         self.snoozeHandler = snoozeHandler
@@ -288,6 +296,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     func dispatch(snapshot: ResponseSnapshot, completion: @escaping () -> Void) {
         let gate = NotificationResponseCompletionGate(completion)
         let retainsBackgroundExecution = snapshot.actionIdentifier == PriorityNotificationActionIdentifier.complete
+            || snapshot.actionIdentifier == PriorityNotificationActionIdentifier.skip
         continuationCoordinator.submit { @MainActor [weak self] in
             guard let self else { gate.complete(); return }
             await self.handle(snapshot: snapshot)
@@ -320,6 +329,25 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                               reason: "Complete was decoded and dispatched on the main actor.")
             let completed = await handleComplete(payload: snapshot.complete)
             if !completed {
+                releaseAction(identifier: snapshot.requestIdentifier, action: snapshot.actionIdentifier)
+            }
+        case PriorityNotificationActionIdentifier.skip:
+            guard claimAction(identifier: snapshot.requestIdentifier, action: snapshot.actionIdentifier) else {
+                recordActionStage(snapshot: snapshot, operation: "duplicate action ignored",
+                                  reason: "This exact Skip callback was already consumed safely.")
+                return
+            }
+            // Only a category whose occurrence supports canonical Skip can
+            // reach the write; anything else is refused with no mutation.
+            guard PriorityNotificationCategory.allowsSkip(snapshot.open.categoryIdentifier) else {
+                recordActionStage(snapshot: snapshot, operation: "skip refused",
+                                  reason: "This notification's category does not offer canonical Skip; nothing changed.")
+                return
+            }
+            recordActionStage(snapshot: snapshot, operation: "action decoded",
+                              reason: "Skip was decoded and dispatched on the main actor.")
+            let skipped = await handleSkip(payload: snapshot.complete)
+            if !skipped {
                 releaseAction(identifier: snapshot.requestIdentifier, action: snapshot.actionIdentifier)
             }
         case PriorityNotificationActionIdentifier.snooze:
@@ -428,6 +456,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             ))
             await completionCleanup(priorityId, occurrenceDate)
             await reconcileAfterAction()
+            playFeedback(.priorityCompleted)
             return true
         } catch {
             if Self.isStaleVersion(error),
@@ -448,6 +477,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                     ))
                     await completionCleanup(refreshedPriorityId, refreshedOccurrenceDate)
                     await reconcileAfterAction()
+                    playFeedback(.priorityCompleted)
                     return true
                 } catch { /* bounded retry exhausted; record the safe rejection below */ }
             }
@@ -481,6 +511,110 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                 ),
                 expectedVersion: expectedVersion
             )
+        }
+    }
+
+    /// Notification Skip: the same canonical `priority.skip.v1` command as
+    /// Priority Detail's Mark Skipped, against the identity and version the
+    /// notification's completion contract carries (the Server's skip command
+    /// uses exactly those). The Server still owns eligibility and "today":
+    /// a past, future or unsupported occurrence is refused there, changes
+    /// nothing, and leaves the notification in place. Never a local-only
+    /// skip state.
+    @MainActor
+    private func handleSkip(payload: CompleteActionPayload) async -> Bool {
+        guard payload.commandType == ProductionCommandType.completePriority,
+              let expectedVersion = payload.expectedVersion,
+              let priorityId = payload.priorityId,
+              let occurrenceDate = payload.occurrenceDate,
+              payload.dose == nil, payload.protocolId == nil
+        else {
+            recordSkip(identifier: "action.skip.invalid-payload", operation: "skip not dispatched",
+                       reason: "The notification did not carry a plain canonical occurrence identity and version.")
+            return false
+        }
+        guard skipActionHandler != nil || environment != nil else {
+            recordSkip(identifier: "action.skip.environment-unavailable", operation: "skip not dispatched",
+                       reason: "The application environment was not available; canonical state remains unchanged.")
+            return false
+        }
+        let identifier = "action.skip.\(priorityId).\(occurrenceDate)"
+        do {
+            try await performSkip(payload: payload, priorityId: priorityId,
+                                  occurrenceDate: occurrenceDate, expectedVersion: expectedVersion)
+            recordSkip(identifier: identifier, operation: "skip accepted",
+                       reason: "The canonical skip command succeeded.")
+            await completionCleanup(priorityId, occurrenceDate)
+            await reconcileAfterAction()
+            playFeedback(.prioritySkipped)
+            return true
+        } catch PrioritySkipError.alreadyCompleted {
+            // First terminal state wins on the Server: the occurrence is
+            // already complete, so its reminder is no longer needed.
+            recordSkip(identifier: identifier, operation: "skip not applied",
+                       reason: "The occurrence was already completed; it stays completed.")
+            await completionCleanup(priorityId, occurrenceDate)
+            await reconcileAfterAction()
+            return true
+        } catch {
+            if Self.isStaleVersion(error),
+               let refreshed = await resolveStaleCompletion(payload),
+               refreshed.dose == nil, refreshed.protocolId == nil,
+               let refreshedVersion = refreshed.expectedVersion {
+                do {
+                    try await performSkip(payload: refreshed, priorityId: priorityId,
+                                          occurrenceDate: occurrenceDate, expectedVersion: refreshedVersion)
+                    recordSkip(identifier: identifier, operation: "skip accepted after exact occurrence refresh",
+                               reason: "The request carried a stale version; the unchanged exact occurrence was re-read and skipped once.")
+                    await completionCleanup(priorityId, occurrenceDate)
+                    await reconcileAfterAction()
+                    playFeedback(.prioritySkipped)
+                    return true
+                } catch PrioritySkipError.alreadyCompleted {
+                    await completionCleanup(priorityId, occurrenceDate)
+                    await reconcileAfterAction()
+                    return true
+                } catch { /* bounded retry exhausted; record the safe rejection below */ }
+            }
+            recordSkip(identifier: identifier, operation: "skip rejected",
+                       reason: "The canonical skip command did not succeed; the occurrence remains unchanged.")
+            return false
+        }
+    }
+
+    @MainActor
+    private func performSkip(
+        payload: CompleteActionPayload,
+        priorityId: String,
+        occurrenceDate: String,
+        expectedVersion: Int
+    ) async throws {
+        if let skipActionHandler {
+            try await skipActionHandler(payload)
+        } else if let environment {
+            try await environment.priorityCompletionWriteAPI.skip(
+                priorityId: priorityId, occurrenceDate: occurrenceDate, expectedVersion: expectedVersion
+            )
+        }
+    }
+
+    @MainActor
+    private func recordSkip(identifier: String, operation: String, reason: String) {
+        NotificationDiagnostics.record(.init(
+            capturedAt: Date(), identifier: identifier, operation: operation, reason: reason,
+            fireDate: nil, timeZoneIdentifier: TimeZone.current.identifier
+        ))
+    }
+
+    /// A haptic only reaches the Founder when the action ran while the app
+    /// was on screen (a banner acted on in-app); the system client plays
+    /// nothing otherwise. Background notification actions get none.
+    @MainActor
+    private func playFeedback(_ event: PhysiqueOSFeedbackEvent) {
+        if let feedbackHandler {
+            feedbackHandler(event)
+        } else {
+            environment?.feedback.play(event)
         }
     }
 
