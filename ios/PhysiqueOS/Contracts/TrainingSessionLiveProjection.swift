@@ -70,6 +70,39 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         var valueText: String?
     }
 
+    /// Which two (at most) set/context rows a glance surface shows. Encodes
+    /// the Founder's two-row rule so a renderer never derives it:
+    /// - `previousAndCurrent`: normal set entry (row 1 Previous, row 2 Current).
+    /// - `currentAndUpNext`: Current is the exercise's final set (Previous drops away).
+    /// - `completedAndUpNext`: an exercise was just finished; row 1 is that
+    ///   completed set, row 2 is the next exercise's first set, not yet started.
+    /// - `currentOnly`: nothing completed yet.
+    /// - `completedOnly`: every set is complete.
+    /// - `empty`: no sets yet (planning).
+    enum ContextLayout: String, Codable, Hashable, Sendable {
+        case previousAndCurrent
+        case currentAndUpNext
+        case completedAndUpNext
+        case currentOnly
+        case completedOnly
+        case empty
+
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Self(rawValue: raw) ?? .previousAndCurrent
+        }
+    }
+
+    struct ContextRow: Hashable, Sendable {
+        enum Role: String, Hashable, Sendable { case previous, completed, current, upNext }
+        var role: Role
+        var set: SetCue
+        var exercise: ExerciseCue?
+        /// This row's set is `currentSet`, the one Complete Set completes.
+        /// After an exercise is finished, the "Up Next" row is that target.
+        var isCompletionTarget: Bool
+    }
+
     struct Rest: Codable, Hashable, Sendable {
         var id: String
         var mode: TrainingRestMode
@@ -96,6 +129,8 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
     /// The most recently completed set (by `completedAt`; list order for
     /// sets completed before timestamps existed).
     var previousSet: SetCue?
+    /// `previousSet`'s exercise.
+    var previousExercise: ExerciseCue?
     var currentExercise: ExerciseCue?
     /// The set a Complete Set control would complete.
     var currentSet: SetCue?
@@ -107,6 +142,7 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
     var upNextExercise: ExerciseCue?
     /// Every set is complete (and there is at least one).
     var isWorkoutComplete: Bool
+    var contextLayout: ContextLayout
     /// Present only while `phase == .inProgress`.
     var rest: Rest?
 
@@ -139,6 +175,22 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         let totalSets = draft.totalSetCount
         let completedSets = draft.completedSetCount
         let upNextExerciseIndex = upNext.flatMap { next in next.exerciseIndex == current?.exerciseIndex ? nil : next.exerciseIndex }
+        let previous = cursor.previous(before: current)
+        let isFinal = current != nil && incompleteInCurrent == 1
+        let layout: ContextLayout
+        if let current {
+            let currentStarted = draft.exercises[current.exerciseIndex].sets.contains(where: \.isCompleted)
+            if isFinal, upNextExerciseIndex != nil {
+                layout = .currentAndUpNext
+            } else if let previous, previous.exerciseIndex != current.exerciseIndex, !currentStarted,
+                      draft.exercises[previous.exerciseIndex].sets.allSatisfy(\.isCompleted) {
+                layout = .completedAndUpNext
+            } else {
+                layout = previous == nil ? .currentOnly : .previousAndCurrent
+            }
+        } else {
+            layout = previous == nil ? .empty : .completedOnly
+        }
         return Self(
             schemaVersion: schemaVersion,
             sessionId: draft.id,
@@ -153,15 +205,34 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
                 completedExercises: draft.exercises.filter { !$0.sets.isEmpty && $0.sets.allSatisfy(\.isCompleted) }.count,
                 totalExercises: draft.exercises.count
             ),
-            previousSet: cursor.previous(before: current).map { setCue(draft, $0) },
+            previousSet: previous.map { setCue(draft, $0) },
+            previousExercise: previous.map { exerciseCue(draft, $0.exerciseIndex) },
             currentExercise: current.map { exerciseCue(draft, $0.exerciseIndex) },
             currentSet: current.map { setCue(draft, $0) },
-            isFinalSetOfExercise: current != nil && incompleteInCurrent == 1,
+            isFinalSetOfExercise: isFinal,
             upNextSet: upNext.map { setCue(draft, $0) },
             upNextExercise: upNextExerciseIndex.map { exerciseCue(draft, $0) },
             isWorkoutComplete: totalSets > 0 && completedSets == totalSets,
+            contextLayout: layout,
             rest: restCue
         )
+    }
+
+    /// The rows to render, in order, never more than two.
+    var contextRows: [ContextRow] {
+        func row(_ role: ContextRow.Role, _ set: SetCue?, _ exercise: ExerciseCue?) -> ContextRow? {
+            set.map { ContextRow(role: role, set: $0, exercise: exercise, isCompletionTarget: $0.setId == currentSet?.setId) }
+        }
+        let rows: [ContextRow?]
+        switch contextLayout {
+        case .previousAndCurrent: rows = [row(.previous, previousSet, previousExercise), row(.current, currentSet, currentExercise)]
+        case .currentAndUpNext: rows = [row(.current, currentSet, currentExercise), row(.upNext, upNextSet, upNextExercise)]
+        case .completedAndUpNext: rows = [row(.completed, previousSet, previousExercise), row(.upNext, currentSet, currentExercise)]
+        case .currentOnly: rows = [row(.current, currentSet, currentExercise)]
+        case .completedOnly: rows = [row(.completed, previousSet, previousExercise)]
+        case .empty: rows = []
+        }
+        return Array(rows.compactMap { $0 }.prefix(2))
     }
 
     /// Lock-Screen-safe variant: no exercise names, values, or areas.
@@ -174,7 +245,7 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
             copy[keyPath: keyPath]?.durationSeconds = nil
             copy[keyPath: keyPath]?.valueText = nil
         }
-        for keyPath in [\Self.currentExercise, \Self.upNextExercise] {
+        for keyPath in [\Self.previousExercise, \Self.currentExercise, \Self.upNextExercise] {
             copy[keyPath: keyPath]?.name = "Exercise"
             copy[keyPath: keyPath]?.variantLabel = nil
             copy[keyPath: keyPath]?.supersetPartnerName = nil

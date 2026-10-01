@@ -88,6 +88,56 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         XCTAssertEqual(advanced.progress.completedExercises, 1)
     }
 
+    func testTwoRowRuleAcrossTheFinalSetTransition() throws {
+        func rows(_ projection: TrainingSessionLiveProjection) -> [String] {
+            projection.contextRows.map { "\($0.role.rawValue):\($0.set.setId)\($0.isCompletionTarget ? "*" : "")" }
+        }
+        var draft = session([
+            exercise("bench", "Bench", sets: [set("b1", 1), set("b2", 2), set("b3", 3)]),
+            exercise("fly", "Fly", sets: [set("f1", 1), set("f2", 2)]),
+        ])
+        var projection = try project(draft)
+        XCTAssertEqual(projection.contextLayout, .currentOnly)
+        XCTAssertEqual(rows(projection), ["current:b1*"])
+
+        draft.exercises[0].sets[0].isCompleted = true; draft.exercises[0].sets[0].completedAt = stamp(60)
+        projection = try project(draft)
+        XCTAssertEqual(projection.contextLayout, .previousAndCurrent)
+        XCTAssertEqual(rows(projection), ["previous:b1", "current:b2*"])
+
+        draft.exercises[0].sets[1].isCompleted = true; draft.exercises[0].sets[1].completedAt = stamp(30)
+        projection = try project(draft)
+        XCTAssertEqual(projection.contextLayout, .currentAndUpNext, "Final set: Previous drops away.")
+        XCTAssertEqual(rows(projection), ["current:b3*", "upNext:f1"])
+        XCTAssertEqual(projection.contextRows.last?.exercise?.name, "Fly")
+
+        draft.exercises[0].sets[2].isCompleted = true; draft.exercises[0].sets[2].completedAt = stamp(5)
+        projection = try project(draft)
+        XCTAssertEqual(projection.contextLayout, .completedAndUpNext)
+        XCTAssertEqual(rows(projection), ["completed:b3", "upNext:f1*"], "Up Next is now what Complete Set completes.")
+        XCTAssertEqual(projection.contextRows.first?.exercise?.name, "Bench")
+
+        draft.exercises[1].sets[0].isCompleted = true; draft.exercises[1].sets[0].completedAt = stamp(1)
+        projection = try project(draft)
+        XCTAssertEqual(projection.contextLayout, .previousAndCurrent)
+        XCTAssertEqual(rows(projection), ["previous:f1", "current:f2*"], "Last set of the workout has no Up Next, so back to Previous + Current.")
+
+        draft.exercises[1].sets[1].isCompleted = true; draft.exercises[1].sets[1].completedAt = stamp(0)
+        projection = try project(draft)
+        XCTAssertEqual(projection.contextLayout, .completedOnly)
+        XCTAssertEqual(rows(projection), ["completed:f2"])
+    }
+
+    func testSupersetNeverShowsThreeRows() throws {
+        let row = exercise("row", "Row", sets: [set("r1", 1, done: stamp(40)), set("r2", 2)])
+        let curl = exercise("curl", "Curl", sets: [set("c1", 1, done: stamp(20)), set("c2", 2)])
+        let draft = session([row, curl], relationships: [.init(id: "ss", relationshipType: "superset", memberExerciseIds: ["row", "curl"])])
+        let projection = try project(draft)
+        XCTAssertLessThanOrEqual(projection.contextRows.count, 2)
+        XCTAssertEqual(projection.contextRows.map(\.set.setId), ["r2", "c2"], "Row's final set: Current + Up Next (partner).")
+        XCTAssertEqual(projection.contextLayout, .currentAndUpNext)
+    }
+
     func testTimedSets() throws {
         let draft = session([exercise("plank", "Plank", measurement: .duration, sets: [
             set("p1", 1, reps: nil, load: nil, duration: 45, done: stamp(60)), set("p2", 2, reps: nil, load: nil, duration: 60),
