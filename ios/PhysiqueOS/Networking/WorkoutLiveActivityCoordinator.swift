@@ -55,7 +55,15 @@ final class WorkoutLiveActivityCoordinator {
     /// Which workout (and when it started) each known activity belongs to,
     /// so a lifecycle event can be attributed even after the activity left
     /// `activities()`.
-    private var activityMeta: [String: (sessionId: String, startedAt: Date)] = [:]
+    private var activityMeta: [String: ActivityMeta] = [:]
+    private struct ActivityMeta {
+        var sessionId: String
+        /// When THIS activity was requested (or, for one adopted after a
+        /// relaunch, the workout start as a conservative stand-in). The
+        /// system's 8 h limit counts from the request, not the workout start.
+        var requestedAt: Date
+        var lifecycle: WorkoutLiveActivitySnapshot.Lifecycle
+    }
     private var lifecycleObservation: WorkoutLiveActivityObservation?
     private var enablementObservation: WorkoutLiveActivityObservation?
     private var lastEnablement: Bool?
@@ -113,11 +121,10 @@ final class WorkoutLiveActivityCoordinator {
             // Turning Live Activities off ends every activity (system-side) and
             // turning them back on is an explicit opt-in: forget swipe
             // suppression so the current workout can show again.
-            if !enabled {
-                // Whatever ends now is the system's doing, never a swipe.
-                for id in self.activityMeta.keys { self.markEndedByUs(id) }
-            }
             if enabled, self.lastEnablement == false {
+                // Anything that stopped while Live Activities were off was the
+                // system's doing, never a swipe.
+                for snapshot in self.client.activities() where !snapshot.isLive { self.markEndedByUs(snapshot.id) }
                 self.defaults.removeObject(forKey: Self.suppressedKey)
                 self.requestSync()
             }
@@ -125,16 +132,21 @@ final class WorkoutLiveActivityCoordinator {
         }
     }
 
-    /// A user swipe-away: a dismissed/ended activity this app did not end,
-    /// for a workout that still exists, while Live Activities are enabled and
-    /// well before the system's own 8 h limit.
+    /// A user swipe-away is a LIVE activity going straight to `.dismissed`
+    /// that this app did not end. Everything the system does instead (the
+    /// 8 h limit, a force quit, Live Activities turned off) arrives as
+    /// `.ended` first, so `.ended` never suppresses, and a later `.dismissed`
+    /// of an already-ended activity is not a swipe either.
     private func noteLifecycle(activityId: String, lifecycle: WorkoutLiveActivitySnapshot.Lifecycle) {
-        guard lifecycle == .dismissed || lifecycle == .ended else { return }
-        guard !endedByUsIds().contains(activityId),
-              let meta = activityMeta[activityId] ?? client.activities().first(where: { $0.id == activityId }).map({ ($0.attributes.sessionId, $0.attributes.startedAt) }),
+        guard var meta = activityMeta[activityId] else { return }
+        let wasLive = meta.lifecycle == .active || meta.lifecycle == .stale || meta.lifecycle == .pending
+        meta.lifecycle = lifecycle
+        activityMeta[activityId] = meta
+        guard lifecycle == .dismissed, wasLive,
+              !endedByUsIds().contains(activityId),
               authority?.draft(id: meta.sessionId) != nil,
               client.areActivitiesEnabled,
-              now().timeIntervalSince(meta.startedAt) < Self.systemLimitGuard else { return }
+              now().timeIntervalSince(meta.requestedAt) < Self.systemLimitGuard else { return }
         suppress(sessionId: meta.sessionId)
         diagnostics.append("suppressed")
     }
@@ -214,8 +226,9 @@ final class WorkoutLiveActivityCoordinator {
         // bring that session's activity back. Endings this app made itself
         // (Save & Leave, a replaced session) are not suppression.
         for snapshot in client.activities()
-        where !snapshot.isLive && !endedByUs.contains(snapshot.id) && authority.draft(id: snapshot.attributes.sessionId) != nil
-            && client.areActivitiesEnabled && current.timeIntervalSince(snapshot.attributes.startedAt) < Self.systemLimitGuard {
+        where snapshot.lifecycle == .dismissed && !endedByUs.contains(snapshot.id)
+            && authority.draft(id: snapshot.attributes.sessionId) != nil && client.areActivitiesEnabled
+            && current.timeIntervalSince(activityMeta[snapshot.id]?.requestedAt ?? snapshot.attributes.startedAt) < Self.systemLimitGuard {
             suppress(sessionId: snapshot.attributes.sessionId)
         }
 
@@ -253,7 +266,11 @@ final class WorkoutLiveActivityCoordinator {
         }
 
         if let keeper {
-            activityMeta[keeper.id] = (subject.id, keeper.attributes.startedAt)
+            if activityMeta[keeper.id] == nil {
+                activityMeta[keeper.id] = ActivityMeta(sessionId: subject.id, requestedAt: keeper.attributes.startedAt, lifecycle: keeper.lifecycle)
+            } else {
+                activityMeta[keeper.id]?.lifecycle = keeper.lifecycle
+            }
             await updateIfNeeded(keeper, state: state, projection: projection, current: current, coalesceValuesOnly: coalesceValuesOnly)
         } else {
             requestNew(attributes: attributes, state: state, current: current)
@@ -268,7 +285,7 @@ final class WorkoutLiveActivityCoordinator {
         do {
             let id = try client.request(attributes: attributes, state: state, staleDate: staleDate(for: state, current: current))
             lastSent[id] = state
-            activityMeta[id] = (attributes.sessionId, attributes.startedAt)
+            activityMeta[id] = ActivityMeta(sessionId: attributes.sessionId, requestedAt: now(), lifecycle: .active)
             diagnostics.append("requested")
         } catch WorkoutLiveActivityRequestError.notForeground {
             // Retried by `reconcile()` when the app next becomes active.

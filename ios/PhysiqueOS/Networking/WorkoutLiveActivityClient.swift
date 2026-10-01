@@ -83,6 +83,7 @@ final class ActivityKitWorkoutLiveActivityClient: WorkoutLiveActivityClient {
                 content: ActivityContent(state: state, staleDate: staleDate),
                 pushType: nil
             )
+            startWatching(activity.id)
             return activity.id
         } catch let error as ActivityAuthorizationError {
             switch error {
@@ -125,11 +126,36 @@ final class ActivityKitWorkoutLiveActivityClient: WorkoutLiveActivityClient {
         await activity.end(state.map { ActivityContent(state: $0, staleDate: nil) }, dismissalPolicy: policy)
     }
 
+    private var lifecycleOnChange: (@MainActor (String, WorkoutLiveActivitySnapshot.Lifecycle) -> Void)?
+    private var stateWatchers: [String: Task<Void, Never>] = [:]
+    private var updatesWatcher: Task<Void, Never>?
+
     func observeLifecycle(
         _ onChange: @escaping @MainActor (String, WorkoutLiveActivitySnapshot.Lifecycle) -> Void
     ) -> WorkoutLiveActivityObservation {
-        let task = Task.detached { await Self.watchLifecycle(onChange) }
-        return WorkoutLiveActivityObservation { task.cancel() }
+        lifecycleOnChange = onChange
+        for activity in Activity<WorkoutActivityAttributes>.activities { startWatching(activity.id) }
+        // Activities started elsewhere (another process); this process's own
+        // requests are watched directly from `request`.
+        updatesWatcher = Task.detached { [weak self] in
+            for await activity in Activity<WorkoutActivityAttributes>.activityUpdates {
+                if Task.isCancelled { return }
+                let id = activity.id
+                await MainActor.run { self?.startWatching(id) }
+            }
+        }
+        return WorkoutLiveActivityObservation { [weak self] in
+            self?.updatesWatcher?.cancel()
+            self?.updatesWatcher = nil
+            self?.stateWatchers.values.forEach { $0.cancel() }
+            self?.stateWatchers.removeAll()
+            self?.lifecycleOnChange = nil
+        }
+    }
+
+    private func startWatching(_ id: String) {
+        guard stateWatchers[id] == nil, let onChange = lifecycleOnChange else { return }
+        stateWatchers[id] = Task.detached { await Self.watchStates(id: id, onChange) }
     }
 
     func observeEnablement(_ onChange: @escaping @MainActor (Bool) -> Void) -> WorkoutLiveActivityObservation {
@@ -140,24 +166,6 @@ final class ActivityKitWorkoutLiveActivityClient: WorkoutLiveActivityClient {
             }
         }
         return WorkoutLiveActivityObservation { task.cancel() }
-    }
-
-    /// Watches existing and future activities' state streams. Activities are
-    /// looked up by id inside each task (they are not Sendable).
-    private nonisolated static func watchLifecycle(
-        _ onChange: @escaping @MainActor (String, WorkoutLiveActivitySnapshot.Lifecycle) -> Void
-    ) async {
-        var children: [String: Task<Void, Never>] = [:]
-        defer { children.values.forEach { $0.cancel() } }
-        func watch(_ id: String) {
-            guard children[id] == nil else { return }
-            children[id] = Task.detached { await watchStates(id: id, onChange) }
-        }
-        for activity in Activity<WorkoutActivityAttributes>.activities { watch(activity.id) }
-        for await activity in Activity<WorkoutActivityAttributes>.activityUpdates {
-            if Task.isCancelled { return }
-            watch(activity.id)
-        }
     }
 
     private nonisolated static func watchStates(

@@ -46,8 +46,13 @@ final class FakeWorkoutLiveActivityClient: WorkoutLiveActivityClient {
     func update(id: String, state: WorkoutActivityAttributes.ContentState, staleDate: Date?) async {
         if holdUpdates { await withCheckedContinuation { heldUpdates.append($0) } }
         updates.append((id, state, staleDate))
-        if let index = records.firstIndex(where: { $0.id == id }) { records[index].state = state }
+        if let index = records.firstIndex(where: { $0.id == id }) {
+            records[index].state = state
+            if records[index].lifecycle == .stale { records[index].lifecycle = .active } // a refresh clears staleness
+        }
     }
+
+    var heldCount: Int { heldUpdates.count }
 
     func releaseUpdates() {
         holdUpdates = false
@@ -72,6 +77,7 @@ final class FakeWorkoutLiveActivityClient: WorkoutLiveActivityClient {
         if let index = records.firstIndex(where: { $0.id == id }) {
             if dropsDismissedActivities, lifecycle == .dismissed { records.remove(at: index) } else { records[index].lifecycle = lifecycle }
         }
+        // (a real dismissal of an already-ended activity keeps its record id for the sweep)
         lifecycleHandlers.values.forEach { $0(id, lifecycle) }
     }
 
@@ -112,6 +118,7 @@ final class WorkoutLiveActivityCoordinatorTests: XCTestCase {
 
     private final class Clock: @unchecked Sendable {
         var now = F.now
+        func advance(_ seconds: TimeInterval) { now = now.addingTimeInterval(seconds) }
     }
 
     private struct Harness {
@@ -383,16 +390,50 @@ final class WorkoutLiveActivityCoordinatorTests: XCTestCase {
         XCTAssertEqual(h.client.live.count, 1, "An unrelated suppressed id never affects the current workout.")
     }
 
-    func testSystemEndingNearTheEightHourLimitIsNotASwipe() async {
-        let long = F.session(id: "long", [F.exercise("a", "A", sets: [F.set("a1", 1)])], startedAt: F.stamp(7.8 * 3600))
-        let h = harness(drafts: [long])
+    func testASystemEndingIsNeverASwipe() async {
+        let h = harness(drafts: [liveDraft()])
         await settle(h)
-        XCTAssertEqual(h.client.live.count, 1)
-        h.client.systemEnd(id: h.client.live[0].id)
+        h.client.systemEnd(id: h.client.live[0].id) // 8 h limit / force quit / Settings: `.ended`, not `.dismissed`
         await settle(h)
         h.coordinator.reconcile()
         await settle(h)
-        XCTAssertEqual(h.client.requests, 2, "The 8 h system ending is not user intent: the activity may be requested again.")
+        XCTAssertEqual(h.client.requests, 2, "The workout is still live, so the activity may be requested again.")
+        XCTAssertFalse(h.coordinator.diagnostics.contains("suppressed"))
+    }
+
+    func testDismissingAnAlreadyEndedActivityIsNotASwipe() async {
+        let h = harness(drafts: [liveDraft()])
+        await settle(h)
+        let id = h.client.live[0].id
+        h.client.systemEnd(id: id)
+        h.client.userDismiss(id: id) // the system's later cleanup of the ended activity
+        await settle(h)
+        XCTAssertFalse(h.coordinator.diagnostics.contains("suppressed"))
+        XCTAssertEqual(h.client.live.count, 1)
+    }
+
+    func testAnOldWorkoutResumedLaterIsStillSwipeSuppressed() async {
+        // The 8 h guard measures the ACTIVITY, not the workout: a workout begun this
+        // morning and resumed tonight gets a fresh activity whose swipe must stick.
+        let morning = F.session(id: "morning", [F.exercise("a", "A", sets: [F.set("a1", 1), F.set("a2", 2)])], startedAt: F.stamp(9 * 3600))
+        let h = harness(drafts: [morning])
+        await settle(h)
+        XCTAssertEqual(h.client.live.count, 1)
+        h.client.userDismiss(id: h.client.live[0].id)
+        await settle(h)
+        h.coordinator.reconcile()
+        await settle(h)
+        XCTAssertEqual(h.client.requests, 1)
+        XCTAssertTrue(h.client.live.isEmpty)
+    }
+
+    func testASwipeNearTheSystemLimitOfThisActivityIsTreatedAsTheSystem() async {
+        let h = harness(drafts: [liveDraft()])
+        await settle(h)
+        h.clock.advance(WorkoutLiveActivityCoordinator.systemLimitGuard + 60)
+        h.client.userDismiss(id: h.client.live[0].id)
+        await settle(h)
+        XCTAssertFalse(h.coordinator.diagnostics.contains("suppressed"))
     }
 
     func testTurningLiveActivitiesOffAndOnClearsSwipeSuppression() async {
@@ -419,18 +460,21 @@ final class WorkoutLiveActivityCoordinatorTests: XCTestCase {
     }
 
     func testOurOwnEndingsSurviveARelaunchOfTheCoordinator() async {
-        let h = harness(drafts: [liveDraft()])
+        let client = FakeWorkoutLiveActivityClient()
+        client.dropsDismissedActivities = false // the ended record stays listed across the restart
+        let h = harness(drafts: [liveDraft()], client: client)
         await settle(h)
         h.authority.saveAndLeave(sessionId: "session-1", leftAt: "2026-10-01T17:01:00Z")
         await settle(h)
-        XCTAssertTrue(h.client.live.isEmpty)
-        // New process: same defaults, same client; the old (ended) record may still be listed.
-        let relaunched = WorkoutLiveActivityCoordinator(client: h.client, defaults: h.defaults, now: { F.now })
+        XCTAssertTrue(client.live.isEmpty)
+        XCTAssertEqual(client.records.map(\.lifecycle), [.dismissed], "Precondition: our ended record is still listed.")
+        // New process: same defaults, same client.
+        let relaunched = WorkoutLiveActivityCoordinator(client: client, defaults: h.defaults, now: { F.now })
         h.authority.resume(sessionId: "session-1")
         relaunched.attach(to: h.authority, environment: .sandbox)
         for _ in 0..<4 { await Task.yield() }
         await relaunched.flush()
-        XCTAssertEqual(h.client.live.count, 1, "A pre-restart Save & Leave ending must not read as a swipe.")
+        XCTAssertEqual(client.live.count, 1, "A pre-restart Save & Leave ending must not read as a swipe.")
     }
 
     func testFlushWaitsForAnInFlightSyncAndRendersTheNewestState() async throws {
@@ -438,16 +482,28 @@ final class WorkoutLiveActivityCoordinatorTests: XCTestCase {
         await settle(h)
         h.client.holdUpdates = true
         h.authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
-        for _ in 0..<6 { await Task.yield() } // the sync is now suspended inside the held update
+        var spins = 0
+        while h.client.heldCount == 0, spins < 200 { await Task.yield(); spins += 1 }
+        XCTAssertEqual(h.client.heldCount, 1, "Precondition: a sync is suspended inside the held update.")
+
         h.authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2")
-        let flushed = Task { @MainActor in await h.coordinator.flush() }
-        for _ in 0..<4 { await Task.yield() }
+        let flushFinished = FlagBox()
+        let flushed = Task { @MainActor in
+            await h.coordinator.flush()
+            flushFinished.value = true
+        }
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertFalse(flushFinished.value, "flush must not return while the in-flight sync has not rendered.")
+
         h.client.releaseUpdates()
         await flushed.value
+        XCTAssertTrue(flushFinished.value)
         let state = try XCTUnwrap(h.client.live.first?.state)
         XCTAssertEqual(state.completedSets, 2, "flush returned only after the second completion was rendered.")
         XCTAssertEqual(state.target?.setId, "b3")
     }
+
+    private final class FlagBox { var value = false }
 
     func testAStaleActivityIsRefreshedEvenWhenItsContentIsUnchanged() async {
         let h = harness(drafts: [liveDraft()])
