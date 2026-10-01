@@ -122,6 +122,15 @@ struct AppDestinationRouterView: View {
             PhotoSetDetailView(setId: setId, initialPoseId: poseId)
         case .progressStream(let streamId) where streamId == "energy":
             EnergyHistoryView()
+        // Recovery / Sleep Evidence. Each screen reads its own bounded
+        // `recovery-sleep*` resource through `environment.recoverySleepAPI`
+        // (Server in Founder Production, synthetic fixture in Sandbox).
+        case .progressStream(let streamId) where streamId == "recovery":
+            RecoveryEvidenceView()
+        case .progressStream(let streamId) where streamId == RecoverySleepDestination.trendsStreamId:
+            RecoverySleepTrendsView()
+        case .progressStream(let streamId) where RecoverySleepDestination.sleepDay(fromStreamId: streamId) != nil:
+            RecoverySleepNightView(sleepDay: RecoverySleepDestination.sleepDay(fromStreamId: streamId) ?? "")
         // The bare Training Library root (`/progress/training/library`,
         // no area/exercise segment) — the same 10 canonical areas the
         // landing page's own "Training Areas" grid shows, rendered as a

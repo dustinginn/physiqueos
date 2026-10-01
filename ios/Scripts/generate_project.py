@@ -41,6 +41,7 @@ app_files = [
     ("Contracts", "DirectWeighInValidation.swift"),
     ("Contracts", "EvidenceDateParsing.swift"),
     ("Contracts", "EvidenceReadModel.swift"),
+    ("Contracts", "RecoverySleepReadModel.swift"),
     ("Contracts", "EvidenceHubUsage.swift"),
     ("Contracts", "EvidenceChronology.swift"),
     ("Contracts", "TrainingReadModel.swift"),
@@ -81,6 +82,7 @@ app_files = [
     ("Networking", "EvidenceAPI.swift"),
     ("Networking", "TrainingAPI.swift"),
     ("Networking", "ActivityAPI.swift"),
+    ("Networking", "RecoverySleepAPI.swift"),
     ("Networking", "NutritionAPI.swift"),
     ("Networking", "WeightEvidenceAPI.swift"),
     ("Networking", "WeightWriteAPI.swift"),
@@ -221,6 +223,10 @@ app_files = [
     ("Presentation/Evidence", "EvidenceViewModel.swift"),
     ("Presentation/Evidence", "EvidenceHeaderView.swift"),
     ("Presentation/Evidence", "EvidenceStreamRowView.swift"),
+    ("Presentation/Evidence", "SleepEvidencePresentation.swift"),
+    ("Presentation/Evidence", "SleepEvidenceCharts.swift"),
+    ("Presentation/Evidence", "RecoverySleepViewModels.swift"),
+    ("Presentation/Evidence", "RecoverySleepViews.swift"),
     ("Presentation/Evidence", "ActivityHistoryView.swift"),
     ("Presentation/Evidence", "ActivityHistoryViewModel.swift"),
     ("Presentation/Evidence", "ActivityDayView.swift"),
@@ -283,6 +289,7 @@ resource_files = [
     ("Resources", "EvidenceChronologyFixture.json"),
     ("Resources", "TrainingFixture.json"),
     ("Resources", "ActivityFixture.json"),
+    ("Resources", "RecoverySleepFixture.json"),
     ("Resources", "NutritionFixture.json"),
     ("Resources", "WeightFixture.json"),
     ("Resources", "DEXAFixture.json"),
@@ -392,6 +399,7 @@ test_files = [
     ("PhysiqueOSTests", "EvidenceReadModelTests.swift"),
     ("PhysiqueOSTests", "EvidenceReviewHeaderDateTests.swift"),
     ("PhysiqueOSTests", "EvidenceHubUsageTests.swift"),
+    ("PhysiqueOSTests", "RecoverySleepReadModelTests.swift"),
     ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
     ("PhysiqueOSTests", "TrainingLibraryCatalogTests.swift"),
     ("PhysiqueOSTests", "ActivityReadModelTests.swift"),
@@ -427,6 +435,7 @@ test_files = [
 ui_test_files = [
     ("PhysiqueOSUITests", "TrainingAcceptanceUITests.swift"),
     ("PhysiqueOSUITests", "GoalsAcceptanceUITests.swift"),
+    ("PhysiqueOSUITests", "RecoverySleepAcceptanceUITests.swift"),
 ]
 
 BUNDLE_ID_APP = "com.physiqueos.native.dev"

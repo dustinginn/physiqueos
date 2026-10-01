@@ -2174,9 +2174,15 @@ struct ProductionEvidenceAPI: EvidenceAPI {
         async let energyRead = ProductionEnergyAPI(api: api).fetchEnergyReport(scope: .all)
         async let dexaRead = ProductionDEXAAPI(api: api).fetchDEXAReport(scope: .all)
         async let photosRead = ProductionPhotosAPI(api: api).fetchPhotosLanding(scope: .all)
+        // Recovery is fail-soft: an authority without the Sleep read model
+        // (404) or a transient Sleep failure keeps the "Coming soon" row and
+        // never blanks the hub. Same bounded, cached `recovery-sleep` read the
+        // Recovery screen then reuses.
+        async let recoveryRead: RecoverySleepLanding? = try? ProductionRecoverySleepAPI(api: api).fetchLanding(policy: .cacheFirst)
         let (weight, training, nutrition, activity, energy, dexa, photos) = try await (
             weightRead, trainingRead, nutritionRead, activityRead, energyRead, dexaRead, photosRead
         )
+        let recovery = await recoveryRead
 
         let streams: [EvidenceStreamSummary] = [
             trainingStream(training),
@@ -2187,7 +2193,7 @@ struct ProductionEvidenceAPI: EvidenceAPI {
             activityStream(activity),
             energyStream(energy),
             timelineStream(),
-            comingSoonStream(id: "recovery", title: "Recovery", tone: .primary),
+            recovery.map(RecoverySleepHubSummary.stream) ?? comingSoonStream(id: "recovery", title: "Recovery", tone: .primary),
             comingSoonStream(id: "health-metrics", title: "Health Metrics", tone: .primary),
         ]
 

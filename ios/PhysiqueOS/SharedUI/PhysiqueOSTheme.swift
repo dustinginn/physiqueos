@@ -35,6 +35,18 @@ enum PhysiqueOSTheme {
     /// `--chart-3` (effort/amber).
     static let chartEffort = Color(hex: 0xFBBF24)
 
+    /// Recovery / Sleep Evidence. Total sleep uses the Recovery stream teal
+    /// (`EvidenceStreamPresentation` "recovery"); stages are also told apart
+    /// by lane position and labels, never by color alone. Awake is a neutral
+    /// slate on purpose — nothing here signals good or bad.
+    static let sleepTotal = Color(hex: 0x5EEAD4)
+    static let sleepDeep = Color(hex: 0x6366F1)
+    static let sleepCore = Color(hex: 0x60A5FA)
+    static let sleepREM = Color(hex: 0xA78BFA)
+    static let sleepAwake = Color(hex: 0xCBD5E1)
+    static let sleepUnspecified = Color(hex: 0x5EEAD4, opacity: 0.7)
+    static let sleepInBed = Color(hex: 0x94A3B8, opacity: 0.16)
+
     /// Nutrition semantics mirror the current web dark-theme tokens in
     /// `src/app/globals.css`. Keeping these centralized preserves visual
     /// continuity across future Native Nutrition surfaces.
