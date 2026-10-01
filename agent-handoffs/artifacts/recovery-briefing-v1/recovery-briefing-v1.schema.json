@@ -1,36 +1,30 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://physiqueos.local/schemas/recovery-briefing-v1.schema.json",
-  "title": "Recovery Briefing V1 read contract",
-  "description": "Non-shipping proposal. A period-level Recovery assessment for stored Briefing artifacts. It is context-only and must not create Goal Confidence observations.",
+  "title": "Recovery Briefing V1 shadow assessment contract",
+  "description": "Non-shipping, non-strategic Server-only shadow output. It must not be stored, published, or converted into V3 or Confidence evidence.",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schemaVersion",
-    "assessmentId",
-    "period",
-    "status",
-    "sleep",
-    "foamRolling",
-    "corroboration",
-    "commentary",
-    "policy",
-    "provenance"
+    "schemaVersion", "shadow", "assessmentId", "period", "status", "sleep",
+    "foamRolling", "corroboration", "commentary", "dataLimitations", "policy",
+    "provenance", "integrity"
   ],
   "properties": {
     "schemaVersion": { "const": "recovery_briefing_v1" },
-    "assessmentId": { "type": "string", "minLength": 1 },
+    "shadow": { "const": true },
+    "assessmentId": { "type": "string", "pattern": "^recovery_briefing_v1\\|[0-9a-f]{64}$" },
     "period": {
       "type": "object",
       "additionalProperties": false,
       "required": ["cadence", "startDate", "endDate", "timeZone", "expectedNights", "observedNights"],
       "properties": {
-        "cadence": { "enum": ["midweek", "weekly", "monthly", "dexa", "photo"] },
+        "cadence": { "enum": ["midweek", "weekly", "monthly"] },
         "startDate": { "type": "string", "format": "date" },
         "endDate": { "type": "string", "format": "date" },
         "timeZone": { "type": "string", "minLength": 1 },
-        "expectedNights": { "type": "integer", "minimum": 1 },
-        "observedNights": { "type": "integer", "minimum": 0 }
+        "expectedNights": { "type": "integer", "minimum": 1, "maximum": 31 },
+        "observedNights": { "type": "integer", "minimum": 0, "maximum": 31 }
       }
     },
     "status": {
@@ -42,17 +36,14 @@
         "label": { "enum": ["Green", "Yellow", "Red", "Not enough data"] },
         "reasonCodes": {
           "type": "array",
+          "uniqueItems": true,
           "items": {
             "enum": [
-              "period_typical",
-              "persistent_low_sleep",
-              "severe_persistent_low_sleep",
-              "corroborated_training_constraint",
-              "insufficient_period_nights",
+              "period_typical", "persistent_low_sleep", "severe_persistent_low_sleep",
+              "corroborated_training_constraint", "insufficient_period_nights",
               "insufficient_baseline_nights"
             ]
-          },
-          "uniqueItems": true
+          }
         }
       }
     },
@@ -78,13 +69,14 @@
         "periodSummary": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["averageMinutes", "deltaFromBaselineMinutes", "materialLowNights", "severeLowNights", "longestMaterialLowRun"],
+          "required": ["averageMinutes", "deltaFromBaselineMinutes", "materialLowNights", "severeLowNights", "longestMaterialLowRun", "longestSevereLowRun"],
           "properties": {
             "averageMinutes": { "type": ["number", "null"] },
             "deltaFromBaselineMinutes": { "type": ["number", "null"] },
             "materialLowNights": { "type": "integer", "minimum": 0 },
             "severeLowNights": { "type": "integer", "minimum": 0 },
-            "longestMaterialLowRun": { "type": "integer", "minimum": 0 }
+            "longestMaterialLowRun": { "type": "integer", "minimum": 0 },
+            "longestSevereLowRun": { "type": "integer", "minimum": 0 }
           }
         },
         "trend": {
@@ -101,7 +93,7 @@
                 "additionalProperties": false,
                 "required": ["label", "totalSleepMinutes", "reliability"],
                 "properties": {
-                  "label": { "type": "string" },
+                  "label": { "type": "string", "minLength": 1 },
                   "totalSleepMinutes": { "type": ["number", "null"] },
                   "reliability": { "enum": ["reliable", "timezone_uncertain", "missing"] }
                 }
@@ -132,9 +124,9 @@
         "additionalProperties": false,
         "required": ["domain", "signal", "temporalRelation", "language", "causality"],
         "properties": {
-          "domain": { "enum": ["training", "injury_limitation"] },
-          "signal": { "type": "string", "minLength": 1 },
-          "temporalRelation": { "enum": ["same_period", "sleep_precedes_signal", "repeated_prior_windows"] },
+          "domain": { "const": "training" },
+          "signal": { "const": "material_training_constraint" },
+          "temporalRelation": { "enum": ["same_period", "sleep_precedes_signal"] },
           "language": { "type": "string", "minLength": 1 },
           "causality": { "const": "not_inferred" }
         }
@@ -150,27 +142,52 @@
         "body": { "type": ["string", "null"] }
       }
     },
+    "dataLimitations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
     "policy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["version", "confidenceCoupling", "foamCanSetStatus", "causalClaimsAllowed"],
+      "required": ["version", "confidenceCoupling", "foamCanSetStatus", "foamCanEscalateStatus", "foamCanRescueStatus", "trainingCanManufactureNonGreenStatus", "causalClaimsAllowed", "medicalThresholds"],
       "properties": {
         "version": { "const": "recovery_status_policy_v1" },
         "confidenceCoupling": { "const": "none" },
         "foamCanSetStatus": { "const": false },
-        "causalClaimsAllowed": { "const": false }
+        "foamCanEscalateStatus": { "const": false },
+        "foamCanRescueStatus": { "const": false },
+        "trainingCanManufactureNonGreenStatus": { "const": false },
+        "causalClaimsAllowed": { "const": false },
+        "medicalThresholds": { "const": false }
       }
     },
     "provenance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["evidenceCutoff", "generatedAt", "sleepEvidenceIds", "foamEvidenceIds", "trainingEvidenceIds"],
+      "required": ["producer", "producerVersion", "shadow", "strategicEligibility", "evidenceCutoff", "generatedAt", "sleepEvidenceIds", "foamEvidenceIds", "trainingEvidenceIds", "repositoryReads", "persistenceWrites", "runtimeClockReads"],
       "properties": {
+        "producer": { "const": "recovery_briefing_assessment_service_v1" },
+        "producerVersion": { "const": "recovery_briefing_assessment_service_v1" },
+        "shadow": { "const": true },
+        "strategicEligibility": { "const": "excluded" },
         "evidenceCutoff": { "type": "string", "format": "date-time" },
         "generatedAt": { "type": "string", "format": "date-time" },
         "sleepEvidenceIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
         "foamEvidenceIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
-        "trainingEvidenceIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+        "trainingEvidenceIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "repositoryReads": { "const": 0 },
+        "persistenceWrites": { "const": 0 },
+        "runtimeClockReads": { "const": 0 }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "semanticDigest"],
+      "properties": {
+        "algorithm": { "const": "sha256:stable-json" },
+        "semanticDigest": { "type": "string", "pattern": "^sha256_[0-9a-f]{64}$" }
       }
     }
   }
