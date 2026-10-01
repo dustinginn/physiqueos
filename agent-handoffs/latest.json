@@ -1,80 +1,71 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-29T08:30:00Z",
+  "generated_at_utc": "2026-10-01T06:13:29Z",
   "task": {
-    "id": "peptide-protocol-native-ux-redesign-next-batch-20260929",
-    "title": "DESIGN PUBLISHED: simplified peptide editor + canonical Pause/Resume (execution-item suspension window) + 3 Build 69 roll-forwards; implementation starting",
-    "agent": "claude",
-    "status": "in_progress"
+    "id": "sleep-verify-import-oct2-d0-20261001",
+    "title": "Verify historical Sleep Evidence import and activate October 2 prospective validation",
+    "agent": "codex",
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "production_server_sha": "98534bf8e91dd48da62fc807beae5d14c282aa04",
-    "native_build67_final_sha": "8359bdcb",
-    "native_reviewed_candidate_sha": "dc7763e5",
-    "native_build68_final_sha": "537f538b",
-    "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
-    "native_build68_processing_status": "VALID",
-    "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "98534bf8",
-    "server_candidate_branch": "claude/server-records-on-prod-20260929",
-    "production_deployment_id": "ab7fe481-abd9-4334-bfcd-f224560bb801",
-    "previous_production_server_sha": "faa9151a8118acf48fda6541e8e23898f1148246",
-    "native_candidate_sha": "efa65db1",
-    "native_candidate_branch": "claude/native-build69-integrated-20260929",
-    "native_recommended_build": "69",
-    "codex_celebration_branch": "codex/native-workout-complete-record-celebration-20260928",
-    "codex_celebration_sha": "ef54e482",
-    "native_build69_final_sha": "efa65db1",
-    "native_build69_delivery_id": "91831873-845e-46af-aa6a-bb9629cf9999",
-    "native_build69_processing_status": "VALID",
-    "native_build69_dsym_uuid": "A621757F-1B2A-31FF-9D2D-62FD831781E6",
-    "last_uploaded_build": "69"
+    "production_server_sha": "b81c784e5b8a6d5b82ed02a649b5fa3d0edeeff8",
+    "production_deployment": "8008f928-02b6-46b0-99ab-d403b870499a",
+    "native_sha": "b6d98889a9ebac2fd6755ec126c1b5ba394545fa",
+    "native_build": "74",
+    "claude_native_proposal_sha": "d550c629e6028fef2db44e98cd51f2a4d2d6ff2f"
   },
   "result": {
-    "summary": "Audit (8 readers + critic + 3-lens adversarial critique) established the execution item as the sole peptide authority (versionless protocol roots; protocol.status must stay active). Design: history-preserving timeline rule (S1), Change dose = steady dose from a date (S2), pause/resume as a dated suspension window on the execution item enforced at the projection choke point plus Priority Detail, nextDue, completion ports and Morning Check-In (S3), additive read keys (S4). Native: one screen, tappable rows + focused sheets, Advanced disclosure, no generator vocabulary. Roll-forwards confirmed Server-only (provenance caption, Foam Rolling skip two layers, Weekly Averages six-week cap).",
+    "summary": "Verified the completed Build 74 historical import at 8,601 unique samples, 87 batches, and 87 sleep days from 2026-07-06 through 2026-09-30. All history is permanently quarantined, September is 30/30 canon-v2 semantic parity, the exact 2,878-sample validation remains zero-write green, live Recovery/Sleep reads pass, historical overlap with Oct 2 is 0/0, and read precedence prevents future double-count without deletion. Activated prospective Sleep for Oct 2 in validation_only with Oura preferred, no backfill, and strategic use off; independent post-apply audits pass with strategic leakage zero.",
     "success": true,
-    "production_mutated": false,
+    "production_mutated": true,
     "deployed": false,
     "testflight_uploaded": false,
     "founder_device_operated": false
   },
   "validation": {
-    "tests": {
-      "status": "pending",
-      "summary": "Implementation not started at publish time."
-    },
-    "review": {
+    "historical_import": {
       "status": "passed",
-      "summary": "Design critique: 3 lenses, sound-with-changes; blockers folded into the map."
+      "summary": "8,601 unique samples; 87 unique batches/days; first 2026-07-06; last 2026-09-30; v2 and permanent quarantine on all records; ordinary Sleep 0/0; D0 overlap 0/0."
     },
-    "replay_fidelity": {
+    "september_v2": {
       "status": "passed",
-      "summary": "Read-only production shapes (peptides, Foam Rolling protocol, weight weeks) verified; no production change."
+      "summary": "30/30 exact semantic parity after canonical key ordering; 11 duplicate-copy nights resolved to one conflict-free copy within tolerance; 19/19 unaffected equivalent; exact 2,878-sample zero-write audit passed."
+    },
+    "read_model": {
+      "status": "passed",
+      "summary": "Landing, ranged trends, weekly aggregation, paging, night detail, stages, continuity, timeline, provenance/timezone, scoped queries, and prospective-over-historical day precedence passed against production data."
+    },
+    "strategic_quarantine": {
+      "status": "passed",
+      "summary": "No historical V3, Goal, Briefing/Narrative/recommendation, Confidence, or strategic Evidence mutation/reference; source audit leak total 0."
+    },
+    "prospective_policy": {
+      "status": "passed",
+      "summary": "Oct 2 D0 applied in validation_only; floor 2026-10-02T01:00:00Z; Oura preference; historicalBackfill false; strategic quarantine; no strategicEffectiveAt; served capability enabled."
+    },
+    "native_contract": {
+      "status": "reconciliation_required",
+      "summary": "Claude d550c629 proposal is not decode-compatible with the live resource names, query parameters, envelopes, enum values, trends arrays, or flat night-detail shape. Exact adapter differences are in the full report."
     }
   },
-  "decisions_required": [
-    "Optional Founder input (not blocking): should briefings say 'paused' for a paused peptide (today they keep treating it as part of the plan)?",
-    "Optional: include supplement reminders in Mark Skipped (deferred in this build)."
-  ],
+  "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "Sep 28 Activity is still frozen in production (supersedes continue to 837 cal); self-heals at the next-morning complete_day summary."
+    "A raw JSON byte comparison initially flagged all September nights because equivalent object keys were inserted in a different order; recursive field/value comparison and canonical key ordering proved 30/30 semantic identity.",
+    "Claude's Native Recovery/Sleep UI is cleanly separated behind models/APIs but targets its proposed v0 contract, not the deployed Server contract; it must be adapted before integrated Native acceptance."
   ],
   "backlog": [
-    "Workout Complete performance-record celebration: Codex, pending; integrate on its GH report.",
-    "Cross-device freeze residuals: time-based takeover / missing-metric guard / long-supersede alert.",
-    "Duplicate Logger instance guard; skip 412 auto-refetch; prune notifier/celebration keys.",
-    "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
-    "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
+    "Observe 2-3 prospective nights for background delivery, Oura primary selection, late-update reconciliation, recent-window behavior, one canonical day, v2 stage/continuity display, Evidence updates, and zero strategic leakage.",
+    "Adapt Claude RecoverySleepReadModel.swift and RecoverySleepAPI.swift plus fixtures/tests to the exact live Server contract; do not merge the proposal unchanged.",
+    "Keep strategic Sleep off until prospective sync acceptance, Recovery Briefing design/review, and a separate explicit Founder authorization."
   ],
-  "recommended_next_step": "Claude implements Server (gated) and Native candidates per the map, then publishes the combined candidate for review.",
-  "full_report_path": "agent-handoffs/reports/20260929T083000Z-peptide-protocol-editor-pause-resume-design-map.md",
+  "recommended_next_step": "Run the defined 2-3-night prospective acceptance beginning with sleep day 2026-10-02. Do not rerun a destructive historical operation, do not enable strategic Sleep, and do not merge Claude's Native read models without the documented contract adapter.",
+  "full_report_path": "agent-handoffs/reports/20261001T061329Z-sleep-historical-import-verified-prospective-d0.md",
   "related_report_paths": [
-    "agent-handoffs/reports/20260929T050000Z-server-98534bf8-and-native-build69-distribution.md",
-    "agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md",
-    "agent-handoffs/reports/20260929T043000Z-daily-driver-server-faa9151a-production-deploy.md",
-    "agent-handoffs/reports/20260929T050000Z-native-consolidated-daily-driver-candidate-build69.md"
+    "agent-handoffs/reports/20261001T053235Z-healthkit-sleep-v2-server-deployed-founder-import-gate.md",
+    "agent-handoffs/reports/20261001T050828Z-healthkit-sleep-v2-historical-evidence-prospective-prep.md",
+    "agent-handoffs/reports/20261001T044541Z-healthkit-sleep-evidence-native-implementation.md"
   ],
   "safety": {
     "contains_secrets": false,
