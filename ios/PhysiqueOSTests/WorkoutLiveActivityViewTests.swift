@@ -94,6 +94,7 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
 
     private func render<V: View>(_ view: V, size: CGSize, scheme: ColorScheme = .dark) -> UIImage {
         let host = UIHostingController(rootView: view.environment(\.colorScheme, scheme))
+        host.safeAreaRegions = []
         host.view.bounds = CGRect(origin: .zero, size: size)
         host.view.backgroundColor = .clear
         let window = UIWindow(frame: CGRect(origin: .zero, size: size))
