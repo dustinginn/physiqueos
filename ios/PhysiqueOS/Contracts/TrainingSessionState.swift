@@ -88,7 +88,7 @@ final class UnsetTrainingRestPreferences: TrainingRestPreferenceProviding {
 @MainActor
 final class UserDefaultsTrainingRestPreferences: TrainingRestPreferenceProviding {
     static let globalKey = "physiqueos.trainingLogger.restPreference.global.v1"
-    private let defaults: UserDefaults
+    private nonisolated(unsafe) let defaults: UserDefaults // UserDefaults is thread-safe
 
     nonisolated init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 

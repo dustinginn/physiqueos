@@ -81,7 +81,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         return draft
     }
 
-    private func authority(
+    private func makeAuthority(
         _ store: TrainingLoggerDraftStore,
         environment: NativeAPIEnvironment = .sandbox,
         rest: TrainingRestConfiguration? = .stopwatch,
@@ -110,7 +110,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         var legacy = liveSession()
         legacy.exercises[0].sets[0].isCompleted = true // completed before completedAt existed
         let store = RecordingStore([legacy, liveSession(id: "past", mode: .past)])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
 
         XCTAssertEqual(Set(authority.drafts.map(\.id)), ["session-1", "past"])
         XCTAssertNil(completedAt(authority, "b1"), "Older completed sets are never given an invented timestamp.")
@@ -124,7 +124,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         let stale = liveSession(id: "stale", startedAt: "2026-09-30T01:00:00Z")
         let past = liveSession(id: "past", mode: .past)
         let active = liveSession(id: "active", startedAt: "2026-10-01T16:00:00Z")
-        let (authority, _) = authority(RecordingStore([left, submitted, stale, past, active]))
+        let (authority, _) = makeAuthority(RecordingStore([left, submitted, stale, past, active]))
         XCTAssertEqual(authority.activeLiveSession()?.id, "active")
     }
 
@@ -132,7 +132,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testCompleteSetStampsCompletedAtAdvancesRevisionAndPersistsBeforePublishing() {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         var publishedAtPersistTime: Bool?
         store.onPersist = { written in
             publishedAtPersistTime = authority.draft(id: written.id)?.currentRevision == written.currentRevision
@@ -151,7 +151,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testDuplicateCompletionIsSafeAndPreservesTimestampAndRest() {
         let store = RecordingStore([liveSession()])
-        let (authority, clock) = authority(store)
+        let (authority, clock) = makeAuthority(store)
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1",
                                              context: .intent(mutationId: "m1", expectedRevision: 0)), .applied(revision: 1))
         let stamped = completedAt(authority, "b1")
@@ -173,11 +173,11 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testDuplicateMutationIdSurvivesRelaunch() {
         let store = RecordingStore([liveSession()])
-        let (first, _) = authority(store)
+        let (first, _) = makeAuthority(store)
         first.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: .intent(mutationId: "m1", expectedRevision: 0))
         first.setCompletion(sessionId: "session-1", exerciseId: "bench", setId: "b1", completed: false)
 
-        let (relaunched, _) = authority(store)
+        let (relaunched, _) = makeAuthority(store)
         XCTAssertEqual(relaunched.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1",
                                               context: .intent(mutationId: "m1", expectedRevision: 0)), .duplicate(revision: 2),
                        "A replayed intent must not re-complete a set the Founder has since un-completed.")
@@ -186,7 +186,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testMutationLedgerIsBounded() {
         let store = RecordingStore([liveSession(exercises: [exercise("bench", sets: (1...40).map { set("s\($0)", $0) })])])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         for number in 1...40 {
             authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "s\(number)",
                                   context: intent(authority, "m\(number)"))
@@ -198,7 +198,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testStaleRevisionIsRefusedWithoutWritingButSatisfiedRequestIsUnchanged() {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         authority.setValue(sessionId: "session-1", exerciseId: "bench", setId: "b1", field: .load, value: 105) // UI edit -> rev 1
 
         let stale = authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1",
@@ -216,7 +216,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testIdentityIsValidatedSoAStaleIntentCannotCompleteTheWrongSet() {
         let store = RecordingStore([liveSession(), liveSession(id: "other", startedAt: "2026-10-01T16:40:00Z")])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let intent = TrainingSessionMutationContext.intent(mutationId: "m", expectedRevision: 0)
 
         XCTAssertEqual(authority.completeSet(sessionId: "missing", exerciseId: "bench", setId: "b1", context: intent), .rejected(.sessionNotFound))
@@ -236,8 +236,8 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         func outcome(_ adjust: (inout TrainingLoggerDraft) -> Void) -> TrainingSessionMutationOutcome {
             var draft = liveSession()
             adjust(&draft)
-            let (authority, _) = authority(RecordingStore([draft]))
-            return authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: intent)
+            let (subject, _) = makeAuthority(RecordingStore([draft]))
+            return subject.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: intent)
         }
         XCTAssertEqual(outcome { $0.leftAt = "2026-10-01T16:59:00Z" }, .rejected(.sessionNotMutable))
         XCTAssertEqual(outcome { $0.step = .review }, .rejected(.sessionNotMutable))
@@ -246,8 +246,8 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(outcome { $0.mode = .past }, .rejected(.sessionNotMutable))
         XCTAssertEqual(outcome { $0.beginAddingExercises() }, .applied(revision: 1), "Adding exercises mid-workout is still the live workout.")
 
-        let (authority, _) = authority(RecordingStore([liveSession()]))
-        authority.beginSubmission(sessionId: "session-1")
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
+        XCTAssertTrue(authority.beginSubmission(sessionId: "session-1"))
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: intent), .rejected(.sessionNotMutable),
                        "Nothing external may change a draft whose Finish commit is in flight.")
         authority.endSubmission(sessionId: "session-1")
@@ -256,7 +256,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testIntentCompletesOnlyFilledSetsAndCannotUseStructuralEdits() {
         let store = RecordingStore([liveSession(exercises: [exercise("bench", sets: [set("blank", 1, reps: nil, load: nil), set("b2", 2)])])])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let intent = TrainingSessionMutationContext.intent(mutationId: "m", expectedRevision: 0)
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "blank", context: intent), .rejected(.setValuesIncomplete))
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "blank"), .applied(revision: 1),
@@ -269,7 +269,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testPersistenceFailureLeavesMemoryEqualToStorage() {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         let before = authority.draft(id: "session-1")
         store.failPersist = true
@@ -292,7 +292,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: "draft")
         store.save(liveSession())
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
 
         XCTAssertEqual(authority.setValue(sessionId: "session-1", exerciseId: "bench", setId: "b1", field: .load, value: .nan), .rejected(.persistenceFailed))
         XCTAssertEqual(authority.draft(id: "session-1")?.exercises[0].sets[0].load, 100)
@@ -305,7 +305,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testCompletedAtSetPreserveClearSemantics() {
         let store = RecordingStore([liveSession()])
-        let (authority, clock) = authority(store)
+        let (authority, clock) = makeAuthority(store)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         let first = completedAt(authority, "b1")
         clock.advance(20)
@@ -328,7 +328,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testStructuralEditCannotForgeOrMoveATimestamp() {
         let store = RecordingStore([liveSession()])
-        let (authority, clock) = authority(store)
+        let (authority, clock) = makeAuthority(store)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         let original = completedAt(authority, "b1")
         clock.advance(60)
@@ -340,7 +340,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testRetrospectiveEntryRecordsNoCompletionInstantOrRest() {
         let store = RecordingStore([liveSession(mode: .past)])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         XCTAssertEqual(authority.draft(id: "session-1")?.exercises[0].sets[0].isCompleted, true)
         XCTAssertNil(completedAt(authority, "b1"), "Data-entry time is not when a past set was performed.")
@@ -351,7 +351,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testStopwatchStartsAtCompletionAndNextCompletionReplacesIt() throws {
         let store = RecordingStore([liveSession()])
-        let (authority, clock) = authority(store, rest: .stopwatch)
+        let (authority, clock) = makeAuthority(store, rest: .stopwatch)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         let first = try XCTUnwrap(authority.draft(id: "session-1")?.rest)
         XCTAssertEqual(first.mode, .stopwatch)
@@ -371,7 +371,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testCountdownUsesAbsoluteEndAndExpiryChangesNothing() throws {
         let store = RecordingStore([liveSession()])
-        let (authority, clock) = authority(store, rest: .countdown(seconds: 90))
+        let (authority, clock) = makeAuthority(store, rest: .countdown(seconds: 90))
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         let rest = try XCTUnwrap(authority.draft(id: "session-1")?.rest)
         XCTAssertEqual(rest.mode, .countdown)
@@ -391,12 +391,12 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testOffAndInvalidCountdownCreateNoRestAndOffEndsAPriorRest() {
         for configuration: TrainingRestConfiguration? in [nil, .off, .countdown(seconds: 0), .init(mode: .countdown, countdownDurationSeconds: nil)] {
-            let (authority, _) = authority(RecordingStore([liveSession()]), rest: configuration)
+            let (authority, _) = makeAuthority(RecordingStore([liveSession()]), rest: configuration)
             authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
             XCTAssertNil(authority.draft(id: "session-1")?.rest, "\(String(describing: configuration))")
         }
 
-        let (authority, _) = authority(RecordingStore([liveSession()]), rest: .stopwatch)
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]), rest: .stopwatch)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         XCTAssertNotNil(authority.draft(id: "session-1")?.rest)
         authority.setRestConfiguration(sessionId: "session-1", .off)
@@ -419,7 +419,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     func testUncompletingTheRestSourceEndsRestButOtherSetsDoNot() {
-        let (authority, _) = authority(RecordingStore([liveSession()]))
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2")
         authority.setCompletion(sessionId: "session-1", exerciseId: "bench", setId: "b1", completed: false)
@@ -429,7 +429,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     func testEndRestIsIdempotentAndRefusesAReplacedInterval() throws {
-        let (authority, _) = authority(RecordingStore([liveSession()]))
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         let firstId = try XCTUnwrap(authority.draft(id: "session-1")?.rest?.id)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2")
@@ -443,12 +443,12 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     func testRelaunchRestoresStopwatchAndCountdownExactly() throws {
         for configuration in [TrainingRestConfiguration.stopwatch, .countdown(seconds: 150)] {
             let store = RecordingStore([liveSession()])
-            let (first, _) = authority(store, rest: configuration)
+            let (first, _) = makeAuthority(store, rest: configuration)
             first.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
             let rest = try XCTUnwrap(first.draft(id: "session-1")?.rest)
 
             let later = Clock(t0.addingTimeInterval(70))
-            let (relaunched, _) = authority(store, rest: configuration, clock: later)
+            let (relaunched, _) = makeAuthority(store, rest: configuration, clock: later)
             XCTAssertEqual(relaunched.draft(id: "session-1")?.rest, rest)
             let projection = try XCTUnwrap(TrainingSessionLiveProjection.make(from: relaunched.draft(id: "session-1")!, now: later.now))
             XCTAssertEqual(projection.rest?.startedAt, t0, "Stopwatch elapsed = now - startedAt = 70 s, with no app ticking.")
@@ -463,7 +463,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testSaveAndLeaveEndsRestResumeDoesNotRestartIt() {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         authority.saveAndLeave(sessionId: "session-1", leftAt: "2026-10-01T17:05:00Z")
         XCTAssertNil(authority.draft(id: "session-1")?.rest)
@@ -478,7 +478,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testFinishStampsOnceAndEndsRestCancelAndCommitEndSessionsWithReasons() {
         let store = RecordingStore([liveSession(), liveSession(id: "second", startedAt: "2026-10-01T16:45:00Z")])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         authority.markFinishing(sessionId: "session-1", finishedAt: "2026-10-01T17:30:00Z")
         authority.markFinishing(sessionId: "session-1", finishedAt: "2026-10-01T17:45:00Z")
@@ -497,7 +497,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     func testAwaitingDurabilityEndsRestAndBlocksIntents() {
-        let (authority, _) = authority(RecordingStore([liveSession()]))
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         authority.setSubmissionState(sessionId: "session-1", .acceptedProcessing)
         XCTAssertNil(authority.draft(id: "session-1")?.rest)
@@ -507,7 +507,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testMultipleDraftsAreIndependent() {
         let store = RecordingStore([liveSession(), liveSession(id: "past", mode: .past)])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let started = authority.startSession(mode: .live, workoutDate: "2026-10-01", startedAt: "2026-10-01T16:58:00Z")
         XCTAssertEqual(started?.currentRevision, 1)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
@@ -553,7 +553,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testViewModelRendersAuthorityAndAnIntentIsVisibleImmediately() async throws {
         let store = RecordingStore()
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let viewModel = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
         await viewModel.load()
         viewModel.start(mode: .live)
@@ -581,7 +581,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testIntentAfterUIAndUIAfterIntentNeverLoseUpdatesThroughTheStructuralEditPath() async throws {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let viewModel = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
         await viewModel.load()
         viewModel.resume(draftId: "session-1")
@@ -598,7 +598,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     func testStaleRowTapCannotInvertANewerCompletion() async throws {
-        let (authority, _) = authority(RecordingStore([liveSession()]))
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
         let viewModel = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
         await viewModel.load()
         viewModel.resume(draftId: "session-1")
@@ -610,7 +610,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testReopenedScreenSeesCurrentAuthorityStateWithoutReload() async throws {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let first = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
         await first.load()
         first.resume(draftId: "session-1")
@@ -628,7 +628,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testViewModelPersistIsANoOpAndEditsWriteExactlyOnce() async throws {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let viewModel = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
         await viewModel.load()
         viewModel.resume(draftId: "session-1")
@@ -642,7 +642,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testViewModelSurfacesOnlyPersistenceFailure() async throws {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let viewModel = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
         await viewModel.load()
         viewModel.resume(draftId: "session-1")
@@ -658,13 +658,13 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     // MARK: Review hardening
 
     func testIntentWithoutRevisionIsRefused() {
-        let (authority, _) = authority(RecordingStore([liveSession()]))
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
         let unversioned = TrainingSessionMutationContext(origin: .intent, mutationId: "m", expectedRevision: nil)
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: unversioned), .rejected(.revisionRequired))
     }
 
     func testUnchangedIntentReplayedAfterUndoCannotReapply() {
-        let (authority, _) = authority(RecordingStore([liveSession()]))
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1") // UI first, rev 1
         let rendered = intent(authority, "m1")
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: rendered), .unchanged(revision: 1))
@@ -675,7 +675,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testEndedSessionCannotBeRecreatedByALateWholeDraftWrite() async throws {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let viewModel = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
         await viewModel.load()
         viewModel.resume(draftId: "session-1")
@@ -687,7 +687,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     func testSecondFinishForTheSameSessionIsRefusedByTheLock() {
-        let (authority, _) = authority(RecordingStore([liveSession()]))
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
         XCTAssertTrue(authority.beginSubmission(sessionId: "session-1"))
         XCTAssertFalse(authority.beginSubmission(sessionId: "session-1"))
         authority.endSubmission(sessionId: "session-1")
@@ -698,7 +698,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         var draft = liveSession()
         draft.exercises[0].sets[0].isCompleted = true
         draft.rest = .init(id: "r", mode: .off, startedAt: "2026-10-01T16:59:00.000Z", endsAt: nil, durationSeconds: nil, sourceExerciseId: "bench", sourceSetId: "b1")
-        let (authority, _) = authority(RecordingStore([draft]))
+        let (authority, _) = makeAuthority(RecordingStore([draft]))
         authority.setValue(sessionId: "session-1", exerciseId: "bench", setId: "b2", field: .reps, value: 9)
         XCTAssertNil(authority.draft(id: "session-1")?.rest)
     }
@@ -708,7 +708,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     func testInterleavedUIAndIntentCallersFromManyTasksSerializeWithoutLoss() async throws {
         let sets = (1...24).map { set("s\($0)", $0) }
         let store = RecordingStore([liveSession(exercises: [exercise("bench", sets: sets)])])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
 
         await withTaskGroup(of: Void.self) { group in
             for number in 1...24 {
@@ -742,7 +742,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     func testCompareAndSetLetsExactlyOneOfTwoRacingIntentsWin() async {
-        let (authority, _) = authority(RecordingStore([liveSession()]))
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
         async let first = authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1",
                                                 context: .intent(mutationId: "a", expectedRevision: 0))
         async let second = authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2",
@@ -753,7 +753,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     func testTwoRapidCompletionsOrderTimestampsEvenWithinOneSecond() {
-        let (authority, clock) = authority(RecordingStore([liveSession()]))
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
         clock.advance(0.2)
         authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2")
@@ -768,7 +768,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     func testSetEntryStaysLocalAndWritesOncePerKeystroke() async throws {
         let store = RecordingStore([liveSession()])
-        let (authority, _) = authority(store)
+        let (authority, _) = makeAuthority(store)
         let viewModel = TrainingLoggerViewModel(api: api, writeAPI: NotAvailableTrainingWriteAPI(), sessionAuthority: authority)
         await viewModel.load()
         viewModel.resume(draftId: "session-1")
