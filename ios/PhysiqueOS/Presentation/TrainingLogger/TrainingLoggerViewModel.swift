@@ -123,6 +123,10 @@ final class TrainingLoggerViewModel {
                 var recoveredCompletions: [TrainingLoggerDraft] = []
                 for candidate in savedDrafts {
                     if await writeAPI.isDraftAlreadyDurable(candidate) {
+                        // Only the caller that actually ends the session runs
+                        // its cleanup, so two screens recovering the same
+                        // draft never reconcile its evidence twice.
+                        guard sessionAuthority.endSession(sessionId: candidate.id, reason: .committed).isAccepted else { continue }
                         // Exact deterministic identity/fingerprint proof
                         // clears only this residue. Same-date/category sibling
                         // drafts remain independent and untouched. Attached
@@ -137,7 +141,6 @@ final class TrainingLoggerViewModel {
                                 await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
                             }
                         }
-                        sessionAuthority.endSession(sessionId: candidate.id, reason: .committed)
                         recoveredCompletions.append(candidate)
                     } else if candidate.submissionState != nil {
                         scheduleDurabilityRecovery(for: candidate)
@@ -167,7 +170,7 @@ final class TrainingLoggerViewModel {
         completedPerformanceRecords = []
         completedDraft = nil
         selectedDraftId = sessionAuthority.startSession(mode: mode, workoutDate: workoutDate, startedAt: startedAt)?.id
-        validationMessage = nil
+        validationMessage = selectedDraftId == nil ? "This workout couldn't be saved on this device. Try again." : nil
     }
 
     func resume() {
@@ -184,12 +187,12 @@ final class TrainingLoggerViewModel {
             return
         }
         selectedDraftId = draftId
+        validationMessage = nil
         noteRejection(sessionAuthority.resume(sessionId: draftId))
         if draft?.supportingEvidenceAssets.isEmpty == false,
            draft?.supportingWorkouts == nil {
             update { $0.addSupportingEvidence([]) }
         }
-        validationMessage = nil
     }
 
     func discardSavedDraft() {
@@ -311,19 +314,23 @@ final class TrainingLoggerViewModel {
     func submit() async {
         guard canWrite, completedDraft == nil, let sessionId = draft?.id, !isSubmitting else { return }
         if draft?.mode == .live {
-            // Stamps `finishedAt` only the first time; always ends rest.
+            // Stamps `finishedAt` only the first time; always ends rest. A
+            // refused stamp stops here: committing without the persisted
+            // window would change the idempotency signature on retry.
             if draft?.finishedAt == nil { validationMessage = nil }
-            noteRejection(sessionAuthority.markFinishing(
+            let stamped = sessionAuthority.markFinishing(
                 sessionId: sessionId, finishedAt: ISO8601DateFormatter().string(from: now())
-            ))
+            )
+            noteRejection(stamped)
+            guard stamped.isAccepted else { return }
         }
         guard let submittedDraft = draft else { return }
         guard authority == .founderProduction else {
             completeLocalCapture()
             return
         }
+        guard sessionAuthority.beginSubmission(sessionId: sessionId) else { return }
         isSubmitting = true
-        sessionAuthority.beginSubmission(sessionId: sessionId)
         validationMessage = nil
         refreshWarning = nil
         defer {
@@ -408,10 +415,11 @@ final class TrainingLoggerViewModel {
         _ candidate: TrainingLoggerDraft,
         commitResult: TrainingCommitResult? = nil
     ) {
-        if candidate.supportingEvidenceAssets.isEmpty {
+        // Only the caller that actually ends the session owns its cleanup.
+        let ended = sessionAuthority.endSession(sessionId: candidate.id, reason: .committed).isAccepted
+        if ended, candidate.supportingEvidenceAssets.isEmpty {
             attachmentStore.removeAll(draftId: candidate.id)
         }
-        sessionAuthority.endSession(sessionId: candidate.id, reason: .committed)
         if draft?.id == candidate.id || selectedDraftId == candidate.id {
             var completed = candidate
             completed.step = .complete
@@ -422,6 +430,7 @@ final class TrainingLoggerViewModel {
             processingMessage = nil
             loadCompletedPerformanceRecords(for: candidate, commitResult: commitResult)
         }
+        guard ended else { return }
         Task { [writeAPI] in
             await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
         }

@@ -165,7 +165,9 @@ struct TrainingSessionMutationContext: Equatable, Sendable {
 
     static let ui = Self(origin: .ui, mutationId: nil, expectedRevision: nil)
     static let system = Self(origin: .system, mutationId: nil, expectedRevision: nil)
-    static func intent(mutationId: String, expectedRevision: Int?) -> Self {
+    /// Intents always carry the revision they were rendered from, so a
+    /// replayed or delayed id can never re-apply after a newer change.
+    static func intent(mutationId: String, expectedRevision: Int) -> Self {
         .init(origin: .intent, mutationId: mutationId, expectedRevision: expectedRevision)
     }
 }
@@ -173,6 +175,11 @@ struct TrainingSessionMutationContext: Equatable, Sendable {
 enum TrainingSessionMutationRejection: Error, Equatable, Sendable {
     case writesNotAuthorized
     case sessionNotFound
+    /// The id belongs to a session that already ended in this process
+    /// (cancelled, discarded, committed); it is never re-created.
+    case sessionEnded
+    /// An `.intent` mutation must name the revision it was rendered from.
+    case revisionRequired
     case exerciseNotFound
     case setNotFound
     /// Refused by the compare-and-set guard; carries the current revision.
@@ -321,6 +328,7 @@ enum TrainingSessionInvariants {
             }
         }
 
+        if next.rest?.mode == .off { next.rest = nil } // e.g. an unknown future mode
         if let rest = next.rest {
             let sourceStillComplete = next.exercises
                 .first { $0.id == rest.sourceExerciseId }?

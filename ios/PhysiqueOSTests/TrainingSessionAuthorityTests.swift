@@ -95,6 +95,11 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         return (authority, clock)
     }
 
+    /// An intent rendered from the session's current revision.
+    private func intent(_ authority: TrainingSessionAuthority, _ mutationId: String, session: String = "session-1") -> TrainingSessionMutationContext {
+        .intent(mutationId: mutationId, expectedRevision: authority.draft(id: session)?.currentRevision ?? 0)
+    }
+
     private func completedAt(_ authority: TrainingSessionAuthority, _ setId: String, in session: String = "session-1") -> String? {
         authority.draft(id: session)?.exercises.flatMap(\.sets).first { $0.id == setId }?.completedAt
     }
@@ -184,7 +189,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         let (authority, _) = authority(store)
         for number in 1...40 {
             authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "s\(number)",
-                                  context: .intent(mutationId: "m\(number)", expectedRevision: nil))
+                                  context: intent(authority, "m\(number)"))
         }
         let ledger = authority.draft(id: "session-1")?.appliedMutationIds ?? []
         XCTAssertEqual(ledger.count, TrainingSessionInvariants.mutationLedgerLimit)
@@ -212,7 +217,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     func testIdentityIsValidatedSoAStaleIntentCannotCompleteTheWrongSet() {
         let store = RecordingStore([liveSession(), liveSession(id: "other", startedAt: "2026-10-01T16:40:00Z")])
         let (authority, _) = authority(store)
-        let intent = TrainingSessionMutationContext.intent(mutationId: "m", expectedRevision: nil)
+        let intent = TrainingSessionMutationContext.intent(mutationId: "m", expectedRevision: 0)
 
         XCTAssertEqual(authority.completeSet(sessionId: "missing", exerciseId: "bench", setId: "b1", context: intent), .rejected(.sessionNotFound))
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "fly", setId: "b1", context: intent), .rejected(.setNotFound),
@@ -227,7 +232,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     func testIntentOnlyMutatesAnInProgressLiveSessionAtSetEntry() {
-        let intent = TrainingSessionMutationContext.intent(mutationId: "m", expectedRevision: nil)
+        let intent = TrainingSessionMutationContext.intent(mutationId: "m", expectedRevision: 0)
         func outcome(_ adjust: (inout TrainingLoggerDraft) -> Void) -> TrainingSessionMutationOutcome {
             var draft = liveSession()
             adjust(&draft)
@@ -252,7 +257,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     func testIntentCompletesOnlyFilledSetsAndCannotUseStructuralEdits() {
         let store = RecordingStore([liveSession(exercises: [exercise("bench", sets: [set("blank", 1, reps: nil, load: nil), set("b2", 2)])])])
         let (authority, _) = authority(store)
-        let intent = TrainingSessionMutationContext.intent(mutationId: "m", expectedRevision: nil)
+        let intent = TrainingSessionMutationContext.intent(mutationId: "m", expectedRevision: 0)
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "blank", context: intent), .rejected(.setValuesIncomplete))
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "blank"), .applied(revision: 1),
                        "The Logger itself keeps its existing permissive checkmark.")
@@ -485,9 +490,9 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         authority.endSession(sessionId: "second", reason: .cancelled)
         XCTAssertEqual(authority.lastChange?.kind, .ended(.cancelled))
         XCTAssertTrue(store.drafts.isEmpty)
-        XCTAssertEqual(authority.endSession(sessionId: "second", reason: .cancelled), .rejected(.sessionNotFound))
+        XCTAssertEqual(authority.endSession(sessionId: "second", reason: .cancelled), .rejected(.sessionEnded))
         XCTAssertEqual(authority.completeSet(sessionId: "second", exerciseId: "bench", setId: "b1",
-                                             context: .intent(mutationId: "late", expectedRevision: nil)), .rejected(.sessionNotFound),
+                                             context: .intent(mutationId: "late", expectedRevision: 0)), .rejected(.sessionEnded),
                        "An intent arriving after Cancel cannot resurrect the session.")
     }
 
@@ -497,7 +502,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         authority.setSubmissionState(sessionId: "session-1", .acceptedProcessing)
         XCTAssertNil(authority.draft(id: "session-1")?.rest)
         XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2",
-                                             context: .intent(mutationId: "m", expectedRevision: nil)), .rejected(.sessionNotMutable))
+                                             context: .intent(mutationId: "m", expectedRevision: 2)), .rejected(.sessionNotMutable))
     }
 
     func testMultipleDraftsAreIndependent() {
@@ -528,7 +533,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(sandbox.drafts.map(\.id), ["sandbox-session"])
         XCTAssertEqual(production.drafts.map(\.id), ["production-session"])
         XCTAssertEqual(sandbox.completeSet(sessionId: "production-session", exerciseId: "bench", setId: "b1",
-                                           context: .intent(mutationId: "m", expectedRevision: nil)), .rejected(.sessionNotFound))
+                                           context: .intent(mutationId: "m", expectedRevision: 0)), .rejected(.sessionNotFound))
     }
 
     // MARK: Draft schema compatibility
@@ -581,9 +586,9 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         await viewModel.load()
         viewModel.resume(draftId: "session-1")
 
-        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: .intent(mutationId: "m1", expectedRevision: nil))
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: intent(authority, "m1"))
         viewModel.update { $0.applyVariant(nil, to: "fly", catalog: []) ; $0.exercises[1].sets[0].reps = 15 }
-        authority.completeSet(sessionId: "session-1", exerciseId: "fly", setId: "f1", context: .intent(mutationId: "m2", expectedRevision: nil))
+        authority.completeSet(sessionId: "session-1", exerciseId: "fly", setId: "f1", context: intent(authority, "m2"))
         viewModel.setCompletion(exerciseId: "bench", setId: "b2", completed: true)
 
         let stored = try XCTUnwrap(store.stored("session-1"))
@@ -598,7 +603,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         await viewModel.load()
         viewModel.resume(draftId: "session-1")
         let renderedIncomplete = try XCTUnwrap(viewModel.draft?.exercises[0].sets[0])
-        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: .intent(mutationId: "m", expectedRevision: nil))
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: intent(authority, "m"))
         viewModel.setCompletion(exerciseId: "bench", setId: "b1", completed: !renderedIncomplete.isCompleted)
         XCTAssertEqual(viewModel.draft?.exercises[0].sets[0].isCompleted, true)
     }
@@ -611,7 +616,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         first.resume(draftId: "session-1")
         first.setValue(exerciseId: "bench", setId: "b1", field: .reps, value: 6)
         // Screen dismissed; an intent completes a set while no Logger is on screen.
-        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: .intent(mutationId: "bg", expectedRevision: nil))
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: intent(authority, "bg"))
 
         let reopened = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
         await reopened.load()
@@ -650,6 +655,54 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertNil(viewModel.validationMessage)
     }
 
+    // MARK: Review hardening
+
+    func testIntentWithoutRevisionIsRefused() {
+        let (authority, _) = authority(RecordingStore([liveSession()]))
+        let unversioned = TrainingSessionMutationContext(origin: .intent, mutationId: "m", expectedRevision: nil)
+        XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: unversioned), .rejected(.revisionRequired))
+    }
+
+    func testUnchangedIntentReplayedAfterUndoCannotReapply() {
+        let (authority, _) = authority(RecordingStore([liveSession()]))
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1") // UI first, rev 1
+        let rendered = intent(authority, "m1")
+        XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: rendered), .unchanged(revision: 1))
+        authority.setCompletion(sessionId: "session-1", exerciseId: "bench", setId: "b1", completed: false) // Founder undoes, rev 2
+        XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1", context: rendered), .rejected(.staleRevision(current: 2)))
+        XCTAssertEqual(authority.draft(id: "session-1")?.exercises[0].sets[0].isCompleted, false)
+    }
+
+    func testEndedSessionCannotBeRecreatedByALateWholeDraftWrite() async throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, _) = authority(store)
+        let viewModel = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        let staleCopy = try XCTUnwrap(viewModel.draft)
+        viewModel.cancelWorkout()
+        XCTAssertEqual(authority.replace(staleCopy), .rejected(.sessionEnded))
+        viewModel.draft = staleCopy
+        XCTAssertTrue(store.drafts.isEmpty, "A cancelled workout never comes back as a saved draft.")
+    }
+
+    func testSecondFinishForTheSameSessionIsRefusedByTheLock() {
+        let (authority, _) = authority(RecordingStore([liveSession()]))
+        XCTAssertTrue(authority.beginSubmission(sessionId: "session-1"))
+        XCTAssertFalse(authority.beginSubmission(sessionId: "session-1"))
+        authority.endSubmission(sessionId: "session-1")
+        XCTAssertTrue(authority.beginSubmission(sessionId: "session-1"))
+    }
+
+    func testRestWithUnknownModeIsDropped() {
+        var draft = liveSession()
+        draft.exercises[0].sets[0].isCompleted = true
+        draft.rest = .init(id: "r", mode: .off, startedAt: "2026-10-01T16:59:00.000Z", endsAt: nil, durationSeconds: nil, sourceExerciseId: "bench", sourceSetId: "b1")
+        let (authority, _) = authority(RecordingStore([draft]))
+        authority.setValue(sessionId: "session-1", exerciseId: "bench", setId: "b2", field: .reps, value: 9)
+        XCTAssertNil(authority.draft(id: "session-1")?.rest)
+    }
+
     // MARK: Concurrency
 
     func testInterleavedUIAndIntentCallersFromManyTasksSerializeWithoutLoss() async throws {
@@ -660,17 +713,21 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         await withTaskGroup(of: Void.self) { group in
             for number in 1...24 {
                 group.addTask {
-                    // Off the main actor, like an intent's perform(); hops to the authority's actor.
-                    await authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "s\(number)",
-                                                context: .intent(mutationId: "intent-\(number)", expectedRevision: nil))
+                    // Off the main actor, like an intent's perform(): render the
+                    // revision and complete in one turn on the authority's actor.
+                    await MainActor.run {
+                        _ = authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "s\(number)",
+                                                  context: .intent(mutationId: "intent-\(number)",
+                                                                   expectedRevision: authority.draft(id: "session-1")!.currentRevision))
+                    }
                 }
                 group.addTask {
                     await authority.setValue(sessionId: "session-1", exerciseId: "bench", setId: "s\(number)",
                                              field: .load, value: Double(100 + number))
                 }
-                group.addTask { // replayed intent
+                group.addTask { // replayed intent carrying an old revision
                     await authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "s\(number)",
-                                                context: .intent(mutationId: "intent-\(number)", expectedRevision: nil))
+                                                context: .intent(mutationId: "intent-\(number)", expectedRevision: 0))
                 }
             }
         }

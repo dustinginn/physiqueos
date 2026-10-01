@@ -236,9 +236,8 @@ final class AppEnvironment {
     let trainingLoggerAttachmentStore: TrainingLoggerAttachmentStore
     private let trainingEvidenceBindingStore: TrainingEvidenceBindingStore
 
-    var trainingLoggerDraftStore: TrainingLoggerDraftStore {
-        nativeAuthority == .founderProduction ? founderProductionTrainingLoggerDraftStore : sandboxTrainingLoggerDraftStore
-    }
+    // The draft stores are reachable only through `trainingSessionAuthority`,
+    // their single writer.
     /// Device-wide rest preference (unset until a later task adds an editor;
     /// unset means Off).
     let trainingRestPreferences = UserDefaultsTrainingRestPreferences()

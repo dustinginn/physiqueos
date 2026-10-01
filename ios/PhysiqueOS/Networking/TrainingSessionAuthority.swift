@@ -26,6 +26,9 @@ final class TrainingSessionAuthority {
     /// change them meanwhile, so the committed payload and the local draft
     /// cannot diverge underneath the request.
     @ObservationIgnored private var submittingSessionIds: Set<String> = []
+    /// Sessions ended in this process. A late whole-draft write can never
+    /// bring one back.
+    @ObservationIgnored private var endedSessionIds: Set<String> = []
 
     /// Every saved draft for this authority, newest first (store order).
     private(set) var drafts: [TrainingLoggerDraft]
@@ -112,7 +115,9 @@ final class TrainingSessionAuthority {
         mutate(sessionId: sessionId, context: .system, scope: .lifecycle) { $0.submissionState = state }
     }
 
-    func beginSubmission(sessionId: String) { submittingSessionIds.insert(sessionId) }
+    /// Returns `false` when a Finish for this session is already in flight
+    /// (for example from another Logger screen); the caller must not commit.
+    func beginSubmission(sessionId: String) -> Bool { submittingSessionIds.insert(sessionId).inserted }
     func endSubmission(sessionId: String) { submittingSessionIds.remove(sessionId) }
     func isSubmitting(sessionId: String) -> Bool { submittingSessionIds.contains(sessionId) }
 
@@ -121,9 +126,12 @@ final class TrainingSessionAuthority {
     @discardableResult
     func endSession(sessionId: String, reason: TrainingSessionEndReason) -> TrainingSessionMutationOutcome {
         guard canWrite else { return .rejected(.writesNotAuthorized) }
-        guard let existing = draft(id: sessionId) else { return .rejected(.sessionNotFound) }
+        guard let existing = draft(id: sessionId) else {
+            return .rejected(endedSessionIds.contains(sessionId) ? .sessionEnded : .sessionNotFound)
+        }
         store.discard(id: sessionId)
         submittingSessionIds.remove(sessionId)
+        endedSessionIds.insert(sessionId)
         drafts.removeAll { $0.id == sessionId }
         lastChange = .init(sessionId: sessionId, revision: existing.currentRevision, kind: .ended(reason))
         return .applied(revision: existing.currentRevision)
@@ -222,11 +230,15 @@ final class TrainingSessionAuthority {
     }
 
     /// Whole-draft replacement kept for older call sites (`viewModel.draft =`).
-    /// Identity, revision, and invariants still come from the authority.
+    /// Identity, revision, and invariants still come from the authority, but
+    /// the content is the caller's: only use it with a draft read from this
+    /// authority in the same main-actor turn. Product code uses typed
+    /// operations and `edit`.
     @discardableResult
     func replace(_ replacement: TrainingLoggerDraft) -> TrainingSessionMutationOutcome {
         guard canWrite else { return .rejected(.writesNotAuthorized) }
         guard draft(id: replacement.id) != nil else {
+            guard !endedSessionIds.contains(replacement.id) else { return .rejected(.sessionEnded) }
             var inserted = replacement
             inserted.revision = max(1, replacement.currentRevision)
             do { try store.persist(inserted) } catch { return .rejected(.persistenceFailed) }
@@ -259,8 +271,11 @@ final class TrainingSessionAuthority {
         _ transform: (inout TrainingLoggerDraft) throws -> Void
     ) -> TrainingSessionMutationOutcome {
         guard canWrite else { return .rejected(.writesNotAuthorized) }
-        guard let index = drafts.firstIndex(where: { $0.id == sessionId }) else { return .rejected(.sessionNotFound) }
+        guard let index = drafts.firstIndex(where: { $0.id == sessionId }) else {
+            return .rejected(endedSessionIds.contains(sessionId) ? .sessionEnded : .sessionNotFound)
+        }
         let current = drafts[index]
+        if context.origin == .intent, context.expectedRevision == nil { return .rejected(.revisionRequired) }
         if let mutationId = context.mutationId, current.appliedMutationIds?.contains(mutationId) == true {
             return .duplicate(revision: current.currentRevision)
         }
