@@ -445,13 +445,12 @@ function selectAuthoritativeLaneCopy(intervals) {
     return { selected: intervals, corroborating: [], candidateCount: 1, applied: false };
   }
   const allAsleepCoverage = unionMs(intervals.filter((sample) => ASLEEP.has(sample.stage)));
-  const candidates = partitions.map((partition) => {
+  const candidates = copyPartitionCandidates(basis).map((partition) => {
     // A lone unspecified envelope is shared technical context when staged or
     // awake partitions exist; it cannot identify which source copy produced it.
     const activity = exclusive.length > 0 ? [...partition, ...unspecified] : partition;
     const asleep = activity.filter((sample) => ASLEEP.has(sample.stage));
-    if (asleep.length === 0) return null;
-    const extent = spanOf(asleep);
+    const extent = spanOf(asleep.length > 0 ? asleep : activity);
     const resolved = resolveLaneTimeline(activity, extent);
     const coverageMs = unionMs(asleep);
     const stagedCoverageMs = unionMs(activity.filter((sample) => SPECIFIC.has(sample.stage)));
@@ -465,14 +464,14 @@ function selectAuthoritativeLaneCopy(intervals) {
       signature: copySignature(activity),
       idSignature: activity.map((sample) => String(sample.id)).sort().join("\u0000"),
     };
-  }).filter(Boolean);
+  }).filter((candidate) => candidate.coverageMs > 0).sort(compareCopies);
   if (candidates.length === 0) {
     return { selected: intervals, corroborating: [], candidateCount: 1, applied: false };
   }
-  const ordered = candidates.sort(compareCopies);
-  const selectedIds = new Set(ordered[0].activity.map((sample) => sample.id));
+  const selectedCandidate = candidates[0];
+  const selectedIds = new Set(selectedCandidate.activity.map((sample) => sample.id));
   return {
-    selected: ordered[0].activity,
+    selected: selectedCandidate.activity,
     corroborating: intervals.filter((sample) => !selectedIds.has(sample.id)),
     candidateCount: partitions.length,
     applied: true,
@@ -483,7 +482,7 @@ function selectAuthoritativeInBedCopy(intervals, extent) {
   if (intervals.length <= 1) return { selected: intervals, corroborating: [] };
   const partitions = partitionNonOverlapping(intervals);
   if (partitions.length <= 1) return { selected: intervals, corroborating: [] };
-  const ordered = partitions.map((partition) => ({
+  const selectedCandidate = copyPartitionCandidates(intervals).map((partition) => ({
     activity: partition,
     coverageMs: unionMs(partition, extent),
     stagedCoverageMs: 0,
@@ -491,17 +490,34 @@ function selectAuthoritativeInBedCopy(intervals, extent) {
     usable: unionMs(partition, extent) > 0,
     signature: copySignature(partition),
     idSignature: partition.map((sample) => String(sample.id)).sort().join("\u0000"),
-  })).sort(compareCopies);
-  const selectedIds = new Set(ordered[0].activity.map((sample) => sample.id));
+  })).sort(compareCopies)[0];
+  const selectedIds = new Set(selectedCandidate.activity.map((sample) => sample.id));
   return {
-    selected: ordered[0].activity,
+    selected: selectedCandidate.activity,
     corroborating: intervals.filter((sample) => !selectedIds.has(sample.id)),
   };
 }
 
-function partitionNonOverlapping(intervals) {
+// Equal-start shorter- and longer-first orderings each protect a different
+// adversarial shape (a genuine short stage beside a wider interval versus a
+// stray short disagreement inside a complete copy). Evaluate the coherent
+// chains from both deterministic colorings; never splice samples between them.
+function copyPartitionCandidates(intervals) {
+  const seen = new Set();
+  return [
+    ...partitionNonOverlapping(intervals, byCopyInterval),
+    ...partitionNonOverlapping(intervals, byCopyIntervalShortFirst),
+  ].filter((partition) => {
+    const key = partition.map((sample) => String(sample.id)).sort().join("\u0000");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function partitionNonOverlapping(intervals, ordering = byCopyInterval) {
   const partitions = [];
-  for (const interval of [...intervals].sort(byCopyInterval)) {
+  for (const interval of [...intervals].sort(ordering)) {
     const available = partitions
       .map((partition, index) => ({ partition, index, lastEnd: Math.max(...partition.map((sample) => sample.end)) }))
       .filter(({ partition }) => partition.every((sample) => !overlaps(sample, interval)))
@@ -521,6 +537,11 @@ function byCopyInterval(left, right) {
   // short conflicting observation then becomes corroborating instead of
   // breaking the complete chain into two artificial fragments.
   return left.start - right.start || right.end - left.end ||
+    String(left.stage).localeCompare(String(right.stage)) || String(left.id).localeCompare(String(right.id));
+}
+
+function byCopyIntervalShortFirst(left, right) {
+  return left.start - right.start || left.end - right.end ||
     String(left.stage).localeCompare(String(right.stage)) || String(left.id).localeCompare(String(right.id));
 }
 
