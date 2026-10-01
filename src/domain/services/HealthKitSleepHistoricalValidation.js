@@ -339,7 +339,7 @@ function independentlyResolveSelectedCopy(samples, start, end) {
   let conflictingSpecificIntervals = 0;
   for (let left = 0; left < specific.length; left += 1) {
     for (let right = left + 1; right < specific.length; right += 1) {
-      if (Math.min(specific[left].end, specific[right].end) - Math.max(specific[left].start, specific[right].start) > 1000) {
+      if (Math.min(specific[left].end, specific[right].end) > Math.max(specific[left].start, specific[right].start)) {
         conflictingSpecificIntervals += 1;
       }
     }

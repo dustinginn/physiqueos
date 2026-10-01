@@ -67,7 +67,6 @@ export const SLEEP_CANON_V2_PARAMETERS = Object.freeze({
   ...SLEEP_CANON_V1_PARAMETERS,
   withinLaneCopyResolution: Object.freeze({
     conflictStages: Object.freeze(["awake", "asleep_core", "asleep_deep", "asleep_rem"]),
-    boundaryToleranceSeconds: 1,
     unspecifiedMayEnvelopeSpecificStages: true,
     selectionOrder: Object.freeze([
       "usable", "asleep_coverage", "staged_coverage", "resolved_coverage", "sample_count", "stable_content",
@@ -79,7 +78,6 @@ const GAP_MS = SLEEP_CANON_V1_PARAMETERS.episodeGapMinutes * 60 * 1000;
 const ASLEEP = new Set(HEALTHKIT_SLEEP_ASLEEP_STAGES);
 const SPECIFIC = new Set(HEALTHKIT_SLEEP_SPECIFIC_STAGES);
 const PRECEDENCE = new Map(SLEEP_CANON_V1_PARAMETERS.lanePrecedence.map((stage, index) => [stage, index]));
-const COPY_BOUNDARY_TOLERANCE_MS = SLEEP_CANON_V2_PARAMETERS.withinLaneCopyResolution.boundaryToleranceSeconds * 1000;
 const V1_PARAMETERS_DIGEST = `sha256_${digest(stable(SLEEP_CANON_V1_PARAMETERS))}`;
 const PARAMETERS_DIGEST = `sha256_${digest(stable(SLEEP_CANON_V2_PARAMETERS))}`;
 
@@ -531,7 +529,7 @@ function partitionNonOverlapping(intervals, ordering = byCopyInterval) {
 }
 
 function overlaps(left, right) {
-  return Math.min(left.end, right.end) - Math.max(left.start, right.start) > COPY_BOUNDARY_TOLERANCE_MS;
+  return Math.min(left.end, right.end) > Math.max(left.start, right.start);
 }
 
 function byCopyInterval(left, right) {
