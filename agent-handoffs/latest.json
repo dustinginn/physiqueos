@@ -1,63 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T14:54:08Z",
-  "task": {
-    "id": "healthkit-sleep-evidence-integrated-native-20261001",
-    "title": "Recovery/Sleep Evidence reconciled to live Server b81c784e; Build 75 VALID",
-    "agent": "claude",
-    "status": "completed"
-  },
+  "generated_at_utc": "2026-10-01T16:15:28Z",
+  "task": {"id": "workout-logger-session-authority-foundation-20261001", "title": "Workout Logger session authority foundation (checkpoint: blocked on shared-machine disk)", "agent": "claude", "status": "blocked"},
   "repository": "dustinginn/physiqueos",
-  "authority": {
-    "base_sha": "b6d98889a9ebac2fd6755ec126c1b5ba394545fa",
-    "final_sha": "77681cd7",
-    "production_server_sha": "b81c784e5b8a6d5b82ed02a649b5fa3d0edeeff8",
-    "production_deployment": "8008f928-02b6-46b0-99ab-d403b870499a",
-    "native_sha": "77681cd7",
-    "native_build": "75"
-  },
-  "result": {
-    "summary": "Native Recovery/Sleep Evidence adapted to the live b81c784e contract (landing/trends/night, bounded ranges, trends paging, tolerant enums, v2 stage gating, uncertain-zone honesty). Read-only real Founder Production acceptance: 87 historical nights decode through the Native decoder/adapter across landing, all ranges (6M weekly), paging (87 unique, earliest 2026-07-06) and historical nights. Generator drift fixed (byte-identical regeneration). Fresh review findings fixed. Build 75 uploaded (delivery 82938660) VALID. Strategic OFF.",
-    "success": true,
-    "production_mutated": false,
-    "deployed": false,
-    "testflight_uploaded": true
-  },
-  "validation": {
-    "tests": {
-      "status": "passed",
-      "summary": "Sleep unit 23/23 incl. real-capture acceptance; full unit 1660 (1 known Peptide failure, 1 env-gated skip); Sleep UI 2/2; Founder-page and Evidence journey UI pass; Release compile OK."
-    },
-    "review": {
-      "status": "approved",
-      "summary": "Fresh independent review: no blockers; 5 findings fixed in c03aaf56."
-    },
-    "zero_write_audit": {
-      "status": "passed",
-      "summary": "Read-only acceptance capture: READ ONLY txn, 0 non-SELECT statements, rolled back."
-    }
-  },
-  "decisions_required": [
-    "Founder: install Build 75 and run the acceptance steps in the report.",
-    "Codex/Founder: Server window medians are not midnight-safe (fix suggested); sleep day 2026-10-01 is in neither historical nor prospective lane."
-  ],
-  "blockers": [],
-  "unexpected_findings": [
-    "Server window median computed on raw minute-of-day (not midnight-safe); Native guards display.",
-    "Sleep day 2026-10-01 uncovered (historical ends Sep 30, D0 Oct 2).",
-    "Live night route returns 404 RESOURCE_NOT_FOUND, never data:null."
-  ],
-  "backlog": [
-    "Oct 2-4 prospective empirical acceptance (separate gate)",
-    "Server midnight-safe window median"
-  ],
-  "recommended_next_step": "Founder installs Build 75 and follows the acceptance flow; prospective nights accrue naturally.",
-  "full_report_path": "agent-handoffs/reports/20261001T145408Z-healthkit-sleep-evidence-integrated-native.md",
-  "safety": {
-    "contains_secrets": false,
-    "contains_credentials": false,
-    "contains_production_exports": false,
-    "contains_founder_evidence": false,
-    "safe_for_chatgpt_retrieval": true
-  }
+  "authority": {"base_sha": "77681cd7", "final_sha": "1ecc251b", "production_server_sha": null, "production_deployment": "8008f928-02b6-46b0-99ab-d403b870499a", "native_sha": "77681cd7", "native_build": "75"},
+  "result": {"summary": "Candidate TrainingSessionAuthority foundation pushed (1ecc251b, uncompiled): app-scoped authority, idempotent typed ops, revision CAS, completedAt, Stopwatch/Countdown/Off rest, VM migration, pure Live Activity projection, adversarial tests. Build/tests held: shared Mac at 8.3 GiB free under a concurrent Sleep lane test run (rule: no heavy work below 15 GiB).", "success": false, "production_mutated": false, "deployed": false, "testflight_uploaded": false},
+  "validation": {"tests": {"status": "not_run", "summary": "Held by disk gate."}, "review": {"status": "not_run", "summary": "Pending compile."}, "zero_write_audit": {"status": "not_applicable", "summary": "No production access."}},
+  "decisions_required": [],
+  "blockers": ["Shared Mac disk 8.3 GiB free (<15 GiB gate) during a concurrent Native test run; waiting, not deleting others' data."],
+  "unexpected_findings": [],
+  "backlog": ["Compile, test, Release build, fresh review, final report."],
+  "recommended_next_step": "Agent resumes automatically when disk is above 15 GiB; no Founder action needed unless disk stays low.",
+  "full_report_path": "agent-handoffs/reports/20261001T161528Z-workout-logger-session-authority-foundation-checkpoint.md",
+  "safety": {"contains_secrets": false, "contains_credentials": false, "contains_production_exports": false, "contains_founder_evidence": false, "safe_for_chatgpt_retrieval": true}
 }
