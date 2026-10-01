@@ -176,4 +176,93 @@ When Founder adds, closes, defers, reopens, or reprioritizes a meaningful Physiq
 - do not treat speculative ideas as committed backlog unless Founder adopts them;
 - when a build is assembled, review all items marked for next-build integration before bump/upload.
 
+
+FOUNDER IOS ROADMAP — 2026-10-01
+
+Near-term ordering after current acceptance work:
+
+1. Workout Logger Live Activities
+Status: IN PROGRESS / Build 77 real-workout acceptance.
+Founder plans several days of real use before finalizing ergonomics/typography.
+
+2. Home Screen widget
+Status: HIGH-INTEREST / likely next iOS feature after Live Activities settles.
+Founder wants:
+- daily totals displayed;
+- Start Workout Logger action/button.
+Exact daily-total composition and widget sizes/layout remain to be designed.
+
+3. Apple Watch companion
+Status: HIGH-INTEREST / likely after several days of Live Activity use, potentially next week.
+Desired direction:
+- Watch as workout execution surface;
+- current/next set context;
+- Complete Set;
+- rest Stopwatch/Countdown;
+- workout progress;
+- phone remains editing/planning surface for load/reps/exercises;
+- paired Watch app may become source of Apple Health strength workout start/end and workout-time heart rate/physiology;
+- structured PhysiqueOS Logger remains authority for exercises/sets/reps/load;
+- HealthKit remains physiological workout-observation layer.
+Use Build 77 Live Activity real-world acceptance to inform Watch V1 interaction design.
+
+NEXT CONSOLIDATED NATIVE BUILD — currently expected Build 78
+
+A. Performance Record celebration lifecycle fix
+Authority: 69cad804e2ac7d74ed98914e1601f2e7863dadc3.
+Integrate/review against current Native authority rather than releasing alone.
+Add appropriate celebratory haptic alongside confetti/PR presentation.
+
+B. Actionable Priority notification — Skip
+Expose canonical Skip for notification actions where the Priority supports it.
+No notification-only state.
+
+C. Actionable Priority notification — one-tap Complete control
+For simple binary Priorities that require no additional input, provide an Apple Reminders-style checkbox/check-circle action directly from the notification rather than requiring long-press -> Complete.
+Do NOT apply this shortcut to Morning Check-In/weight or other flows that may require additional information.
+Use canonical in-app completion semantics and preserve specialized/dose-aware behavior where applicable.
+
+D. Targeted haptic feedback
+Treat haptics as interaction polish, not a standalone feature project.
+Initial accepted candidates:
+- PR celebration: celebratory haptic + confetti;
+- Priority completion: subtle success haptic;
+- Priority Skip: lighter confirmation haptic;
+- Workout set completion: consider subtle confirmation, especially interactive system surfaces, after real-use acceptance.
+Avoid haptics on ordinary read-only navigation/charts/browsing.
+
+PARKED IOS FEATURES
+
+Native capture / quick intake
+- Native Progress Photo capture: keep for possible later enhancement; current workflow is sufficient.
+- DEXA quick upload / Files picker shortcut: keep for later. Current preferred workflow remains DEXA notification -> Priority -> Files because the Priority may carry the needed context/action.
+- Broader Share-to-PhysiqueOS evidence intake enhancements: keep lower priority; current workflows are sufficient.
+
+Face ID / biometric authentication
+- Keep for future multi-user/login phase.
+- Not needed for current Founder-stage app.
+
+Home Screen quick actions
+- Keep lower priority.
+- Likely inexpensive, but not necessary yet.
+
+REMOVED / CURRENTLY NOT WANTED
+
+Siri / broad Shortcuts surface
+- Founder currently sees no meaningful need.
+- Remove from active roadmap/backlog for now.
+- Existing AppIntent use required internally by features such as Live Activities does not imply a user-facing Siri/Shortcuts project.
+
+CURRENT-SCOPE COMPLETE
+
+General deep HealthKit integration
+- Consider current non-Watch scope sufficiently robust/complete.
+- Activity, Nutrition, Cardio and Sleep have substantially reached the desired current state.
+- Do not reopen generic HealthKit work as a feature project.
+- Next meaningful HealthKit expansion belongs to the paired Apple Watch project (Watch-owned strength workout + heart-rate/physiological observations).
+
+Training Logger / Live Activities
+- Existing broad Native Workout Logger feature vision has become the current Logger + Build 77 Live Activities work.
+- Do not duplicate it as a separate future backlog item.
+
 END BACKLOG.
