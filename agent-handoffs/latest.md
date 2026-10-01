@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Workout Logger TrainingSessionAuthority foundation: candidate validated, ready for review (`workout-logger-session-authority-foundation-20261001`)
+- Task: Workout Live Activities Phase 1: checkpoint 1 (candidate, pre-TestFlight) (`workout-live-activities-phase1-implementation-20261001`)
 - Agent: claude
-- Status: completed
-- Generated (UTC): 2026-10-01T19:31:09Z
+- Status: partial
+- Generated (UTC): 2026-10-01T20:51:10Z
 - Success: true
 
-Summary: App-scoped TrainingSessionAuthority implemented and validated: typed idempotent ops, revision compare-and-set, per-set completedAt, Stopwatch/Countdown/Off rest, ViewModel migration, pure Live Activity projection with the Founder two-row rule. Candidate e3f3f5f1 (Build 75 base) and 2b41dc48 (merged with Build 76) both pass Release compile; full unit suite 1749 tests with 1 pre-existing Peptide failure; Server commit parity proven; two independent reviews, no blockers. No ActivityKit/Widget/UI, no deploy, no TestFlight.
+Summary: Phase 1 candidate 27f6dbf8 pushed: superset hardening, rest preference (Stopwatch default), shared ActivityKit contract, Widget Extension via generator, coordinator, Complete Set intent through TrainingSessionAuthority, deep link, shipping-view screenshots matching the approved prototype. Unit suite green except one known unrelated Peptide test. Review, Release compile, archive and upload pending; system-rendered UI and locked-device behavior are physical-device items.
 
-Detailed report: `agent-handoffs/reports/20261001T193109Z-workout-logger-session-authority-foundation.md`
+Detailed report: `agent-handoffs/reports/20261001T205110Z-workout-live-activities-phase1-checkpoint-1.md`
 
 Protocol: `agent-handoffs/README.md`
