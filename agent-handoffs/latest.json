@@ -1,59 +1,61 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T04:45:41Z",
+  "generated_at_utc": "2026-10-01T05:08:28Z",
   "task": {
-    "id": "healthkit-sleep-evidence-native-implementation-20261001",
-    "title": "Recovery/Sleep Evidence Native implementation against proposed contract v0 (not integrated, not uploaded)",
-    "agent": "claude",
+    "id": "healthkit-sleep-v2-historical-evidence-prospective-20261001",
+    "title": "HealthKit Sleep v2 historical Evidence and prospective preparation",
+    "agent": "codex",
     "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "a5041eb0",
-    "final_sha": "d550c629",
-    "production_server_sha": "08aeecde",
-    "production_deployment": "1e7d28e6-b142-4d8c-9fac-96dd1498ffd8",
-    "native_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
-    "native_build": "73"
+    "base_sha": "133d838eac81b0b02da392d88b28d0eea4779706",
+    "final_sha": "b81c784e",
+    "production_deployment": "660f5d57-8ad3-44e3-a7b8-9a5a451dd8b4",
+    "production_server_sha": "133d838eac81b0b02da392d88b28d0eea4779706",
+    "native_sha": "b6d98889",
+    "native_build": "74"
   },
   "result": {
-    "summary": "Recovery landing, Trends, Night detail and paged nights implemented on claude/sleep-evidence-native-20261001 @ d550c629 (base a5041eb0). Production reads only four bounded recovery-sleep* Server resources (404 => not available; hub row fail-soft); synthetic fixture Sandbox-only. v2-gated stages; Server-flagged uncertain clock times shown approximate and excluded from consistency. Codex read model not yet published, so contract proposal v0 documented in docs/native-contracts; integrated acceptance pending. No upload.",
-    "success": true,
-    "production_mutated": false,
-    "deployed": false,
-    "testflight_uploaded": false
+    "summary": "sleep-canon-v2 133d838e is live and healthy; its exact 2,878-sample zero-write validation passes with 11/11 corrected duplicate-copy nights and zero strategic leakage. Production PhysiqueOS coverage establishes 2026-07-06 as the historical product boundary. A structurally quarantined historical import and bounded Recovery/Sleep read model are implemented and tested; Native Build 74 is uploaded and VALID. Import count remains zero and first representable Sleep day remains an on-device result. Hardened Server commit b81c784e cannot be pushed/deployed until the exact private-source GitHub push is explicitly approved. D0 2026-10-07 is prepared in validation_only mode but not activated; strategic Sleep is OFF.",
+    "success": false,
+    "production_mutated": true,
+    "deployed": true,
+    "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "RecoverySleep unit 18/18, UI 2/2, FounderServerAPITests 243/243, Evidence + Founder-page + Evidence journey regressions pass; full unit 1651 with 1 known Peptide failure; Release compile OK."
+      "summary": "Sleep Server 120/120; phase-3 308/309 with one unrelated missing private fixture; Next build; iOS build; historical import and surrounding Native Sleep suites; Build 74 release/archive/upload guards."
     },
     "review": {
-      "status": "not_run",
-      "summary": "Fresh review recommended before integrated Build 74."
+      "status": "approved",
+      "summary": "Adversarial review fixed exact instant fencing, historical command body bounds, result contract version, and stage-status projection before release preparation."
     },
     "zero_write_audit": {
-      "status": "not_applicable",
-      "summary": "No production access."
+      "status": "passed",
+      "summary": "Exact production runtime, 2,878 validation samples, 30 nights, 11/11 affected nights selected/conflict-free/tolerance-correct, prospective OFF, ordinary Sleep 0/0, strategic leaks 0, mutations 0."
     }
   },
   "decisions_required": [
-    "Codex: publish Server recovery-sleep read model matching contract v0 or list differences.",
-    "Coordinate integrated Build 74 (this branch + any required historical-import Native capability) under Codex rollout task."
+    "Explicitly approve pushing Native commits cf00c234 and b6d98889 plus Server commit b81c784e to the dustinginn/physiqueos GitHub repository."
   ],
   "blockers": [
-    "Server Recovery/Sleep read-model contract not yet published by Codex (integration acceptance blocked, implementation not)."
+    "The private-source GitHub push safety gate blocks the hardened Server and integrated Native code pushes without exact explicit approval; therefore the Server slice cannot yet be deployed and the historical import cannot run.",
+    "The first representable Sleep day on or after 2026-07-06 requires Founder installation and operation of Build 74 after the Server slice is live."
   ],
   "unexpected_findings": [
-    "Production Evidence Hub fails entirely if any read throws; Recovery read added fail-soft to avoid regressions."
+    "The week beginning 2026-06-29 still has only three core-daily PhysiqueOS evidence days despite earlier Weight/canonical records; July 6 is the first consistently populated cross-domain boundary.",
+    "The reviewed read model initially inferred stage availability from numeric values rather than canonical completeness; adversarial testing caught and corrected this before deployment."
   ],
   "backlog": [
-    "Fresh review",
-    "Adapter alignment to Codex contract",
-    "Integrated Founder Production read check"
+    "Push/deploy hardened Server slice after explicit approval.",
+    "Founder installs Build 74 and runs bounded historical Sleep Evidence import; record first representable day and sanitized counts/shape.",
+    "Run fresh D0 dry run and, only if all gates pass, activate October 7 prospective validation_only Sleep.",
+    "Design and Founder-approve Recovery Briefing card before any separate future strategic-graduation decision."
   ],
-  "recommended_next_step": "Codex publishes the read model; Native aligns adapter and runs integrated read check before Build 74.",
-  "full_report_path": "agent-handoffs/reports/20261001T044541Z-healthkit-sleep-evidence-native-implementation.md",
+  "recommended_next_step": "Approve the exact private-source GitHub pushes listed in decisions_required; then deploy b81c784e, install Build 74, run the bounded historical import, and reevaluate the still-future October 7 D0 without enabling strategic Sleep.",
+  "full_report_path": "agent-handoffs/reports/20261001T050828Z-healthkit-sleep-v2-historical-evidence-prospective-prep.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
