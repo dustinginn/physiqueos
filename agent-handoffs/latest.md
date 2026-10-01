@@ -2,16 +2,16 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Recovery Briefing V1 one-card prototype and Server shadow candidate (`recovery-briefing-v1-shadow-assessment-20261001`)
+- Task: Shared Mac conservative storage audit during active Native Build 78 (`shared-mac-build78-active-conservative-storage-audit-20261001`)
 - Agent: codex
-- Status: candidate
-- Generated (UTC): 2026-10-01T22:45:16Z
+- Status: complete
+- Generated (UTC): 2026-10-01T23:49:30Z
 - Success: true
 
-Summary: Recovery V1 now has exactly one quiet card plus a pure, versioned Server shadow-assessment candidate. The candidate passed 89 focused tests and fresh independent review, but remains intentionally unwired and undeployed because no approved validation-only Recovery input-authority/composition boundary exists.
+Summary: Inventoried the shared Mac while Build 78 remained active, protected its dirty worktree, dedicated DerivedData and Simulator, and reclaimed 0.416 GiB by removing only five clean pushed worktrees from completed Recovery/Sleep reporting sessions. Free space ended at 22.746 GiB; no active process, archive, cache, Simulator data, product source, or Build 78 artifact was touched.
 
-Detailed report: `agent-handoffs/reports/20261001T224516Z-recovery-briefing-v1-shadow-assessment.md`
+Detailed report: `agent-handoffs/reports/20261001T234930Z-shared-mac-build78-active-conservative-storage-audit.md`
 
-Implementation: `codex/recovery-briefing-v1-shadow-assessment-server` at `1bfa92ef874c3c96f05b23a9d3cbdfb956384156`
+Protected Native authority at snapshot: Build 77 / `c299fa29a14e04a4a22ac782d4610a4562e4f6e0`; Build 78 remained active and locally uncommitted.
 
 Protocol: `agent-handoffs/README.md`
