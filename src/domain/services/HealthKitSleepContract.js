@@ -24,6 +24,8 @@ export const HEALTHKIT_SLEEP_SAMPLE_SCHEMA_VERSION = "healthkit-sleep-sample-v1"
 export const HEALTHKIT_SLEEP_STAGE_SCHEMA_VERSION = "hk-sleep-v1";
 export const HEALTHKIT_SLEEP_SAMPLE_COLLECTION = "healthKitSleepSamples";
 export const HEALTHKIT_SLEEP_DAY_COLLECTION = "healthKitSleepDays";
+export const HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_SAMPLE_COLLECTION = "healthKitSleepHistoricalEvidenceSamples";
+export const HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_DAY_COLLECTION = "healthKitSleepHistoricalEvidenceDays";
 export const HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION = "healthKitConfiguration";
 export const HEALTHKIT_SLEEP_SAMPLE_ID_PREFIX = "healthkit_sleep_sample_";
 export const HEALTHKIT_SLEEP_DAY_ID_PREFIX = "healthkit_sleep_day_";
@@ -118,6 +120,7 @@ export const HealthKitSleepDeletionSource = Object.freeze({
 export const HealthKitSleepIngestionPurpose = Object.freeze({
   OPERATIONAL: "operational",
   VALIDATION_ONLY: "validation_only",
+  HISTORICAL_EVIDENCE_IMPORT: "historical_evidence_import",
 });
 
 /**
@@ -304,6 +307,7 @@ export function createHealthKitSleepSampleRecord({
 } = {}) {
   const sleepDayKey = deriveHealthKitSleepDay(sample.endedAt, sample.timeZone);
   const state = lifecycle ?? { state: HealthKitSleepLifecycle.LIVE };
+  const historical = ingestionPurpose === HealthKitSleepIngestionPurpose.HISTORICAL_EVIDENCE_IMPORT;
   return Object.freeze({
     schemaVersion: HEALTHKIT_SLEEP_SAMPLE_SCHEMA_VERSION,
     id: getHealthKitSleepSampleRecordId(ownerUserId, sample.externalId),
@@ -326,8 +330,13 @@ export function createHealthKitSleepSampleRecord({
     status: state.state,
     lifecycle: structuredClone(state),
     ingestionPurpose,
+    origin: ingestionPurpose,
     ingestion: { firstReceivedAt: receivedAt, batchId, deliveryDeviceId },
-    evidenceEligibility: { state: "quarantined", strategic: false, decidedBy: "healthkit-strategic-evidence-quarantine-v1" },
+    strategicEligible: false,
+    evidenceEligibility: {
+      state: "quarantined", strategic: false, permanent: historical,
+      decidedBy: historical ? "healthkit-sleep-historical-evidence-permanent-quarantine-v1" : "healthkit-strategic-evidence-quarantine-v1",
+    },
   });
 }
 

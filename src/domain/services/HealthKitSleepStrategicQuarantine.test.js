@@ -44,6 +44,10 @@ const SLEEP_ALLOWED = new Set([
   // Phase C isolated historical-validation lane and guarded operations.
   "domain/services/HealthKitSleepHistoricalValidation.js",
   "application/commands/HealthKitSleepHistoricalValidationPort.js",
+  "application/commands/HealthKitSleepHistoricalEvidenceImportPort.js",
+  "application/recovery/HealthKitSleepEvidenceReadService.js",
+  "domain/services/HealthKitSleepStrategicEligibility.js",
+  "platform/database/PostgresHealthKitSleepEvidenceReadStore.js",
   "platform/operations/HealthKitSleepPolicyRunner.js",
   "platform/operations/HealthKitSleepAudit.js",
 ]);

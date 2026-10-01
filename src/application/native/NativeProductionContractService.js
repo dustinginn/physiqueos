@@ -38,6 +38,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS,
   Phase3Command.INGEST_HEALTHKIT_SLEEP,
   Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION,
+  Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE,
   Phase3Command.EDIT_DEXA_REVIEW,
   Phase3Command.COMMIT_EVIDENCE_REVIEW,
   Phase3Command.DISPOSE_EVIDENCE_REVIEW,
@@ -97,6 +98,7 @@ export function createNativeProductionContractService({
       // any read failure advertises Sleep as disabled (fail closed).
       let sleepCapability = null;
       let validationCapability = null;
+      let historicalEvidenceCapability = null;
       try {
         sleepCapability = await readers.healthKitSleep?.getCapability?.() ?? null;
       } catch {
@@ -107,7 +109,12 @@ export function createNativeProductionContractService({
       } catch {
         validationCapability = null;
       }
-      return withHealthKitSleepCapability(nativeProductionContractManifest, sleepCapability, validationCapability);
+      try {
+        historicalEvidenceCapability = await readers.healthKitSleep?.getHistoricalEvidenceCapability?.() ?? null;
+      } catch {
+        historicalEvidenceCapability = null;
+      }
+      return withHealthKitSleepCapability(nativeProductionContractManifest, sleepCapability, validationCapability, historicalEvidenceCapability);
     },
 
     async read({ request, resource, input = {} }) {
@@ -178,6 +185,9 @@ export function createNativeProductionContractService({
         case "healthkit-sep23-activity-repair-preflight": data = await readers.healthKitCanary.getSeptember23ActivityRepairPreflight({
           authenticatedDeviceId: principal.deviceId,
         }); break;
+        case "recovery-sleep-landing": data = await readers.recoverySleep.landing({ ownerUserId, throughDate: input.throughDate }); break;
+        case "recovery-sleep-trends": data = await readers.recoverySleep.trends({ ownerUserId, startDate: required(input.startDate, "startDate"), endDate: required(input.endDate, "endDate"), limit: input.limit ?? 30, cursor: input.cursor ?? null }); break;
+        case "recovery-sleep-night": data = await readers.recoverySleep.night({ ownerUserId, sleepDay: required(input.sleepDay, "sleepDay") }); break;
         case "energy": {
           // The raw progress read returns unreconciled source collections
           // (Activity/Nutrition days, DEXA scans). Native must not derive

@@ -41,7 +41,14 @@ import { assertNotQuarantinedHealthKitEvidence } from "../../domain/services/Hea
 /// before the prospective activation floor) refuse only that sample; the rest of
 /// the batch commits. Canonical days are recomputed only for touched days, and a
 /// recomputation with an unchanged inputDigest writes nothing.
-export function createHealthKitSleepIngestPort({ records, now = () => new Date() } = {}) {
+export function createHealthKitSleepIngestPort({
+  records,
+  now = () => new Date(),
+  sampleCollection = HEALTHKIT_SLEEP_SAMPLE_COLLECTION,
+  dayCollection = HEALTHKIT_SLEEP_DAY_COLLECTION,
+  activationPolicy = null,
+  immutableIngestionPurpose = null,
+} = {}) {
   return async function ingestHealthKitSleep(context) {
     if (typeof records?.putIfAbsent !== "function" || typeof records?.listByOccurrenceDateRange !== "function") {
       throw new Error("HealthKit Sleep ingestion requires create-if-absent and scoped date-range record storage.");
@@ -59,7 +66,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
       });
     }
     const ownerUserId = context.ownerUserId;
-    const policy = resolveHealthKitSleepActivationPolicy(await records.get({
+    const policy = activationPolicy ?? resolveHealthKitSleepActivationPolicy(await records.get({
       ownerUserId, collection: HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION, recordId: HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID,
     }));
     if (!policy.enabled) {
@@ -111,13 +118,14 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
         continue;
       }
       const recordId = getHealthKitSleepSampleRecordId(ownerUserId, sample.externalId);
-      const existing = await records.get({ ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, recordId });
+      const existing = await records.get({ ownerUserId, collection: sampleCollection, recordId });
       if (!existing) {
         const record = createHealthKitSleepSampleRecord({
-          ownerUserId, sample, receivedAt, batchId: batch.batchId, deliveryDeviceId, ingestionPurpose: policy.mode,
+          ownerUserId, sample, receivedAt, batchId: batch.batchId, deliveryDeviceId,
+          ingestionPurpose: immutableIngestionPurpose ?? policy.mode,
         });
         const stored = await records.putIfAbsent({
-          ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, recordId, payload: record,
+          ownerUserId, collection: sampleCollection, recordId, payload: record,
         });
         if (stored.created) {
           touch({ ...sample, id: recordId });
@@ -130,10 +138,10 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
         // sample stays deleted; its content is kept only as provenance.
         const record = createHealthKitSleepSampleRecord({
           ownerUserId, sample, receivedAt, batchId: batch.batchId, deliveryDeviceId,
-          ingestionPurpose: policy.mode, lifecycle: existing.lifecycle,
+          ingestionPurpose: immutableIngestionPurpose ?? policy.mode, lifecycle: existing.lifecycle,
         });
         await records.put({
-          ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, recordId, payload: record, expectedVersion: existing.version,
+          ownerUserId, collection: sampleCollection, recordId, payload: record, expectedVersion: existing.version,
         });
         sampleResults.push(outcome(sample, "deleted_before_arrival"));
       } else if (existing.contentFingerprint === sample.contentFingerprint) {
@@ -147,10 +155,10 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
     const deletionResults = [];
     for (const deletion of batch.deletions) {
       const recordId = getHealthKitSleepSampleRecordId(ownerUserId, deletion.externalId);
-      const existing = await records.get({ ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, recordId });
+      const existing = await records.get({ ownerUserId, collection: sampleCollection, recordId });
       if (!existing) {
         await records.putIfAbsent({
-          ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, recordId,
+          ownerUserId, collection: sampleCollection, recordId,
           payload: createHealthKitSleepTombstoneRecord({
             ownerUserId, externalId: deletion.externalId, deletedAt: receivedAt, batchId: batch.batchId,
             deletionSource: HealthKitSleepDeletionSource.HK_DELETED_OBJECT,
@@ -176,7 +184,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
       // real zone inside the scoped read. The instant test below is exact.
       const candidates = await records.listByOccurrenceDateRange({
         ownerUserId,
-        collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION,
+        collection: sampleCollection,
         startDate: shiftDateKey(deriveHealthKitSleepDay(startMs, "UTC"), -2),
         endDate: shiftDateKey(deriveHealthKitSleepDay(endMs, "UTC"), 2),
       });
@@ -199,7 +207,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
       result: Object.freeze({
         contractVersion: HEALTHKIT_SLEEP_CONTRACT_VERSION,
         batchId: batch.batchId,
-        ingestionPurpose: policy.mode,
+        ingestionPurpose: immutableIngestionPurpose ?? policy.mode,
         samples: Object.freeze(sampleResults),
         deletions: Object.freeze(deletionResults),
         windowManifest: manifestResult,
@@ -217,7 +225,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
       };
       delete payload.version;
       await records.put({
-        ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, recordId: existing.id, payload, expectedVersion: existing.version,
+        ownerUserId, collection: sampleCollection, recordId: existing.id, payload, expectedVersion: existing.version,
       });
       if (existing.startedAt && existing.endedAt) touch(existing);
     }
@@ -247,7 +255,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
       const results = [];
       for (const sleepDay of [...affected].sort()) {
         const recordId = getHealthKitSleepDayRecordId(sleepDay);
-        const existing = await records.get({ ownerUserId, collection: HEALTHKIT_SLEEP_DAY_COLLECTION, recordId });
+        const existing = await records.get({ ownerUserId, collection: dayCollection, recordId });
         const content = pass.computed.get(sleepDay) ?? (existing ? emptyHealthKitSleepDay(sleepDay, { preference }) : null);
         if (!content) continue;
         if (existing?.inputDigest === content.inputDigest) continue;
@@ -259,10 +267,19 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
           observedAt: content.windowClosesAt ?? existing?.observedAt ?? null,
           revision: Number(existing?.revision ?? 0) + 1,
           computedAt: receivedAt,
-          evidenceEligibility: { state: "quarantined", strategic: false, decidedBy: "healthkit-strategic-evidence-quarantine-v1" },
+          origin: immutableIngestionPurpose ?? content.ingestionPurpose,
+          ingestionPurpose: immutableIngestionPurpose ?? content.ingestionPurpose,
+          strategicEligible: false,
+          evidenceEligibility: {
+            state: "quarantined", strategic: false,
+            permanent: immutableIngestionPurpose === "historical_evidence_import",
+            decidedBy: immutableIngestionPurpose === "historical_evidence_import"
+              ? "healthkit-sleep-historical-evidence-permanent-quarantine-v1"
+              : "healthkit-strategic-evidence-quarantine-v1",
+          },
         });
         await records.put({
-          ownerUserId, collection: HEALTHKIT_SLEEP_DAY_COLLECTION, recordId, payload,
+          ownerUserId, collection: dayCollection, recordId, payload,
           expectedVersion: existing ? existing.version : null,
         });
         results.push(Object.freeze({ sleepDay, revision: payload.revision }));
@@ -282,7 +299,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
         const lowEdge = shiftDateKey(low, ZONE_SKEW_DAYS);
         const highEdge = shiftDateKey(high, -ZONE_SKEW_DAYS);
         const samples = await records.listByOccurrenceDateRange({
-          ownerUserId, collection: HEALTHKIT_SLEEP_SAMPLE_COLLECTION, startDate: low, endDate: high,
+          ownerUserId, collection: sampleCollection, startDate: low, endDate: high,
         });
         const inRun = new Set(run);
         const relevantIds = new Set(changedSampleIds);
@@ -301,7 +318,7 @@ export function createHealthKitSleepIngestPort({ records, now = () => new Date()
         // Previously stored days that depended on any relevant sample must be
         // rewritten too, wherever (zone skew) they were stored.
         const storedDays = await records.listByOccurrenceDateRange({
-          ownerUserId, collection: HEALTHKIT_SLEEP_DAY_COLLECTION, startDate: shiftDateKey(low, -2), endDate: shiftDateKey(high, 2),
+          ownerUserId, collection: dayCollection, startDate: shiftDateKey(low, -2), endDate: shiftDateKey(high, 2),
         });
         for (const day of storedDays) {
           if (!(day.inputSampleIds ?? []).some((id) => relevantIds.has(id))) continue;

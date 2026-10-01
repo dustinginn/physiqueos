@@ -10,6 +10,7 @@ import {
   HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH,
 } from "../../domain/services/HealthKitSleepContract.js";
 import { getProgressPhotoPoseContract } from "../../domain/models/progressPhotoPoseVocabulary.js";
+import { HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT } from "../commands/HealthKitSleepHistoricalEvidenceImportPort.js";
 import { ANALYSIS_DERIVATIVE_REQUIRED_MIME_TYPES, PHOTO_CONTAINER_MIME_TYPES } from "../../domain/services/ImageContainerDetection.js";
 import {
   STAGED_DERIVATIVE_MAXIMUM_BYTES,
@@ -43,6 +44,9 @@ export const NativeProductionResource = Object.freeze({
   ACTIVITY: "activity",
   HEALTHKIT_ACTIVITY_CANARY: "healthkit-activity-canary",
   HEALTHKIT_SEP23_ACTIVITY_REPAIR_PREFLIGHT: "healthkit-sep23-activity-repair-preflight",
+  RECOVERY_SLEEP_LANDING: "recovery-sleep-landing",
+  RECOVERY_SLEEP_TRENDS: "recovery-sleep-trends",
+  RECOVERY_SLEEP_NIGHT: "recovery-sleep-night",
   ENERGY: "energy",
   DEXA: "dexa",
   PHOTOS: "photos",
@@ -86,6 +90,9 @@ const reads = Object.freeze([
   read("activity", "/api/v1/native/read/activity", "progressEvidence.getActivity"),
   read("healthkit-activity-canary", "/api/v1/native/read/healthkit-activity-canary", "healthKitCanary.getActivityValidation", { pagination: "required inclusive startDate/endDate; maximum 31 local dates" }),
   read("healthkit-sep23-activity-repair-preflight", "/api/v1/native/read/healthkit-sep23-activity-repair-preflight", "healthKitCanary.getSeptember23ActivityRepairPreflight"),
+  read("recovery-sleep-landing", "/api/v1/native/read/recovery-sleep-landing", "recoverySleep.landing", { pagination: "fixed 14-night landing; bounded 30-day source lookback" }),
+  read("recovery-sleep-trends", "/api/v1/native/read/recovery-sleep-trends", "recoverySleep.trends", { pagination: "required startDate/endDate; maximum 10 years; limit:1-100; weekly aggregation at 6 months" }),
+  read("recovery-sleep-night", "/api/v1/native/read/recovery-sleep-night", "recoverySleep.night"),
   read("energy", "/api/v1/native/read/energy", "progressEvidence.getEnergy"),
   read("dexa", "/api/v1/native/read/dexa", "progressEvidence.getDEXA"),
   read("photos", "/api/v1/native/read/photos", "progressPhotos.getNativePhotosTimeline", { pagination: "limit:1-50; default:12; canonical newest-first sessions" }),
@@ -118,6 +125,7 @@ const writes = Object.freeze([
   write(Phase3Command.UPSERT_ACTIVITY_DAY, ["localDate", "dailyActivity", "sourceIdentity", "source"], "manual, typed, or screenshot provenance only; direct device-health sync is forbidden"),
   write(Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS, ["batchId", "observations"], "source observations remain separate; Activity and Nutrition daily totals may canonicalize only inside the server-owned activation window into the quarantined HealthKit canonical day store; strategic Evidence eligibility is not decided by ingestion"),
   write(Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION, ["batchId", "runId", "samples"], "dormant: refused with 409 HEALTHKIT_SLEEP_HISTORICAL_VALIDATION_NOT_ENABLED unless healthKitSleepHistoricalValidation.enabled and runId matches; samples only, each ending inside the advertised window; validation-only collection, never canonical production history, quarantined"),
+  write(Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE, ["batchId", "runId", "samples"], "source-controlled one-time Evidence import; July 6 through October 3 only; structurally separate collections; permanently non-strategic"),
   write(Phase3Command.INGEST_HEALTHKIT_SLEEP, ["batchId"], "dormant: refused with 409 HEALTHKIT_SLEEP_INGESTION_NOT_ENABLED unless healthKitSleepIngestion.enabled; samples, deletions and a bounded window manifest; per-sample identity conflicts refuse only that sample; canonical sleep days are quarantined"),
   write(Phase3Command.EDIT_DEXA_REVIEW, ["reviewId", "evidenceObjectId", "measurements"], "If-Match required for every edit"),
   write(Phase3Command.COMMIT_EVIDENCE_REVIEW, ["reviewId"], "If-Match required to start the canonical Evidence Review lifecycle"),
@@ -227,6 +235,7 @@ export const nativeProductionContractManifest = Object.freeze({
   // manifest replaces this block per owner via withHealthKitSleepCapability.
   healthKitSleepIngestion: healthKitSleepIngestionContract(null),
   healthKitSleepHistoricalValidation: healthKitSleepHistoricalValidationContract(null),
+  healthKitSleepHistoricalEvidence: healthKitSleepHistoricalEvidenceContract(null),
   reads,
   writes,
 });
@@ -265,15 +274,31 @@ function healthKitSleepHistoricalValidationContract(policy) {
   });
 }
 
+function healthKitSleepHistoricalEvidenceContract(capability) {
+  const enabled = capability?.enabled === true;
+  return Object.freeze({
+    commandType: Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE,
+    contractVersion: "healthkit-sleep-historical-evidence-v1",
+    enabled,
+    runId: enabled ? HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.runId : null,
+    startSleepDay: enabled ? HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.startSleepDay : null,
+    endSleepDay: enabled ? HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.endSleepDay : null,
+    maximumSamplesPerBatch: HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH,
+    ingestionPurpose: "historical_evidence_import",
+    semantics: "bounded HealthKit re-read into structurally separate Recovery/Sleep Evidence collections; permanently excluded from strategic systems",
+  });
+}
+
 /**
  * The served manifest: the static contract with the per-owner Sleep
  * capabilities resolved. Null capabilities keep both lanes disabled.
  */
-export function withHealthKitSleepCapability(manifest, capability, validationPolicy = null) {
+export function withHealthKitSleepCapability(manifest, capability, validationPolicy = null, historicalEvidenceCapability = null) {
   return Object.freeze({
     ...manifest,
     healthKitSleepIngestion: healthKitSleepIngestionContract(capability),
     healthKitSleepHistoricalValidation: healthKitSleepHistoricalValidationContract(validationPolicy),
+    healthKitSleepHistoricalEvidence: healthKitSleepHistoricalEvidenceContract(historicalEvidenceCapability),
   });
 }
 

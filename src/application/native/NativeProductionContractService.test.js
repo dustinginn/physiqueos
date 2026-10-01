@@ -78,6 +78,11 @@ function fixture(overrides = {}) {
         authenticatedDeviceId: principal.deviceId,
       }),
     },
+    recoverySleep: {
+      landing: call({ schemaVersion: "recovery-sleep-evidence-v1", nights: [] }),
+      trends: call({ schemaVersion: "recovery-sleep-trends-v1", nights: [], series: [] }),
+      night: call({ schemaVersion: "recovery-sleep-night-v1", sleepDay: "2026-09-30" }),
+    },
     photos: { getNativePhotosTimeline: call({ sessions: [], page: { limit: 12, count: 0, hasMore: false } }) },
     briefings: { listNativeHistory: call({ items: [], page: { limit: 20, hasMore: false, nextCursor: null } }), getNativeArtifact: call({ artifact: { artifactId: "briefing-1" } }), getDexaArtifact: call({ artifact: { id: "dexa-event-1" } }) },
     photoEvents: { getPhotoEvent: call({ artifact: { id: "photo-event-1" } }) },
@@ -386,6 +391,8 @@ describe("Native production contract boundary", () => {
       "operating-plan-energy-strategy": { strategyId: "energy-protocol" },
       "operating-plan-coaching-updates": { strategyId: "coaching-protocol" },
       "healthkit-activity-canary": { startDate: "2026-09-01", endDate: "2026-09-07" },
+      "recovery-sleep-trends": { startDate: "2026-07-06", endDate: "2026-09-30" },
+      "recovery-sleep-night": { sleepDay: "2026-09-30" },
     };
     const results = new Map();
     for (const declaration of nativeProductionContractManifest.reads) {
@@ -697,6 +704,7 @@ describe("Native production contract boundary", () => {
       "training-session.commit.v1", "nutrition-day.upsert.v1", "activity-day.upsert.v1",
       "healthkit.observations.ingest.v1",
       "healthkit.sleep.historical-validation.ingest.v1",
+      "healthkit.sleep.historical-evidence.ingest.v1",
       "healthkit.sleep.ingest.v1",
       "dexa-review.measurements.v1", "evidence-review.commit.v1", "evidence-review.dispose.v1",
       "workout-reconciliation.resolve.v1",

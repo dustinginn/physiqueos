@@ -689,9 +689,11 @@ function buildDay(sleepDay, dayEpisodes, preference, { algorithmVersion, paramet
     timeZone,
     timeZoneShift: zones.length > 1,
     windowClosesAt: timeZone ? iso(sleepDayWindowEndMs(sleepDay, timeZone)) : null,
-    ingestionPurpose: inputs.some((sample) => sample.ingestionPurpose === HealthKitSleepIngestionPurpose.VALIDATION_ONLY)
-      ? HealthKitSleepIngestionPurpose.VALIDATION_ONLY
-      : HealthKitSleepIngestionPurpose.OPERATIONAL,
+    ingestionPurpose: inputs.some((sample) => sample.ingestionPurpose === HealthKitSleepIngestionPurpose.HISTORICAL_EVIDENCE_IMPORT)
+      ? HealthKitSleepIngestionPurpose.HISTORICAL_EVIDENCE_IMPORT
+      : inputs.some((sample) => sample.ingestionPurpose === HealthKitSleepIngestionPurpose.VALIDATION_ONLY)
+        ? HealthKitSleepIngestionPurpose.VALIDATION_ONLY
+        : HealthKitSleepIngestionPurpose.OPERATIONAL,
     mainEpisodeIndex: mainIndex,
     mainSleep: main ? Object.freeze({
       asleepSeconds: main.asleepSeconds,

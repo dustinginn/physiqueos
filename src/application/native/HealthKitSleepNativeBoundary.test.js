@@ -144,8 +144,8 @@ describe("Native manifest Sleep capability", () => {
       enabled: true, mode: "operational", effectiveSleepDay: "2026-09-10", activationFloor: "2026-09-10T01:00:00.000Z",
     });
     // Everything else in the manifest is unchanged.
-    const { healthKitSleepIngestion: _served, ...rest } = served;
-    const { healthKitSleepIngestion: _static, ...staticRest } = nativeProductionContractManifest;
+    const { healthKitSleepIngestion: _served, healthKitSleepHistoricalEvidence: _servedHistorical, ...rest } = served;
+    const { healthKitSleepIngestion: _static, healthKitSleepHistoricalEvidence: _staticHistorical, ...staticRest } = nativeProductionContractManifest;
     expect(rest).toEqual(staticRest);
   });
 });

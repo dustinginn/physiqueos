@@ -7,6 +7,7 @@ import {
   HEALTHKIT_SLEEP_VALIDATION_POLICY_RECORD_ID,
   resolveHealthKitSleepValidationPolicy,
 } from "../../domain/services/HealthKitSleepHistoricalValidation.js";
+import { HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT } from "../commands/HealthKitSleepHistoricalEvidenceImportPort.js";
 
 /**
  * Resolves the owner's Sleep activation policy for the Native manifest. One
@@ -32,6 +33,9 @@ export function createHealthKitSleepCapabilityReadService({ records, ownerUserId
         collection: HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION,
         recordId: HEALTHKIT_SLEEP_VALIDATION_POLICY_RECORD_ID,
       }));
+    },
+    async getHistoricalEvidenceCapability() {
+      return Object.freeze({ enabled: true, ...HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT });
     },
   });
 }

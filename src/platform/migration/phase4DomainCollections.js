@@ -59,6 +59,11 @@ export const PHASE4_APPLICATION_RECORD_TABLES = Object.freeze({
   // never scan the generic observation collection.
   healthKitSleepSamples: "canonical_training_records",
   healthKitSleepDays: "canonical_training_records",
+  // Historical Sleep is display-only forever. Keeping both raw samples and
+  // derived days in distinct collections makes a future broad operational
+  // eligibility change incapable of sweeping history into strategy.
+  healthKitSleepHistoricalEvidenceSamples: "canonical_training_records",
+  healthKitSleepHistoricalEvidenceDays: "canonical_training_records",
   // Bounded historical Sleep validation (Phase C): a structurally separate
   // collection that no ordinary Sleep or strategic reader references.
   healthKitSleepValidationSamples: "canonical_training_records",
