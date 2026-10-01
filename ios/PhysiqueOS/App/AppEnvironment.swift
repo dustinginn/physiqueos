@@ -513,6 +513,10 @@ final class AppEnvironment {
     /// Recovery / Sleep Evidence. Founder Production reads only the Server
     /// `recovery-sleep*` resources; the bundled synthetic fixture exists for
     /// Sandbox alone and is never reachable from Production.
+    /// The Goal scope selection shared by the Recovery landing, Trends and
+    /// the night-history sheet (in memory; resets with the authority).
+    let recoverySleepScope = RecoverySleepScopeStore()
+
     var recoverySleepAPI: RecoverySleepAPI {
         nativeAuthority == .founderProduction ? ProductionRecoverySleepAPI(api: productionNativeAPI) : FixtureRecoverySleepAPI()
     }

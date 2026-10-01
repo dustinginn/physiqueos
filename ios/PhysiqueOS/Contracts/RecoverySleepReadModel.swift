@@ -610,6 +610,65 @@ enum RecoverySleepAdapter {
         )
     }
 
+    /// A Goal with no Sleep Evidence in its dates (no read is made).
+    static func emptyLanding() -> RecoverySleepLanding {
+        RecoverySleepLanding(
+            state: .noData, lastNight: nil, nights: [],
+            sevenNightAverage: RecoverySleepAverage(asleepSeconds: nil, nightCount: 0, windowNights: 7),
+            priorSevenNightAverage: RecoverySleepAverage(asleepSeconds: nil, nightCount: 0, windowNights: 7),
+            trailingAverages: [],
+            sleepWindow: RecoverySleepWindowSummary(typicalStartMinutes: nil, typicalEndMinutes: nil, startSpreadMinutes: nil, endSpreadMinutes: nil, nightsIncluded: 0, nightsExcludedUncertainTime: 0),
+            sources: []
+        )
+    }
+
+    static func emptyTrends(startDate: String, endDate: String) -> RecoverySleepTrends {
+        RecoverySleepTrends(startDate: startDate, endDate: endDate, granularity: .night, averageAsleepSeconds: nil, nightsWithData: 0,
+                            isTruncated: false, totalSleep: [], windowRows: [], continuity: [], stageMix: [])
+    }
+
+    /// The Goal-scoped landing snapshot, derived from ONE bounded trends read
+    /// (<= 30 newest nights inside the Goal's dates, so nothing outside the
+    /// range is ever requested). It applies the same rules the Server landing
+    /// does: 14 nights shown, the 7-night average over the 7 newest recorded
+    /// nights, and window statistics over nights with a window and a reliable
+    /// time zone. DISPLAY-ONLY derivation from Server totals and facts. The
+    /// typical window is taken in minutes-after-18:00 space, so it is
+    /// midnight-safe.
+    static func scopedLanding(_ live: RecoverySleepLiveTrends, now: Date = .now) -> RecoverySleepLanding {
+        let all = live.nights
+        let shownLive = Array(all.prefix(RecoverySleepQuery.landingNights))
+        let shown = shownLive.map { summary($0, now: now) }
+        let recorded = all.filter { $0.status == .asleepRecorded && $0.mainSleep?.asleepSeconds != nil }
+        let seven = recorded.prefix(7).compactMap { $0.mainSleep?.asleepSeconds }
+        let prior = recorded.dropFirst(7).prefix(7).compactMap { $0.mainSleep?.asleepSeconds }
+        let averages = trailingAverages(shown)
+        let included = shownLive.compactMap { night -> RecoverySleepTrends.WindowRow? in
+            night.timeZoneUncertain == true ? nil : windowRow(night)
+        }
+        let starts = included.map(\.startMinutes)
+        let ends = included.map(\.endMinutes)
+        let primaryLabels = Set(shownLive.compactMap(\.source))
+        let labels = Set(all.flatMap { ([$0.source].compactMap { $0 }) + ($0.corroboratingSources ?? []) }).sorted()
+        return RecoverySleepLanding(
+            state: shown.isEmpty ? .noData : .available,
+            lastNight: shownLive.first { $0.status == .asleepRecorded }.map { summary($0, now: now) } ?? shown.first,
+            nights: shown,
+            sevenNightAverage: RecoverySleepAverage(asleepSeconds: RecoverySleepStats.roundedMean(seven), nightCount: seven.count, windowNights: 7),
+            priorSevenNightAverage: RecoverySleepAverage(asleepSeconds: RecoverySleepStats.roundedMean(Array(prior)), nightCount: prior.count, windowNights: 7),
+            trailingAverages: shown.map { RecoverySleepLanding.AveragePoint(sleepDay: $0.sleepDay, asleepSeconds: averages[$0.sleepDay]) },
+            sleepWindow: RecoverySleepWindowSummary(
+                typicalStartMinutes: RecoverySleepStats.median(starts),
+                typicalEndMinutes: RecoverySleepStats.median(ends),
+                startSpreadMinutes: RecoverySleepStats.mad(starts),
+                endSpreadMinutes: RecoverySleepStats.mad(ends),
+                nightsIncluded: included.count,
+                nightsExcludedUncertainTime: shownLive.filter { $0.timeZoneUncertain == true }.count
+            ),
+            sources: labels.map { RecoverySleepSource(label: $0, role: primaryLabels.contains($0) ? .counted : .alsoRecorded) }
+        )
+    }
+
     static func windowRow(_ night: RecoverySleepLiveNight) -> RecoverySleepTrends.WindowRow? {
         guard let window = night.sleepWindow,
               let start = SleepEvidenceInstant.parse(window.start), let end = SleepEvidenceInstant.parse(window.end) else { return nil }
@@ -777,5 +836,28 @@ enum SleepEvidenceInstant {
         calendar.timeZone = zone
         let parts = calendar.dateComponents([.hour, .minute], from: date)
         return ((parts.hour ?? 0) * 60 + (parts.minute ?? 0) - 18 * 60 + 1440) % 1440
+    }
+}
+
+/// Small, JavaScript-`Math.round`-compatible statistics for DISPLAY-ONLY
+/// derivations (Goal-scoped snapshot). Server facts are never recomputed by
+/// these in the unscoped path.
+enum RecoverySleepStats {
+    static func roundHalfUp(_ value: Double) -> Int { Int((value + 0.5).rounded(.down)) }
+
+    static func roundedMean(_ values: [Int]) -> Int? {
+        values.isEmpty ? nil : roundHalfUp(Double(values.reduce(0, +)) / Double(values.count))
+    }
+
+    static func median(_ values: [Int]) -> Int? {
+        guard !values.isEmpty else { return nil }
+        let sorted = values.sorted()
+        let count = sorted.count
+        return count % 2 == 1 ? sorted[(count - 1) / 2] : roundHalfUp(Double(sorted[count / 2 - 1] + sorted[count / 2]) / 2)
+    }
+
+    static func mad(_ values: [Int]) -> Int? {
+        guard let center = median(values) else { return nil }
+        return median(values.map { abs($0 - center) })
     }
 }

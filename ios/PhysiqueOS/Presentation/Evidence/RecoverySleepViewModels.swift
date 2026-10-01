@@ -25,17 +25,21 @@ private func loadState<Value: Equatable>(_ work: () async throws -> Value) async
 @MainActor
 final class RecoverySleepLandingViewModel {
     private(set) var state: RecoverySleepLoadState<RecoverySleepLanding> = .loading
+    private var loadedRange: RecoverySleepScopeRange?
     private let api: RecoverySleepAPI
 
     init(api: RecoverySleepAPI) {
         self.api = api
     }
 
-    /// One bounded read (`recovery-sleep`). A reload keeps the last shown
-    /// landing on screen until the new one arrives.
-    func load(policy: RecoverySleepReadPolicy = .cacheFirst) async {
-        let next = await loadState { try await api.fetchLanding(policy: policy) }
-        if case .failed = next, case .loaded = state { return }
+    /// One bounded read inside the selected scope. Switching scope shows the
+    /// loading state (never another scope's nights); a plain reload keeps the
+    /// last shown landing on screen until the new one arrives.
+    func load(range: RecoverySleepScopeRange, policy: RecoverySleepReadPolicy = .cacheFirst) async {
+        if loadedRange != range { state = .loading }
+        let next = await loadState { try await api.fetchLanding(range: range, policy: policy) }
+        if case .failed = next, case .loaded = state, loadedRange == range { return }
+        loadedRange = range
         state = next
     }
 }
@@ -43,30 +47,37 @@ final class RecoverySleepLandingViewModel {
 @Observable
 @MainActor
 final class RecoverySleepTrendsViewModel {
-    private(set) var range: RecoverySleepTrendRange = .oneMonth
+    private struct CacheKey: Hashable {
+        let selector: RecoverySleepTrendRange
+        let range: RecoverySleepScopeRange
+    }
+
+    private(set) var selector: RecoverySleepTrendRange = .oneMonth
     private(set) var state: RecoverySleepLoadState<RecoverySleepTrends> = .loading
-    private var loaded: [RecoverySleepTrendRange: RecoverySleepTrends] = [:]
+    private var loaded: [CacheKey: RecoverySleepTrends] = [:]
     private let api: RecoverySleepAPI
 
     init(api: RecoverySleepAPI) {
         self.api = api
     }
 
-    func load() async {
-        await select(range)
+    func load(range: RecoverySleepScopeRange) async {
+        await select(selector, range: range)
     }
 
-    /// One bounded read per range; ranges already shown this visit are kept.
-    func select(_ range: RecoverySleepTrendRange) async {
-        self.range = range
-        if let cached = loaded[range] {
+    /// One bounded read per selector and scope; combinations already shown
+    /// this visit are kept.
+    func select(_ selector: RecoverySleepTrendRange, range: RecoverySleepScopeRange) async {
+        self.selector = selector
+        let key = CacheKey(selector: selector, range: range)
+        if let cached = loaded[key] {
             state = .loaded(cached)
             return
         }
-        if case .loaded = state {} else { state = .loading }
-        let next = await loadState { try await api.fetchTrends(range: range) }
-        guard self.range == range else { return }
-        if case .loaded(let trends) = next { loaded[range] = trends }
+        state = .loading
+        let next = await loadState { try await api.fetchTrends(selector: selector, range: range) }
+        guard self.selector == selector else { return }
+        if case .loaded(let trends) = next { loaded[key] = trends }
         state = next
     }
 }
@@ -80,10 +91,12 @@ final class RecoverySleepNightsViewModel {
     private var nextCursor: String?
     private var hasLoadedFirstPage = false
     private let api: RecoverySleepAPI
+    private let range: RecoverySleepScopeRange
     private let pageSize: Int
 
-    init(api: RecoverySleepAPI, pageSize: Int = RecoverySleepQuery.nightsPageLimit) {
+    init(api: RecoverySleepAPI, range: RecoverySleepScopeRange, pageSize: Int = RecoverySleepQuery.nightsPageLimit) {
         self.api = api
+        self.range = range
         self.pageSize = pageSize
     }
 
@@ -91,7 +104,7 @@ final class RecoverySleepNightsViewModel {
 
     func loadFirstPage() async {
         guard !hasLoadedFirstPage else { return }
-        let next = await loadState { try await api.fetchNights(cursor: nil, limit: pageSize) }
+        let next = await loadState { try await api.fetchNights(cursor: nil, limit: pageSize, range: range) }
         switch next {
         case .loaded(let page):
             items = page.items
@@ -109,7 +122,7 @@ final class RecoverySleepNightsViewModel {
         guard let cursor = nextCursor, !isLoadingMore else { return }
         isLoadingMore = true
         defer { isLoadingMore = false }
-        guard let page = try? await api.fetchNights(cursor: cursor, limit: pageSize) else { return }
+        guard let page = try? await api.fetchNights(cursor: cursor, limit: pageSize, range: range) else { return }
         let known = Set(items.map(\.sleepDay))
         items += page.items.filter { !known.contains($0.sleepDay) }
         nextCursor = page.nextCursor

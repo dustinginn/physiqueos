@@ -3,12 +3,26 @@ import Foundation
 /// Read seam for Recovery / Sleep Evidence. Every screen reads exactly one
 /// bounded resource: the landing (`recovery-sleep-landing`), a dated trend
 /// range or page (`recovery-sleep-trends`), or one night
-/// (`recovery-sleep-night`). Native never issues an unbounded history read.
+/// (`recovery-sleep-night`). Every read is made inside the selected Goal
+/// scope's range (a Goal's canonical dates intersected with the available
+/// Sleep Evidence); Native never issues an unbounded history read and never
+/// requests dates outside the range.
 protocol RecoverySleepAPI: Sendable {
-    func fetchLanding(policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding
-    func fetchTrends(range: RecoverySleepTrendRange) async throws -> RecoverySleepTrends
-    func fetchNights(cursor: String?, limit: Int) async throws -> RecoverySleepNightsPage
+    /// The Evidence "today" the scope ranges are resolved against.
+    func today() -> String
+    /// The canonical Goal date windows for Build Lean Mass and Visible Abs.
+    func fetchGoalWindows() async throws -> [RecoverySleepScope: RecoverySleepGoalWindow]
+    func fetchLanding(range: RecoverySleepScopeRange, policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding
+    func fetchTrends(selector: RecoverySleepTrendRange, range: RecoverySleepScopeRange) async throws -> RecoverySleepTrends
+    func fetchNights(cursor: String?, limit: Int, range: RecoverySleepScopeRange) async throws -> RecoverySleepNightsPage
     func fetchNight(sleepDay: String) async throws -> RecoverySleepNightDetail
+}
+
+extension RecoverySleepAPI {
+    /// The unscoped ("All Sleep") landing, e.g. for the Evidence Hub row.
+    func fetchLanding(policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding {
+        try await fetchLanding(range: RecoverySleepScopeResolver.resolve(scope: .all, goalWindow: nil, today: today()), policy: policy)
+    }
 }
 
 enum RecoverySleepReadPolicy: Sendable {
@@ -28,14 +42,17 @@ enum RecoverySleepAPIError: Error, Equatable {
 enum RecoverySleepQuery {
     /// First sleep day of the reviewed historical Evidence import (the
     /// PhysiqueOS consistent-evidence boundary; Build 74
-    /// `HealthKitSleepHistoricalEvidenceCapability` pins the same day). "All"
-    /// never reaches earlier than this.
+    /// `HealthKitSleepHistoricalEvidenceCapability` pins the same day). No
+    /// scope ever reaches earlier than this.
     static let evidenceStartSleepDay = "2026-07-06"
     /// Server: night granularity below 183 days, weekly at or above.
     static let weeklyThresholdDays = 183
     /// Server page maximum.
     static let maximumPageLimit = 100
     static let nightsPageLimit = 30
+    /// The landing snapshot looks back this many nights.
+    static let landingLookbackDays = 30
+    static let landingNights = 14
 
     struct Range: Equatable, Sendable {
         let startDate: String
@@ -48,11 +65,14 @@ enum RecoverySleepQuery {
             && SleepEvidenceDay.date(value) != nil
     }
 
-    /// Bounded dates for a selector, ending today (local). Night-granularity
-    /// ranges request a full page (<= 100 nights) so charts are complete; an
-    /// "All" span that would exceed one page is widened to the weekly
-    /// threshold so the Server aggregates every night instead of truncating.
-    static func range(_ selector: RecoverySleepTrendRange, today: String) -> Range {
+    /// Bounded dates for a selector inside a scope. The selector counts back
+    /// from the scope's last day (today for current scopes, the Goal's final
+    /// day for a completed Goal) and never reaches before the scope's first
+    /// day. Night-granularity ranges request a full page (<= 100 nights); the
+    /// span length alone decides night vs weekly on the Server. `nil` when
+    /// the scope has no Sleep Evidence (no read is made).
+    static func range(_ selector: RecoverySleepTrendRange, scope: RecoverySleepScopeRange) -> Range? {
+        guard !scope.isEmpty else { return nil }
         let days: Int
         switch selector {
         case .twoWeeks: days = 14
@@ -60,21 +80,18 @@ enum RecoverySleepQuery {
         case .threeMonths: days = 90
         case .sixMonths: days = weeklyThresholdDays
         case .all:
-            // Always exactly the Evidence start through today. Between 101
-            // and 182 days the Server returns the newest 100 nights (the
-            // trends model flags that as truncated); from 183 days it is
-            // weekly and complete.
-            let start = min(evidenceStartSleepDay, today)
-            return Range(startDate: start, endDate: today, limit: maximumPageLimit)
+            return Range(startDate: scope.startDate, endDate: scope.endDate, limit: maximumPageLimit)
         }
-        let start = SleepEvidenceDay.shift(today, days: -(days - 1)) ?? today
-        return Range(startDate: start, endDate: today, limit: maximumPageLimit)
+        let counted = SleepEvidenceDay.shift(scope.endDate, days: -(days - 1)) ?? scope.endDate
+        return Range(startDate: max(counted, scope.startDate), endDate: scope.endDate, limit: maximumPageLimit)
     }
 
-    /// Bounds for paged night history: Evidence start through today.
-    static func historyRange(today: String) -> (startDate: String, endDate: String) {
-        let start = min(evidenceStartSleepDay, today)
-        return (start, today)
+    /// The snapshot window behind a Goal-scoped landing: the last
+    /// `landingLookbackDays` of the scope, never before its first day.
+    static func landingRange(scope: RecoverySleepScopeRange) -> Range? {
+        guard !scope.isEmpty else { return nil }
+        let counted = SleepEvidenceDay.shift(scope.endDate, days: -(landingLookbackDays - 1)) ?? scope.endDate
+        return Range(startDate: max(counted, scope.startDate), endDate: scope.endDate, limit: landingLookbackDays)
     }
 }
 
@@ -82,25 +99,63 @@ enum RecoverySleepQuery {
 
 struct ProductionRecoverySleepAPI: RecoverySleepAPI {
     let api: ProductionNativeAPI
-    var today: @Sendable () -> String = { SleepEvidenceDay.today() }
+    var clock: @Sendable () -> String = { SleepEvidenceDay.today() }
 
-    func fetchLanding(policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding {
-        let live = try await read(RecoverySleepResource.landing, query: ["throughDate": today()],
-                                  policy: policy == .reload ? .reload : .cacheFirst, as: RecoverySleepLiveLanding.self)
-        return RecoverySleepAdapter.landing(live)
+    func today() -> String { clock() }
+
+    /// The canonical Goal windows come from the Server's own Goal/Phase
+    /// context (`context.startDate` / `context.endDate`), the same source the
+    /// other Evidence verticals use; one tiny read per Goal.
+    func fetchGoalWindows() async throws -> [RecoverySleepScope: RecoverySleepGoalWindow] {
+        async let leanMass = goalWindow(.buildLeanMass)
+        async let visibleAbs = goalWindow(.visibleAbs)
+        return try await [.buildLeanMass: leanMass, .visibleAbs: visibleAbs]
     }
 
-    func fetchTrends(range selector: RecoverySleepTrendRange) async throws -> RecoverySleepTrends {
-        let range = RecoverySleepQuery.range(selector, today: today())
-        let live = try await read(RecoverySleepResource.trends,
-                                  query: ["startDate": range.startDate, "endDate": range.endDate, "limit": String(range.limit)],
-                                  policy: .cacheFirst, as: RecoverySleepLiveTrends.self)
+    private func goalWindow(_ scope: RecoverySleepScope) async throws -> RecoverySleepGoalWindow {
+        do {
+            let payload = try await api.readResource("photos", query: ["context": scope.rawValue, "limit": "1"], policy: .cacheFirst, as: GoalContextPayload.self).data
+            return RecoverySleepGoalWindow(startDate: payload.context.startDate, endDate: payload.context.endDate)
+        } catch ProductionNativeError.notFound {
+            throw RecoverySleepAPIError.notAvailable
+        }
+    }
+
+    private struct GoalContextPayload: Decodable, Sendable { let context: NativeGoalPhaseContext }
+
+    func fetchLanding(range: RecoverySleepScopeRange, policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding {
+        let readPolicy: ProductionNativeAPI.ReadPolicy = policy == .reload ? .reload : .cacheFirst
+        if range.isEmpty { return RecoverySleepAdapter.emptyLanding() }
+        if range.scope == .all {
+            let live = try await read(RecoverySleepResource.landing, query: ["throughDate": range.endDate], policy: readPolicy, as: RecoverySleepLiveLanding.self)
+            return RecoverySleepAdapter.landing(live)
+        }
+        // A Goal's snapshot is derived from ONE bounded trends read so no night
+        // outside the Goal's dates is ever requested or shown.
+        guard let window = RecoverySleepQuery.landingRange(scope: range) else { return RecoverySleepAdapter.emptyLanding() }
+        let live = try await read(
+            RecoverySleepResource.trends,
+            query: ["startDate": window.startDate, "endDate": window.endDate, "limit": String(window.limit)],
+            policy: readPolicy, as: RecoverySleepLiveTrends.self
+        )
+        return RecoverySleepAdapter.scopedLanding(live)
+    }
+
+    func fetchTrends(selector: RecoverySleepTrendRange, range: RecoverySleepScopeRange) async throws -> RecoverySleepTrends {
+        guard let bounds = RecoverySleepQuery.range(selector, scope: range) else {
+            return RecoverySleepAdapter.emptyTrends(startDate: range.startDate, endDate: range.endDate)
+        }
+        let live = try await read(
+            RecoverySleepResource.trends,
+            query: ["startDate": bounds.startDate, "endDate": bounds.endDate, "limit": String(bounds.limit)],
+            policy: .cacheFirst, as: RecoverySleepLiveTrends.self
+        )
         return RecoverySleepAdapter.trends(live)
     }
 
-    func fetchNights(cursor: String?, limit: Int) async throws -> RecoverySleepNightsPage {
-        let bounds = RecoverySleepQuery.historyRange(today: today())
-        var query = ["startDate": bounds.startDate, "endDate": bounds.endDate,
+    func fetchNights(cursor: String?, limit: Int, range: RecoverySleepScopeRange) async throws -> RecoverySleepNightsPage {
+        guard !range.isEmpty else { return RecoverySleepNightsPage(items: [], nextCursor: nil) }
+        var query = ["startDate": range.startDate, "endDate": range.endDate,
                      "limit": String(min(max(1, limit), RecoverySleepQuery.maximumPageLimit))]
         if let cursor {
             guard RecoverySleepQuery.isSleepDayKey(cursor) else { throw RecoverySleepAPIError.nightNotFound }
@@ -144,8 +199,8 @@ struct ProductionRecoverySleepAPI: RecoverySleepAPI {
 /// live Server shape, generated by `ios/Scripts/generate_recovery_sleep_fixture.py`
 /// — through the same rules the Server read service applies (newest first,
 /// bounded date filtering, cursor paging, weekly aggregation at >= 183 days),
-/// decoded with the production decoder configuration. Requested dates are
-/// shifted so "today" maps onto the fixture's newest night.
+/// decoded with the production decoder configuration. The Sandbox is frozen
+/// at the fixture's newest sleep day so it behaves identically on any date.
 struct FixtureRecoverySleepAPI: RecoverySleepAPI {
     enum FixtureError: Error { case resourceNotFound }
 
@@ -163,13 +218,33 @@ struct FixtureRecoverySleepAPI: RecoverySleepAPI {
         let examples: Examples
     }
 
-    private let bundle: Bundle
-    private let today: @Sendable () -> String
+    /// The fixture's newest sleep day (also stored in the file).
+    static let anchorSleepDay = "2026-10-01"
 
-    init(bundle: Bundle = .main, today: @escaping @Sendable () -> String = { SleepEvidenceDay.today() }) {
+    private let bundle: Bundle
+    private let goalWindows: [RecoverySleepScope: RecoverySleepGoalWindow]
+
+    init(
+        bundle: Bundle = .main,
+        goalWindows: [RecoverySleepScope: RecoverySleepGoalWindow] = FixtureRecoverySleepAPI.canonicalGoalWindows()
+    ) {
         self.bundle = bundle
-        self.today = today
+        self.goalWindows = goalWindows
     }
+
+    /// The Sandbox's canonical Goals (`EvidenceChronologyFixture.json`), the
+    /// same chronology every other Sandbox Evidence vertical filters by.
+    static func canonicalGoalWindows() -> [RecoverySleepScope: RecoverySleepGoalWindow] {
+        var windows: [RecoverySleepScope: RecoverySleepGoalWindow] = [:]
+        for goal in EvidenceChronology.canonicalGoals {
+            let window = RecoverySleepGoalWindow(startDate: goal.startDate, endDate: goal.targetDate)
+            if goal.id == EvidenceCanonicalGoalID.buildLeanMass { windows[.buildLeanMass] = window }
+            if goal.id == EvidenceCanonicalGoalID.visibleAbs { windows[.visibleAbs] = window }
+        }
+        return windows
+    }
+
+    func today() -> String { Self.anchorSleepDay }
 
     func loadFixture() throws -> FixtureFile {
         guard let url = bundle.url(forResource: "RecoverySleepFixture", withExtension: "json") else {
@@ -178,73 +253,74 @@ struct FixtureRecoverySleepAPI: RecoverySleepAPI {
         return try RecoverySleepDecoding.decoder().decode(FixtureFile.self, from: Data(contentsOf: url))
     }
 
-    /// Fixture-relative day for a requested (device-relative) day.
-    private func shifted(_ day: String, fixture: FixtureFile) -> String {
-        guard let offset = SleepEvidenceDay.span(today(), fixture.anchorSleepDay) else { return day }
-        return SleepEvidenceDay.shift(day, days: offset - 1) ?? day
+    func fetchGoalWindows() async throws -> [RecoverySleepScope: RecoverySleepGoalWindow] { goalWindows }
+
+    func fetchLanding(range: RecoverySleepScopeRange, policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding {
+        if range.isEmpty { return RecoverySleepAdapter.emptyLanding() }
+        let fixture = try loadFixture()
+        if range.scope == .all {
+            let end = range.endDate
+            let rows = newest(fixture.nights, from: SleepEvidenceDay.shift(end, days: -(RecoverySleepQuery.landingLookbackDays - 1)) ?? end, through: end)
+            let shown = Array(rows.prefix(RecoverySleepQuery.landingNights))
+            let seven = rows.filter { $0.status == .asleepRecorded }.prefix(7).compactMap { $0.mainSleep?.asleepSeconds }
+            let eligible = shown.filter { $0.sleepWindow != nil && $0.timeZoneUncertain != true }
+            let starts = eligible.compactMap { minuteOfDay($0.sleepWindow?.start, $0.sleepWindow?.timeZone) }
+            let ends = eligible.compactMap { minuteOfDay($0.sleepWindow?.end, $0.sleepWindow?.timeZone) }
+            let labels = Set(rows.flatMap { [$0.source].compactMap { $0 } + ($0.corroboratingSources ?? []) }).sorted()
+            let live = RecoverySleepLiveLanding(
+                schemaVersion: "recovery-sleep-evidence-v1",
+                lastNight: shown.first { $0.status == .asleepRecorded } ?? shown.first,
+                nights: shown,
+                sevenNightAverage: .init(seconds: seven.isEmpty ? nil : Int((Double(seven.reduce(0, +)) / Double(seven.count)).rounded()), nightCount: seven.count),
+                window: .init(medianStartMinute: Self.median(starts), medianEndMinute: Self.median(ends),
+                              startSpreadMinutes: Self.mad(starts), endSpreadMinutes: Self.mad(ends),
+                              nightsUsed: eligible.count, inferredNightsExcluded: shown.filter { $0.timeZoneUncertain == true }.count),
+                sources: labels.map { .init(label: $0) },
+                strategicUse: "quarantined"
+            )
+            return RecoverySleepAdapter.landing(live, now: anchoredNow())
+        }
+        guard let window = RecoverySleepQuery.landingRange(scope: range) else { return RecoverySleepAdapter.emptyLanding() }
+        let live = trends(fixture, start: window.startDate, end: window.endDate, limit: window.limit, cursor: nil)
+        return RecoverySleepAdapter.scopedLanding(live, now: anchoredNow())
+    }
+
+    func fetchTrends(selector: RecoverySleepTrendRange, range: RecoverySleepScopeRange) async throws -> RecoverySleepTrends {
+        guard let bounds = RecoverySleepQuery.range(selector, scope: range) else {
+            return RecoverySleepAdapter.emptyTrends(startDate: range.startDate, endDate: range.endDate)
+        }
+        let fixture = try loadFixture()
+        return RecoverySleepAdapter.trends(trends(fixture, start: bounds.startDate, end: bounds.endDate, limit: bounds.limit, cursor: nil), now: anchoredNow())
+    }
+
+    func fetchNights(cursor: String?, limit: Int, range: RecoverySleepScopeRange) async throws -> RecoverySleepNightsPage {
+        guard !range.isEmpty else { return RecoverySleepNightsPage(items: [], nextCursor: nil) }
+        let fixture = try loadFixture()
+        let live = trends(fixture, start: range.startDate, end: range.endDate, limit: min(max(1, limit), RecoverySleepQuery.maximumPageLimit), cursor: cursor)
+        return RecoverySleepAdapter.page(live, now: anchoredNow())
+    }
+
+    func fetchNight(sleepDay: String) async throws -> RecoverySleepNightDetail {
+        let fixture = try loadFixture()
+        guard let night = fixture.nights.first(where: { $0.sleepDay == sleepDay }) else { throw RecoverySleepAPIError.nightNotFound }
+        return RecoverySleepAdapter.detail(night, now: anchoredNow())
     }
 
     private func newest(_ nights: [RecoverySleepLiveNight], from start: String, through end: String) -> [RecoverySleepLiveNight] {
         nights.filter { $0.sleepDay >= start && $0.sleepDay <= end }.sorted { $0.sleepDay > $1.sleepDay }
     }
 
-    func fetchLanding(policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding {
-        let fixture = try loadFixture()
-        let end = fixture.anchorSleepDay
-        let rows = newest(fixture.nights, from: SleepEvidenceDay.shift(end, days: -29) ?? end, through: end)
-        let shown = Array(rows.prefix(14))
-        let seven = rows.filter { $0.status == .asleepRecorded }.prefix(7).compactMap { $0.mainSleep?.asleepSeconds }
-        let eligible = shown.filter { $0.sleepWindow != nil && $0.timeZoneUncertain != true }
-        let starts = eligible.compactMap { minuteOfDay($0.sleepWindow?.start, $0.sleepWindow?.timeZone) }
-        let ends = eligible.compactMap { minuteOfDay($0.sleepWindow?.end, $0.sleepWindow?.timeZone) }
-        let labels = Set(rows.flatMap { [$0.source].compactMap { $0 } + ($0.corroboratingSources ?? []) }).sorted()
-        let live = RecoverySleepLiveLanding(
-            schemaVersion: "recovery-sleep-evidence-v1",
-            lastNight: shown.first { $0.status == .asleepRecorded } ?? shown.first,
-            nights: shown,
-            sevenNightAverage: .init(seconds: seven.isEmpty ? nil : Int((Double(seven.reduce(0, +)) / Double(seven.count)).rounded()), nightCount: seven.count),
-            window: .init(medianStartMinute: Self.median(starts), medianEndMinute: Self.median(ends),
-                          startSpreadMinutes: Self.mad(starts), endSpreadMinutes: Self.mad(ends),
-                          nightsUsed: eligible.count, inferredNightsExcluded: shown.filter { $0.timeZoneUncertain == true }.count),
-            sources: labels.map { .init(label: $0) },
-            strategicUse: "quarantined"
-        )
-        return RecoverySleepAdapter.landing(live, now: anchoredNow(fixture))
-    }
-
-    func fetchTrends(range selector: RecoverySleepTrendRange) async throws -> RecoverySleepTrends {
-        let fixture = try loadFixture()
-        let range = RecoverySleepQuery.range(selector, today: today())
-        return RecoverySleepAdapter.trends(try trends(fixture, start: shifted(range.startDate, fixture: fixture),
-                                                      end: shifted(range.endDate, fixture: fixture), limit: range.limit, cursor: nil),
-                                           now: anchoredNow(fixture))
-    }
-
-    func fetchNights(cursor: String?, limit: Int) async throws -> RecoverySleepNightsPage {
-        let fixture = try loadFixture()
-        let bounds = RecoverySleepQuery.historyRange(today: fixture.anchorSleepDay)
-        return RecoverySleepAdapter.page(try trends(fixture, start: bounds.startDate, end: bounds.endDate,
-                                                    limit: min(max(1, limit), RecoverySleepQuery.maximumPageLimit), cursor: cursor),
-                                         now: anchoredNow(fixture))
-    }
-
-    func fetchNight(sleepDay: String) async throws -> RecoverySleepNightDetail {
-        let fixture = try loadFixture()
-        guard let night = fixture.nights.first(where: { $0.sleepDay == sleepDay }) else { throw RecoverySleepAPIError.nightNotFound }
-        return RecoverySleepAdapter.detail(night, now: anchoredNow(fixture))
-    }
-
     /// The fixture's "now": mid-morning on its newest sleep day, so the
     /// newest night is still inside its update window in Sandbox.
-    private func anchoredNow(_ fixture: FixtureFile) -> Date {
+    private func anchoredNow() -> Date {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
-        let parts = fixture.anchorSleepDay.split(separator: "-").compactMap { Int($0) }
+        let parts = Self.anchorSleepDay.split(separator: "-").compactMap { Int($0) }
         return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: 9, minute: 41)) ?? .now
     }
 
     /// Mirrors the Server `trends` rules over the fixture nights.
-    private func trends(_ fixture: FixtureFile, start: String, end: String, limit: Int, cursor: String?) throws -> RecoverySleepLiveTrends {
+    private func trends(_ fixture: FixtureFile, start: String, end: String, limit: Int, cursor: String?) -> RecoverySleepLiveTrends {
         let span = SleepEvidenceDay.span(start, end) ?? 1
         var rows = newest(fixture.nights, from: start, through: end)
         if let cursor { rows = rows.filter { $0.sleepDay < cursor } }

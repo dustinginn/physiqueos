@@ -11,10 +11,18 @@ private func axisLabel(_ text: String) -> some View {
         .foregroundStyle(PhysiqueOSTheme.textMuted)
 }
 
-/// Day labels offset from the newest point so neither edge label clips.
-private func labelDates(_ newestFirst: [Date], stride: Int) -> [Date] {
-    let phase = stride >= 7 ? 3 : 1
-    return newestFirst.enumerated().filter { $0.offset % stride == phase }.map(\.element)
+/// The shared vertical tick grid + labels every longitudinal Sleep chart draws
+/// from the one `SleepAxisPolicy.Plan`, so labels align across charts.
+@AxisContentBuilder
+private func sleepDateAxisMarks(_ plan: SleepAxisPolicy.Plan, showsLabels: Bool = true) -> some AxisContent {
+    AxisMarks(values: plan.tickDates) { value in
+        AxisGridLine().foregroundStyle(PhysiqueOSTheme.divider.opacity(0.6))
+        if showsLabels {
+            AxisValueLabel(anchor: .top) {
+                if let date = value.as(Date.self), let label = plan.label(for: date) { axisLabel(label) }
+            }
+        }
+    }
 }
 
 // MARK: - Total sleep: nightly (or weekly) bars + Server trailing average
@@ -49,6 +57,7 @@ struct SleepTotalChart: View {
     /// Newest first.
     let points: [SleepTotalChartPoint]
     var isWeekly = false
+    let plan: SleepAxisPolicy.Plan
     @Binding var selectedId: String?
     var height: CGFloat = 176
 
@@ -88,13 +97,8 @@ struct SleepTotalChart: View {
                 AxisValueLabel { axisLabel("\(value.as(Int.self) ?? 0)h") }
             }
         }
-        .chartXAxis {
-            AxisMarks(values: labelDates(points.map(\.date), stride: isWeekly ? 4 : (points.count > 20 ? 7 : 3))) { value in
-                AxisValueLabel {
-                    if let date = value.as(Date.self) { axisLabel(date.formatted(.dateTime.month(.abbreviated).day())) }
-                }
-            }
-        }
+        .chartXScale(domain: plan.domain)
+        .chartXAxis { sleepDateAxisMarks(plan) }
         .chartOverlay { proxy in
             GeometryReader { geometry in
                 Rectangle().fill(.clear).contentShape(Rectangle())
@@ -190,11 +194,13 @@ struct SleepWindowChart: View {
     /// Newest first (drawn at the top).
     let rows: [SleepWindowChartRow]
     let summary: RecoverySleepWindowSummary?
+    /// The same plan the date charts use: rows are labelled on the plan's tick
+    /// days so a night's label lines up with every other Sleep chart.
+    let plan: SleepAxisPolicy.Plan
     var rowHeight: CGFloat = 13
 
     private var rowLabels: [String] {
-        let stride = rows.count > 14 ? 5 : 2
-        return rows.enumerated().filter { $0.offset % stride == 0 }.map(\.element.label)
+        SleepAxisPolicy.rowLabels(plan: plan, rowDays: rows.map(\.id))
     }
 
     var body: some View {
@@ -222,14 +228,10 @@ struct SleepWindowChart: View {
                     height: .fixed(7)
                 )
                 .cornerRadius(3.5)
-                .foregroundStyle(PhysiqueOSTheme.sleepTotal.opacity(row.includedInConsistency ? 0.88 : 0.3))
-                .annotation(position: .trailing, spacing: 4) {
-                    if !row.includedInConsistency {
-                        Image(systemName: "circle.dashed")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                }
+                // Historical bars keep normal prominence: the Server's exclusion
+                // of uncertain nights applies to the typical-window statistics,
+                // not to how the night is drawn.
+                .foregroundStyle(PhysiqueOSTheme.sleepTotal.opacity(0.88))
             }
         }
         .chartXScale(domain: lower...upper)
@@ -255,7 +257,7 @@ struct SleepWindowChart: View {
         guard let start = summary?.typicalStartMinutes, let end = summary?.typicalEndMinutes else { return "No typical window yet" }
         let excluded = rows.filter { !$0.includedInConsistency }.count
         return "Typically \(SleepEvidenceFormat.clockFromMinutes(start)) to \(SleepEvidenceFormat.clockFromMinutes(end))"
-            + (excluded > 0 ? ". \(excluded) nights with uncertain clock times are faded and not counted." : "")
+            + (excluded > 0 ? ". \(excluded) nights have approximate clock times and are not counted in the typical window." : "")
     }
 }
 
@@ -478,6 +480,7 @@ struct SleepStageBar: View {
 struct SleepContinuityChart: View {
     /// Newest first.
     let rows: [RecoverySleepTrends.ContinuityRow]
+    let plan: SleepAxisPolicy.Plan
 
     private var available: [(Date, RecoverySleepTrends.ContinuityRow)] {
         rows.reversed().compactMap { row in
@@ -486,15 +489,9 @@ struct SleepContinuityChart: View {
         }
     }
 
-    private var domain: ClosedRange<Date> {
-        let dates = rows.compactMap { SleepEvidenceFormat.chartDate($0.sleepDay) }
-        let low = (dates.min() ?? .now).addingTimeInterval(-43_200)
-        let high = (dates.max() ?? .now).addingTimeInterval(43_200)
-        return low...max(high, low.addingTimeInterval(86_400))
-    }
+    private var domain: ClosedRange<Date> { plan.domain }
 
     var body: some View {
-        let dates = rows.compactMap { SleepEvidenceFormat.chartDate($0.sleepDay) }
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Awake in sleep window")
@@ -516,7 +513,7 @@ struct SleepContinuityChart: View {
                         AxisValueLabel { axisLabel("\(value.as(Int.self) ?? 0)m") }
                     }
                 }
-                .chartXAxis(.hidden)
+                .chartXAxis { sleepDateAxisMarks(plan, showsLabels: false) }
                 .frame(height: 70)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Awake in sleep window per night")
@@ -542,13 +539,7 @@ struct SleepContinuityChart: View {
                         AxisValueLabel { axisLabel(String(format: "%.0fh", value.as(Double.self) ?? 0)) }
                     }
                 }
-                .chartXAxis {
-                    AxisMarks(values: labelDates(Array(dates), stride: dates.count > 20 ? 7 : 3)) { value in
-                        AxisValueLabel {
-                            if let date = value.as(Date.self) { axisLabel(date.formatted(.dateTime.month(.abbreviated).day())) }
-                        }
-                    }
-                }
+                .chartXAxis { sleepDateAxisMarks(plan) }
                 .frame(height: 86)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Longest continuous sleep per night")
@@ -562,6 +553,7 @@ struct SleepContinuityChart: View {
 
 struct SleepStageMixChart: View {
     let rows: [RecoverySleepTrends.StageMixRow]
+    let plan: SleepAxisPolicy.Plan
 
     private struct Share: Identifiable {
         let id: String
@@ -588,7 +580,8 @@ struct SleepStageMixChart: View {
                 AxisValueLabel { axisLabel("\(Int((value.as(Double.self) ?? 0) * 100))%") }
             }
         }
-        .chartXAxis(.hidden)
+        .chartXScale(domain: plan.domain)
+        .chartXAxis { sleepDateAxisMarks(plan) }
         .chartLegend(position: .bottom, alignment: .leading)
         .frame(height: 140)
         .accessibilityElement(children: .ignore)
