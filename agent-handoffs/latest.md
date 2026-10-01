@@ -2,14 +2,16 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Workout Live Activities Phase 1 final: Build 77 uploaded, VALID (`workout-live-activities-phase1-implementation-20261001`)
-- Agent: claude
-- Status: completed
-- Generated (UTC): 2026-10-01T22:09:47Z
+- Task: Recovery Briefing V1 one-card prototype and Server shadow candidate (`recovery-briefing-v1-shadow-assessment-20261001`)
+- Agent: codex
+- Status: candidate
+- Generated (UTC): 2026-10-01T22:45:16Z
 - Success: true
 
-Summary: Workout Logger Live Activities Phase 1 shipped as Build 77 (1.0 (77)) from c299fa29: Widget Extension, coordinator, Complete Set LiveActivityIntent through TrainingSessionAuthority, round-aware supersets, Stopwatch-default rest preference, tap-to-open. Full unit 1832 tests (1 known Peptide failure), UI journeys green, Release archive with extension signed via release tool, delivery 2d0daa39-a6c9-4bc7-a027-1ec9243bf7e3 processing VALID. Physical-device acceptance not done.
+Summary: Recovery V1 now has exactly one quiet card plus a pure, versioned Server shadow-assessment candidate. The candidate passed 89 focused tests and fresh independent review, but remains intentionally unwired and undeployed because no approved validation-only Recovery input-authority/composition boundary exists.
 
-Detailed report: `agent-handoffs/reports/20261001T220947Z-workout-live-activities-phase1-implementation.md`
+Detailed report: `agent-handoffs/reports/20261001T224516Z-recovery-briefing-v1-shadow-assessment.md`
+
+Implementation: `codex/recovery-briefing-v1-shadow-assessment-server` at `1bfa92ef874c3c96f05b23a9d3cbdfb956384156`
 
 Protocol: `agent-handoffs/README.md`
