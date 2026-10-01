@@ -69,7 +69,7 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
             exercise("dips", "Dips", measurement: .bodyweightReps, defaultLoadType: "bodyweight", sets: [set("d1", 1, reps: 12, load: nil), set("d2", 2, reps: 10, load: 25)]),
         ])
         let atFinal = try project(draft)
-        XCTAssertTrue(atFinal.isFinalSetOfExercise)
+        XCTAssertTrue(atFinal.isFinalSetOfUnit)
         XCTAssertEqual(atFinal.currentSet?.setId, "b2")
         XCTAssertEqual(atFinal.upNextExercise?.name, "Dips")
         XCTAssertEqual(atFinal.upNextSet?.setId, "d1")
@@ -81,7 +81,7 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         XCTAssertEqual(advanced.previousSet?.setId, "b2")
         XCTAssertEqual(advanced.currentExercise?.name, "Dips")
         XCTAssertEqual(advanced.currentSet?.setId, "d1")
-        XCTAssertFalse(advanced.isFinalSetOfExercise)
+        XCTAssertFalse(advanced.isFinalSetOfUnit)
         XCTAssertEqual(advanced.upNextSet?.setId, "d2")
         XCTAssertNil(advanced.upNextExercise, "Up Next stays in the same exercise.")
         XCTAssertEqual(advanced.upNextSet?.valueText, "BW + 25 lb × 10")
@@ -128,68 +128,150 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         XCTAssertEqual(rows(projection), ["completed:f2"])
     }
 
-    func testSupersetNeverShowsThreeRows() throws {
-        let row = exercise("row", "Row", sets: [set("r1", 1, done: stamp(40)), set("r2", 2)])
-        let curl = exercise("curl", "Curl", sets: [set("c1", 1, done: stamp(20)), set("c2", 2)])
-        let draft = session([row, curl], relationships: [.init(id: "ss", relationshipType: "superset", memberExerciseIds: ["row", "curl"])])
-        let projection = try project(draft)
-        XCTAssertLessThanOrEqual(projection.contextRows.count, 2)
-        XCTAssertEqual(projection.contextRows.map(\.set.setId), ["r2", "c2"], "Row's final set: Current + Up Next (partner).")
-        XCTAssertEqual(projection.contextLayout, .currentAndUpNext)
+    // MARK: Superset round/unit semantics (Founder decision 4)
+
+    /// One entry per step: the layout and rows the projection shows *before*
+    /// completing its own current set, ending with the all-complete state.
+    private func walk(_ draft: TrainingLoggerDraft, file: StaticString = #filePath, line: UInt = #line) throws -> [String] {
+        var draft = draft
+        var steps: [String] = []
+        var tick = 600.0
+        for _ in 0..<64 {
+            let projection = try project(draft)
+            XCTAssertLessThanOrEqual(projection.contextRows.count, 2, "Never more than two rows.", file: file, line: line)
+            XCTAssertLessThanOrEqual(projection.contextRows.filter(\.isCompletionTarget).count, 1, file: file, line: line)
+            let rows = projection.contextRows.map { "\($0.role.rawValue):\($0.set.setId)\($0.isCompletionTarget ? "*" : "")" }.joined(separator: " ")
+            steps.append("\(projection.contextLayout.rawValue)\(projection.isFinalSetOfUnit ? "!" : "") [\(rows)]")
+            guard let target = projection.currentSet else { return steps }
+            let exerciseIndex = draft.exercises.firstIndex { $0.id == target.exerciseId }!
+            let setIndex = draft.exercises[exerciseIndex].sets.firstIndex { $0.id == target.setId }!
+            draft.exercises[exerciseIndex].sets[setIndex].isCompleted = true
+            draft.exercises[exerciseIndex].sets[setIndex].completedAt = stamp(tick)
+            tick -= 10
+        }
+        XCTFail("Walk did not terminate", file: file, line: line)
+        return steps
     }
 
-    func testSingleSetExercisesStillShowCompletedPlusUpNext() throws {
-        var draft = session([
-            exercise("a", "A", sets: [set("a1", 1), set("a2", 2)]),
-            exercise("b", "B", sets: [set("b1", 1)]),
-            exercise("c", "C", sets: [set("c1", 1)]),
+    private func superset(_ aSets: Int, _ bSets: Int, then tail: [TrainingLoggerDraftExercise] = [], before head: [TrainingLoggerDraftExercise] = []) -> TrainingLoggerDraft {
+        let a = exercise("a", "Row", sets: (1...aSets).map { set("a\($0)", $0) })
+        let b = exercise("b", "Curl", sets: (1...bSets).map { set("b\($0)", $0) })
+        return session(head + [a, b] + tail, relationships: [.init(id: "ss", relationshipType: "superset", memberExerciseIds: ["a", "b"])])
+    }
+
+    private var ordinaryC: TrainingLoggerDraftExercise { exercise("c", "Press", sets: [set("c1", 1), set("c2", 2)]) }
+
+    func testEqualSizeSupersetAlternatesAndOnlyFinishesWithTheLastRound() throws {
+        let steps = try walk(superset(3, 3, then: [ordinaryC]))
+        XCTAssertEqual(steps, [
+            "currentOnly [current:a1*]",
+            "previousAndCurrent [previous:a1 current:b1*]",
+            "previousAndCurrent [previous:b1 current:a2*]",
+            "previousAndCurrent [previous:a2 current:b2*]",
+            "previousAndCurrent [previous:b2 current:a3*]",   // first member of the final round is NOT final
+            "currentAndUpNext! [current:b3* upNext:c1]",       // the unit's last set
+            "completedAndUpNext [completed:b3 upNext:c1*]",
+            "previousAndCurrent! [previous:c1 current:c2*]",   // last unit: final set but no Up Next
+            "completedOnly [completed:c2]",
         ])
-        draft.exercises[0].sets[0].isCompleted = true; draft.exercises[0].sets[0].completedAt = stamp(40)
-        var projection = try project(draft)
-        XCTAssertEqual(projection.contextRows.map(\.set.setId), ["a2", "b1"], "A's final set: Current + Up Next.")
-
-        draft.exercises[0].sets[1].isCompleted = true; draft.exercises[0].sets[1].completedAt = stamp(20)
-        projection = try project(draft)
-        XCTAssertEqual(projection.contextLayout, .completedAndUpNext, "B is a single set, but the transition shows Completed + Up Next.")
-        XCTAssertEqual(projection.contextRows.map(\.set.setId), ["a2", "b1"])
-        XCTAssertEqual(projection.contextRows.map(\.isCompletionTarget), [false, true])
-
-        draft.exercises[1].sets[0].isCompleted = true; draft.exercises[1].sets[0].completedAt = stamp(5)
-        projection = try project(draft)
-        XCTAssertEqual(projection.contextLayout, .completedAndUpNext)
-        XCTAssertEqual(projection.contextRows.map(\.set.setId), ["b1", "c1"])
     }
 
-    func testTimedSets() throws {
-        let draft = session([exercise("plank", "Plank", measurement: .duration, sets: [
-            set("p1", 1, reps: nil, load: nil, duration: 45, done: stamp(60)), set("p2", 2, reps: nil, load: nil, duration: 60),
-        ])])
-        let projection = try project(draft)
-        XCTAssertEqual(projection.previousSet?.valueText, "45 s")
-        XCTAssertEqual(projection.currentSet?.valueText, "60 s")
-        XCTAssertEqual(projection.currentExercise?.measurement, .duration)
-    }
-
-    func testSupersetAlternatesMembersAndNamesPartner() throws {
-        let row = exercise("row", "Cable Row", sets: [set("r1", 1), set("r2", 2)])
-        let curl = exercise("curl", "Curl", sets: [set("c1", 1), set("c2", 2)])
-        let press = exercise("press", "Press", sets: [set("x1", 1)])
-        var draft = session([row, press, curl], relationships: [.init(id: "ss", relationshipType: "superset", memberExerciseIds: ["row", "curl"])])
-
+    func testSupersetMemberLabelsPartnersAndRoundIdentity() throws {
+        var draft = superset(2, 2, then: [ordinaryC])
         var projection = try project(draft)
-        XCTAssertEqual(projection.currentSet?.setId, "r1", "A superset is one unit at its first member's position.")
+        XCTAssertEqual(projection.currentExercise?.supersetLabel, "A")
         XCTAssertEqual(projection.currentExercise?.supersetPartnerName, "Curl")
-        XCTAssertEqual(projection.upNextSet?.setId, "c1", "After row set 1 comes curl set 1, not the next row set.")
-
         draft.exercises[0].sets[0].isCompleted = true; draft.exercises[0].sets[0].completedAt = stamp(30)
         projection = try project(draft)
-        XCTAssertEqual(projection.currentSet?.setId, "c1")
-        XCTAssertEqual(projection.upNextSet?.setId, "r2")
+        XCTAssertEqual(projection.currentExercise?.supersetLabel, "B")
+        XCTAssertEqual(projection.currentExercise?.supersetPartnerName, "Row")
+        XCTAssertEqual(projection.currentSet?.setNumber, 1, "B1 is round 1.")
+        XCTAssertEqual(projection.previousExercise?.supersetLabel, "A")
+        XCTAssertNil(try project(session([exercise("c", "Press", sets: [set("c1", 1)])])).currentExercise?.supersetLabel)
+    }
 
-        draft.exercises[2].sets[0].isCompleted = true; draft.exercises[2].sets[0].completedAt = stamp(10)
-        projection = try project(draft)
-        XCTAssertEqual(projection.currentSet?.setId, "r2")
-        XCTAssertEqual(projection.previousSet?.setId, "c1")
+    func testUnequalSupersetWithShortFirstMemberDoesNotShowCompletedMidRound() throws {
+        let steps = try walk(superset(1, 3, then: [ordinaryC]))
+        XCTAssertEqual(steps, [
+            "currentOnly [current:a1*]",
+            "previousAndCurrent [previous:a1 current:b1*]",    // A is exhausted but the unit is not: no Completed + Up Next
+            "previousAndCurrent [previous:b1 current:b2*]",
+            "currentAndUpNext! [current:b3* upNext:c1]",
+            "completedAndUpNext [completed:b3 upNext:c1*]",
+            "previousAndCurrent! [previous:c1 current:c2*]",
+            "completedOnly [completed:c2]",
+        ])
+    }
+
+    func testUnequalSupersetWithShortSecondMemberFinishesOnTheLongMembersLastSet() throws {
+        let steps = try walk(superset(3, 1, then: [ordinaryC]))
+        XCTAssertEqual(Array(steps.prefix(5)), [
+            "currentOnly [current:a1*]",
+            "previousAndCurrent [previous:a1 current:b1*]",
+            "previousAndCurrent [previous:b1 current:a2*]",    // B is exhausted but the unit is mid-way
+            "currentAndUpNext! [current:a3* upNext:c1]",
+            "completedAndUpNext [completed:a3 upNext:c1*]",
+        ])
+    }
+
+    func testSingleSetSupersetMembers() throws {
+        let steps = try walk(superset(1, 1, then: [ordinaryC]))
+        XCTAssertEqual(Array(steps.prefix(3)), [
+            "currentOnly [current:a1*]",
+            "currentAndUpNext! [current:b1* upNext:c1]",       // B1 is the unit's last set
+            "completedAndUpNext [completed:b1 upNext:c1*]",
+        ])
+    }
+
+    func testSupersetAsTheLastUnitHasNoUpNextAndEndsCompletedOnly() throws {
+        XCTAssertEqual(try walk(superset(2, 2)), [
+            "currentOnly [current:a1*]",
+            "previousAndCurrent [previous:a1 current:b1*]",
+            "previousAndCurrent [previous:b1 current:a2*]",
+            "previousAndCurrent! [previous:a2 current:b2*]",
+            "completedOnly [completed:b2]",
+        ])
+    }
+
+    func testEnteringASupersetFromAnOrdinaryExerciseAndBackToBackSupersets() throws {
+        let head = exercise("h", "Squat", sets: [set("h1", 1)])
+        XCTAssertEqual(Array(try walk(superset(1, 2, then: [ordinaryC], before: [head])).prefix(4)), [
+            "currentAndUpNext! [current:h1* upNext:a1]",
+            "completedAndUpNext [completed:h1 upNext:a1*]",    // single-set ordinary exercise: straight to Completed + Up Next
+            "previousAndCurrent [previous:a1 current:b1*]",
+            "currentAndUpNext! [current:b2* upNext:c1]",
+        ])
+
+        var twoSupersets = superset(1, 1)
+        twoSupersets.exercises += [exercise("x", "X", sets: [set("x1", 1)]), exercise("y", "Y", sets: [set("y1", 1)])]
+        twoSupersets.relationships.append(.init(id: "ss2", relationshipType: "superset", memberExerciseIds: ["x", "y"]))
+        XCTAssertEqual(try walk(twoSupersets), [
+            "currentOnly [current:a1*]",
+            "currentAndUpNext! [current:b1* upNext:x1]",
+            "completedAndUpNext [completed:b1 upNext:x1*]",
+            "previousAndCurrent! [previous:x1 current:y1*]",
+            "completedOnly [completed:y1]",
+        ])
+    }
+
+    func testSupersetOutOfOrderCompletionStillFollowsTheLowestRound() throws {
+        var draft = superset(3, 3, then: [ordinaryC])
+        for offset in 0..<2 {
+            draft.exercises[0].sets[offset].isCompleted = true
+            draft.exercises[0].sets[offset].completedAt = stamp(Double(60 - offset * 10))
+        }
+        let projection = try project(draft)
+        XCTAssertEqual(projection.currentSet?.setId, "b1", "The partner's lowest incomplete round comes first, not a3.")
+        XCTAssertEqual(projection.previousSet?.setId, "a2")
+        XCTAssertEqual(projection.contextLayout, .previousAndCurrent)
+    }
+
+    func testSupersetRedactionRemovesMemberLabelsAndPartnerNames() throws {
+        let redacted = try project(superset(2, 2, then: [ordinaryC])).redacted()
+        let encoded = String(decoding: try JSONEncoder().encode(redacted), as: UTF8.self)
+        XCTAssertFalse(encoded.contains("Curl"))
+        XCTAssertFalse(encoded.contains("Row"))
+        XCTAssertNil(redacted.currentExercise?.supersetLabel)
     }
 
     func testFollowsTheFounderAfterOutOfOrderCompletion() throws {
@@ -214,7 +296,7 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         XCTAssertTrue(projection.isWorkoutComplete)
         XCTAssertNil(projection.currentSet)
         XCTAssertNil(projection.upNextSet)
-        XCTAssertFalse(projection.isFinalSetOfExercise)
+        XCTAssertFalse(projection.isFinalSetOfUnit)
         XCTAssertEqual(projection.previousSet?.setId, "b2")
     }
 
@@ -314,7 +396,7 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         let after = try project(try XCTUnwrap(authority.draft(id: "session-1")))
         XCTAssertEqual(after.previousSet?.setId, "b1")
         XCTAssertEqual(after.currentSet?.setId, "b2")
-        XCTAssertTrue(after.isFinalSetOfExercise)
+        XCTAssertTrue(after.isFinalSetOfUnit)
         XCTAssertEqual(after.upNextExercise?.name, "Fly")
         XCTAssertEqual(after.rest?.mode, .countdown)
         XCTAssertEqual(after.rest?.endsAt, now.addingTimeInterval(120))

@@ -52,6 +52,9 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         var setCount: Int
         var completedSetCount: Int
         var supersetPartnerName: String?
+        /// "A" / "B": this exercise's member letter inside its superset, nil
+        /// for an ordinary exercise. A set's round is its `setNumber`.
+        var supersetLabel: String?
     }
 
     struct SetCue: Codable, Hashable, Sendable {
@@ -135,8 +138,9 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
     var currentExercise: ExerciseCue?
     /// The set a Complete Set control would complete.
     var currentSet: SetCue?
-    /// `currentSet` is the last incomplete set of `currentExercise`.
-    var isFinalSetOfExercise: Bool
+    /// `currentSet` is the last incomplete set of its *unit*: an ordinary
+    /// exercise, or a whole superset (both members, every round).
+    var isFinalSetOfUnit: Bool
     /// The set that becomes current once `currentSet` is completed.
     var upNextSet: SetCue?
     /// `upNextSet`'s exercise when it differs from `currentExercise`.
@@ -159,7 +163,7 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         let current = cursor.current()
         let upNext = current.flatMap { cursor.current(afterCompleting: $0) }
         let currentExercise = current.map { draft.exercises[$0.exerciseIndex] }
-        let incompleteInCurrent = currentExercise?.sets.filter { !$0.isCompleted }.count ?? 0
+        let incompleteInUnit = current.map { cursor.incompleteCount(inUnitOf: $0.exerciseIndex) } ?? 0
 
         let labels = draft.selectedAreaIds.map { areaLabels[$0] ?? PresentationLanguage.displayName(fromIdentifier: $0) }
         let label = labels.isEmpty ? "Workout" : labels.joined(separator: " · ")
@@ -177,16 +181,18 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         let completedSets = draft.completedSetCount
         let upNextExerciseIndex = upNext.flatMap { next in next.exerciseIndex == current?.exerciseIndex ? nil : next.exerciseIndex }
         let previous = cursor.previous(before: current)
-        let isFinal = current != nil && incompleteInCurrent == 1
+        let isFinal = current != nil && incompleteInUnit == 1
         let layout: ContextLayout
         if let current {
-            let currentStarted = draft.exercises[current.exerciseIndex].sets.contains(where: \.isCompleted)
-            if let previous, previous.exerciseIndex != current.exerciseIndex, !currentStarted,
-               draft.exercises[previous.exerciseIndex].sets.allSatisfy(\.isCompleted) {
-                // The transition moment wins even when the next exercise is a
-                // single set: Completed + Up Next, never a third row.
+            if let previous, !cursor.sameUnit(previous.exerciseIndex, current.exerciseIndex),
+               !cursor.hasCompletedSet(inUnitOf: current.exerciseIndex),
+               cursor.incompleteCount(inUnitOf: previous.exerciseIndex) == 0 {
+                // The transition moment wins even when the next unit is a
+                // single set: Completed + Up Next, never a third row. A unit
+                // is a whole superset, so one member running out of sets
+                // mid-round never triggers it.
                 layout = .completedAndUpNext
-            } else if isFinal, upNextExerciseIndex != nil {
+            } else if isFinal, upNext != nil {
                 layout = .currentAndUpNext
             } else {
                 layout = previous == nil ? .currentOnly : .previousAndCurrent
@@ -212,7 +218,7 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
             previousExercise: previous.map { exerciseCue(draft, $0.exerciseIndex) },
             currentExercise: current.map { exerciseCue(draft, $0.exerciseIndex) },
             currentSet: current.map { setCue(draft, $0) },
-            isFinalSetOfExercise: isFinal,
+            isFinalSetOfUnit: isFinal,
             upNextSet: upNext.map { setCue(draft, $0) },
             upNextExercise: upNextExerciseIndex.map { exerciseCue(draft, $0) },
             isWorkoutComplete: totalSets > 0 && completedSets == totalSets,
@@ -252,6 +258,7 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
             copy[keyPath: keyPath]?.name = "Exercise"
             copy[keyPath: keyPath]?.variantLabel = nil
             copy[keyPath: keyPath]?.supersetPartnerName = nil
+            copy[keyPath: keyPath]?.supersetLabel = nil
         }
         return copy
     }
@@ -270,6 +277,8 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
     private static func exerciseCue(_ draft: TrainingLoggerDraft, _ index: Int) -> ExerciseCue {
         let exercise = draft.exercises[index]
         let partner = draft.relationshipContext(for: exercise.id)?.partnerNames.first
+        let unit = TrainingSessionCursor(draft: draft).unitMembers(ofExercise: index)
+        let letter = unit.count > 1 ? unit.firstIndex(of: index).map { String(UnicodeScalar(UInt8(65 + $0))) } : nil
         return ExerciseCue(
             exerciseId: exercise.id,
             name: truncate(exercise.name, to: nameLimit),
@@ -277,7 +286,8 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
             measurement: exercise.measurement,
             setCount: exercise.sets.count,
             completedSetCount: exercise.sets.filter(\.isCompleted).count,
-            supersetPartnerName: partner.map { truncate($0, to: nameLimit) }
+            supersetPartnerName: partner.map { truncate($0, to: nameLimit) },
+            supersetLabel: letter
         )
     }
 
@@ -362,6 +372,29 @@ struct TrainingSessionCursor {
             units.append(unit)
         }
         self.units = units
+    }
+
+    private func unitIndex(ofExercise exerciseIndex: Int) -> Int? {
+        units.firstIndex { $0.contains(exerciseIndex) }
+    }
+
+    /// Exercise indices of the unit (a superset's members in list order, or
+    /// the single exercise).
+    func unitMembers(ofExercise exerciseIndex: Int) -> [Int] {
+        unitIndex(ofExercise: exerciseIndex).map { units[$0] } ?? [exerciseIndex]
+    }
+
+    func sameUnit(_ lhs: Int, _ rhs: Int) -> Bool {
+        unitIndex(ofExercise: lhs) == unitIndex(ofExercise: rhs)
+    }
+
+    /// Incomplete sets across every member of the unit.
+    func incompleteCount(inUnitOf exerciseIndex: Int) -> Int {
+        unitMembers(ofExercise: exerciseIndex).reduce(0) { $0 + draft.exercises[$1].sets.filter { !$0.isCompleted }.count }
+    }
+
+    func hasCompletedSet(inUnitOf exerciseIndex: Int) -> Bool {
+        unitMembers(ofExercise: exerciseIndex).contains { draft.exercises[$0].sets.contains(where: \.isCompleted) }
     }
 
     /// The most recently completed set that has a timestamp.
