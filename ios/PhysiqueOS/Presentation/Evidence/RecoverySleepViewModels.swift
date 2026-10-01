@@ -25,17 +25,35 @@ private func loadState<Value: Equatable>(_ work: () async throws -> Value) async
 @MainActor
 final class RecoverySleepLandingViewModel {
     private(set) var state: RecoverySleepLoadState<RecoverySleepLanding> = .loading
+    private var loadedRange: RecoverySleepScopeRange?
+    /// The scope the current `state` belongs to.
+    private var stateRange: RecoverySleepScopeRange?
+    private var requestedRange: RecoverySleepScopeRange?
     private let api: RecoverySleepAPI
 
     init(api: RecoverySleepAPI) {
         self.api = api
     }
 
-    /// One bounded read (`recovery-sleep`). A reload keeps the last shown
-    /// landing on screen until the new one arrives.
-    func load(policy: RecoverySleepReadPolicy = .cacheFirst) async {
-        let next = await loadState { try await api.fetchLanding(policy: policy) }
-        if case .failed = next, case .loaded = state { return }
+    /// What to show for `range`: never another scope's nights, even for the
+    /// frame before the reload for a freshly selected scope starts.
+    func state(for range: RecoverySleepScopeRange?) -> RecoverySleepLoadState<RecoverySleepLanding> {
+        guard let range, stateRange == range else { return .loading }
+        return state
+    }
+
+    /// One bounded read inside the selected scope. Switching scope shows the
+    /// loading state (never another scope's nights); a plain reload keeps the
+    /// last shown landing on screen until the new one arrives.
+    func load(range: RecoverySleepScopeRange, policy: RecoverySleepReadPolicy = .cacheFirst) async {
+        requestedRange = range
+        if loadedRange != range { state = .loading; stateRange = range }
+        let next = await loadState { try await api.fetchLanding(range: range, policy: policy) }
+        // A cancelled or superseded read must not overwrite a newer scope.
+        guard !Task.isCancelled, requestedRange == range else { return }
+        if case .failed = next, case .loaded = state, loadedRange == range { return }
+        loadedRange = range
+        stateRange = range
         state = next
     }
 }
@@ -43,30 +61,47 @@ final class RecoverySleepLandingViewModel {
 @Observable
 @MainActor
 final class RecoverySleepTrendsViewModel {
-    private(set) var range: RecoverySleepTrendRange = .oneMonth
+    private struct CacheKey: Hashable {
+        let selector: RecoverySleepTrendRange
+        let range: RecoverySleepScopeRange
+    }
+
+    private(set) var selector: RecoverySleepTrendRange = .oneMonth
     private(set) var state: RecoverySleepLoadState<RecoverySleepTrends> = .loading
-    private var loaded: [RecoverySleepTrendRange: RecoverySleepTrends] = [:]
+    private var loaded: [CacheKey: RecoverySleepTrends] = [:]
+    private var stateRange: RecoverySleepScopeRange?
+    private var requestedKey: CacheKey?
     private let api: RecoverySleepAPI
 
     init(api: RecoverySleepAPI) {
         self.api = api
     }
 
-    func load() async {
-        await select(range)
+    func state(for range: RecoverySleepScopeRange?) -> RecoverySleepLoadState<RecoverySleepTrends> {
+        guard let range, stateRange == range else { return .loading }
+        return state
     }
 
-    /// One bounded read per range; ranges already shown this visit are kept.
-    func select(_ range: RecoverySleepTrendRange) async {
-        self.range = range
-        if let cached = loaded[range] {
+    func load(range: RecoverySleepScopeRange) async {
+        await select(selector, range: range)
+    }
+
+    /// One bounded read per selector and scope; combinations already shown
+    /// this visit are kept.
+    func select(_ selector: RecoverySleepTrendRange, range: RecoverySleepScopeRange) async {
+        self.selector = selector
+        let key = CacheKey(selector: selector, range: range)
+        requestedKey = key
+        stateRange = range
+        if let cached = loaded[key] {
             state = .loaded(cached)
             return
         }
-        if case .loaded = state {} else { state = .loading }
-        let next = await loadState { try await api.fetchTrends(range: range) }
-        guard self.range == range else { return }
-        if case .loaded(let trends) = next { loaded[range] = trends }
+        state = .loading
+        let next = await loadState { try await api.fetchTrends(selector: selector, range: range) }
+        if case .loaded(let trends) = next { loaded[key] = trends }
+        // A cancelled or superseded read must not overwrite a newer scope or range.
+        guard !Task.isCancelled, requestedKey == key else { return }
         state = next
     }
 }
@@ -80,10 +115,12 @@ final class RecoverySleepNightsViewModel {
     private var nextCursor: String?
     private var hasLoadedFirstPage = false
     private let api: RecoverySleepAPI
+    private let range: RecoverySleepScopeRange
     private let pageSize: Int
 
-    init(api: RecoverySleepAPI, pageSize: Int = RecoverySleepQuery.nightsPageLimit) {
+    init(api: RecoverySleepAPI, range: RecoverySleepScopeRange, pageSize: Int = RecoverySleepQuery.nightsPageLimit) {
         self.api = api
+        self.range = range
         self.pageSize = pageSize
     }
 
@@ -91,7 +128,7 @@ final class RecoverySleepNightsViewModel {
 
     func loadFirstPage() async {
         guard !hasLoadedFirstPage else { return }
-        let next = await loadState { try await api.fetchNights(cursor: nil, limit: pageSize) }
+        let next = await loadState { try await api.fetchNights(cursor: nil, limit: pageSize, range: range) }
         switch next {
         case .loaded(let page):
             items = page.items
@@ -109,7 +146,7 @@ final class RecoverySleepNightsViewModel {
         guard let cursor = nextCursor, !isLoadingMore else { return }
         isLoadingMore = true
         defer { isLoadingMore = false }
-        guard let page = try? await api.fetchNights(cursor: cursor, limit: pageSize) else { return }
+        guard let page = try? await api.fetchNights(cursor: cursor, limit: pageSize, range: range) else { return }
         let known = Set(items.map(\.sleepDay))
         items += page.items.filter { !known.contains($0.sleepDay) }
         nextCursor = page.nextCursor

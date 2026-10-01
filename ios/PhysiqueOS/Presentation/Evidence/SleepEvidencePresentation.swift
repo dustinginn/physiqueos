@@ -142,21 +142,27 @@ struct SleepClockPresentation: Equatable {
 
     var provenanceText: String {
         switch certainty {
-        case .recorded: "Recorded with the sleep data"
-        case .inferred: "Inferred from your phone when it synced"
-        case .uncertain: "Inferred long after this night — may be wrong if you travelled"
-        case .unknown: "Not known"
+        case .recorded: "The time zone was recorded with the sleep data"
+        case .inferred: "The time zone comes from your phone when it synced"
+        case .uncertain: "Time zones were not preserved for historical nights, so these clock times are estimates and may shift during travel"
+        case .unknown: "The time zone is not known"
         }
     }
 
     var shortProvenance: String {
         switch certainty {
         case .recorded: "recorded"
-        case .inferred: "inferred at sync"
-        case .uncertain: "uncertain"
+        case .inferred: "from phone at sync"
+        case .uncertain: "estimated"
         case .unknown: "unknown"
         }
     }
+}
+
+/// Shared copy for approximate historical clock times. One concise note per
+/// surface; the per-row markers it replaces were repetitive.
+enum SleepEvidenceCopy {
+    static let approximateClockTimes = "Historical clock times are approximate. Sleep duration is exact. Historical time zones were not preserved, so sleep and wake times may shift during travel."
 }
 
 extension PhysiqueOSTheme {

@@ -12,6 +12,10 @@ final class RecoverySleepReadModelTests: XCTestCase {
         try FixtureRecoverySleepAPI(bundle: bundle).loadFixture()
     }
 
+    private func allRange(_ today: String = "2026-10-01") -> RecoverySleepScopeRange {
+        RecoverySleepScopeResolver.resolve(scope: .all, goalWindow: nil, today: today)
+    }
+
     private func liveNight(_ day: String) throws -> RecoverySleepLiveNight {
         try XCTUnwrap(try fixture().nights.first { $0.sleepDay == day })
     }
@@ -185,31 +189,40 @@ final class RecoverySleepReadModelTests: XCTestCase {
 
     // MARK: Ranges / paging
 
-    func testRangeSelectorsAreBoundedAndUseServerGranularity() {
+    func testRangeSelectorsAreBoundedAndUseServerGranularity() throws {
         let today = "2026-10-01"
-        let twoWeeks = RecoverySleepQuery.range(.twoWeeks, today: today)
+        func range(_ selector: RecoverySleepTrendRange, today: String = today) throws -> RecoverySleepQuery.Range {
+            try XCTUnwrap(RecoverySleepQuery.range(selector, scope: allRange(today)))
+        }
+        let twoWeeks = try range(.twoWeeks)
         XCTAssertEqual(twoWeeks.startDate, "2026-09-18")
         XCTAssertEqual(twoWeeks.endDate, today)
-        XCTAssertEqual(SleepEvidenceDay.span(RecoverySleepQuery.range(.oneMonth, today: today).startDate, today), 30)
-        XCTAssertEqual(SleepEvidenceDay.span(RecoverySleepQuery.range(.threeMonths, today: today).startDate, today), 90)
-        XCTAssertEqual(SleepEvidenceDay.span(RecoverySleepQuery.range(.sixMonths, today: today).startDate, today), 183, "weekly at the Server threshold")
-        let all = RecoverySleepQuery.range(.all, today: today)
+        XCTAssertEqual(SleepEvidenceDay.span(try range(.oneMonth).startDate, today), 30)
+        // Until the Evidence is that old, 3M / 6M are clamped to its start.
+        XCTAssertEqual(try range(.threeMonths).startDate, "2026-07-06")
+        XCTAssertEqual(try range(.sixMonths).startDate, "2026-07-06")
+        let later = "2027-03-01"
+        XCTAssertEqual(SleepEvidenceDay.span(try range(.threeMonths, today: later).startDate, later), 90)
+        XCTAssertEqual(SleepEvidenceDay.span(try range(.sixMonths, today: later).startDate, later), 183, "weekly at the Server threshold")
+        let all = try range(.all)
         XCTAssertEqual(all.startDate, "2026-07-06", "All starts at the Evidence boundary, never earlier")
         XCTAssertEqual(all.limit, 100)
-        // All never reaches before the Evidence start, at any date.
+        // No scope ever reaches before the Evidence start, at any date.
         for later in ["2026-12-01", "2027-02-01", "2027-06-01"] {
-            XCTAssertEqual(RecoverySleepQuery.range(.all, today: later).startDate, "2026-07-06", later)
+            XCTAssertEqual(try range(.all, today: later).startDate, "2026-07-06", later)
+            XCTAssertGreaterThanOrEqual(try range(.sixMonths, today: later).startDate, "2026-07-06", later)
         }
         for selector in RecoverySleepTrendRange.allCases {
-            let range = RecoverySleepQuery.range(selector, today: today)
-            XCTAssertLessThanOrEqual(range.startDate, range.endDate)
-            XCTAssertLessThanOrEqual(SleepEvidenceDay.span(range.startDate, range.endDate) ?? 9999, 3660)
+            let bounds = try range(selector)
+            XCTAssertLessThanOrEqual(bounds.startDate, bounds.endDate)
+            XCTAssertLessThanOrEqual(SleepEvidenceDay.span(bounds.startDate, bounds.endDate) ?? 9999, 3660)
         }
     }
 
     func testSandboxEmulationMatchesServerPortExamples() async throws {
         let file = try fixture()
-        let api = FixtureRecoverySleepAPI(bundle: bundle, today: { file.anchorSleepDay })
+        let api = FixtureRecoverySleepAPI(bundle: bundle)
+        XCTAssertEqual(api.today(), file.anchorSleepDay)
         let landing = try await api.fetchLanding(policy: .cacheFirst)
         let expected = RecoverySleepAdapter.landing(file.examples.landing, now: landing.lastNight.map { _ in Self.anchorNow } ?? .now)
         XCTAssertEqual(landing.nights.map(\.sleepDay), expected.nights.map(\.sleepDay))
@@ -217,13 +230,13 @@ final class RecoverySleepReadModelTests: XCTestCase {
         XCTAssertEqual(landing.sleepWindow, expected.sleepWindow)
         XCTAssertEqual(landing.sources.map(\.label), expected.sources.map(\.label))
 
-        let week = try await api.fetchTrends(range: .sixMonths)
+        let week = try await api.fetchTrends(selector: .all, range: allRange("2027-03-01")) // span >= 183 days: weekly at the Server threshold
         XCTAssertEqual(week.granularity, .week)
         XCTAssertEqual(week.totalSleep.map(\.periodStart), file.examples.trendsWeek.weekSeries.map(\.weekStart))
         XCTAssertEqual(week.totalSleep.map(\.asleepSeconds), file.examples.trendsWeek.weekSeries.map(\.averageAsleepSeconds))
         XCTAssertEqual(week.totalSleep.map(\.nightCount), file.examples.trendsWeek.weekSeries.map(\.nightCount))
 
-        let month = try await api.fetchTrends(range: .oneMonth)
+        let month = try await api.fetchTrends(selector: .oneMonth, range: allRange())
         XCTAssertEqual(month.granularity, .night)
         XCTAssertEqual(month.totalSleep.map(\.periodStart), file.examples.trendsNight.nightSeries.map(\.sleepDay))
     }
@@ -237,7 +250,7 @@ final class RecoverySleepReadModelTests: XCTestCase {
     @MainActor
     func testNightsPagingHasNoDuplicatesAndEnds() async throws {
         let file = try fixture()
-        let model = RecoverySleepNightsViewModel(api: FixtureRecoverySleepAPI(bundle: bundle, today: { file.anchorSleepDay }), pageSize: 20)
+        let model = RecoverySleepNightsViewModel(api: FixtureRecoverySleepAPI(bundle: bundle), range: allRange(), pageSize: 20)
         await model.loadFirstPage()
         XCTAssertEqual(model.items.count, 20)
         while model.canLoadMore { await model.loadMore() }
@@ -250,14 +263,16 @@ final class RecoverySleepReadModelTests: XCTestCase {
     @MainActor
     func testTrendsViewModelReadsEachRangeOnce() async throws {
         let file = try fixture()
-        let api = CountingRecoverySleepAPI(base: FixtureRecoverySleepAPI(bundle: bundle, today: { file.anchorSleepDay }))
+        _ = file
+        let api = CountingRecoverySleepAPI(base: FixtureRecoverySleepAPI(bundle: bundle))
         let model = RecoverySleepTrendsViewModel(api: api)
-        await model.load()
-        await model.select(.twoWeeks)
-        await model.select(.oneMonth)
+        let range = allRange()
+        await model.load(range: range)
+        await model.select(.twoWeeks, range: range)
+        await model.select(.oneMonth, range: range)
         let calls = await api.trendCalls
         XCTAssertEqual(calls, ["1m", "2w"])
-        await model.select(.all)
+        await model.select(.all, range: range)
         guard case .loaded(let all) = model.state else { return XCTFail("expected All trends") }
         XCTAssertEqual(all.totalSleep.last?.periodStart, "2026-07-06", "All reaches the Evidence start")
     }
@@ -265,7 +280,8 @@ final class RecoverySleepReadModelTests: XCTestCase {
     @MainActor
     func testNightViewModelStatesAndNotAvailable() async throws {
         let file = try fixture()
-        let api = FixtureRecoverySleepAPI(bundle: bundle, today: { file.anchorSleepDay })
+        _ = file
+        let api = FixtureRecoverySleepAPI(bundle: bundle)
         let found = RecoverySleepNightViewModel(sleepDay: "2026-09-29", api: api)
         await found.load()
         guard case .loaded(let detail) = found.state else { return XCTFail("expected night") }
@@ -275,7 +291,7 @@ final class RecoverySleepReadModelTests: XCTestCase {
         await missing.load()
         XCTAssertEqual(missing.state, .notFound)
         let unavailable = RecoverySleepLandingViewModel(api: UnavailableRecoverySleepAPI())
-        await unavailable.load()
+        await unavailable.load(range: allRange())
         XCTAssertEqual(unavailable.state, .notAvailable)
     }
 
@@ -299,11 +315,11 @@ final class RecoverySleepReadModelTests: XCTestCase {
             "recovery-sleep-trends": (200, envelope("recovery-sleep-trends", try json(file.examples.trendsPage2, key: "trendsPage2"))),
             "recovery-sleep-night": (200, envelope("recovery-sleep-night", "null")),
         ])
-        let api = ProductionRecoverySleepAPI(api: try await pairedAPI(transport), today: { "2026-10-01" })
+        let api = ProductionRecoverySleepAPI(api: try await pairedAPI(transport), clock: { "2026-10-01" })
         let landing = try await api.fetchLanding(policy: .cacheFirst)
         XCTAssertEqual(landing.nights.count, 14)
-        _ = try await api.fetchTrends(range: .threeMonths)
-        let page = try await api.fetchNights(cursor: "2026-09-11", limit: 500)
+        _ = try await api.fetchTrends(selector: .threeMonths, range: allRange())
+        let page = try await api.fetchNights(cursor: "2026-09-11", limit: 500, range: allRange())
         XCTAssertEqual(page.nextCursor, file.examples.trendsPage2.page.nextCursor)
         do {
             _ = try await api.fetchNight(sleepDay: "2026-09-10")
@@ -314,7 +330,7 @@ final class RecoverySleepReadModelTests: XCTestCase {
         XCTAssertEqual(reads.map(\.path), ["/api/v1/native/read/recovery-sleep-landing", "/api/v1/native/read/recovery-sleep-trends",
                                            "/api/v1/native/read/recovery-sleep-trends", "/api/v1/native/read/recovery-sleep-night"])
         XCTAssertEqual(reads[0].query["throughDate"], "2026-10-01")
-        XCTAssertEqual(reads[1].query["startDate"], "2026-07-04")
+        XCTAssertEqual(reads[1].query["startDate"], "2026-07-06", "3M never reaches before the Evidence start")
         XCTAssertEqual(reads[1].query["endDate"], "2026-10-01")
         XCTAssertEqual(reads[1].query["limit"], "100")
         XCTAssertEqual(reads[2].query["startDate"], "2026-07-06", "history never reaches before the Evidence start")
@@ -328,7 +344,7 @@ final class RecoverySleepReadModelTests: XCTestCase {
         let transport = RecoverySleepStubTransport(responses: [
             "recovery-sleep-landing": (404, #"{"title":"Not found","status":404,"code":"NOT_FOUND","fieldErrors":[]}"#),
         ])
-        let api = ProductionRecoverySleepAPI(api: try await pairedAPI(transport), today: { "2026-10-01" })
+        let api = ProductionRecoverySleepAPI(api: try await pairedAPI(transport), clock: { "2026-10-01" })
         do {
             _ = try await api.fetchLanding(policy: .cacheFirst)
             XCTFail("expected notAvailable")
@@ -338,7 +354,7 @@ final class RecoverySleepReadModelTests: XCTestCase {
             XCTFail("expected nightNotFound")
         } catch { XCTAssertEqual(error as? RecoverySleepAPIError, .nightNotFound) }
         do {
-            _ = try await api.fetchNights(cursor: "not-a-day", limit: 20)
+            _ = try await api.fetchNights(cursor: "not-a-day", limit: 20, range: allRange())
             XCTFail("expected rejection")
         } catch { XCTAssertEqual(error as? RecoverySleepAPIError, .nightNotFound) }
         let paths = await transport.reads.map(\.path)
@@ -351,7 +367,7 @@ final class RecoverySleepReadModelTests: XCTestCase {
         let transport = RecoverySleepStubTransport(responses: [
             "recovery-sleep-night": (404, #"{"title":"The requested resource is unavailable.","status":404,"code":"RESOURCE_NOT_FOUND","fieldErrors":[]}"#),
         ])
-        let api = ProductionRecoverySleepAPI(api: try await pairedAPI(transport), today: { "2026-10-01" })
+        let api = ProductionRecoverySleepAPI(api: try await pairedAPI(transport), clock: { "2026-10-01" })
         do {
             _ = try await api.fetchNight(sleepDay: "2026-10-01")
             XCTFail("expected nightNotFound")
@@ -472,19 +488,23 @@ private actor CountingRecoverySleepAPI: RecoverySleepAPI {
 
     init(base: FixtureRecoverySleepAPI) { self.base = base }
 
-    func fetchLanding(policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding { try await base.fetchLanding(policy: policy) }
-    func fetchTrends(range: RecoverySleepTrendRange) async throws -> RecoverySleepTrends {
-        trendCalls.append(range.rawValue)
-        return try await base.fetchTrends(range: range)
+    nonisolated func today() -> String { base.today() }
+    func fetchGoalWindows() async throws -> [RecoverySleepScope: RecoverySleepGoalWindow] { try await base.fetchGoalWindows() }
+    func fetchLanding(range: RecoverySleepScopeRange, policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding { try await base.fetchLanding(range: range, policy: policy) }
+    func fetchTrends(selector: RecoverySleepTrendRange, range: RecoverySleepScopeRange) async throws -> RecoverySleepTrends {
+        trendCalls.append(selector.rawValue)
+        return try await base.fetchTrends(selector: selector, range: range)
     }
-    func fetchNights(cursor: String?, limit: Int) async throws -> RecoverySleepNightsPage { try await base.fetchNights(cursor: cursor, limit: limit) }
+    func fetchNights(cursor: String?, limit: Int, range: RecoverySleepScopeRange) async throws -> RecoverySleepNightsPage { try await base.fetchNights(cursor: cursor, limit: limit, range: range) }
     func fetchNight(sleepDay: String) async throws -> RecoverySleepNightDetail { try await base.fetchNight(sleepDay: sleepDay) }
 }
 
 private struct UnavailableRecoverySleepAPI: RecoverySleepAPI {
-    func fetchLanding(policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding { throw RecoverySleepAPIError.notAvailable }
-    func fetchTrends(range: RecoverySleepTrendRange) async throws -> RecoverySleepTrends { throw RecoverySleepAPIError.notAvailable }
-    func fetchNights(cursor: String?, limit: Int) async throws -> RecoverySleepNightsPage { throw RecoverySleepAPIError.notAvailable }
+    func today() -> String { "2026-10-01" }
+    func fetchGoalWindows() async throws -> [RecoverySleepScope: RecoverySleepGoalWindow] { throw RecoverySleepAPIError.notAvailable }
+    func fetchLanding(range: RecoverySleepScopeRange, policy: RecoverySleepReadPolicy) async throws -> RecoverySleepLanding { throw RecoverySleepAPIError.notAvailable }
+    func fetchTrends(selector: RecoverySleepTrendRange, range: RecoverySleepScopeRange) async throws -> RecoverySleepTrends { throw RecoverySleepAPIError.notAvailable }
+    func fetchNights(cursor: String?, limit: Int, range: RecoverySleepScopeRange) async throws -> RecoverySleepNightsPage { throw RecoverySleepAPIError.notAvailable }
     func fetchNight(sleepDay: String) async throws -> RecoverySleepNightDetail { throw RecoverySleepAPIError.notAvailable }
 }
 

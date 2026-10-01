@@ -35,6 +35,7 @@ private struct RecoverySleepChrome: ViewModifier {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .restoresInteractivePopGesture()
+            .suppressesContentAreaPopGesture()
             .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -203,6 +204,46 @@ private func legendDash(_ label: String) -> some View {
 private let notAvailableText = "Sleep from Apple Health will appear here once it is available for your account."
 private let noDataText = "Sleep from Apple Health will appear here after your first synced night."
 
+/// The shared Goal-context selector (Build Lean Mass / Visible Abs / All
+/// Sleep): the same control the other Evidence verticals use, driving one
+/// selection that applies to the landing, Trends and the night history.
+private struct SleepScopeSelector: View {
+    @Environment(AppEnvironment.self) private var environment
+
+    var body: some View {
+        let store = environment.recoverySleepScope
+        TrainingScopeSelectorView(scope: store.scopeContext(today: environment.recoverySleepAPI.today())) { pillID in
+            if let scope = RecoverySleepScope(pillID: pillID) { store.select(scope) }
+        }
+    }
+}
+
+/// What a screen shows in place of its content when the selected scope has
+/// no range to read (Goal dates unknown) or no Sleep Evidence.
+private struct SleepScopeStateCard: View {
+    let store: RecoverySleepScopeStore
+    let range: RecoverySleepScopeRange?
+    let retry: () -> Void
+
+    var body: some View {
+        CardContainer {
+            VStack(spacing: 10) {
+                if let range, range.isEmpty {
+                    SleepStateMessage(text: "No Sleep Evidence falls inside this Goal's dates.")
+                } else if store.windowsState == .failed {
+                    SleepStateMessage(text: "This Goal's dates could not be loaded.")
+                    Button("Try again", action: retry)
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .foregroundStyle(PhysiqueOSTheme.accent)
+                        .frame(minHeight: 44)
+                } else {
+                    ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 120)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Night row
 
 struct RecoverySleepNightRow: View {
@@ -228,10 +269,7 @@ struct RecoverySleepNightRow: View {
                 if let window = clock.window {
                     HStack(spacing: 4) {
                         Text(window)
-                        if clock.isClockTimeCaution {
-                            Image(systemName: "circle.dashed").font(.system(size: 9, weight: .bold))
-                        }
-                        if clock.showsZone, let zone = clock.zoneLabel { Text(zone) }
+                        if !clock.isClockTimeCaution, clock.showsZone, let zone = clock.zoneLabel { Text(zone) }
                     }
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -274,7 +312,7 @@ struct RecoverySleepNightRow: View {
         } else if let status = night.statusText {
             parts.append(status)
         }
-        if clock.isClockTimeCaution { parts.append("Clock times uncertain") }
+        if clock.isClockTimeCaution { parts.append("Clock times approximate") }
         if night.windowOpen { parts.append("Still updating") }
         return parts.joined(separator: ". ")
     }
@@ -283,6 +321,7 @@ struct RecoverySleepNightRow: View {
 // MARK: - Paged night list (Show All)
 
 struct RecoverySleepNightsSheet: View {
+    let range: RecoverySleepScopeRange
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: RecoverySleepNightsViewModel?
@@ -327,7 +366,7 @@ struct RecoverySleepNightsSheet: View {
         }
         .preferredColorScheme(.dark)
         .task {
-            if viewModel == nil { viewModel = RecoverySleepNightsViewModel(api: environment.recoverySleepAPI) }
+            if viewModel == nil { viewModel = RecoverySleepNightsViewModel(api: environment.recoverySleepAPI, range: range) }
             await viewModel?.loadFirstPage()
         }
     }
@@ -341,6 +380,11 @@ struct RecoveryEvidenceView: View {
     @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var selectedDay: String?
     @State private var showsAllNights = false
+    @State private var retryNonce = 0
+
+    private var store: RecoverySleepScopeStore { environment.recoverySleepScope }
+    private var scopeRange: RecoverySleepScopeRange? { store.range(today: environment.recoverySleepAPI.today()) }
+    private var reloadKey: String { "\(environment.nativeAuthority.rawValue)|\(store.selected.rawValue)|\(retryNonce)" }
 
     var body: some View {
         ScrollView {
@@ -349,29 +393,53 @@ struct RecoveryEvidenceView: View {
                 .padding(.top, 12)
         }
         .recoverySleepChrome(backLabel: "Evidence Hub")
-        .task(id: environment.nativeAuthority) {
+        .task(id: reloadKey) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = RecoverySleepLandingViewModel(api: environment.recoverySleepAPI)
                 viewModelAuthority = environment.nativeAuthority
             }
-            await viewModel?.load()
+            selectedDay = nil
+            await reload()
         }
         .refreshable {
             if environment.nativeAuthority == .founderProduction {
                 await environment.productionNativeAPI.invalidateReadResources([RecoverySleepResource.landing, RecoverySleepResource.trends])
             }
-            await viewModel?.load(policy: .reload)
+            await reload(policy: .reload)
         }
-        .refreshesOnForegroundWhenVisible { await viewModel?.load() }
-        .sheet(isPresented: $showsAllNights) { RecoverySleepNightsSheet() }
+        .refreshesOnForegroundWhenVisible { await reload() }
+        .sheet(isPresented: $showsAllNights) {
+            if let range = scopeRange { RecoverySleepNightsSheet(range: range) }
+        }
         .accessibilityIdentifier("sleep.recovery.landing")
+    }
+
+    /// Resolves the selected scope's range (loading the canonical Goal dates
+    /// on demand), then reads inside it. "All Sleep" never needs Goal dates.
+    private func reload(policy: RecoverySleepReadPolicy = .cacheFirst) async {
+        let api = environment.recoverySleepAPI
+        if store.selected.isGoal { await store.loadWindows(api: api, authority: environment.nativeAuthority.rawValue) }
+        guard let range = store.range(today: api.today()), !range.isEmpty else { return }
+        await viewModel?.load(range: range, policy: policy)
     }
 
     @ViewBuilder
     private var content: some View {
         VStack(alignment: .leading, spacing: 24) {
             SleepScreenHeader(eyebrow: "Evidence Report", title: "Recovery", subtitle: "Sleep from Apple Health")
-            switch viewModel?.state {
+            SleepScopeSelector()
+            if scopeRange == nil || scopeRange?.isEmpty == true {
+                SleepScopeStateCard(store: store, range: scopeRange) { retryNonce += 1 }
+            } else {
+                landingContent
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var landingContent: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            switch viewModel?.state(for: scopeRange) {
             case .none, .loading:
                 ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 300)
             case .notAvailable:
@@ -390,17 +458,17 @@ struct RecoveryEvidenceView: View {
 
     @ViewBuilder
     private func loaded(_ landing: RecoverySleepLanding) -> some View {
-        if let lastNight = landing.lastNight { lastNightCard(lastNight, average: landing.sevenNightAverage) }
+        if let lastNight = landing.lastNight { lastNightCard(lastNight, average: landing.sevenNightAverage, isCurrent: scopeRange?.isCurrent ?? true) }
         sleepChartCard(landing)
         sleepWindowCard(landing)
         recentNightsCard(landing)
         dataSourcesCard(landing.sources)
     }
 
-    private func lastNightCard(_ night: RecoverySleepNightSummary, average: RecoverySleepAverage) -> some View {
+    private func lastNightCard(_ night: RecoverySleepNightSummary, average: RecoverySleepAverage, isCurrent: Bool) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Last Night") {
+                TrainingSectionHeaderView(title: isCurrent ? "Last Night" : "Final Night") {
                     Text(SleepEvidenceFormat.sleepDay(night.sleepDay))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -420,7 +488,7 @@ struct RecoveryEvidenceView: View {
                                 .foregroundStyle(PhysiqueOSTheme.accent)
                         }
                         if let window = night.clock.window {
-                            Text(window + (night.clock.showsZone ? " · \(night.clock.zoneLabel ?? "")" : ""))
+                            Text(window + (night.clock.showsZone && !night.clock.isClockTimeCaution ? " · \(night.clock.zoneLabel ?? "")" : ""))
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                         }
@@ -451,6 +519,11 @@ struct RecoveryEvidenceView: View {
         }
     }
 
+    /// The landing's 14-night snapshot always uses the 2W label density.
+    private func axisPlan(_ landing: RecoverySleepLanding) -> SleepAxisPolicy.Plan {
+        SleepAxisPolicy.plan(selector: .twoWeeks, pointDates: landing.nights.compactMap { SleepEvidenceFormat.chartDate($0.sleepDay) })
+    }
+
     private func sleepChartCard(_ landing: RecoverySleepLanding) -> some View {
         let points = SleepTotalChartPoint.fromLanding(landing)
         let selected = selectedDay.flatMap { day in landing.nights.first { $0.sleepDay == day } }
@@ -471,7 +544,7 @@ struct RecoveryEvidenceView: View {
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                SleepTotalChart(points: points, selectedId: $selectedDay)
+                SleepTotalChart(points: points, plan: axisPlan(landing), selectedId: $selectedDay)
                 if let selected {
                     NavigationLink(value: RecoverySleepDestination.night(selected.sleepDay)) {
                         HStack {
@@ -517,7 +590,7 @@ struct RecoveryEvidenceView: View {
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 } else {
-                    SleepWindowChart(rows: rows, summary: plausible ? window : nil)
+                    SleepWindowChart(rows: rows, summary: plausible ? window : nil, plan: axisPlan(landing))
                     windowStats(window, plausible: plausible)
                 }
             }
@@ -539,13 +612,9 @@ struct RecoveryEvidenceView: View {
                 .foregroundStyle(PhysiqueOSTheme.textMuted)
         }
         if window.nightsExcludedUncertainTime > 0 {
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "circle.dashed").font(.system(size: 10, weight: .bold)).padding(.top, 2)
-                Text("\(window.nightsExcludedUncertainTime) faded night\(window.nightsExcludedUncertainTime == 1 ? " has" : "s have") uncertain clock times (time zone inferred) and \(window.nightsExcludedUncertainTime == 1 ? "isn't" : "aren't") counted in the typical window. Total sleep is unaffected.")
-            }
-            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(PhysiqueOSTheme.textMuted)
-            .accessibilityElement(children: .combine)
+            Text(SleepEvidenceCopy.approximateClockTimes)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                .foregroundStyle(PhysiqueOSTheme.textMuted)
         }
     }
 
@@ -612,9 +681,15 @@ struct RecoveryEvidenceView: View {
 struct RecoverySleepTrendsView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: RecoverySleepTrendsViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var selectedId: String?
     @State private var showsStageMix = false
     @State private var showsAllNights = false
+    @State private var retryNonce = 0
+
+    private var store: RecoverySleepScopeStore { environment.recoverySleepScope }
+    private var scopeRange: RecoverySleepScopeRange? { store.range(today: environment.recoverySleepAPI.today()) }
+    private var reloadKey: String { "\(environment.nativeAuthority.rawValue)|\(store.selected.rawValue)|\(retryNonce)" }
 
     private let ranges: [RecoverySleepTrendRange] = [.twoWeeks, .oneMonth, .threeMonths, .sixMonths, .all]
 
@@ -622,37 +697,52 @@ struct RecoverySleepTrendsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 SleepScreenHeader(eyebrow: "Recovery", title: "Sleep Trends", subtitle: "Inspect nights over time")
-                rangeSelector
-                switch viewModel?.state {
-                case .none, .loading:
-                    ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 300)
-                case .notAvailable:
-                    CardContainer { SleepStateMessage(text: notAvailableText) }
-                case .failed(let message):
-                    CardContainer { SleepStateMessage(text: message) }
-                case .loaded(let trends):
-                    loaded(trends)
+                SleepScopeSelector()
+                if scopeRange == nil || scopeRange?.isEmpty == true {
+                    SleepScopeStateCard(store: store, range: scopeRange) { retryNonce += 1 }
+                } else {
+                    rangeSelector
+                    switch viewModel?.state(for: scopeRange) {
+                    case .none, .loading:
+                        ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 300)
+                    case .notAvailable:
+                        CardContainer { SleepStateMessage(text: notAvailableText) }
+                    case .failed(let message):
+                        CardContainer { SleepStateMessage(text: message) }
+                    case .loaded(let trends):
+                        loaded(trends)
+                    }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
         }
         .recoverySleepChrome(backLabel: "Recovery")
-        .task {
-            if viewModel == nil { viewModel = RecoverySleepTrendsViewModel(api: environment.recoverySleepAPI) }
-            await viewModel?.load()
+        .task(id: reloadKey) {
+            if viewModelAuthority != environment.nativeAuthority || viewModel == nil {
+                viewModel = RecoverySleepTrendsViewModel(api: environment.recoverySleepAPI)
+                viewModelAuthority = environment.nativeAuthority
+            }
+            selectedId = nil
+            let api = environment.recoverySleepAPI
+            if store.selected.isGoal { await store.loadWindows(api: api, authority: environment.nativeAuthority.rawValue) }
+            guard let range = store.range(today: api.today()), !range.isEmpty else { return }
+            await viewModel?.load(range: range)
         }
-        .sheet(isPresented: $showsAllNights) { RecoverySleepNightsSheet() }
+        .sheet(isPresented: $showsAllNights) {
+            if let range = scopeRange { RecoverySleepNightsSheet(range: range) }
+        }
         .accessibilityIdentifier("sleep.trends.screen")
     }
 
     private var rangeSelector: some View {
         HStack(spacing: 4) {
             ForEach(ranges) { option in
-                let isSelected = viewModel?.range == option
+                let isSelected = viewModel?.selector == option
                 Button {
                     selectedId = nil
-                    Task { await viewModel?.select(option) }
+                    guard let range = scopeRange else { return }
+                    Task { await viewModel?.select(option, range: range) }
                 } label: {
                     Text(option.label)
                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
@@ -675,21 +765,32 @@ struct RecoverySleepTrendsView: View {
 
     @ViewBuilder
     private func loaded(_ trends: RecoverySleepTrends) -> some View {
-        totalCard(trends)
+        let plan = axisPlan(trends)
+        totalCard(trends, plan: plan)
         if trends.granularity == .week {
             CardContainer {
                 SleepNoteRow(systemImage: "calendar", title: "Weekly view",
                              detail: "Longer ranges show weekly averages. Sleep window, continuity and stage mix are shown for ranges up to 3 months.")
             }
         } else {
-            if let rows = trends.windowRows, !rows.isEmpty { windowCard(rows, summary: nil) }
-            if let continuity = trends.continuity { continuityCard(continuity) }
-            if let stageMix = trends.stageMix { stageMixCard(stageMix) }
+            if let rows = trends.windowRows, !rows.isEmpty { windowCard(rows, summary: nil, plan: plan) }
+            if let continuity = trends.continuity { continuityCard(continuity, plan: plan) }
+            if let stageMix = trends.stageMix { stageMixCard(stageMix, plan: plan) }
         }
         allNightsCard
     }
 
-    private func totalCard(_ trends: RecoverySleepTrends) -> some View {
+    /// One plan for every chart on the screen: the selected range's label
+    /// density over the plotted dates (weekly bars span a whole week).
+    private func axisPlan(_ trends: RecoverySleepTrends) -> SleepAxisPolicy.Plan {
+        SleepAxisPolicy.plan(
+            selector: viewModel?.selector ?? .oneMonth,
+            pointDates: trends.totalSleep.compactMap { SleepEvidenceFormat.chartDate($0.periodStart) },
+            pointSpan: trends.granularity == .week ? 7 * 86_400 : 86_400
+        )
+    }
+
+    private func totalCard(_ trends: RecoverySleepTrends, plan: SleepAxisPolicy.Plan) -> some View {
         let points = SleepTotalChartPoint.fromTrends(trends)
         let isWeekly = trends.granularity == .week
         let selected = selectedId.flatMap { id in trends.totalSleep.first { $0.periodStart == id } }
@@ -708,7 +809,7 @@ struct RecoverySleepTrendsView: View {
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
-                SleepTotalChart(points: points, isWeekly: isWeekly, selectedId: $selectedId, height: 190)
+                SleepTotalChart(points: points, isWeekly: isWeekly, plan: plan, selectedId: $selectedId, height: 190)
                 if trends.isTruncated {
                     Text("Showing the latest \(trends.totalSleep.count) nights. Choose 6M for weekly averages of a longer span.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -728,7 +829,7 @@ struct RecoverySleepTrendsView: View {
         }
     }
 
-    private func windowCard(_ rows: [RecoverySleepTrends.WindowRow], summary: RecoverySleepWindowSummary?) -> some View {
+    private func windowCard(_ rows: [RecoverySleepTrends.WindowRow], summary: RecoverySleepWindowSummary?, plan: SleepAxisPolicy.Plan) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Sleep Window") {
@@ -738,7 +839,7 @@ struct RecoverySleepTrendsView: View {
                             .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     }
                 }
-                SleepWindowChart(rows: SleepWindowChartRow.fromTrends(rows), summary: summary, rowHeight: rows.count > 14 ? 11 : 13)
+                SleepWindowChart(rows: SleepWindowChartRow.fromTrends(rows), summary: summary, plan: plan, rowHeight: rows.count > 14 ? 11 : 13)
                 if let summary, let startSpread = summary.startSpreadMinutes, let endSpread = summary.endSpreadMinutes {
                     Text("Fell asleep within ±\(startSpread)m · woke within ±\(endSpread)m of the typical window, from \(summary.nightsIncluded) nights.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -746,7 +847,7 @@ struct RecoverySleepTrendsView: View {
                 }
                 let excluded = summary?.nightsExcludedUncertainTime ?? rows.filter { !$0.includedInConsistency }.count
                 if excluded > 0 {
-                    Text("\(excluded) faded night\(excluded == 1 ? " has" : "s have") uncertain clock times (time zone inferred) and \(excluded == 1 ? "isn't" : "aren't") used as consistency evidence. Total sleep is unaffected.")
+                    Text(SleepEvidenceCopy.approximateClockTimes)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
@@ -754,13 +855,13 @@ struct RecoverySleepTrendsView: View {
         }
     }
 
-    private func continuityCard(_ rows: [RecoverySleepTrends.ContinuityRow]) -> some View {
+    private func continuityCard(_ rows: [RecoverySleepTrends.ContinuityRow], plan: SleepAxisPolicy.Plan) -> some View {
         let pending = rows.filter { $0.status == .pendingCorrection }.count
         let absent = rows.filter { $0.status == .absent }.count
         return CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Continuity")
-                SleepContinuityChart(rows: rows)
+                SleepContinuityChart(rows: rows, plan: plan)
                 if pending + absent > 0 {
                     Text(continuityGapText(pending: pending, absent: absent))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -777,7 +878,7 @@ struct RecoverySleepTrendsView: View {
         return parts.joined(separator: " and ") + "; shown as gaps."
     }
 
-    private func stageMixCard(_ rows: [RecoverySleepTrends.StageMixRow]) -> some View {
+    private func stageMixCard(_ rows: [RecoverySleepTrends.StageMixRow], plan: SleepAxisPolicy.Plan) -> some View {
         CardContainer {
             VStack(alignment: .leading, spacing: 12) {
                 Button { withAnimation(.easeInOut(duration: 0.2)) { showsStageMix.toggle() } } label: {
@@ -799,7 +900,7 @@ struct RecoverySleepTrendsView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("sleep.stageMix.toggle")
                 .accessibilityValue(showsStageMix ? "Expanded" : "Collapsed")
-                if showsStageMix { SleepStageMixChart(rows: rows) }
+                if showsStageMix { SleepStageMixChart(rows: rows, plan: plan) }
                 Text("Stage estimates come from your sleep source and vary between devices.")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
@@ -892,22 +993,15 @@ struct RecoverySleepNightView: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
             if let window = clock.window {
-                Text(window + (clock.zoneLabel.map { " · \($0)" } ?? ""))
+                Text(window + (!clock.isClockTimeCaution ? (clock.zoneLabel.map { " · \($0)" } ?? "") : ""))
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
-            HStack(spacing: 6) {
-                if night.windowOpen, let closes = SleepEvidenceFormat.instant(night.windowClosesAt) {
-                    SleepStatusTag(text: "Still updating until \(SleepEvidenceFormat.clock(closes, in: clock.zone))", systemImage: "clock.arrow.circlepath")
-                }
-                if clock.isClockTimeCaution {
-                    SleepStatusTag(text: "Clock times uncertain", systemImage: "circle.dashed")
-                } else if clock.certainty != .recorded {
-                    SleepStatusTag(text: "Time zone inferred", systemImage: "circle.dashed")
-                }
+            if night.windowOpen, let closes = SleepEvidenceFormat.instant(night.windowClosesAt) {
+                SleepStatusTag(text: "Still updating until \(SleepEvidenceFormat.clock(closes, in: clock.zone))", systemImage: "clock.arrow.circlepath")
             }
-            if clock.certainty == .uncertain {
-                Text("Total sleep is exact. The clock times use a time zone inferred after this night and may be off if you were travelling.")
+            if clock.isClockTimeCaution {
+                Text(SleepEvidenceCopy.approximateClockTimes)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
