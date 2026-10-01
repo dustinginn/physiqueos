@@ -11,6 +11,7 @@ import UserNotifications
 struct PhysiqueOSApp: App {
     @State private var environment: AppEnvironment
     @State private var notificationDelegate: PriorityNotificationDelegate
+    @State private var workoutLiveActivity: WorkoutLiveActivityBridge
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -25,6 +26,12 @@ struct PhysiqueOSApp: App {
         PriorityNotificationCategoryRegistrar.registerCategories()
         _environment = State(initialValue: environment)
         _notificationDelegate = State(initialValue: notificationDelegate)
+        // The Live Activity's Complete Set intent runs in this process, and a
+        // background launch to run it still constructs the App, so the
+        // handler and the coordinator are installed here, not on a view.
+        let liveActivity = WorkoutLiveActivityBridge(environment: environment)
+        liveActivity.install()
+        _workoutLiveActivity = State(initialValue: liveActivity)
         // HealthKit background delivery relaunches a terminated app WITHOUT
         // ever activating a scene, so the scenePhase-driven bootstrap below
         // cannot be what re-registers the observers. Do it here, in the
@@ -88,9 +95,17 @@ struct PhysiqueOSApp: App {
                     // change: a suspended app gets no day-change notification,
                     // so "Today" is recomputed from the system on every
                     // activation, under every authority.
-                    if phase == .active { Task { await environment.reevaluateDailyDriverDay() } }
+                    if phase == .active {
+                        workoutLiveActivity.reconcile()
+                        Task { await environment.reevaluateDailyDriverDay() }
+                    }
                     guard phase == .active, environment.nativeAuthority == .founderProduction else { return }
                     Task { await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap() }
+                }
+                // Switching Sandbox <-> Founder Production moves the Live
+                // Activity to the other authority's workout (or ends it).
+                .onChange(of: environment.nativeAuthority) { _, _ in
+                    workoutLiveActivity.attachToSelectedAuthority()
                 }
                 // Foregrounded across local midnight, a manual clock / DST /
                 // carrier time change, or a zone change while running.

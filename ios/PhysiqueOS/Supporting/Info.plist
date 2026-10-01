@@ -6,6 +6,19 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.physiqueos.native.dev.workout-activity</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>physiqueos-workout</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleIconFiles</key>
 	<array>
 		<string>AppIcon60x60</string>

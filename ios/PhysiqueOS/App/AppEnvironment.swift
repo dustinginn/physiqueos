@@ -238,9 +238,23 @@ final class AppEnvironment {
 
     // The draft stores are reachable only through `trainingSessionAuthority`,
     // their single writer.
-    /// Device-wide rest preference (unset until a later task adds an editor;
-    /// unset means Off).
-    let trainingRestPreferences = UserDefaultsTrainingRestPreferences()
+    /// Device-wide rest preference (Stopwatch until the user chooses).
+    @ObservationIgnored private var restPreferencesStorage: UserDefaultsTrainingRestPreferences?
+
+    /// Test seam: substitute a hermetic preference store.
+    @MainActor
+    func useTrainingRestPreferences(_ preferences: UserDefaultsTrainingRestPreferences) {
+        restPreferencesStorage = preferences
+        trainingSessionAuthorities.removeAll()
+    }
+
+    @MainActor
+    var trainingRestPreferences: UserDefaultsTrainingRestPreferences {
+        if let restPreferencesStorage { return restPreferencesStorage }
+        let created = UserDefaultsTrainingRestPreferences()
+        restPreferencesStorage = created
+        return created
+    }
     /// One app-scoped `TrainingSessionAuthority` per Native authority, each
     /// over that authority's own draft store, created on first use. They are
     /// the only writers of those stores, so Sandbox and Founder Production

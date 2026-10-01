@@ -383,6 +383,38 @@ session_authority_test_files = [
 ]
 SESSION_AUTHORITY_BLOCK = 0x14FF
 
+# Workout Live Activity (Phase 1): a Widget Extension plus its app-side
+# coordinator. IDs come from a second pinned block (0x1600+, see
+# LIVE_ACTIVITY_BLOCK) after every earlier object, so nothing renumbers.
+live_activity_app_files = [
+    ("Contracts", "WorkoutActivityContentMapper.swift"),
+    ("Networking", "WorkoutLiveActivityClient.swift"),
+    ("Networking", "WorkoutLiveActivityCoordinator.swift"),
+    ("Networking", "WorkoutLiveActivityBridge.swift"),
+    ("Presentation/TrainingLogger", "TrainingRestPreferenceMenu.swift"),
+]
+live_activity_test_files = [
+    ("PhysiqueOSTests", "WorkoutLiveActivityContractTests.swift"),
+    ("PhysiqueOSTests", "WorkoutLiveActivityCoordinatorTests.swift"),
+    ("PhysiqueOSTests", "WorkoutLiveActivityIntentTests.swift"),
+    ("PhysiqueOSTests", "WorkoutLiveActivityViewTests.swift"),
+    ("PhysiqueOSTests", "TrainingRestPreferenceTests.swift"),
+]
+# Compiled into BOTH the app and the extension (extension-safe code only).
+live_activity_shared_files = [
+    ("PhysiqueOSShared", "WorkoutActivityAttributes.swift"),
+    ("PhysiqueOSShared", "CompleteWorkoutSetIntent.swift"),
+    ("PhysiqueOSShared", "WorkoutLiveActivityViews.swift"),
+]
+# Extension target only.
+live_activity_extension_files = [
+    ("PhysiqueOSLiveActivity", "PhysiqueOSLiveActivityBundle.swift"),
+    ("PhysiqueOSLiveActivity", "WorkoutLiveActivityWidget.swift"),
+]
+LIVE_ACTIVITY_PLIST = ("PhysiqueOSLiveActivity", "Info.plist")
+LIVE_ACTIVITY_FRAMEWORKS = ["WidgetKit.framework", "SwiftUI.framework"]
+LIVE_ACTIVITY_BLOCK = 0x15FF
+
 # Daily-driver local-day authority. Allocated after every established object
 # (including the N1 tests) so adding it renumbers nothing.
 dd_app_files = [
@@ -490,6 +522,7 @@ ui_test_files = [
 BUNDLE_ID_APP = "com.physiqueos.native.dev"
 BUNDLE_ID_TEST = "com.physiqueos.native.dev.Tests"
 BUNDLE_ID_UI_TEST = "com.physiqueos.native.dev.UITests"
+BUNDLE_ID_LIVE_ACTIVITY = "com.physiqueos.native.dev.WorkoutActivity"
 DEPLOYMENT_TARGET = "18.0"
 
 # One authoritative TestFlight build number. Increment this value, run this
@@ -536,7 +569,7 @@ for group, fname in test_files:
 # Groups (every distinct directory that needs a PBXGroup)
 group_names = sorted(set(
     ["App", "Contracts", "Networking", "SharedUI", "Resources", "Presentation", "Supporting"]
-    + [g for g, _ in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files]
+    + [g for g, _ in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files]
     + [g for g, _ in resource_files]
     + [g for g, _ in reference_only_files + late_reference_only_files]
 ), key=lambda g: (g.count("/"), g))
@@ -636,7 +669,7 @@ for group, fname in sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST]:
 for group, fname in recovery_sleep_app_files + recovery_sleep_resource_files + recovery_sleep_test_files + recovery_sleep_ui_test_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:{group}/{fname}")
-for group, fname in sleep_polish_app_files + sleep_polish_test_files + session_authority_test_files:
+for group, fname in sleep_polish_app_files + sleep_polish_test_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:{group}/{fname}")
 assert _counter[0] < SESSION_AUTHORITY_BLOCK, "Session authority ID block would collide with earlier objects"
@@ -645,6 +678,30 @@ _counter[0] = SESSION_AUTHORITY_BLOCK
 for group, fname in session_authority_app_files + session_authority_test_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:{group}/{fname}")
+_counter[0] = _resume_counter
+assert _counter[0] < LIVE_ACTIVITY_BLOCK, "Live Activity ID block would collide with earlier objects"
+_resume_counter = _counter[0]
+_counter[0] = LIVE_ACTIVITY_BLOCK
+for group, fname in live_activity_app_files + live_activity_test_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:{group}/{fname}")
+for group, fname in live_activity_shared_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:app:{group}/{fname}")
+    I(f"buildfile:ext:{group}/{fname}")
+for group, fname in live_activity_extension_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:ext:{group}/{fname}")
+I(f"fileref:{LIVE_ACTIVITY_PLIST[0]}/{LIVE_ACTIVITY_PLIST[1]}")
+I("group:PhysiqueOSShared")
+I("group:PhysiqueOSLiveActivity")
+I("fileref:PhysiqueOSLiveActivity.appex")
+for framework in LIVE_ACTIVITY_FRAMEWORKS:
+    I(f"fileref:framework:{framework}")
+    I(f"buildfile:ext:framework:{framework}")
+for name in ("extTarget", "extConfigList", "extDebug", "extRelease", "extSourcesPhase", "extFrameworksPhase",
+             "extResourcesPhase", "embedExtensionsPhase", "buildfile:embed:appex", "extDependency", "extContainerProxy"):
+    I(name)
 _counter[0] = _resume_counter
 
 # ---------------- PBXBuildFile ----------------
@@ -670,10 +727,10 @@ for group, fname in late_app_files:
 for group, fname in late_test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
-for group, fname in n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files:
+for group, fname in n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
-for group, fname in [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files:
+for group, fname in [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
 for framework in system_frameworks:
@@ -698,7 +755,7 @@ container_proxy = f"""\t\t{I('testContainerProxy')} /* PBXContainerItemProxy */ 
 
 # ---------------- PBXFileReference ----------------
 fileref_lines = []
-for group, fname in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + resource_files + late_resource_files + recovery_sleep_resource_files + reference_only_files + late_reference_only_files + test_files + late_test_files + [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + ui_test_files + recovery_sleep_ui_test_files:
+for group, fname in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + resource_files + late_resource_files + recovery_sleep_resource_files + reference_only_files + late_reference_only_files + test_files + late_test_files + [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + ui_test_files + recovery_sleep_ui_test_files:
     fr = I(f"fileref:{group}/{fname}")
     fileref_lines.append(f"\t\t{fr} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};")
 for framework in system_frameworks:
@@ -741,7 +798,7 @@ frameworks_phases = f"""\t\t{I('appFrameworksPhase')} /* Frameworks */ = {{
 
 # ---------------- PBXGroup ----------------
 all_members = (
-    [(g, f) for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files]
+    [(g, f) for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files]
     + [(g, f) for g, f in resource_files]
     + [(g, f) for g, f in late_resource_files + recovery_sleep_resource_files]
     + [(g, f) for g, f in reference_only_files + late_reference_only_files]
@@ -795,7 +852,7 @@ for g in group_names:
 \t\t\tsourceTree = "<group>";
 \t\t}};""")
 
-test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files)
+test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files)
 group_lines.append(f"""\t\t{I('group:PhysiqueOSTests')} /* PhysiqueOSTests */ = {{
 \t\t\tisa = PBXGroup;
 \t\t\tchildren = (
@@ -838,12 +895,12 @@ group_lines.append(f"""\t\t{I('group:main')} /* Main */ = {{
 \t\t}};""")
 
 # ---------------- PBXNativeTarget ----------------
-app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files)
+app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files)
 app_resource_build_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Resources */,"
     for g, f in resource_files + late_resource_files + recovery_sleep_resource_files
 )
-test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files)
+test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files)
 ui_test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in ui_test_files + recovery_sleep_ui_test_files)
 
 sources_phases = f"""\t\t{I('appSourcesPhase')} /* Sources */ = {{
@@ -1208,6 +1265,236 @@ config_lists = f"""\t\t{I('projConfigList')} /* Build configuration list for PBX
 \t\t\tdefaultConfigurationName = Release;
 \t\t}};"""
 
+# ---------------- Workout Live Activity extension (additive) ----------------
+# Everything below only APPENDS to sections built above, so the established
+# objects and their IDs are untouched.
+_appex_ref = I("fileref:PhysiqueOSLiveActivity.appex")
+
+def _bf_sources(bf_name, group, fname):
+    fr = I(f"fileref:{group}/{fname}")
+    return f"\t\t{I(bf_name)} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};"
+
+for group, fname in live_activity_shared_files:
+    buildfile_lines.append(_bf_sources(f"buildfile:app:{group}/{fname}", group, fname))
+    buildfile_lines.append(_bf_sources(f"buildfile:ext:{group}/{fname}", group, fname))
+for group, fname in live_activity_extension_files:
+    buildfile_lines.append(_bf_sources(f"buildfile:ext:{group}/{fname}", group, fname))
+for framework in LIVE_ACTIVITY_FRAMEWORKS:
+    buildfile_lines.append(
+        f"\t\t{I(f'buildfile:ext:framework:{framework}')} /* {framework} in Frameworks */ = "
+        f"{{isa = PBXBuildFile; fileRef = {I(f'fileref:framework:{framework}')} /* {framework} */; }};"
+    )
+buildfile_lines.append(
+    f"\t\t{I('buildfile:embed:appex')} /* PhysiqueOSLiveActivity.appex in Embed Foundation Extensions */ = "
+    f"{{isa = PBXBuildFile; fileRef = {_appex_ref} /* PhysiqueOSLiveActivity.appex */; "
+    f"settings = {{ATTRIBUTES = (RemoveHeadersOnCopy, ); }}; }};"
+)
+
+container_proxy += f"""
+\t\t{I('extContainerProxy')} /* PBXContainerItemProxy */ = {{
+\t\t\tisa = PBXContainerItemProxy;
+\t\t\tcontainerPortal = {I('project')} /* Project object */;
+\t\t\tproxyType = 1;
+\t\t\tremoteGlobalIDString = {I('extTarget')};
+\t\t\tremoteInfo = PhysiqueOSLiveActivity;
+\t\t}};"""
+
+copy_phase = f"""\t\t{I('embedExtensionsPhase')} /* Embed Foundation Extensions */ = {{
+\t\t\tisa = PBXCopyFilesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tdstPath = "";
+\t\t\tdstSubfolderSpec = 13;
+\t\t\tfiles = (
+\t\t\t\t{I('buildfile:embed:appex')} /* PhysiqueOSLiveActivity.appex in Embed Foundation Extensions */,
+\t\t\t);
+\t\t\tname = "Embed Foundation Extensions";
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};"""
+
+for group, fname in live_activity_shared_files + live_activity_extension_files:
+    fileref_lines.append(f"\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};")
+fileref_lines.append(f"\t\t{I(f'fileref:{LIVE_ACTIVITY_PLIST[0]}/{LIVE_ACTIVITY_PLIST[1]}')} /* Info.plist */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = \"Info.plist\"; sourceTree = \"<group>\"; }};")
+for framework in LIVE_ACTIVITY_FRAMEWORKS:
+    fileref_lines.append(
+        f"\t\t{I(f'fileref:framework:{framework}')} /* {framework} */ = "
+        f"{{isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = {framework}; "
+        f"path = System/Library/Frameworks/{framework}; sourceTree = SDKROOT; }};"
+    )
+fileref_lines.append(f"\t\t{_appex_ref} /* PhysiqueOSLiveActivity.appex */ = {{isa = PBXFileReference; explicitFileType = \"wrapper.app-extension\"; includeInIndex = 0; path = PhysiqueOSLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; }};")
+
+_ext_framework_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:ext:framework:{f}')} /* {f} in Frameworks */," for f in LIVE_ACTIVITY_FRAMEWORKS
+)
+frameworks_phases += f"""
+\t\t{I('extFrameworksPhase')} /* Frameworks */ = {{
+\t\t\tisa = PBXFrameworksBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+{_ext_framework_ids}
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};"""
+
+def _group_block(name, files, extra_children=()):
+    kids = "\n".join(
+        [f"\t\t\t\t{I(f'fileref:{g}/{f}')} /* {f} */," for g, f in files]
+        + [f"\t\t\t\t{I(f'fileref:{g}/{f}')} /* {f} */," for g, f in extra_children]
+    )
+    return f"""\t\t{I(f'group:{name}')} /* {name} */ = {{
+\t\t\tisa = PBXGroup;
+\t\t\tchildren = (
+{kids}
+\t\t\t);
+\t\t\tpath = {name};
+\t\t\tsourceTree = "<group>";
+\t\t}};"""
+
+group_lines.append(_group_block("PhysiqueOSShared", live_activity_shared_files))
+group_lines.append(_group_block("PhysiqueOSLiveActivity", live_activity_extension_files, [LIVE_ACTIVITY_PLIST]))
+
+_new_children_main = (
+    f"\t\t\t\t{I('group:PhysiqueOSShared')} /* PhysiqueOSShared */,\n"
+    f"\t\t\t\t{I('group:PhysiqueOSLiveActivity')} /* PhysiqueOSLiveActivity */,\n"
+)
+_main_anchor = f"\t\t\t\t{I('group:PhysiqueOSUITests')} /* PhysiqueOSUITests */,\n"
+_main_index = [i for i, l in enumerate(group_lines) if l.startswith(f"\t\t{I('group:main')} ")]
+assert len(_main_index) == 1
+group_lines[_main_index[0]] = group_lines[_main_index[0]].replace(_main_anchor, _main_anchor + _new_children_main, 1)
+_products_index = [i for i, l in enumerate(group_lines) if l.startswith(f"\t\t{I('group:products')} ")]
+assert len(_products_index) == 1
+_products_anchor = f"\t\t\t\t{I('fileref:PhysiqueOSUITests.xctest')} /* PhysiqueOSUITests.xctest */,\n"
+group_lines[_products_index[0]] = group_lines[_products_index[0]].replace(
+    _products_anchor, _products_anchor + f"\t\t\t\t{_appex_ref} /* PhysiqueOSLiveActivity.appex */,\n", 1)
+
+# App target: compile the shared files, embed the extension, depend on it.
+_shared_app_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:app:{g}/{f}')} /* {f} in Sources */," for g, f in live_activity_shared_files
+)
+sources_phases = sources_phases.replace(
+    f"{app_source_build_ids}\n", f"{app_source_build_ids}\n{_shared_app_ids}\n", 1)
+_ext_source_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:ext:{g}/{f}')} /* {f} in Sources */,"
+    for g, f in live_activity_shared_files + live_activity_extension_files
+)
+sources_phases += f"""
+\t\t{I('extSourcesPhase')} /* Sources */ = {{
+\t\t\tisa = PBXSourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+{_ext_source_ids}
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};"""
+resources_phases += f"""
+\t\t{I('extResourcesPhase')} /* Resources */ = {{
+\t\t\tisa = PBXResourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};"""
+
+_app_phases_old = f"""\t\t\t\t{I('appResourcesPhase')} /* Resources */,
+\t\t\t);
+\t\t\tbuildRules = (
+\t\t\t);
+\t\t\tdependencies = (
+\t\t\t);
+\t\t\tname = PhysiqueOS;"""
+_app_phases_new = f"""\t\t\t\t{I('appResourcesPhase')} /* Resources */,
+\t\t\t\t{I('embedExtensionsPhase')} /* Embed Foundation Extensions */,
+\t\t\t);
+\t\t\tbuildRules = (
+\t\t\t);
+\t\t\tdependencies = (
+\t\t\t\t{I('extDependency')} /* PBXTargetDependency */,
+\t\t\t);
+\t\t\tname = PhysiqueOS;"""
+assert native_targets.count(_app_phases_old) == 1
+native_targets = native_targets.replace(_app_phases_old, _app_phases_new)
+native_targets += f"""
+\t\t{I('extTarget')} /* PhysiqueOSLiveActivity */ = {{
+\t\t\tisa = PBXNativeTarget;
+\t\t\tbuildConfigurationList = {I('extConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSLiveActivity" */;
+\t\t\tbuildPhases = (
+\t\t\t\t{I('extSourcesPhase')} /* Sources */,
+\t\t\t\t{I('extFrameworksPhase')} /* Frameworks */,
+\t\t\t\t{I('extResourcesPhase')} /* Resources */,
+\t\t\t);
+\t\t\tbuildRules = (
+\t\t\t);
+\t\t\tdependencies = (
+\t\t\t);
+\t\t\tname = PhysiqueOSLiveActivity;
+\t\t\tproductName = PhysiqueOSLiveActivity;
+\t\t\tproductReference = {_appex_ref} /* PhysiqueOSLiveActivity.appex */;
+\t\t\tproductType = "com.apple.product-type.app-extension";
+\t\t}};"""
+
+target_dependency += f"""
+\t\t{I('extDependency')} /* PBXTargetDependency */ = {{
+\t\t\tisa = PBXTargetDependency;
+\t\t\ttarget = {I('extTarget')} /* PhysiqueOSLiveActivity */;
+\t\t\ttargetProxy = {I('extContainerProxy')} /* PBXContainerItemProxy */;
+\t\t}};"""
+
+_attr_anchor = f"""\t\t\t\t\t{I('uiTestTarget')} = {{
+\t\t\t\t\t\tCreatedOnToolsVersion = 26.0;
+\t\t\t\t\t\tTestTargetID = {I('appTarget')};
+\t\t\t\t\t}};
+"""
+assert project_obj.count(_attr_anchor) == 1
+project_obj = project_obj.replace(_attr_anchor, _attr_anchor + f"""\t\t\t\t\t{I('extTarget')} = {{
+\t\t\t\t\t\tCreatedOnToolsVersion = 27.0;
+\t\t\t\t\t}};
+""")
+_targets_anchor = f"\t\t\t\t{I('uiTestTarget')} /* PhysiqueOSUITests */,\n"
+assert project_obj.count(_targets_anchor) == 1
+project_obj = project_obj.replace(_targets_anchor, _targets_anchor + f"\t\t\t\t{I('extTarget')} /* PhysiqueOSLiveActivity */,\n")
+
+ext_common = f"""
+\t\t\t\tAPPLICATION_EXTENSION_API_ONLY = YES;
+\t\t\t\tCODE_SIGN_STYLE = Automatic;
+\t\t\t\tCURRENT_PROJECT_VERSION = {APP_BUILD_NUMBER};
+\t\t\t\tDEVELOPMENT_TEAM = {DEVELOPMENT_TEAM};
+\t\t\t\tGENERATE_INFOPLIST_FILE = YES;
+\t\t\t\tINFOPLIST_FILE = "PhysiqueOSLiveActivity/Info.plist";
+\t\t\t\tINFOPLIST_KEY_CFBundleDisplayName = "Workout";
+\t\t\t\tINFOPLIST_KEY_NSHumanReadableCopyright = "";
+\t\t\t\tLD_RUNPATH_SEARCH_PATHS = (
+\t\t\t\t\t"$(inherited)",
+\t\t\t\t\t"@executable_path/Frameworks",
+\t\t\t\t\t"@executable_path/../../Frameworks",
+\t\t\t\t);
+\t\t\t\tMARKETING_VERSION = 1.0;
+\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = {BUNDLE_ID_LIVE_ACTIVITY};
+\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";
+\t\t\t\tSKIP_INSTALL = YES;
+\t\t\t\tSWIFT_EMIT_LOC_STRINGS = YES;
+\t\t\t\tTARGETED_DEVICE_FAMILY = 1;"""
+ext_debug = f"""\t\t{I('extDebug')} /* Debug */ = {{
+\t\t\tisa = XCBuildConfiguration;
+\t\t\tbuildSettings = {{{ext_common}
+\t\t\t}};
+\t\t\tname = Debug;
+\t\t}};"""
+ext_release = f"""\t\t{I('extRelease')} /* Release */ = {{
+\t\t\tisa = XCBuildConfiguration;
+\t\t\tbuildSettings = {{{ext_common}
+\t\t\t}};
+\t\t\tname = Release;
+\t\t}};"""
+config_lists += f"""
+\t\t{I('extConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSLiveActivity" */ = {{
+\t\t\tisa = XCConfigurationList;
+\t\t\tbuildConfigurations = (
+\t\t\t\t{I('extDebug')} /* Debug */,
+\t\t\t\t{I('extRelease')} /* Release */,
+\t\t\t);
+\t\t\tdefaultConfigurationIsVisible = 0;
+\t\t\tdefaultConfigurationName = Release;
+\t\t}};"""
+
 pbxproj = f"""// !$*UTF8*$!
 {{
 \tarchiveVersion = 1;
@@ -1223,6 +1510,10 @@ pbxproj = f"""// !$*UTF8*$!
 /* Begin PBXContainerItemProxy section */
 {container_proxy}
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+{copy_phase}
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 {chr(10).join(fileref_lines)}
@@ -1265,6 +1556,8 @@ pbxproj = f"""// !$*UTF8*$!
 {test_release}
 {ui_test_debug}
 {ui_test_release}
+{ext_debug}
+{ext_release}
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1282,7 +1575,7 @@ with open(f"{ROOT}/PhysiqueOS.xcodeproj/project.pbxproj", "w") as f:
 print("wrote project.pbxproj,", len(pbxproj), "bytes")
 print("appTarget id:", I('appTarget'))
 print("testTarget id:", I('testTarget'))
-print("app files:", len(app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files), "resources:", len(resource_files + late_resource_files + recovery_sleep_resource_files),
+print("app files:", len(app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files), "resources:", len(resource_files + late_resource_files + recovery_sleep_resource_files),
       "reference-only:", len(reference_only_files + late_reference_only_files),
-      "test files:", len(test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files))
+      "test files:", len(test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files))
 print("development team:", DEVELOPMENT_TEAM)

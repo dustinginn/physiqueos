@@ -582,6 +582,8 @@ struct TrainingLoggerView: View {
                 .controlSize(.regular)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
 
+                TrainingRestPreferenceMenu(preferences: environment.trainingRestPreferences)
+
                 Button {
                     focusedNumericFieldID = nil
                     viewModel.beginAddingExercises()

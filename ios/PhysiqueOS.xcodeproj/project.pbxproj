@@ -358,6 +358,11 @@
 		000000000000000000001501 /* TrainingSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001500 /* TrainingSessionState.swift */; };
 		000000000000000000001503 /* TrainingSessionLiveProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001502 /* TrainingSessionLiveProjection.swift */; };
 		000000000000000000001505 /* TrainingSessionAuthority.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001504 /* TrainingSessionAuthority.swift */; };
+		000000000000000000001601 /* WorkoutActivityContentMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001600 /* WorkoutActivityContentMapper.swift */; };
+		000000000000000000001603 /* WorkoutLiveActivityClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001602 /* WorkoutLiveActivityClient.swift */; };
+		000000000000000000001605 /* WorkoutLiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001604 /* WorkoutLiveActivityCoordinator.swift */; };
+		000000000000000000001607 /* WorkoutLiveActivityBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001606 /* WorkoutLiveActivityBridge.swift */; };
+		000000000000000000001609 /* TrainingRestPreferenceMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001608 /* TrainingRestPreferenceMenu.swift */; };
 		0000000000000000000012D1 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D0 /* HealthKitSynchronizationTests.swift */; };
 		0000000000000000000012D3 /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D2 /* HealthKitSleepIngestionTests.swift */; };
 		0000000000000000000012D5 /* HealthKitSleepHistoricalValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D4 /* HealthKitSleepHistoricalValidationTests.swift */; };
@@ -370,9 +375,25 @@
 		0000000000000000000012EF /* PhotoInspectionViewerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012EE /* PhotoInspectionViewerTests.swift */; };
 		0000000000000000000013B5 /* RecoverySleepReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013B4 /* RecoverySleepReadModelTests.swift */; };
 		0000000000000000000013BD /* RecoverySleepPolishTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013BC /* RecoverySleepPolishTests.swift */; };
-		0000000000000000000013BF /* TrainingSessionAuthorityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013BE /* TrainingSessionAuthorityTests.swift */; };
-		0000000000000000000013C1 /* TrainingSessionLiveProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013C0 /* TrainingSessionLiveProjectionTests.swift */; };
+		000000000000000000001507 /* TrainingSessionAuthorityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001506 /* TrainingSessionAuthorityTests.swift */; };
+		000000000000000000001509 /* TrainingSessionLiveProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001508 /* TrainingSessionLiveProjectionTests.swift */; };
+		00000000000000000000160B /* WorkoutLiveActivityContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000160A /* WorkoutLiveActivityContractTests.swift */; };
+		00000000000000000000160D /* WorkoutLiveActivityCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000160C /* WorkoutLiveActivityCoordinatorTests.swift */; };
+		00000000000000000000160F /* WorkoutLiveActivityIntentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000160E /* WorkoutLiveActivityIntentTests.swift */; };
+		000000000000000000001611 /* WorkoutLiveActivityViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001610 /* WorkoutLiveActivityViewTests.swift */; };
+		000000000000000000001613 /* TrainingRestPreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001612 /* TrainingRestPreferenceTests.swift */; };
 		0000000000000000000012B3 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
+		000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001614 /* WorkoutActivityAttributes.swift */; };
+		000000000000000000001616 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001614 /* WorkoutActivityAttributes.swift */; };
+		000000000000000000001618 /* CompleteWorkoutSetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001617 /* CompleteWorkoutSetIntent.swift */; };
+		000000000000000000001619 /* CompleteWorkoutSetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001617 /* CompleteWorkoutSetIntent.swift */; };
+		00000000000000000000161B /* WorkoutLiveActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000161A /* WorkoutLiveActivityViews.swift */; };
+		00000000000000000000161C /* WorkoutLiveActivityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000161A /* WorkoutLiveActivityViews.swift */; };
+		00000000000000000000161E /* PhysiqueOSLiveActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000161D /* PhysiqueOSLiveActivityBundle.swift */; };
+		000000000000000000001620 /* WorkoutLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000161F /* WorkoutLiveActivityWidget.swift */; };
+		000000000000000000001626 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 000000000000000000001625 /* WidgetKit.framework */; };
+		000000000000000000001628 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 000000000000000000001627 /* SwiftUI.framework */; };
+		000000000000000000001631 /* PhysiqueOSLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 000000000000000000001624 /* PhysiqueOSLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -390,7 +411,28 @@
 			remoteGlobalIDString = 000000000000000000001286;
 			remoteInfo = PhysiqueOS;
 		};
+		000000000000000000001633 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000001282 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000000001629;
+			remoteInfo = PhysiqueOSLiveActivity;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		000000000000000000001630 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				000000000000000000001631 /* PhysiqueOSLiveActivity.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		000000000000000000001001 /* PhysiqueOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSApp.swift"; sourceTree = "<group>"; };
@@ -674,6 +716,11 @@
 		000000000000000000001500 /* TrainingSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionState.swift"; sourceTree = "<group>"; };
 		000000000000000000001502 /* TrainingSessionLiveProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionLiveProjection.swift"; sourceTree = "<group>"; };
 		000000000000000000001504 /* TrainingSessionAuthority.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionAuthority.swift"; sourceTree = "<group>"; };
+		000000000000000000001600 /* WorkoutActivityContentMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutActivityContentMapper.swift"; sourceTree = "<group>"; };
+		000000000000000000001602 /* WorkoutLiveActivityClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityClient.swift"; sourceTree = "<group>"; };
+		000000000000000000001604 /* WorkoutLiveActivityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityCoordinator.swift"; sourceTree = "<group>"; };
+		000000000000000000001606 /* WorkoutLiveActivityBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityBridge.swift"; sourceTree = "<group>"; };
+		000000000000000000001608 /* TrainingRestPreferenceMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingRestPreferenceMenu.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E7 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
@@ -755,8 +802,13 @@
 		0000000000000000000012EE /* PhotoInspectionViewerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoInspectionViewerTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B4 /* RecoverySleepReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepReadModelTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013BC /* RecoverySleepPolishTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepPolishTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000013BE /* TrainingSessionAuthorityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionAuthorityTests.swift"; sourceTree = "<group>"; };
-		0000000000000000000013C0 /* TrainingSessionLiveProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionLiveProjectionTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001506 /* TrainingSessionAuthorityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionAuthorityTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001508 /* TrainingSessionLiveProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionLiveProjectionTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000160A /* WorkoutLiveActivityContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityContractTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000160C /* WorkoutLiveActivityCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityCoordinatorTests.swift"; sourceTree = "<group>"; };
+		00000000000000000000160E /* WorkoutLiveActivityIntentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityIntentTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001610 /* WorkoutLiveActivityViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityViewTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001612 /* TrainingRestPreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingRestPreferenceTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001296 /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		000000000000000000001298 /* GoalsAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepAcceptanceUITests.swift"; sourceTree = "<group>"; };
@@ -764,6 +816,15 @@
 		000000000000000000001280 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000001281 /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		00000000000000000000129A /* PhysiqueOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001614 /* WorkoutActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutActivityAttributes.swift"; sourceTree = "<group>"; };
+		000000000000000000001617 /* CompleteWorkoutSetIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CompleteWorkoutSetIntent.swift"; sourceTree = "<group>"; };
+		00000000000000000000161A /* WorkoutLiveActivityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityViews.swift"; sourceTree = "<group>"; };
+		00000000000000000000161D /* PhysiqueOSLiveActivityBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSLiveActivityBundle.swift"; sourceTree = "<group>"; };
+		00000000000000000000161F /* WorkoutLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutLiveActivityWidget.swift"; sourceTree = "<group>"; };
+		000000000000000000001621 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		000000000000000000001625 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		000000000000000000001627 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		000000000000000000001624 /* PhysiqueOSLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PhysiqueOSLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -786,6 +847,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		00000000000000000000162E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000001626 /* WidgetKit.framework in Frameworks */,
+				000000000000000000001628 /* SwiftUI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -875,6 +945,7 @@
 				0000000000000000000013B8 /* RecoverySleepScope.swift */,
 				000000000000000000001500 /* TrainingSessionState.swift */,
 				000000000000000000001502 /* TrainingSessionLiveProjection.swift */,
+				000000000000000000001600 /* WorkoutActivityContentMapper.swift */,
 			);
 			path = Contracts;
 			sourceTree = "<group>";
@@ -956,6 +1027,9 @@
 				0000000000000000000012CA /* HealthKitAutomaticSynchronizationCoordinator.swift */,
 				0000000000000000000013A8 /* RecoverySleepAPI.swift */,
 				000000000000000000001504 /* TrainingSessionAuthority.swift */,
+				000000000000000000001602 /* WorkoutLiveActivityClient.swift */,
+				000000000000000000001604 /* WorkoutLiveActivityCoordinator.swift */,
+				000000000000000000001606 /* WorkoutLiveActivityBridge.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -1236,6 +1310,7 @@
 			children = (
 				0000000000000000000011DB /* TrainingLoggerView.swift */,
 				0000000000000000000011DD /* TrainingLoggerViewModel.swift */,
+				000000000000000000001608 /* TrainingRestPreferenceMenu.swift */,
 			);
 			path = TrainingLogger;
 			sourceTree = "<group>";
@@ -1324,8 +1399,13 @@
 				0000000000000000000012EE /* PhotoInspectionViewerTests.swift */,
 				0000000000000000000013B4 /* RecoverySleepReadModelTests.swift */,
 				0000000000000000000013BC /* RecoverySleepPolishTests.swift */,
-				0000000000000000000013BE /* TrainingSessionAuthorityTests.swift */,
-				0000000000000000000013C0 /* TrainingSessionLiveProjectionTests.swift */,
+				000000000000000000001506 /* TrainingSessionAuthorityTests.swift */,
+				000000000000000000001508 /* TrainingSessionLiveProjectionTests.swift */,
+				00000000000000000000160A /* WorkoutLiveActivityContractTests.swift */,
+				00000000000000000000160C /* WorkoutLiveActivityCoordinatorTests.swift */,
+				00000000000000000000160E /* WorkoutLiveActivityIntentTests.swift */,
+				000000000000000000001610 /* WorkoutLiveActivityViewTests.swift */,
+				000000000000000000001612 /* TrainingRestPreferenceTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1346,6 +1426,7 @@
 				000000000000000000001280 /* PhysiqueOS.app */,
 				000000000000000000001281 /* PhysiqueOSTests.xctest */,
 				00000000000000000000129A /* PhysiqueOSUITests.xctest */,
+				000000000000000000001624 /* PhysiqueOSLiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1356,8 +1437,30 @@
 				00000000000000000000126A /* PhysiqueOS */,
 				00000000000000000000126B /* PhysiqueOSTests */,
 				00000000000000000000129B /* PhysiqueOSUITests */,
+				000000000000000000001622 /* PhysiqueOSShared */,
+				000000000000000000001623 /* PhysiqueOSLiveActivity */,
 				000000000000000000001269 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		000000000000000000001622 /* PhysiqueOSShared */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000001614 /* WorkoutActivityAttributes.swift */,
+				000000000000000000001617 /* CompleteWorkoutSetIntent.swift */,
+				00000000000000000000161A /* WorkoutLiveActivityViews.swift */,
+			);
+			path = PhysiqueOSShared;
+			sourceTree = "<group>";
+		};
+		000000000000000000001623 /* PhysiqueOSLiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				00000000000000000000161D /* PhysiqueOSLiveActivityBundle.swift */,
+				00000000000000000000161F /* WorkoutLiveActivityWidget.swift */,
+				000000000000000000001621 /* Info.plist */,
+			);
+			path = PhysiqueOSLiveActivity;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1370,10 +1473,12 @@
 				00000000000000000000128A /* Sources */,
 				00000000000000000000128B /* Frameworks */,
 				00000000000000000000128C /* Resources */,
+				000000000000000000001630 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				000000000000000000001632 /* PBXTargetDependency */,
 			);
 			name = PhysiqueOS;
 			productName = PhysiqueOS;
@@ -1416,6 +1521,23 @@
 			productReference = 00000000000000000000129A /* PhysiqueOSUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		000000000000000000001629 /* PhysiqueOSLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 00000000000000000000162A /* Build configuration list for PBXNativeTarget "PhysiqueOSLiveActivity" */;
+			buildPhases = (
+				00000000000000000000162D /* Sources */,
+				00000000000000000000162E /* Frameworks */,
+				00000000000000000000162F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PhysiqueOSLiveActivity;
+			productName = PhysiqueOSLiveActivity;
+			productReference = 000000000000000000001624 /* PhysiqueOSLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1437,6 +1559,9 @@
 						CreatedOnToolsVersion = 26.0;
 						TestTargetID = 000000000000000000001286;
 					};
+					000000000000000000001629 = {
+						CreatedOnToolsVersion = 27.0;
+					};
 				};
 			};
 			buildConfigurationList = 000000000000000000001283 /* Build configuration list for PBXProject "PhysiqueOS" */;
@@ -1455,6 +1580,7 @@
 				000000000000000000001286 /* PhysiqueOS */,
 				00000000000000000000128D /* PhysiqueOSTests */,
 				00000000000000000000129C /* PhysiqueOSUITests */,
+				000000000000000000001629 /* PhysiqueOSLiveActivity */,
 			);
 		};
 /* End PBXProject section */
@@ -1495,6 +1621,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0000000000000000000012A2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		00000000000000000000162F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -1788,6 +1921,14 @@
 				000000000000000000001501 /* TrainingSessionState.swift in Sources */,
 				000000000000000000001503 /* TrainingSessionLiveProjection.swift in Sources */,
 				000000000000000000001505 /* TrainingSessionAuthority.swift in Sources */,
+				000000000000000000001601 /* WorkoutActivityContentMapper.swift in Sources */,
+				000000000000000000001603 /* WorkoutLiveActivityClient.swift in Sources */,
+				000000000000000000001605 /* WorkoutLiveActivityCoordinator.swift in Sources */,
+				000000000000000000001607 /* WorkoutLiveActivityBridge.swift in Sources */,
+				000000000000000000001609 /* TrainingRestPreferenceMenu.swift in Sources */,
+				000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */,
+				000000000000000000001618 /* CompleteWorkoutSetIntent.swift in Sources */,
+				00000000000000000000161B /* WorkoutLiveActivityViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1855,8 +1996,13 @@
 				0000000000000000000012EF /* PhotoInspectionViewerTests.swift in Sources */,
 				0000000000000000000013B5 /* RecoverySleepReadModelTests.swift in Sources */,
 				0000000000000000000013BD /* RecoverySleepPolishTests.swift in Sources */,
-				0000000000000000000013BF /* TrainingSessionAuthorityTests.swift in Sources */,
-				0000000000000000000013C1 /* TrainingSessionLiveProjectionTests.swift in Sources */,
+				000000000000000000001507 /* TrainingSessionAuthorityTests.swift in Sources */,
+				000000000000000000001509 /* TrainingSessionLiveProjectionTests.swift in Sources */,
+				00000000000000000000160B /* WorkoutLiveActivityContractTests.swift in Sources */,
+				00000000000000000000160D /* WorkoutLiveActivityCoordinatorTests.swift in Sources */,
+				00000000000000000000160F /* WorkoutLiveActivityIntentTests.swift in Sources */,
+				000000000000000000001611 /* WorkoutLiveActivityViewTests.swift in Sources */,
+				000000000000000000001613 /* TrainingRestPreferenceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1867,6 +2013,18 @@
 				000000000000000000001297 /* TrainingAcceptanceUITests.swift in Sources */,
 				000000000000000000001299 /* GoalsAcceptanceUITests.swift in Sources */,
 				0000000000000000000013B7 /* RecoverySleepAcceptanceUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		00000000000000000000162D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000001616 /* WorkoutActivityAttributes.swift in Sources */,
+				000000000000000000001619 /* CompleteWorkoutSetIntent.swift in Sources */,
+				00000000000000000000161C /* WorkoutLiveActivityViews.swift in Sources */,
+				00000000000000000000161E /* PhysiqueOSLiveActivityBundle.swift in Sources */,
+				000000000000000000001620 /* WorkoutLiveActivityWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1882,6 +2040,11 @@
 			isa = PBXTargetDependency;
 			target = 000000000000000000001286 /* PhysiqueOS */;
 			targetProxy = 0000000000000000000012A4 /* PBXContainerItemProxy */;
+		};
+		000000000000000000001632 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000000001629 /* PhysiqueOSLiveActivity */;
+			targetProxy = 000000000000000000001633 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2124,6 +2287,56 @@
 			};
 			name = Release;
 		};
+		00000000000000000000162B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 76;
+				DEVELOPMENT_TEAM = 33GMTRM6G9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "PhysiqueOSLiveActivity/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Workout";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.physiqueos.native.dev.WorkoutActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		00000000000000000000162C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 76;
+				DEVELOPMENT_TEAM = 33GMTRM6G9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "PhysiqueOSLiveActivity/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Workout";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.physiqueos.native.dev.WorkoutActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -2159,6 +2372,15 @@
 			buildConfigurations = (
 				00000000000000000000129E /* Debug */,
 				00000000000000000000129F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		00000000000000000000162A /* Build configuration list for PBXNativeTarget "PhysiqueOSLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				00000000000000000000162B /* Debug */,
+				00000000000000000000162C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

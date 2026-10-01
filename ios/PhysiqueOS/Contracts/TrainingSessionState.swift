@@ -83,30 +83,72 @@ final class UnsetTrainingRestPreferences: TrainingRestPreferenceProviding {
     func restConfiguration(canonicalExerciseId: String?) -> TrainingRestConfiguration? { nil }
 }
 
-/// A global default persisted on device. It stays unset until a later
-/// Logger/Live Activity task adds the editor; nothing writes it today.
+/// The device-wide rest preference. Stopwatch until the user chooses
+/// otherwise (Founder decision); Countdown and Off stay selectable, and
+/// Countdown keeps its own duration. Observable so the Logger menu reflects
+/// it. A change applies to the *next* completed set: a rest interval that is
+/// already running keeps the mode it started with.
 @MainActor
+@Observable
 final class UserDefaultsTrainingRestPreferences: TrainingRestPreferenceProviding {
     static let globalKey = "physiqueos.trainingLogger.restPreference.global.v1"
-    private nonisolated(unsafe) let defaults: UserDefaults // UserDefaults is thread-safe
+    static let defaultConfiguration = TrainingRestConfiguration.stopwatch
+    static let defaultCountdownSeconds = 90
+    /// Offered Countdown lengths, in seconds.
+    static let countdownPresets = [30, 45, 60, 90, 120, 150, 180, 240, 300]
 
-    nonisolated init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+    @ObservationIgnored private let defaults: UserDefaults
+    /// The configuration in effect. Always valid: a Countdown without a
+    /// usable duration is never stored.
+    private(set) var configuration: TrainingRestConfiguration
+    /// The last Countdown length chosen, kept while Stopwatch or Off is selected
+    /// so switching back restores it.
+    private(set) var countdownSeconds: Int
 
-    var globalDefault: TrainingRestConfiguration? {
-        get {
-            guard let data = defaults.data(forKey: Self.globalKey) else { return nil }
-            return try? JSONDecoder().decode(TrainingRestConfiguration.self, from: data)
-        }
-        set {
-            guard let newValue, let data = try? JSONEncoder().encode(newValue) else {
-                defaults.removeObject(forKey: Self.globalKey)
-                return
-            }
-            defaults.set(data, forKey: Self.globalKey)
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let stored = defaults.data(forKey: Self.globalKey).flatMap { try? JSONDecoder().decode(TrainingRestConfiguration.self, from: $0) }
+        let resolved = stored.flatMap { $0.effectiveMode == $0.mode ? $0 : nil } ?? Self.defaultConfiguration
+        let remembered = (defaults.object(forKey: Self.globalKey + ".countdownSeconds") as? Int)
+            .flatMap { TrainingRestConfiguration.countdownDurationRange.contains($0) ? $0 : nil }
+        configuration = resolved
+        countdownSeconds = resolved.countdownDurationSeconds ?? remembered ?? Self.defaultCountdownSeconds
+    }
+
+    func select(_ mode: TrainingRestMode) {
+        switch mode {
+        case .stopwatch: apply(.stopwatch)
+        case .off: apply(.off)
+        case .countdown: apply(.countdown(seconds: countdownSeconds))
         }
     }
 
-    func restConfiguration(canonicalExerciseId: String?) -> TrainingRestConfiguration? { globalDefault }
+    func selectCountdown(seconds: Int) {
+        guard TrainingRestConfiguration.countdownDurationRange.contains(seconds) else { return }
+        countdownSeconds = seconds
+        defaults.set(seconds, forKey: Self.globalKey + ".countdownSeconds")
+        apply(.countdown(seconds: seconds))
+    }
+
+    private func apply(_ configuration: TrainingRestConfiguration) {
+        self.configuration = configuration
+        if let data = try? JSONEncoder().encode(configuration) { defaults.set(data, forKey: Self.globalKey) }
+    }
+
+    func restConfiguration(canonicalExerciseId: String?) -> TrainingRestConfiguration? { configuration }
+
+    /// "Stopwatch", "Countdown 1:30" or "Off".
+    var summary: String { Self.summary(for: configuration) }
+
+    static func summary(for configuration: TrainingRestConfiguration) -> String {
+        switch configuration.effectiveMode {
+        case .stopwatch: "Stopwatch"
+        case .off: "Off"
+        case .countdown: "Countdown \(clock(seconds: configuration.countdownDurationSeconds ?? 0))"
+        }
+    }
+
+    static func clock(seconds: Int) -> String { String(format: "%d:%02d", seconds / 60, seconds % 60) }
 }
 
 /// Fixed preference, for tests and previews.
@@ -247,6 +289,9 @@ struct TrainingSessionChange: Equatable, Sendable {
     enum Kind: Equatable, Sendable {
         case started
         case mutated
+        /// A Finish commit began or ended for this session (the revision is
+        /// unchanged; observers re-read `isSubmitting`).
+        case submission
         case ended(TrainingSessionEndReason)
     }
 

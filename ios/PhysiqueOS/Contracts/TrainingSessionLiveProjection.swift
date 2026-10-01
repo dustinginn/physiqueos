@@ -162,7 +162,6 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         let cursor = TrainingSessionCursor(draft: draft)
         let current = cursor.current()
         let upNext = current.flatMap { cursor.current(afterCompleting: $0) }
-        let currentExercise = current.map { draft.exercises[$0.exerciseIndex] }
         let incompleteInUnit = current.map { cursor.incompleteCount(inUnitOf: $0.exerciseIndex) } ?? 0
 
         let labels = draft.selectedAreaIds.map { areaLabels[$0] ?? PresentationLanguage.displayName(fromIdentifier: $0) }
@@ -230,7 +229,12 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
     /// The rows to render, in order, never more than two.
     var contextRows: [ContextRow] {
         func row(_ role: ContextRow.Role, _ set: SetCue?, _ exercise: ExerciseCue?) -> ContextRow? {
-            set.map { ContextRow(role: role, set: $0, exercise: exercise, isCompletionTarget: $0.setId == currentSet?.setId) }
+            set.map { cue in
+                ContextRow(
+                    role: role, set: cue, exercise: exercise,
+                    isCompletionTarget: cue.setId == currentSet?.setId && cue.exerciseId == currentSet?.exerciseId
+                )
+            }
         }
         let rows: [ContextRow?]
         switch contextLayout {
@@ -276,8 +280,8 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
 
     private static func exerciseCue(_ draft: TrainingLoggerDraft, _ index: Int) -> ExerciseCue {
         let exercise = draft.exercises[index]
-        let partner = draft.relationshipContext(for: exercise.id)?.partnerNames.first
         let unit = TrainingSessionCursor(draft: draft).unitMembers(ofExercise: index)
+        let partner = unit.first { $0 != index }.map { draft.exercises[$0].name }
         let letter = unit.count > 1 ? unit.firstIndex(of: index).map { String(UnicodeScalar(UInt8(65 + $0))) } : nil
         return ExerciseCue(
             exerciseId: exercise.id,
@@ -367,7 +371,7 @@ struct TrainingSessionCursor {
                     }
                 }
             }
-            unit.sort()
+            unit = Array(Set(unit)).sorted()
             unit.forEach { placed.insert($0) }
             units.append(unit)
         }
@@ -423,9 +427,14 @@ struct TrainingSessionCursor {
     /// (or overall when nothing is left).
     func previous(before current: Position?) -> Position? {
         if let anchor = anchor() { return anchor }
-        let ordered = units.flatMap { unit in
-            unit.flatMap { exerciseIndex in
+        // Round-interleaved inside a superset (A1 B1 A2 B2 ...), so the
+        // fallback alternates exactly like the live cursor does.
+        let ordered = units.flatMap { unit -> [Position] in
+            let positions = unit.flatMap { exerciseIndex in
                 draft.exercises[exerciseIndex].sets.indices.map { Position(exerciseIndex: exerciseIndex, setIndex: $0) }
+            }
+            return unit.count == 1 ? positions : positions.sorted {
+                $0.setIndex == $1.setIndex ? $0.exerciseIndex < $1.exerciseIndex : $0.setIndex < $1.setIndex
             }
         }
         let limit = current.flatMap { ordered.firstIndex(of: $0) } ?? ordered.count

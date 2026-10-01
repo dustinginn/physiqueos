@@ -33,7 +33,10 @@ final class TrainingSessionAuthority {
     /// Every saved draft for this authority, newest first (store order).
     private(set) var drafts: [TrainingLoggerDraft]
     /// The most recent accepted change.
-    private(set) var lastChange: TrainingSessionChange?
+    private(set) var lastChange: TrainingSessionChange? {
+        didSet { if let lastChange { observers.values.forEach { $0(lastChange) } } }
+    }
+    @ObservationIgnored private var observers: [UUID: @MainActor (TrainingSessionChange) -> Void] = [:]
 
     init(
         store: TrainingLoggerDraftStore,
@@ -54,6 +57,17 @@ final class TrainingSessionAuthority {
 
     func draft(id: String) -> TrainingLoggerDraft? {
         drafts.first { $0.id == id }
+    }
+
+    /// Calls `handler` synchronously after every accepted change (including
+    /// the end of a session) on the main actor, after memory and storage
+    /// agree. For projections such as the Live Activity coordinator, which
+    /// are write-only consumers and never mutate from the callback.
+    /// Cancel with the returned token.
+    func observeChanges(_ handler: @escaping @MainActor (TrainingSessionChange) -> Void) -> TrainingSessionObservation {
+        let id = UUID()
+        observers[id] = handler
+        return TrainingSessionObservation { [weak self] in self?.observers[id] = nil }
     }
 
     /// The live session the Log tab routes into (see
@@ -117,8 +131,20 @@ final class TrainingSessionAuthority {
 
     /// Returns `false` when a Finish for this session is already in flight
     /// (for example from another Logger screen); the caller must not commit.
-    func beginSubmission(sessionId: String) -> Bool { submittingSessionIds.insert(sessionId).inserted }
-    func endSubmission(sessionId: String) { submittingSessionIds.remove(sessionId) }
+    func beginSubmission(sessionId: String) -> Bool {
+        let inserted = submittingSessionIds.insert(sessionId).inserted
+        if inserted { announceSubmissionChange(sessionId) }
+        return inserted
+    }
+
+    func endSubmission(sessionId: String) {
+        if submittingSessionIds.remove(sessionId) != nil { announceSubmissionChange(sessionId) }
+    }
+
+    private func announceSubmissionChange(_ sessionId: String) {
+        guard let draft = draft(id: sessionId) else { return }
+        lastChange = .init(sessionId: sessionId, revision: draft.currentRevision, kind: .submission)
+    }
     func isSubmitting(sessionId: String) -> Bool { submittingSessionIds.contains(sessionId) }
 
     /// Removes a session: Cancel, discard of a saved draft, or durable
@@ -334,5 +360,43 @@ final class TrainingSessionAuthority {
             let left = sortKey($0), right = sortKey($1)
             return left == right ? $0.id < $1.id : left > right
         }
+    }
+}
+
+
+/// Cancels an `observeChanges` subscription. Releasing it does not cancel;
+/// call `cancel()` (or let the authority go away).
+@MainActor
+final class TrainingSessionObservation {
+    private var onCancel: (@MainActor () -> Void)?
+    init(onCancel: @escaping @MainActor () -> Void) { self.onCancel = onCancel }
+    func cancel() { onCancel?(); onCancel = nil }
+}
+
+extension TrainingSessionAuthority {
+    /// How long a live workout can be the Live Activity's subject, matching
+    /// the Log tab's "in progress" window.
+    static let liveActivityWindow = TrainingLoggerDraft.activeLiveSessionWindow
+
+    /// The session the Live Activity should represent: the newest live draft
+    /// that is at set entry, in review, or finishing, and not left or
+    /// complete. Planning (areas / exercise picking) has no sets to show, and
+    /// Save & Leave means "not now", so neither has an activity.
+    func liveActivitySubject(at now: Date) -> TrainingLoggerDraft? {
+        // Accepts both plain and fractional-second timestamps.
+        func started(_ draft: TrainingLoggerDraft) -> Date? { draft.startedAt.flatMap(TrainingSessionClock.date(from:)) }
+        return drafts
+            .filter { draft in
+                guard draft.mode == .live, draft.step != .complete, draft.leftAt == nil,
+                      let start = started(draft) else { return false }
+                let age = now.timeIntervalSince(start)
+                guard age >= -5 * 60, age <= Self.liveActivityWindow else { return false }
+                switch draft.step {
+                case .workout, .summary, .evidence, .review: return true
+                case .exercises: return draft.isAddingExercises
+                case .entry, .areas, .complete: return false
+                }
+            }
+            .max { (started($0) ?? .distantPast) < (started($1) ?? .distantPast) }
     }
 }

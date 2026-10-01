@@ -153,6 +153,23 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         return steps
     }
 
+    private func walkProjections(_ draft: TrainingLoggerDraft) throws -> [TrainingSessionLiveProjection] {
+        var draft = draft
+        var out: [TrainingSessionLiveProjection] = []
+        var tick = 600.0
+        for _ in 0..<64 {
+            let projection = try project(draft)
+            out.append(projection)
+            guard let target = projection.currentSet else { return out }
+            let exerciseIndex = draft.exercises.firstIndex { $0.id == target.exerciseId }!
+            let setIndex = draft.exercises[exerciseIndex].sets.firstIndex { $0.id == target.setId }!
+            draft.exercises[exerciseIndex].sets[setIndex].isCompleted = true
+            draft.exercises[exerciseIndex].sets[setIndex].completedAt = stamp(tick)
+            tick -= 10
+        }
+        return out
+    }
+
     private func superset(_ aSets: Int, _ bSets: Int, then tail: [TrainingLoggerDraftExercise] = [], before head: [TrainingLoggerDraftExercise] = []) -> TrainingLoggerDraft {
         let a = exercise("a", "Row", sets: (1...aSets).map { set("a\($0)", $0) })
         let b = exercise("b", "Curl", sets: (1...bSets).map { set("b\($0)", $0) })
@@ -187,7 +204,9 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         XCTAssertEqual(projection.currentExercise?.supersetPartnerName, "Row")
         XCTAssertEqual(projection.currentSet?.setNumber, 1, "B1 is round 1.")
         XCTAssertEqual(projection.previousExercise?.supersetLabel, "A")
-        XCTAssertNil(try project(session([exercise("c", "Press", sets: [set("c1", 1)])])).currentExercise?.supersetLabel)
+        let ordinary = try XCTUnwrap(try project(session([exercise("c", "Press", sets: [set("c1", 1)])])).currentExercise)
+        XCTAssertNil(ordinary.supersetLabel)
+        XCTAssertNil(ordinary.supersetPartnerName)
     }
 
     func testUnequalSupersetWithShortFirstMemberDoesNotShowCompletedMidRound() throws {
@@ -254,6 +273,62 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         ])
     }
 
+    func testMalformedSupersetRelationshipsStayDeterministic() throws {
+        // Duplicate member ids must not double-count the unit.
+        var duplicated = superset(2, 2, then: [ordinaryC])
+        duplicated.relationships = [.init(id: "ss", relationshipType: "superset", memberExerciseIds: ["b", "a", "b"])]
+        XCTAssertEqual(try walk(duplicated), try walk(superset(2, 2, then: [ordinaryC])))
+
+        // A missing partner is just an ordinary exercise.
+        var orphan = superset(2, 2, then: [ordinaryC])
+        orphan.relationships = [.init(id: "ss", relationshipType: "superset", memberExerciseIds: ["a", "ghost"])]
+        let first = try XCTUnwrap(try project(orphan).currentExercise)
+        XCTAssertNil(first.supersetLabel)
+        XCTAssertNil(first.supersetPartnerName)
+
+        // Overlapping relationships never produce a partner without a label.
+        var overlapping = superset(2, 2, then: [ordinaryC])
+        overlapping.relationships.append(.init(id: "ss2", relationshipType: "superset", memberExerciseIds: ["b", "c"]))
+        for step in try walkProjections(overlapping) {
+            for cue in [step.currentExercise, step.previousExercise, step.upNextExercise].compactMap({ $0 }) {
+                XCTAssertEqual(cue.supersetLabel == nil, cue.supersetPartnerName == nil)
+            }
+        }
+    }
+
+    func testSupersetWithoutTimestampsAlternatesInTheFallbackToo() throws {
+        var draft = superset(3, 3, then: [ordinaryC])
+        for exerciseIndex in 0..<2 { draft.exercises[exerciseIndex].sets[0].isCompleted = true } // a1, b1; no completedAt
+        var projection = try project(draft)
+        XCTAssertEqual(projection.currentSet?.setId, "a2")
+        XCTAssertEqual(projection.previousSet?.setId, "b1", "Previous is the round-interleaved predecessor, not a1.")
+        draft.exercises[0].sets[1].isCompleted = true // a2
+        projection = try project(draft)
+        XCTAssertEqual(projection.currentSet?.setId, "b2")
+        XCTAssertEqual(projection.previousSet?.setId, "a2")
+    }
+
+    func testZeroSetMemberDoesNotBreakTheUnit() throws {
+        var draft = superset(2, 1, then: [ordinaryC])
+        draft.exercises[1].sets = []
+        let steps = try walk(draft)
+        XCTAssertEqual(steps.first, "currentOnly [current:a1*]")
+        XCTAssertTrue(steps.contains { $0.hasPrefix("completedAndUpNext [completed:a2") })
+    }
+
+    func testCompletingAnEarlierUnitAfterALaterOneStartedStillTargetsTheOpenSet() throws {
+        // X(3 sets), Y(2), Z(2): a1, c1, a2, a3 completed in that order.
+        let draft = session([
+            exercise("a", "A", sets: [set("a1", 1, done: stamp(40)), set("a2", 2, done: stamp(20)), set("a3", 3, done: stamp(10))]),
+            exercise("c", "C", sets: [set("c1", 1, done: stamp(30)), set("c2", 2)]),
+            exercise("d", "D", sets: [set("d1", 1), set("d2", 2)]),
+        ])
+        let projection = try project(draft)
+        XCTAssertEqual(projection.currentSet?.setId, "c2")
+        XCTAssertEqual(projection.contextLayout, .currentAndUpNext, "Y was already started, so this is not the first set of the next unit.")
+        XCTAssertEqual(projection.contextRows.map(\.set.setId), ["c2", "d1"])
+    }
+
     func testSupersetOutOfOrderCompletionStillFollowsTheLowestRound() throws {
         var draft = superset(3, 3, then: [ordinaryC])
         for offset in 0..<2 {
@@ -271,7 +346,10 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         let encoded = String(decoding: try JSONEncoder().encode(redacted), as: UTF8.self)
         XCTAssertFalse(encoded.contains("Curl"))
         XCTAssertFalse(encoded.contains("Row"))
-        XCTAssertNil(redacted.currentExercise?.supersetLabel)
+        let redactedExercise = try XCTUnwrap(redacted.currentExercise)
+        XCTAssertNil(redactedExercise.supersetLabel)
+        XCTAssertNil(redactedExercise.supersetPartnerName)
+        XCTAssertEqual(try project(superset(2, 2, then: [ordinaryC])).currentExercise?.supersetPartnerName, "Curl", "Positive control: the unredacted projection carries the partner.")
     }
 
     func testFollowsTheFounderAfterOutOfOrderCompletion() throws {
@@ -364,6 +442,7 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
             return item
         }
         var draft = session(exercises)
+        draft.relationships = [.init(id: UUID().uuidString, relationshipType: "superset", memberExerciseIds: [exercises[0].id, exercises[1].id])]
         draft.selectedAreaIds = (0..<12).map { "area-\($0)-\(String(repeating: "y", count: 20))" }
         draft.rest = .init(id: "rest|\(UUID().uuidString)|2026-10-01T16:59:50.000Z", mode: .countdown, startedAt: stamp(10), endsAt: stamp(-80), durationSeconds: 90,
                            sourceExerciseId: exercises[0].id, sourceSetId: exercises[0].sets[0].id)

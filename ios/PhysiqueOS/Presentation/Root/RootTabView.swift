@@ -81,6 +81,23 @@ struct RootTabView: View {
         .task {
             consumeNotificationDestination()
         }
+        // Tapping the Workout Live Activity. Navigation only: the URL never
+        // mutates a workout, and the session must exist on this device.
+        .onOpenURL { openWorkoutFromLiveActivity($0) }
+    }
+
+    private func openWorkoutFromLiveActivity(_ url: URL) {
+        guard let sessionId = WorkoutActivityDeepLink.sessionId(from: url) else { return }
+        let authority = environment.trainingSessionAuthority(for: environment.nativeAuthority)
+        selectedTab = .log
+        Task { @MainActor in
+            await Task.yield()
+            logPath = NavigationPath()
+            guard authority.draft(id: sessionId) != nil else { return }
+            environment.pendingTrainingLoggerResumeDraftId = sessionId
+            noteNavigation(.trainingLogger)
+            logPath.append(AppDestination.trainingLogger)
+        }
     }
 
     /// External notification destinations open on Home's shared stack — it
