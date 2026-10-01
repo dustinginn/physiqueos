@@ -4,7 +4,7 @@
   "task": {
     "id": "healthkit-sleep-evidence-design-20260930",
     "title": "Design the HealthKit Sleep Evidence surface (design only, no strategic decisions)",
-    "status": "ready"
+    "status": "completed"
   },
   "target": {
     "agent": "claude",
@@ -29,5 +29,12 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_agent_retrieval": true
+  },
+  "lifecycle": {
+    "claimed_by": "claude",
+    "claimed_at_utc": null,
+    "completed_at_utc": "2026-10-01T03:27:26Z",
+    "completion_status": "completed",
+    "completion_handoff_path": "agent-handoffs/reports/20261001T032718Z-healthkit-sleep-evidence-design.md"
   }
 }

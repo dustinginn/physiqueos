@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Sleep historical shape validation: passed with one canonical defect (Oura duplicate copies); Evidence design GO (`healthkit-sleep-historical-shape-audit-and-evidence-handoff-20260930`)
+- Task: Sleep Evidence product design (Recovery stream): IA, screens, charts, states, v2 gating, future hooks (`healthkit-sleep-evidence-design-20260930`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-09-30T21:03:26Z
+- Generated (UTC): 2026-10-01T03:27:18Z
 - Success: true
 
-Summary: 2878 isolated validation samples verified (run hv-2026-10-01-30d, all in window, no duplicates, 0 ordinary Sleep rows, 0 leaks). Oura-only, 30/30 nights staged, Oura primary 30/30. Correctness checks pass; defect: Oura writes duplicate copies of 11/30 nights into one lane and sleep-canon-v1 blends them (asleep total within 2%, awake/deep/REM/core split distorted). Fix = sleep-canon-v2 within-lane copy resolution before stage minutes are used. Runner D0 anchor blocks any D0 other than 2026-10-01; relaxation proposed. Zero writes.
+Summary: Design-only: Sleep becomes the first real content of the existing Recovery Evidence stream. Selective landing (last night, 14-night total chart with 7-night average, sleep window consistency, recent nights, sources); deeper Trends and Night detail (hypnogram, stages, continuity, in-bed, additional sleep, provenance). Stage/continuity gated by read-model status so sleep-canon-v2 values plug in without layout change. No score, no strategic weighting; future Briefing Recovery card, foam rolling and V3 association principles recorded as hooks only. Smallest Slice 1 recommended.
 
-Detailed report: `agent-handoffs/reports/20260930T210326Z-healthkit-sleep-historical-shape-validation.md`
+Detailed report: `agent-handoffs/reports/20261001T032718Z-healthkit-sleep-evidence-design.md`
 
 Protocol: `agent-handoffs/README.md`
