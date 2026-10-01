@@ -353,6 +353,9 @@
 		0000000000000000000013AD /* SleepEvidenceCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013AC /* SleepEvidenceCharts.swift */; };
 		0000000000000000000013AF /* RecoverySleepViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013AE /* RecoverySleepViewModels.swift */; };
 		0000000000000000000013B1 /* RecoverySleepViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013B0 /* RecoverySleepViews.swift */; };
+		000000000000000000001501 /* TrainingSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001500 /* TrainingSessionState.swift */; };
+		000000000000000000001503 /* TrainingSessionLiveProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001502 /* TrainingSessionLiveProjection.swift */; };
+		000000000000000000001505 /* TrainingSessionAuthority.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001504 /* TrainingSessionAuthority.swift */; };
 		0000000000000000000012D1 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D0 /* HealthKitSynchronizationTests.swift */; };
 		0000000000000000000012D3 /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D2 /* HealthKitSleepIngestionTests.swift */; };
 		0000000000000000000012D5 /* HealthKitSleepHistoricalValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D4 /* HealthKitSleepHistoricalValidationTests.swift */; };
@@ -364,6 +367,8 @@
 		0000000000000000000012ED /* PeptideScreenPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012EC /* PeptideScreenPresentationTests.swift */; };
 		0000000000000000000012EF /* PhotoInspectionViewerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012EE /* PhotoInspectionViewerTests.swift */; };
 		0000000000000000000013B5 /* RecoverySleepReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013B4 /* RecoverySleepReadModelTests.swift */; };
+		000000000000000000001507 /* TrainingSessionAuthorityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001506 /* TrainingSessionAuthorityTests.swift */; };
+		000000000000000000001509 /* TrainingSessionLiveProjectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001508 /* TrainingSessionLiveProjectionTests.swift */; };
 		0000000000000000000012B3 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
 /* End PBXBuildFile section */
 
@@ -661,6 +666,9 @@
 		0000000000000000000013AC /* SleepEvidenceCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SleepEvidenceCharts.swift"; sourceTree = "<group>"; };
 		0000000000000000000013AE /* RecoverySleepViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepViewModels.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B0 /* RecoverySleepViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepViews.swift"; sourceTree = "<group>"; };
+		000000000000000000001500 /* TrainingSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionState.swift"; sourceTree = "<group>"; };
+		000000000000000000001502 /* TrainingSessionLiveProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionLiveProjection.swift"; sourceTree = "<group>"; };
+		000000000000000000001504 /* TrainingSessionAuthority.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionAuthority.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E7 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
@@ -741,6 +749,8 @@
 		0000000000000000000012EC /* PeptideScreenPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideScreenPresentationTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012EE /* PhotoInspectionViewerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoInspectionViewerTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B4 /* RecoverySleepReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepReadModelTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001506 /* TrainingSessionAuthorityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionAuthorityTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001508 /* TrainingSessionLiveProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionLiveProjectionTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001296 /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		000000000000000000001298 /* GoalsAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepAcceptanceUITests.swift"; sourceTree = "<group>"; };
@@ -856,6 +866,8 @@
 				0000000000000000000013A0 /* HealthKitSleepHistoricalEvidence.swift */,
 				0000000000000000000012DE /* DailyDriverLocalDay.swift */,
 				0000000000000000000013A6 /* RecoverySleepReadModel.swift */,
+				000000000000000000001500 /* TrainingSessionState.swift */,
+				000000000000000000001502 /* TrainingSessionLiveProjection.swift */,
 			);
 			path = Contracts;
 			sourceTree = "<group>";
@@ -936,6 +948,7 @@
 				0000000000000000000012C8 /* HealthKitFounderCanaryCoordinator.swift */,
 				0000000000000000000012CA /* HealthKitAutomaticSynchronizationCoordinator.swift */,
 				0000000000000000000013A8 /* RecoverySleepAPI.swift */,
+				000000000000000000001504 /* TrainingSessionAuthority.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -1302,6 +1315,8 @@
 				0000000000000000000012EC /* PeptideScreenPresentationTests.swift */,
 				0000000000000000000012EE /* PhotoInspectionViewerTests.swift */,
 				0000000000000000000013B4 /* RecoverySleepReadModelTests.swift */,
+				000000000000000000001506 /* TrainingSessionAuthorityTests.swift */,
+				000000000000000000001508 /* TrainingSessionLiveProjectionTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1759,6 +1774,9 @@
 				0000000000000000000013AD /* SleepEvidenceCharts.swift in Sources */,
 				0000000000000000000013AF /* RecoverySleepViewModels.swift in Sources */,
 				0000000000000000000013B1 /* RecoverySleepViews.swift in Sources */,
+				000000000000000000001501 /* TrainingSessionState.swift in Sources */,
+				000000000000000000001503 /* TrainingSessionLiveProjection.swift in Sources */,
+				000000000000000000001505 /* TrainingSessionAuthority.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1825,6 +1843,8 @@
 				0000000000000000000012ED /* PeptideScreenPresentationTests.swift in Sources */,
 				0000000000000000000012EF /* PhotoInspectionViewerTests.swift in Sources */,
 				0000000000000000000013B5 /* RecoverySleepReadModelTests.swift in Sources */,
+				000000000000000000001507 /* TrainingSessionAuthorityTests.swift in Sources */,
+				000000000000000000001509 /* TrainingSessionLiveProjectionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

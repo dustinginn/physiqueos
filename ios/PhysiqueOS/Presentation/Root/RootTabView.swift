@@ -123,7 +123,7 @@ struct RootTabView: View {
         let previous = selectedTab
         selectedTab = newTab
         guard newTab == .log, previous != .log, logPath.isEmpty,
-              let session = TrainingLoggerDraft.activeLiveSession(in: environment.trainingLoggerDraftStore.loadAll())
+              let session = environment.trainingSessionAuthority(for: environment.nativeAuthority).activeLiveSession()
         else { return }
         environment.pendingTrainingLoggerResumeDraftId = session.id
         noteNavigation(.trainingLogger)

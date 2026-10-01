@@ -12,15 +12,48 @@ final class TrainingLoggerViewModel {
     private let api: TrainingLoggerAPI
     private let writeAPI: TrainingWriteAPI
     private let catalogWriteAPI: TrainingExerciseCatalogWriteAPI
-    private let draftStore: TrainingLoggerDraftStore
+    /// The app-scoped owner of in-progress sessions. This view model only
+    /// selects a session and commands it; it never holds its own mutable
+    /// copy, so nothing it writes can overwrite a newer change (for example
+    /// a future Live Activity intent).
+    let sessionAuthority: TrainingSessionAuthority
     private let attachmentStore: TrainingLoggerAttachmentStore
     let authority: NativeAPIEnvironment
     private let now: @Sendable () -> Date
 
     var loadState: LoadState = .loading
     var configuration: TrainingLoggerConfiguration?
-    var draft: TrainingLoggerDraft?
-    var savedDrafts: [TrainingLoggerDraft] = []
+    /// The session this screen shows, by identity.
+    private var selectedDraftId: String?
+    /// A finished workout shown on Workout Complete. It no longer exists in
+    /// the authority (the Server owns it after a durable commit).
+    private var completedDraft: TrainingLoggerDraft?
+
+    /// The selected session as the authority currently holds it.
+    /// Assigning is a compatibility path: `nil` deselects; a draft is
+    /// written through the authority as a whole-draft replacement.
+    var draft: TrainingLoggerDraft? {
+        get {
+            if let completedDraft { return completedDraft }
+            return selectedDraftId.flatMap { sessionAuthority.draft(id: $0) }
+        }
+        set {
+            completedDraft = nil
+            guard let newValue else {
+                selectedDraftId = nil
+                return
+            }
+            guard newValue.step != .complete else {
+                completedDraft = newValue
+                selectedDraftId = newValue.id
+                return
+            }
+            selectedDraftId = newValue.id
+            noteRejection(sessionAuthority.replace(newValue))
+        }
+    }
+
+    var savedDrafts: [TrainingLoggerDraft] { canWrite ? sessionAuthority.drafts : [] }
     /// Canonical performance records the just-completed session established,
     /// as reported by the Server. Empty when there are none or they are not
     /// known; Native never computes them.
@@ -57,7 +90,8 @@ final class TrainingLoggerViewModel {
         api: TrainingLoggerAPI,
         writeAPI: TrainingWriteAPI = NotAvailableTrainingWriteAPI(),
         catalogWriteAPI: TrainingExerciseCatalogWriteAPI = NotAvailableTrainingExerciseCatalogWriteAPI(),
-        draftStore: TrainingLoggerDraftStore,
+        draftStore: TrainingLoggerDraftStore? = nil,
+        sessionAuthority: TrainingSessionAuthority? = nil,
         attachmentStore: TrainingLoggerAttachmentStore = FileTrainingLoggerAttachmentStore(),
         authority: NativeAPIEnvironment = .sandbox,
         durabilityRecoveryMaxAttempts: Int = 30,
@@ -67,7 +101,12 @@ final class TrainingLoggerViewModel {
         self.api = api
         self.writeAPI = writeAPI
         self.catalogWriteAPI = catalogWriteAPI
-        self.draftStore = draftStore
+        // The app passes its app-scoped authority. A bare store (tests,
+        // previews) gets a private authority over that store, which is what
+        // a fresh process does on relaunch.
+        self.sessionAuthority = sessionAuthority ?? TrainingSessionAuthority(
+            store: draftStore ?? MemoryTrainingLoggerDraftStore(), environment: authority, now: now
+        )
         self.attachmentStore = attachmentStore
         self.authority = authority
         self.durabilityRecoveryMaxAttempts = durabilityRecoveryMaxAttempts
@@ -79,9 +118,8 @@ final class TrainingLoggerViewModel {
         guard configuration == nil else { return }
         do {
             configuration = try await api.fetchConfiguration()
-            savedDrafts = canWrite ? draftStore.loadAll() : []
+            if canWrite { sessionAuthority.reloadFromStore() }
             if authority == .founderProduction {
-                var remaining: [TrainingLoggerDraft] = []
                 var recoveredCompletions: [TrainingLoggerDraft] = []
                 for candidate in savedDrafts {
                     if await writeAPI.isDraftAlreadyDurable(candidate) {
@@ -99,21 +137,18 @@ final class TrainingLoggerViewModel {
                                 await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
                             }
                         }
-                        draftStore.discard(id: candidate.id)
+                        sessionAuthority.endSession(sessionId: candidate.id, reason: .committed)
                         recoveredCompletions.append(candidate)
-                    } else {
-                        remaining.append(candidate)
-                        if candidate.submissionState != nil {
-                            scheduleDurabilityRecovery(for: candidate)
-                        }
+                    } else if candidate.submissionState != nil {
+                        scheduleDurabilityRecovery(for: candidate)
                     }
                 }
-                savedDrafts = Self.sortDrafts(remaining)
-                if let recovered = Self.sortDrafts(recoveredCompletions).first {
+                if let recovered = TrainingSessionAuthority.sorted(recoveredCompletions).first {
                     var completed = recovered
                     completed.step = .complete
                     completed.submissionState = nil
-                    draft = completed
+                    completedDraft = completed
+                    selectedDraftId = completed.id
                     completedPerformanceRecords = []
                     processingMessage = nil
                     loadCompletedPerformanceRecords(for: completed, commitResult: nil)
@@ -130,9 +165,9 @@ final class TrainingLoggerViewModel {
         let workoutDate = Self.dateKey(date)
         let startedAt = mode == .live ? ISO8601DateFormatter().string(from: date) : nil
         completedPerformanceRecords = []
-        draft = .fresh(mode: mode, workoutDate: workoutDate, startedAt: startedAt)
+        completedDraft = nil
+        selectedDraftId = sessionAuthority.startSession(mode: mode, workoutDate: workoutDate, startedAt: startedAt)?.id
         validationMessage = nil
-        persist()
     }
 
     func resume() {
@@ -143,8 +178,13 @@ final class TrainingLoggerViewModel {
     func resume(draftId: String) {
         guard canWrite else { return }
         completedPerformanceRecords = []
-        draft = savedDrafts.first { $0.id == draftId }
-        draft?.leftAt = nil
+        completedDraft = nil
+        guard sessionAuthority.draft(id: draftId) != nil else {
+            selectedDraftId = nil
+            return
+        }
+        selectedDraftId = draftId
+        noteRejection(sessionAuthority.resume(sessionId: draftId))
         if draft?.supportingEvidenceAssets.isEmpty == false,
            draft?.supportingWorkouts == nil {
             update { $0.addSupportingEvidence([]) }
@@ -161,8 +201,7 @@ final class TrainingLoggerViewModel {
         guard canWrite else { return }
         guard savedDrafts.contains(where: { $0.id == draftId }) else { return }
         attachmentStore.removeAll(draftId: draftId)
-        draftStore.discard(id: draftId)
-        savedDrafts.removeAll { $0.id == draftId }
+        sessionAuthority.endSession(sessionId: draftId, reason: .discarded)
         if draft?.id == draftId { draft = nil }
     }
 
@@ -170,21 +209,46 @@ final class TrainingLoggerViewModel {
         guard canWrite else { return }
         if let draftId = draft?.id {
             attachmentStore.removeAll(draftId: draftId)
-            draftStore.discard(id: draftId)
-            savedDrafts.removeAll { $0.id == draftId }
+            sessionAuthority.endSession(sessionId: draftId, reason: .cancelled)
         }
         draft = nil
         completedPerformanceRecords = []
         validationMessage = nil
     }
 
+    /// Structural Logger edit, applied by the authority to its current
+    /// draft (never to a copy held here).
     func update(_ mutation: (inout TrainingLoggerDraft) -> Void) {
-        guard canWrite else { return }
-        guard var draft else { return }
-        mutation(&draft)
-        self.draft = draft
+        guard canWrite, completedDraft == nil, let selectedDraftId,
+              sessionAuthority.draft(id: selectedDraftId) != nil else { return }
         validationMessage = nil
-        persist()
+        noteRejection(sessionAuthority.edit(sessionId: selectedDraftId, mutation))
+    }
+
+    /// Set-row checkmark. `completed` is the end state the row asked for,
+    /// so a tap rendered before a newer change cannot invert it.
+    func setCompletion(exerciseId: String, setId: String, completed: Bool) {
+        guard canWrite, completedDraft == nil, let selectedDraftId else { return }
+        validationMessage = nil
+        noteRejection(sessionAuthority.setCompletion(
+            sessionId: selectedDraftId, exerciseId: exerciseId, setId: setId, completed: completed
+        ))
+    }
+
+    func setValue(exerciseId: String, setId: String, field: TrainingSessionSetField, value: Double?) {
+        guard canWrite, completedDraft == nil, let selectedDraftId else { return }
+        validationMessage = nil
+        noteRejection(sessionAuthority.setValue(
+            sessionId: selectedDraftId, exerciseId: exerciseId, setId: setId, field: field, value: value
+        ))
+    }
+
+    /// Only a failed device write is worth telling the Founder about; the
+    /// screen already reflects authoritative state for every other outcome.
+    private func noteRejection(_ outcome: TrainingSessionMutationOutcome) {
+        if outcome == .rejected(.persistenceFailed) {
+            validationMessage = "This change couldn't be saved on this device. Try again."
+        }
     }
 
     func go(to step: TrainingLoggerStep) {
@@ -231,7 +295,8 @@ final class TrainingLoggerViewModel {
         guard canWrite else { return }
         guard var draft else { return }
         draft.step = .complete
-        self.draft = draft
+        completedDraft = draft
+        selectedDraftId = draft.id
         // When supporting evidence is attached, its files stay on disk until
         // `reconcileSupportingEvidenceAfterCommit` (running in the
         // background, after this returns) has read them — it owns deleting
@@ -240,15 +305,17 @@ final class TrainingLoggerViewModel {
         if draft.supportingEvidenceAssets.isEmpty {
             attachmentStore.removeAll(draftId: draft.id)
         }
-        draftStore.discard(id: draft.id)
-        savedDrafts.removeAll { $0.id == draft.id }
+        sessionAuthority.endSession(sessionId: draft.id, reason: .committed)
     }
 
     func submit() async {
-        guard canWrite, draft != nil, !isSubmitting else { return }
-        if draft?.mode == .live, draft?.finishedAt == nil {
-            let finishedAt = ISO8601DateFormatter().string(from: now())
-            update { $0.finishedAt = finishedAt }
+        guard canWrite, completedDraft == nil, let sessionId = draft?.id, !isSubmitting else { return }
+        if draft?.mode == .live {
+            // Stamps `finishedAt` only the first time; always ends rest.
+            if draft?.finishedAt == nil { validationMessage = nil }
+            noteRejection(sessionAuthority.markFinishing(
+                sessionId: sessionId, finishedAt: ISO8601DateFormatter().string(from: now())
+            ))
         }
         guard let submittedDraft = draft else { return }
         guard authority == .founderProduction else {
@@ -256,9 +323,13 @@ final class TrainingLoggerViewModel {
             return
         }
         isSubmitting = true
+        sessionAuthority.beginSubmission(sessionId: sessionId)
         validationMessage = nil
         refreshWarning = nil
-        defer { isSubmitting = false }
+        defer {
+            isSubmitting = false
+            sessionAuthority.endSubmission(sessionId: sessionId)
+        }
         let committed: TrainingCommitResult
         do {
             let result = try await writeAPI.commit(submittedDraft)
@@ -266,7 +337,7 @@ final class TrainingLoggerViewModel {
             guard result.isDurable else {
                 let state: TrainingLoggerSubmissionState = result.status == "accepted_processing"
                     ? .acceptedProcessing : .resultUnknown
-                update { $0.submissionState = state }
+                sessionAuthority.setSubmissionState(sessionId: sessionId, state)
                 processingMessage = state == .acceptedProcessing
                     ? "Finishing workout… PhysiqueOS has accepted it. You can safely leave while it finishes."
                     : "Checking workout… Keep this saved draft while PhysiqueOS verifies the result. You do not need to retry."
@@ -340,13 +411,13 @@ final class TrainingLoggerViewModel {
         if candidate.supportingEvidenceAssets.isEmpty {
             attachmentStore.removeAll(draftId: candidate.id)
         }
-        draftStore.discard(id: candidate.id)
-        savedDrafts.removeAll { $0.id == candidate.id }
-        if draft?.id == candidate.id {
+        sessionAuthority.endSession(sessionId: candidate.id, reason: .committed)
+        if draft?.id == candidate.id || selectedDraftId == candidate.id {
             var completed = candidate
             completed.step = .complete
             completed.submissionState = nil
-            draft = completed
+            completedDraft = completed
+            selectedDraftId = completed.id
             completedPerformanceRecords = []
             processingMessage = nil
             loadCompletedPerformanceRecords(for: candidate, commitResult: commitResult)
@@ -358,9 +429,11 @@ final class TrainingLoggerViewModel {
 
     /// Save & Leave: keep the workout, and stop the Log tab routing into it.
     func saveAndLeave() {
-        guard canWrite, draft != nil, draft?.step != .complete else { return }
-        draft?.leftAt = ISO8601DateFormatter().string(from: now())
-        persist()
+        guard canWrite, completedDraft == nil, let selectedDraftId,
+              sessionAuthority.draft(id: selectedDraftId) != nil else { return }
+        noteRejection(sessionAuthority.saveAndLeave(
+            sessionId: selectedDraftId, leftAt: ISO8601DateFormatter().string(from: now())
+        ))
     }
 
     /// Uses only the authoritative commit/read contract. The draft identity
@@ -388,14 +461,10 @@ final class TrainingLoggerViewModel {
         completedPerformanceRecords = records
     }
 
-    func persist() {
-        guard canWrite else { return }
-        guard let draft, draft.step != .complete else { return }
-        draftStore.save(draft)
-        savedDrafts.removeAll { $0.id == draft.id }
-        savedDrafts.append(draft)
-        savedDrafts = Self.sortDrafts(savedDrafts)
-    }
+    /// Every accepted mutation is already durable when the authority
+    /// publishes it, so there is nothing left to flush. Kept for the view's
+    /// `onDisappear` hook and older call sites; it never writes.
+    func persist() {}
 
     var availableCategorySuggestion: TrainingLoggerCategorySuggestion? {
         guard let draft, let suggestion = configuration?.categorySuggestion,
@@ -486,14 +555,6 @@ final class TrainingLoggerViewModel {
         var date: String
         var time: String?
         var detail: String
-    }
-
-    private static func sortDrafts(_ drafts: [TrainingLoggerDraft]) -> [TrainingLoggerDraft] {
-        drafts.sorted {
-            let left = $0.startedAt ?? $0.workoutDate
-            let right = $1.startedAt ?? $1.workoutDate
-            return left == right ? $0.id < $1.id : left > right
-        }
     }
 
     private static func displayDate(_ value: String) -> String {

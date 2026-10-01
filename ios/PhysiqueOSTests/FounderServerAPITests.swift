@@ -4871,6 +4871,66 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(bodyweightSets[2]["unit"] as? String, "bodyweight")
     }
 
+    /// Session-local authority state (revision, mutation ledger, rest, rest
+    /// override, per-set completedAt) never reaches the commit: the payload
+    /// and the idempotency signature are byte-identical with and without it.
+    func testProductionTrainingCommitIgnoresSessionAuthorityLocalState() async throws {
+        let result = #"{"status":"confirmation_requested","reviewId":"review-1","reviewRevision":1,"sessionId":"native-session-local","intendedDate":"2026-10-01","exerciseIds":["barbell_bench_press"]}"#
+        let durable = #"{"outcome":"committed","receipt":{"status":"committed","result":"# + result + #", "operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"},"confirmation":{"state":"processing","accepted":true,"reviewId":"review-1","continuationKey":"continuation","completedStep":"canonical_commit","trainingSessionDurable":true,"publication":null}}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, durable),
+            .json(200, durable),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let writeAPI = ProductionTrainingWriteAPI(
+            api: api, reviewAPI: NotAvailableEvidenceReviewAPI(),
+            idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()),
+            durabilityRetryDelay: .zero
+        )
+        var plain = TrainingLoggerDraft(
+            id: "native-session-local", mode: .live, workoutDate: "2026-10-01", selectedAreaIds: ["chest"],
+            exercises: [TrainingLoggerDraftExercise(
+                id: "occurrence-1", canonicalExerciseId: "barbell_bench_press", name: "Barbell Bench Press",
+                areaId: "chest", measurement: .repsLoad, executionVariant: nil,
+                sets: [
+                    TrainingLoggerDraftSet(id: "set-1", setNumber: 1, reps: 8, load: 185, durationSeconds: nil, isCompleted: true),
+                    TrainingLoggerDraftSet(id: "set-2", setNumber: 2, reps: 8, load: 185, durationSeconds: nil, isCompleted: false),
+                ],
+                previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
+                isProvisional: false, provenance: nil
+            )],
+            relationships: [], step: .review, exercisePickerReturnStep: nil,
+            exercisePickerExistingExerciseIds: nil, supportingEvidence: nil, supportingWorkouts: nil,
+            supportingWorkoutFailureAssetIds: nil
+        )
+        plain.startedAt = "2026-10-01T16:00:00Z"
+        plain.finishedAt = "2026-10-01T17:00:00Z"
+        var local = plain
+        local.revision = 42
+        local.appliedMutationIds = ["intent-1", "intent-2"]
+        local.restConfiguration = .countdown(seconds: 90)
+        local.rest = .init(id: "rest|set-1|x", mode: .countdown, startedAt: "2026-10-01T16:30:00.000Z",
+                           endsAt: "2026-10-01T16:31:30.000Z", durationSeconds: 90, sourceExerciseId: "occurrence-1", sourceSetId: "set-1")
+        local.exercises[0].sets[0].completedAt = "2026-10-01T16:30:00.000Z"
+
+        _ = try await writeAPI.commit(plain)
+        _ = try await writeAPI.commit(local)
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 3)
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[2].value(forHTTPHeaderField: "Idempotency-Key"),
+                       "Same signature, so the same idempotency identity.")
+        let first = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
+        let second = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[2].httpBody)) as? [String: Any])
+        XCTAssertEqual(first["payload"] as? NSDictionary, second["payload"] as? NSDictionary)
+        let body = String(decoding: try XCTUnwrap(requests[2].httpBody), as: UTF8.self)
+        for localOnly in ["completedAt", "revision", "appliedMutationIds", "restConfiguration", "\"rest\""] {
+            XCTAssertFalse(body.contains(localOnly), "\(localOnly) must stay on device")
+        }
+    }
+
     func testProductionTrainingCommitRecoversLostAcknowledgementWithSameIdempotencyKey() async throws {
         let readback = productionEnvelope(resource: "training-session", data: #"{"id":"training|authoritative|training_logger_draft_native-session-lost-ack","label":"Traditional Strength Training","value":"Shoulders · 1 exercise","detail":"","date":"2026-09-15","sourceEvidence":[],"exercises":[{"id":"occurrence-1","name":"Shoulder Press Machine","canonicalExerciseId":"shoulder_press_machine","executionVariant":null,"sets":[{"setNumber":1,"reps":8,"weight":100,"weightUnit":"lb","durationSeconds":null,"loadType":"external_load","setType":null}]}],"exerciseRelationshipGroups":[]}"#)
         let transport = SequencedFounderTransport([

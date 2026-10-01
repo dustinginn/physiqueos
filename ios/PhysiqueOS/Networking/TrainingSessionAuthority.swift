@@ -1,0 +1,323 @@
+import Foundation
+import Observation
+
+/// App-scoped owner of the Workout Logger's in-progress sessions for one
+/// Native authority (Sandbox or Founder Production).
+///
+/// The persisted `TrainingLoggerDraftStore` stays the durable record; this
+/// object is its only writer. It holds the authoritative in-memory copy,
+/// applies every mutation to that copy on the main actor (so mutations are
+/// serialized and none is computed from a stale snapshot), writes the result
+/// through the store, and only then publishes it. `TrainingLoggerViewModel`
+/// renders and commands this state; a future LiveActivityIntent uses the
+/// same typed operations (`completeSet`, `endRest`) with a mutation id and
+/// expected revision.
+///
+/// The Server stays authoritative only after a durable Finish
+/// (`TrainingWriteAPI.commit`), which this type does not perform.
+@MainActor
+@Observable
+final class TrainingSessionAuthority {
+    let environment: NativeAPIEnvironment
+    @ObservationIgnored private let store: TrainingLoggerDraftStore
+    @ObservationIgnored private let restPreferences: TrainingRestPreferenceProviding
+    @ObservationIgnored private let now: @Sendable () -> Date
+    /// Sessions whose Finish commit is in flight. Non-UI origins cannot
+    /// change them meanwhile, so the committed payload and the local draft
+    /// cannot diverge underneath the request.
+    @ObservationIgnored private var submittingSessionIds: Set<String> = []
+
+    /// Every saved draft for this authority, newest first (store order).
+    private(set) var drafts: [TrainingLoggerDraft]
+    /// The most recent accepted change.
+    private(set) var lastChange: TrainingSessionChange?
+
+    init(
+        store: TrainingLoggerDraftStore,
+        environment: NativeAPIEnvironment,
+        restPreferences: TrainingRestPreferenceProviding = UnsetTrainingRestPreferences(),
+        now: @escaping @Sendable () -> Date = Date.init
+    ) {
+        self.store = store
+        self.environment = environment
+        self.restPreferences = restPreferences
+        self.now = now
+        self.drafts = Self.sorted(store.loadAll())
+    }
+
+    var canWrite: Bool {
+        (try? NativeProductWriteGuard.authorize(.workoutLogger, in: environment)) != nil
+    }
+
+    func draft(id: String) -> TrainingLoggerDraft? {
+        drafts.first { $0.id == id }
+    }
+
+    /// The live session the Log tab routes into (see
+    /// `TrainingLoggerDraft.activeLiveSession`).
+    func activeLiveSession(at date: Date? = nil) -> TrainingLoggerDraft? {
+        TrainingLoggerDraft.activeLiveSession(in: drafts, now: date ?? now())
+    }
+
+    /// Re-reads the store. Memory already equals storage because every
+    /// accepted mutation is written before it is published; this only picks
+    /// up writes made outside the authority (older call sites, tests).
+    func reloadFromStore() {
+        let stored = Self.sorted(store.loadAll())
+        if stored != drafts { drafts = stored }
+    }
+
+    // MARK: - Lifecycle
+
+    /// Starts a new draft with its own identity. Existing drafts are never
+    /// touched (multiple drafts are allowed by design).
+    @discardableResult
+    func startSession(mode: TrainingLoggerMode, workoutDate: String, startedAt: String?) -> TrainingLoggerDraft? {
+        guard canWrite else { return nil }
+        var draft = TrainingLoggerDraft.fresh(mode: mode, workoutDate: workoutDate, startedAt: startedAt)
+        draft.revision = 1
+        do { try store.persist(draft) } catch { return nil }
+        drafts = Self.sorted(drafts + [draft])
+        lastChange = .init(sessionId: draft.id, revision: 1, kind: .started)
+        return draft
+    }
+
+    /// Resume makes a left draft the in-progress workout again.
+    @discardableResult
+    func resume(sessionId: String) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { $0.leftAt = nil }
+    }
+
+    /// Save & Leave: keep the draft, stop Log-tab routing into it, end rest.
+    @discardableResult
+    func saveAndLeave(sessionId: String, leftAt: String) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { draft in
+            draft.leftAt = leftAt
+            draft.rest = nil
+        }
+    }
+
+    /// Finish pressed: stamp `finishedAt` once (persisted before the commit
+    /// so retries keep one session window) and end rest.
+    @discardableResult
+    func markFinishing(sessionId: String, finishedAt: String) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { draft in
+            if draft.mode == .live, draft.finishedAt == nil { draft.finishedAt = finishedAt }
+            draft.rest = nil
+        }
+    }
+
+    @discardableResult
+    func setSubmissionState(sessionId: String, _ state: TrainingLoggerSubmissionState?) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: .system, scope: .lifecycle) { $0.submissionState = state }
+    }
+
+    func beginSubmission(sessionId: String) { submittingSessionIds.insert(sessionId) }
+    func endSubmission(sessionId: String) { submittingSessionIds.remove(sessionId) }
+    func isSubmitting(sessionId: String) -> Bool { submittingSessionIds.contains(sessionId) }
+
+    /// Removes a session: Cancel, discard of a saved draft, or durable
+    /// commit. Attachment files are the caller's concern.
+    @discardableResult
+    func endSession(sessionId: String, reason: TrainingSessionEndReason) -> TrainingSessionMutationOutcome {
+        guard canWrite else { return .rejected(.writesNotAuthorized) }
+        guard let existing = draft(id: sessionId) else { return .rejected(.sessionNotFound) }
+        store.discard(id: sessionId)
+        submittingSessionIds.remove(sessionId)
+        drafts.removeAll { $0.id == sessionId }
+        lastChange = .init(sessionId: sessionId, revision: existing.currentRevision, kind: .ended(reason))
+        return .applied(revision: existing.currentRevision)
+    }
+
+    // MARK: - Set operations
+
+    /// Completes one exact set. Idempotent: an already-complete set is
+    /// `.unchanged` and keeps its `completedAt` and rest. The set must belong
+    /// to the named exercise in the named session. An `.intent` caller may
+    /// only complete a set whose entered values are valid, on an in-progress
+    /// live session at set entry.
+    @discardableResult
+    func completeSet(
+        sessionId: String, exerciseId: String, setId: String,
+        context: TrainingSessionMutationContext = .ui
+    ) -> TrainingSessionMutationOutcome {
+        setCompletion(sessionId: sessionId, exerciseId: exerciseId, setId: setId, completed: true, context: context)
+    }
+
+    /// Sets a set's completion to an explicit end state (never a toggle, so
+    /// a tap rendered from older state cannot invert a newer change).
+    @discardableResult
+    func setCompletion(
+        sessionId: String, exerciseId: String, setId: String, completed: Bool,
+        context: TrainingSessionMutationContext = .ui
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .content) { draft in
+            let (exerciseIndex, setIndex) = try Self.locate(exerciseId: exerciseId, setId: setId, in: draft)
+            if completed, context.origin == .intent, !draft.exercises[exerciseIndex].sets[setIndex].isCompleted {
+                let exercise = draft.exercises[exerciseIndex]
+                if exercise.sets[setIndex].validationMessage(for: exercise.measurement) != nil {
+                    throw TrainingSessionMutationRejection.setValuesIncomplete
+                }
+            }
+            draft.exercises[exerciseIndex].sets[setIndex].isCompleted = completed
+        }
+    }
+
+    @discardableResult
+    func setValue(
+        sessionId: String, exerciseId: String, setId: String,
+        field: TrainingSessionSetField, value: Double?,
+        context: TrainingSessionMutationContext = .ui
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .content) { draft in
+            let (exerciseIndex, setIndex) = try Self.locate(exerciseId: exerciseId, setId: setId, in: draft)
+            draft.exercises[exerciseIndex].sets[setIndex][keyPath: field.keyPath] = value
+        }
+    }
+
+    // MARK: - Rest
+
+    /// Ends the named rest interval. Ending a rest that already ended is
+    /// `.unchanged`; naming a different (replaced) rest is refused.
+    @discardableResult
+    func endRest(sessionId: String, restId: String, context: TrainingSessionMutationContext = .ui) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .content) { draft in
+            guard let rest = draft.rest else { return }
+            guard rest.id == restId else { throw TrainingSessionMutationRejection.restNotFound }
+            draft.rest = nil
+        }
+    }
+
+    /// Session-level rest override (`nil` = follow preferences). Applies to
+    /// the next completion; an interval already running is left as started.
+    @discardableResult
+    func setRestConfiguration(
+        sessionId: String, _ configuration: TrainingRestConfiguration?,
+        context: TrainingSessionMutationContext = .ui
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .content) { $0.restConfiguration = configuration }
+    }
+
+    /// Effective rest configuration for a set of this exercise: session
+    /// override, then exercise/global preference, then Off.
+    func restConfiguration(for exercise: TrainingLoggerDraftExercise, in draft: TrainingLoggerDraft) -> TrainingRestConfiguration {
+        draft.restConfiguration
+            ?? restPreferences.restConfiguration(canonicalExerciseId: exercise.canonicalExerciseId)
+            ?? .off
+    }
+
+    // MARK: - Structural edits (UI only)
+
+    /// General Logger edit (exercise list, variants, supersets, evidence,
+    /// areas, step navigation) applied to the authoritative current draft,
+    /// never to a caller's copy. UI origin only: other origins must use the
+    /// typed operations above.
+    @discardableResult
+    func edit(
+        sessionId: String, context: TrainingSessionMutationContext = .ui,
+        _ transform: (inout TrainingLoggerDraft) -> Void
+    ) -> TrainingSessionMutationOutcome {
+        guard context.origin == .ui else { return .rejected(.originNotPermitted) }
+        return mutate(sessionId: sessionId, context: context, scope: .content) { transform(&$0) }
+    }
+
+    /// Whole-draft replacement kept for older call sites (`viewModel.draft =`).
+    /// Identity, revision, and invariants still come from the authority.
+    @discardableResult
+    func replace(_ replacement: TrainingLoggerDraft) -> TrainingSessionMutationOutcome {
+        guard canWrite else { return .rejected(.writesNotAuthorized) }
+        guard draft(id: replacement.id) != nil else {
+            var inserted = replacement
+            inserted.revision = max(1, replacement.currentRevision)
+            do { try store.persist(inserted) } catch { return .rejected(.persistenceFailed) }
+            drafts = Self.sorted(drafts + [inserted])
+            lastChange = .init(sessionId: inserted.id, revision: inserted.currentRevision, kind: .started)
+            return .applied(revision: inserted.currentRevision)
+        }
+        return edit(sessionId: replacement.id) { draft in
+            let revision = draft.revision, ledger = draft.appliedMutationIds
+            draft = replacement
+            draft.revision = revision
+            draft.appliedMutationIds = ledger
+        }
+    }
+
+    // MARK: - Core
+
+    private enum Scope {
+        /// Workout content; refused for non-UI origins unless the session is
+        /// externally mutable and no Finish is in flight.
+        case content
+        /// Resume / leave / finish / submission bookkeeping.
+        case lifecycle
+    }
+
+    private func mutate(
+        sessionId: String,
+        context: TrainingSessionMutationContext,
+        scope: Scope,
+        _ transform: (inout TrainingLoggerDraft) throws -> Void
+    ) -> TrainingSessionMutationOutcome {
+        guard canWrite else { return .rejected(.writesNotAuthorized) }
+        guard let index = drafts.firstIndex(where: { $0.id == sessionId }) else { return .rejected(.sessionNotFound) }
+        let current = drafts[index]
+        if let mutationId = context.mutationId, current.appliedMutationIds?.contains(mutationId) == true {
+            return .duplicate(revision: current.currentRevision)
+        }
+        if scope == .content, context.origin != .ui {
+            guard TrainingSessionInvariants.acceptsExternalContentMutation(current),
+                  !submittingSessionIds.contains(sessionId) else { return .rejected(.sessionNotMutable) }
+        }
+
+        var next = current
+        do { try transform(&next) }
+        catch let rejection as TrainingSessionMutationRejection { return .rejected(rejection) }
+        catch { return .rejected(.sessionNotMutable) }
+        guard next.id == current.id else { return .rejected(.sessionNotFound) }
+        let sessionOverride = next.restConfiguration
+        TrainingSessionInvariants.normalize(&next, previous: current, now: now()) { exercise in
+            sessionOverride
+                ?? restPreferences.restConfiguration(canonicalExerciseId: exercise.canonicalExerciseId)
+                ?? .off
+        }
+
+        if TrainingSessionInvariants.contentEqual(next, current) {
+            return .unchanged(revision: current.currentRevision)
+        }
+        if let expected = context.expectedRevision, expected != current.currentRevision {
+            return .rejected(.staleRevision(current: current.currentRevision))
+        }
+        next.revision = current.currentRevision + 1
+        next.appliedMutationIds = current.appliedMutationIds
+        if let mutationId = context.mutationId {
+            next.appliedMutationIds = Array(((current.appliedMutationIds ?? []) + [mutationId])
+                .suffix(TrainingSessionInvariants.mutationLedgerLimit))
+        }
+
+        do { try store.persist(next) } catch { return .rejected(.persistenceFailed) }
+        drafts[index] = next
+        if Self.sortKey(next) != Self.sortKey(current) { drafts = Self.sorted(drafts) }
+        lastChange = .init(sessionId: sessionId, revision: next.currentRevision, kind: .mutated)
+        return .applied(revision: next.currentRevision)
+    }
+
+    private static func locate(exerciseId: String, setId: String, in draft: TrainingLoggerDraft) throws -> (Int, Int) {
+        guard let exerciseIndex = draft.exercises.firstIndex(where: { $0.id == exerciseId }) else {
+            throw TrainingSessionMutationRejection.exerciseNotFound
+        }
+        guard let setIndex = draft.exercises[exerciseIndex].sets.firstIndex(where: { $0.id == setId }) else {
+            throw TrainingSessionMutationRejection.setNotFound
+        }
+        return (exerciseIndex, setIndex)
+    }
+
+    private static func sortKey(_ draft: TrainingLoggerDraft) -> String { draft.startedAt ?? draft.workoutDate }
+
+    /// Same order as the draft store and the Logger's saved-draft list.
+    static func sorted(_ drafts: [TrainingLoggerDraft]) -> [TrainingLoggerDraft] {
+        drafts.sorted {
+            let left = sortKey($0), right = sortKey($1)
+            return left == right ? $0.id < $1.id : left > right
+        }
+    }
+}

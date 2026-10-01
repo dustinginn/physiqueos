@@ -4,6 +4,14 @@ protocol TrainingLoggerDraftStore: AnyObject {
     func loadAll() -> [TrainingLoggerDraft]
     func save(_ draft: TrainingLoggerDraft)
     func discard(id: String)
+    /// `save` that reports failure instead of dropping the write. Used by
+    /// `TrainingSessionAuthority`, which publishes a mutation only after
+    /// this returns.
+    func persist(_ draft: TrainingLoggerDraft) throws
+}
+
+enum TrainingLoggerDraftStoreError: Error, Equatable {
+    case encodingFailed
 }
 
 extension TrainingLoggerDraftStore {
@@ -11,6 +19,7 @@ extension TrainingLoggerDraftStore {
     /// code uses the exact-ID collection methods above.
     func load() -> TrainingLoggerDraft? { loadAll().first }
     func discard() { loadAll().forEach { discard(id: $0.id) } }
+    func persist(_ draft: TrainingLoggerDraft) throws { save(draft) }
 }
 
 final class UserDefaultsTrainingLoggerDraftStore: TrainingLoggerDraftStore {
@@ -42,10 +51,16 @@ final class UserDefaultsTrainingLoggerDraftStore: TrainingLoggerDraftStore {
     }
 
     func save(_ draft: TrainingLoggerDraft) {
+        try? persist(draft)
+    }
+
+    /// Fails (writing nothing) when the collection cannot be encoded, for
+    /// example a non-finite number in a set field.
+    func persist(_ draft: TrainingLoggerDraft) throws {
         var drafts = loadAll().filter { $0.id != draft.id }
         drafts.append(draft)
         let envelope = CollectionEnvelope(schemaVersion: 2, drafts: Self.sorted(drafts))
-        guard let data = try? encoder.encode(envelope) else { return }
+        guard let data = try? encoder.encode(envelope) else { throw TrainingLoggerDraftStoreError.encodingFailed }
         defaults.set(data, forKey: key)
     }
 

@@ -147,6 +147,24 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// from Log's saved workouts, but the Log tab no longer routes into it.
     /// Cleared when the workout is resumed.
     var leftAt: String? = nil
+    /// Monotonic local revision, advanced by `TrainingSessionAuthority` on
+    /// every accepted mutation. Local-only concurrency state (never sent to
+    /// the Server); `nil` on drafts written before the authority existed and
+    /// read as 0.
+    var revision: Int? = nil
+    /// Bounded ledger of the most recent caller-supplied mutation ids the
+    /// authority accepted for this draft, so a replayed command (for example
+    /// a future Live Activity intent delivered twice) is recognized even
+    /// after relaunch. Local-only.
+    var appliedMutationIds: [String]? = nil
+    /// The active rest interval, owned by `TrainingSessionAuthority`. Absolute
+    /// timestamps only; nothing ticks. Local-only.
+    var rest: TrainingSessionRestState? = nil
+    /// Session-level rest override. `nil` defers to the rest preference
+    /// provider (exercise, then global), and finally to Off.
+    var restConfiguration: TrainingRestConfiguration? = nil
+
+    var currentRevision: Int { revision ?? 0 }
 
     static func fresh(mode: TrainingLoggerMode, workoutDate: String, startedAt: String? = nil) -> Self {
         .init(
@@ -300,6 +318,11 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
     var loadType: String?
     var durationSeconds: Double?
     var isCompleted: Bool
+    /// Instant this set last transitioned incomplete -> complete in a live
+    /// session (ISO8601, fractional seconds). Stamped and cleared only by
+    /// `TrainingSessionAuthority`; never backfilled for older drafts and
+    /// never sent in the training commit. See `TrainingSessionInvariants`.
+    var completedAt: String? = nil
 
     init(
         id: String,
@@ -308,7 +331,8 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
         load: Double?,
         loadType: String? = nil,
         durationSeconds: Double?,
-        isCompleted: Bool
+        isCompleted: Bool,
+        completedAt: String? = nil
     ) {
         self.id = id
         self.setNumber = setNumber
@@ -317,6 +341,7 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
         self.loadType = loadType
         self.durationSeconds = durationSeconds
         self.isCompleted = isCompleted
+        self.completedAt = completedAt
     }
 
     static func empty(number: Int) -> Self {
@@ -592,6 +617,7 @@ extension TrainingLoggerDraft {
         set.id = UUID().uuidString
         set.setNumber = exercises[index].sets.count + 1
         set.isCompleted = false
+        set.completedAt = nil
         exercises[index].sets.append(set)
     }
 

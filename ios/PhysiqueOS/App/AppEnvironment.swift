@@ -239,6 +239,26 @@ final class AppEnvironment {
     var trainingLoggerDraftStore: TrainingLoggerDraftStore {
         nativeAuthority == .founderProduction ? founderProductionTrainingLoggerDraftStore : sandboxTrainingLoggerDraftStore
     }
+    /// Device-wide rest preference (unset until a later task adds an editor;
+    /// unset means Off).
+    let trainingRestPreferences = UserDefaultsTrainingRestPreferences()
+    /// One app-scoped `TrainingSessionAuthority` per Native authority, each
+    /// over that authority's own draft store, created on first use. They are
+    /// the only writers of those stores, so Sandbox and Founder Production
+    /// sessions never mix and no screen holds a competing copy.
+    @ObservationIgnored private var trainingSessionAuthorities: [NativeAPIEnvironment: TrainingSessionAuthority] = [:]
+
+    @MainActor
+    func trainingSessionAuthority(for environment: NativeAPIEnvironment) -> TrainingSessionAuthority {
+        if let existing = trainingSessionAuthorities[environment] { return existing }
+        let created = TrainingSessionAuthority(
+            store: environment == .founderProduction ? founderProductionTrainingLoggerDraftStore : sandboxTrainingLoggerDraftStore,
+            environment: environment,
+            restPreferences: trainingRestPreferences
+        )
+        trainingSessionAuthorities[environment] = created
+        return created
+    }
     let loggingSandboxStore: LoggingSandboxStore
     let operatingPlanStore: OperatingPlanSandboxStore
     let goalsSandboxStore: GoalsSandboxStore

@@ -64,7 +64,7 @@ struct TrainingLoggerView: View {
                     api: environment.trainingLoggerAPI,
                     writeAPI: environment.trainingWriteAPI,
                     catalogWriteAPI: environment.trainingExerciseCatalogWriteAPI,
-                    draftStore: environment.trainingLoggerDraftStore,
+                    sessionAuthority: environment.trainingSessionAuthority(for: environment.nativeAuthority),
                     attachmentStore: environment.trainingLoggerAttachmentStore,
                     authority: environment.nativeAuthority
                 )
@@ -804,7 +804,7 @@ struct TrainingLoggerView: View {
                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                 .frame(width: 30)
             NumericEditField(
-                text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: exercise.measurement == .duration ? "duration" : "reps", keyPath: exercise.measurement == .duration ? \.durationSeconds : \.reps),
+                text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: exercise.measurement == .duration ? .durationSeconds : .reps),
                 accessibilityLabel: exercise.measurement == .duration ? "Set \(set.setNumber) seconds" : "Set \(set.setNumber) reps",
                 fieldID: primaryID,
                 focusedFieldID: $focusedNumericFieldID,
@@ -815,7 +815,7 @@ struct TrainingLoggerView: View {
                 .frame(height: 34)
             let loadID = TrainingLoggerNumericFieldTarget(exerciseId: exercise.id, setId: set.id, kind: .load).id
             NumericEditField(
-                text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: "load", keyPath: \.load),
+                text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: .load),
                 accessibilityLabel: "Set \(set.setNumber) optional external load",
                 fieldID: loadID,
                 focusedFieldID: $focusedNumericFieldID,
@@ -825,11 +825,7 @@ struct TrainingLoggerView: View {
             )
                 .frame(height: 34)
             Button {
-                viewModel.update { draft in
-                    guard let exerciseIndex = draft.exercises.firstIndex(where: { $0.id == exercise.id }),
-                          let setIndex = draft.exercises[exerciseIndex].sets.firstIndex(where: { $0.id == set.id }) else { return }
-                    draft.exercises[exerciseIndex].sets[setIndex].isCompleted.toggle()
-                }
+                viewModel.setCompletion(exerciseId: exercise.id, setId: set.id, completed: !set.isCompleted)
             } label: {
                 Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 21))
@@ -1260,23 +1256,18 @@ struct TrainingLoggerView: View {
         _ viewModel: TrainingLoggerViewModel,
         exerciseId: String,
         setId: String,
-        field: String,
-        keyPath: WritableKeyPath<TrainingLoggerDraftSet, Double?>
+        field: TrainingSessionSetField
     ) -> Binding<String> {
-        let bufferKey = "\(exerciseId)|\(setId)|\(field)"
+        let bufferKey = "\(exerciseId)|\(setId)|\(field.bufferName)"
         return Binding(
             get: {
                 if let buffer = numericEditBuffers[bufferKey] { return buffer }
-                guard let value = viewModel.draft?.exercises.first(where: { $0.id == exerciseId })?.sets.first(where: { $0.id == setId })?[keyPath: keyPath] else { return "" }
+                guard let value = viewModel.draft?.exercises.first(where: { $0.id == exerciseId })?.sets.first(where: { $0.id == setId })?[keyPath: field.keyPath] else { return "" }
                 return value.rounded() == value ? String(Int(value)) : String(value)
             },
             set: { text in
                 numericEditBuffers[bufferKey] = text
-                viewModel.update { draft in
-                    guard let exerciseIndex = draft.exercises.firstIndex(where: { $0.id == exerciseId }),
-                          let setIndex = draft.exercises[exerciseIndex].sets.firstIndex(where: { $0.id == setId }) else { return }
-                    draft.exercises[exerciseIndex].sets[setIndex][keyPath: keyPath] = NumericEditingContract.parsedValue(text)
-                }
+                viewModel.setValue(exerciseId: exerciseId, setId: setId, field: field, value: NumericEditingContract.parsedValue(text))
             }
         )
     }
