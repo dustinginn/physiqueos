@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://physiqueos.local/schemas/recovery-briefing-v1.schema.json",
+  "title": "Recovery Briefing V1 read contract",
+  "description": "Non-shipping proposal. A period-level Recovery assessment for stored Briefing artifacts. It is context-only and must not create Goal Confidence observations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "assessmentId",
+    "period",
+    "status",
+    "sleep",
+    "foamRolling",
+    "corroboration",
+    "commentary",
+    "policy",
+    "provenance"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "recovery_briefing_v1" },
+    "assessmentId": { "type": "string", "minLength": 1 },
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cadence", "startDate", "endDate", "timeZone", "expectedNights", "observedNights"],
+      "properties": {
+        "cadence": { "enum": ["midweek", "weekly", "monthly", "dexa", "photo"] },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "timeZone": { "type": "string", "minLength": 1 },
+        "expectedNights": { "type": "integer", "minimum": 1 },
+        "observedNights": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "label", "reasonCodes"],
+      "properties": {
+        "state": { "enum": ["green", "yellow", "red", "unavailable"] },
+        "label": { "enum": ["Green", "Yellow", "Red", "Not enough data"] },
+        "reasonCodes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "period_typical",
+              "persistent_low_sleep",
+              "severe_persistent_low_sleep",
+              "corroborated_training_constraint",
+              "insufficient_period_nights",
+              "insufficient_baseline_nights"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "sleep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "baseline", "periodSummary", "trend"],
+      "properties": {
+        "source": { "const": "healthkit_sleep" },
+        "baseline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lookbackNights", "usableNights", "centerMinutes", "robustSpreadMinutes", "excludesCurrentPeriod", "usesFutureData"],
+          "properties": {
+            "lookbackNights": { "const": 28 },
+            "usableNights": { "type": "integer", "minimum": 0, "maximum": 28 },
+            "centerMinutes": { "type": ["number", "null"] },
+            "robustSpreadMinutes": { "type": ["number", "null"] },
+            "excludesCurrentPeriod": { "const": true },
+            "usesFutureData": { "const": false }
+          }
+        },
+        "periodSummary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["averageMinutes", "deltaFromBaselineMinutes", "materialLowNights", "severeLowNights", "longestMaterialLowRun"],
+          "properties": {
+            "averageMinutes": { "type": ["number", "null"] },
+            "deltaFromBaselineMinutes": { "type": ["number", "null"] },
+            "materialLowNights": { "type": "integer", "minimum": 0 },
+            "severeLowNights": { "type": "integer", "minimum": 0 },
+            "longestMaterialLowRun": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "trend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["granularity", "points", "clockMetricsEligible"],
+          "properties": {
+            "granularity": { "enum": ["night", "week"] },
+            "clockMetricsEligible": { "type": "boolean" },
+            "points": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["label", "totalSleepMinutes", "reliability"],
+                "properties": {
+                  "label": { "type": "string" },
+                  "totalSleepMinutes": { "type": ["number", "null"] },
+                  "reliability": { "enum": ["reliable", "timezone_uncertain", "missing"] }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "foamRolling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayRole", "scheduleAuthority", "scheduledOccurrences", "completedOccurrences", "missedOccurrences", "exceptionOccurrences", "state"],
+      "properties": {
+        "displayRole": { "const": "execution_context_only" },
+        "scheduleAuthority": { "enum": ["authoritative", "not_yet_effective", "unavailable"] },
+        "scheduledOccurrences": { "type": ["integer", "null"], "minimum": 0 },
+        "completedOccurrences": { "type": "integer", "minimum": 0 },
+        "missedOccurrences": { "type": ["integer", "null"], "minimum": 0 },
+        "exceptionOccurrences": { "type": ["integer", "null"], "minimum": 0 },
+        "state": { "enum": ["on_track", "mixed", "observed_only", "not_scheduled", "unavailable"] }
+      }
+    },
+    "corroboration": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["domain", "signal", "temporalRelation", "language", "causality"],
+        "properties": {
+          "domain": { "enum": ["training", "injury_limitation"] },
+          "signal": { "type": "string", "minLength": 1 },
+          "temporalRelation": { "enum": ["same_period", "sleep_precedes_signal", "repeated_prior_windows"] },
+          "language": { "type": "string", "minLength": 1 },
+          "causality": { "const": "not_inferred" }
+        }
+      }
+    },
+    "commentary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visible", "headline", "body"],
+      "properties": {
+        "visible": { "type": "boolean" },
+        "headline": { "type": ["string", "null"] },
+        "body": { "type": ["string", "null"] }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "confidenceCoupling", "foamCanSetStatus", "causalClaimsAllowed"],
+      "properties": {
+        "version": { "const": "recovery_status_policy_v1" },
+        "confidenceCoupling": { "const": "none" },
+        "foamCanSetStatus": { "const": false },
+        "causalClaimsAllowed": { "const": false }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceCutoff", "generatedAt", "sleepEvidenceIds", "foamEvidenceIds", "trainingEvidenceIds"],
+      "properties": {
+        "evidenceCutoff": { "type": "string", "format": "date-time" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "sleepEvidenceIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "foamEvidenceIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "trainingEvidenceIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    }
+  }
+}

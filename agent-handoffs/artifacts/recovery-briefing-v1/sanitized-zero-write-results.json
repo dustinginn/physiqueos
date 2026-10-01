@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "recovery_briefing_zero_write_replay_v1",
+  "scope": {
+    "sleepPeriod": "2026-07-06/2026-09-30",
+    "sleepNights": 87,
+    "canonicalTrainingDates": 80,
+    "trainingPerformanceEventDates": 42,
+    "rawNightlyValuesIncluded": false,
+    "rawDatesIncluded": false,
+    "exerciseNamesIncluded": false,
+    "databaseWrites": 0
+  },
+  "sleepDistributionMinutes": {
+    "p10": 358.8,
+    "p25": 373.3,
+    "p50": 401.5,
+    "p75": 430,
+    "p90": 467.1
+  },
+  "baselineRobustSpreadMinutes": {
+    "p10": 18.5,
+    "p25": 20,
+    "p50": 25,
+    "p75": 26.3,
+    "p90": 30.3
+  },
+  "foamRolling": {
+    "scheduleAuthorityEffectiveFrom": "2026-09-15",
+    "observedCompleted": 25,
+    "observedMissed": 7,
+    "preAuthorityMissingDaysClassifiedAsMissed": false
+  },
+  "candidatePolicyReplay": {
+    "weekly": {
+      "periods": 11,
+      "unavailable": 2,
+      "green": 9,
+      "yellow": 0,
+      "red": 0,
+      "materialLowNights": 19,
+      "severeLowNights": 3,
+      "trainingCorroboratedPeriods": 1,
+      "periodsWithKnownFoamOutcomes": 7
+    },
+    "midweek": {
+      "periods": 12,
+      "unavailable": 2,
+      "green": 10,
+      "yellow": 0,
+      "red": 0,
+      "materialLowNights": 7,
+      "severeLowNights": 0,
+      "trainingCorroboratedPeriods": 1,
+      "periodsWithKnownFoamOutcomes": 6
+    },
+    "monthly": {
+      "periods": 3,
+      "unavailable": 1,
+      "green": 1,
+      "yellow": 1,
+      "red": 0,
+      "materialLowNights": 18,
+      "severeLowNights": 3,
+      "trainingCorroboratedPeriods": 0,
+      "periodsWithKnownFoamOutcomes": 3
+    }
+  },
+  "noiseChecks": {
+    "greenWeeksWithAtLeastTwoFoamMisses": 1,
+    "greenWeeksThatWouldBecomeYellowWithoutPeriodMeanGate": 4,
+    "greenWeeksThatWouldBecomeYellowWithTwoConsecutiveMaterialLowNightsAlone": 5
+  }
+}
