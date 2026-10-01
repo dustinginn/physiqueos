@@ -510,6 +510,13 @@ final class AppEnvironment {
         nativeAuthority == .founderProduction ? ProductionNutritionAPI(api: productionNativeAPI) : sandboxNutritionAPI
     }
 
+    /// Recovery / Sleep Evidence. Founder Production reads only the Server
+    /// `recovery-sleep*` resources; the bundled synthetic fixture exists for
+    /// Sandbox alone and is never reachable from Production.
+    var recoverySleepAPI: RecoverySleepAPI {
+        nativeAuthority == .founderProduction ? ProductionRecoverySleepAPI(api: productionNativeAPI) : FixtureRecoverySleepAPI()
+    }
+
     var energyAPI: EnergyAPI {
         nativeAuthority == .founderProduction ? ProductionEnergyAPI(api: productionNativeAPI) : sandboxEnergyAPI
     }

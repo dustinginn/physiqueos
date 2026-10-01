@@ -75,11 +75,11 @@
     {
       "id": "recovery",
       "title": "Recovery",
-      "metric": "Coming soon",
-      "trend": "Sleep, HRV, readiness, and recovery.",
-      "lastUpdated": null,
-      "status": "placeholder",
-      "tone": "muted",
+      "metric": "Last night · 7h 30m",
+      "trend": "Sleep from Apple Health.",
+      "lastUpdated": "2026-10-01",
+      "status": "available",
+      "tone": "success",
       "destination": { "id": "progress.stream", "parameters": { "streamId": "recovery" } }
     },
     {

@@ -269,6 +269,7 @@
 		000000000000000000001208 /* PlusJakartaSans[wght].ttf in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001207 /* PlusJakartaSans[wght].ttf */; };
 		00000000000000000000120A /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001209 /* OFL.txt */; };
 		0000000000000000000012A6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012A5 /* Assets.xcassets */; };
+		0000000000000000000013B3 /* RecoverySleepFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013B2 /* RecoverySleepFixture.json */; };
 		00000000000000000000120D /* AppTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000120C /* AppTabTests.swift */; };
 		00000000000000000000120F /* HomeReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000120E /* HomeReadModelTests.swift */; };
 		000000000000000000001211 /* PriorityReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001210 /* PriorityReadModelTests.swift */; };
@@ -317,6 +318,7 @@
 		000000000000000000001267 /* PhotoProcessingUXTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001266 /* PhotoProcessingUXTests.swift */; };
 		000000000000000000001297 /* TrainingAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001296 /* TrainingAcceptanceUITests.swift */; };
 		000000000000000000001299 /* GoalsAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001298 /* GoalsAcceptanceUITests.swift */; };
+		0000000000000000000013B7 /* RecoverySleepAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */; };
 		0000000000000000000012A8 /* HealthKitCapabilityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012A7 /* HealthKitCapabilityModels.swift */; };
 		0000000000000000000012AA /* HealthKitTypeRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012A9 /* HealthKitTypeRegistry.swift */; };
 		0000000000000000000012AC /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012AB /* HealthKitService.swift */; };
@@ -345,6 +347,12 @@
 		0000000000000000000012E5 /* PeptideSupportSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E4 /* PeptideSupportSheets.swift */; };
 		0000000000000000000012E7 /* PeptideDosePlanEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E6 /* PeptideDosePlanEditor.swift */; };
 		0000000000000000000012E9 /* PhotoInspectionViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012E8 /* PhotoInspectionViewer.swift */; };
+		0000000000000000000013A7 /* RecoverySleepReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013A6 /* RecoverySleepReadModel.swift */; };
+		0000000000000000000013A9 /* RecoverySleepAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013A8 /* RecoverySleepAPI.swift */; };
+		0000000000000000000013AB /* SleepEvidencePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013AA /* SleepEvidencePresentation.swift */; };
+		0000000000000000000013AD /* SleepEvidenceCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013AC /* SleepEvidenceCharts.swift */; };
+		0000000000000000000013AF /* RecoverySleepViewModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013AE /* RecoverySleepViewModels.swift */; };
+		0000000000000000000013B1 /* RecoverySleepViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013B0 /* RecoverySleepViews.swift */; };
 		0000000000000000000012D1 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D0 /* HealthKitSynchronizationTests.swift */; };
 		0000000000000000000012D3 /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D2 /* HealthKitSleepIngestionTests.swift */; };
 		0000000000000000000012D5 /* HealthKitSleepHistoricalValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D4 /* HealthKitSleepHistoricalValidationTests.swift */; };
@@ -355,6 +363,7 @@
 		0000000000000000000012EB /* PeptideSupportEditorViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012EA /* PeptideSupportEditorViewModelTests.swift */; };
 		0000000000000000000012ED /* PeptideScreenPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012EC /* PeptideScreenPresentationTests.swift */; };
 		0000000000000000000012EF /* PhotoInspectionViewerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012EE /* PhotoInspectionViewerTests.swift */; };
+		0000000000000000000013B5 /* RecoverySleepReadModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013B4 /* RecoverySleepReadModelTests.swift */; };
 		0000000000000000000012B3 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
 /* End PBXBuildFile section */
 
@@ -646,6 +655,12 @@
 		0000000000000000000012E4 /* PeptideSupportSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideSupportSheets.swift"; sourceTree = "<group>"; };
 		0000000000000000000012E6 /* PeptideDosePlanEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideDosePlanEditor.swift"; sourceTree = "<group>"; };
 		0000000000000000000012E8 /* PhotoInspectionViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoInspectionViewer.swift"; sourceTree = "<group>"; };
+		0000000000000000000013A6 /* RecoverySleepReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepReadModel.swift"; sourceTree = "<group>"; };
+		0000000000000000000013A8 /* RecoverySleepAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepAPI.swift"; sourceTree = "<group>"; };
+		0000000000000000000013AA /* SleepEvidencePresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SleepEvidencePresentation.swift"; sourceTree = "<group>"; };
+		0000000000000000000013AC /* SleepEvidenceCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SleepEvidenceCharts.swift"; sourceTree = "<group>"; };
+		0000000000000000000013AE /* RecoverySleepViewModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepViewModels.swift"; sourceTree = "<group>"; };
+		0000000000000000000013B0 /* RecoverySleepViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepViews.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E7 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
@@ -665,6 +680,7 @@
 		000000000000000000001207 /* PlusJakartaSans[wght].ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PlusJakartaSans[wght].ttf"; sourceTree = "<group>"; };
 		000000000000000000001209 /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL.txt"; sourceTree = "<group>"; };
 		0000000000000000000012A5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
+		0000000000000000000013B2 /* RecoverySleepFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "RecoverySleepFixture.json"; sourceTree = "<group>"; };
 		00000000000000000000120B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		0000000000000000000012B1 /* PhysiqueOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "PhysiqueOS.entitlements"; sourceTree = "<group>"; };
 		00000000000000000000120C /* AppTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTabTests.swift"; sourceTree = "<group>"; };
@@ -724,8 +740,10 @@
 		0000000000000000000012EA /* PeptideSupportEditorViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideSupportEditorViewModelTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012EC /* PeptideScreenPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PeptideScreenPresentationTests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012EE /* PhotoInspectionViewerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhotoInspectionViewerTests.swift"; sourceTree = "<group>"; };
+		0000000000000000000013B4 /* RecoverySleepReadModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepReadModelTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001296 /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		000000000000000000001298 /* GoalsAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsAcceptanceUITests.swift"; sourceTree = "<group>"; };
+		0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012B2 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		000000000000000000001280 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000001281 /* PhysiqueOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -837,6 +855,7 @@
 				0000000000000000000012BE /* HealthKitSleepHistoricalValidation.swift */,
 				0000000000000000000013A0 /* HealthKitSleepHistoricalEvidence.swift */,
 				0000000000000000000012DE /* DailyDriverLocalDay.swift */,
+				0000000000000000000013A6 /* RecoverySleepReadModel.swift */,
 			);
 			path = Contracts;
 			sourceTree = "<group>";
@@ -916,6 +935,7 @@
 				0000000000000000000012C6 /* HealthKitSynchronizationEngine.swift */,
 				0000000000000000000012C8 /* HealthKitFounderCanaryCoordinator.swift */,
 				0000000000000000000012CA /* HealthKitAutomaticSynchronizationCoordinator.swift */,
+				0000000000000000000013A8 /* RecoverySleepAPI.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -967,6 +987,7 @@
 				000000000000000000001203 /* TrainingLoggerFixture.json */,
 				000000000000000000001205 /* BriefingsFixture.json */,
 				0000000000000000000012A5 /* Assets.xcassets */,
+				0000000000000000000013B2 /* RecoverySleepFixture.json */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -1062,6 +1083,10 @@
 				0000000000000000000011B7 /* EnergyHistoryView.swift */,
 				0000000000000000000011B9 /* EnergyHistoryViewModel.swift */,
 				0000000000000000000011BB /* EnergyChartViews.swift */,
+				0000000000000000000013AA /* SleepEvidencePresentation.swift */,
+				0000000000000000000013AC /* SleepEvidenceCharts.swift */,
+				0000000000000000000013AE /* RecoverySleepViewModels.swift */,
+				0000000000000000000013B0 /* RecoverySleepViews.swift */,
 			);
 			path = Evidence;
 			sourceTree = "<group>";
@@ -1276,6 +1301,7 @@
 				0000000000000000000012EA /* PeptideSupportEditorViewModelTests.swift */,
 				0000000000000000000012EC /* PeptideScreenPresentationTests.swift */,
 				0000000000000000000012EE /* PhotoInspectionViewerTests.swift */,
+				0000000000000000000013B4 /* RecoverySleepReadModelTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1285,6 +1311,7 @@
 			children = (
 				000000000000000000001296 /* TrainingAcceptanceUITests.swift */,
 				000000000000000000001298 /* GoalsAcceptanceUITests.swift */,
+				0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */,
 			);
 			path = PhysiqueOSUITests;
 			sourceTree = "<group>";
@@ -1432,6 +1459,7 @@
 				000000000000000000001208 /* PlusJakartaSans[wght].ttf in Resources */,
 				00000000000000000000120A /* OFL.txt in Resources */,
 				0000000000000000000012A6 /* Assets.xcassets in Resources */,
+				0000000000000000000013B3 /* RecoverySleepFixture.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1725,6 +1753,12 @@
 				0000000000000000000012E5 /* PeptideSupportSheets.swift in Sources */,
 				0000000000000000000012E7 /* PeptideDosePlanEditor.swift in Sources */,
 				0000000000000000000012E9 /* PhotoInspectionViewer.swift in Sources */,
+				0000000000000000000013A7 /* RecoverySleepReadModel.swift in Sources */,
+				0000000000000000000013A9 /* RecoverySleepAPI.swift in Sources */,
+				0000000000000000000013AB /* SleepEvidencePresentation.swift in Sources */,
+				0000000000000000000013AD /* SleepEvidenceCharts.swift in Sources */,
+				0000000000000000000013AF /* RecoverySleepViewModels.swift in Sources */,
+				0000000000000000000013B1 /* RecoverySleepViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1790,6 +1824,7 @@
 				0000000000000000000012EB /* PeptideSupportEditorViewModelTests.swift in Sources */,
 				0000000000000000000012ED /* PeptideScreenPresentationTests.swift in Sources */,
 				0000000000000000000012EF /* PhotoInspectionViewerTests.swift in Sources */,
+				0000000000000000000013B5 /* RecoverySleepReadModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1799,6 +1834,7 @@
 			files = (
 				000000000000000000001297 /* TrainingAcceptanceUITests.swift in Sources */,
 				000000000000000000001299 /* GoalsAcceptanceUITests.swift in Sources */,
+				0000000000000000000013B7 /* RecoverySleepAcceptanceUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
