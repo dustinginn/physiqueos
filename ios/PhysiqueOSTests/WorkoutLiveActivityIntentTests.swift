@@ -188,6 +188,11 @@ final class WorkoutLiveActivityIntentTests: XCTestCase {
         let outcome = await WorkoutActivityIntentRuntime.resolve(request(rig))
         XCTAssertEqual(outcome, .applied)
         XCTAssertEqual(rig.authority.draft(id: "session-1")?.completedSetCount, 1)
+        let rendered = rig.client.live.first?.state
+        XCTAssertEqual(rendered?.completedSets, 1, "The intent returns only after the Live Activity re-rendered.")
+        XCTAssertEqual(rendered?.target?.setId, "b2")
+        XCTAssertEqual(rendered?.revision, rig.authority.draft(id: "session-1")?.currentRevision)
+        XCTAssertNotNil(rendered?.rest)
     }
 
     func testTheIntentCarriesTheExactRenderedIdentityAndIsNotDiscoverable() async throws {

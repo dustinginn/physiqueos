@@ -19,7 +19,8 @@ final class WorkoutLiveActivityBridge {
     /// background launch to run an intent still constructs the App).
     func install() {
         WorkoutActivityIntentRuntime.handler = { [weak self] request in
-            await MainActor.run { self?.complete(request) ?? .unavailable }
+            guard let self else { return .unavailable }
+            return await self.completeAndRender(request)
         }
         attachToSelectedAuthority()
     }
@@ -37,6 +38,15 @@ final class WorkoutLiveActivityBridge {
         coordinator.reconcile()
     }
 
+    /// The intent path: resolve the tap, then wait for the Live Activity to
+    /// re-render, so a background process cannot suspend before the new
+    /// state (and the new `expectedRevision`) is on screen.
+    func completeAndRender(_ request: WorkoutCompleteSetRequest) async -> WorkoutCompleteSetOutcome {
+        let outcome = complete(request)
+        await coordinator.flush()
+        return outcome
+    }
+
     /// Resolves one Complete Set tap. Never throws and never partially
     /// applies: the authority either accepts the exact (session, exercise,
     /// set, revision) or rejects it with a reason.
@@ -47,8 +57,6 @@ final class WorkoutLiveActivityBridge {
             sessionId: request.sessionId, exerciseId: request.exerciseId, setId: request.setId,
             context: .intent(mutationId: request.mutationId, expectedRevision: request.expectedRevision)
         )
-        // Render the result before a background process can suspend.
-        Task { @MainActor [coordinator] in await coordinator.flush() }
         return Self.map(outcome)
     }
 
