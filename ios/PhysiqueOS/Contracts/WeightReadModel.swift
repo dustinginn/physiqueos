@@ -1,0 +1,238 @@
+import Foundation
+
+/// Native transport mirror of the web's live Weight Evidence page
+/// (`/progress/weight`, `WeightReportScreen.jsx` ←
+/// `WeightEvidenceContextService.getWeightTimelineReport` →
+/// `ProgressReportingService.getWeightReport`). Unlike every other Evidence
+/// vertical ported so far, Weight has **no day/detail route on the web at
+/// all** — verified directly from source (no backing route file, and
+/// history rows render as plain non-`Link` `<div>`s) — so this one read
+/// model covers the entire page: landing, history, and trend, with no
+/// separate day-detail projection to define.
+///
+/// This is also the one vertical where "port faithfully" deliberately does
+/// **not** mean "add the missing pieces a Founder might expect": the
+/// Highest/Lowest cards are a hardcoded, contextId-keyed lookup table on
+/// the web — NOT derived from any goal-direction property — and streaks/
+/// Related Goals are test-enforced absent. See `WeightEvidenceCalculator.swift`
+/// for the literal branch this port reproduces rather than "fixes."
+struct WeightReportReadModel: Codable, Equatable {
+    /// `report.title` — "Weight".
+    var title: String
+    /// `report.subtitle` — "Weight evidence over time." (verified literal
+    /// string from source, unlike Nutrition's unconfirmed one).
+    var subtitle: String
+    var scope: TrainingScopeContext
+    /// `report.summary` — exactly 4 cards, whose labels/values depend on
+    /// the selected scope (see `WeightEvidenceCalculator.summary`).
+    var summary: [WeightSummaryCard]
+    var chart: WeightChartData
+    /// `report.weeklyAverages` — newest-first (`orderWeeklyAveragesNewestFirst`).
+    /// Under Founder Production the server returns every calendar week
+    /// inside the selected Goal window (there is no six-week cap), so a
+    /// long Goal can produce dozens of rows whose year-less labels repeat
+    /// across years — which is why `WeightWeeklyAverage.id` keys on the
+    /// server's `sortDate`, never on the label. Native carries the full
+    /// array as delivered — the Weekly Averages card's collapsed preview
+    /// is the only trimming, and expanding it shows every row. Only the
+    /// Sandbox fixture path (`WeightEvidenceCalculator.weeklyAverages`)
+    /// still keeps the last 6.
+    var weeklyAverages: [WeightWeeklyAverage]
+    /// `report.history` — every scoped weight point, reversed (newest
+    /// first), matching the web's own `[...points].reverse()`.
+    var history: [WeightHistoryEntry]
+    var dataSources: [WeightDataSource]
+
+    // MARK: - Founder Production only (Patch 3 continuation)
+    //
+    // The native `weight` resource (`projectNativeWeightRead`,
+    // server-side) is a purpose-built Native contract, not a mirror of
+    // `WeightReportScreen.jsx`'s web card layout — it additionally sends
+    // a revision-safe `current` reading, up to 7 `recentWeighIns`,
+    // canonical rolling 3-day/7-day averages, and a Goal-appropriate
+    // `extrema` selection (which of highest/lowest is relevant is a
+    // server decision — `extrema.goalRelevant` — never a Native
+    // hardcoded lookup). All are `nil` under Sandbox, which has no wire
+    // equivalent to decode them from.
+    var current: WeightHistoryEntry? = nil
+    var recentWeighIns: [WeightHistoryEntry]? = nil
+    var rollingAverages: WeightRollingAverages? = nil
+    var extrema: WeightExtremaContext? = nil
+    var dexaContext: WeightDEXAContextSection? = nil
+    var page: WeightHistoryPage? = nil
+
+    /// The revision Native must echo back as `If-Match` to correct an
+    /// existing entry on `dateKey` — searches `current`/`recentWeighIns`/
+    /// `history` (in that order, all already decoded from one fetch) for
+    /// an exact date match. `nil` means no canonical entry exists yet for
+    /// that date (a brand-new weigh-in, no `expectedVersion` needed) —
+    /// never guessed or fabricated when absent.
+    func revision(forDateKey dateKey: String) -> Int? {
+        if current?.date == dateKey { return current?.revision }
+        if let match = recentWeighIns?.first(where: { $0.date == dateKey }) { return match.revision }
+        return history.first(where: { $0.date == dateKey })?.revision
+    }
+}
+
+/// `rollingAverages.{threeDay,sevenDay}` — a canonical rolling window the
+/// server computed (at most one weigh-in per intended day); Native must
+/// never recompute this from raw history itself.
+struct WeightRollingAverageWindow: Codable, Equatable {
+    var requestedDays: Int
+    var observationCount: Int
+    var startDate: String?
+    var endDate: String?
+    var value: Double?
+    var unit: String?
+}
+
+struct WeightRollingAverages: Codable, Equatable {
+    var threeDay: WeightRollingAverageWindow
+    var sevenDay: WeightRollingAverageWindow
+}
+
+/// `extrema.{highest,lowest}` — a raw numeric point (not yet formatted
+/// into a display string, unlike `WeightHistoryEntry.value`).
+struct WeightExtremePoint: Codable, Equatable {
+    var id: String
+    var date: String
+    var value: Double
+    var unit: String
+    var revision: Int?
+}
+
+/// `extrema.goalRelevant` says which of `highest`/`lowest` the server
+/// considers relevant to the focused Goal (mirrors what used to be a
+/// Native-hardcoded `contextId` lookup table — now a server decision
+/// Native only renders, never recomputes).
+struct WeightExtremaContext: Codable, Equatable {
+    var goalRelevant: [String]
+    var highest: WeightExtremePoint?
+    var lowest: WeightExtremePoint?
+}
+
+struct WeightDEXAContextSection: Codable, Equatable {
+    var latest: WeightChartMarker?
+    var markers: [WeightChartMarker]
+}
+
+struct WeightHistoryPage: Codable, Equatable {
+    var limit: Int
+    var count: Int
+    var hasMore: Bool
+}
+
+/// `summaryMetric`/`summaryChange`'s rendered output — plain label+value;
+/// no icon/tone, matching `WeightReportScreen.jsx`'s literal `<Card>` grid.
+struct WeightSummaryCard: Codable, Equatable, Identifiable {
+    var label: String
+    var value: String
+
+    var id: String { label }
+}
+
+struct WeightChartPoint: Codable, Equatable, Identifiable {
+    var id: String
+    var date: String
+    var value: Double?
+    /// Already server-formatted: `"{value} {unit}"`, e.g. `"167.0 lb"`.
+    var label: String
+    /// `"Morning weight"` | `"Different weigh-in conditions"` —
+    /// `weightEntry.context.isDefault`-driven, matching the history row's
+    /// own `detail` field exactly (the same field, reused for both the
+    /// chart point and the history row, as the web does).
+    var detail: String
+}
+
+/// `chart.markers` — DEXA scan dates. `label` is decoded for field-for-
+/// field fidelity but, matching the live web chart exactly, is never
+/// rendered as visible text — `ProgressLineChart.jsx` draws only a dashed
+/// guideline with no `<text>` element and no legend (verified directly
+/// from source). The native chart reproduces that same unlabeled-guideline
+/// look rather than inventing a label the real product doesn't show.
+struct WeightChartMarker: Codable, Equatable, Identifiable {
+    var id: String
+    var date: String
+    var label: String
+}
+
+struct WeightChartData: Codable, Equatable {
+    var points: [WeightChartPoint]
+    var markers: [WeightChartMarker]
+}
+
+/// `getWeeklyAverages`'s per-week row. `isBaseWeek` mirrors the web's own
+/// "Base" label for the oldest week shown (`weekOverWeek == nil`), kept as
+/// its own explicit flag rather than inferring "oldest" from array order,
+/// since `weeklyAverages` here is already newest-first for display.
+///
+/// `week` is the display label only (`"Jul 19"`, year-less). Row identity
+/// comes from `sortDate` — the server's `YYYY-MM-DD` week start — because
+/// once a Goal window spans more than a year two rows can legitimately
+/// carry the same label, and a label-keyed `ForEach` would collide.
+/// `sortDate` is `nil` only for the Sandbox calculator path, whose
+/// six-week window can never repeat a label, so the label is a safe
+/// fallback identity there.
+struct WeightWeeklyAverage: Codable, Equatable, Identifiable {
+    var week: String
+    var average: Double
+    var weekOverWeek: Double?
+    var isBaseWeek: Bool
+    var entryCount: Int
+    var sortDate: String? = nil
+
+    var id: String { sortDate ?? week }
+}
+
+/// A `history` row — plain (non-navigating) on the web, matching
+/// `WeightReportScreen.jsx:108-131`'s bare `<div>`s: no delta-per-row, no
+/// id-based link. `attributedScope` is decoded/displayed for Goal/Phase
+/// chronology fidelity even though there is no detail screen to push to.
+struct WeightHistoryEntry: Codable, Equatable, Identifiable {
+    var id: String
+    var date: String
+    var detail: String
+    var value: String
+    var attributedScope: EvidenceScopeAttribution? = nil
+    /// The canonical `weightEntries` record's Postgres revision — present
+    /// only under Founder Production (`current`/`recentWeighIns`/`history`
+    /// entries there each carry it; Sandbox has no wire equivalent). This
+    /// is the exact value Native must echo back as `If-Match` when
+    /// `weight.submit.v1`/`check-in.submit.v1` corrects an existing
+    /// same-day value — always re-read fresh immediately before
+    /// submitting a correction rather than trusting a cached copy, since
+    /// a web-side edit can bump it without Native's knowledge.
+    var revision: Int? = nil
+}
+
+struct WeightDataSource: Codable, Equatable, Identifiable {
+    var name: String
+    var status: String
+
+    var id: String { name }
+}
+
+/// The raw, unscoped weight entry — the fixture's source of truth that
+/// `WeightEvidenceCalculator` derives every scoped `WeightReportReadModel`
+/// from, mirroring `weightEntry.js`'s canonical shape closely enough for
+/// this port's purposes (full `context`/`source`/`fieldProvenance` detail
+/// is not consumed by the live Weight Evidence page and is not carried
+/// here, matching the established "decode what a screen actually renders"
+/// convention already used throughout this codebase).
+struct WeightEntryFixture: Codable, Equatable, Identifiable {
+    var id: String
+    var date: String
+    var value: Double
+    var unit: String
+    /// `context.isDefault` — `true` for the ordinary "Morning weight" case,
+    /// `false` for a flagged "Different weigh-in conditions" entry.
+    var isDefaultConditions: Bool
+}
+
+/// A DEXA scan's minimal weight-chart-relevant fields — `measuredAt` only;
+/// the rest of a real DEXA scan record (body fat %, lean/fat mass, ...) is
+/// a separate stream (`/progress/dexa`) this fixture does not duplicate.
+struct DEXAScanFixture: Codable, Equatable, Identifiable {
+    var id: String
+    var date: String
+}

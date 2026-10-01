@@ -8,6 +8,8 @@ import {
   HEALTHKIT_SLEEP_MAX_DELETIONS_PER_BATCH,
   HEALTHKIT_SLEEP_MAX_MANIFEST_LIVE_IDS,
   HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH,
+  sleepDayWindowEndMs,
+  sleepDayWindowStartMs,
 } from "../../domain/services/HealthKitSleepContract.js";
 import { getProgressPhotoPoseContract } from "../../domain/models/progressPhotoPoseVocabulary.js";
 import { HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT } from "../commands/HealthKitSleepHistoricalEvidenceImportPort.js";
@@ -125,7 +127,7 @@ const writes = Object.freeze([
   write(Phase3Command.UPSERT_ACTIVITY_DAY, ["localDate", "dailyActivity", "sourceIdentity", "source"], "manual, typed, or screenshot provenance only; direct device-health sync is forbidden"),
   write(Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS, ["batchId", "observations"], "source observations remain separate; Activity and Nutrition daily totals may canonicalize only inside the server-owned activation window into the quarantined HealthKit canonical day store; strategic Evidence eligibility is not decided by ingestion"),
   write(Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION, ["batchId", "runId", "samples"], "dormant: refused with 409 HEALTHKIT_SLEEP_HISTORICAL_VALIDATION_NOT_ENABLED unless healthKitSleepHistoricalValidation.enabled and runId matches; samples only, each ending inside the advertised window; validation-only collection, never canonical production history, quarantined"),
-  write(Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE, ["batchId", "runId", "samples"], "source-controlled one-time Evidence import; July 6 through October 3 only; structurally separate collections; permanently non-strategic"),
+  write(Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE, ["batchId", "runId", "samples"], "source-controlled one-time Evidence import; July 6 through October 6 only; structurally separate collections; permanently non-strategic"),
   write(Phase3Command.INGEST_HEALTHKIT_SLEEP, ["batchId"], "dormant: refused with 409 HEALTHKIT_SLEEP_INGESTION_NOT_ENABLED unless healthKitSleepIngestion.enabled; samples, deletions and a bounded window manifest; per-sample identity conflicts refuse only that sample; canonical sleep days are quarantined"),
   write(Phase3Command.EDIT_DEXA_REVIEW, ["reviewId", "evidenceObjectId", "measurements"], "If-Match required for every edit"),
   write(Phase3Command.COMMIT_EVIDENCE_REVIEW, ["reviewId"], "If-Match required to start the canonical Evidence Review lifecycle"),
@@ -283,6 +285,8 @@ function healthKitSleepHistoricalEvidenceContract(capability) {
     runId: enabled ? HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.runId : null,
     startSleepDay: enabled ? HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.startSleepDay : null,
     endSleepDay: enabled ? HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.endSleepDay : null,
+    windowStart: enabled ? new Date(sleepDayWindowStartMs(HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.startSleepDay, HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.timeZone)).toISOString() : null,
+    windowEnd: enabled ? new Date(sleepDayWindowEndMs(HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.endSleepDay, HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT.timeZone)).toISOString() : null,
     maximumSamplesPerBatch: HEALTHKIT_SLEEP_MAX_SAMPLES_PER_BATCH,
     ingestionPurpose: "historical_evidence_import",
     semantics: "bounded HealthKit re-read into structurally separate Recovery/Sleep Evidence collections; permanently excluded from strategic systems",

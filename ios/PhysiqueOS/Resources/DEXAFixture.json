@@ -1,0 +1,215 @@
+{
+  "scans": [
+    {
+      "id": "dexa-fixture-001",
+      "measuredAt": "2026-05-24",
+      "totalMassLb": 185.5,
+      "bodyFatPercentage": 14.8,
+      "fatMassLb": 27.4,
+      "leanMassLb": 154.8,
+      "boneMineralContentLb": 6.9,
+      "restingMetabolicRateKcal": 2140,
+      "visceralAdiposeTissueMassLb": 1.8,
+      "visceralAdiposeTissueVolumeIn3": 32.5,
+      "androidFatPercentage": 18.2,
+      "gynoidFatPercentage": 12.4,
+      "androidGynoidRatio": 1.47,
+      "regional": {
+        "arms": {
+          "leanMassLb": 17.2,
+          "fatMassLb": 3.1
+        },
+        "legs": {
+          "leanMassLb": 52.4,
+          "fatMassLb": 8.9
+        },
+        "trunk": {
+          "leanMassLb": 72.1,
+          "fatMassLb": 13.8
+        },
+        "android": {
+          "leanMassLb": 9.8,
+          "fatMassLb": 1.9
+        },
+        "gynoid": {
+          "leanMassLb": 17.5,
+          "fatMassLb": 3.2
+        }
+      },
+      "totalBMD": 1.198,
+      "tScore": -0.2,
+      "zScore": 0.3,
+      "sourceLabel": "BodySpec PDF"
+    },
+    {
+      "id": "dexa-fixture-002",
+      "measuredAt": "2026-06-20",
+      "totalMassLb": 178.0,
+      "bodyFatPercentage": 11.5,
+      "fatMassLb": 20.5,
+      "leanMassLb": 154.6,
+      "boneMineralContentLb": 6.9,
+      "restingMetabolicRateKcal": 2160,
+      "visceralAdiposeTissueMassLb": 1.3,
+      "visceralAdiposeTissueVolumeIn3": 24.1,
+      "androidFatPercentage": 14.6,
+      "gynoidFatPercentage": 9.8,
+      "androidGynoidRatio": 1.49,
+      "regional": {
+        "arms": {
+          "leanMassLb": 17.5,
+          "fatMassLb": 2.4
+        },
+        "legs": {
+          "leanMassLb": 53.0,
+          "fatMassLb": 6.8
+        },
+        "trunk": {
+          "leanMassLb": 71.8,
+          "fatMassLb": 10.4
+        },
+        "android": {
+          "leanMassLb": 10.1,
+          "fatMassLb": 1.4
+        },
+        "gynoid": {
+          "leanMassLb": 17.6,
+          "fatMassLb": 2.5
+        }
+      },
+      "totalBMD": 1.201,
+      "tScore": -0.1,
+      "zScore": 0.4,
+      "sourceLabel": "BodySpec PDF"
+    },
+    {
+      "id": "dexa-fixture-003",
+      "measuredAt": "2026-07-18",
+      "totalMassLb": 172.0,
+      "bodyFatPercentage": 8.2,
+      "fatMassLb": 14.1,
+      "leanMassLb": 155.0,
+      "boneMineralContentLb": 6.9,
+      "restingMetabolicRateKcal": 2185,
+      "visceralAdiposeTissueMassLb": 0.9,
+      "visceralAdiposeTissueVolumeIn3": 17.2,
+      "androidFatPercentage": 10.1,
+      "gynoidFatPercentage": 7.2,
+      "androidGynoidRatio": 1.4,
+      "regional": {
+        "arms": {
+          "leanMassLb": 17.8,
+          "fatMassLb": 1.6
+        },
+        "legs": {
+          "leanMassLb": 53.6,
+          "fatMassLb": 4.6
+        },
+        "trunk": {
+          "leanMassLb": 71.6,
+          "fatMassLb": 6.8
+        },
+        "android": {
+          "leanMassLb": 10.3,
+          "fatMassLb": 0.9
+        },
+        "gynoid": {
+          "leanMassLb": 17.8,
+          "fatMassLb": 1.7
+        }
+      },
+      "totalBMD": 1.204,
+      "tScore": 0.0,
+      "zScore": 0.5,
+      "sourceLabel": "BodySpec PDF"
+    },
+    {
+      "id": "dexa-fixture-004",
+      "measuredAt": "2026-08-16",
+      "totalMassLb": 177.0,
+      "bodyFatPercentage": 9.0,
+      "fatMassLb": 15.9,
+      "leanMassLb": 158.0,
+      "boneMineralContentLb": 7.0,
+      "restingMetabolicRateKcal": 2220,
+      "visceralAdiposeTissueMassLb": 1.0,
+      "visceralAdiposeTissueVolumeIn3": 18.6,
+      "androidFatPercentage": 11.0,
+      "gynoidFatPercentage": 7.8,
+      "androidGynoidRatio": 1.41,
+      "regional": {
+        "arms": {
+          "leanMassLb": 18.3,
+          "fatMassLb": 1.8
+        },
+        "legs": {
+          "leanMassLb": 54.6,
+          "fatMassLb": 5.1
+        },
+        "trunk": {
+          "leanMassLb": 72.9,
+          "fatMassLb": 7.6
+        },
+        "android": {
+          "leanMassLb": 10.5,
+          "fatMassLb": 1.0
+        },
+        "gynoid": {
+          "leanMassLb": 18.1,
+          "fatMassLb": 1.9
+        }
+      },
+      "totalBMD": 1.207,
+      "tScore": 0.1,
+      "zScore": 0.5,
+      "sourceLabel": "BodySpec PDF"
+    },
+    {
+      "id": "dexa-fixture-005",
+      "measuredAt": "2026-08-30",
+      "totalMassLb": 179.4,
+      "bodyFatPercentage": 9.4,
+      "fatMassLb": 16.9,
+      "leanMassLb": 159.5,
+      "boneMineralContentLb": 7.0,
+      "restingMetabolicRateKcal": 2240,
+      "visceralAdiposeTissueMassLb": 1.1,
+      "visceralAdiposeTissueVolumeIn3": 19.8,
+      "androidFatPercentage": 11.6,
+      "gynoidFatPercentage": 8.1,
+      "androidGynoidRatio": 1.43,
+      "regional": {
+        "arms": {
+          "leanMassLb": 18.6,
+          "fatMassLb": 1.9
+        },
+        "legs": {
+          "leanMassLb": 55.1,
+          "fatMassLb": 5.4
+        },
+        "trunk": {
+          "leanMassLb": 73.7,
+          "fatMassLb": 8.1
+        },
+        "android": {
+          "leanMassLb": 10.6,
+          "fatMassLb": 1.1
+        },
+        "gynoid": {
+          "leanMassLb": 18.3,
+          "fatMassLb": 2.0
+        }
+      },
+      "totalBMD": 1.209,
+      "tScore": 0.1,
+      "zScore": 0.6,
+      "sourceLabel": "BodySpec PDF"
+    }
+  ],
+  "dataSources": [
+    {
+      "name": "BodySpec",
+      "status": "Connected"
+    }
+  ]
+}

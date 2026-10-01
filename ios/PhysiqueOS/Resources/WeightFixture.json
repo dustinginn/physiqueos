@@ -1,0 +1,155 @@
+{
+  "weights": [
+    {
+      "id": "weight-fixture-001",
+      "date": "2026-05-23",
+      "value": 185.5,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-002",
+      "date": "2026-05-24",
+      "value": 185.0,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-003",
+      "date": "2026-05-31",
+      "value": 183.2,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-004",
+      "date": "2026-06-07",
+      "value": 181.5,
+      "unit": "lb",
+      "isDefaultConditions": false
+    },
+    {
+      "id": "weight-fixture-005",
+      "date": "2026-06-14",
+      "value": 179.8,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-006",
+      "date": "2026-06-21",
+      "value": 178.0,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-007",
+      "date": "2026-06-28",
+      "value": 176.4,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-008",
+      "date": "2026-07-05",
+      "value": 174.9,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-009",
+      "date": "2026-07-12",
+      "value": 173.3,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-010",
+      "date": "2026-07-18",
+      "value": 172.0,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-011",
+      "date": "2026-07-19",
+      "value": 172.2,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-012",
+      "date": "2026-07-26",
+      "value": 173.8,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-013",
+      "date": "2026-08-02",
+      "value": 175.0,
+      "unit": "lb",
+      "isDefaultConditions": false
+    },
+    {
+      "id": "weight-fixture-014",
+      "date": "2026-08-09",
+      "value": 176.2,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-015",
+      "date": "2026-08-16",
+      "value": 177.1,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-016",
+      "date": "2026-08-23",
+      "value": 178.3,
+      "unit": "lb",
+      "isDefaultConditions": true
+    },
+    {
+      "id": "weight-fixture-017",
+      "date": "2026-08-30",
+      "value": 179.4,
+      "unit": "lb",
+      "isDefaultConditions": true
+    }
+  ],
+  "dexaScans": [
+    {
+      "id": "dexa-fixture-001",
+      "date": "2026-05-24"
+    },
+    {
+      "id": "dexa-fixture-002",
+      "date": "2026-07-05"
+    },
+    {
+      "id": "dexa-fixture-003",
+      "date": "2026-08-16"
+    }
+  ],
+  "dataSources": [
+    {
+      "name": "Founder Weigh-ins",
+      "status": "Connected"
+    },
+    {
+      "name": "Apple Health",
+      "status": "Suggested"
+    },
+    {
+      "name": "Withings",
+      "status": "Suggested"
+    },
+    {
+      "name": "Garmin",
+      "status": "Future"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "localDate": "2026-08-28",
+  "loggedToday": [
+    {
+      "kind": "training",
+      "summary": "Strength Training · 52 min",
+      "context": null,
+      "destination": { "id": "training.session", "parameters": { "sessionId": "session-fixture-001" } }
+    },
+    {
+      "kind": "nutrition",
+      "summary": "3 meals · 2,140 calories",
+      "context": null,
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "nutrition" } }
+    },
+    {
+      "kind": "activity",
+      "summary": "Nothing logged yet",
+      "context": null,
+      "destination": null
+    }
+  ],
+  "pendingEvidenceReviews": [
+    {
+      "id": "review-fixture-001",
+      "title": "Check-in ready to review",
+      "date": "Friday, August 28",
+      "summary": "1 weight entry",
+      "likelyDuplicate": false,
+      "destination": { "id": "evidence.review", "parameters": { "reviewId": "review-fixture-001" } }
+    }
+  ]
+}

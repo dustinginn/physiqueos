@@ -1,0 +1,35 @@
+[
+  {
+    "id": "goal-build-lean-mass",
+    "title": "Build Lean Mass",
+    "status": "active",
+    "startDate": "2026-07-19",
+    "targetDate": null,
+    "phases": [
+      {
+        "id": "phase-establish-maintenance",
+        "name": "Establish Maintenance",
+        "order": 0,
+        "status": "completed",
+        "startDate": "2026-07-19",
+        "completedAt": "2026-08-15"
+      },
+      {
+        "id": "phase-lean-mass-build",
+        "name": "Lean Mass Build",
+        "order": 1,
+        "status": "active",
+        "startDate": "2026-08-16",
+        "completedAt": null
+      }
+    ]
+  },
+  {
+    "id": "goal-visible-abs",
+    "title": "Visible Abs",
+    "status": "completed",
+    "startDate": "2026-05-24",
+    "targetDate": "2026-07-18",
+    "phases": []
+  }
+]

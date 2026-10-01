@@ -1,0 +1,202 @@
+import SwiftUI
+
+/// The single place every `NavigationStack`'s
+/// `.navigationDestination(for: AppDestination.self)` resolves through —
+/// Home, Log, and Evidence all share this one router instead of three
+/// independently-guessed switch statements, so a destination that gains a
+/// real screen (Training history/day/session today) renders identically no
+/// matter which tab pushed it. A destination without a real screen yet
+/// falls through to the existing `DestinationPlaceholderView`.
+struct AppDestinationRouterView: View {
+    @Environment(AppEnvironment.self) private var environment
+    let destination: AppDestination
+    var onReturnToLog: () -> Void = {}
+    var onReturnToHome: () -> Void = {}
+    var onNavigate: (AppDestination) -> Void = { _ in }
+
+    var body: some View {
+        Group { routedContent }
+            .onAppear {
+#if DEBUG
+                NativePerformanceDiagnostics.recordShell(surface: destination.serverDestinationId)
+#endif
+            }
+    }
+
+    @ViewBuilder
+    private var routedContent: some View {
+        switch destination {
+        case .goalDetail(let goalId):
+            GoalDetailView(goalId: goalId, onNavigate: onNavigate)
+        case .goalPhase(let goalId, let phaseId):
+            GoalPhaseDetailView(goalId: goalId, phaseId: phaseId)
+        case .goalPlan(let goalId, let focus):
+            GoalStrategyView(goalId: goalId, focus: focus)
+        case .goalEdit(let goalId):
+            GoalEditWizardView(onNavigate: onNavigate, goalId: goalId)
+        case .goalTransition:
+            GoalTransitionWizardView(onNavigate: onNavigate)
+        case .goalProtocolTransition:
+            GoalProtocolTransitionView(onNavigate: onNavigate)
+        case .goalProtocolTransitionEdit(let category):
+            GoalProtocolCategoryEditorView(category: category)
+        case .goalTransitionReview:
+            GoalTransitionFinalReviewView(onNavigate: onNavigate)
+        case .goalTransitionSuccess:
+            GoalTransitionSuccessView(onNavigate: onNavigate)
+        case .goalPhaseTransition(let goalId, let phaseId):
+            if environment.nativeAuthority == .founderProduction {
+                GoalUnavailableView(message: "Phase transitions are not available in Native production.")
+            } else {
+                PhaseTransitionView(goalId: goalId, phaseId: phaseId)
+            }
+        case .checkIn(let checkInType) where ["morning", "morning-weight", "morning_weigh_in", "weight"].contains(checkInType):
+            MorningCheckInView(onNavigate: onNavigate)
+        case .priorityDetail(let priorityId):
+            PriorityDetailView(onNavigate: onNavigate, priorityId: priorityId)
+        case .priorityOccurrence(let priorityId, let occurrenceDate):
+            PriorityDetailView(onNavigate: onNavigate, priorityId: priorityId, occurrenceDate: occurrenceDate)
+        case .briefingDetail(let briefingId):
+            BriefingDetailView(briefingId: briefingId, onNavigate: onNavigate, onReturnToHome: onReturnToHome)
+        case .briefingList:
+            BriefingHistoryView(onNavigate: onNavigate)
+        case .manualWeighIn:
+            ManualWeighInView(onReturnToLog: onReturnToLog)
+        case .evidenceIntake:
+            if environment.nativeAuthority == .founderProduction {
+                ProductionEvidenceUploadView(onNavigate: onNavigate, onReturnToLog: onReturnToLog)
+            } else {
+                EvidenceIntakeView(onNavigate: onNavigate)
+            }
+        case .photoUpload:
+            if environment.nativeAuthority == .founderProduction {
+                ProductionEvidenceUploadView(fixedScenario: .progressPhotos, onNavigate: onNavigate, onReturnToLog: onReturnToLog)
+            } else {
+                EvidenceIntakeView(initialScenario: .progressPhotos, onNavigate: onNavigate)
+            }
+        case .dexaUpload:
+            if environment.nativeAuthority == .founderProduction {
+                ProductionEvidenceUploadView(fixedScenario: .dexa, onNavigate: onNavigate, onReturnToLog: onReturnToLog)
+            } else {
+                EvidenceIntakeView(initialScenario: .dexa, onNavigate: onNavigate)
+            }
+        case .localEvidenceReview(let reviewId):
+            LocalEvidenceReviewView(reviewId: reviewId, onReturnToLog: onReturnToLog, onNavigate: onNavigate)
+        case .evidenceReview(let reviewId):
+            EvidenceReviewDetailView(reviewId: reviewId, onReturnToLog: onReturnToLog)
+        case .evidenceRecoveryUpload(let type, let occurrenceDateKey):
+            if environment.nativeAuthority == .founderProduction {
+                DestinationPlaceholderView(destination: destination)
+            } else {
+                EvidenceIntakeView(
+                    initialScenario: type.evidenceScenario,
+                    initialRecoveryContext: .init(evidenceType: type, occurrenceDateKey: occurrenceDateKey),
+                    onNavigate: onNavigate
+                )
+            }
+        case .trainingLogger:
+            TrainingLoggerView()
+        case .trainingSession(let sessionId):
+            TrainingSessionDetailView(sessionId: sessionId)
+        case .trainingDay(let date):
+            TrainingDayView(date: date)
+        case .progressStream(let streamId) where streamId == "training":
+            TrainingHistoryView()
+        case .progressStream(let streamId) where streamId == "activity":
+            ActivityHistoryView()
+        case .activityDay(let date):
+            ActivityDayView(date: date)
+        case .progressStream(let streamId) where streamId == "nutrition":
+            NutritionHistoryView()
+        case .nutritionDay(let dayId):
+            NutritionDayView(dayId: dayId)
+        case .progressStream(let streamId) where streamId == "weight":
+            WeightHistoryView()
+        case .progressStream(let streamId) where streamId == "dexa":
+            DEXAHistoryView()
+        case .progressStream(let streamId) where streamId == "photos":
+            PhotosHistoryView()
+        case .progressStream(let streamId) where streamId == "timeline":
+            TimelineView()
+        case .photoSetDetail(let setId, let poseId):
+            PhotoSetDetailView(setId: setId, initialPoseId: poseId)
+        case .progressStream(let streamId) where streamId == "energy":
+            EnergyHistoryView()
+        // The bare Training Library root (`/progress/training/library`,
+        // no area/exercise segment) — the same 10 canonical areas the
+        // landing page's own "Training Areas" grid shows, rendered as a
+        // plain Browse list instead of a tile grid (verified from source:
+        // `getLibraryChildren` returns the identical `FLAT_TRAINING_NAV_GROUPS`
+        // set for an empty path).
+        case .progressStream(let streamId) where streamId == "training/library":
+            TrainingLibraryRootView()
+        // Reporting: `training/reporting/{reportId}` — one screen handles
+        // all 6 real `reportingLinks` ids (resistance/cardio/volume/
+        // frequency/consistency/history); `TrainingReportingView` itself
+        // renders the correct content per id.
+        case .progressStream(let streamId) where streamId.hasPrefix("training/reporting/"):
+            TrainingReportingView(reportId: String(streamId.dropFirst("training/reporting/".count)))
+        // Nutrition Reporting: `nutrition/reporting/{reportId}` — one
+        // screen handles all 3 real report ids (calories/macros/meals).
+        case .progressStream(let streamId) where streamId.hasPrefix("nutrition/reporting/"):
+            NutritionReportingView(reportId: String(streamId.dropFirst("nutrition/reporting/".count)))
+        // All 10 canonical Training Areas are fixture-backed (see
+        // TrainingFixture.json's `areas` array) — `TrainingAreaView` is
+        // fully generic over `areaId` and already renders an honest empty
+        // "Browse" section for an area with zero exercises (matching real
+        // web behavior). An individual exercise leaf (drilling into one
+        // exercise from inside an area, e.g. "bench-press") uses this exact
+        // same `.trainingExercise` case with a non-area id, and now routes
+        // to the real Exercise Detail/history screen instead of a
+        // placeholder.
+        case .trainingExercise(let exerciseId) where TrainingAreaIcon.canonicalAreaIds.contains(exerciseId):
+            TrainingAreaView(areaId: exerciseId)
+        case .trainingLibraryArea(let areaId, let browseAll):
+            TrainingAreaView(areaId: areaId, browseAll: browseAll)
+        case .trainingExercise(let exerciseId):
+            TrainingExerciseDetailView(exerciseId: exerciseId)
+        case .operatingPlan:
+            OperatingPlanLandingView(onNavigate: onNavigate)
+        case .operatingPlanStrategy(let strategyType, let strategyId):
+            OperatingPlanStrategyDetailView(strategyType: strategyType, strategyId: strategyId, onNavigate: onNavigate)
+        case .operatingPlanStrategyEdit(let strategyType, let strategyId):
+            OperatingPlanStrategyEditorView(strategyType: strategyType, strategyId: strategyId)
+        case .operatingPlanProtocolDomain(let protocolId):
+            OperatingPlanProtocolDomainView(protocolId: protocolId, onNavigate: onNavigate)
+        case .operatingPlanPeptideExecution(let protocolId):
+            OperatingPlanPeptideExecutionView(protocolId: protocolId, onNavigate: onNavigate)
+        case .operatingPlanRecoverySupport(let executionId):
+            OperatingPlanRecoverySupportView(executionId: executionId)
+        case .operatingPlanTracking:
+            OperatingPlanTrackingView(onNavigate: onNavigate)
+        case .operatingPlanTrackingSupport(let executionId):
+            OperatingPlanTrackingSupportView(executionId: executionId)
+        case .operatingPlanSupplementSupport(let protocolId):
+            OperatingPlanSupplementSupportView(protocolId: protocolId)
+        case .operatingPlanSupplementNew:
+            OperatingPlanSupplementEditorView(protocolId: nil)
+        case .operatingPlanSupplementEdit(let protocolId):
+            OperatingPlanSupplementEditorView(protocolId: protocolId)
+        case .operatingPlanStatus(_, let title, let detail, let status):
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    OperatingPlanScreenHeader(eyebrow: "Operating Plan", title: title, subtitle: detail)
+                    CardContainer(padding: .sm) {
+                        OperatingPlanFieldRow(label: "Status", value: status)
+                    }
+                }
+                .padding(16)
+            }
+            .background(PhysiqueOSTheme.background)
+            .navigationTitle(title)
+        case .operatingPlanDexaAppointment:
+            OperatingPlanDexaAppointmentView()
+        case .operatingPlanTrainingStrategyBuilder:
+            OperatingPlanTrainingProtocolBuilderView(onNavigate: onNavigate)
+        case .founderServerConnection:
+            FounderServerConnectionView()
+        default:
+            DestinationPlaceholderView(destination: destination)
+        }
+    }
+}

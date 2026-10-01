@@ -156,5 +156,7 @@ describe("Sleep request-body bound", () => {
     expect(HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES).toBeGreaterThanOrEqual(derived);
     expect(HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES).toBeLessThanOrEqual(Math.ceil(derived * 1.15));
     expect(resolveNativeCommandMaximumRequestBytes(Phase3Command.INGEST_HEALTHKIT_SLEEP)).toBe(HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES);
+    expect(resolveNativeCommandMaximumRequestBytes(Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION)).toBe(HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES);
+    expect(resolveNativeCommandMaximumRequestBytes(Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE)).toBe(HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES);
   });
 });

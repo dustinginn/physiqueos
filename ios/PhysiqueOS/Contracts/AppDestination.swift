@@ -1,0 +1,215 @@
+import Foundation
+
+/// A bounded subset of the server's typed destination registry
+/// (`src/contracts/v1/destination.js`), covering only the destinations Home
+/// and Log actually link to. This is not a transcription of all 22 server
+/// cases — cases are added only when a real screen needs them.
+///
+/// Case names and associated values mirror the server's `DestinationId` and
+/// required-parameter contract so a later live API can decode directly into
+/// this type without the screen changing.
+enum AppDestination: Hashable, Codable {
+    case goalDetail(goalId: String)
+    /// Native Goals browse destinations derived from the current web goal
+    /// phase and Operating Plan links. These are presentation-only routes;
+    /// they do not claim a production mutation contract.
+    case goalPhase(goalId: String, phaseId: String)
+    case goalPlan(goalId: String, focus: GoalPlanFocus)
+    /// `/goals/[goalId]/edit`.
+    case goalEdit(goalId: String)
+    /// `/goals/transition` (Route A of the 5-route Goal Transition tree).
+    case goalTransition
+    /// `/goals/transition/protocols` (Route B).
+    case goalProtocolTransition
+    /// `/goals/transition/protocols/edit/[category]` (Route C).
+    case goalProtocolTransitionEdit(category: String)
+    /// `/goals/transition/review` (Route D).
+    case goalTransitionReview
+    /// `/goals/transition/success` (Route E).
+    case goalTransitionSuccess
+    /// Native-only: the honest Phase Transition + Energy Strategy
+    /// extension (see `GoalsSandboxModel.swift`'s doc comment — the live
+    /// web's Phase Review flow does not yet prompt for a new Energy
+    /// Strategy; this models the intended domain contract).
+    case goalPhaseTransition(goalId: String, phaseId: String)
+    case checkIn(checkInType: String)
+    case photoUpload
+    case dexaUpload
+    case briefingDetail(briefingId: String)
+    case briefingList
+    case priorityDetail(priorityId: String)
+    /// Native-only route retaining the exact canonical occurrence opened
+    /// from Home/history. The production server resolves the detail for
+    /// this explicit date; Native never substitutes today/latest.
+    case priorityOccurrence(priorityId: String, occurrenceDate: String)
+    case evidenceReview(reviewId: String)
+    case trainingSession(sessionId: String)
+    /// `training.exercise` — a Training Area row's own destination
+    /// (`/progress/training/library/:exerciseSlug`,
+    /// `TRAINING_EXERCISE`/`getTrainingAreaNavigationGroups`,
+    /// `src/screens/ProgressPlaceholderScreen.jsx:986-996`). The router
+    /// distinguishes canonical Training Area ids from individual exercise
+    /// ids and presents the corresponding typed Native screen.
+    case trainingExercise(exerciseId: String)
+    case trainingLibraryArea(areaId: String, browseAll: Bool)
+    /// `progress.stream` — the server's catch-all `/progress/*` pattern.
+    /// Log's Nutrition and (multi-session/no-id) Training rows resolve
+    /// here today because the server destination registry has no
+    /// dedicated nutrition-day or activity destination id yet — verified
+    /// directly against `destinationFromWebHref`'s pattern list, not
+    /// assumed.
+    case progressStream(streamId: String)
+    /// `/progress/training/day/:date` — verified against
+    /// `destinationFromWebHref`'s pattern list (`src/contracts/v1/destination.js`):
+    /// there is no dedicated Training Day destination id yet, so this href
+    /// falls through the same catch-all `progress.stream` pattern as
+    /// `progressStream` above, with a compound `streamId` of
+    /// `"training/day/<date>"`. This preserves that exact, if unusual,
+    /// current contract fact — the same kind of quirk already recorded for
+    /// `trainingLogger` — rather than inventing a dedicated destination id
+    /// the server does not have.
+    case trainingDay(date: String)
+    /// `/progress/activity/day/:date` — same catch-all `progress.stream`
+    /// contract quirk as `trainingDay` above (no dedicated Activity Day
+    /// destination id on the server yet), with a compound `streamId` of
+    /// `"activity/day/<date>"`.
+    case activityDay(date: String)
+    /// `/progress/nutrition/day/:dayId` — same catch-all `progress.stream`
+    /// contract quirk as `trainingDay`/`activityDay` above (no dedicated
+    /// Nutrition Day destination id on the server yet, verified against
+    /// `destinationFromWebHref`'s pattern list during this port's audit),
+    /// with a compound `streamId` of `"nutrition/day/<dayId>"`.
+    case nutritionDay(dayId: String)
+    /// Photo set/session detail — a Native-only typed push destination.
+    /// The web has no route here at all (confirmed by audit: set detail
+    /// is a client-side `PhotoModal`, not a URL) — this doesn't claim a
+    /// server destination contract, the same "Native-only" treatment
+    /// `manualWeighIn`/`evidenceIntake` already use, matching this port's
+    /// Detail Navigation requirement (a real push instead of a web modal).
+    case photoSetDetail(setId: String, poseId: PhotoPoseID? = nil)
+    /// The web's own typed-destination registry currently maps
+    /// `/log/training` (the Training Logger entry point) to the same
+    /// `log` destination id as `/log` itself — Training Logger has no
+    /// dedicated destination id yet. This case preserves that exact,
+    /// if unusual, current contract fact rather than inventing a nicer
+    /// one; `serverDestinationId` intentionally returns `"log"` to match.
+    case trainingLogger
+    /// Native-only typed routes for the fixture-backed logging sandbox.
+    /// They intentionally do not claim a server destination contract.
+    case manualWeighIn
+    case evidenceIntake
+    case localEvidenceReview(reviewId: String)
+    /// Morning Check-In's Evidence Recovery card — routes into the SAME
+    /// `EvidenceIntakeView` every other upload uses, pre-seeded with the
+    /// missing type's scenario and a recovery context so confirming/
+    /// discarding the resulting review returns to Morning Check-In
+    /// instead of Log (mirrors `EvidenceRecoveryContext`'s exact role on
+    /// web — verified this is a context-passing wrapper around the
+    /// identical intake/review pipeline, not a separate ingestion path).
+    case evidenceRecoveryUpload(type: MorningEvidenceRecoveryType, occurrenceDateKey: String)
+    /// Native-only typed routes for the fixture-backed Operating Plan
+    /// browse/sandbox vertical (`src/app/profile/operating-plan/**`,
+    /// `src/app/profile/protocols/**`). Like the logging-sandbox cases
+    /// above, these do not claim a server destination contract — the web's
+    /// `OperatingPlanScreen.jsx`'s landing composer and
+    /// `OperatingPlanStrategyDetailService` return raw `href` strings,
+    /// not typed destination objects, so there
+    /// is no existing `DestinationId` to mirror.
+    case operatingPlan
+    /// `strategy/[strategyType]/[strategyId]` — `strategyType` is one of
+    /// `energy`, `nutrition`, `training`, `briefings`
+    /// (`OperatingPlanStrategyType`'s exact allowlist).
+    case operatingPlanStrategy(strategyType: String, strategyId: String)
+    /// `strategy/[strategyType]/[strategyId]/edit` — reachable only for
+    /// `nutrition`, `training`, `briefings` (Energy has no editor route in
+    /// web today).
+    case operatingPlanStrategyEdit(strategyType: String, strategyId: String)
+    /// `/profile/protocols/[protocolId]` when the resolved protocol's
+    /// category is Recovery, Peptide, or Supplement and it is active —
+    /// `StrategyDomainScreen`'s roll-up of every active protocol sharing
+    /// that category, keyed by one representative protocol id exactly as
+    /// the web's `protocolItem()` href does.
+    case operatingPlanProtocolDomain(protocolId: String)
+    /// `execution/peptides/[protocolId]` — dosing detail, with an in-place
+    /// edit mode mirroring the web's own `?edit=1` toggle on the same
+    /// route rather than a second destination.
+    case operatingPlanPeptideExecution(protocolId: String)
+    /// `execution/[executionId]` for the Recovery (foam-rolling) support
+    /// method — same in-place `?edit=1` toggle pattern as peptide
+    /// execution above.
+    case operatingPlanRecoverySupport(executionId: String)
+    case operatingPlanTracking
+    case operatingPlanTrackingSupport(executionId: String)
+    case operatingPlanSupplementSupport(protocolId: String)
+    case operatingPlanSupplementNew
+    case operatingPlanSupplementEdit(protocolId: String)
+    /// Server-projected, intentionally read-only canonical configuration
+    /// state when a landing item has no established detail/editor route.
+    case operatingPlanStatus(domain: String, title: String, detail: String, status: String)
+    /// `/profile/operating-plan/execution/dexa` — view/edit the next DEXA
+    /// appointment. Reached from Priority Detail's "View DEXA Appointment"
+    /// action, not from a landing card (the real Tracking section only
+    /// surfaces Morning Weigh-In).
+    case operatingPlanDexaAppointment
+    /// `/profile/operating-plan/training/new` — the 11-step Training
+    /// Protocol Builder. Reached from the Operating Plan landing's
+    /// Training row only while no Training strategy is active yet; the
+    /// real web page itself redirects away once one exists.
+    case operatingPlanTrainingStrategyBuilder
+    /// Native-only controlled proof of the live Founder bearer transport.
+    /// This does not claim a current web destination id.
+    case founderServerConnection
+
+    /// The server's destination id string, for parity with
+    /// `DestinationId` values and for the placeholder screen's display.
+    var serverDestinationId: String {
+        switch self {
+        case .goalDetail: "goal.detail"
+        case .goalPhase: "native.goal.phase"
+        case .goalPlan: "native.goal.plan"
+        case .goalEdit: "native.goal.edit"
+        case .goalTransition: "native.goal.transition"
+        case .goalProtocolTransition: "native.goal.transition.protocols"
+        case .goalProtocolTransitionEdit: "native.goal.transition.protocols.edit"
+        case .goalTransitionReview: "native.goal.transition.review"
+        case .goalTransitionSuccess: "native.goal.transition.success"
+        case .goalPhaseTransition: "native.goal.phase.transition"
+        case .checkIn: "check-in"
+        case .photoUpload: "photo.upload"
+        case .dexaUpload: "dexa.upload"
+        case .briefingDetail: "briefing.detail"
+        case .briefingList: "briefing.list"
+        case .priorityDetail: "priority.detail"
+        case .priorityOccurrence: "native.priority.occurrence"
+        case .evidenceReview: "evidence.review"
+        case .trainingSession: "training.session"
+        case .trainingExercise: "training.exercise"
+        case .trainingLibraryArea: "native.training.library.area"
+        case .progressStream: "progress.stream"
+        case .trainingDay: "progress.stream"
+        case .activityDay: "progress.stream"
+        case .nutritionDay: "progress.stream"
+        case .trainingLogger: "log"
+        case .manualWeighIn: "native.manual-weigh-in"
+        case .evidenceIntake: "native.evidence-intake"
+        case .localEvidenceReview: "native.evidence-review"
+        case .evidenceRecoveryUpload: "native.evidence-recovery-upload"
+        case .photoSetDetail: "native.photo-set-detail"
+        case .operatingPlan: "native.operating-plan"
+        case .operatingPlanStrategy: "native.operating-plan.strategy"
+        case .operatingPlanStrategyEdit: "native.operating-plan.strategy.edit"
+        case .operatingPlanProtocolDomain: "native.operating-plan.protocol"
+        case .operatingPlanPeptideExecution: "native.operating-plan.protocol.peptide"
+        case .operatingPlanRecoverySupport: "native.operating-plan.protocol.recovery"
+        case .operatingPlanTracking: "native.operating-plan.tracking"
+        case .operatingPlanTrackingSupport: "native.operating-plan.tracking.support"
+        case .operatingPlanSupplementSupport: "native.operating-plan.protocol.supplement.support"
+        case .operatingPlanSupplementNew: "native.operating-plan.supplement.new"
+        case .operatingPlanSupplementEdit: "native.operating-plan.supplement.edit"
+        case .operatingPlanStatus: "native.operating-plan.status"
+        case .operatingPlanDexaAppointment: "native.operating-plan.dexa-appointment"
+        case .operatingPlanTrainingStrategyBuilder: "native.operating-plan.training.new"
+        case .founderServerConnection: "native.founder-server-connection"
+        }
+    }
+}

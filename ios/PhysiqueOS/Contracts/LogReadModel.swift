@@ -1,0 +1,127 @@
+import Foundation
+
+/// Native transport mirror of the server's `log.v1` application read model
+/// (`Phase3ReadModelService` + `LogReadService.getLog`,
+/// `LoggedTodayService.composeLoggedTodaySummary`). Only genuinely
+/// server-computed/dynamic state is modeled here — Training Logger's and
+/// Upload's card copy are static in the web source too (hardcoded JSX, not
+/// read-model fields), so they live directly in `LogView`, exactly mirroring
+/// how the web itself has no server data behind them.
+struct LogReadModel: Codable, Equatable {
+    /// The server-computed local "today" (`getLocalDateKey`), used as the
+    /// default/maximum selectable date for the weigh-in entry — native
+    /// must not derive this itself (see docs/PHYSIQUEOS_NATIVE_V1.md's
+    /// timezone-drift concern from the Track A audit).
+    var localDate: String
+    /// Always exactly three rows — training, nutrition, activity, in that
+    /// order — matching `composeLoggedTodaySummary`'s fixed row list.
+    var loggedToday: [LoggedTodayRow]
+    var pendingEvidenceReviews: [PendingEvidenceReview]
+    /// Server-owned confirmations that have crossed the durable acceptance
+    /// boundary but have not reached canonical read visibility yet. Optional
+    /// keeps older fixture/read payloads backward compatible.
+    var processingEvidenceReviews: [ProcessingEvidenceReview]? = nil
+
+    var hasPendingEvidenceReviews: Bool { !pendingEvidenceReviews.isEmpty }
+    var genericProcessingEvidenceReviews: [ProcessingEvidenceReview] {
+        (processingEvidenceReviews ?? []).filter { !["nutrition", "activity", "training"].contains($0.domain) }
+    }
+}
+
+enum LoggedTodayRowKind: String, Codable {
+    case training, nutrition, activity
+    /// Founder Production only, Build 21 — synthesized locally, never
+    /// decoded from the wire: `evidence-review-queue`'s own
+    /// `loggedToday.rows` doesn't send a Weight row today (a confirmed,
+    /// narrow server gap — see `ProductionLogAPI.fetchLog()`'s doc
+    /// comment for the exact fix). Native composes this 4th row itself
+    /// from a second, already-existing read (`weight`'s own exact-date
+    /// `current`), never from a "latest weight" guess.
+    case weight
+
+    /// `LOGGED_TODAY_ICONS` in `LogHubScreen.jsx`.
+    var systemImage: String {
+        switch self {
+        case .training: "figure.strengthtraining.traditional"
+        case .nutrition: "fork.knife"
+        case .activity: "waveform.path.ecg"
+        case .weight: "scalemass"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .training: "Training"
+        case .nutrition: "Nutrition"
+        case .activity: "Activity"
+        case .weight: "Weight"
+        }
+    }
+}
+
+struct LoggedTodayRow: Codable, Equatable, Identifiable {
+    var kind: LoggedTodayRowKind
+    var summary: String
+    var context: String?
+    var destination: AppDestination?
+    var processing: Bool? = nil
+    /// Server-composed lines for a row that summarizes more than one thing
+    /// (Training: Strength and today's Cardio, one line per modality).
+    /// `summary` stays the single-line fallback and accessibility text.
+    var lines: [LoggedTodayLine]? = nil
+
+    var id: String { kind.rawValue }
+
+    /// The lines to show when the row summarizes several things; empty when
+    /// the single `summary` line already says everything.
+    var displayLines: [LoggedTodayLine] {
+        guard let lines, lines.count > 1 else { return [] }
+        return lines
+    }
+}
+
+/// One server-composed line of a Logged Today row (e.g. "Strength Training ·
+/// 50 min", "2 Outdoor Walks · 32 min"). Native renders it verbatim.
+struct LoggedTodayLine: Codable, Equatable, Hashable, Identifiable {
+    var id: String
+    var kind: String
+    var summary: String
+}
+
+struct ProcessingEvidenceReview: Codable, Equatable, Identifiable {
+    var id: String
+    var localDate: String
+    var domain: String
+    var label: String
+    var status: String
+}
+
+/// Ephemeral client acknowledgment of a Server-accepted confirmation. It
+/// bridges only the read-projection race between the durable command
+/// receipt and the queue's next lifecycle snapshot; the Server review
+/// status remains authoritative and terminal failures restore retry UI.
+struct AcceptedEvidenceReviewProcessing: Equatable, Sendable {
+    var id: String
+    var localDate: String?
+    var domain: String
+    var label: String
+}
+
+struct PendingEvidenceReview: Codable, Equatable, Identifiable {
+    var id: String
+    var title: String
+    /// Already display-formatted (e.g. "Thursday, August 28"), mirroring
+    /// `formatPendingReviewDate` — presentation formatting the server
+    /// already performs, not recomputed here.
+    var date: String
+    var summary: String
+    var likelyDuplicate: Bool
+    var destination: AppDestination
+    /// `"healthkit_workout_reconciliation"` for a Strength-candidate review
+    /// (`projectPendingReviews`'s `presentation.kind`), nil for every other
+    /// pending review type (photo/nutrition/DEXA/generic evidence, which the
+    /// server never tags). The only reliable, already-server-provided way to
+    /// scope the reconciliation-review notifier to exactly this review type
+    /// without re-deriving it from `id`'s internal prefix convention.
+    var kind: String? = nil
+}

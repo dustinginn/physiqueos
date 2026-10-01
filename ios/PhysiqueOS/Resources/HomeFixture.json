@@ -1,0 +1,86 @@
+{
+  "header": {
+    "greeting": "Good morning,",
+    "name": "Alex"
+  },
+  "hero": {
+    "mode": "active",
+    "goalLabel": "Lean Definition Goal",
+    "headline": "On track.",
+    "supportLine": "Keep executing the plan.",
+    "confidence": 68,
+    "confidenceDetail": {
+      "qualitativeLevel": "Moderate",
+      "supportingFactors": [
+        "Weight trends have continued to hold up, which supports confidence that the plan is working."
+      ],
+      "limitingFactors": [
+        "There hasn't yet been enough direct body-composition evidence to confirm the desired outcome."
+      ],
+      "clarifyingFactors": [
+        "The next DEXA measurement can directly confirm how this is progressing."
+      ],
+      "uncertaintyStatement": ""
+    },
+    "projectedFinish": "Nov 14",
+    "daysRemaining": "62 days",
+    "actionLabel": null,
+    "actionDestination": null
+  },
+  "nextBestAction": {
+    "title": "Log Morning Weight",
+    "icon": "scale",
+    "destination": { "id": "check-in", "parameters": { "checkInType": "morning" } }
+  },
+  "briefingCards": [
+    {
+      "id": "briefing-daily-fixture-001",
+      "sectionLabel": "Daily Briefing",
+      "title": "Daily Briefing Ready",
+      "prompt": "See what's changed.",
+      "createdAt": "2026-08-28T13:00:00.000Z",
+      "destination": { "id": "briefing.detail", "parameters": { "briefingId": "briefing-daily-fixture-001" } }
+    }
+  ],
+  "goals": [
+    {
+      "id": "goal_fixture_build_lean_mass",
+      "title": "Build Lean Mass",
+      "current": "16.2",
+      "target": "12.0",
+      "unit": "%",
+      "icon": "target",
+      "color": "success",
+      "presentationMode": "primary",
+      "progress": 61,
+      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_fixture_build_lean_mass" } }
+    },
+    {
+      "id": "goal_maintain_8_9_body_fat",
+      "title": "Maintain Strength Baseline",
+      "current": "",
+      "target": "",
+      "unit": "",
+      "icon": "dumbbell",
+      "color": "evidence",
+      "presentationMode": "supporting",
+      "status": "Maintaining",
+      "detail": "Strength holding steady",
+      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_maintain_8_9_body_fat" } }
+    },
+    {
+      "id": "goal_preserve_lean_mass",
+      "title": "Preserve Lean Mass",
+      "current": "",
+      "target": "",
+      "unit": "",
+      "icon": "shield",
+      "color": "primary",
+      "presentationMode": "supporting",
+      "status": "On track",
+      "detail": "Lean mass stable across recent DEXA scans",
+      "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_preserve_lean_mass" } }
+    }
+  ],
+  "todaysFocus": []
+}

@@ -1,0 +1,399 @@
+import XCTest
+@testable import PhysiqueOS
+
+/// Regression coverage for the Home read-model contract introduced in this
+/// slice. These tests protect the boundary the Native V1 design depends on:
+/// native must decode and display server-owned values, never derive them.
+final class HomeReadModelTests: XCTestCase {
+
+    private static func context(title: String, time: String, dose: String? = nil) -> String {
+        PriorityExecutionContextPresentation.context(
+            for: executionContextItem(title: title, time: time, dose: dose)
+        ) ?? ""
+    }
+
+    private static func executionContextItem(title: String, time: String?, dose: String?) -> PriorityOccurrence {
+        PriorityOccurrence(
+            id: "priority-\(title)", executionItemId: "execution-\(title)", date: "2026-09-16",
+            title: title, subtitle: "Tonight", metadata: nil, changeLabel: nil,
+            icon: .target, color: .primary, urgency: .available, completed: false,
+            completable: true, expectedVersion: 1, actionLabel: nil,
+            completionContext: nil,
+            notificationAction: PriorityNotificationAction(
+                classification: .specializedWorkflowRequired,
+                workflow: dose == nil ? "priority_detail" : "peptide_protocol",
+                scheduledTime: time,
+                completionCommand: dose.map { value in
+                    PriorityNotificationCompletionCommand(
+                        commandType: "priority.complete.v1", expectedVersion: 1,
+                        payload: PriorityNotificationCompletionPayload(
+                            priorityId: "priority", occurrenceDate: "2026-09-16", dose: value,
+                            protocolId: "protocol"
+                        )
+                    )
+                }
+            )
+        )
+    }
+
+    func testWebParityTokensKeepPhaseAndGuardrailGeometrySymmetrical() {
+        XCTAssertEqual(HomeGoalWebParityTokens.cardHorizontalPadding, 16)
+        XCTAssertEqual(HomeGoalWebParityTokens.cardVerticalPadding, 15)
+        XCTAssertEqual(HomeGoalWebParityTokens.phaseIconSize, HomeGoalWebParityTokens.guardrailIconSize)
+        XCTAssertEqual(HomeGoalWebParityTokens.cardCornerRadius, 16)
+        XCTAssertGreaterThanOrEqual(HomeGoalWebParityTokens.phaseToPhaseSpacing, 12)
+        XCTAssertGreaterThanOrEqual(HomeGoalWebParityTokens.guardrailTopSpacing, HomeGoalWebParityTokens.phaseToPhaseSpacing)
+    }
+
+    // MARK: - Fixture decoding integrity
+
+    func testBundledFixtureDecodesWithoutError() throws {
+        let model = try Self.loadBundledFixture()
+        XCTAssertFalse(model.header.name.isEmpty)
+        XCTAssertFalse(model.goals.isEmpty)
+        XCTAssertNotNil(model.hero.confidence)
+    }
+
+    func testFixtureExercisesBothGoalPresentationModes() throws {
+        let model = try Self.loadBundledFixture()
+        let hasPrimary = model.goals.contains { if case .primary = $0.presentation { return true } else { return false } }
+        let hasSupporting = model.goals.contains { if case .supporting = $0.presentation { return true } else { return false } }
+        XCTAssertTrue(hasPrimary, "Fixture should exercise the primary-goal presentation.")
+        XCTAssertTrue(hasSupporting, "Fixture should exercise the supporting-objective presentation.")
+    }
+
+    // MARK: - Confidence is supplied, never recomputed
+
+    /// Decodes two fixtures that differ only in their confidence value and
+    /// asserts the decoded model reflects each value exactly. `HomeReadModel`
+    /// decoding is a pure structural mapping with no arithmetic over
+    /// `confidence` anywhere in its `init(from:)` path — this test would
+    /// catch a future change that started deriving or clamping the value
+    /// during decode instead of passing it through untouched.
+    func testConfidenceValueIsPassedThroughVerbatim() throws {
+        for expected in [0, 42, 100] {
+            let json = Self.confidenceOnlyFixture(confidence: expected)
+            let model = try JSONDecoder().decode(HomeReadModel.self, from: json)
+            XCTAssertEqual(model.hero.confidence, expected)
+        }
+    }
+
+    func testMissingConfidenceDecodesToNilNotZero() throws {
+        let json = Self.confidenceOnlyFixture(confidence: nil)
+        let model = try JSONDecoder().decode(HomeReadModel.self, from: json)
+        XCTAssertNil(model.hero.confidence, "Absent confidence must stay absent, never default to 0 or another computed value.")
+    }
+
+    // MARK: - Section visibility follows fixture state
+
+    func testEmptyBriefingCardsHidesTheSection() throws {
+        var model = try Self.loadBundledFixture()
+        model.briefingCards = []
+        XCTAssertFalse(model.hasBriefingCards)
+    }
+
+    func testNonEmptyBriefingCardsShowsTheSection() throws {
+        let model = try Self.loadBundledFixture()
+        XCTAssertTrue(model.hasBriefingCards)
+    }
+
+    func testEmptyTodaysFocusHidesTheSection() throws {
+        var model = try Self.loadBundledFixture()
+        model.todaysFocus = []
+        XCTAssertFalse(model.hasTodaysFocus)
+    }
+
+    func testCanonicalSupplementIconDecodesAsPillsWithoutChangingPeptideOrRecoverySemantics() throws {
+        XCTAssertEqual(HomeFocusIconPresentation.systemImage(for: .pills), "pills.fill")
+        XCTAssertEqual(HomeFocusIconPresentation.systemImage(for: .syringe), "syringe.fill")
+        XCTAssertEqual(
+            HomeFocusIconPresentation.systemImage(for: .activity),
+            "figure.strengthtraining.traditional"
+        )
+
+        let decoded = try JSONDecoder().decode(
+            HomeFocusIcon.self,
+            from: Data(#""pills""#.utf8)
+        )
+        XCTAssertEqual(decoded, .pills)
+    }
+
+    func testFutureServerIconsDegradeNeutrallyWithoutDroppingHomeOrPriority() throws {
+        let json = Data(#"""
+        {
+          "header":{"greeting":"Good morning","name":"Founder"},
+          "hero":{"mode":"active","goalLabel":"Goal","headline":"On track","supportLine":"Continue","confidence":null,"confidenceDetail":null,"projectedFinish":null,"daysRemaining":null,"actionLabel":null,"actionDestination":null},
+          "nextBestAction":{"title":"Future action","icon":"future_domain_icon","destination":{"id":"briefing.list","parameters":{}}},
+          "briefingCards":[],
+          "goals":[{"id":"goal","title":"Goal","current":"1","target":"2","unit":"lb","icon":"future_goal_icon","color":"future_color","presentationMode":"primary","progress":50,"destination":null}],
+          "todaysFocus":[
+            {"id":"future-priority","executionItemId":"execution-future","date":"2026-09-18","title":"Future priority","subtitle":null,"metadata":null,"changeLabel":null,"icon":"future_focus_icon","color":"future_color","urgency":"available","completed":false,"completable":false,"expectedVersion":null,"actionLabel":null,"completionContext":null},
+            {"id":"known-priority","executionItemId":"execution-known","date":"2026-09-18","title":"Known priority","subtitle":null,"metadata":null,"changeLabel":null,"icon":"pills","color":"effort","urgency":"available","completed":false,"completable":false,"expectedVersion":null,"actionLabel":null,"completionContext":null}
+          ]
+        }
+        """#.utf8)
+        let model = try JSONDecoder().decode(HomeReadModel.self, from: json)
+        XCTAssertEqual(model.nextBestAction.icon, .unknown)
+        XCTAssertEqual(model.goals.first?.icon, .unknown)
+        XCTAssertEqual(model.goals.first?.color, .muted)
+        XCTAssertEqual(model.todaysFocus.map(\.icon), [.unknown, .pills])
+        XCTAssertEqual(HomeFocusIconPresentation.systemImage(for: model.todaysFocus[0].icon), "circle.dashed")
+        XCTAssertEqual(model.todaysFocus.map(\.title), ["Future priority", "Known priority"])
+    }
+
+    // MARK: - Typed, bounded route intent
+
+    func testDestinationRoundTripsThroughTheServerWireShape() throws {
+        let destinations: [AppDestination] = [
+            .goalDetail(goalId: "goal_fixture_lean_definition"),
+            .checkIn(checkInType: "morning"),
+            .photoUpload,
+            .dexaUpload,
+            .briefingDetail(briefingId: "briefing-daily-fixture-001"),
+            .briefingList,
+            .priorityDetail(priorityId: "priority-fixture-001"),
+        ]
+        for destination in destinations {
+            let data = try JSONEncoder().encode(destination)
+            let decoded = try JSONDecoder().decode(AppDestination.self, from: data)
+            XCTAssertEqual(decoded, destination)
+        }
+    }
+
+    func testDestinationWireShapeMatchesServerIdFormat() throws {
+        // Guards against a native-only id format drifting from the server's
+        // actual DestinationId strings (src/contracts/v1/destination.js).
+        let data = try JSONEncoder().encode(AppDestination.goalDetail(goalId: "abc"))
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(object?["id"] as? String, "goal.detail")
+        let parameters = object?["parameters"] as? [String: Any]
+        XCTAssertEqual(parameters?["goalId"] as? String, "abc")
+    }
+
+    func testUnknownDestinationIdFailsClosedRatherThanGuessing() {
+        let json = Data(#"{"id": "some.unrecognized.destination", "parameters": {}}"#.utf8)
+        XCTAssertThrowsError(try JSONDecoder().decode(AppDestination.self, from: json))
+    }
+
+    func testEveryHomeInteractionCarriesAResolvableDestination() throws {
+        let model = try Self.loadBundledFixture()
+        XCTAssertNotNil(model.nextBestAction.destination)
+        for card in model.briefingCards where card.destination != nil {
+            XCTAssertEqual(card.destination?.serverDestinationId, "briefing.detail")
+        }
+        for goal in model.goals where goal.destination != nil {
+            XCTAssertEqual(goal.destination?.serverDestinationId, "goal.detail")
+        }
+    }
+
+    /// The literal reported bug: "Home → Your Goals looks tappable but goes
+    /// nowhere." Every row `GoalRowView` renders — primary and every
+    /// supporting/guardrail objective — must carry a real destination, not
+    /// a `nil` that leaves the row hover-styled but inert (verified against
+    /// source for this task: the real web's `GoalRow` applies its hover/
+    /// focus styling unconditionally, so a missing `href` there is exactly
+    /// this "looks tappable but isn't" bug class, not merely a cosmetic
+    /// difference).
+    func testEveryHomeGoalRowHasARealDestinationNotNil() throws {
+        let model = try Self.loadBundledFixture()
+        for goal in model.goals {
+            XCTAssertNotNil(goal.destination, "\(goal.title) must have a real destination.")
+        }
+    }
+
+    /// Each Home goal's destination must resolve to an *existing* Goal
+    /// page — not merely be non-`nil` syntactically. Uses canonical Goal
+    /// identity end-to-end through `GoalsAPI`, the same seam
+    /// `GoalDetailView` itself calls, so this fails if a Home goal ever
+    /// points at an id nothing in the Goals vertical actually resolves.
+    func testEveryHomeGoalDestinationResolvesThroughTheRealGoalsAPI() async throws {
+        let model = try Self.loadBundledFixture()
+        let api = FixtureGoalsAPI()
+        for goal in model.goals {
+            guard case .goalDetail(let goalId) = goal.destination else {
+                return XCTFail("\(goal.title) destination is not a goalDetail case.")
+            }
+            let detail = try await api.fetchGoalDetail(goalId: goalId)
+            XCTAssertNotNil(detail, "\(goal.title) (\(goalId)) does not resolve to a real Goal.")
+            XCTAssertNotNil(detail?.id)
+        }
+    }
+
+    /// Do not duplicate Goal detail inside Home: a supporting/guardrail
+    /// objective must resolve to the *lightweight* supporting-objective
+    /// shape, not accidentally collide with the primary Goal's own rich
+    /// `active` detail (which would mean Home and the Goals vertical are
+    /// describing two different things under the same id, or that a
+    /// supporting row is silently rendering the full multi-phase page).
+    func testSupportingGoalRowsResolveToTheLightweightSupportingShapeNotActiveOrCompleted() async throws {
+        let model = try Self.loadBundledFixture()
+        let api = FixtureGoalsAPI()
+        let supportingRows = model.goals.filter { if case .supporting = $0.presentation { true } else { false } }
+        XCTAssertFalse(supportingRows.isEmpty)
+        for goal in supportingRows {
+            guard case .goalDetail(let goalId) = goal.destination else { continue }
+            let detail = try await api.fetchGoalDetail(goalId: goalId)
+            XCTAssertNotNil(detail?.supporting, "\(goal.title) should resolve to a supporting objective.")
+            XCTAssertNil(detail?.active)
+            XCTAssertNil(detail?.completed)
+        }
+    }
+
+    func testHomeProjectsEverySupportingObjectiveToTheOwningActiveGoal() async throws {
+        let home = try Self.loadBundledFixture()
+        let hub = try await FixtureGoalsAPI().fetchGoalsHub()
+        let activeGoal = hub.activeGoal!
+        let projected = HomeViewModel.projectGoals(home.goals, from: activeGoal)
+        let supporting = projected.filter { if case .supporting = $0.presentation { true } else { false } }
+
+        XCTAssertFalse(supporting.isEmpty)
+        XCTAssertTrue(supporting.allSatisfy { $0.destination == activeGoal.destination })
+        XCTAssertTrue(projected.allSatisfy { $0.destination == activeGoal.destination })
+    }
+
+    func testCompletedHomePrioritiesAreRemovedFromTheVisibleProjection() throws {
+        let completed = PriorityOccurrence(
+            id: "priority-completed",
+            executionItemId: "execution_foam_roll",
+            date: "2026-08-30",
+            title: "Foam roll",
+            subtitle: nil,
+            metadata: nil,
+            changeLabel: nil,
+            icon: .activity,
+            color: .primary,
+            urgency: .available,
+            completed: true,
+            completable: true,
+            actionLabel: nil,
+            completionContext: nil,
+            continueActionDestination: nil
+        )
+        var pending = completed
+        pending.id = "priority-pending"
+        pending.completed = false
+        let priorities = [completed, pending]
+
+        let visible = HomeViewModel.visiblePriorities(priorities)
+
+        XCTAssertEqual(visible.map(\.id), [pending.id])
+        XCTAssertFalse(visible.contains { $0.id == completed.id })
+    }
+
+    func testExactCanonicalTimesRemainVisibleForThreeCardCompactHomeLayout() {
+        XCTAssertTrue(Self.context(title: "Morning Weigh-In", time: "05:30").contains("5:30"))
+        XCTAssertTrue(Self.context(title: "Foam Rolling", time: "19:15").contains("7:15"))
+        XCTAssertTrue(Self.context(title: "Tesamorelin", time: "22:29", dose: "0.5 mg").contains("10:29"))
+    }
+
+    func testPeptideDoseComesFromCanonicalCompletionPayload() {
+        XCTAssertTrue(Self.context(title: "Tesamorelin", time: "22:29", dose: "0.5 mg").contains("0.5 mg"))
+    }
+
+    func testDaypartIsOnlyFallbackWhenCanonicalExactTimeIsAbsent() {
+        var item = Self.executionContextItem(title: "Untimed support", time: nil, dose: nil)
+        item.subtitle = "Tonight"
+        XCTAssertEqual(PriorityExecutionContextPresentation.primaryLine(for: item), "Tonight")
+        item.notificationAction?.scheduledTime = "21:00"
+        XCTAssertNotEqual(PriorityExecutionContextPresentation.primaryLine(for: item), "Tonight")
+        item.subtitle = nil
+        item.notificationAction?.scheduledTime = nil
+        XCTAssertNil(PriorityExecutionContextPresentation.primaryLine(for: item))
+    }
+
+    // MARK: - Natural prose capitalization
+
+    /// Mirrors the product rule in
+    /// `src/domain/presentation/proseCapitalization.js`: internal domain
+    /// nouns (Goal, Confidence, Evidence, ...) must read as ordinary English
+    /// mid-sentence, not as proper nouns. This does not reimplement that
+    /// module — it checks the same narrow rule against the prose fields
+    /// Home actually renders, so fixture/live copy that violates it fails a
+    /// test instead of only being caught by eyeballing the simulator.
+    func testProseCopyUsesNaturalMidSentenceCapitalization() throws {
+        let model = try Self.loadBundledFixture()
+        var prose = [model.hero.headline, model.hero.supportLine]
+        if let detail = model.hero.confidenceDetail {
+            prose += detail.supportingFactors + detail.limitingFactors + detail.clarifyingFactors
+            if !detail.uncertaintyStatement.isEmpty { prose.append(detail.uncertaintyStatement) }
+        }
+        for sentence in prose {
+            XCTAssertTrue(
+                NaturalCapitalizationCheck.violations(in: sentence).isEmpty,
+                "Unnatural mid-sentence capitalization in: \"\(sentence)\""
+            )
+        }
+    }
+
+    /// The bundled fixture's own copy happens to contain no mid-sentence
+    /// domain nouns, so the assertion above would pass even if the checker
+    /// were broken. This test exercises the checker directly against a
+    /// deliberately bad and a deliberately fine string, so a regression in
+    /// the rule itself — not just in fixture copy — is caught.
+    func testNaturalCapitalizationCheckDetectsMidSentenceViolations() {
+        XCTAssertEqual(
+            NaturalCapitalizationCheck.violations(in: "Your Goal is progressing well."),
+            ["Goal"]
+        )
+        XCTAssertTrue(
+            NaturalCapitalizationCheck.violations(in: "Weight trends are good. Confidence continues to build.").isEmpty,
+            "Sentence-initial capitalization must not be flagged."
+        )
+    }
+
+    // MARK: - Fixtures
+
+    static func loadBundledFixture() throws -> HomeReadModel {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "HomeFixture", withExtension: "json"))
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(HomeReadModel.self, from: data)
+    }
+
+    static func confidenceOnlyFixture(confidence: Int?) -> Data {
+        let confidenceLiteral = confidence.map(String.init) ?? "null"
+        let json = """
+        {
+          "header": { "greeting": "Good morning,", "name": "Alex" },
+          "hero": {
+            "mode": "active", "goalLabel": "Test Goal", "headline": "On track.",
+            "supportLine": "Keep executing the plan.", "confidence": \(confidenceLiteral),
+            "confidenceDetail": null, "projectedFinish": null, "daysRemaining": null,
+            "actionLabel": null, "actionDestination": null
+          },
+          "nextBestAction": { "title": "Log Morning Weight", "icon": "scale", "destination": { "id": "check-in", "parameters": { "checkInType": "morning" } } },
+          "briefingCards": [],
+          "goals": [],
+          "todaysFocus": []
+        }
+        """
+        return Data(json.utf8)
+    }
+}
+
+/// Test-only mirror of the product's mid-sentence capitalization rule.
+/// Not shipped in the app target — it exists to check fixture/live copy in
+/// tests, the same way the web repository's equivalent module is only
+/// exercised from its own test suite.
+enum NaturalCapitalizationCheck {
+    static let domainNouns = [
+        "Training", "Energy", "Weight", "Photos", "Goal", "Recovery", "Activity",
+        "Strategy", "Phase", "Forecast", "Confidence", "Evidence", "Guardrail",
+        "Nutrition", "Review", "Baseline", "Trajectory", "Protocol",
+    ]
+
+    static func violations(in text: String) -> [String] {
+        guard !text.isEmpty else { return [] }
+        var found: [String] = []
+        for noun in domainNouns {
+            guard let regex = try? NSRegularExpression(pattern: "\\b\(noun)\\b") else { continue }
+            let range = NSRange(text.startIndex..., in: text)
+            for match in regex.matches(in: text, range: range) {
+                guard let matchRange = Range(match.range, in: text) else { continue }
+                let prefix = text[text.startIndex..<matchRange.lowerBound].trimmingCharacters(in: .whitespaces)
+                if prefix.isEmpty || prefix.hasSuffix(".") || prefix.hasSuffix("!") || prefix.hasSuffix("?") { continue }
+                found.append(noun)
+            }
+        }
+        return found
+    }
+}

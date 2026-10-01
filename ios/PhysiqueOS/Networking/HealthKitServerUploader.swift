@@ -1,0 +1,337 @@
+import Foundation
+
+struct HealthKitDailyRevisionRecovery: Equatable, Sendable {
+    static let schemaVersion = "healthkit-daily-revision-recovery-v1"
+
+    let observationType: HealthKitS1ObservationType
+    let localDate: String
+    let receivedSourceRevision: UInt64
+    let nextExpectedRevision: UInt64
+    let identityDigest: String
+
+    init(
+        observationType: HealthKitS1ObservationType,
+        localDate: String,
+        receivedSourceRevision: UInt64,
+        nextExpectedRevision: UInt64,
+        identityDigest: String
+    ) {
+        self.observationType = observationType
+        self.localDate = localDate
+        self.receivedSourceRevision = receivedSourceRevision
+        self.nextExpectedRevision = nextExpectedRevision
+        self.identityDigest = identityDigest
+    }
+
+    init?(problem: ProductionProblemDetails) {
+        guard problem.code == "HEALTHKIT_OBSERVATION_IDENTITY_COLLISION",
+              case let .object(value) = problem.recovery,
+              value["kind"]?.stringValue == "healthkit_daily_revision_collision",
+              value["schemaVersion"]?.stringValue == Self.schemaVersion,
+              let typeRaw = value["observationType"]?.stringValue,
+              let observationType = HealthKitS1ObservationType(rawValue: typeRaw),
+              observationType == .activitySummary || observationType == .nutritionDailyTotal,
+              let localDate = value["localDate"]?.stringValue,
+              Self.isLocalDate(localDate),
+              let receivedSourceRevision = value["receivedSourceRevision"]?.uint64Value,
+              let nextExpectedRevision = value["nextExpectedRevision"]?.uint64Value,
+              nextExpectedRevision > receivedSourceRevision,
+              let identityDigest = value["identityDigest"]?.stringValue,
+              identityDigest.count == 64,
+              identityDigest.allSatisfy({ $0.isHexDigit })
+        else { return nil }
+        self.observationType = observationType
+        self.localDate = localDate
+        self.receivedSourceRevision = receivedSourceRevision
+        self.nextExpectedRevision = nextExpectedRevision
+        self.identityDigest = identityDigest
+    }
+
+    static func identityDigest(
+        observationType: HealthKitS1ObservationType,
+        externalID: String,
+        bundleIdentifier: String,
+        deliveryDeviceID: String,
+        ingestionPurpose: HealthKitIngestionPurpose
+    ) -> String {
+        HealthKitStableDigest.hex([
+            "healthkit-daily-revision-identity-v1",
+            observationType.rawValue,
+            externalID,
+            bundleIdentifier,
+            deliveryDeviceID,
+            ingestionPurpose.rawValue,
+        ].joined(separator: "\0"))
+    }
+
+    private static func isLocalDate(_ value: String) -> Bool {
+        guard value.count == 10 else { return false }
+        let characters = Array(value)
+        return characters[4] == "-" && characters[7] == "-" &&
+            characters.enumerated().allSatisfy { index, character in
+                index == 4 || index == 7 ? character == "-" : character.isNumber
+            }
+    }
+}
+
+enum HealthKitUploadResult: Equatable, Sendable {
+    case durablyAccepted(batchID: String, receiptIdentity: String)
+    case transientFailure(code: String)
+    case rejected(code: String, recovery: HealthKitDailyRevisionRecovery? = nil)
+}
+
+/// What the Server reported for one accepted observation. The Server alone
+/// decides whether a daily snapshot canonicalized; the app only shows it.
+struct HealthKitCanonicalizationReport: Equatable, Sendable {
+    let observationType: String
+    let outcome: String
+    let reconciliationState: String?
+    let reason: String?
+    let occurredAt: String?
+
+    var wasCanonicalized: Bool {
+        reconciliationState?.hasSuffix("_day_canonicalized") == true || reconciliationState == "workout_canonicalized"
+    }
+}
+
+/// Collects the Server's per-observation reconciliation from durable
+/// acknowledgements so the Founder screen can show canonicalized versus
+/// deferred, instead of treating every acknowledgement as success.
+final class HealthKitCanonicalizationLedger: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: [HealthKitCanonicalizationReport] = []
+
+    func reset() { lock.lock(); stored = []; lock.unlock() }
+    func record(_ reports: [HealthKitCanonicalizationReport]) { lock.lock(); stored += reports; lock.unlock() }
+    func reports() -> [HealthKitCanonicalizationReport] { lock.lock(); defer { lock.unlock() }; return stored }
+}
+
+protocol HealthKitObservationUploader: Sendable {
+    func upload(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult
+}
+
+/// Server-authenticated authority required only for daily revision recovery
+/// and the bounded September 23 repair. Local cursor identities are not
+/// authentication principals and must never be substituted here.
+protocol HealthKitRevisionRecoveryAuthoritySource: Sendable {
+    func healthKitAuthenticatedDeviceIdentity() async throws -> String
+    func healthKitSeptember23ActivityRepairPreflight() async throws -> HealthKitSeptember23ActivityRepairServerFacts
+}
+
+struct ProductionHealthKitObservationUploader: HealthKitObservationUploader, HealthKitRevisionRecoveryAuthoritySource {
+    private struct Result: Decodable, Sendable {
+        struct Observation: Decodable, Sendable {
+            struct Reconciliation: Decodable, Sendable {
+                let state: String?
+                let reason: String?
+            }
+            let observationType: String?
+            let outcome: String?
+            let occurredAt: String?
+            let reconciliation: Reconciliation?
+        }
+        let status: String
+        let batchId: String
+        let cursorResponsibility: String
+        let observations: [Observation]?
+    }
+
+    let api: ProductionNativeAPI
+    var ledger: HealthKitCanonicalizationLedger? = nil
+    /// Called after every durably accepted ingest -- foreground sync and
+    /// HealthKit background delivery alike. Every ingest re-assesses the
+    /// in-window workouts on the Server, so any of them can make a Strength
+    /// reconciliation review ready. Must not block: it only schedules work.
+    var onDurablyAccepted: (@Sendable () -> Void)? = nil
+    /// Called when the Server answers 409 `HEALTHKIT_SLEEP_INGESTION_NOT_ENABLED`
+    /// so the shared Sleep gate latches off until the next manifest read.
+    var onSleepIngestionDisabled: (@Sendable () -> Void)? = nil
+
+    func healthKitAuthenticatedDeviceIdentity() async throws -> String {
+        try await api.authenticatedServerDeviceIdentity()
+    }
+
+    func healthKitSeptember23ActivityRepairPreflight() async throws -> HealthKitSeptember23ActivityRepairServerFacts {
+        let envelope: ProductionResponseEnvelope<HealthKitSeptember23ActivityRepairServerFacts> = try await api.readResource(
+            "healthkit-sep23-activity-repair-preflight",
+            policy: .reload,
+            as: HealthKitSeptember23ActivityRepairServerFacts.self
+        )
+        return envelope.data
+    }
+
+    func upload(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult {
+        if HealthKitSleepWireMapper.isSleepPartition(partition) {
+            return await uploadSleep(partition)
+        }
+        do {
+            let payload = try HealthKitS1WireMapper.payload(for: partition)
+            let outcome: ProductionCommandOutcome<Result> = try await api.submitCommand(
+                HealthKitServerIngestionContract.commandType,
+                idempotencyKey: partition.identity,
+                payload: payload
+            )
+            guard outcome.outcome != .pending else {
+                return .transientFailure(code: "healthkit_server_receipt_pending")
+            }
+            guard let result = outcome.receipt.result,
+                  result.batchId == partition.identity,
+                  result.cursorResponsibility == HealthKitServerIngestionContract.queryCursorAuthority
+            else {
+                return .transientFailure(code: "healthkit_server_acknowledgement_invalid")
+            }
+            ledger?.record((result.observations ?? []).map {
+                HealthKitCanonicalizationReport(
+                    observationType: $0.observationType ?? "unknown",
+                    outcome: $0.outcome ?? "unknown",
+                    reconciliationState: $0.reconciliation?.state,
+                    reason: $0.reconciliation?.reason,
+                    occurredAt: $0.occurredAt
+                )
+            })
+            let receipt = outcome.receipt.commandId
+                ?? outcome.receipt.operationId
+                ?? "receipt:\(partition.identity)"
+            onDurablyAccepted?()
+            return .durablyAccepted(batchID: result.batchId, receiptIdentity: receipt)
+        } catch let error as ProductionNativeError {
+            switch error {
+            case let .validation(problem), let .failedPrecondition(problem),
+                 let .preconditionRequired(problem), let .conflict(problem):
+                return .rejected(code: problem.code, recovery: HealthKitDailyRevisionRecovery(problem: problem))
+            case .incompatibleContractVersion:
+                return .rejected(code: "healthkit_server_contract_incompatible")
+            case .authorityMismatch, .resourceMismatch:
+                return .rejected(code: "healthkit_server_authority_invalid")
+            default:
+                return .transientFailure(code: "healthkit_server_upload_unavailable")
+            }
+        } catch let error as HealthKitSyncError {
+            return .rejected(code: error.diagnosticCode)
+        } catch {
+            return .transientFailure(code: "healthkit_server_upload_failed")
+        }
+    }
+}
+
+// MARK: - Sleep (healthkit.sleep.ingest.v1)
+
+/// Exact Phase A response semantics, shared by staged partitions and the
+/// window manifest so both classify a Server answer identically.
+enum HealthKitSleepResponseClassification: Equatable, Sendable {
+    /// 200 with a result that acknowledges every submitted identity. Per-sample
+    /// refusals (`refused_identity_conflict`, `refused_before_activation_floor`,
+    /// `refused_after_activation_window`) and `deleted_before_arrival` are
+    /// durable Server decisions, so the partition is acknowledged.
+    case acknowledged
+    /// 409 `HEALTHKIT_SLEEP_INGESTION_NOT_ENABLED`: temporary. Keep the staged
+    /// batch, do not advance the cursor, re-check the manifest later.
+    case disabled
+    /// 400 (private field / contract invalid) and other permanent problems: an
+    /// implementation bug. Fail closed; only the problem code is kept.
+    case rejected(code: String)
+    case transient(code: String)
+
+    static func classify(_ error: Error) -> HealthKitSleepResponseClassification {
+        guard let error = error as? ProductionNativeError else {
+            if let error = error as? HealthKitSyncError { return .rejected(code: error.diagnosticCode) }
+            return .transient(code: "healthkit_sleep_upload_failed")
+        }
+        switch error {
+        case let .conflict(problem) where problem.code == HealthKitSleepIngestionContract.disabledProblemCode:
+            return .disabled
+        case let .validation(problem), let .failedPrecondition(problem),
+             let .preconditionRequired(problem), let .conflict(problem):
+            return .rejected(code: problem.code)
+        case .incompatibleContractVersion:
+            return .rejected(code: "healthkit_server_contract_incompatible")
+        case .authorityMismatch, .resourceMismatch:
+            return .rejected(code: "healthkit_server_authority_invalid")
+        default:
+            return .transient(code: "healthkit_sleep_upload_unavailable")
+        }
+    }
+}
+
+extension ProductionHealthKitObservationUploader: HealthKitSleepManifestSubmitting {
+    func uploadSleep(_ partition: HealthKitStagedPartition) async -> HealthKitUploadResult {
+        let payload: HealthKitSleepWirePayload
+        do { payload = try HealthKitSleepWireMapper.payload(for: partition) }
+        catch { return .rejected(code: "healthkit_partition_not_sleep_deliverable") }
+        do {
+            let outcome: ProductionCommandOutcome<HealthKitSleepIngestResult> = try await api.submitCommand(
+                HealthKitSleepIngestionContract.commandType,
+                idempotencyKey: partition.identity,
+                payload: payload
+            )
+            guard outcome.outcome != .pending else { return .transientFailure(code: "healthkit_server_receipt_pending") }
+            guard let result = outcome.receipt.result, result.acknowledges(payload) else {
+                return .transientFailure(code: "healthkit_sleep_acknowledgement_invalid")
+            }
+            let receipt = outcome.receipt.commandId ?? outcome.receipt.operationId ?? "receipt:\(partition.identity)"
+            return .durablyAccepted(batchID: result.batchId, receiptIdentity: receipt)
+        } catch {
+            switch HealthKitSleepResponseClassification.classify(error) {
+            case .acknowledged:
+                return .transientFailure(code: "healthkit_sleep_acknowledgement_invalid")
+            case .disabled:
+                onSleepIngestionDisabled?()
+                return .transientFailure(code: HealthKitSleepIngestionContract.disabledDiagnosticCode)
+            case let .rejected(code):
+                return .rejected(code: code)
+            case let .transient(code):
+                return .transientFailure(code: code)
+            }
+        }
+    }
+
+    func submitSleepWindowManifest(_ manifest: HealthKitSleepWireWindowManifest) async -> HealthKitSleepManifestSubmitResult {
+        let material = ([manifest.windowStart, manifest.windowEnd] + manifest.liveExternalIds).joined(separator: "\u{0}")
+        let batchID = "healthkit_sleep_manifest_\(HealthKitStableDigest.hex(material))"
+        let payload = HealthKitSleepWirePayload(batchId: batchID, samples: nil, deletions: nil, windowManifest: manifest)
+        do {
+            let outcome: ProductionCommandOutcome<HealthKitSleepIngestResult> = try await api.submitCommand(
+                HealthKitSleepIngestionContract.commandType,
+                idempotencyKey: batchID,
+                payload: payload
+            )
+            guard outcome.outcome != .pending,
+                  let result = outcome.receipt.result,
+                  result.acknowledges(payload),
+                  let window = result.windowManifest
+            else { return .failed(code: "healthkit_sleep_manifest_acknowledgement_invalid") }
+            return .accepted(markedDeleted: window.markedDeleted)
+        } catch {
+            switch HealthKitSleepResponseClassification.classify(error) {
+            case .disabled:
+                onSleepIngestionDisabled?()
+                return .disabled
+            case let .rejected(code), let .transient(code):
+                return .failed(code: code)
+            case .acknowledged:
+                return .failed(code: "healthkit_sleep_manifest_acknowledgement_invalid")
+            }
+        }
+    }
+}
+
+private extension ProductionJSONValue {
+    var stringValue: String? {
+        guard case let .string(value) = self else { return nil }
+        return value
+    }
+
+    var uint64Value: UInt64? {
+        // JSON numbers arrive as Double. Values above JavaScript's exact
+        // integer range cannot be trusted as an authoritative revision and
+        // converting the rounded 2^64 representation can trap.
+        let maximumExactJSONInteger = 9_007_199_254_740_991.0
+        guard case let .number(value) = self,
+              value.isFinite,
+              value.rounded(.towardZero) == value,
+              value >= 0,
+              value <= maximumExactJSONInteger
+        else { return nil }
+        return UInt64(value)
+    }
+}

@@ -1,0 +1,574 @@
+import Foundation
+
+protocol EvidenceReviewAPI: Sendable {
+    func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel?
+    func resolveWorkoutReconciliation(
+        reviewId: String,
+        expectedVersion: String,
+        loggerSessionCanonicalId: String?
+    ) async throws -> WorkoutReconciliationCommandResult
+}
+
+struct WorkoutReconciliationCommandResult: Decodable, Sendable, Equatable {
+    struct Resolution: Decodable, Sendable, Equatable {
+        var action: String
+        var selectedLoggerSessionCanonicalId: String?
+        var linkId: String?
+    }
+
+    var status: String
+    var reviewId: String
+    var revision: Int?
+    var resolution: Resolution?
+}
+
+extension EvidenceReviewAPI {
+    func resolveWorkoutReconciliation(
+        reviewId: String,
+        expectedVersion: String,
+        loggerSessionCanonicalId: String?
+    ) async throws -> WorkoutReconciliationCommandResult {
+        throw WorkoutReconciliationWriteUnavailable()
+    }
+}
+
+private struct WorkoutReconciliationWriteUnavailable: Error {}
+
+/// This detail screen is only ever reached via the `.evidenceReview`
+/// destination, which only `ProductionLogAPI` ever constructs — Sandbox's
+/// pending reviews always route through `.localEvidenceReview` to
+/// `LocalEvidenceReviewView` instead. This stub exists only so the
+/// authority-switching `AppEnvironment.evidenceReviewAPI` has a Sandbox
+/// arm at all, matching the pattern every other production-only API
+/// (e.g. `NotAvailableTimelineAPI`) follows.
+struct NotAvailableEvidenceReviewAPI: EvidenceReviewAPI {
+    struct NotAvailable: Error {}
+
+    func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel? {
+        throw NotAvailable()
+    }
+
+    func resolveWorkoutReconciliation(
+        reviewId: String,
+        expectedVersion: String,
+        loggerSessionCanonicalId: String?
+    ) async throws -> WorkoutReconciliationCommandResult {
+        throw NotAvailable()
+    }
+}
+
+/// Volatile production review state and concurrency identity. Confirmation
+/// and disposition use separate canonical commands; no sandbox state is used.
+struct ProductionEvidenceReviewAPI: EvidenceReviewAPI {
+    let api: ProductionNativeAPI
+    var backgroundTaskScheduler: any BackgroundTaskScheduling = UIKitBackgroundTaskScheduler()
+
+    func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel? {
+        let envelope = try await api.readResource("evidence-review", query: ["reviewId": reviewId], policy: .reload, as: Payload.self)
+        guard let review = envelope.data.review else { return nil }
+        let reconciliation = envelope.data.presentation?.workoutReconciliation
+        let isReconciliation = reconciliation != nil
+        return EvidenceReviewDetailReadModel(
+            id: isReconciliation ? (envelope.data.presentation?.id ?? "") : review.id,
+            status: isReconciliation ? (envelope.data.presentation?.status ?? "invalid_terminal_history") : review.status,
+            createdAt: review.createdAt,
+            version: isReconciliation ? Int(envelope.data.presentation?.version ?? "") : review.version,
+            items: (envelope.data.presentation?.items ?? []).map { item in
+                let raw = (review.interpretedEvidence?.evidenceObjects ?? []).first { $0.id == item.object?.id }
+                return EvidenceReviewDetailItem(
+                    id: item.object?.id ?? raw?.id ?? UUID().uuidString,
+                    type: item.type ?? raw?.evidenceType ?? "evidence",
+                    date: item.date ?? raw?.observedAt ?? raw?.date,
+                    canonicalDate: raw?.observedAt ?? raw?.date,
+                    title: item.title,
+                    noun: item.noun,
+                    sourceLabel: item.sourceLabel,
+                    included: item.included,
+                    metrics: item.metrics.map { .init(label: $0.label, value: $0.value) },
+                    exercises: (item.exercises + item.strengthSetDetails).map {
+                        .init(
+                            name: $0.name,
+                            sets: $0.sets,
+                            occurrenceLabel: $0.occurrenceLabel,
+                            variantLabel: $0.variantLabel ?? $0.executionVariant?.label,
+                            proposedNewExercise: $0.proposedNewExercise ?? false,
+                            supersetWith: $0.supersetWith ?? []
+                        )
+                    },
+                    meals: item.meals.map { meal in
+                        .init(
+                            id: meal.id ?? "meal-\(meal.name)",
+                            name: meal.name,
+                            summary: meal.summary,
+                            foods: meal.foods.map {
+                                .init(id: $0.id ?? "food-\($0.name)", name: $0.name, brand: $0.brand, serving: $0.serving, calories: $0.calories)
+                            }
+                        )
+                    },
+                    sourceFiles: item.sourceFiles,
+                    typedEvidence: item.typedEvidence,
+                    reconciliation: item.reconciliation,
+                    photoSession: raw?.photoSession,
+                    dexaMeasurements: raw?.dexaMeasurements ?? item.object?.dexaMeasurements
+                )
+            }.ifEmpty {
+                (review.interpretedEvidence?.evidenceObjects ?? []).map { object in
+                    EvidenceReviewDetailItem(
+                        id: object.id ?? UUID().uuidString,
+                        type: object.evidenceType ?? "evidence",
+                        date: object.observedAt ?? object.date,
+                        canonicalDate: object.observedAt ?? object.date,
+                        title: nil,
+                        noun: nil,
+                        sourceLabel: nil,
+                        included: true,
+                        metrics: object.fallbackMetrics,
+                        exercises: object.fallbackExercises,
+                        photoSession: object.photoSession,
+                        dexaMeasurements: object.dexaMeasurements
+                    )
+                }
+            },
+            summary: envelope.data.presentation?.summary.text,
+            excludedSummary: envelope.data.presentation?.summary.excludedText,
+            workoutReconciliation: reconciliation
+        )
+    }
+
+    func resolveWorkoutReconciliation(
+        reviewId: String,
+        expectedVersion: String,
+        loggerSessionCanonicalId: String?
+    ) async throws -> WorkoutReconciliationCommandResult {
+        let action = loggerSessionCanonicalId == nil ? "no_match" : "confirm"
+        let signature = ProductionIdempotentSubmission.signature([
+            ProductionCommandType.resolveWorkoutReconciliation,
+            reviewId,
+            expectedVersion,
+            action,
+            loggerSessionCanonicalId ?? "-",
+        ])
+        let idempotencyKey = ProductionIdempotentSubmission.deterministicKey(forSignature: signature)
+        let payload = WorkoutReconciliationResolutionPayload(
+            reviewId: reviewId,
+            action: action,
+            loggerSessionCanonicalId: loggerSessionCanonicalId
+        )
+        // A real Build 61 attempt (already carrying `submitCommand`'s own
+        // post-401-refresh retry) still lost this exact confirm silently: a
+        // bounded, owner-scoped read of the server's own `command_receipts`
+        // ledger for that attempt's window showed zero rows for this command
+        // at any status, and the surrounding request logs show no 401/token-
+        // expiry event anywhere near it either -- only unrelated command
+        // traffic succeeding around it. The write's very first send hit a
+        // plain, ordinary transport failure with no token expiry involved,
+        // so `submitCommand`'s existing retry (scoped to the 401-refresh
+        // branch only) never had a chance to engage.
+        //
+        // The retry lives HERE, one call site, deliberately NOT inside the
+        // shared `submitCommand`: other callers (training commit, morning
+        // check-in) already have their own, more careful "verify what
+        // actually happened" recovery for a lost acknowledgment -- adding a
+        // blind retry inside `submitCommand` itself would silently short-
+        // circuit that existing, deliberate behavior for every command type,
+        // not just this one. This confirm has no such existing recovery, so
+        // one bounded extra attempt, reusing the exact same idempotency
+        // signature and payload, is the correct fix at this exact scope: the
+        // server's own command-receipt replay is keyed on that identity, so
+        // a genuine duplicate delivery returns the original outcome rather
+        // than creating a second mutation.
+        // A real Build 64 attempt proved this exact submission -- including
+        // the retry above -- can be cancelled by the OS before it (or its
+        // retry) ever reaches the network at all: a bounded, owner-scoped
+        // read of `command_receipts` showed zero rows for this command at
+        // any status, and the server's own request log shows total silence
+        // for a commands-endpoint request in the whole window, while
+        // `taskWasCancelledAtCatch` on the client proved the app's own Swift
+        // Task was never cancelled. The app has no background-execution
+        // assertion anywhere for an in-flight write, and this is the one
+        // command routinely triggered moments after the app foregrounds from
+        // a push notification -- exactly when a brief, easy-to-miss
+        // backgrounding (a screen lock, a notification banner tap-away) can
+        // have this exact in-flight request torn down by the OS with no
+        // cooperative Swift-Task cancellation involved at all. Wrapping the
+        // whole submission (both the original attempt and its retry) in a
+        // background-execution assertion gives the OS explicit permission to
+        // let it finish across exactly that kind of brief transition.
+        return try await withBackgroundExecutionAssertion(
+            named: "physiqueos.workout-reconciliation.resolve",
+            scheduler: backgroundTaskScheduler
+        ) {
+            let outcome: ProductionCommandOutcome<WorkoutReconciliationCommandResult>
+            do {
+                outcome = try await api.submitCommand(
+                    ProductionCommandType.resolveWorkoutReconciliation,
+                    idempotencyKey: idempotencyKey,
+                    expectedVersion: expectedVersion,
+                    payload: payload
+                )
+            } catch ProductionNativeError.networkFailure {
+                outcome = try await api.submitCommand(
+                    ProductionCommandType.resolveWorkoutReconciliation,
+                    idempotencyKey: idempotencyKey,
+                    expectedVersion: expectedVersion,
+                    payload: payload
+                )
+            }
+            guard outcome.outcome != .pending, let result = outcome.receipt.result else {
+                throw ProductionNativeError.networkFailure
+            }
+            return result
+        }
+    }
+
+    private struct Payload: Decodable, @unchecked Sendable {
+        var review: Review?
+        var presentation: Presentation?
+    }
+
+    private struct Presentation: Decodable {
+        var kind: String?
+        var id: String?
+        var status: String?
+        var version: String?
+        var localDate: String?
+        var title: String?
+        var items: [PresentedItem]
+        var summary: Summary
+        var workout: ReconciliationWorkout?
+        var candidates: [ReconciliationCandidate]
+        var resolution: ReconciliationResolution?
+
+        struct Summary: Decodable {
+            var text: String?
+            var excludedText: String?
+
+            init(text: String?, excludedText: String?) {
+                self.text = text
+                self.excludedText = excludedText
+            }
+
+            init(from decoder: Decoder) throws {
+                if let value = try? decoder.singleValueContainer().decode(String.self) {
+                    text = value
+                    excludedText = nil
+                    return
+                }
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                text = try container.decodeIfPresent(String.self, forKey: .text)
+                excludedText = try container.decodeIfPresent(String.self, forKey: .excludedText)
+            }
+
+            private enum CodingKeys: String, CodingKey { case text, excludedText }
+        }
+
+        struct ReconciliationWorkout: Decodable {
+            var family: String
+            var canonicalType: String
+            var startedAt: String
+            var endedAt: String?
+        }
+
+        struct ReconciliationCandidate: Decodable {
+            var loggerSessionCanonicalId: String
+            var confidence: Int
+            var basis: String
+            var loggerSession: LoggerSession?
+
+            struct LoggerSession: Decodable {
+                var activityType: String?
+                var startedAt: String?
+                var endedAt: String?
+            }
+        }
+
+        var workoutReconciliation: WorkoutReconciliationDetail? {
+            guard kind == "healthkit_workout_reconciliation",
+                  let localDate,
+                  let title,
+                  let workout
+            else { return nil }
+            return .init(
+                localDate: localDate,
+                title: title,
+                summary: summary.text ?? "Choose the matching Workout Logger session, or choose No match.",
+                workout: .init(
+                    family: workout.family,
+                    canonicalType: workout.canonicalType,
+                    startedAt: workout.startedAt,
+                    endedAt: workout.endedAt
+                ),
+                candidates: candidates.map {
+                    .init(
+                        loggerSessionCanonicalId: $0.loggerSessionCanonicalId,
+                        confidence: $0.confidence,
+                        basis: $0.basis,
+                        activityType: $0.loggerSession?.activityType ?? "Strength Training",
+                        startedAt: $0.loggerSession?.startedAt,
+                        endedAt: $0.loggerSession?.endedAt
+                    )
+                },
+                resolution: resolution.map {
+                    .init(
+                        action: $0.action,
+                        selectedLoggerSessionCanonicalId: $0.selectedLoggerSessionCanonicalId,
+                        linkId: $0.linkId
+                    )
+                }
+            )
+        }
+
+        struct ReconciliationResolution: Decodable {
+            var action: String
+            var selectedLoggerSessionCanonicalId: String?
+            var linkId: String?
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case kind, id, status, version, localDate, title, items, summary, workout, candidates, resolution
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try container.decodeIfPresent(String.self, forKey: .kind)
+            id = try container.decodeIfPresent(String.self, forKey: .id)
+            status = try container.decodeIfPresent(String.self, forKey: .status)
+            version = try container.decodeIfPresent(String.self, forKey: .version)
+            localDate = try container.decodeIfPresent(String.self, forKey: .localDate)
+            title = try container.decodeIfPresent(String.self, forKey: .title)
+            items = try container.decodeIfPresent([PresentedItem].self, forKey: .items) ?? []
+            summary = try container.decodeIfPresent(Summary.self, forKey: .summary) ?? Summary(text: nil, excludedText: nil)
+            workout = try container.decodeIfPresent(ReconciliationWorkout.self, forKey: .workout)
+            candidates = try container.decodeIfPresent([ReconciliationCandidate].self, forKey: .candidates) ?? []
+            resolution = try container.decodeIfPresent(ReconciliationResolution.self, forKey: .resolution)
+        }
+    }
+
+    private struct WorkoutReconciliationResolutionPayload: Encodable {
+        var reviewId: String
+        var action: String
+        var loggerSessionCanonicalId: String?
+    }
+
+    private struct PresentedItem: Decodable {
+        var type: String?
+        var date: String?
+        var title: String?
+        var noun: String?
+        var sourceLabel: String?
+        var included: Bool
+        var metrics: [Metric]
+        var exercises: [Exercise]
+        var strengthSetDetails: [Exercise]
+        var meals: [Meal]
+        var sourceFiles: [String]
+        var typedEvidence: String?
+        var reconciliation: String?
+        var object: EvidenceObject?
+
+        struct Metric: Decodable { var label: String; var value: String }
+        struct Exercise: Decodable {
+            var name: String
+            var sets: [String]
+            var occurrenceLabel: String?
+            var variantLabel: String?
+            var proposedNewExercise: Bool?
+            var supersetWith: [String]?
+            var executionVariant: ExecutionVariant?
+
+            struct ExecutionVariant: Decodable { var label: String? }
+        }
+        struct Meal: Decodable {
+            var id: String?
+            var name: String
+            var summary: String
+            var foods: [Food]
+
+            struct Food: Decodable {
+                var id: String?
+                var name: String
+                var brand: String?
+                var serving: String?
+                var calories: String?
+            }
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case type, date, title, noun, sourceLabel, included, metrics, exercises, strengthSetDetails
+            case meals, sourceFiles, typedEvidence, reconciliation, object
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            type = try container.decodeIfPresent(String.self, forKey: .type)
+            date = try container.decodeIfPresent(String.self, forKey: .date)
+            title = try container.decodeIfPresent(String.self, forKey: .title)
+            noun = try container.decodeIfPresent(String.self, forKey: .noun)
+            sourceLabel = try container.decodeIfPresent(String.self, forKey: .sourceLabel)
+            included = try container.decodeIfPresent(Bool.self, forKey: .included) ?? true
+            metrics = try container.decodeIfPresent([Metric].self, forKey: .metrics) ?? []
+            exercises = try container.decodeIfPresent([Exercise].self, forKey: .exercises) ?? []
+            strengthSetDetails = try container.decodeIfPresent([Exercise].self, forKey: .strengthSetDetails) ?? []
+            meals = try container.decodeIfPresent([Meal].self, forKey: .meals) ?? []
+            sourceFiles = try container.decodeIfPresent([String].self, forKey: .sourceFiles) ?? []
+            typedEvidence = try container.decodeIfPresent(String.self, forKey: .typedEvidence)
+            reconciliation = try container.decodeIfPresent(String.self, forKey: .reconciliation)
+            object = try container.decodeIfPresent(EvidenceObject.self, forKey: .object)
+        }
+    }
+
+    private struct Review: Decodable {
+        var id: String
+        var status: String
+        var createdAt: String?
+        var version: Int?
+        var interpretedEvidence: InterpretedEvidence?
+    }
+
+    /// Wire keys are snake_case (`evidence_objects`); the shared decoder's
+    /// `.convertFromSnakeCase` already matches these to the camelCase
+    /// property names below automatically — explicit `CodingKeys` with
+    /// snake_case raw values here would double-convert and fail to decode.
+    private struct InterpretedEvidence: Decodable {
+        var evidenceObjects: [EvidenceObject]?
+    }
+
+    private struct EvidenceObject: Decodable {
+        var id: String?
+        var evidenceType: String?
+        var observedAt: String?
+        var date: String?
+        var measuredAt: String?
+        var totalMass: MassValue?
+        var bodyFatPercentage: Double?
+        var fatMass: MassValue?
+        var leanMass: MassValue?
+        var boneMineralContent: MassValue?
+        var restingMetabolicRate: MassValue?
+        var visceralAdiposeTissue: VisceralAdiposeTissue?
+        var metadata: [String: ProductionJSONValue]?
+        var dailyTotals: [String: ProductionJSONValue]?
+        var exercises: [RawExercise]?
+        var photos: [RawPhoto]?
+        var captureMetadata: PhotoCaptureMetadata?
+        var conditions: PhotoConditions?
+        var goalRelationship: PhotoGoalRelationship?
+
+        struct RawExercise: Decodable {
+            var name: String?
+            var sets: [RawSet]?
+        }
+        struct RawSet: Decodable {
+            var reps: Double?
+            var weight: Double?
+            var load: Double?
+        }
+        struct RawPhoto: Decodable {
+            var id: String?
+            var poseId: String?
+            var label: String?
+            var orientation: String?
+            var contractionState: String?
+            var poseVariant: String?
+        }
+        struct PhotoCaptureMetadata: Decodable { var timeOfDay: String? }
+        struct PhotoConditions: Decodable { var timeOfDay: String? }
+        struct PhotoGoalRelationship: Decodable { var status: String?; var goalLabel: String? }
+
+        var photoSession: EvidenceReviewPhotoSession? {
+            guard ["photo_session", "progress_photo"].contains(evidenceType), let id else { return nil }
+            return .init(
+                sessionId: id,
+                timeOfDay: captureMetadata?.timeOfDay ?? conditions?.timeOfDay,
+                goalRelationship: EvidenceReviewPhotoSession.goalRelationshipText(goalLabel: goalRelationship?.goalLabel, status: goalRelationship?.status),
+                photos: (photos ?? []).enumerated().map { index, photo in
+                    .init(
+                        id: photo.id ?? "photo-\(index + 1)", poseId: photo.poseId, label: photo.label,
+                        orientation: photo.orientation, contractionState: photo.contractionState,
+                        poseVariant: photo.poseVariant
+                    )
+                }
+            )
+        }
+
+        /// `applyDexaReviewMeasurements`'s exact stored shape
+        /// (`DexaPdfIntakeService.js`) — only present when `evidenceType`
+        /// is a DEXA scan. Optional throughout: an object that hasn't
+        /// finished interpretation yet (or isn't DEXA at all) simply
+        /// decodes every field to `nil`, never a decode failure.
+        var dexaMeasurements: DEXAScanMeasurements? {
+            guard ["dexa_scan", "dexa", "body_composition"].contains(evidenceType) else { return nil }
+            return DEXAScanMeasurements(
+                measuredAt: measuredAt ?? observedAt ?? date,
+                totalMassLb: totalMass?.value,
+                bodyFatPercentage: bodyFatPercentage,
+                fatMassLb: fatMass?.value,
+                leanMassLb: leanMass?.value,
+                boneMineralContentLb: boneMineralContent?.value,
+                restingMetabolicRateKcal: restingMetabolicRate?.value,
+                visceralAdiposeTissueMassLb: visceralAdiposeTissue?.mass?.value,
+                visceralAdiposeTissueVolumeIn3: visceralAdiposeTissue?.volume?.value
+            )
+        }
+
+        var fallbackMetrics: [EvidenceReviewMetric] {
+            if let dexa = dexaMeasurements {
+                return [
+                    ("Total mass", dexa.totalMassLb, "lb"), ("Body fat", dexa.bodyFatPercentage, "%"),
+                    ("Fat tissue", dexa.fatMassLb, "lb"), ("Lean tissue", dexa.leanMassLb, "lb"),
+                    ("Bone mineral", dexa.boneMineralContentLb, "lb"), ("RMR", dexa.restingMetabolicRateKcal, "kcal/day"),
+                    ("VAT mass", dexa.visceralAdiposeTissueMassLb, "lb"), ("VAT volume", dexa.visceralAdiposeTissueVolumeIn3, "in³")
+                ].map { metric in
+                    .init(label: metric.0, value: metric.1.map { "\(Self.number($0)) \(metric.2)" } ?? "Needs review")
+                }
+            }
+            return []
+        }
+
+        var fallbackExercises: [EvidenceReviewDetailExercise] {
+            (exercises ?? []).compactMap { exercise in
+                guard let name = exercise.name else { return nil }
+                return .init(name: name, sets: (exercise.sets ?? []).map { set in
+                    let reps = set.reps.map(Self.number) ?? "—"
+                    let load = (set.weight ?? set.load).map(Self.number)
+                    return load.map { "\(reps) reps @ \($0) lb" } ?? "\(reps) reps"
+                })
+            }
+        }
+
+        private static func number(_ value: Double) -> String {
+            value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+        }
+    }
+
+    private struct MassValue: Decodable {
+        var value: Double?
+        var unit: String?
+    }
+
+    private struct VisceralAdiposeTissue: Decodable {
+        var mass: MassValue?
+        var volume: MassValue?
+    }
+}
+
+private extension Array {
+    func ifEmpty(_ fallback: () -> Self) -> Self { isEmpty ? fallback() : self }
+}
+
+/// `dexa-review.measurements.v1`'s exact input/output shape
+/// (`applyDexaReviewMeasurements`, `DexaPdfIntakeService.js`) — every
+/// field Native must resend on every edit, since the server does a full
+/// replace, not a merge (an omitted field is silently nulled on the
+/// canonical scan, RMR/VAT included).
+struct DEXAScanMeasurements: Equatable, Sendable {
+    var measuredAt: String?
+    var totalMassLb: Double?
+    var bodyFatPercentage: Double?
+    var fatMassLb: Double?
+    var leanMassLb: Double?
+    var boneMineralContentLb: Double?
+    var restingMetabolicRateKcal: Double?
+    var visceralAdiposeTissueMassLb: Double?
+    var visceralAdiposeTissueVolumeIn3: Double?
+}

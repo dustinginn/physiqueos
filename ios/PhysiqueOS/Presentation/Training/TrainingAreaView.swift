@@ -1,0 +1,138 @@
+import SwiftUI
+
+/// A single Training Area (`/progress/training/library/:areaId`) — fully
+/// generic over `areaId`, fixture-backed for all 10 canonical areas
+/// (Chest, Back, Shoulders, Biceps, Triceps, Core, Quads, Hamstrings,
+/// Glutes, Calves; see `TrainingFixture.json`'s `areas` array). Areas with
+/// zero exercises today (Biceps, Core, Quads, Hamstrings, Glutes, Calves)
+/// render this exact screen with an honest empty "Browse" section — no
+/// exercises and no placeholder copy — matching real web behavior for an
+/// area with no logged exercises (`InformationList` renders nothing, not a
+/// "come back later" message; verified directly from source).
+///
+/// Reproduces `TrainingKnowledgeScreen.jsx`'s `mode="library"` render path
+/// for a bare area path exactly: `TrainingLibraryHeader` (eyebrow, title,
+/// breadcrumb pill row, no description — `getLibraryContent` sets
+/// `summary: null` for every area) → the shared scope selector → one
+/// "Browse" card listing every exercise resolved to this area
+/// (`BrowseCard`/`InformationList`/`InformationListItem`,
+/// `DeepPagePrimitives.jsx`). Exercise rows push the same
+/// `AppDestination.trainingExercise` case the Training landing's area rows
+/// already use — `AppDestinationRouterView` tells the two apart by id
+/// membership in `TrainingAreaIcon.canonicalAreaIds` and routes a real
+/// exercise id to `TrainingExerciseDetailView`.
+///
+/// The scope selector here is deliberately display-only (no `onSelect`),
+/// re-verified against source for this task's Training Library pass rather
+/// than left as an unexamined gap: `TrainingEvidenceContextService`'s own
+/// `trainingLibrary: globalReport.trainingLibrary` keeps the Areas/exercise
+/// catalog and per-exercise counts global even when a Goal/Phase is
+/// selected — only an exercise's own occurrence history (Current Benchmark/
+/// Last Session/Recent History on `TrainingExerciseDetailView`, which *does*
+/// wire this selector) narrows with scope. Selecting a Goal/Phase here would
+/// change nothing to select against, matching real product behavior exactly
+/// rather than a Native-only limitation.
+struct TrainingAreaView: View {
+    @Environment(AppEnvironment.self) private var environment
+    @State private var viewModel: TrainingAreaViewModel?
+    @State private var viewModelAuthority: NativeAPIEnvironment?
+    let areaId: String
+    var browseAll = false
+
+    var body: some View {
+        ScrollView {
+            content
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+        }
+        .physiqueOSScrollBottomClearance()
+        .background(PhysiqueOSTheme.background)
+        .navigationBarTitleDisplayMode(.inline)
+        .restoresInteractivePopGesture()
+        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .task(id: environment.nativeAuthority) {
+            if viewModelAuthority != environment.nativeAuthority {
+                viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId, browseAll: browseAll)
+                viewModelAuthority = environment.nativeAuthority
+            }
+            await viewModel?.load()
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel?.state {
+        case .none, .loading:
+            ProgressView()
+                .tint(PhysiqueOSTheme.accent)
+                .frame(maxWidth: .infinity, minHeight: 300)
+        case .failed(let message):
+            Text(message)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .frame(maxWidth: .infinity, minHeight: 300)
+        case .loaded(.none):
+            Text("This training area could not be found.")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .frame(maxWidth: .infinity, minHeight: 300)
+        case .loaded(.some(let area)):
+            VStack(alignment: .leading, spacing: 24) {
+                TrainingLibraryHeaderView(title: area.title, breadcrumbs: area.breadcrumbs)
+                TrainingScopeSelectorView(scope: area.scope) { pillID in
+                    Task { await viewModel?.selectScope(pillID: pillID) }
+                }
+                Button(viewModel?.browseAll == true ? "Show My Library" : "Browse All Exercises") {
+                    Task { await viewModel?.selectCatalog(browseAll: viewModel?.browseAll != true) }
+                }
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                browseCard(area.exercises)
+            }
+        }
+    }
+
+    /// `BrowseCard` (`DeepPagePrimitives.jsx:53-69`): `SectionHeader`
+    /// title="Browse" (no action) + `InformationList` — a flat, divided
+    /// list rather than individually-spaced cards like Training Areas'
+    /// own grid.
+    private func browseCard(_ exercises: [TrainingAreaExerciseRow]) -> some View {
+        CardContainer(padding: .sm) {
+            VStack(alignment: .leading, spacing: 12) {
+                TrainingSectionHeaderView(title: "Browse")
+                LazyVStack(spacing: 0) {
+                    ForEach(exercises) { exercise in
+                        NavigationLink(value: exercise.destination) {
+                            HStack(spacing: 8) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(exercise.label)
+                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    if let detail = exercise.detail {
+                                        Text(detail)
+                                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    }
+                                }
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(PhysiqueOSTheme.accent)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
+                            .frame(minHeight: 44)
+                            .frame(maxWidth: .infinity)
+                            .background(PhysiqueOSTheme.surfaceMuted)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+
+                        if exercise.id != exercises.last?.id {
+                            Divider().overlay(PhysiqueOSTheme.divider)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

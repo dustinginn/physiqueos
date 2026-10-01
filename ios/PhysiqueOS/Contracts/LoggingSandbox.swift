@@ -1,0 +1,931 @@
+import Foundation
+
+struct LoggingSandboxError: Error, Equatable, LocalizedError {
+    var message: String
+    var errorDescription: String? { message }
+}
+
+enum WeightUnit: String, Codable, CaseIterable, Identifiable {
+    case lb
+    case kg
+
+    var id: String { rawValue }
+}
+
+struct LocalWeightEntry: Codable, Equatable {
+    var dateKey: String
+    var value: Double
+    var unit: WeightUnit
+    var recordedAt: Date
+    var correctionCount: Int
+}
+
+struct MorningCheckInResult: Equatable {
+    var weight: LocalWeightEntry
+    var reconciledPriorityCount: Int
+}
+
+enum ManualWeighInValidation {
+    static var calendar: Calendar {
+        var value = Calendar(identifier: .gregorian)
+        value.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        return value
+    }
+
+    static func error(weightText: String, unit: WeightUnit, date: Date, maximumDate: Date) -> String? {
+        let trimmed = weightText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Double(trimmed), value.isFinite else { return "Enter a valid weight." }
+        let range = unit == .lb ? 50.0...1000.0 : 22.7...453.6
+        guard range.contains(value) else {
+            return unit == .lb
+                ? "Weight must be between 50 and 1,000 lb."
+                : "Weight must be between 22.7 and 453.6 kg."
+        }
+        guard calendar.startOfDay(for: date) <= calendar.startOfDay(for: maximumDate) else {
+            return "A weigh-in cannot be logged for a future date."
+        }
+        return nil
+    }
+}
+
+enum EvidenceCategory: String, Codable, CaseIterable, Identifiable {
+    case training
+    case nutrition
+    case weight
+    case activity
+    case dexa
+    case progressPhotos = "progress_photos"
+    case labs
+    case recovery
+    case generic
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .training: "Training"
+        case .nutrition: "Nutrition"
+        case .weight: "Weight"
+        case .activity: "Activity"
+        case .dexa: "DEXA"
+        case .progressPhotos: "Progress Photos"
+        case .labs: "Lab Panel"
+        case .recovery: "Recovery"
+        case .generic: "Evidence"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .training: "dumbbell.fill"
+        case .nutrition: "fork.knife"
+        case .weight: "scalemass.fill"
+        case .activity: "figure.walk"
+        case .dexa: "doc.text.fill"
+        case .progressPhotos: "camera.fill"
+        case .labs: "cross.case.fill"
+        case .recovery: "bed.double.fill"
+        case .generic: "tray.full.fill"
+        }
+    }
+}
+
+enum EvidenceFixtureScenario: String, Codable, CaseIterable, Identifiable {
+    case automatic
+    case workout
+    case training
+    case cardio
+    case nutrition
+    case weight
+    case activity
+    case dexa
+    case progressPhotos = "progress_photos"
+    case labs
+    case recovery
+    case mixed
+    case generic
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .workout: "Workout"
+        case .training: "Training · strength"
+        case .cardio: "Training · cardio"
+        case .nutrition: "Nutrition"
+        case .weight: "Weight"
+        case .activity: "Activity"
+        case .dexa: "DEXA"
+        case .progressPhotos: "Progress Photos"
+        case .labs: "Lab Panel"
+        case .recovery: "Recovery"
+        case .mixed: "Multiple types"
+        case .generic: "Evidence"
+        }
+    }
+
+    var category: EvidenceCategory? {
+        switch self {
+        case .automatic: nil
+        case .workout, .training, .cardio: .training
+        case .nutrition: .nutrition
+        case .weight: .weight
+        case .activity: .activity
+        case .dexa: .dexa
+        case .progressPhotos: .progressPhotos
+        case .labs: .labs
+        case .recovery: .recovery
+        case .mixed: .generic
+        case .generic: .generic
+        }
+    }
+}
+
+struct SandboxAttachment: Codable, Equatable, Identifiable {
+    enum Source: String, Codable, Hashable {
+        case photos = "Photos"
+        case files = "Files"
+    }
+
+    var id: String
+    var displayName: String
+    var source: Source
+    var contentType: String? = nil
+    var data: Data? = nil
+    var extractedText: String? = nil
+    var loadError: String? = nil
+
+    var isImage: Bool {
+        contentType?.hasPrefix("image/") == true || displayName.range(of: #"\.(png|jpe?g|heic|heif)$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    var isPDF: Bool {
+        contentType == "application/pdf" || displayName.lowercased().hasSuffix(".pdf")
+    }
+}
+
+protocol EvidenceLabeledChoice { var label: String { get } }
+
+enum ProgressPhotoOrientation: String, Codable, CaseIterable, Identifiable, EvidenceLabeledChoice {
+    case unconfirmed, front, rear, side, leftSide = "left_side", rightSide = "right_side"
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .unconfirmed: "Choose orientation"
+        case .front: "Front"
+        case .rear: "Rear"
+        case .side: "Side"
+        case .leftSide: "Left Side"
+        case .rightSide: "Right Side"
+        }
+    }
+}
+
+enum ProgressPhotoContraction: String, Codable, CaseIterable, Identifiable, EvidenceLabeledChoice {
+    case unconfirmed, relaxed, flexed
+    var id: String { rawValue }
+    var label: String { self == .unconfirmed ? "Choose condition" : rawValue.capitalized }
+}
+
+enum ProgressPhotoTimeOfDay: String, Codable, CaseIterable, Identifiable, EvidenceLabeledChoice {
+    case morning, afternoon, evening
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+}
+
+enum ProgressPhotoPoseVariant: String, Codable, CaseIterable, Identifiable, EvidenceLabeledChoice {
+    case standard, doubleBiceps = "double_biceps", latSpread = "lat_spread", sideChest = "side_chest", other
+    var id: String { rawValue }
+    var label: String { rawValue.replacingOccurrences(of: "_", with: " ").capitalized }
+}
+
+enum ProgressPhotoGoalRole: String, Codable, CaseIterable, Identifiable, EvidenceLabeledChoice {
+    case supporting, primary, contextOnly = "context_only"
+    var id: String { rawValue }
+    var label: String { rawValue.replacingOccurrences(of: "_", with: " ").capitalized }
+}
+
+struct ProgressPhotoIdentityDraft: Codable, Equatable, Identifiable {
+    var id: String
+    var attachmentId: String
+    var orientation: ProgressPhotoOrientation
+    var contraction: ProgressPhotoContraction
+    var poseVariant: ProgressPhotoPoseVariant
+    var customLabel: String
+    var goalRole: ProgressPhotoGoalRole
+    var tags: String
+    var confirmed: Bool
+
+    var poseLabel: String {
+        guard orientation != .unconfirmed, contraction != .unconfirmed else { return "Pose not confirmed" }
+        if poseVariant == .other, !customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return customLabel
+        }
+        let variant = poseVariant == .standard ? "" : " · \(poseVariant.label)"
+        return "\(orientation.label) \(contraction.label)\(variant)"
+    }
+}
+
+/// One choice in a Session Conditions control: what the Founder reads, and
+/// the exact multipart value Native sends. `wireValue == nil` means the field
+/// is omitted from the request, which the Server canonicalizes to "unknown".
+struct ProgressPhotoConditionOption: Equatable {
+    let label: String
+    let wireValue: String?
+}
+
+/// The Session Conditions controls, as approved in Build 8: time of day
+/// replaced the earlier Morning tri-state, and lighting/location/session
+/// notes stopped being Founder-facing. Labels, option sets, and wire values
+/// live here so the sandbox and production upload surfaces render the same
+/// approved presentation from one definition instead of drifting apart —
+/// Build 42's production view was written with its own unlabeled pickers and
+/// lost both the labels and Pump's Present/None wording.
+///
+/// Pump reads Unknown/Present/None to match the Web flow's wording while
+/// serializing the same canonical tri-state as Fasted and Post-workout
+/// ("true"/"false"); Web's own Pump control carries those identical values.
+enum ProgressPhotoConditionField: String, Codable, CaseIterable, Identifiable {
+    case timeOfDay, fasted, postWorkout, pump
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .timeOfDay: "Time of day"
+        case .fasted: "Fasted"
+        case .postWorkout: "Post-workout"
+        case .pump: "Pump"
+        }
+    }
+
+    var options: [ProgressPhotoConditionOption] {
+        switch self {
+        case .timeOfDay:
+            ProgressPhotoTimeOfDay.allCases.map { .init(label: $0.label, wireValue: $0.rawValue) }
+        case .fasted, .postWorkout:
+            [.init(label: "Unknown", wireValue: nil),
+             .init(label: "Yes", wireValue: "true"),
+             .init(label: "No", wireValue: "false")]
+        case .pump:
+            [.init(label: "Unknown", wireValue: nil),
+             .init(label: "Present", wireValue: "true"),
+             .init(label: "None", wireValue: "false")]
+        }
+    }
+
+    /// Shown when nothing is selected. Time of day is required by the Server
+    /// contract, so it prompts rather than claiming an unknown tri-state.
+    var unselectedLabel: String { self == .timeOfDay ? "Choose" : "Unknown" }
+}
+
+struct ProgressPhotoSessionDraft: Codable, Equatable {
+    /// Two columns by two rows, reading left to right, top to bottom.
+    static let conditionGrid: [[ProgressPhotoConditionField]] = [
+        [.timeOfDay, .fasted],
+        [.postWorkout, .pump],
+    ]
+
+    static let userFacingConditionLabels = conditionGrid.flatMap { $0 }.map(\.label)
+
+    var timeOfDay: ProgressPhotoTimeOfDay? = nil
+    var fasted: Bool?
+    var postWorkout: Bool?
+    var pump: Bool?
+    var originalUnedited = false
+
+    /// The exact multipart value this draft sends for `field`, or nil when the
+    /// field is omitted.
+    func wireValue(for field: ProgressPhotoConditionField) -> String? {
+        switch field {
+        case .timeOfDay: timeOfDay?.rawValue
+        case .fasted: fasted.map(String.init)
+        case .postWorkout: postWorkout.map(String.init)
+        case .pump: pump.map(String.init)
+        }
+    }
+
+    func selectedLabel(for field: ProgressPhotoConditionField) -> String {
+        let value = wireValue(for: field)
+        guard value != nil else { return field.unselectedLabel }
+        return field.options.first { $0.wireValue == value }?.label ?? field.unselectedLabel
+    }
+
+    mutating func apply(_ option: ProgressPhotoConditionOption, to field: ProgressPhotoConditionField) {
+        switch field {
+        case .timeOfDay: timeOfDay = option.wireValue.flatMap(ProgressPhotoTimeOfDay.init(rawValue:))
+        case .fasted: fasted = option.wireValue.map { $0 == "true" }
+        case .postWorkout: postWorkout = option.wireValue.map { $0 == "true" }
+        case .pump: pump = option.wireValue.map { $0 == "true" }
+        }
+    }
+}
+
+struct DEXAIntakeDraft: Codable, Equatable {
+    var totalMass = ""
+    var bodyFatPercentage = ""
+    var fatMass = ""
+    var leanMass = ""
+    var boneMineralContent = ""
+    var restingMetabolicRate = ""
+    var vatMass = ""
+    var vatVolume = ""
+    var valuesConfirmed = false
+
+    var hasRequiredValues: Bool {
+        [totalMass, bodyFatPercentage, fatMass, leanMass].allSatisfy {
+            guard let value = Double($0), value.isFinite else { return false }
+            return value > 0
+        }
+    }
+}
+
+enum EvidenceInterpretationState: Equatable {
+    case editing
+    case pending
+    case ready(reviewId: String)
+}
+
+struct EvidencePipelineTimings: Equatable {
+    var assetLoadingSeconds: Double?
+    var interpretationSeconds: Double?
+    var reconciliationSeconds: Double?
+    var reviewReadySeconds: Double?
+}
+
+struct EvidenceIntakeDraft: Codable, Equatable {
+    var occurrenceDate: Date
+    var details: String
+    var attachments: [SandboxAttachment]
+    var scenario: EvidenceFixtureScenario
+    var dexa: DEXAIntakeDraft
+    var photoIdentities: [ProgressPhotoIdentityDraft]
+    var photoSession: ProgressPhotoSessionDraft
+
+    static func fresh(now: Date = Date()) -> Self {
+        .init(
+            occurrenceDate: now,
+            details: "",
+            attachments: [],
+            scenario: .automatic,
+            dexa: .init(),
+            photoIdentities: [],
+            photoSession: .init()
+        )
+    }
+
+    var hasContent: Bool {
+        !attachments.isEmpty || !details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var submittedText: String {
+        ([details] + attachments.compactMap(\.extractedText))
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n\n")
+    }
+}
+
+enum EvidenceSandboxRouter {
+    static func scenario(for draft: EvidenceIntakeDraft) -> EvidenceFixtureScenario {
+        guard draft.scenario == .automatic else { return draft.scenario }
+        let categories = detectedCategories(for: draft)
+        if categories.count > 1 { return .mixed }
+        return switch categories.first {
+        case .training: .workout
+        case .nutrition: .nutrition
+        case .weight: .weight
+        case .activity: .activity
+        case .dexa: .dexa
+        case .progressPhotos: .progressPhotos
+        case .labs: .labs
+        case .recovery: .recovery
+        case .generic, .none: .automatic
+        }
+    }
+
+    /// Classifies each evidence *source* (the typed details, and each
+    /// attachment's own extracted text + filename) independently, then
+    /// unions the results — rather than classifying one blob concatenated
+    /// across the entire package. A package legitimately containing
+    /// Nutrition, Activity, and Training evidence at once must keep all
+    /// three: the intra-source Training-vs-Activity/Weight disambiguation
+    /// below (a single image whose own text is ambiguous between "a
+    /// workout screenshot" and "an Activity/Weight reading") is a
+    /// same-source heuristic and must never suppress a genuinely separate
+    /// Activity or Weight screenshot elsewhere in the same package just
+    /// because a *different* attachment happens to contain Training
+    /// signal. This was the actual cause of a real Founder regression:
+    /// Activity was silently dropped from a Nutrition+Activity+Training
+    /// upload (present and correct when the same Activity evidence was
+    /// paired with only Nutrition) because the suppression previously ran
+    /// against the whole package's merged text.
+    static func detectedCategories(for draft: EvidenceIntakeDraft) -> [EvidenceCategory] {
+        var result: [EvidenceCategory] = []
+        for source in classificationSources(for: draft) where !source.classificationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            for category in detectedCategories(inSingleSource: source.classificationText) where !result.contains(category) {
+                result.append(category)
+            }
+        }
+        // Local Vision OCR cannot identify a physique. When a multi-image
+        // package has no recognized document/workout/nutrition signals
+        // anywhere, route it to an explicitly unconfirmed Progress Photo
+        // review rather than pretending high-confidence visual recognition
+        // occurred. This stays package-level by design — it only applies
+        // once every source has been checked and none matched anything.
+        let imageAttachments = draft.attachments.filter(\.isImage)
+        if result.isEmpty,
+           imageAttachments.count >= 2,
+           imageAttachments.count == draft.attachments.count {
+            result.append(.progressPhotos)
+        }
+        return result
+    }
+
+    /// Per-attachment classification for production Automatic grouping.
+    /// This deliberately uses the same single-source specificity model as
+    /// package classification, but never lets a sibling attachment's signal
+    /// turn this attachment into an ambiguous/global choice.
+    static func detectedCategories(for attachment: SandboxAttachment) -> [EvidenceCategory] {
+        let text = [attachment.extractedText, attachment.displayName]
+            .compactMap { $0 }
+            .joined(separator: "\n")
+            .lowercased()
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
+        return detectedCategories(inSingleSource: text)
+    }
+
+    /// The concatenated, original-case text of just the sources whose own
+    /// per-source classification actually included `category` — used by
+    /// per-category field extraction (e.g. `activityItem`) so a field
+    /// label shared with another domain (e.g. "active calories", which
+    /// appears both on an Activity rings summary as "Move ... cal" and on
+    /// a Training workout summary) is never read from a *different*
+    /// domain's attachment once both are legitimately present in the same
+    /// package. Falls back to the caller using the whole package's text
+    /// when no source's own classification matches (e.g. an explicitly
+    /// chosen scenario whose typed text doesn't happen to use the
+    /// automatic classifier's exact keyword phrasing) — callers are
+    /// expected to fall back to `draft.submittedText` when this is empty.
+    static func sourceText(for draft: EvidenceIntakeDraft, matching category: EvidenceCategory) -> String {
+        classificationSources(for: draft)
+            .filter { !$0.classificationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && detectedCategories(inSingleSource: $0.classificationText).contains(category) }
+            .map(\.valueText)
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n\n")
+    }
+
+    /// One source per attachment (its own extracted text, paired with a
+    /// classification-only text that also folds in its own filename —
+    /// never another attachment's), plus the typed details as their own
+    /// source. `valueText` (used for field extraction) never includes the
+    /// filename; `classificationText` (used only to decide which
+    /// category(ies) this source belongs to) does, preserving the
+    /// original filename-assisted classification (e.g. a DEXA export
+    /// named "BodySpec.pdf") without letting a filename leak into
+    /// extracted field values.
+    private static func classificationSources(for draft: EvidenceIntakeDraft) -> [(classificationText: String, valueText: String)] {
+        var sources: [(String, String)] = [(draft.details.lowercased(), draft.details)]
+        sources.append(contentsOf: draft.attachments.map { attachment in
+            let classification = [attachment.extractedText, attachment.displayName].compactMap { $0 }.joined(separator: "\n").lowercased()
+            return (classification, attachment.extractedText ?? "")
+        })
+        return sources
+    }
+
+    /// How much weight one matched term carries for its own category.
+    ///
+    /// `defining` terms name the evidence type itself or a measurement that
+    /// essentially only that type reports ("bodyspec", "regional lean",
+    /// "activity rings", "shoulder press"). `supporting` terms are real
+    /// signal but plausibly incidental in another domain's document — a
+    /// BodySpec report discusses "nutrition" and "training" in its
+    /// recommendations, and reports a "body fat" percentage, without being
+    /// any of those things.
+    enum SignalSpecificity {
+        case defining
+        case supporting
+
+        var diagnosticLabel: String {
+            switch self {
+            case .defining: "defining"
+            case .supporting: "supporting"
+            }
+        }
+    }
+
+    /// Deterministic evidence-strength classification for ONE source.
+    ///
+    /// Flat substring-OR treated a single incidental word as equal to a
+    /// cluster of document-identity terms. The real Founder BodySpec PDF
+    /// matched ten DEXA terms alongside exactly one "nutrition" and one
+    /// "training", came out as three categories, and was routed to the
+    /// ambiguous branch. The rule below is the smallest correction that
+    /// removes the equivalence without hardcoding "DEXA beats Nutrition":
+    ///
+    ///   1. A category with at least one `defining` term is established.
+    ///   2. When any category is established that way, categories resting on
+    ///      `supporting` terms alone are outweighed and dropped.
+    ///   3. With no defining match anywhere, supporting matches are all we
+    ///      have, so they classify — two or more first, a lone one otherwise.
+    ///
+    /// Genuine cross-family ambiguity survives: two categories each holding a
+    /// defining term both stay, and the caller still routes to `.mixed`.
+    /// Rule 2 also subsumes the hand-written Weight-vs-DEXA and
+    /// Activity-vs-Training suppressions this replaces — a DEXA report's bare
+    /// "174.7 lb" line and a workout summary's "steps" are supporting-only
+    /// matches that now lose to the defining category in their own source.
+    private static func detectedCategories(inSingleSource text: String) -> [EvidenceCategory] {
+        var defining: [EvidenceCategory] = []
+        var supportingOnly: [EvidenceCategory] = []
+        var loneSupporting: [EvidenceCategory] = []
+
+        for (category, terms) in categorySignals {
+            var definingMatches = 0
+            var supportingMatches = 0
+            for (term, specificity) in terms where text.contains(term) {
+                switch specificity {
+                case .defining: definingMatches += 1
+                case .supporting: supportingMatches += 1
+                }
+            }
+            if let (pattern, specificity) = categoryPatterns[category],
+               text.range(of: pattern, options: .regularExpression) != nil {
+                switch specificity {
+                case .defining: definingMatches += 1
+                case .supporting: supportingMatches += 1
+                }
+            }
+            if definingMatches > 0 {
+                defining.append(category)
+            } else if supportingMatches >= 2 {
+                supportingOnly.append(category)
+            } else if supportingMatches == 1 {
+                loneSupporting.append(category)
+            }
+        }
+
+        if !defining.isEmpty { return defining }
+        if !supportingOnly.isEmpty { return supportingOnly }
+        return loneSupporting
+    }
+
+    /// The keyword tables, each term tagged with the weight it carries. These
+    /// are shared verbatim by the classification decision above and by
+    /// `detectedSignals(for:)` below, so the diagnostic can never drift from
+    /// the logic it explains. Declaration order fixes the order of the
+    /// returned categories, which the caller relies on being stable.
+    static let categorySignals: [(category: EvidenceCategory, terms: [(term: String, specificity: SignalSpecificity)])] = [
+        (.dexa, [
+            ("dexa", .defining), ("bodyspec", .defining), ("body composition", .defining),
+            ("lean tissue", .defining), ("fat tissue", .defining), ("regional lean", .defining),
+            ("regional fat", .defining), ("bone mineral content", .defining), ("vat volume", .defining),
+            // Reported by scales and lab panels too.
+            ("fat mass", .supporting), ("body fat", .supporting),
+        ]),
+        (.labs, [
+            ("lab panel", .defining), ("bloodwork", .defining), ("blood test", .defining),
+            ("hemoglobin", .defining), ("cholesterol", .defining),
+            // Appears in protocol and goal notes.
+            ("testosterone", .supporting),
+        ]),
+        (.recovery, [
+            ("hrv", .defining), ("readiness", .defining), ("recovery score", .defining),
+            ("time asleep", .defining),
+            // Turns up in any report's lifestyle section.
+            ("sleep", .supporting),
+        ]),
+        // Progress-photo evidence is images, not text. Text that names a pose
+        // is usually narrative — a DEXA report suggesting "front relaxed pose
+        // photos taken the same morning" is still a DEXA report. So no pose
+        // name is treated as defining; a photo session identifies itself
+        // through the all-images package rule in `detectedCategories(for:)`,
+        // and two or more pose phrases with nothing else present still
+        // classify on their own.
+        (.progressPhotos, [
+            ("progress photo", .supporting), ("front relaxed", .supporting), ("rear relaxed", .supporting),
+            ("side relaxed", .supporting), ("pose photo", .supporting),
+        ]),
+        // A calorie value appears on both Apple workout summaries and Nutrition
+        // screens. It is therefore deliberately not a Nutrition term at all.
+        (.nutrition, [
+            ("macros", .defining), ("food diary", .defining), ("daily nutrition", .defining),
+            ("myfitnesspal", .defining), ("cronometer", .defining), ("serving size", .defining),
+            ("breakfast", .defining), ("lunch", .defining), ("dinner", .defining),
+            ("snacks", .defining), ("meal", .defining), ("carbohydrate", .defining), ("carbs", .defining),
+            // The bare word and single macro names are what a DEXA report's
+            // recommendations use. This is the real Founder collision.
+            ("nutrition", .supporting), ("protein", .supporting),
+            ("fiber", .supporting), ("sodium", .supporting),
+        ]),
+        (.training, [
+            ("workout", .defining), ("traditional strength", .defining), ("functional strength", .defining),
+            ("sets", .defining), ("reps", .defining), ("active calories", .defining),
+            ("workout time", .defining), ("average heart rate", .defining),
+            ("shoulder press", .defining), ("bench press", .defining), ("lateral raise", .defining),
+            ("squat", .defining), ("deadlift", .defining), ("curl", .defining),
+            ("treadmill", .defining), ("stair stepper", .defining), ("outdoor walk", .defining),
+            ("indoor walk", .defining), ("outdoor run", .defining), ("indoor run", .defining),
+            ("cycling", .defining), ("elliptical", .defining), ("rowing", .defining), ("hiking", .defining),
+            // The other half of the real Founder collision, plus a word that
+            // labels a field on almost every report.
+            ("training", .supporting), ("duration", .supporting),
+        ]),
+        (.activity, [
+            ("activity rings", .defining), ("move goal", .defining),
+            ("stand hours", .defining), ("exercise minutes", .defining),
+            ("steps", .supporting),
+        ]),
+        (.weight, [
+            ("morning weight", .defining), ("body weight", .defining),
+            ("weighed in", .defining), ("scale weight", .defining),
+        ]),
+    ]
+
+    /// Regular-expression signals, one per category, carrying the same tiers.
+    /// A set line ("185 lb 8r x 3") is unmistakably Training. A lone mass
+    /// reading is not unmistakably a weigh-in — a DEXA report prints one.
+    static let categoryPatterns: [EvidenceCategory: (pattern: String, specificity: SignalSpecificity)] = [
+        .training: (trainingSetPattern, .defining),
+        .weight: (weightReadingPattern, .supporting),
+    ]
+
+    static let trainingSetPattern = #"(?im)^\s*\d+(?:\.\d+)?\s*(?:p|lb|lbs|pounds?)\s+\d+(?:\.\d+)?\s*(?:r|reps?)\s*[x×]\s*\d+\s*$"#
+    static let weightReadingPattern = #"(?m)^\s*\d{2,3}(?:\.\d+)?\s*(?:lb|lbs|kg)\s*$"#
+
+    /// Bounded classification diagnostic: reports WHICH fixed signal caused
+    /// each category to match, as stable identifiers drawn from our own
+    /// keyword tables (e.g. `nutrition.keyword.protein`) — never the
+    /// surrounding document text. This exists because Build 25 and Build 26
+    /// both "corrected" Automatic precedence against an *inferred* keyword
+    /// collision that turned out not to be the real one; the next real
+    /// ambiguous document must report its actual collision rather than be
+    /// guessed at again.
+    static func detectedSignals(for draft: EvidenceIntakeDraft) -> [String] {
+        var signals: [String] = []
+        func append(_ identifier: String) {
+            if !signals.contains(identifier) { signals.append(identifier) }
+        }
+        for source in classificationSources(for: draft) {
+            let text = source.classificationText
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            for (category, terms) in categorySignals {
+                for (term, specificity) in terms where text.contains(term) {
+                    // The tier is part of the identifier so a reported
+                    // collision shows at a glance which side rested on
+                    // document identity and which on an incidental word.
+                    append("\(category.rawValue).\(specificity.diagnosticLabel).\(term.replacingOccurrences(of: " ", with: "_"))")
+                }
+            }
+            if text.range(of: trainingSetPattern, options: .regularExpression) != nil {
+                append("training.defining.pattern_set_line")
+            }
+            if text.range(of: weightReadingPattern, options: .regularExpression) != nil {
+                append("weight.supporting.pattern_reading_line")
+            }
+        }
+        return signals
+    }
+}
+
+struct EvidenceReviewField: Codable, Equatable, Identifiable {
+    var id: String
+    var label: String
+    var value: String
+    var unit: String?
+    var required: Bool
+
+    var isValid: Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return !required }
+        guard unit != nil else { return true }
+        guard let number = Double(trimmed) else { return false }
+        return number.isFinite
+    }
+}
+
+struct EvidenceReviewSet: Codable, Equatable, Identifiable {
+    var id: String
+    var summary: String
+    var reps: String? = nil
+    var load: String? = nil
+    var unit: String? = nil
+
+    /// Mirrors `TrainingSet.isBodyweight` — a set explicitly performed at
+    /// bodyweight, not a set whose load is merely unset/unknown. `load`
+    /// stays `nil` for a bodyweight set (never coerced to `0`); this flag
+    /// is what actually distinguishes the two "no numeric load" cases.
+    var isBodyweight: Bool { unit == "bodyweight" }
+
+    var isValid: Bool {
+        guard reps != nil || load != nil else { return !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        guard let reps, let repValue = Double(reps), repValue.isFinite, repValue > 0 else { return false }
+        guard let load else { return true }
+        guard let loadValue = Double(load), loadValue.isFinite, loadValue >= 0 else { return false }
+        return true
+    }
+
+    mutating func refreshSummary() {
+        guard let reps else { return }
+        if isBodyweight { summary = "\(reps) reps · BW" }
+        else if let load { summary = "\(reps) reps @ \(load) \(unit ?? "lb")" }
+        else { summary = "\(reps) reps" }
+    }
+}
+
+struct EvidenceReviewExercise: Codable, Equatable, Identifiable {
+    var id: String
+    var name: String
+    var variant: String?
+    var relationship: String?
+    var sets: [EvidenceReviewSet]
+    /// Set only when this exercise name resolves, case-insensitively, to a
+    /// `TrainingLoggerCatalogExercise.canonicalExerciseId` — the same
+    /// catalog identity Workout Logger itself resolves against. `nil` when
+    /// unresolved; the occurrence is still preserved distinctly (see
+    /// `isProvisional`), never dropped or merged into another exercise.
+    var canonicalExerciseId: String? = nil
+    /// Mirrors `TrainingLoggerDraftExercise.isProvisional` — true when this
+    /// exercise could not be matched to the canonical catalog. A
+    /// provisional exercise remains a fully distinct, includable
+    /// occurrence; the Founder may match it to an existing catalog
+    /// exercise in Evidence Review, exactly as Workout Logger's own
+    /// "Create new exercise" flow leaves a provisional exercise usable
+    /// until it is later reconciled.
+    var isProvisional: Bool = false
+    /// Set once the Founder chooses a Training Area for a provisional
+    /// exercise via Evidence Review's "Create New Exercise" action —
+    /// mirrors the one additional input Workout Logger's own
+    /// `addProvisionalExercise(name:areaId:)` requires. This only records
+    /// Founder intent for the future canonicalization command
+    /// (`TrainingExerciseCanonicalizationCommand`); it does not itself
+    /// assign a `canonicalExerciseId` or clear `isProvisional` — no
+    /// connected server exists yet to actually create the exercise.
+    var proposedAreaId: String? = nil
+}
+
+struct EvidenceReviewFood: Codable, Equatable, Identifiable {
+    var id: String
+    var name: String
+    var detail: String
+    var calories: String?
+}
+
+struct EvidenceReviewMeal: Codable, Equatable, Identifiable {
+    var id: String
+    var name: String
+    var summary: String
+    var foods: [EvidenceReviewFood]
+}
+
+enum NutritionEvidenceScope: String, Codable, Equatable {
+    case fullDay = "full_day"
+    case meal
+    case unknown
+}
+
+enum NutritionReviewDisposition: String, Codable, CaseIterable, Identifiable {
+    case replaceExisting = "replace_existing"
+    case addDistinctMeal = "add_distinct_meal"
+    var id: String { rawValue }
+    var label: String { self == .replaceExisting ? "Replace existing" : "Add to this day" }
+}
+
+struct EvidenceReviewItem: Codable, Equatable, Identifiable {
+    var id: String
+    var category: EvidenceCategory
+    var title: String
+    var occurrenceDate: Date
+    var fields: [EvidenceReviewField]
+    var exercises: [EvidenceReviewExercise] = []
+    var meals: [EvidenceReviewMeal] = []
+    var nutritionScope: NutritionEvidenceScope = .unknown
+    var photoIdentities: [ProgressPhotoIdentityDraft] = []
+    var included = true
+    var nutritionReplacementRequired = false
+    var nutritionDisposition: NutritionReviewDisposition?
+
+    var hasRequiredValues: Bool {
+        guard fields.allSatisfy(\.isValid) else { return false }
+        let populated = Set(fields.filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.map(\.id))
+        return switch category {
+        case .training: (!exercises.isEmpty && exercises.allSatisfy { exercise in
+            !exercise.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !exercise.sets.isEmpty && exercise.sets.allSatisfy(\.isValid)
+        }) || !populated.isEmpty
+        case .nutrition: !populated.intersection(["calories", "protein", "carbs", "fat"]).isEmpty
+        case .weight: populated.contains("weight")
+        case .activity: !populated.intersection(["activeCalories", "exerciseMinutes", "steps", "duration", "distance", "heartRate"]).isEmpty
+        case .dexa: ["totalMass", "bodyFat", "fatMass", "leanMass"].allSatisfy(populated.contains)
+        case .progressPhotos: true
+        case .labs, .recovery, .generic: !populated.isEmpty
+        }
+    }
+    var specialReviewComplete: Bool {
+        let photoMetadataReady = fields
+            .filter { ["timeOfDay", "fasted", "originalUnedited"].contains($0.id) }
+            .allSatisfy { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        return (!nutritionReplacementRequired || nutritionDisposition != nil) &&
+        (category != .progressPhotos || (photoIdentities.allSatisfy(\.confirmed) && photoMetadataReady))
+    }
+    var canConfirm: Bool { included && hasRequiredValues && specialReviewComplete }
+}
+
+enum LocalEvidenceReviewStatus: String, Codable, Equatable {
+    case awaitingConfirmation
+    case confirmed
+}
+
+struct LocalEvidenceReview: Codable, Equatable, Identifiable {
+    var id: String
+    var sourceAssets: [SandboxAttachment]
+    var typedDetails: String
+    var items: [EvidenceReviewItem]
+    var status: LocalEvidenceReviewStatus
+    var interpretationMessage: String? = nil
+    /// Set only when this review was started from a Morning Check-In
+    /// evidence-recovery action — mirrors the real `EvidenceRecoveryContext`
+    /// carried in `review_metadata` on web. When present, confirming or
+    /// discarding this review returns to Morning Check-In instead of Log.
+    var recoveryContext: MorningEvidenceRecoveryContext? = nil
+
+    var category: EvidenceCategory { items.first?.category ?? .generic }
+    var occurrenceDate: Date { items.first?.occurrenceDate ?? .distantPast }
+    var includedCount: Int { items.filter(\.included).count }
+    var excludedCount: Int { items.count - includedCount }
+    var canConfirm: Bool { includedCount > 0 && items.filter(\.included).allSatisfy(\.canConfirm) }
+    var completionTitle: String {
+        let includedCategories = Set(items.filter(\.included).map(\.category))
+        guard includedCategories.count == 1, let category = includedCategories.first else {
+            return "Evidence review complete"
+        }
+        return switch category {
+        case .training: "Workout review complete"
+        case .nutrition: "Nutrition review complete"
+        case .activity: "Activity review complete"
+        case .weight: "Weight review complete"
+        case .dexa: "DEXA review complete"
+        case .progressPhotos: "Photo review complete"
+        case .labs: "Lab review complete"
+        case .recovery: "Recovery review complete"
+        case .generic: "Review complete"
+        }
+    }
+}
+
+/// The exercise picker's combined Training-Area + search filtering, pulled
+/// out of the sheet view so both rules are independently unit-testable.
+enum ExercisePickerFiltering {
+    static func filtered(
+        catalog: [TrainingLoggerCatalogExercise],
+        selectedAreaId: String?,
+        query: String
+    ) -> [TrainingLoggerCatalogExercise] {
+        catalog
+            .filter { selectedAreaId == nil || $0.areaId == selectedAreaId }
+            .filter { ExerciseSearchMatching.matches(query: query, exerciseName: $0.name) }
+            .sorted { $0.name < $1.name }
+    }
+}
+
+/// Tolerant substring matching for the exercise picker's search field —
+/// forgiving of capitalization, punctuation, and spacing differences (e.g.
+/// "pull ups" surfaces "Pull-ups") without doing any fuzzy/typo-tolerant
+/// matching. The Founder always explicitly picks the canonical exercise
+/// from the filtered results; this never silently auto-matches.
+enum ExerciseSearchMatching {
+    static func matches(query: String, exerciseName: String) -> Bool {
+        let normalizedQuery = normalize(query)
+        guard !normalizedQuery.isEmpty else { return true }
+        return normalize(exerciseName).contains(normalizedQuery)
+    }
+
+    static func isCanonicalMatch(_ candidate: String, _ exerciseName: String) -> Bool {
+        let lhs = normalize(candidate)
+        let rhs = normalize(exerciseName)
+        return lhs == rhs || singularized(lhs) == singularized(rhs)
+    }
+
+    private static func normalize(_ value: String) -> String {
+        value.lowercased().replacingOccurrences(of: #"[^a-z0-9]+"#, with: "", options: .regularExpression)
+    }
+
+    private static func singularized(_ value: String) -> String {
+        value.hasSuffix("s") ? String(value.dropLast()) : value
+    }
+}
+
+enum NumericEditingContract {
+    static func shouldSelectAllOnFocus(_ text: String) -> Bool { !text.isEmpty }
+
+    static func parsedValue(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return Double(trimmed)
+    }
+
+    static func finishActionVisible(step: TrainingLoggerStep?, keyboardVisible: Bool) -> Bool {
+        step == .workout && !keyboardVisible
+    }
+}

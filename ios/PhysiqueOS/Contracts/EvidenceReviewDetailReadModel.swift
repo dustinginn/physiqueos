@@ -1,0 +1,146 @@
+import Foundation
+
+/// Founder Production Evidence Review detail
+/// (`evidence-review` native resource, `EvidenceReviewReadService.getReview`).
+///
+/// The server runs the review through its shared
+/// `createEvidenceReviewPresentation` projection, so Native receives the
+/// same human-readable titles, summaries, inclusion decisions, metrics,
+/// meals/training detail, and source labels as web. Swift only renders that
+/// finished presentation; it does not recreate evidence interpretation.
+/// DEXA also retains the raw measurement object needed by the existing
+/// full-replacement correction command.
+struct EvidenceReviewDetailReadModel: Equatable {
+    var id: String
+    var status: String
+    var createdAt: String?
+    var version: Int?
+    var items: [EvidenceReviewDetailItem]
+    var summary: String? = nil
+    var excludedSummary: String? = nil
+    /// Present only for a typed HealthKit ↔ Workout Logger identity review.
+    /// It is reconciliation evidence, never strategic/coaching evidence.
+    var workoutReconciliation: WorkoutReconciliationDetail? = nil
+}
+
+struct WorkoutReconciliationDetail: Equatable {
+    var localDate: String
+    var title: String
+    var summary: String
+    var workout: WorkoutReconciliationWorkout
+    var candidates: [WorkoutReconciliationCandidate]
+    var resolution: WorkoutReconciliationResolution? = nil
+}
+
+struct WorkoutReconciliationResolution: Equatable {
+    var action: String
+    var selectedLoggerSessionCanonicalId: String?
+    var linkId: String?
+}
+
+struct WorkoutReconciliationWorkout: Equatable {
+    var family: String
+    var canonicalType: String
+    var startedAt: String
+    var endedAt: String?
+}
+
+struct WorkoutReconciliationCandidate: Equatable, Identifiable {
+    var id: String { loggerSessionCanonicalId }
+    var loggerSessionCanonicalId: String
+    var confidence: Int
+    var basis: String
+    var activityType: String
+    var startedAt: String?
+    var endedAt: String?
+}
+
+struct EvidenceReviewDetailItem: Equatable, Identifiable {
+    var id: String
+    var type: String
+    var date: String?
+    /// Stable canonical date supplied by the raw interpreted object. The
+    /// presentation date may be localized for display and must not be used
+    /// as a durable readback key after confirmation.
+    var canonicalDate: String? = nil
+    var title: String? = nil
+    var noun: String? = nil
+    var sourceLabel: String? = nil
+    var included: Bool = true
+    var metrics: [EvidenceReviewMetric] = []
+    var exercises: [EvidenceReviewDetailExercise] = []
+    var meals: [EvidenceReviewDetailMeal] = []
+    var sourceFiles: [String] = []
+    var typedEvidence: String? = nil
+    var reconciliation: String? = nil
+    /// Server-owned Progress Photos session identity and pose mapping. Native
+    /// renders this for confirmation but never creates a parallel PhotoSession
+    /// authority; the review id remains the only commit identity.
+    var photoSession: EvidenceReviewPhotoSession? = nil
+    /// Non-nil only for a DEXA scan object — the exact fields
+    /// `dexa-review.measurements.v1` requires Native to resend in full on
+    /// every edit (the server replaces, never merges).
+    var dexaMeasurements: DEXAScanMeasurements? = nil
+}
+
+struct EvidenceReviewPhotoSession: Equatable {
+    var sessionId: String
+    var timeOfDay: String?
+    /// Founder-facing text only: the resolved Goal's name, or a plain-language
+    /// state. Never a raw wire enum such as `needs_review`.
+    var goalRelationship: String?
+    var photos: [EvidenceReviewPhotoIdentity]
+
+    /// The Goal's own name when the session resolved to one; otherwise the
+    /// plain-language state. A resolved scheduled session shows its Goal, and
+    /// only a genuinely unresolved session says it needs review.
+    static func goalRelationshipText(goalLabel: String?, status: String?) -> String? {
+        if let label = goalLabel?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty { return label }
+        switch status {
+        case "resolved": return "Linked goal"
+        case "needs_review": return "Needs session review"
+        case "unrelated": return "No goal linked"
+        default: return nil
+        }
+    }
+}
+
+struct EvidenceReviewPhotoIdentity: Equatable, Identifiable {
+    var id: String
+    var poseId: String?
+    var label: String?
+    var orientation: String?
+    var contractionState: String?
+    var poseVariant: String?
+}
+
+struct EvidenceReviewMetric: Equatable, Identifiable {
+    var id: String { label }
+    var label: String
+    var value: String
+}
+
+struct EvidenceReviewDetailExercise: Equatable, Identifiable {
+    var id: String { name }
+    var name: String
+    var sets: [String]
+    var occurrenceLabel: String? = nil
+    var variantLabel: String? = nil
+    var proposedNewExercise: Bool = false
+    var supersetWith: [String] = []
+}
+
+struct EvidenceReviewDetailMeal: Equatable, Identifiable {
+    var id: String
+    var name: String
+    var summary: String
+    var foods: [EvidenceReviewDetailFood]
+}
+
+struct EvidenceReviewDetailFood: Equatable, Identifiable {
+    var id: String
+    var name: String
+    var brand: String?
+    var serving: String?
+    var calories: String?
+}

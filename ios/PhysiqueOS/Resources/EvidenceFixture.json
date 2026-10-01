@@ -1,0 +1,96 @@
+{
+  "title": "Evidence Hub",
+  "subtitle": "PhysiqueOS organizes what it knows about your body, progress, and routines.",
+  "streams": [
+    {
+      "id": "training",
+      "title": "Training",
+      "metric": "4 sessions",
+      "trend": "2 resistance / 2 cardio.",
+      "lastUpdated": "2026-08-26",
+      "status": "available",
+      "tone": "primary",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "training" } }
+    },
+    {
+      "id": "nutrition",
+      "title": "Nutrition",
+      "metric": "9 days",
+      "trend": "Nutrition history available.",
+      "lastUpdated": "2026-08-30",
+      "status": "available",
+      "tone": "primary",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "nutrition" } }
+    },
+    {
+      "id": "weight",
+      "title": "Weight",
+      "metric": "179.4 lb",
+      "trend": "Down 6.1 lb since the cut began.",
+      "lastUpdated": "2026-08-30",
+      "status": "available",
+      "tone": "evidence",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "weight" } }
+    },
+    {
+      "id": "photos",
+      "title": "Progress Photos",
+      "metric": "Latest Photo Set",
+      "trend": "View photo progress",
+      "lastUpdated": "2026-08-30",
+      "status": "available",
+      "tone": "primary",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "photos" } }
+    },
+    {
+      "id": "dexa",
+      "title": "DEXA",
+      "metric": "9.4%",
+      "trend": "5 scans on record.",
+      "lastUpdated": "2026-08-30",
+      "status": "available",
+      "tone": "success",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "dexa" } }
+    },
+    {
+      "id": "activity",
+      "title": "Activity",
+      "metric": "612 active cal",
+      "trend": "38 active calories below the recorded daily target.",
+      "lastUpdated": "2026-08-30",
+      "status": "available",
+      "tone": "success",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "activity" } }
+    },
+    {
+      "id": "energy",
+      "title": "Energy",
+      "metric": "Available",
+      "trend": "Derived intake and estimated expenditure history.",
+      "lastUpdated": "2026-08-27",
+      "status": "available",
+      "tone": "primary",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "energy" } }
+    },
+    {
+      "id": "recovery",
+      "title": "Recovery",
+      "metric": "Coming soon",
+      "trend": "Sleep, HRV, readiness, and recovery.",
+      "lastUpdated": null,
+      "status": "placeholder",
+      "tone": "muted",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "recovery" } }
+    },
+    {
+      "id": "health-metrics",
+      "title": "Health Metrics",
+      "metric": "Coming soon",
+      "trend": "Vitals, labs, and wearable health signals.",
+      "lastUpdated": null,
+      "status": "placeholder",
+      "tone": "evidence",
+      "destination": { "id": "progress.stream", "parameters": { "streamId": "health-metrics" } }
+    }
+  ]
+}

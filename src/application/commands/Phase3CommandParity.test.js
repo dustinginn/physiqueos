@@ -36,7 +36,7 @@ const payloads = {
   [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: { batchId: "healthkit-batch-2026-08-11", observations: [{ observationType: "workout" }] },
   [Phase3Command.INGEST_HEALTHKIT_SLEEP]: { batchId: "healthkit-sleep-batch-2026-08-11", deletions: [{ externalId: "00000000-0000-4000-8000-000000000001" }] },
   [Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION]: { batchId: "healthkit-sleep-validation-batch", runId: "hv-2026-10-10-30d", samples: [{ externalId: "00000000-0000-4000-8000-000000000002" }] },
-  [Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE]: { batchId: "healthkit-sleep-evidence-batch", runId: "sleep-evidence-2026-07-06-through-2026-10-03-v1", samples: [{ externalId: "00000000-0000-4000-8000-000000000003" }] },
+  [Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE]: { batchId: "healthkit-sleep-evidence-batch", runId: "sleep-evidence-2026-07-06-through-2026-10-06-v1", samples: [{ externalId: "00000000-0000-4000-8000-000000000003" }] },
   [Phase3Command.EDIT_DEXA_REVIEW]: { reviewId: "review-dexa", evidenceObjectId: "dexa-one", measurements: { measuredAt: "2026-08-11", totalMass: 180 } },
   [Phase3Command.COMMIT_EVIDENCE_REVIEW]: { reviewId: "review-dexa" },
   [Phase3Command.SAVE_RECURRING_SUPPORT]: {

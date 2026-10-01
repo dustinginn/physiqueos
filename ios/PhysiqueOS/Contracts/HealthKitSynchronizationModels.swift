@@ -1,0 +1,362 @@
+import Foundation
+
+enum HealthKitSynchronizationStream: String, CaseIterable, Codable, Hashable, Sendable {
+    case activitySummary
+    case activeEnergy
+    case exerciseTime
+    case standTime
+    case stepCount
+    case walkingRunningDistance
+    case flightsClimbed
+    case nutritionEnergy
+    case nutritionProtein
+    case nutritionCarbohydrates
+    case nutritionTotalFat
+    case nutritionFiber
+    /// Synthetic, explicitly bounded daily aggregate (calories, protein,
+    /// carbohydrates, fat) across all sources. Not a per-sample stream.
+    case nutritionDailyTotal
+    case workouts
+    case heartRate
+    case cyclingDistance
+    case sleepAnalysis
+
+    var domain: HealthKitReadDomain {
+        switch self {
+        case .activitySummary, .activeEnergy, .exerciseTime, .standTime,
+             .stepCount, .walkingRunningDistance, .flightsClimbed:
+            .activity
+        case .nutritionEnergy, .nutritionProtein, .nutritionCarbohydrates,
+             .nutritionTotalFat, .nutritionFiber, .nutritionDailyTotal:
+            .nutrition
+        case .workouts, .heartRate, .cyclingDistance:
+            .workouts
+        case .sleepAnalysis:
+            .sleep
+        }
+    }
+
+    var objectTypeIdentifier: String {
+        switch self {
+        case .activitySummary: "HKActivitySummaryType"
+        case .activeEnergy: "HKQuantityTypeIdentifierActiveEnergyBurned"
+        case .exerciseTime: "HKQuantityTypeIdentifierAppleExerciseTime"
+        case .standTime: "HKQuantityTypeIdentifierAppleStandTime"
+        case .stepCount: "HKQuantityTypeIdentifierStepCount"
+        case .walkingRunningDistance: "HKQuantityTypeIdentifierDistanceWalkingRunning"
+        case .flightsClimbed: "HKQuantityTypeIdentifierFlightsClimbed"
+        case .nutritionEnergy: "HKQuantityTypeIdentifierDietaryEnergyConsumed"
+        case .nutritionProtein: "HKQuantityTypeIdentifierDietaryProtein"
+        case .nutritionCarbohydrates: "HKQuantityTypeIdentifierDietaryCarbohydrates"
+        case .nutritionTotalFat: "HKQuantityTypeIdentifierDietaryFatTotal"
+        case .nutritionFiber: "HKQuantityTypeIdentifierDietaryFiber"
+        case .nutritionDailyTotal: "PhysiqueOSNutritionDailyTotal"
+        case .workouts: "HKWorkoutTypeIdentifier"
+        case .heartRate: "HKQuantityTypeIdentifierHeartRate"
+        case .cyclingDistance: "HKQuantityTypeIdentifierDistanceCycling"
+        case .sleepAnalysis: "HKCategoryTypeIdentifierSleepAnalysis"
+        }
+    }
+
+    var deliveryCapability: HealthKitStreamDeliveryCapability {
+        switch self {
+        case .activitySummary: .s1(observationType: .activitySummary)
+        case .nutritionDailyTotal: .s1(observationType: .nutritionDailyTotal)
+        case .workouts: .s1(observationType: .workout)
+        // Delivered only through the dormant, manifest-gated Sleep command.
+        case .sleepAnalysis: .sleepV1
+        default: .s1(observationType: .quantitySample)
+        }
+    }
+}
+
+enum HealthKitS1ObservationType: String, Codable, Sendable {
+    case activitySummary = "activity_summary"
+    case nutritionDailyTotal = "nutrition_daily_total"
+    case workout
+    case quantitySample = "quantity_sample"
+}
+
+enum HealthKitStreamDeliveryCapability: Equatable, Codable, Sendable {
+    case s1(observationType: HealthKitS1ObservationType)
+    /// `healthkit.sleep.ingest.v1`: samples and deletions in one partition.
+    case sleepV1
+    case localOnly(reason: String)
+}
+
+struct HealthKitCursorScope: Equatable, Hashable, Codable, Sendable {
+    let ownerIdentity: String
+    let enrolledDeviceIdentity: String
+    let stream: HealthKitSynchronizationStream
+    let predicateVersion: String
+}
+
+struct HealthKitAuthoritativeCursor: Equatable, Codable, Sendable {
+    let scope: HealthKitCursorScope
+    let opaqueAnchorData: Data
+    let generation: UInt64
+    let digest: String
+    let acceptedAt: Date
+}
+
+struct HealthKitQuerySource: Equatable, Codable, Sendable {
+    let bundleIdentifier: String
+    let sourceName: String
+    let sourceRevision: String?
+    let productType: String?
+    let privacySafeDeviceProvenance: String?
+}
+
+struct HealthKitQueryOccurrence: Equatable, Codable, Sendable {
+    let startedAt: Date?
+    let endedAt: Date?
+    let localDate: String
+    let calendarIdentifier: String
+    let timeZoneIdentifier: String
+    let utcOffsetSeconds: Int
+    let localDayStartedAt: Date
+    let localDayEndedAt: Date
+}
+
+struct HealthKitQueryQuantity: Equatable, Codable, Sendable {
+    let originalValue: Double?
+    let originalUnit: String?
+    let normalizedValue: Double?
+    let normalizedUnit: String?
+    let workoutExternalID: String?
+}
+
+struct HealthKitQueryWorkout: Equatable, Codable, Sendable {
+    let activityType: String
+    let durationSeconds: Double?
+    let activeCalories: Double?
+    let totalCalories: Double?
+    let distance: Double?
+    let distanceUnit: String?
+    let averageHeartRate: Double?
+    let telemetryTypeIdentifiers: [String]
+    /// Apple's own `HKMetadataKeyIndoorWorkout` metadata boolean, read
+    /// through unchanged: `nil` when HealthKit does not carry the key for
+    /// this workout (unknown -- e.g. Strength has no indoor/outdoor
+    /// concept), `true` for indoor, `false` for outdoor. Distinguishes
+    /// Indoor Walk from Outdoor Walk (and similarly indoor/outdoor running
+    /// and cycling), which otherwise share the same `activityType` raw
+    /// value. Never derived from GPS/location/distance/speed/date -- only
+    /// this exact metadata key.
+    let isIndoorWorkout: Bool?
+
+    init(
+        activityType: String,
+        durationSeconds: Double?,
+        activeCalories: Double?,
+        totalCalories: Double?,
+        distance: Double?,
+        distanceUnit: String?,
+        averageHeartRate: Double?,
+        telemetryTypeIdentifiers: [String],
+        isIndoorWorkout: Bool? = nil
+    ) {
+        self.activityType = activityType
+        self.durationSeconds = durationSeconds
+        self.activeCalories = activeCalories
+        self.totalCalories = totalCalories
+        self.distance = distance
+        self.distanceUnit = distanceUnit
+        self.averageHeartRate = averageHeartRate
+        self.telemetryTypeIdentifiers = telemetryTypeIdentifiers
+        self.isIndoorWorkout = isIndoorWorkout
+    }
+}
+
+struct HealthKitQueryActivitySummary: Equatable, Codable, Sendable {
+    enum Coverage: String, Codable, Sendable { case partialDay = "partial_day"; case completeDay = "complete_day" }
+
+    let dailyActivity: [String: Double]
+    let aggregationScope: String
+    let coverage: Coverage
+    let sourceRevision: UInt64
+}
+
+/// HealthKit daily dietary statistics across all sources. Calories, protein,
+/// carbohydrates, and fat only; there are no meal objects.
+struct HealthKitQueryNutritionDailyTotal: Equatable, Codable, Sendable {
+    static let aggregationScope = "daily_total_all_sources"
+    static let permittedKeys: Set<String> = ["calories", "protein_g", "carbs_g", "fat_g"]
+
+    let dailyNutrition: [String: Double]
+    let aggregationScope: String
+    let coverage: HealthKitQueryActivitySummary.Coverage
+    let sourceRevision: UInt64
+}
+
+struct HealthKitQuerySleep: Equatable, Codable, Sendable {
+    /// Raw `HKCategoryValueSleepAnalysis`, passed through unchanged (a future
+    /// value is forwarded; the Server maps it to `unknown`).
+    let stageValue: Int
+    /// `sample_metadata` when the sample carried `HKMetadataKeyTimeZone`,
+    /// `device_at_ingest` when the device zone was substituted. Optional so
+    /// any older staged envelope still decodes.
+    var timeZoneSource: String? = nil
+    /// `HKMetadataKeyWasUserEntered`; `nil` when absent (sent as `false`).
+    var wasUserEntered: Bool? = nil
+}
+
+enum HealthKitQueryPayload: Equatable, Codable, Sendable {
+    case quantity(HealthKitQueryQuantity)
+    case workout(HealthKitQueryWorkout)
+    case activitySummary(HealthKitQueryActivitySummary)
+    case nutritionDailyTotal(HealthKitQueryNutritionDailyTotal)
+    case sleep(HealthKitQuerySleep)
+}
+
+struct HealthKitQueryAddition: Equatable, Codable, Sendable {
+    let healthKitUUID: UUID?
+    let objectTypeIdentifier: String
+    let source: HealthKitQuerySource
+    let occurrence: HealthKitQueryOccurrence
+    let payload: HealthKitQueryPayload
+    let allowlistedMetadata: [String: String]
+}
+
+struct HealthKitQueryDeletion: Equatable, Codable, Sendable {
+    let healthKitUUID: UUID
+    let immutableExternalID: String?
+    let objectTypeIdentifier: String
+}
+
+struct HealthKitAnchoredQueryResult: Equatable, Codable, Sendable {
+    let additions: [HealthKitQueryAddition]
+    let deletions: [HealthKitQueryDeletion]
+    let proposedAnchorData: Data
+    let completedAt: Date
+}
+
+struct NormalizedHealthKitObservation: Equatable, Codable, Sendable {
+    let immutableExternalID: String
+    let healthKitUUID: UUID?
+    let objectTypeIdentifier: String
+    let source: HealthKitQuerySource
+    let occurrence: HealthKitQueryOccurrence
+    let payload: HealthKitQueryPayload
+    let allowlistedMetadata: [String: String]
+}
+
+struct NormalizedHealthKitDeletion: Equatable, Codable, Sendable {
+    let immutableExternalID: String
+    let healthKitUUID: UUID
+    let objectTypeIdentifier: String
+}
+
+enum HealthKitPartitionDisposition: Equatable, Codable, Sendable {
+    case serverRequired
+    case localDeferred(reason: String)
+    case localCheckpoint
+}
+
+enum HealthKitPartitionAttemptState: Equatable, Codable, Sendable {
+    case pending
+    case uploading
+    case transientFailure(code: String)
+    case rejected(code: String)
+    case acknowledged(receiptIdentity: String, at: Date)
+    case deferredByCapability(reason: String)
+    case checkpointed
+
+    var permitsCursorAdvance: Bool {
+        switch self {
+        case .acknowledged, .deferredByCapability, .checkpointed: true
+        default: false
+        }
+    }
+}
+
+struct HealthKitStagedPartition: Equatable, Codable, Sendable {
+    let identity: String
+    let index: Int
+    let ingestionPurpose: HealthKitIngestionPurpose
+    let disposition: HealthKitPartitionDisposition
+    let additions: [NormalizedHealthKitObservation]
+    let deletions: [NormalizedHealthKitDeletion]
+    var attemptState: HealthKitPartitionAttemptState
+    var attemptCount: Int
+    var lastAttemptAt: Date?
+}
+
+struct HealthKitStagedBatch: Equatable, Codable, Sendable {
+    let identity: String
+    let scope: HealthKitCursorScope
+    let ingestionPurpose: HealthKitIngestionPurpose
+    let previousCursorDigest: String?
+    let proposedCursor: HealthKitAuthoritativeCursor
+    let createdAt: Date
+    var partitions: [HealthKitStagedPartition]
+}
+
+struct HealthKitDeferredChange: Equatable, Codable, Sendable {
+    let batchIdentity: String
+    let partitionIdentity: String
+    let reason: String
+    let additions: [NormalizedHealthKitObservation]
+    let deletions: [NormalizedHealthKitDeletion]
+    let stagedAt: Date
+}
+
+struct HealthKitStreamDiagnostics: Equatable, Codable, Sendable {
+    var enabled: Bool
+    var availability: HealthKitAvailability
+    var authorizationState: String
+    var lastObserverWakeup: Date?
+    var lastSuccessfulAnchoredQuery: Date?
+    var cursorGeneration: UInt64?
+    var cursorDigest: String?
+    var pendingBatchCount: Int
+    var lastUploadAttempt: Date?
+    var lastDurableAcknowledgement: Date?
+    var lastErrorCode: String?
+    var boundedRecoveryCount: Int
+    /// Set only when `HealthKitSynchronizationEngine.deliverPending` retires
+    /// a permanently-rejected batch (see `abandonPendingBatch`). All three
+    /// are `Optional`, not defaulted, so decoding an envelope persisted by
+    /// an older build before this field existed (e.g. an already-poisoned
+    /// Build 51 device) still succeeds -- a missing key decodes as `nil`,
+    /// never a decode failure that would quarantine unrelated pending/cursor
+    /// state. `abandonedBatchCount` is `Int?` for the same reason: it is
+    /// read as `?? 0` everywhere it is incremented or reported.
+    var lastAbandonedBatchCode: String?
+    var lastAbandonedAt: Date?
+    var abandonedBatchCount: Int?
+    /// Daily-snapshot recovery state is optional for backwards-compatible
+    /// decoding of Build 56 envelopes. It contains no HealthKit values or
+    /// device identifiers, only the affected local day and revision floor.
+    var dailyRevisionFloorCount: Int? = nil
+    var lastDailyRevisionRecoveryAt: Date? = nil
+    var lastDailyRevisionRecoveryCode: String? = nil
+    var lastDailyRevisionRecoveryLocalDate: String? = nil
+    var lastDailyRevisionNextExpected: UInt64? = nil
+    /// Local-only deferred changes retired by the bounded retention policy
+    /// (`FileHealthKitSynchronizationStore.maximumRetainedDeferredChanges`).
+    /// Optional for decoding envelopes written before the bound existed.
+    var deferredChangesRetiredCount: Int? = nil
+    var lastDeferredChangesRetiredAt: Date? = nil
+}
+
+enum HealthKitSyncError: Error, Equatable, Sendable {
+    case featureDisabled
+    case pendingBatchMustResolve
+    case corruptCursor
+    case ownerOrDeviceMismatch
+    case invalidAcknowledgement
+    case serverRejected(code: String)
+    case operational(code: String)
+
+    var diagnosticCode: String {
+        switch self {
+        case .featureDisabled: "healthkit_feature_disabled"
+        case .pendingBatchMustResolve: "healthkit_pending_batch_must_resolve"
+        case .corruptCursor: "healthkit_cursor_corrupt"
+        case .ownerOrDeviceMismatch: "healthkit_owner_or_device_mismatch"
+        case .invalidAcknowledgement: "healthkit_acknowledgement_invalid"
+        case let .serverRejected(code), let .operational(code): code
+        }
+    }
+}

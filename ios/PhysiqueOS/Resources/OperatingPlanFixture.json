@@ -1,0 +1,547 @@
+{
+  "landing": {
+    "sections": [
+      {
+        "id": "energy",
+        "iconKey": "energy",
+        "tone": "primary",
+        "title": "Energy Strategy",
+        "subtitle": "Phase-aware intake and activity targets.",
+        "supplementsAction": false,
+        "items": [
+          {
+            "id": "energy-strategy",
+            "title": "Phase 2 Energy Strategy",
+            "detail": "2,750–2,850 kcal intake · 550 active kcal · Every 2 weeks review",
+            "destination": { "id": "native.operating-plan.strategy", "parameters": { "strategyType": "energy", "strategyId": "strategy_fixture_energy" } },
+            "status": null
+          }
+        ]
+      },
+      {
+        "id": "nutrition",
+        "iconKey": "nutrition",
+        "tone": "primary",
+        "title": "Nutrition",
+        "subtitle": "Macro targets supporting the current phase.",
+        "supplementsAction": false,
+        "items": [
+          {
+            "id": "nutrition-strategy",
+            "title": "Calorie Calibration",
+            "detail": "Protein per body weight · Balanced carbohydrate and fat",
+            "destination": { "id": "native.operating-plan.strategy", "parameters": { "strategyType": "nutrition", "strategyId": "strategy_fixture_nutrition" } },
+            "status": null
+          }
+        ]
+      },
+      {
+        "id": "training",
+        "iconKey": "training",
+        "tone": "effort",
+        "title": "Training",
+        "subtitle": "Weekly structure and progression intent.",
+        "supplementsAction": false,
+        "items": [
+          {
+            "id": "training-strategy",
+            "title": "9 area sessions · Moderate progression",
+            "detail": "Priorities: Chest, Back",
+            "destination": { "id": "native.operating-plan.strategy", "parameters": { "strategyType": "training", "strategyId": "strategy_fixture_training" } },
+            "status": null
+          }
+        ]
+      },
+      {
+        "id": "recovery",
+        "iconKey": "recovery",
+        "tone": "success",
+        "title": "Recovery",
+        "subtitle": "Support methods protecting training output.",
+        "supplementsAction": false,
+        "items": [
+          {
+            "id": "recovery-strategy",
+            "title": "Recovery Strategy",
+            "detail": "Foam Rolling",
+            "destination": { "id": "native.operating-plan.protocol", "parameters": { "protocolId": "protocol_fixture_recovery_foam_roll" } },
+            "status": null
+          }
+        ]
+      },
+      {
+        "id": "peptide",
+        "iconKey": "peptide",
+        "tone": "effort",
+        "title": "Peptides",
+        "subtitle": "Active dosing strategies supporting the goal.",
+        "supplementsAction": false,
+        "items": [
+          {
+            "id": "peptide-strategy",
+            "title": "Peptide Strategy",
+            "detail": "Retatrutide, Tesamorelin",
+            "destination": { "id": "native.operating-plan.protocol", "parameters": { "protocolId": "protocol_fixture_peptide_retatrutide" } },
+            "status": null
+          }
+        ]
+      },
+      {
+        "id": "supplement",
+        "iconKey": "supplement",
+        "tone": "success",
+        "title": "Supplements",
+        "subtitle": "Daily support alongside the training block.",
+        "supplementsAction": true,
+        "items": [
+          {
+            "id": "supplement-strategy",
+            "title": "Supplement Strategy",
+            "detail": "Tongkat Ali, Electrolytes",
+            "destination": { "id": "native.operating-plan.protocol", "parameters": { "protocolId": "protocol_fixture_supplement_tongkat_ali" } },
+            "status": null
+          }
+        ]
+      },
+      {
+        "id": "tracking",
+        "iconKey": "tracking",
+        "tone": "evidence",
+        "title": "Tracking",
+        "subtitle": "Support scheduling for daily evidence capture.",
+        "supplementsAction": false,
+        "items": [
+          {
+            "id": "tracking-morning-weigh-in",
+            "title": "Morning Weigh-In",
+            "detail": "Automatically satisfied when today's valid weight is recorded.",
+            "destination": { "id": "native.operating-plan.tracking", "parameters": {} },
+            "status": null
+          }
+        ]
+      },
+      {
+        "id": "coaching",
+        "iconKey": "coaching",
+        "tone": "primary",
+        "title": "Coaching Updates",
+        "subtitle": "How and when PhysiqueOS synthesizes progress.",
+        "supplementsAction": false,
+        "items": [
+          {
+            "id": "coaching-strategy",
+            "title": "Coaching Updates",
+            "detail": "Midweek and weekly synthesis on",
+            "destination": { "id": "native.operating-plan.strategy", "parameters": { "strategyType": "briefings", "strategyId": "strategy_fixture_coaching" } },
+            "status": null
+          }
+        ]
+      }
+    ]
+  },
+  "strategyDetails": [
+    {
+      "strategyType": "energy",
+      "strategyId": "strategy_fixture_energy",
+      "title": "Lean Mass Build Energy Strategy",
+      "purpose": "A controlled surplus supporting the current lean-mass build while training and recovery evidence accumulate.",
+      "goal": "Your lean mass goal",
+      "startedDate": "Started Aug 16, 2026",
+      "status": "Active",
+      "fields": [
+        { "label": "Current Energy Phase", "value": "Bulk" },
+        { "label": "Caloric Intake", "value": "2,750–2,850 kcal/day" },
+        { "label": "Activity Target", "value": "550 active kcal/day" },
+        { "label": "Calibration Approach", "value": "Every 2 Weeks · Small adjustments" }
+      ],
+      "editLabel": null,
+      "energyPhaseHistory": [
+        {
+          "id": "phase_fixture_maintenance",
+          "goalId": "goal_fixture_build_lean_mass",
+          "phaseName": "Phase 1 Maintenance Calibration",
+          "phaseOrder": 1,
+          "isActive": false,
+          "caloricIntake": "2,450 kcal/day (calibrated)",
+          "activityTarget": "500 active kcal/day",
+          "reviewCadence": "Weekly",
+          "note": "Calibration held long enough to set a repeatable maintenance baseline before the current surplus began."
+        },
+        {
+          "id": "phase_fixture_lean_mass_build",
+          "goalId": "goal_fixture_build_lean_mass",
+          "phaseName": "Phase 2 Lean Mass Build",
+          "phaseOrder": 2,
+          "isActive": true,
+          "caloricIntake": "2,750–2,850 kcal/day",
+          "activityTarget": "550 active kcal/day",
+          "reviewCadence": "Every 2 weeks",
+          "note": "A controlled surplus with its own intake and activity target, held distinct from the earlier calibration phase above."
+        }
+      ]
+    },
+    {
+      "strategyType": "nutrition",
+      "strategyId": "strategy_fixture_nutrition",
+      "title": "Macro Strategy",
+      "purpose": "Macro targets translating the current strategy into daily protein, carbohydrate, and fat.",
+      "goal": "Your lean mass goal",
+      "startedDate": "Started Aug 16, 2026",
+      "status": "Active",
+      "fields": [
+        { "label": "Protein Target", "value": "1.0 g per lb bodyweight" },
+        { "label": "Carbohydrate Approach", "value": "Balanced" },
+        { "label": "Fat Approach", "value": "Balanced" },
+        { "label": "Macro Philosophy", "value": "Balanced carbohydrates paired with balanced fat, adjusted around training days." }
+      ],
+      "editLabel": "Edit Strategy",
+      "energyPhaseHistory": []
+    },
+    {
+      "strategyType": "training",
+      "strategyId": "strategy_fixture_training",
+      "title": "Build Lean Mass Training",
+      "purpose": "Weekly structure and progression intent supporting the current lean-mass build.",
+      "goal": "Your lean mass goal",
+      "startedDate": "Started Aug 16, 2026",
+      "status": "Active",
+      "fields": [
+        { "label": "Weekly Structure", "value": "9 area sessions" },
+        { "label": "Training Focus", "value": "Chest, Back" },
+        { "label": "Progression", "value": "Moderate" },
+        { "label": "Current Phase", "value": "Lean Mass Build" }
+      ],
+      "editLabel": "Edit Strategy",
+      "energyPhaseHistory": []
+    },
+    {
+      "strategyType": "briefings",
+      "strategyId": "strategy_fixture_coaching",
+      "title": "Wednesday and Sunday Coaching",
+      "purpose": "Turn current evidence into timely coaching without returning to routine daily briefings.",
+      "goal": "Your lean mass goal",
+      "startedDate": "Started Jul 19, 2026",
+      "status": "Active",
+      "fields": [
+        { "label": "Midweek Calibration", "value": "Wednesday · 6:00 PM" },
+        { "label": "Weekly Synthesis", "value": "Sunday · 9:00 AM" },
+        { "label": "Routine Daily Briefings", "value": "Off" },
+        { "label": "Notifications", "value": "Notify when ready" },
+        { "label": "Event Briefings", "value": "Photo and DEXA remain active when eligible" }
+      ],
+      "editLabel": "Edit Coaching Updates",
+      "energyPhaseHistory": []
+    }
+  ],
+  "nutritionEditors": [
+    {
+      "strategyId": "strategy_fixture_nutrition",
+      "proteinBasis": "body_weight",
+      "proteinRatio": 1.0,
+      "fixedProteinGrams": 190,
+      "carbohydrateStrategy": "balanced",
+      "fatStrategy": "balanced"
+    }
+  ],
+  "trainingEditors": [
+    {
+      "strategyId": "strategy_fixture_training",
+      "frequencies": [
+        { "area": "arms", "count": 2 },
+        { "area": "core", "count": 2 },
+        { "area": "lower_body", "count": 2 },
+        { "area": "back", "count": 1 },
+        { "area": "chest", "count": 1 },
+        { "area": "shoulders", "count": 1 }
+      ],
+      "priorities": ["chest", "back"],
+      "progression": "moderate"
+    }
+  ],
+  "coachingEditors": [
+    {
+      "strategyId": "strategy_fixture_coaching",
+      "midweek": { "enabled": true, "day": "wednesday", "localTime": "18:00" },
+      "weekly": { "enabled": true, "day": "sunday", "localTime": "09:00" },
+      "monthly": { "enabled": true, "dayOfMonth": 1, "localTime": "09:00" },
+      "photos": { "cadence": "weekly_interval_2", "day": "saturday", "timeOfDay": "morning", "reminderEnabled": true },
+      "dexa": {
+        "plannedDate": "2026-10-31",
+        "localTime": "09:00",
+        "reminderPreferences": ["week_before", "day_before", "morning_of"],
+        "uploadReminder": true,
+        "preparationNote": "Use consistent morning preparation conditions."
+      },
+      "photoEventBriefingEnabled": true,
+      "dexaEventBriefingEnabled": true,
+      "notificationPreference": "notify_when_ready"
+    }
+  ],
+  "protocolDomains": {
+    "recovery": {
+      "category": "recovery",
+      "title": "Recovery Strategy",
+      "purpose": "Support methods that protect training performance and recovery between sessions.",
+      "methods": [
+        {
+          "id": "method-foam-roll",
+          "protocolId": "protocol_fixture_recovery_foam_roll",
+          "name": "Foam Rolling",
+          "purpose": "Support recovery and mobility between training sessions.",
+          "supportSummary": "Daily reminder after training",
+          "currentDose": null,
+          "currentSchedule": null,
+          "editDestination": { "id": "native.operating-plan.protocol.recovery", "parameters": { "executionId": "execution_fixture_foam_roll" } }
+        }
+      ]
+    },
+    "peptide": {
+      "category": "peptide",
+      "title": "Peptide Strategy",
+      "purpose": "Active dosing strategies supporting body composition and recovery.",
+      "methods": [
+        {
+          "id": "method-retatrutide",
+          "protocolId": "protocol_fixture_peptide_retatrutide",
+          "name": "Retatrutide",
+          "purpose": "Support body composition alongside training and nutrition.",
+          "supportSummary": "Increase, hold, then decrease · weekly",
+          "currentDose": "3 mg",
+          "currentSchedule": "Weekly, Monday",
+          "editDestination": { "id": "native.operating-plan.protocol.peptide", "parameters": { "protocolId": "protocol_fixture_peptide_retatrutide" } }
+        },
+        {
+          "id": "method-tesamorelin",
+          "protocolId": "protocol_fixture_peptide_tesamorelin",
+          "name": "Tesamorelin",
+          "purpose": "Support lean mass and recovery alongside training.",
+          "supportSummary": "Keep this dose · daily",
+          "currentDose": "2.0 mg",
+          "currentSchedule": "Daily",
+          "editDestination": { "id": "native.operating-plan.protocol.peptide", "parameters": { "protocolId": "protocol_fixture_peptide_tesamorelin" } }
+        }
+      ]
+    },
+    "supplement": {
+      "category": "supplement",
+      "title": "Supplement Strategy",
+      "purpose": "Daily support supplements alongside the current training block.",
+      "methods": [
+        {
+          "id": "method-tongkat-ali",
+          "protocolId": "protocol_fixture_supplement_tongkat_ali",
+          "name": "Tongkat Ali",
+          "purpose": "Support recovery and hormonal balance.",
+          "supportSummary": "Daily, with breakfast",
+          "currentDose": null,
+          "currentSchedule": null,
+          "editDestination": { "id": "native.operating-plan.protocol.supplement.support", "parameters": { "protocolId": "protocol_fixture_supplement_tongkat_ali" } }
+        },
+        {
+          "id": "method-electrolytes",
+          "protocolId": "protocol_fixture_supplement_electrolytes",
+          "name": "Electrolytes",
+          "purpose": "Support hydration and training performance.",
+          "supportSummary": "Daily, around training",
+          "currentDose": null,
+          "currentSchedule": null,
+          "editDestination": { "id": "native.operating-plan.protocol.supplement.support", "parameters": { "protocolId": "protocol_fixture_supplement_electrolytes" } }
+        }
+      ]
+    }
+  },
+  "peptideExecutions": [
+    {
+      "protocolId": "protocol_fixture_peptide_retatrutide",
+      "name": "Retatrutide",
+      "purpose": "Support body composition alongside training and nutrition.",
+      "state": "CANONICAL",
+      "supportSchedule": {
+        "frequency": "weekly", "daysOfWeek": ["monday"], "intervalDays": 1,
+        "timing": "evening", "specificTime": "", "startDate": "2026-06-01", "endDate": null
+      },
+      "dosing": {
+        "pattern": "up_hold_down",
+        "startingDoseAmount": 2.0,
+        "startingDoseUnit": "mg",
+        "startDate": "2026-06-01",
+        "stepAmount": 0.5,
+        "stepInterval": 2,
+        "stepUnit": "weeks",
+        "targetDoseAmount": 6.0,
+        "holdDuration": 4,
+        "holdUnit": "weeks",
+        "decreaseAmount": 0.5,
+        "decreaseInterval": 2,
+        "decreaseUnit": "weeks",
+        "landingDoseAmount": 2.0,
+        "endDate": null
+      },
+      "timeline": [
+        { "id": "phase-1", "label": "Week 1–2", "window": "Jun 1 – Jun 14", "doseAmount": 2.0, "doseUnit": "mg", "status": "completed", "startDate": "2026-06-01", "endDate": "2026-06-14" },
+        { "id": "phase-2", "label": "Week 3–4", "window": "Jun 15 – Jun 28", "doseAmount": 2.5, "doseUnit": "mg", "status": "completed", "startDate": "2026-06-15", "endDate": "2026-06-28" },
+        { "id": "phase-3", "label": "Week 5 onward", "window": "Jun 29 – Oct 12", "doseAmount": 3.0, "doseUnit": "mg", "status": "active", "startDate": "2026-06-29", "endDate": "2026-10-12" },
+        { "id": "phase-4", "label": "Phase 4", "window": "Oct 13 – Until changed", "doseAmount": 3.5, "doseUnit": "mg", "status": "upcoming", "startDate": "2026-10-13", "endDate": null }
+      ],
+      "reminderPreference": "remind",
+      "notes": "Take under the conditions specified for this protocol.",
+      "executionRevision": 7,
+      "lifecycle": { "state": "active", "since": null, "history": [] },
+      "currentDose": { "amount": 3.0, "unit": "mg" },
+      "currentDoseLabel": "3 mg",
+      "currentPhase": { "startDate": "2026-06-29", "endDate": "2026-10-12" },
+      "plannedChanges": [
+        { "startDate": "2026-10-13", "dose": { "amount": 3.5, "unit": "mg" }, "label": "3.5 mg on Oct 13" }
+      ],
+      "dosingHistory": [
+        { "startDate": "2026-06-15", "endDate": "2026-06-28", "dose": { "amount": 2.5, "unit": "mg" }, "label": "2.5 mg · Jun 15 – Jun 28" },
+        { "startDate": "2026-06-01", "endDate": "2026-06-14", "dose": { "amount": 2.0, "unit": "mg" }, "label": "2 mg · Jun 1 – Jun 14" }
+      ],
+      "dosingMode": "structured",
+      "advancedPlan": true,
+      "nextDue": "Oct 5, 2026 · Evening",
+      "nextDueDate": "2026-10-05",
+      "nextDueTime": null,
+      "priorityId": "reminder_fixture_peptide_retatrutide"
+    },
+    {
+      "protocolId": "protocol_fixture_peptide_tesamorelin",
+      "name": "Tesamorelin",
+      "purpose": "Support lean mass and recovery alongside training.",
+      "state": "LEGACY_COMPATIBLE",
+      "supportSchedule": {
+        "frequency": "daily", "daysOfWeek": [], "intervalDays": 1,
+        "timing": "evening", "specificTime": "", "startDate": "2026-05-15", "endDate": null
+      },
+      "dosing": {
+        "pattern": "stay",
+        "startingDoseAmount": 2.0,
+        "startingDoseUnit": "mg",
+        "startDate": "2026-05-15",
+        "stepAmount": 0,
+        "stepInterval": 0,
+        "stepUnit": "weeks",
+        "targetDoseAmount": 0,
+        "holdDuration": 1,
+        "holdUnit": "weeks",
+        "decreaseAmount": 0,
+        "decreaseInterval": 1,
+        "decreaseUnit": "weeks",
+        "landingDoseAmount": 0,
+        "endDate": null
+      },
+      "timeline": [
+        { "id": "phase-1", "label": "Ongoing", "window": "Started May 15", "doseAmount": 2.0, "doseUnit": "mg", "status": "active", "startDate": "2026-05-15", "endDate": null }
+      ],
+      "reminderPreference": "none",
+      "notes": "Taken at night while fasted.",
+      "executionRevision": 3,
+      "lifecycle": { "state": "active", "since": null, "history": [] },
+      "currentDose": { "amount": 2.0, "unit": "mg" },
+      "currentDoseLabel": "2 mg",
+      "currentPhase": { "startDate": "2026-05-15", "endDate": null },
+      "plannedChanges": [],
+      "dosingHistory": [],
+      "dosingMode": "structured",
+      "advancedPlan": false,
+      "nextDue": "Sep 29, 2026 · 9:45 PM",
+      "nextDueDate": "2026-09-29",
+      "nextDueTime": "21:45",
+      "priorityId": "reminder_fixture_peptide_tesamorelin"
+    }
+  ],
+  "recoverySupports": [
+    {
+      "executionId": "execution_fixture_foam_roll",
+      "name": "Foam Rolling",
+      "purpose": "Support recovery and mobility between training sessions.",
+      "supportSummary": "Daily reminder after training",
+      "supportSchedule": {
+        "frequency": "daily", "daysOfWeek": [], "intervalDays": 1,
+        "timing": "evening", "specificTime": "", "startDate": "2026-07-19", "endDate": null
+      },
+      "reminderPreference": "remind",
+      "notes": "Focus on lower body after leg sessions."
+    }
+  ],
+  "supplementSupports": [
+    {
+      "protocolId": "protocol_fixture_supplement_tongkat_ali",
+      "name": "Tongkat Ali",
+      "supportSummary": "Daily · Morning",
+      "doseAmount": "2", "doseUnit": "capsules",
+      "supportSchedule": {
+        "frequency": "daily", "daysOfWeek": [], "intervalDays": 1,
+        "timing": "morning", "specificTime": "", "startDate": "2026-07-19", "endDate": null
+      },
+      "reminderPreference": "remind",
+      "notes": "Take with breakfast."
+    },
+    {
+      "protocolId": "protocol_fixture_supplement_electrolytes",
+      "name": "Electrolytes",
+      "supportSummary": "Daily · Afternoon",
+      "doseAmount": "1", "doseUnit": "scoop",
+      "supportSchedule": {
+        "frequency": "daily", "daysOfWeek": [], "intervalDays": 1,
+        "timing": "afternoon", "specificTime": "", "startDate": "2026-07-19", "endDate": null
+      },
+      "reminderPreference": "none",
+      "notes": "Use around training."
+    }
+  ],
+  "tracking": {
+    "executionId": "execution_morning_weigh_in",
+    "title": "Morning Weigh-In",
+    "purpose": "Track daily body-weight trends so PI can evaluate progress and energy strategy against the current goal.",
+    "currentSupport": "Daily · Morning",
+    "completion": "Automatically satisfied when today's valid weight is recorded.",
+    "supportSchedule": {
+      "frequency": "daily", "daysOfWeek": [], "intervalDays": 1,
+      "timing": "morning", "specificTime": "", "startDate": "2026-07-19", "endDate": null
+    },
+    "reminderPreference": "remind",
+    "notes": "Usually immediately after waking and before food or water."
+  },
+  "supplements": [
+    {
+      "mode": "edit",
+      "protocolId": "protocol_fixture_supplement_tongkat_ali",
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalOptions": [{ "id": "goal_fixture_build_lean_mass", "title": "Build Lean Mass" }],
+      "name": "Tongkat Ali",
+      "purpose": "Support recovery and hormonal balance.",
+      "role": "Daily supplementation alongside the current training block.",
+      "startDate": "2026-07-19",
+      "initialStatus": "active"
+    },
+    {
+      "mode": "edit",
+      "protocolId": "protocol_fixture_supplement_electrolytes",
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalOptions": [{ "id": "goal_fixture_build_lean_mass", "title": "Build Lean Mass" }],
+      "name": "Electrolytes",
+      "purpose": "Support hydration and training performance.",
+      "role": "Daily, taken around training sessions.",
+      "startDate": "2026-07-19",
+      "initialStatus": "active"
+    },
+    {
+      "mode": "edit",
+      "protocolId": "protocol_fixture_supplement_multivitamin",
+      "goalId": "goal_fixture_build_lean_mass",
+      "goalOptions": [{ "id": "goal_fixture_build_lean_mass", "title": "Build Lean Mass" }],
+      "name": "Multivitamin",
+      "purpose": "General micronutrient support.",
+      "role": "Daily, with breakfast.",
+      "startDate": "2026-07-19",
+      "initialStatus": "active"
+    }
+  ],
+  "supplementLifecycle": {
+    "protocol_fixture_supplement_tongkat_ali": "active",
+    "protocol_fixture_supplement_electrolytes": "active",
+    "protocol_fixture_supplement_multivitamin": "paused"
+  },
+  "goalOptions": [{ "id": "goal_fixture_build_lean_mass", "title": "Build Lean Mass" }]
+}
