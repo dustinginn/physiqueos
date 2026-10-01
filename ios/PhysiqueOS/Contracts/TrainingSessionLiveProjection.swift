@@ -29,10 +29,11 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         /// Durably committed.
         case complete
 
-        /// Unknown future values decode as `.inProgress`.
+        /// Unknown future values decode as `.paused`, so a renderer never
+        /// offers Complete Set for a state it does not understand.
         init(from decoder: Decoder) throws {
             let raw = try decoder.singleValueContainer().decode(String.self)
-            self = Self(rawValue: raw) ?? .inProgress
+            self = Self(rawValue: raw) ?? .paused
         }
     }
 
@@ -180,11 +181,13 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         let layout: ContextLayout
         if let current {
             let currentStarted = draft.exercises[current.exerciseIndex].sets.contains(where: \.isCompleted)
-            if isFinal, upNextExerciseIndex != nil {
-                layout = .currentAndUpNext
-            } else if let previous, previous.exerciseIndex != current.exerciseIndex, !currentStarted,
-                      draft.exercises[previous.exerciseIndex].sets.allSatisfy(\.isCompleted) {
+            if let previous, previous.exerciseIndex != current.exerciseIndex, !currentStarted,
+               draft.exercises[previous.exerciseIndex].sets.allSatisfy(\.isCompleted) {
+                // The transition moment wins even when the next exercise is a
+                // single set: Completed + Up Next, never a third row.
                 layout = .completedAndUpNext
+            } else if isFinal, upNextExerciseIndex != nil {
+                layout = .currentAndUpNext
             } else {
                 layout = previous == nil ? .currentOnly : .previousAndCurrent
             }

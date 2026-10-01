@@ -138,6 +138,28 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         XCTAssertEqual(projection.contextLayout, .currentAndUpNext)
     }
 
+    func testSingleSetExercisesStillShowCompletedPlusUpNext() throws {
+        var draft = session([
+            exercise("a", "A", sets: [set("a1", 1), set("a2", 2)]),
+            exercise("b", "B", sets: [set("b1", 1)]),
+            exercise("c", "C", sets: [set("c1", 1)]),
+        ])
+        draft.exercises[0].sets[0].isCompleted = true; draft.exercises[0].sets[0].completedAt = stamp(40)
+        var projection = try project(draft)
+        XCTAssertEqual(projection.contextRows.map(\.set.setId), ["a2", "b1"], "A's final set: Current + Up Next.")
+
+        draft.exercises[0].sets[1].isCompleted = true; draft.exercises[0].sets[1].completedAt = stamp(20)
+        projection = try project(draft)
+        XCTAssertEqual(projection.contextLayout, .completedAndUpNext, "B is a single set, but the transition shows Completed + Up Next.")
+        XCTAssertEqual(projection.contextRows.map(\.set.setId), ["a2", "b1"])
+        XCTAssertEqual(projection.contextRows.map(\.isCompletionTarget), [false, true])
+
+        draft.exercises[1].sets[0].isCompleted = true; draft.exercises[1].sets[0].completedAt = stamp(5)
+        projection = try project(draft)
+        XCTAssertEqual(projection.contextLayout, .completedAndUpNext)
+        XCTAssertEqual(projection.contextRows.map(\.set.setId), ["b1", "c1"])
+    }
+
     func testTimedSets() throws {
         let draft = session([exercise("plank", "Plank", measurement: .duration, sets: [
             set("p1", 1, reps: nil, load: nil, duration: 45, done: stamp(60)), set("p2", 2, reps: nil, load: nil, duration: 60),
@@ -248,21 +270,24 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         let encoded = String(decoding: try JSONEncoder().encode(redacted), as: UTF8.self)
         XCTAssertFalse(encoded.contains("Bench"))
         XCTAssertFalse(encoded.contains("Chest"))
+        XCTAssertFalse(encoded.contains("Fly"))
     }
 
     func testPayloadStaysSmallAndCarriesNoHistory() throws {
         let longName = String(repeating: "Incline Dumbbell Press ", count: 4)
         let exercises = (0..<40).map { index in
-            var item = exercise("exercise-\(index)", "\(longName)\(index)", sets: (1...6).map { set("s\(index)-\($0)", $0, done: $0 < 3 ? stamp(Double(1000 - index)) : nil) })
+            let uuid = UUID().uuidString
+            var item = exercise(uuid, "\(longName)\(index)", sets: (1...6).map { set(UUID().uuidString, $0, done: $0 < 3 ? stamp(Double(1000 - index)) : nil) })
             item.previousPerformance = .init(workoutDate: "2026-09-01", sets: [], contextLabel: String(repeating: "x", count: 500))
             return item
         }
         var draft = session(exercises)
         draft.selectedAreaIds = (0..<12).map { "area-\($0)-\(String(repeating: "y", count: 20))" }
-        draft.rest = .init(id: "rest|s0-1|x", mode: .countdown, startedAt: stamp(10), endsAt: stamp(-80), durationSeconds: 90, sourceExerciseId: "exercise-0", sourceSetId: "s0-1")
+        draft.rest = .init(id: "rest|\(UUID().uuidString)|2026-10-01T16:59:50.000Z", mode: .countdown, startedAt: stamp(10), endsAt: stamp(-80), durationSeconds: 90,
+                           sourceExerciseId: exercises[0].id, sourceSetId: exercises[0].sets[0].id)
         let projection = try project(draft)
         let size = try JSONEncoder().encode(projection).count
-        XCTAssertLessThanOrEqual(size, 2_048, "ActivityKit allows 4 KB for attributes + state; keep ≥2× headroom (was \(size)).")
+        XCTAssertLessThanOrEqual(size, 3_072, "ActivityKit allows 4 KB for attributes + state; UUID ids and max-length names must stay under it (was \(size)).")
         XCTAssertLessThanOrEqual(projection.sessionLabel.count, TrainingSessionLiveProjection.labelLimit)
         XCTAssertLessThanOrEqual(projection.currentExercise?.name.count ?? 0, TrainingSessionLiveProjection.nameLimit)
     }
@@ -271,7 +296,8 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         let projection = try project(session([exercise("bench", "Bench", sets: [set("b1", 1)])]))
         var json = String(decoding: try JSONEncoder().encode(projection), as: UTF8.self)
         json = json.replacingOccurrences(of: #""phase":"inProgress""#, with: #""phase":"someFutureCase""#)
-        XCTAssertEqual(try JSONDecoder().decode(TrainingSessionLiveProjection.self, from: Data(json.utf8)).phase, .inProgress)
+        XCTAssertEqual(try JSONDecoder().decode(TrainingSessionLiveProjection.self, from: Data(json.utf8)).phase, .paused,
+                       "An unknown future phase never exposes Complete Set.")
     }
 
     @MainActor

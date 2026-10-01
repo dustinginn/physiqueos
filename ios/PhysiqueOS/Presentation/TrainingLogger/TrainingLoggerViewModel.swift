@@ -294,21 +294,27 @@ final class TrainingLoggerViewModel {
         go(to: .summary)
     }
 
-    func completeLocalCapture() {
-        guard canWrite else { return }
-        guard var draft else { return }
+    /// Shows Workout Complete and ends the session. `source` is the draft
+    /// that was committed (the screen's own selection may already have been
+    /// ended by another screen's recovery). Returns whether this call ended
+    /// the session; only that caller owns cleanup and evidence reconciliation.
+    @discardableResult
+    func completeLocalCapture(source: TrainingLoggerDraft? = nil) -> Bool {
+        guard canWrite else { return false }
+        guard var draft = source ?? draft else { return false }
         draft.step = .complete
         completedDraft = draft
         selectedDraftId = draft.id
+        let ended = sessionAuthority.endSession(sessionId: draft.id, reason: .committed).isAccepted
         // When supporting evidence is attached, its files stay on disk until
         // `reconcileSupportingEvidenceAfterCommit` (running in the
         // background, after this returns) has read them — it owns deleting
         // them once done. With nothing attached, clean up immediately as
         // before.
-        if draft.supportingEvidenceAssets.isEmpty {
+        if ended, draft.supportingEvidenceAssets.isEmpty {
             attachmentStore.removeAll(draftId: draft.id)
         }
-        sessionAuthority.endSession(sessionId: draft.id, reason: .committed)
+        return ended
     }
 
     func submit() async {
@@ -322,14 +328,20 @@ final class TrainingLoggerViewModel {
                 sessionId: sessionId, finishedAt: ISO8601DateFormatter().string(from: now())
             )
             noteRejection(stamped)
-            guard stamped.isAccepted else { return }
+            guard stamped.isAccepted else {
+                if validationMessage == nil { validationMessage = "This workout couldn't be finished. Try again." }
+                return
+            }
         }
         guard let submittedDraft = draft else { return }
         guard authority == .founderProduction else {
             completeLocalCapture()
             return
         }
-        guard sessionAuthority.beginSubmission(sessionId: sessionId) else { return }
+        guard sessionAuthority.beginSubmission(sessionId: sessionId) else {
+            validationMessage = "This workout is already being finished."
+            return
+        }
         isSubmitting = true
         validationMessage = nil
         refreshWarning = nil
@@ -344,7 +356,7 @@ final class TrainingLoggerViewModel {
             guard result.isDurable else {
                 let state: TrainingLoggerSubmissionState = result.status == "accepted_processing"
                     ? .acceptedProcessing : .resultUnknown
-                sessionAuthority.setSubmissionState(sessionId: sessionId, state)
+                noteRejection(sessionAuthority.setSubmissionState(sessionId: sessionId, state))
                 processingMessage = state == .acceptedProcessing
                     ? "Finishing workout… PhysiqueOS has accepted it. You can safely leave while it finishes."
                     : "Checking workout… Keep this saved draft while PhysiqueOS verifies the result. You do not need to retry."
@@ -362,7 +374,7 @@ final class TrainingLoggerViewModel {
         // Nothing past this point may retroactively report the submission
         // as failed or resurrect the local draft — nothing after this point
         // is authoritative over that.
-        completeLocalCapture()
+        let ended = completeLocalCapture(source: submittedDraft)
         loadCompletedPerformanceRecords(for: submittedDraft, commitResult: committed)
         // Reconciling any attached supporting evidence happens entirely in
         // the background, after the durable commit above and after
@@ -371,9 +383,11 @@ final class TrainingLoggerViewModel {
         // screenshots, wait for that instead of starting a redundant,
         // duplicate interpretation.
         let pendingPrewarm = evidencePrewarmTask
-        Task { [writeAPI] in
-            _ = await pendingPrewarm?.value
-            await writeAPI.reconcileSupportingEvidenceAfterCommit(for: submittedDraft)
+        if ended {
+            Task { [writeAPI] in
+                _ = await pendingPrewarm?.value
+                await writeAPI.reconcileSupportingEvidenceAfterCommit(for: submittedDraft)
+            }
         }
         do {
             configuration = try await api.fetchConfiguration()

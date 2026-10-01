@@ -372,6 +372,11 @@ final class TrainingAcceptanceUITests: XCTestCase {
         )
         XCTAssertTrue(app.buttons["Mark set incomplete"].firstMatch.waitForExistence(timeout: 3), "The completed-set state was not restored exactly.")
         attachScreenshot("28-resumed-workout-matches-saved-draft")
+
+        // Resume is durable now, so the resumed workout is the active session
+        // and would route the next test's Log tap straight into the Logger.
+        // Leave it saved, as the journey began.
+        tapButton(identifier: "trainingLogger.inlineSaveAndLeave")
     }
 
     /// Build 21 item 1 acceptance: the screenshot-attachment card Workout

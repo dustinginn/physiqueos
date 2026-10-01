@@ -703,6 +703,115 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertNil(authority.draft(id: "session-1")?.rest)
     }
 
+    // MARK: Finish boundary through the view model
+
+    private actor CountingWriteAPI: TrainingWriteAPI {
+        enum Mode { case durable, processing, fail }
+        var mode: Mode
+        private(set) var commits: [TrainingLoggerDraft] = []
+        private(set) var reconciles = 0
+        private(set) var alreadyDurable = false
+        init(_ mode: Mode = .durable) { self.mode = mode }
+        func setAlreadyDurable(_ value: Bool) { alreadyDurable = value }
+        func setMode(_ value: Mode) { mode = value }
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
+            commits.append(draft)
+            if mode == .fail { throw URLError(.notConnectedToInternet) }
+            return TrainingCommitResult(
+                status: mode == .durable ? "durable" : "accepted_processing", reviewId: nil, reviewRevision: nil,
+                sessionId: draft.id, intendedDate: draft.workoutDate, exerciseIds: draft.exercises.map(\.id)
+            )
+        }
+        func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async { reconciles += 1 }
+        func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { alreadyDurable }
+    }
+
+    private func finishableSession() -> TrainingLoggerDraft {
+        var draft = liveSession(step: .review)
+        draft.exercises[0].sets[0].isCompleted = true
+        return draft
+    }
+
+    func testFinishCommitsOnceReleasesTheLockAndEndsTheSession() async throws {
+        let store = RecordingStore([finishableSession()])
+        let (authority, _) = makeAuthority(store, environment: .founderProduction)
+        let writeAPI = CountingWriteAPI(.durable)
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction)
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        await viewModel.submit()
+
+        let commits = await writeAPI.commits
+        XCTAssertEqual(commits.count, 1)
+        XCTAssertNotNil(commits.first?.finishedAt, "finishedAt is stamped and persisted before the commit.")
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+        XCTAssertTrue(store.drafts.isEmpty)
+        XCTAssertFalse(authority.isSubmitting(sessionId: "session-1"), "The lock is released after a durable commit.")
+        XCTAssertEqual(authority.lastChange?.kind, .ended(.committed))
+    }
+
+    func testFailedFinishKeepsTheDraftAndReleasesTheLockSoRetryIsPossible() async throws {
+        let store = RecordingStore([finishableSession()])
+        let (authority, _) = makeAuthority(store, environment: .founderProduction)
+        let writeAPI = CountingWriteAPI(.fail)
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction)
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        await viewModel.submit()
+        XCTAssertNotNil(viewModel.validationMessage)
+        XCTAssertFalse(authority.isSubmitting(sessionId: "session-1"))
+        let stamped = try XCTUnwrap(store.stored("session-1")?.finishedAt)
+        await writeAPI.setMode(.durable)
+        await viewModel.submit()
+        let commits = await writeAPI.commits
+        XCTAssertEqual(commits.map(\.finishedAt), [stamped, stamped], "A retry reuses the one persisted finish window (same idempotency identity).")
+        XCTAssertTrue(store.drafts.isEmpty)
+    }
+
+    func testAcceptedProcessingPersistsSubmissionStateAndBlocksIntents() async throws {
+        let store = RecordingStore([finishableSession()])
+        let (authority, _) = makeAuthority(store, environment: .founderProduction)
+        let writeAPI = CountingWriteAPI(.processing)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction,
+            durabilityRecoveryMaxAttempts: 0
+        )
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        await viewModel.submit()
+        XCTAssertEqual(store.stored("session-1")?.submissionState, .acceptedProcessing)
+        XCTAssertTrue(viewModel.isAwaitingDurability)
+        XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2",
+                                             context: .intent(mutationId: "late", expectedRevision: authority.draft(id: "session-1")!.currentRevision)),
+                       .rejected(.sessionNotMutable))
+    }
+
+    func testRecoveryOfAnAlreadyDurableDraftCleansUpOnceAcrossTwoScreens() async throws {
+        let store = RecordingStore([finishableSession()])
+        let (authority, _) = makeAuthority(store, environment: .founderProduction)
+        let writeAPI = CountingWriteAPI(.durable)
+        await writeAPI.setAlreadyDurable(true)
+        let first = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction)
+        let second = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction)
+        await first.load()
+        await second.load()
+        XCTAssertTrue(store.drafts.isEmpty)
+        XCTAssertEqual(store.discardCount, 1, "Only the screen that ended the session discards it.")
+        XCTAssertEqual(first.draft?.step, .complete, "The recovering screen shows the completed workout.")
+        XCTAssertNil(second.draft)
+    }
+
+    func testStartSurfacesAFailedLocalWrite() async throws {
+        let store = RecordingStore()
+        store.failPersist = true
+        let (authority, _) = makeAuthority(store)
+        let viewModel = TrainingLoggerViewModel(api: api, sessionAuthority: authority)
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        XCTAssertNil(viewModel.draft)
+        XCTAssertNotNil(viewModel.validationMessage)
+    }
+
     // MARK: Concurrency
 
     func testInterleavedUIAndIntentCallersFromManyTasksSerializeWithoutLoss() async throws {
