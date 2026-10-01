@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T03:27:18Z",
+  "generated_at_utc": "2026-10-01T04:03:11Z",
   "task": {
-    "id": "healthkit-sleep-evidence-design-20260930",
-    "title": "Sleep Evidence product design (Recovery stream): IA, screens, charts, states, v2 gating, future hooks",
+    "id": "healthkit-sleep-evidence-visual-prototype-20261001",
+    "title": "Sleep Evidence NON-SHIPPING visual prototype + 11 Simulator screenshots",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
-    "final_sha": null,
+    "base_sha": "a5041eb0",
+    "final_sha": "3a2697da",
     "production_server_sha": "08aeecde",
     "production_deployment": "1e7d28e6-b142-4d8c-9fac-96dd1498ffd8",
     "native_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
     "native_build": "73"
   },
   "result": {
-    "summary": "Design-only: Sleep becomes the first real content of the existing Recovery Evidence stream. Selective landing (last night, 14-night total chart with 7-night average, sleep window consistency, recent nights, sources); deeper Trends and Night detail (hypnogram, stages, continuity, in-bed, additional sleep, provenance). Stage/continuity gated by read-model status so sleep-canon-v2 values plug in without layout change. No score, no strategic weighting; future Briefing Recovery card, foam rolling and V3 association principles recorded as hooks only. Smallest Slice 1 recommended.",
+    "summary": "Fixture-backed (synthetic) Sleep Evidence prototype on claude/sleep-evidence-prototype-20261001 @ 3a2697da, gated DEBUG + launch argument + Sandbox. Simulator worked headlessly despite the locked Mac; 11 screenshots (hub, Recovery landing, Trends, Night detail, provenance, pending-correction state) committed under ios/Prototypes/SleepEvidence/screenshots/. Unit 7/7, UI 2/2, Evidence regressions and a5041eb0 cleanup test pass; Release compile OK. Non-shipping.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -25,36 +25,30 @@
   },
   "validation": {
     "tests": {
-      "status": "not_applicable",
-      "summary": "Design only; no code."
+      "status": "passed",
+      "summary": "Prototype unit 7/7, prototype UI 2/2, Evidence unit 15/15, corrected-Evidence journey + Founder-page cleanup UI tests pass; Debug + Release build OK."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "Grounded in current Native Evidence code and canonical schema."
+      "status": "not_run",
+      "summary": "Non-shipping prototype; full review deferred to Slice 1 implementation."
     },
     "zero_write_audit": {
       "status": "not_applicable",
-      "summary": "No production reads or writes."
+      "summary": "No production access."
     }
   },
   "decisions_required": [
-    "Show September validation data in Evidence? (recommend no)",
-    "Show Morning Check-In self-reported sleep next to HealthKit Sleep?",
-    "Recovery stream as Sleep's home vs separate Sleep row (design assumes Recovery)",
-    "Awakening count in continuity? (excluded by default)",
-    "Authorize Slice 1 implementation after sleep-canon-v2 + new D0"
+    "Founder: review 11 screenshots and answer 7 visual questions (or approve)."
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Evidence hub already has a placeholder 'recovery' stream (bed icon, teal) that Sleep can fill without a new hub row."
+    "Simulator automation works headlessly while the Mac console is locked; no unlock needed."
   ],
   "backlog": [
-    "Slice 1 Server read model + Native Recovery landing/night detail",
-    "Slice 2 window chart, hypnogram, stages, continuity, trends",
-    "Slice 3 additional sleep, stage mix, training context"
+    "Slice 1 implementation after canon-v2 + D0 relaxation + prospective activation"
   ],
-  "recommended_next_step": "Founder reviews the design and the 4 open decisions; then authorize Slice 1 to follow sleep-canon-v2 and prospective activation.",
-  "full_report_path": "agent-handoffs/reports/20261001T032718Z-healthkit-sleep-evidence-design.md",
+  "recommended_next_step": "Founder visual review of ios/Prototypes/SleepEvidence/screenshots on branch claude/sleep-evidence-prototype-20261001.",
+  "full_report_path": "agent-handoffs/reports/20261001T040311Z-healthkit-sleep-evidence-visual-prototype.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
