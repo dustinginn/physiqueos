@@ -44,7 +44,29 @@ Acceptance:
 - navigation/background timing cannot consume the celebration;
 - no historical replay.
 
-3. HealthKit Sleep — prospective canary acceptance
+3. Actionable Priority notifications — add Skip action
+Status: accepted backlog item; defer to next consolidated Native build, currently expected Build 78.
+Context:
+- PhysiqueOS now supports a canonical skipped state for applicable actionable Priorities.
+- Existing actionable notification flows already support actions such as completion and snooze.
+Requirement:
+- expose Skip from actionable Priority notifications when the underlying Priority/action supports canonical skipping;
+- route through the same canonical Priority mutation semantics as in-app Skip;
+- do not create a notification-only skip state;
+- notification/UI state must reconcile after the action;
+- preserve dose-aware/specialized completion semantics for priorities that require them;
+- fail soft if Skip is not valid for that occurrence.
+Build decision:
+- do NOT create a dedicated build solely for this.
+- integrate/review with the next consolidated Native release, currently expected Build 78, alongside the staged Performance Record celebration fix.
+Acceptance:
+- supported Priority can be skipped directly from notification;
+- resulting occurrence is canonically skipped and reflected in Home/Priority detail;
+- unsupported Priority does not offer an invalid Skip action;
+- repeated/stale action is safe;
+- notification clears/updates appropriately.
+
+4. HealthKit Sleep — prospective canary acceptance
 Status: historical Evidence + Build 76 UI + Server architecture complete. D0 2026-10-02 validation_only. Strategic Sleep OFF.
 Authority:
 - Server 5804e88dac0db6bb04cf43647d6387efeab25906
@@ -56,7 +78,7 @@ Next:
 After acceptance:
 - authorize prospective validation-only Sleep as input to Recovery shadow assessment through a separately reviewed non-strategic composition boundary.
 
-4. Recovery Briefing V1 — shadow calibration then publication
+5. Recovery Briefing V1 — shadow calibration then publication
 Status: visual design accepted; one-card hierarchy accepted; Server shadow assessment candidate implemented but intentionally unwired/un-deployed.
 Authority:
 - candidate 1bfa92ef874c3c96f05b23a9d3cbdfb956384156
@@ -81,7 +103,7 @@ Next:
 
 PARKED / LATER
 
-5. Beta-user readiness / DigitalOcean capacity
+6. Beta-user readiness / DigitalOcean capacity
 Status: not an immediate blocker; Founder may consider another user in roughly the coming month but has not authorized onboarding.
 Next before beta:
 - bounded production capacity/read-latency/cost audit;
@@ -90,7 +112,7 @@ Next before beta:
 Trigger:
 - Founder begins planning actual beta onboarding, or DO cost/performance symptoms recur.
 
-6. Apple Watch companion
+7. Apple Watch companion
 Status: candidate next major feature, not started.
 Current product hypothesis:
 - Watch as execution surface: current/next set, Complete Set, Stopwatch/Countdown, workout progress;
@@ -105,7 +127,7 @@ Trigger:
 
 OPERATIONAL / ENVIRONMENT
 
-7. Shared Mac restart
+8. Shared Mac restart
 Status: recommended when convenient, not currently blocking.
 Last cleanup:
 - free space recovered to approximately 25 GiB;
