@@ -5,6 +5,7 @@ import { createInMemoryCanonicalRecordStore } from "../../platform/database/Phas
 import {
   HEALTHKIT_SLEEP_VALIDATION_POLICY_RECORD_ID,
   HEALTHKIT_SLEEP_VALIDATION_POLICY_SCHEMA_VERSION,
+  compareHealthKitSleepValidationV1V2,
   resolveHealthKitSleepValidationPolicy,
   summarizeHealthKitSleepValidation,
 } from "../../domain/services/HealthKitSleepHistoricalValidation.js";
@@ -167,5 +168,41 @@ describe("sanitized historical shape", () => {
     expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:/);
     expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
     expect(text).not.toMatch(/sourceName|bundleIdentifier/);
+  });
+
+  it("compares v1 and v2 with aggregate copy-selection facts only", async () => {
+    const current = setup([validationPolicy(), OURA_PREFERENCE]);
+    await current.run({ batchId: "b-copy", runId: `hv-${D0}-30d`, samples: [
+      night(100),
+      night(101),
+      wire({
+        id: uuid(102), source: "oura", stage: "core",
+        start: "2026-09-21T23:00:00-07:00", end: "2026-09-22T07:00:00-07:00",
+      }),
+    ] });
+    const comparison = compareHealthKitSleepValidationV1V2({
+      samples: current.store.snapshot().healthKitSleepValidationSamples,
+      preferenceRecord: OURA_PREFERENCE,
+      policy: resolveHealthKitSleepValidationPolicy(validationPolicy()),
+    });
+    expect(comparison).toMatchObject({
+      algorithmVersions: { before: "sleep-canon-v1", candidate: "sleep-canon-v2" },
+      samples: 3,
+      nights: {
+        v1: 2,
+        v2: 2,
+        affectedDuplicateCopies: 1,
+        affectedResolvedToOneSelectedCopy: 1,
+        affectedSelectedCopyConflictFree: 1,
+        affectedSelectedTotalsWithinTolerance: 1,
+        affectedAsleepStableWithinTolerance: 1,
+        unaffected: 1,
+        unaffectedSemanticallyEquivalent: 1,
+      },
+      duplicateCopyCandidates: { 2: 1 },
+    });
+    const text = JSON.stringify(comparison);
+    expect(text).not.toMatch(/2026-\d{2}-\d{2}T/);
+    expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
   });
 });

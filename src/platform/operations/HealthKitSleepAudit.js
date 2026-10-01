@@ -14,6 +14,7 @@ import {
   HEALTHKIT_SLEEP_VALIDATION_POLICY_RECORD_ID,
   HEALTHKIT_SLEEP_VALIDATION_SAMPLE_COLLECTION,
   resolveHealthKitSleepValidationPolicy,
+  compareHealthKitSleepValidationV1V2,
   summarizeHealthKitSleepValidation,
 } from "../../domain/services/HealthKitSleepHistoricalValidation.js";
 
@@ -73,6 +74,7 @@ export async function auditHealthKitSleep({ records, ownerUserId, kind = "dorman
     },
     strategicLeaks,
     strategicLeakTotal: Object.values(strategicLeaks).reduce((sum, value) => sum + value, 0),
+    recordStoreMutations: typeof records.getMutationCount === "function" ? records.getMutationCount() : null,
   };
   if (kind === "dormancy") return Object.freeze(base);
   if (!validation.enabled && !validationRecord?.runId) {
@@ -82,5 +84,6 @@ export async function auditHealthKitSleep({ records, ownerUserId, kind = "dorman
   return Object.freeze({
     ...base,
     historicalShape: policy.enabled ? summarizeHealthKitSleepValidation({ samples: validationSamples, preferenceRecord, policy }) : null,
+    historicalComparison: policy.enabled ? compareHealthKitSleepValidationV1V2({ samples: validationSamples, preferenceRecord, policy }) : null,
   });
 }

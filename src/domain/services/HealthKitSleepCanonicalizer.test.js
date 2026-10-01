@@ -3,6 +3,7 @@ import {
   HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION,
   HealthKitSleepPrimaryReason,
   canonicalizeHealthKitSleep,
+  canonicalizeHealthKitSleepV1,
 } from "./HealthKitSleepCanonicalizer.js";
 import { HealthKitSleepLifecycle } from "./HealthKitSleepContract.js";
 import { resolveHealthKitSleepSourcePreferencePolicy } from "./HealthKitSleepPolicies.js";
@@ -16,7 +17,7 @@ function only(days, key) {
 }
 function main(day) { return day.episodes[day.mainEpisodeIndex]; }
 
-describe("sleep-canon-v1 attribution, clustering and stages", () => {
+describe("sleep-canon-v2 attribution, clustering and stages", () => {
   it("#1 simple overnight unspecified: wake-date day, asleep from instants, stage detail absent", () => {
     const day = only(canonicalizeHealthKitSleep({ samples: [night({ source: "oura" })] }), "2026-09-11");
     expect(day.algorithmVersion).toBe(HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION);
@@ -202,7 +203,7 @@ describe("sleep-canon-v1 attribution, clustering and stages", () => {
   });
 });
 
-describe("sleep-canon-v1 source reconciliation (policy-driven, never hard-coded)", () => {
+describe("sleep-canon-v2 source reconciliation (policy-driven, never hard-coded)", () => {
   const OURA = preferring("oura");
   const watchNight = (overrides = {}) => night({ source: "watch", stage: "core", start: "2026-09-10T22:50:00-07:00", end: "2026-09-11T07:10:00-07:00", ...overrides });
 
@@ -371,5 +372,174 @@ describe("sleep-canon-v1 review regressions", () => {
     // an insufficient sensor lane still outranks an insufficient manual lane.
     expect(episode.primarySource.sourceClass).toBe("third_party");
     expect(episode.reconciliation.primaryUsable).toBe(false);
+  });
+});
+
+describe("sleep-canon-v2 within-lane duplicate-copy resolution", () => {
+  const startMs = Date.parse("2026-09-11T06:00:00.000Z");
+  const isoAt = (minutes) => new Date(startMs + minutes * 60 * 1000).toISOString();
+  const stagedCopy = ({ idBase, shift = 0, source = "oura", stages = ["core", "deep", "rem", "core"] }) =>
+    stages.map((stage, index) => stored({
+      id: uuid(idBase + index),
+      source,
+      stage,
+      start: isoAt(shift + index * 120),
+      end: isoAt(shift + (index + 1) * 120),
+    }));
+  const episode = (samples, preference = null) => main(only(canonicalizeHealthKitSleep({ samples, preference }), "2026-09-11"));
+  const metrics = (value) => ({
+    start: value.start,
+    end: value.end,
+    asleepSeconds: value.asleepSeconds,
+    awakeSeconds: value.awakeSeconds,
+    coreSeconds: value.coreSeconds,
+    deepSeconds: value.deepSeconds,
+    remSeconds: value.remSeconds,
+    unspecifiedSeconds: value.unspecifiedSeconds,
+    inBedSeconds: value.inBedSeconds,
+    timeline: value.timeline,
+  });
+
+  it("selects one exact staged copy with different UUIDs and preserves the other as provenance", () => {
+    const samples = [...stagedCopy({ idBase: 1000 }), ...stagedCopy({ idBase: 2000 })];
+    const value = episode(samples);
+    expect(value.reconciliation.copySelection).toMatchObject({
+      applied: true, candidateCount: 2, selectedSampleCount: 4, corroboratingSampleCount: 4,
+    });
+    expect(value).toMatchObject({ asleepSeconds: 8 * H, coreSeconds: 4 * H, deepSeconds: 2 * H, remSeconds: 2 * H });
+    expect(value.sourceSampleIds).toHaveLength(4);
+    expect(value.corroboratingSampleIds).toHaveLength(4);
+    expect(new Set([...value.sourceSampleIds, ...value.corroboratingSampleIds])).toEqual(new Set(samples.map((sample) => sample.id)));
+  });
+
+  it("selects one near-duplicate shifted copy without expanding the timeline", () => {
+    const value = episode([...stagedCopy({ idBase: 3000 }), ...stagedCopy({ idBase: 4000, shift: 5 })]);
+    expect(value.reconciliation.copySelection).toMatchObject({ applied: true, candidateCount: 2 });
+    expect(value.start).toBe(isoAt(0));
+    expect(value.end).toBe(isoAt(480));
+    expect(value.asleepSeconds).toBe(8 * H);
+    expect(value.timeline).toHaveLength(4);
+  });
+
+  it("prefers a complete copy over a partial overlapping copy", () => {
+    const complete = stagedCopy({ idBase: 5000 });
+    const partial = stagedCopy({ idBase: 6000, shift: 60 }).slice(0, 2);
+    const value = episode([...complete, ...partial]);
+    expect(value.reconciliation.copySelection).toMatchObject({ applied: true, candidateCount: 2 });
+    expect(new Set(value.sourceSampleIds)).toEqual(new Set(complete.map((sample) => sample.id)));
+    expect(value.asleepSeconds).toBe(8 * H);
+  });
+
+  it("chooses one of two complete conflicting staged copies and never combines their simultaneous states", () => {
+    const first = stagedCopy({ idBase: 7000, stages: ["core", "core", "deep", "deep"] });
+    const second = stagedCopy({ idBase: 8000, shift: 5, stages: ["deep", "deep", "core", "core"] });
+    const value = episode([...first, ...second]);
+    expect(value.reconciliation.copySelection).toMatchObject({ applied: true, candidateCount: 2 });
+    expect(value.timeline.map((segment) => segment.stage)).toEqual(["asleep_core", "asleep_deep"]);
+    expect(value).toMatchObject({ asleepSeconds: 8 * H, coreSeconds: 4 * H, deepSeconds: 4 * H });
+  });
+
+  it("resolves three copies deterministically", () => {
+    const samples = [
+      ...stagedCopy({ idBase: 9000 }),
+      ...stagedCopy({ idBase: 10000, shift: 3 }),
+      ...stagedCopy({ idBase: 11000, shift: 6 }),
+    ];
+    const value = episode(samples);
+    expect(value.reconciliation.copySelection).toMatchObject({ applied: true, candidateCount: 3 });
+    expect(value.sourceSampleIds).toHaveLength(4);
+    expect(value.corroboratingSampleIds).toHaveLength(8);
+    expect(value.asleepSeconds).toBe(8 * H);
+  });
+
+  it("keeps genuinely complementary non-overlapping samples in one copy", () => {
+    const samples = stagedCopy({ idBase: 12000 });
+    const value = episode(samples);
+    expect(value.reconciliation.copySelection).toMatchObject({ applied: false, candidateCount: 1, selectedSampleCount: 4 });
+    expect(new Set(value.sourceSampleIds)).toEqual(new Set(samples.map((sample) => sample.id)));
+    expect(value.corroboratingSampleIds).toEqual([]);
+  });
+
+  it("keeps the one in-bed envelope with the selected staged copy", () => {
+    const inBed = stored({ id: uuid(13000), source: "oura", stage: "inBed", start: isoAt(-30), end: isoAt(495) });
+    const value = episode([
+      ...stagedCopy({ idBase: 13100 }),
+      ...stagedCopy({ idBase: 13200, shift: 5 }),
+      inBed,
+    ]);
+    expect(value.reconciliation.copySelection).toMatchObject({ applied: true, selectedSampleCount: 5 });
+    expect(value.inBedSeconds).toBe(8 * H + 45 * 60);
+    expect(value.sourceSampleIds).toContain(inBed.id);
+  });
+
+  it("does not let an overlapping awake disagreement reduce the selected complete copy", () => {
+    const complete = stagedCopy({ idBase: 14000, stages: ["core", "core", "core", "core"] });
+    const disagreement = stored({ id: uuid(14100), source: "oura", stage: "awake", start: isoAt(120), end: isoAt(180) });
+    const value = episode([...complete, disagreement]);
+    expect(value.reconciliation.copySelection).toMatchObject({ applied: true, candidateCount: 2 });
+    expect(value).toMatchObject({ asleepSeconds: 8 * H, awakeSeconds: 0, coreSeconds: 8 * H });
+    expect(value.corroboratingSampleIds).toContain(disagreement.id);
+  });
+
+  it("selects within the Oura lane only after source preference chooses Oura over Watch", () => {
+    const value = episode([
+      ...stagedCopy({ idBase: 15000 }),
+      ...stagedCopy({ idBase: 15100, shift: 5 }),
+      ...stagedCopy({ idBase: 15200, source: "watch", shift: -10 }),
+    ], preferring("oura"));
+    expect(value.primarySource.sourceFamily).toBe("oura");
+    expect(value.reconciliation).toMatchObject({ reason: HealthKitSleepPrimaryReason.SOURCE_PREFERENCE, candidateCount: 2 });
+    expect(value.reconciliation.copySelection).toMatchObject({ applied: true, candidateCount: 2 });
+    expect(value.corroboratingSources).toEqual([expect.objectContaining({ sourceFamily: "apple_watch" })]);
+  });
+
+  it("falls back deterministically when the selected copy is deleted", () => {
+    const samples = [...stagedCopy({ idBase: 16000 }), ...stagedCopy({ idBase: 16100, shift: 5 })];
+    const before = episode(samples);
+    const after = episode(samples.filter((sample) => !before.sourceSampleIds.includes(sample.id)));
+    expect(before.reconciliation.copySelection.applied).toBe(true);
+    expect(after.reconciliation.copySelection.applied).toBe(false);
+    expect(after.asleepSeconds).toBe(8 * H);
+    expect(after.sourceSampleIds).toHaveLength(4);
+  });
+
+  it("recomputes to a later-arriving more authoritative complete copy", () => {
+    const partial = stagedCopy({ idBase: 17000 }).slice(0, 2);
+    const complete = stagedCopy({ idBase: 17100, shift: 5 });
+    const before = episode(partial);
+    const after = episode([...partial, ...complete]);
+    expect(before.asleepSeconds).toBe(4 * H);
+    expect(after.asleepSeconds).toBe(8 * H);
+    expect(after.reconciliation.copySelection.applied).toBe(true);
+    expect(new Set(after.sourceSampleIds)).toEqual(new Set(complete.map((sample) => sample.id)));
+  });
+
+  it("converges under out-of-order arrival", () => {
+    const samples = [...stagedCopy({ idBase: 18000 }), ...stagedCopy({ idBase: 18100, shift: 5 })];
+    const forward = canonicalizeHealthKitSleep({ samples });
+    const reversed = canonicalizeHealthKitSleep({ samples: [...samples].reverse() });
+    expect(JSON.stringify([...reversed])).toBe(JSON.stringify([...forward]));
+  });
+
+  it("retains v1-equivalent totals and timeline when no duplicate exists while versioning the artifact", () => {
+    const samples = [
+      ...stagedCopy({ idBase: 19000 }),
+      stored({ id: uuid(19100), source: "oura", stage: "inBed", start: isoAt(-15), end: isoAt(495) }),
+    ];
+    const v2Day = only(canonicalizeHealthKitSleep({ samples }), "2026-09-11");
+    const v1Day = only(canonicalizeHealthKitSleepV1({ samples }), "2026-09-11");
+    expect(metrics(main(v2Day))).toEqual(metrics(main(v1Day)));
+    expect(v2Day.algorithmVersion).toBe("sleep-canon-v2");
+    expect(v1Day.algorithmVersion).toBe("sleep-canon-v1");
+    expect(v2Day.inputDigest).not.toBe(v1Day.inputDigest);
+  });
+
+  it("never double-counts total asleep, stages, or timeline across duplicate copies", () => {
+    const value = episode([...stagedCopy({ idBase: 20000 }), ...stagedCopy({ idBase: 20100 })]);
+    const staged = value.coreSeconds + value.deepSeconds + value.remSeconds + value.unspecifiedSeconds;
+    const timeline = value.timeline.reduce((sum, segment) => sum + (Date.parse(segment.end) - Date.parse(segment.start)) / 1000, 0);
+    expect(value.asleepSeconds).toBe(8 * H);
+    expect(staged).toBe(value.asleepSeconds);
+    expect(timeline).toBe(value.asleepSeconds + value.awakeSeconds);
   });
 });

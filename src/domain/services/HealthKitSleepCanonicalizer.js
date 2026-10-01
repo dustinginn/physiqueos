@@ -13,7 +13,7 @@ import {
 } from "./HealthKitSleepContract.js";
 import { sleepSourcePreferenceRank } from "./HealthKitSleepPolicies.js";
 
-// sleep-canon-v1: a PURE, deterministic function from live HealthKit Sleep
+// sleep-canon-v2: a PURE, deterministic function from live HealthKit Sleep
 // samples (+ the resolved source-preference policy) to canonical sleep days.
 //
 //   1. Preserve every observation. Reconciliation only decides what is counted.
@@ -30,19 +30,26 @@ import { sleepSourcePreferenceRank } from "./HealthKitSleepPolicies.js";
 //      "Usable" is technical, not coaching: the lane's own asleep union covers
 //      at least minimumUsableCoverageRatio of the episode's all-source asleep
 //      union. Never "newest writer wins".
-//   4. Totals come from the primary lane ONLY (no cross-source gap filling, no
-//      hybrid totals). Within the lane each instant has one state, by
+//   4. Within the primary lane, mutually overlapping staged/awake chains are
+//      candidate copies of the same source episode. Select one technically
+//      usable copy by asleep coverage, staged coverage/completeness, and a
+//      stable content tie-break. Non-selected copies remain corroborating
+//      provenance. Complementary non-overlapping samples remain one copy.
+//   5. Totals come from the selected copy of the primary lane ONLY (no
+//      cross-source or cross-copy gap filling). Within the copy each instant
+//      has one state, by
 //      precedence deep > REM > core > awake > unspecified, so a nested stage
 //      overrides overlapping unspecified sleep and nothing is double counted.
 //      In-bed and awake are never asleep. A gap with no sample is not awake.
-//   5. Sleep day: an episode belongs to the wake date D whose window
+//   6. Sleep day: an episode belongs to the wake date D whose window
 //      [D-1 18:00, D 18:00) contains its end, in the zone of its last primary
 //      asleep sample. Durations always come from absolute instants.
-//   6. Main episode = greatest asleep duration; all others are secondary and
+//   7. Main episode = greatest asleep duration; all others are secondary and
 //      preserved. No UI labels (nap / additional sleep) are decided here.
-//   7. No sleep efficiency, awakening count, or score.
+//   8. No sleep efficiency, awakening count, or score.
 
-export const HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION = "sleep-canon-v1";
+export const HEALTHKIT_SLEEP_CANON_V1_ALGORITHM_VERSION = "sleep-canon-v1";
+export const HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION = "sleep-canon-v2";
 export const HEALTHKIT_SLEEP_DAY_SCHEMA_VERSION = "healthkit-sleep-day-v1";
 
 // Versioned technical parameters. Changing any of them is a new algorithm
@@ -56,11 +63,23 @@ export const SLEEP_CANON_V1_PARAMETERS = Object.freeze({
   classTieBreak: Object.freeze(["apple_watch", "third_party", "apple_other", "apple_iphone", "user_entered"]),
 });
 
+export const SLEEP_CANON_V2_PARAMETERS = Object.freeze({
+  ...SLEEP_CANON_V1_PARAMETERS,
+  withinLaneCopyResolution: Object.freeze({
+    conflictStages: Object.freeze(["awake", "asleep_core", "asleep_deep", "asleep_rem"]),
+    unspecifiedMayEnvelopeSpecificStages: true,
+    selectionOrder: Object.freeze([
+      "usable", "asleep_coverage", "staged_coverage", "resolved_coverage", "sample_count", "stable_content",
+    ]),
+  }),
+});
+
 const GAP_MS = SLEEP_CANON_V1_PARAMETERS.episodeGapMinutes * 60 * 1000;
 const ASLEEP = new Set(HEALTHKIT_SLEEP_ASLEEP_STAGES);
 const SPECIFIC = new Set(HEALTHKIT_SLEEP_SPECIFIC_STAGES);
 const PRECEDENCE = new Map(SLEEP_CANON_V1_PARAMETERS.lanePrecedence.map((stage, index) => [stage, index]));
-const PARAMETERS_DIGEST = `sha256_${digest(stable(SLEEP_CANON_V1_PARAMETERS))}`;
+const V1_PARAMETERS_DIGEST = `sha256_${digest(stable(SLEEP_CANON_V1_PARAMETERS))}`;
+const PARAMETERS_DIGEST = `sha256_${digest(stable(SLEEP_CANON_V2_PARAMETERS))}`;
 
 export const HealthKitSleepPrimaryReason = Object.freeze({
   ONLY_CANDIDATE: "only_candidate",
@@ -80,6 +99,28 @@ export const HealthKitSleepPrimaryReason = Object.freeze({
  * @returns Map<sleepDay, canonical day content> (no owner/revision fields)
  */
 export function canonicalizeHealthKitSleep({ samples = [], preference = null } = {}) {
+  return canonicalize({
+    samples,
+    preference,
+    algorithmVersion: HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION,
+    parametersDigest: PARAMETERS_DIGEST,
+    resolveDuplicateCopies: true,
+  });
+}
+
+// Retained for immutable historical comparison/audit only. Production
+// recomputation always calls canonicalizeHealthKitSleep (v2).
+export function canonicalizeHealthKitSleepV1({ samples = [], preference = null } = {}) {
+  return canonicalize({
+    samples,
+    preference,
+    algorithmVersion: HEALTHKIT_SLEEP_CANON_V1_ALGORITHM_VERSION,
+    parametersDigest: V1_PARAMETERS_DIGEST,
+    resolveDuplicateCopies: false,
+  });
+}
+
+function canonicalize({ samples, preference, algorithmVersion, parametersDigest, resolveDuplicateCopies }) {
   const live = samples
     .filter((sample) => sample && !sample.tombstone && sample.lifecycle?.state === HealthKitSleepLifecycle.LIVE)
     .filter((sample) => sample.stage && sample.stage !== HealthKitSleepStage.UNKNOWN)
@@ -92,7 +133,7 @@ export function canonicalizeHealthKitSleep({ samples = [], preference = null } =
   const groups = cluster(activity).filter((group) => group.some((sample) => ASLEEP.has(sample.stage)));
   const inBedByGroup = assignInBed(groups, inBed);
   const episodes = groups
-    .map((group, index) => buildAsleepEpisode(group, inBedByGroup[index], preference))
+    .map((group, index) => buildAsleepEpisode(group, inBedByGroup[index], preference, { resolveDuplicateCopies }))
     .filter(Boolean);
 
   // An in-bed sample assigned to an asleep group is an input of that episode
@@ -111,14 +152,17 @@ export function canonicalizeHealthKitSleep({ samples = [], preference = null } =
   }
   const days = new Map();
   for (const [sleepDay, dayEpisodes] of [...byDay].sort(([left], [right]) => left.localeCompare(right))) {
-    days.set(sleepDay, buildDay(sleepDay, dayEpisodes, preference));
+    days.set(sleepDay, buildDay(sleepDay, dayEpisodes, preference, { algorithmVersion, parametersDigest }));
   }
   return days;
 }
 
 /** Canonical content of a sleep day that has no episodes left (all deleted). */
 export function emptyHealthKitSleepDay(sleepDay, { preference = null } = {}) {
-  return buildDay(sleepDay, [], preference);
+  return buildDay(sleepDay, [], preference, {
+    algorithmVersion: HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION,
+    parametersDigest: PARAMETERS_DIGEST,
+  });
 }
 
 function toInterval(sample) {
@@ -275,7 +319,7 @@ function tierOf({ usable, manual }) {
   return 3;
 }
 
-function buildAsleepEpisode(group, assignedInBed, preference) {
+function buildAsleepEpisode(group, assignedInBed, preference, { resolveDuplicateCopies }) {
   const asleepAll = group.filter((sample) => ASLEEP.has(sample.stage));
   const episodeAsleepMs = unionMs(asleepAll);
   const candidates = groupLanes(group)
@@ -301,12 +345,19 @@ function buildAsleepEpisode(group, assignedInBed, preference) {
   const { ordered, reason } = rankLanes(candidates);
   const primary = ordered[0];
 
-  const primaryActivity = primary.intervals;
+  const copyResolution = resolveDuplicateCopies
+    ? selectAuthoritativeLaneCopy(primary.intervals)
+    : { selected: primary.intervals, corroborating: [], candidateCount: 1, applied: false };
+  const primaryActivity = copyResolution.selected;
   const primaryAsleep = primaryActivity.filter((sample) => ASLEEP.has(sample.stage));
   const extent = spanOf(primaryAsleep);
   const resolved = resolveLaneTimeline(primaryActivity, extent);
 
-  const laneInBed = assignedInBed.filter((sample) => sample.laneKey === primary.key && near(sample, extent));
+  const allLaneInBed = assignedInBed.filter((sample) => sample.laneKey === primary.key && near(sample, extent));
+  const inBedResolution = resolveDuplicateCopies && copyResolution.applied
+    ? selectAuthoritativeInBedCopy(allLaneInBed, extent)
+    : { selected: allLaneInBed, corroborating: [] };
+  const laneInBed = inBedResolution.selected;
   const inBedUnion = unionMs(laneInBed);
   const extentMs = extent.end - extent.start;
   const inBedDefensible = laneInBed.length > 0 && extentMs > 0 &&
@@ -328,6 +379,7 @@ function buildAsleepEpisode(group, assignedInBed, preference) {
   }));
   const primaryIds = new Set([...primaryActivity, ...laneInBed].map((sample) => sample.id));
   const inputs = [...group, ...assignedInBed];
+  const sameLaneCorroboratingCount = copyResolution.corroborating.length + inBedResolution.corroborating.length;
   return {
     kind: "asleep",
     span: extent,
@@ -348,6 +400,15 @@ function buildAsleepEpisode(group, assignedInBed, preference) {
         primaryUsable: primary.usable,
         preferenceApplied: primary.preferenceRank !== null && primary.preferenceRank !== undefined,
         candidateCount: ordered.length,
+        ...(resolveDuplicateCopies ? {
+          copySelection: Object.freeze({
+            applied: copyResolution.applied,
+            candidateCount: copyResolution.candidateCount,
+            selectedSampleCount: primaryActivity.length + laneInBed.length,
+            corroboratingSampleCount: sameLaneCorroboratingCount,
+            rule: "usable_then_asleep_then_staged_then_resolved_then_samples_then_stable_content",
+          }),
+        } : {}),
       }),
       asleepSeconds,
       awakeSeconds: seconds(resolved.totals.awake),
@@ -365,9 +426,118 @@ function buildAsleepEpisode(group, assignedInBed, preference) {
       }),
       sourceSampleIds: Object.freeze([...primaryIds].sort()),
       corroboratingSources: Object.freeze(corroborating),
-      corroboratingSampleIds: Object.freeze(group.filter((sample) => !primaryIds.has(sample.id)).map((sample) => sample.id).sort()),
+      corroboratingSampleIds: Object.freeze((resolveDuplicateCopies ? inputs : group)
+        .filter((sample) => !primaryIds.has(sample.id)).map((sample) => sample.id).sort()),
     },
   };
+}
+
+// A source copy is a chain of mutually non-overlapping specific-stage/awake
+// samples. Unspecified sleep may legitimately envelope specific stages, so it
+// does not split an otherwise single copy. This is deterministic interval
+// partitioning, not transport/batch inference.
+function selectAuthoritativeLaneCopy(intervals) {
+  const exclusive = intervals.filter((sample) => SPECIFIC.has(sample.stage) || sample.stage === HealthKitSleepStage.AWAKE);
+  const unspecified = intervals.filter((sample) => sample.stage === HealthKitSleepStage.ASLEEP_UNSPECIFIED);
+  const basis = exclusive.length > 0 ? exclusive : unspecified;
+  const partitions = partitionNonOverlapping(basis);
+  if (partitions.length <= 1) {
+    return { selected: intervals, corroborating: [], candidateCount: 1, applied: false };
+  }
+  const allAsleepCoverage = unionMs(intervals.filter((sample) => ASLEEP.has(sample.stage)));
+  const candidates = partitions.map((partition) => {
+    // A lone unspecified envelope is shared technical context when staged or
+    // awake partitions exist; it cannot identify which source copy produced it.
+    const activity = exclusive.length > 0 ? [...partition, ...unspecified] : partition;
+    const asleep = activity.filter((sample) => ASLEEP.has(sample.stage));
+    if (asleep.length === 0) return null;
+    const extent = spanOf(asleep);
+    const resolved = resolveLaneTimeline(activity, extent);
+    const coverageMs = unionMs(asleep);
+    const stagedCoverageMs = unionMs(activity.filter((sample) => SPECIFIC.has(sample.stage)));
+    const resolvedCoverageMs = resolved.totals.asleep + resolved.totals.awake;
+    return {
+      activity,
+      coverageMs,
+      stagedCoverageMs,
+      resolvedCoverageMs,
+      usable: coverageMs > 0 && coverageMs >= SLEEP_CANON_V1_PARAMETERS.minimumUsableCoverageRatio * allAsleepCoverage,
+      signature: copySignature(activity),
+      idSignature: activity.map((sample) => String(sample.id)).sort().join("\u0000"),
+    };
+  }).filter(Boolean);
+  if (candidates.length === 0) {
+    return { selected: intervals, corroborating: [], candidateCount: 1, applied: false };
+  }
+  const ordered = candidates.sort(compareCopies);
+  const selectedIds = new Set(ordered[0].activity.map((sample) => sample.id));
+  return {
+    selected: ordered[0].activity,
+    corroborating: intervals.filter((sample) => !selectedIds.has(sample.id)),
+    candidateCount: partitions.length,
+    applied: true,
+  };
+}
+
+function selectAuthoritativeInBedCopy(intervals, extent) {
+  if (intervals.length <= 1) return { selected: intervals, corroborating: [] };
+  const partitions = partitionNonOverlapping(intervals);
+  if (partitions.length <= 1) return { selected: intervals, corroborating: [] };
+  const ordered = partitions.map((partition) => ({
+    activity: partition,
+    coverageMs: unionMs(partition, extent),
+    stagedCoverageMs: 0,
+    resolvedCoverageMs: unionMs(partition),
+    usable: unionMs(partition, extent) > 0,
+    signature: copySignature(partition),
+    idSignature: partition.map((sample) => String(sample.id)).sort().join("\u0000"),
+  })).sort(compareCopies);
+  const selectedIds = new Set(ordered[0].activity.map((sample) => sample.id));
+  return {
+    selected: ordered[0].activity,
+    corroborating: intervals.filter((sample) => !selectedIds.has(sample.id)),
+  };
+}
+
+function partitionNonOverlapping(intervals) {
+  const partitions = [];
+  for (const interval of [...intervals].sort(byCopyInterval)) {
+    const available = partitions
+      .map((partition, index) => ({ partition, index, lastEnd: Math.max(...partition.map((sample) => sample.end)) }))
+      .filter(({ partition }) => partition.every((sample) => !overlaps(sample, interval)))
+      .sort((left, right) => right.lastEnd - left.lastEnd || left.index - right.index);
+    if (available.length > 0) available[0].partition.push(interval);
+    else partitions.push([interval]);
+  }
+  return partitions;
+}
+
+function overlaps(left, right) {
+  return Math.min(left.end, right.end) > Math.max(left.start, right.start);
+}
+
+function byCopyInterval(left, right) {
+  // At one boundary, place the interval with greater continuation first. A
+  // short conflicting observation then becomes corroborating instead of
+  // breaking the complete chain into two artificial fragments.
+  return left.start - right.start || right.end - left.end ||
+    String(left.stage).localeCompare(String(right.stage)) || String(left.id).localeCompare(String(right.id));
+}
+
+function copySignature(intervals) {
+  return [...intervals].sort(byCopyInterval)
+    .map((sample) => `${sample.stage}:${sample.start}:${sample.end}:${sample.timeZone}:${sample.timeZoneSource}`)
+    .join("|");
+}
+
+function compareCopies(left, right) {
+  return Number(right.usable) - Number(left.usable) ||
+    right.coverageMs - left.coverageMs ||
+    right.stagedCoverageMs - left.stagedCoverageMs ||
+    right.resolvedCoverageMs - left.resolvedCoverageMs ||
+    right.activity.length - left.activity.length ||
+    left.signature.localeCompare(right.signature) ||
+    left.idSignature.localeCompare(right.idSignature);
 }
 
 function buildInBedOnlyEpisode(group, preference) {
@@ -459,7 +629,7 @@ function resolveLaneTimeline(intervals, extent) {
   };
 }
 
-function buildDay(sleepDay, dayEpisodes, preference) {
+function buildDay(sleepDay, dayEpisodes, preference, { algorithmVersion, parametersDigest }) {
   const ordered = [...dayEpisodes].sort((left, right) =>
     left.span.start - right.span.start || left.span.end - right.span.end ||
     String(left.content.sourceSampleIds[0]).localeCompare(String(right.content.sourceSampleIds[0])));
@@ -480,8 +650,8 @@ function buildDay(sleepDay, dayEpisodes, preference) {
   const main = mainIndex !== null ? episodes[mainIndex] : null;
   const preferenceDigest = preference?.configured ? preference.digest : "generic";
   const inputDigest = `sha256_${digest(stable({
-    algorithm: HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION,
-    parameters: PARAMETERS_DIGEST,
+    algorithm: algorithmVersion,
+    parameters: parametersDigest,
     preference: preferenceDigest,
     sleepDay,
     inputs: inputs.map((sample) => [sample.id, sample.contentFingerprint, sample.timeZone, sample.ingestionPurpose]),
@@ -490,8 +660,8 @@ function buildDay(sleepDay, dayEpisodes, preference) {
   return Object.freeze({
     schemaVersion: HEALTHKIT_SLEEP_DAY_SCHEMA_VERSION,
     sleepDay,
-    algorithmVersion: HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION,
-    algorithmParametersDigest: PARAMETERS_DIGEST,
+    algorithmVersion,
+    algorithmParametersDigest: parametersDigest,
     sourcePreference: Object.freeze({ configured: preference?.configured === true, digest: preferenceDigest }),
     inputDigest,
     status: episodes.length === 0 ? "no_sleep_recorded" : main ? "asleep_recorded" : "in_bed_only",

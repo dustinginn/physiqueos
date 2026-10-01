@@ -6,6 +6,7 @@ import {
   isCalendarDateKey,
   isValidTimeZone,
   shiftDateKey,
+  sleepDayWindowEndMs,
   sleepDayWindowStartMs,
 } from "../../domain/services/HealthKitSleepContract.js";
 import {
@@ -54,8 +55,9 @@ const ACTION_RECORD = Object.freeze({
  *            one audit row and re-verifies both in the same transaction.
  *
  * Guards that are not configurable:
- *   - prospective activation only: D0 may not precede the operation's local
- *     date in the policy zone; historicalBackfill is false; strategic evidence
+ *   - prospective activation only: its floor must be strictly future, it may
+ *     equal or follow a historical-validation anchor but can never precede or
+ *     overlap that window; historicalBackfill is false; strategic evidence
  *     eligibility is "quarantined";
  *   - the historical-validation window is at most 30 sleep days and ends the
  *     day before D0; it is refused if an enabled prospective policy names a
@@ -99,12 +101,19 @@ export async function runHealthKitSleepPolicy({
 
   // Anchors that bind the two lanes together: an enabled prospective policy,
   // and any historical-validation run (enabled OR closed) that still records
-  // its D0 and zone. Both lanes must agree on BOTH, so the stored validation
-  // window always ends exactly at the prospective floor.
+  // its D0, zone and end. A later prospective D0 may leave a gap; it must keep
+  // the same zone and its floor must not precede the historical end instant.
   const anchors = {
     activation: current.activation.enabled ? { d0: current.activation.effectiveSleepDay, zone: current.activation.timeZone } : null,
     validation: validationRecord?.runId && validationRecord?.prospectiveEffectiveSleepDay
-      ? { d0: validationRecord.prospectiveEffectiveSleepDay, zone: validationRecord.timeZone }
+      ? {
+          d0: validationRecord.prospectiveEffectiveSleepDay,
+          zone: validationRecord.timeZone,
+          endInstantMs: isCalendarDateKey(validationRecord.prospectiveEffectiveSleepDay) &&
+            isCalendarDateKey(validationRecord.windowEndSleepDay) && isValidTimeZone(validationRecord.timeZone)
+            ? sleepDayWindowEndMs(validationRecord.windowEndSleepDay, validationRecord.timeZone)
+            : null,
+        }
       : null,
   };
   const plan = planRecord({ action, authorization, current, operationAt, existing, anchors });
@@ -160,13 +169,18 @@ function planRecord({ action, authorization, current, operationAt, existing, anc
       if (!isCalendarDateKey(d0)) return { refused: "effective_sleep_day_invalid" };
       if (!isValidTimeZone(zone)) return { refused: "time_zone_invalid" };
       // Prospective means the floor ((D0-1) 18:00 local) is strictly in the future.
-      if (sleepDayWindowStartMs(d0, zone) <= operationAt.getTime()) return { refused: "activation_floor_not_in_future" };
+      const prospectiveFloorMs = sleepDayWindowStartMs(d0, zone);
+      if (prospectiveFloorMs <= operationAt.getTime()) return { refused: "activation_floor_not_in_future" };
       const mode = authorization.mode ?? "validation_only";
       if (!["validation_only", "operational"].includes(mode)) return { refused: "mode_invalid" };
       if (anchors.activation && anchors.activation.d0 !== d0) return { refused: "active_policy_has_different_d0" };
       if (anchors.activation && anchors.activation.zone !== zone) return { refused: "active_policy_has_different_time_zone" };
-      if (anchors.validation && anchors.validation.d0 !== d0) return { refused: "historical_validation_anchored_to_different_d0" };
       if (anchors.validation && anchors.validation.zone !== zone) return { refused: "historical_validation_anchored_to_different_time_zone" };
+      if (anchors.validation && !Number.isFinite(anchors.validation.endInstantMs)) return { refused: "historical_validation_anchor_invalid" };
+      if (anchors.validation && d0 < anchors.validation.d0) return { refused: "prospective_d0_precedes_historical_anchor" };
+      if (anchors.validation && prospectiveFloorMs < anchors.validation.endInstantMs) {
+        return { refused: "prospective_floor_overlaps_historical_validation" };
+      }
       return {
         record: {
           status: "enabled", schemaVersion: HEALTHKIT_SLEEP_ACTIVATION_POLICY_SCHEMA_VERSION,

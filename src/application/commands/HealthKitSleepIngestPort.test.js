@@ -147,6 +147,49 @@ describe("healthkit.sleep.ingest.v1 storage, idempotency and revision", () => {
     expect((await current.run({ batchId: "b3", samples: [nightWire({ id: uuid(3), end: "2026-09-11T06:00:00-07:00" })] })).result.sleepDays).toEqual([]);
   });
 
+  it("sleep-canon-v2 deletes the selected Oura copy, falls back once, and keeps the night single-counted", async () => {
+    const current = setup();
+    const copy = (idBase, shiftMinutes) => ["core", "deep", "rem", "core"].map((stage, index) => {
+      const start = Date.parse("2026-09-10T23:00:00-07:00") + (shiftMinutes + index * 120) * 60 * 1000;
+      return wire({
+        id: uuid(idBase + index),
+        source: "oura",
+        stage,
+        start: new Date(start).toISOString(),
+        end: new Date(start + 120 * 60 * 1000).toISOString(),
+      });
+    });
+    const samples = [...copy(15000, 0), ...copy(16000, 5)];
+    await current.run({ batchId: "copies", samples });
+
+    const before = await current.day();
+    const selectedRecordIds = before.episodes[0].sourceSampleIds;
+    const selectedExternalIds = samples
+      .map((sample) => sample.externalId)
+      .filter((externalId) => selectedRecordIds.includes(getHealthKitSleepSampleRecordId(OWNER, externalId)));
+    expect(before).toMatchObject({ revision: 1, mainSleep: { asleepSeconds: 8 * H } });
+    expect(before.episodes[0].reconciliation.copySelection).toMatchObject({ applied: true, candidateCount: 2 });
+    expect(selectedExternalIds).toHaveLength(4);
+
+    const deletion = await current.run({
+      batchId: "delete-selected-copy",
+      deletions: selectedExternalIds.map((externalId) => ({ externalId })),
+    });
+    expect(deletion.result.sleepDays).toEqual([{ sleepDay: DAY, revision: 2 }]);
+    const after = await current.day();
+    expect(after).toMatchObject({ revision: 2, mainSleep: { asleepSeconds: 8 * H } });
+    expect(after.episodes[0].reconciliation.copySelection).toMatchObject({ applied: false, candidateCount: 1 });
+    expect(after.episodes[0].sourceSampleIds).toHaveLength(4);
+    expect(after.episodes[0].sourceSampleIds.some((id) => selectedRecordIds.includes(id))).toBe(false);
+
+    const replay = await current.run({
+      batchId: "replay-delete-selected-copy",
+      deletions: selectedExternalIds.map((externalId) => ({ externalId })),
+    });
+    expect(replay.result.sleepDays).toEqual([]);
+    expect(await current.day()).toEqual(after);
+  });
+
   it("deleting every sample leaves an explicit empty day (no stale totals)", async () => {
     const current = setup();
     await current.run({ batchId: "b1", samples: [nightWire({ id: uuid(1) })] });

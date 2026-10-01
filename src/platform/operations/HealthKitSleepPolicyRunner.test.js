@@ -8,6 +8,8 @@ import {
 } from "../../domain/services/HealthKitSleepPolicies.js";
 import {
   HEALTHKIT_SLEEP_VALIDATION_POLICY_RECORD_ID,
+  HEALTHKIT_SLEEP_VALIDATION_POLICY_SCHEMA_VERSION,
+  HEALTHKIT_SLEEP_VALIDATION_PURPOSE,
   resolveHealthKitSleepValidationPolicy,
 } from "../../domain/services/HealthKitSleepHistoricalValidation.js";
 
@@ -53,7 +55,7 @@ describe("guarded Sleep policy runner", () => {
     expect(replay.outcome).toBe("already_applied");
   });
 
-  it("refuses a D0 whose floor is not strictly in the future, a conflicting D0, and a conflicting zone", async () => {
+  it("refuses a D0 whose floor is not strictly in the future, an earlier D0, and a conflicting zone", async () => {
     // NOW = Oct 1 11:00 PDT: D0 = Oct 1 has a floor of Sep 30 18:00 (past).
     for (const d0 of ["2026-09-30", "2026-10-01"]) {
       expect(await runHealthKitSleepPolicy({ records: store(), authorization: auth({ effectiveSleepDay: d0 }), action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, now: NOW }))
@@ -68,15 +70,78 @@ describe("guarded Sleep policy runner", () => {
     await dryThenApply(zoned, HealthKitSleepPolicyAction.OPEN_HISTORICAL_VALIDATION, auth({ effectiveSleepDay: "2026-10-05" }));
     expect(await runHealthKitSleepPolicy({ records: zoned, authorization: auth({ effectiveSleepDay: "2026-10-05", timeZone: "America/New_York" }), action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, now: NOW }))
       .toMatchObject({ outcome: "refused", reason: "historical_validation_anchored_to_different_time_zone" });
-    // A CLOSED run still anchors D0.
+    // A CLOSED run still enforces the historical floor.
     await dryThenApply(zoned, HealthKitSleepPolicyAction.CLOSE_HISTORICAL_VALIDATION, auth());
     expect(await runHealthKitSleepPolicy({ records: zoned, authorization: auth({ effectiveSleepDay: "2026-10-03" }), action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, now: NOW }))
-      .toMatchObject({ outcome: "refused", reason: "historical_validation_anchored_to_different_d0" });
+      .toMatchObject({ outcome: "refused", reason: "prospective_d0_precedes_historical_anchor" });
     expect((await dryThenApply(zoned, HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, auth({ effectiveSleepDay: "2026-10-05" }))).outcome).toBe("applied");
     const records = store();
     await dryThenApply(records, HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE, auth({ effectiveSleepDay: "2026-10-02" }));
     expect(await runHealthKitSleepPolicy({ records, authorization: auth({ effectiveSleepDay: "2026-10-05" }), action: HealthKitSleepPolicyAction.OPEN_HISTORICAL_VALIDATION, now: NOW }))
       .toMatchObject({ outcome: "refused", reason: "active_policy_has_different_d0" });
+  });
+
+  it("allows an equal or later prospective D0 after a closed historical run, but never an earlier or overlapping floor", async () => {
+    const historical = (overrides = {}) => ({
+      id: HEALTHKIT_SLEEP_VALIDATION_POLICY_RECORD_ID,
+      status: "disabled",
+      schemaVersion: HEALTHKIT_SLEEP_VALIDATION_POLICY_SCHEMA_VERSION,
+      purpose: HEALTHKIT_SLEEP_VALIDATION_PURPOSE,
+      runId: "hv-2026-10-05-30d",
+      timeZone: "America/Los_Angeles",
+      windowStartSleepDay: "2026-09-05",
+      windowEndSleepDay: "2026-10-04",
+      prospectiveEffectiveSleepDay: "2026-10-05",
+      strategicEvidenceEligibility: "quarantined",
+      canonicalProductionHistory: false,
+      ...overrides,
+    });
+
+    const equal = await runHealthKitSleepPolicy({
+      records: store({ healthKitConfiguration: [historical()] }),
+      authorization: auth({ effectiveSleepDay: "2026-10-05" }),
+      action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE,
+      now: NOW,
+    });
+    expect(equal).toMatchObject({ outcome: "dry_run", plannedResolution: { effectiveSleepDay: "2026-10-05" } });
+
+    const later = await runHealthKitSleepPolicy({
+      records: store({ healthKitConfiguration: [historical()] }),
+      authorization: auth({ effectiveSleepDay: "2026-10-07" }),
+      action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE,
+      now: NOW,
+    });
+    expect(later).toMatchObject({ outcome: "dry_run", plannedResolution: { effectiveSleepDay: "2026-10-07" } });
+
+    expect(await runHealthKitSleepPolicy({
+      records: store({ healthKitConfiguration: [historical()] }),
+      authorization: auth({ effectiveSleepDay: "2026-10-04" }),
+      action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE,
+      now: NOW,
+    })).toMatchObject({ outcome: "refused", reason: "prospective_d0_precedes_historical_anchor" });
+
+    expect(await runHealthKitSleepPolicy({
+      records: store({ healthKitConfiguration: [historical()] }),
+      authorization: auth({ effectiveSleepDay: "2026-10-05", timeZone: "America/New_York" }),
+      action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE,
+      now: NOW,
+    })).toMatchObject({ outcome: "refused", reason: "historical_validation_anchored_to_different_time_zone" });
+
+    // Corrupt/drifted historical facts must fail closed even when D0 itself
+    // equals the recorded anchor: the stored window end is later than floor.
+    expect(await runHealthKitSleepPolicy({
+      records: store({ healthKitConfiguration: [historical({ windowEndSleepDay: "2026-10-05" })] }),
+      authorization: auth({ effectiveSleepDay: "2026-10-05" }),
+      action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE,
+      now: NOW,
+    })).toMatchObject({ outcome: "refused", reason: "prospective_floor_overlaps_historical_validation" });
+
+    expect(await runHealthKitSleepPolicy({
+      records: store({ healthKitConfiguration: [historical({ prospectiveEffectiveSleepDay: "invalid" })] }),
+      authorization: auth({ effectiveSleepDay: "2026-10-05" }),
+      action: HealthKitSleepPolicyAction.ACTIVATE_PROSPECTIVE,
+      now: NOW,
+    })).toMatchObject({ outcome: "refused", reason: "historical_validation_anchor_invalid" });
   });
 
   it("opens a <=30-day historical window that ends the day before D0, and close keeps its facts", async () => {
@@ -111,6 +176,7 @@ describe("zero-write Sleep audit", () => {
       servedCapability: { enabled: false },
       counts: { healthKitSleepSamples: 0, healthKitSleepDays: 0, healthKitSleepValidationSamples: 0 },
       strategicLeakTotal: 0,
+      recordStoreMutations: 0,
     });
     expect(records.getMutationCount()).toBe(0);
   });
