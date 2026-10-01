@@ -1,16 +1,63 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T21:52:44Z",
-  "task": {"id": "shared-mac-safe-storage-recovery-2-20261001", "title": "Focused safe storage cleanup for Workout Live Activities Build 77 (22.4 GiB free)", "agent": "claude", "status": "completed"},
+  "generated_at_utc": "2026-10-01T21:53:35Z",
+  "task": {
+    "id": "recovery-briefing-v1-design-architecture-20261001",
+    "title": "Recovery Briefing V1 design, architecture, zero-write calibration, and Founder prototype",
+    "agent": "codex",
+    "status": "complete"
+  },
   "repository": "dustinginn/physiqueos",
-  "authority": {"base_sha": null, "final_sha": null, "production_server_sha": null, "production_deployment": null, "native_sha": "c299fa29", "native_build": "76"},
-  "result": {"summary": "Free disk raised from 14.87 GiB to 22.41 GiB by deleting 7.27 GiB of regenerated DerivedData and xcresult bundles from one finished job scratch directory, after proving no build/archive/upload was running. Idle Simulator shut down. Live Activities worktree c299fa29 verified clean and equal to origin; Build 75/76 archives, tooling worktrees, signing, credentials and swap preserved.", "success": true, "production_mutated": false, "deployed": false, "testflight_uploaded": false},
-  "validation": {"tests": {"status": "not_applicable", "summary": "Operations cleanup only."}, "review": {"status": "not_applicable", "summary": "Operations cleanup only."}, "zero_write_audit": {"status": "not_applicable", "summary": "No production access."}},
-  "decisions_required": [],
+  "authority": {
+    "base_sha": "ad36e5bbe5419aff03bbf8f6a8a49b5c02d99ef2",
+    "final_sha": "4ade4f1d83badc192329289f85ba1b24f390f416",
+    "production_server_sha": "5804e88dac0db6bb04cf43647d6387efeab25906",
+    "production_deployment": "35f5cea0-535d-445e-8b76-1d7db5f98943",
+    "native_sha": "fcd26309",
+    "native_build": "76"
+  },
+  "result": {
+    "summary": "Recovery Briefing V1 is designed as a quiet Green/Yellow/Red/unavailable period state led by within-person Sleep, with sparse commentary, lightweight foam execution, non-causal training corroboration, and zero automatic Goal Confidence coupling. A strict read-only July-September replay rejected noisy rules, and nine synthetic/redacted Founder-review screenshots plus a versioned Server contract are pushed on the work branch. Nothing shipped or deployed.",
+    "success": true,
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
+  },
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "summary": "Artifact verifier passed 9 prototype scenarios and policy guardrails; modeling runner syntax and git diff checks passed."
+    },
+    "review": {
+      "status": "passed",
+      "summary": "Nine non-shipping renders were visually inspected across Weekly, Midweek, Monthly, insufficient-data, foam, and training-corroboration states."
+    },
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "Production replay used REPEATABLE READ READ ONLY, verified transaction_read_only=on, emitted sanitized aggregates only, and rolled back with zero writes."
+    }
+  },
+  "decisions_required": [
+    "Founder visual approval for the quiet card and placement.",
+    "Founder approval for Green-without-commentary and Midweek no-Red semantics.",
+    "Founder approval to proceed only to prospective Server shadow calibration."
+  ],
   "blockers": [],
-  "unexpected_findings": [],
-  "backlog": ["Restart the Mac when convenient to clear 5.7 GiB of used swap."],
-  "recommended_next_step": "Resume Workout Live Activities Build 77 at c299fa29: rerun gates, archive, validate signing, upload, wait VALID.",
-  "full_report_path": "agent-handoffs/reports/20261001T215244Z-shared-mac-safe-storage-recovery-2.md",
-  "safety": {"contains_secrets": false, "contains_credentials": false, "contains_production_exports": false, "contains_founder_evidence": false, "safe_for_chatgpt_retrieval": true}
+  "unexpected_findings": [
+    "Without a period-average magnitude gate, 4 historically Green weeks would become Yellow; a two-consecutive-low-night rule would make 5 Green weeks Yellow.",
+    "Foam schedule authority begins September 15, so earlier missing days cannot be called misses."
+  ],
+  "backlog": [
+    "After Founder approval, implement a Server-only shadow assessment against prospective eligible Sleep; keep strategic Sleep and clients off.",
+    "Review DEXA/Photo preceding Recovery context separately after recurring cadence calibration."
+  ],
+  "recommended_next_step": "Founder reviews the nine screenshots and candidate policy; if approved, open a Server-only prospective shadow-calibration task with strategic Sleep, Confidence coupling, Native wiring, and production presentation still off.",
+  "full_report_path": "agent-handoffs/reports/20261001T215335Z-recovery-briefing-v1-design-architecture.md",
+  "safety": {
+    "contains_secrets": false,
+    "contains_credentials": false,
+    "contains_production_exports": false,
+    "contains_founder_evidence": false,
+    "safe_for_chatgpt_retrieval": true
+  }
 }
