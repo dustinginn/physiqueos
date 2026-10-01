@@ -27,6 +27,14 @@ enum WorkoutLiveActivityRequestError: Error, Equatable {
     case failed(String)
 }
 
+/// Cancels a client observation.
+@MainActor
+final class WorkoutLiveActivityObservation {
+    private var onCancel: (@MainActor () -> Void)?
+    init(onCancel: @escaping @MainActor () -> Void) { self.onCancel = onCancel }
+    func cancel() { onCancel?(); onCancel = nil }
+}
+
 /// The ActivityKit seam. The coordinator is written and tested against this
 /// protocol; `ActivityKitWorkoutLiveActivityClient` is the only real
 /// implementation, and local updates are the only transport (no push).
@@ -45,6 +53,14 @@ protocol WorkoutLiveActivityClient: AnyObject {
         state: WorkoutActivityAttributes.ContentState?,
         dismissal: WorkoutLiveActivityDismissal
     ) async
+    /// Reports every activity state change (including activities started by
+    /// another process). A dismissed activity may vanish from `activities()`,
+    /// so this is how a user swipe-away is actually observed.
+    func observeLifecycle(
+        _ onChange: @escaping @MainActor (_ activityId: String, _ lifecycle: WorkoutLiveActivitySnapshot.Lifecycle) -> Void
+    ) -> WorkoutLiveActivityObservation
+    /// Reports Live Activities being turned on or off for the app.
+    func observeEnablement(_ onChange: @escaping @MainActor (_ enabled: Bool) -> Void) -> WorkoutLiveActivityObservation
 }
 
 @MainActor
@@ -109,18 +125,68 @@ final class ActivityKitWorkoutLiveActivityClient: WorkoutLiveActivityClient {
         await activity.end(state.map { ActivityContent(state: $0, staleDate: nil) }, dismissalPolicy: policy)
     }
 
-    private static func snapshot(_ activity: Activity<WorkoutActivityAttributes>) -> WorkoutLiveActivitySnapshot {
-        let lifecycle: WorkoutLiveActivitySnapshot.Lifecycle
-        switch activity.activityState {
-        case .active: lifecycle = .active
-        case .stale: lifecycle = .stale
-        case .ended: lifecycle = .ended
-        case .dismissed: lifecycle = .dismissed
-        case .pending: lifecycle = .pending
-        @unknown default: lifecycle = .ended
+    func observeLifecycle(
+        _ onChange: @escaping @MainActor (String, WorkoutLiveActivitySnapshot.Lifecycle) -> Void
+    ) -> WorkoutLiveActivityObservation {
+        let task = Task.detached { await Self.watchLifecycle(onChange) }
+        return WorkoutLiveActivityObservation { task.cancel() }
+    }
+
+    func observeEnablement(_ onChange: @escaping @MainActor (Bool) -> Void) -> WorkoutLiveActivityObservation {
+        let task = Task.detached {
+            for await enabled in ActivityAuthorizationInfo().activityEnablementUpdates {
+                if Task.isCancelled { return }
+                await MainActor.run { onChange(enabled) }
+            }
         }
-        return WorkoutLiveActivitySnapshot(
-            id: activity.id, attributes: activity.attributes, state: activity.content.state, lifecycle: lifecycle
+        return WorkoutLiveActivityObservation { task.cancel() }
+    }
+
+    /// Watches existing and future activities' state streams. Activities are
+    /// looked up by id inside each task (they are not Sendable).
+    private nonisolated static func watchLifecycle(
+        _ onChange: @escaping @MainActor (String, WorkoutLiveActivitySnapshot.Lifecycle) -> Void
+    ) async {
+        var children: [String: Task<Void, Never>] = [:]
+        defer { children.values.forEach { $0.cancel() } }
+        func watch(_ id: String) {
+            guard children[id] == nil else { return }
+            children[id] = Task.detached { await watchStates(id: id, onChange) }
+        }
+        for activity in Activity<WorkoutActivityAttributes>.activities { watch(activity.id) }
+        for await activity in Activity<WorkoutActivityAttributes>.activityUpdates {
+            if Task.isCancelled { return }
+            watch(activity.id)
+        }
+    }
+
+    private nonisolated static func watchStates(
+        id: String,
+        _ onChange: @escaping @MainActor (String, WorkoutLiveActivitySnapshot.Lifecycle) -> Void
+    ) async {
+        guard let activity = Activity<WorkoutActivityAttributes>.activities.first(where: { $0.id == id }) else { return }
+        for await state in activity.activityStateUpdates {
+            if Task.isCancelled { return }
+            let lifecycle = lifecycle(of: state)
+            await MainActor.run { onChange(id, lifecycle) }
+        }
+    }
+
+    private nonisolated static func lifecycle(of state: ActivityState) -> WorkoutLiveActivitySnapshot.Lifecycle {
+        switch state {
+        case .active: .active
+        case .stale: .stale
+        case .ended: .ended
+        case .dismissed: .dismissed
+        case .pending: .pending
+        @unknown default: .ended
+        }
+    }
+
+    private static func snapshot(_ activity: Activity<WorkoutActivityAttributes>) -> WorkoutLiveActivitySnapshot {
+        WorkoutLiveActivitySnapshot(
+            id: activity.id, attributes: activity.attributes, state: activity.content.state,
+            lifecycle: lifecycle(of: activity.activityState)
         )
     }
 }

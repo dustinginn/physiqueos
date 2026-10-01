@@ -1,3 +1,4 @@
+import AppIntents
 import XCTest
 @testable import PhysiqueOS
 
@@ -16,7 +17,7 @@ final class WorkoutLiveActivityIntentTests: XCTestCase {
         var client: FakeWorkoutLiveActivityClient
     }
 
-    private func rig(draft: TrainingLoggerDraft? = nil, rest: TrainingRestConfiguration? = nil) -> Rig {
+    private func rig(draft: TrainingLoggerDraft? = nil) -> Rig {
         let suite = "WorkoutLiveActivityIntentTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
@@ -204,6 +205,7 @@ final class WorkoutLiveActivityIntentTests: XCTestCase {
         XCTAssertEqual(intent.expectedRevision, 7)
         XCTAssertFalse(CompleteWorkoutSetIntent.isDiscoverable)
         XCTAssertFalse(CompleteWorkoutSetIntent.openAppWhenRun)
+        XCTAssertEqual(String(describing: CompleteWorkoutSetIntent.authenticationPolicy), String(describing: IntentAuthenticationPolicy.alwaysAllowed))
 
         let previous = WorkoutActivityIntentRuntime.handler
         defer { WorkoutActivityIntentRuntime.handler = previous }

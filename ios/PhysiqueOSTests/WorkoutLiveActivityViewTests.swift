@@ -264,6 +264,29 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
         try save(render(island.padding(12).frame(width: 393, height: 200).background(Color.black), size: CGSize(width: 393, height: 200)), named: "P2-island-privacy-redacted")
     }
 
+    func testPresentationDecisionsForPrivacyStalenessAndPhase() {
+        typealias P = WorkoutActivityPresentation
+        // Normal: details and Complete Set.
+        XCTAssertEqual(P.make(state: normal, isStale: false, redaction: []), .init(phase: .inProgress, showsSetDetails: true, showsCompleteSet: true))
+        // Privacy hides names/values AND Complete Set (you cannot confirm a set you cannot see).
+        XCTAssertEqual(P.make(state: normal, isStale: false, redaction: .privacy), .init(phase: .inProgress, showsSetDetails: false, showsCompleteSet: false))
+        // Stale stopwatch / Off: safe state, no Complete Set.
+        XCTAssertEqual(P.make(state: normal, isStale: true, redaction: []), .init(phase: .paused, showsSetDetails: true, showsCompleteSet: false))
+        var off = normal; off.rest = nil
+        XCTAssertEqual(P.make(state: off, isStale: true, redaction: []).phase, .paused)
+        // A Countdown reaching zero is "stale" only visually: still in progress, still completable.
+        var expired = normal; expired.rest = countdown(elapsed: 95, remaining: -5)
+        XCTAssertEqual(P.make(state: expired, isStale: true, redaction: []), .init(phase: .inProgress, showsSetDetails: true, showsCompleteSet: true))
+        // Non-progress phases never offer Complete Set.
+        for phase in [State.Phase.allSetsComplete, .reviewing, .finishing, .saved, .paused] {
+            var state = normal; state.phase = phase
+            XCTAssertFalse(P.make(state: state, isStale: false, redaction: []).showsCompleteSet, "\(phase)")
+        }
+        // No target, no button.
+        var noTarget = normal; noTarget.target = nil
+        XCTAssertFalse(P.make(state: noTarget, isStale: false, redaction: []).showsCompleteSet)
+    }
+
     func testStaleActivityShowsTheSafeStateExceptForACountdownReachingZero() throws {
         let stale = lockScreen(attributes(), normal, stale: true)
         try save(render(scene(stale), size: CGSize(width: 393, height: 852)), named: "Q-lock-stale-safe")
@@ -275,7 +298,11 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
         XCTAssertLessThanOrEqual(fittingHeight(expired, width: 365), 160)
     }
 
-    func testDynamicTypeLargeSizesStayWithinTheBudget() throws {
+    /// The Live Activity uses fixed point sizes (as the approved prototype
+    /// does), so Dynamic Type does not rescale it; this guards that the
+    /// layout is still intact and within budget when the environment asks
+    /// for large sizes.
+    func testLargeDynamicTypeSettingsDoNotBreakTheLayout() throws {
         for size in [DynamicTypeSize.large, .accessibility1, .accessibility3] {
             let view = lockScreen(attributes(), finalSet).environment(\.dynamicTypeSize, size)
             XCTAssertLessThanOrEqual(fittingHeight(view, width: 365), 160, "\(size)")

@@ -49,6 +49,19 @@ final class WorkoutLiveActivityCoordinator {
     private var syncInFlight = false
     private var syncRequested = false
     private var immediateRequested = false
+    /// Callers that need their change rendered (`flush`) wait here for the
+    /// in-flight loop, which always runs once more for them.
+    private var syncWaiters: [CheckedContinuation<Void, Never>] = []
+    /// Which workout (and when it started) each known activity belongs to,
+    /// so a lifecycle event can be attributed even after the activity left
+    /// `activities()`.
+    private var activityMeta: [String: (sessionId: String, startedAt: Date)] = [:]
+    private var lifecycleObservation: WorkoutLiveActivityObservation?
+    private var enablementObservation: WorkoutLiveActivityObservation?
+    private var lastEnablement: Bool?
+    /// The system ends an activity at 8 h; an ending this close to that limit
+    /// is the system, not a user swipe.
+    static let systemLimitGuard: TimeInterval = 7.5 * 3600
 
     /// Test visibility (bounded). Also logged (event names only; never
     /// exercise names, values or ids).
@@ -85,12 +98,54 @@ final class WorkoutLiveActivityCoordinator {
         observation = authority.observeChanges { [weak self] change in
             self?.noteChange(change)
         }
+        startPlatformObservations()
         requestSync()
+    }
+
+    private func startPlatformObservations() {
+        guard lifecycleObservation == nil else { return }
+        lifecycleObservation = client.observeLifecycle { [weak self] id, lifecycle in
+            self?.noteLifecycle(activityId: id, lifecycle: lifecycle)
+        }
+        lastEnablement = client.areActivitiesEnabled
+        enablementObservation = client.observeEnablement { [weak self] enabled in
+            guard let self else { return }
+            // Turning Live Activities off ends every activity (system-side) and
+            // turning them back on is an explicit opt-in: forget swipe
+            // suppression so the current workout can show again.
+            if !enabled {
+                // Whatever ends now is the system's doing, never a swipe.
+                for id in self.activityMeta.keys { self.markEndedByUs(id) }
+            }
+            if enabled, self.lastEnablement == false {
+                self.defaults.removeObject(forKey: Self.suppressedKey)
+                self.requestSync()
+            }
+            self.lastEnablement = enabled
+        }
+    }
+
+    /// A user swipe-away: a dismissed/ended activity this app did not end,
+    /// for a workout that still exists, while Live Activities are enabled and
+    /// well before the system's own 8 h limit.
+    private func noteLifecycle(activityId: String, lifecycle: WorkoutLiveActivitySnapshot.Lifecycle) {
+        guard lifecycle == .dismissed || lifecycle == .ended else { return }
+        guard !endedByUsIds().contains(activityId),
+              let meta = activityMeta[activityId] ?? client.activities().first(where: { $0.id == activityId }).map({ ($0.attributes.sessionId, $0.attributes.startedAt) }),
+              authority?.draft(id: meta.sessionId) != nil,
+              client.areActivitiesEnabled,
+              now().timeIntervalSince(meta.startedAt) < Self.systemLimitGuard else { return }
+        suppress(sessionId: meta.sessionId)
+        diagnostics.append("suppressed")
     }
 
     func detach() {
         observation?.cancel()
         observation = nil
+        lifecycleObservation?.cancel()
+        lifecycleObservation = nil
+        enablementObservation?.cancel()
+        enablementObservation = nil
         authority = nil
     }
 
@@ -128,6 +183,11 @@ final class WorkoutLiveActivityCoordinator {
         if !coalesceValuesOnly { immediateRequested = true }
         if syncInFlight {
             syncRequested = true
+            // An immediate caller returns only after the loop has run again
+            // for it, so its change is on screen before it returns.
+            if !coalesceValuesOnly {
+                await withCheckedContinuation { syncWaiters.append($0) }
+            }
             return
         }
         syncInFlight = true
@@ -138,6 +198,9 @@ final class WorkoutLiveActivityCoordinator {
             await syncOnce(coalesceValuesOnly: !immediate)
         } while syncRequested
         syncInFlight = false
+        let waiters = syncWaiters
+        syncWaiters = []
+        waiters.forEach { $0.resume() }
     }
 
     private func syncOnce(coalesceValuesOnly: Bool) async {
@@ -151,7 +214,8 @@ final class WorkoutLiveActivityCoordinator {
         // bring that session's activity back. Endings this app made itself
         // (Save & Leave, a replaced session) are not suppression.
         for snapshot in client.activities()
-        where !snapshot.isLive && !endedByUs.contains(snapshot.id) && authority.draft(id: snapshot.attributes.sessionId) != nil {
+        where !snapshot.isLive && !endedByUs.contains(snapshot.id) && authority.draft(id: snapshot.attributes.sessionId) != nil
+            && client.areActivitiesEnabled && current.timeIntervalSince(snapshot.attributes.startedAt) < Self.systemLimitGuard {
             suppress(sessionId: snapshot.attributes.sessionId)
         }
 
@@ -189,6 +253,7 @@ final class WorkoutLiveActivityCoordinator {
         }
 
         if let keeper {
+            activityMeta[keeper.id] = (subject.id, keeper.attributes.startedAt)
             await updateIfNeeded(keeper, state: state, projection: projection, current: current, coalesceValuesOnly: coalesceValuesOnly)
         } else {
             requestNew(attributes: attributes, state: state, current: current)
@@ -203,6 +268,7 @@ final class WorkoutLiveActivityCoordinator {
         do {
             let id = try client.request(attributes: attributes, state: state, staleDate: staleDate(for: state, current: current))
             lastSent[id] = state
+            activityMeta[id] = (attributes.sessionId, attributes.startedAt)
             diagnostics.append("requested")
         } catch WorkoutLiveActivityRequestError.notForeground {
             // Retried by `reconcile()` when the app next becomes active.
@@ -223,7 +289,9 @@ final class WorkoutLiveActivityCoordinator {
         coalesceValuesOnly: Bool
     ) async {
         let previous = lastSent[snapshot.id] ?? snapshot.state
-        guard state != previous else { return }
+        // A stale activity is refreshed even when its content is unchanged,
+        // which re-arms its stale date.
+        guard state != previous || snapshot.lifecycle == .stale else { return }
         if coalesceValuesOnly, state.significantKey == previous.significantKey {
             scheduleValueUpdate()
             return
@@ -294,9 +362,10 @@ final class WorkoutLiveActivityCoordinator {
     private func isSuppressed(sessionId: String) -> Bool { suppressedIds().contains(sessionId) }
 
     private func suppress(sessionId: String) {
-        var ids = suppressedIds()
-        guard ids.insert(sessionId).inserted else { return }
-        defaults.set(Array(ids).sorted(), forKey: Self.suppressedKey)
+        var ordered = defaults.stringArray(forKey: Self.suppressedKey) ?? []
+        guard !ordered.contains(sessionId) else { return }
+        ordered.append(sessionId)
+        defaults.set(Array(ordered.suffix(40)), forKey: Self.suppressedKey)
     }
 
     private func endedByUsIds() -> Set<String> {
@@ -309,11 +378,10 @@ final class WorkoutLiveActivityCoordinator {
         defaults.set(Array(ids.suffix(40)), forKey: Self.endedByUsKey)
     }
 
-    /// Drops suppressed ids whose workouts no longer exist.
+    /// Suppression is bounded (the newest 40 workouts) rather than pruned by
+    /// existence, so switching authority never drops the other one's entries.
     private func pruneSuppressed() {
-        guard let authority else { return }
-        let existing = Set(authority.drafts.map(\.id))
-        let kept = suppressedIds().filter { existing.contains($0) }
-        defaults.set(Array(kept).sorted(), forKey: Self.suppressedKey)
+        let ordered = defaults.stringArray(forKey: Self.suppressedKey) ?? []
+        if ordered.count > 40 { defaults.set(Array(ordered.suffix(40)), forKey: Self.suppressedKey) }
     }
 }

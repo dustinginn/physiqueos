@@ -88,12 +88,14 @@ struct RootTabView: View {
 
     private func openWorkoutFromLiveActivity(_ url: URL) {
         guard let sessionId = WorkoutActivityDeepLink.sessionId(from: url) else { return }
+        // Another app can fire this URL; a link for a workout that does not
+        // exist here changes nothing at all (no tab switch, no popped stack).
         let authority = environment.trainingSessionAuthority(for: environment.nativeAuthority)
+        guard authority.draft(id: sessionId) != nil else { return }
         selectedTab = .log
         Task { @MainActor in
             await Task.yield()
             logPath = NavigationPath()
-            guard authority.draft(id: sessionId) != nil else { return }
             environment.pendingTrainingLoggerResumeDraftId = sessionId
             noteNavigation(.trainingLogger)
             logPath.append(AppDestination.trainingLogger)

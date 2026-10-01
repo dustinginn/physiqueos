@@ -25,6 +25,26 @@ enum WorkoutActivityPalette {
 
 typealias WorkoutActivityState = WorkoutActivityAttributes.ContentState
 
+/// What the Lock Screen and Island show for a state, decided in one place so
+/// both surfaces agree and tests can assert it without pixels.
+struct WorkoutActivityPresentation: Equatable {
+    var phase: WorkoutActivityState.Phase
+    var showsSetDetails: Bool
+    var showsCompleteSet: Bool
+
+    /// A stale activity (no update for hours) falls back to the safe
+    /// "needs an update" state and offers no Complete Set, unless the
+    /// staleness is only a Countdown reaching zero. Privacy redaction hides
+    /// names, values and Complete Set (completing a set you cannot see).
+    static func make(state: WorkoutActivityState, isStale: Bool, redaction: RedactionReasons) -> Self {
+        var phase = state.phase
+        if isStale, phase == .inProgress, state.rest?.mode != .countdown { phase = .paused }
+        let details = WorkoutActivityPrivacy.showsSetDetails(redaction: redaction)
+        return .init(phase: phase, showsSetDetails: details,
+                     showsCompleteSet: phase == .inProgress && state.canCompleteSet && details)
+    }
+}
+
 enum WorkoutActivityPrivacy {
     /// Exercise names, set values and Complete Set are shown only when the
     /// system is not redacting for privacy (a locked device that hides
@@ -232,9 +252,13 @@ struct WorkoutLockScreenView: View {
 
     private var isPrivate: Bool { !WorkoutActivityPrivacy.showsSetDetails(redaction: redactionReasons) }
 
+    private var presentation: WorkoutActivityPresentation {
+        .make(state: state, isStale: isStale, redaction: redactionReasons)
+    }
+
     var body: some View {
         Group {
-            switch effectivePhase {
+            switch presentation.phase {
             case .inProgress: activeBody
             case .allSetsComplete:
                 statusBody(symbol: "checkmark.circle.fill", color: WorkoutActivityPalette.success,
@@ -260,13 +284,6 @@ struct WorkoutLockScreenView: View {
         .accessibilityElement(children: .contain)
     }
 
-    /// A stale activity (no update for hours) falls back to the safe state,
-    /// unless the staleness is only a Countdown reaching zero.
-    private var effectivePhase: WorkoutActivityState.Phase {
-        if isStale, state.phase == .inProgress, state.rest?.mode != .countdown { return .paused }
-        return state.phase
-    }
-
     private var activeBody: some View {
         VStack(spacing: 5) {
             header
@@ -280,7 +297,7 @@ struct WorkoutLockScreenView: View {
             HStack(spacing: 8) {
                 WorkoutRestSummary(state: state, isStale: isStale)
                 Spacer(minLength: 4)
-                if !isPrivate { WorkoutCompleteSetButton(attributes: attributes, state: state) }
+                if presentation.showsCompleteSet { WorkoutCompleteSetButton(attributes: attributes, state: state) }
             }
             .frame(minHeight: 44)
         }
@@ -362,9 +379,13 @@ struct WorkoutIslandExpandedBottom: View {
 
     private var isPrivate: Bool { !WorkoutActivityPrivacy.showsSetDetails(redaction: redactionReasons) }
 
+    private var presentation: WorkoutActivityPresentation {
+        .make(state: state, isStale: isStale, redaction: redactionReasons)
+    }
+
     var body: some View {
         VStack(spacing: 7) {
-            if state.phase == .inProgress {
+            if presentation.phase == .inProgress {
                 if isPrivate {
                     Text("Set details hidden")
                         .font(.system(size: 12, weight: .semibold))
@@ -380,7 +401,7 @@ struct WorkoutIslandExpandedBottom: View {
                 HStack(spacing: 10) {
                     WorkoutRestSummary(state: state, isStale: isStale)
                     Spacer(minLength: 4)
-                    if !isPrivate { WorkoutCompleteSetButton(attributes: attributes, state: state).frame(width: 122, height: 44) }
+                    if presentation.showsCompleteSet { WorkoutCompleteSetButton(attributes: attributes, state: state).frame(width: 122, height: 44) }
                 }
             } else {
                 Text(statusText).font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 44)
@@ -391,7 +412,7 @@ struct WorkoutIslandExpandedBottom: View {
     }
 
     private var statusText: String {
-        switch state.phase {
+        switch presentation.phase {
         case .allSetsComplete: "All sets complete · open Logger to finish"
         case .reviewing: "Reviewing workout"
         case .finishing: "Saving workout…"

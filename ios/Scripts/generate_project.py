@@ -1471,7 +1471,7 @@ ext_common = f"""
 \t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";
 \t\t\t\tSKIP_INSTALL = YES;
 \t\t\t\tSWIFT_EMIT_LOC_STRINGS = YES;
-\t\t\t\tTARGETED_DEVICE_FAMILY = 1;"""
+\t\t\t\tTARGETED_DEVICE_FAMILY = "1,2";"""
 ext_debug = f"""\t\t{I('extDebug')} /* Debug */ = {{
 \t\t\tisa = XCBuildConfiguration;
 \t\t\tbuildSettings = {{{ext_common}

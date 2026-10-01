@@ -56,6 +56,10 @@ struct CompleteWorkoutSetIntent: LiveActivityIntent {
     static let description = IntentDescription("Completes the current set of your active workout.")
     static let isDiscoverable = false
     static let openAppWhenRun = false
+    /// Completing a set from the Lock Screen is the point of the control, so
+    /// it is explicitly allowed while locked; the authority still refuses
+    /// stale, duplicate, wrong-phase and invalid taps.
+    static let authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
 
     @Parameter(title: "Session") var sessionId: String
     @Parameter(title: "Authority") var authority: String

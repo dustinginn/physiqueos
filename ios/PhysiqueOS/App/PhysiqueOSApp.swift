@@ -98,6 +98,10 @@ struct PhysiqueOSApp: App {
                     if phase == .active {
                         workoutLiveActivity.reconcile()
                         Task { await environment.reevaluateDailyDriverDay() }
+                    } else {
+                        // Leaving the foreground right after typing must not
+                        // leave the first Lock Screen tap on a stale revision.
+                        Task { await workoutLiveActivity.coordinator.flush() }
                     }
                     guard phase == .active, environment.nativeAuthority == .founderProduction else { return }
                     Task { await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap() }

@@ -13,6 +13,13 @@ final class FakeWorkoutLiveActivityClient: WorkoutLiveActivityClient {
     }
 
     var areActivitiesEnabled = true
+    /// Like the real system, dismissed activities leave `activities()`.
+    var dropsDismissedActivities = true
+    /// While true, `update` suspends until `releaseUpdates()`.
+    var holdUpdates = false
+    private var heldUpdates: [CheckedContinuation<Void, Never>] = []
+    private var lifecycleHandlers: [UUID: @MainActor (String, WorkoutLiveActivitySnapshot.Lifecycle) -> Void] = [:]
+    private var enablementHandlers: [UUID: @MainActor (Bool) -> Void] = [:]
     var requestError: WorkoutLiveActivityRequestError?
     private(set) var records: [WorkoutLiveActivitySnapshot] = []
     private(set) var requests = 0
@@ -37,16 +44,55 @@ final class FakeWorkoutLiveActivityClient: WorkoutLiveActivityClient {
     }
 
     func update(id: String, state: WorkoutActivityAttributes.ContentState, staleDate: Date?) async {
+        if holdUpdates { await withCheckedContinuation { heldUpdates.append($0) } }
         updates.append((id, state, staleDate))
         if let index = records.firstIndex(where: { $0.id == id }) { records[index].state = state }
     }
 
+    func releaseUpdates() {
+        holdUpdates = false
+        let held = heldUpdates
+        heldUpdates = []
+        held.forEach { $0.resume() }
+    }
+
+    func observeLifecycle(_ onChange: @escaping @MainActor (String, WorkoutLiveActivitySnapshot.Lifecycle) -> Void) -> WorkoutLiveActivityObservation {
+        let key = UUID()
+        lifecycleHandlers[key] = onChange
+        return WorkoutLiveActivityObservation { [weak self] in self?.lifecycleHandlers[key] = nil }
+    }
+
+    func observeEnablement(_ onChange: @escaping @MainActor (Bool) -> Void) -> WorkoutLiveActivityObservation {
+        let key = UUID()
+        enablementHandlers[key] = onChange
+        return WorkoutLiveActivityObservation { [weak self] in self?.enablementHandlers[key] = nil }
+    }
+
+    private func settle(_ id: String, _ lifecycle: WorkoutLiveActivitySnapshot.Lifecycle) {
+        if let index = records.firstIndex(where: { $0.id == id }) {
+            if dropsDismissedActivities, lifecycle == .dismissed { records.remove(at: index) } else { records[index].lifecycle = lifecycle }
+        }
+        lifecycleHandlers.values.forEach { $0(id, lifecycle) }
+    }
+
+    /// The user swipes the activity away.
+    func userDismiss(id: String) { settle(id, .dismissed) }
+    /// The system ends it (8 h limit, force quit, Settings toggle).
+    func systemEnd(id: String) { settle(id, .ended) }
+
+    func markStale(id: String) {
+        if let index = records.firstIndex(where: { $0.id == id }) { records[index].lifecycle = .stale }
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        areActivitiesEnabled = enabled
+        enablementHandlers.values.forEach { $0(enabled) }
+    }
+
     func end(id: String, state: WorkoutActivityAttributes.ContentState?, dismissal: WorkoutLiveActivityDismissal) async {
         ends.append(.init(id: id, state: state, dismissal: dismissal))
-        if let index = records.firstIndex(where: { $0.id == id }) {
-            if let state { records[index].state = state }
-            records[index].lifecycle = .dismissed
-        }
+        if let index = records.firstIndex(where: { $0.id == id }), let state { records[index].state = state }
+        settle(id, .dismissed)
     }
 
     /// Pre-existing activity from an earlier process.
@@ -58,9 +104,6 @@ final class FakeWorkoutLiveActivityClient: WorkoutLiveActivityClient {
         return id
     }
 
-    func userDismiss(id: String) {
-        if let index = records.firstIndex(where: { $0.id == id }) { records[index].lifecycle = .dismissed }
-    }
 }
 
 @MainActor
@@ -327,16 +370,94 @@ final class WorkoutLiveActivityCoordinatorTests: XCTestCase {
         XCTAssertTrue(h.client.live.isEmpty)
     }
 
-    func testSuppressionIsPrunedWhenTheWorkoutIsGone() async {
+    func testSuppressionIsBoundedAndKeepsTheNewestEntries() async {
+        let h = harness(drafts: [liveDraft()])
+        await settle(h)
+        let ids = (0..<45).map { "old-\($0)" }
+        h.defaults.set(ids, forKey: WorkoutLiveActivityCoordinator.suppressedKey)
+        h.coordinator.reconcile()
+        await settle(h)
+        let kept = h.defaults.stringArray(forKey: WorkoutLiveActivityCoordinator.suppressedKey) ?? []
+        XCTAssertEqual(kept.count, 40)
+        XCTAssertEqual(kept.last, "old-44")
+        XCTAssertEqual(h.client.live.count, 1, "An unrelated suppressed id never affects the current workout.")
+    }
+
+    func testSystemEndingNearTheEightHourLimitIsNotASwipe() async {
+        let long = F.session(id: "long", [F.exercise("a", "A", sets: [F.set("a1", 1)])], startedAt: F.stamp(7.8 * 3600))
+        let h = harness(drafts: [long])
+        await settle(h)
+        XCTAssertEqual(h.client.live.count, 1)
+        h.client.systemEnd(id: h.client.live[0].id)
+        await settle(h)
+        h.coordinator.reconcile()
+        await settle(h)
+        XCTAssertEqual(h.client.requests, 2, "The 8 h system ending is not user intent: the activity may be requested again.")
+    }
+
+    func testTurningLiveActivitiesOffAndOnClearsSwipeSuppression() async {
         let h = harness(drafts: [liveDraft()])
         await settle(h)
         h.client.userDismiss(id: h.client.live[0].id)
         await settle(h)
-        XCTAssertEqual(h.defaults.stringArray(forKey: WorkoutLiveActivityCoordinator.suppressedKey), ["session-1"])
-        h.authority.endSession(sessionId: "session-1", reason: .cancelled)
+        XCTAssertTrue(h.client.live.isEmpty)
+
+        h.client.setEnabled(false)
+        h.client.setEnabled(true)
+        await settle(h)
+        XCTAssertEqual(h.client.live.count, 1, "Re-enabling Live Activities is an explicit opt-in.")
+    }
+
+    func testEndingsMadeWhileDisabledNeverSuppress() async {
+        let h = harness(drafts: [liveDraft()])
+        await settle(h)
+        h.client.setEnabled(false)
+        h.client.systemEnd(id: h.client.live[0].id)
+        h.client.setEnabled(true)
+        await settle(h)
+        XCTAssertEqual(h.client.live.count, 1)
+    }
+
+    func testOurOwnEndingsSurviveARelaunchOfTheCoordinator() async {
+        let h = harness(drafts: [liveDraft()])
+        await settle(h)
+        h.authority.saveAndLeave(sessionId: "session-1", leftAt: "2026-10-01T17:01:00Z")
+        await settle(h)
+        XCTAssertTrue(h.client.live.isEmpty)
+        // New process: same defaults, same client; the old (ended) record may still be listed.
+        let relaunched = WorkoutLiveActivityCoordinator(client: h.client, defaults: h.defaults, now: { F.now })
+        h.authority.resume(sessionId: "session-1")
+        relaunched.attach(to: h.authority, environment: .sandbox)
+        for _ in 0..<4 { await Task.yield() }
+        await relaunched.flush()
+        XCTAssertEqual(h.client.live.count, 1, "A pre-restart Save & Leave ending must not read as a swipe.")
+    }
+
+    func testFlushWaitsForAnInFlightSyncAndRendersTheNewestState() async throws {
+        let h = harness(drafts: [liveDraft()])
+        await settle(h)
+        h.client.holdUpdates = true
+        h.authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
+        for _ in 0..<6 { await Task.yield() } // the sync is now suspended inside the held update
+        h.authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2")
+        let flushed = Task { @MainActor in await h.coordinator.flush() }
+        for _ in 0..<4 { await Task.yield() }
+        h.client.releaseUpdates()
+        await flushed.value
+        let state = try XCTUnwrap(h.client.live.first?.state)
+        XCTAssertEqual(state.completedSets, 2, "flush returned only after the second completion was rendered.")
+        XCTAssertEqual(state.target?.setId, "b3")
+    }
+
+    func testAStaleActivityIsRefreshedEvenWhenItsContentIsUnchanged() async {
+        let h = harness(drafts: [liveDraft()])
+        await settle(h)
+        let before = h.client.updates.count
+        let id = h.client.live[0].id
+        h.client.markStale(id: id)
         h.coordinator.reconcile()
         await settle(h)
-        XCTAssertEqual(h.defaults.stringArray(forKey: WorkoutLiveActivityCoordinator.suppressedKey) ?? [], [])
+        XCTAssertEqual(h.client.updates.count, before + 1)
     }
 
     // MARK: Authorization / platform
