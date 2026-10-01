@@ -51,7 +51,9 @@ struct EvidenceView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
-        case .loaded(let hub):
+        case .loaded(let loadedHub):
+            // No-op unless the non-shipping Sleep prototype gate is open.
+            let hub = SleepEvidencePrototype.decorate(loadedHub, authority: environment.nativeAuthority)
             VStack(alignment: .leading, spacing: 16) {
                 EvidenceHeaderView(title: hub.title, subtitle: hub.subtitle)
 

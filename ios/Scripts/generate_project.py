@@ -221,6 +221,9 @@ app_files = [
     ("Presentation/Evidence", "EvidenceViewModel.swift"),
     ("Presentation/Evidence", "EvidenceHeaderView.swift"),
     ("Presentation/Evidence", "EvidenceStreamRowView.swift"),
+    ("Presentation/Evidence", "SleepEvidencePrototype.swift"),
+    ("Presentation/Evidence", "SleepEvidencePrototypeCharts.swift"),
+    ("Presentation/Evidence", "SleepEvidencePrototypeViews.swift"),
     ("Presentation/Evidence", "ActivityHistoryView.swift"),
     ("Presentation/Evidence", "ActivityHistoryViewModel.swift"),
     ("Presentation/Evidence", "ActivityDayView.swift"),
@@ -392,6 +395,7 @@ test_files = [
     ("PhysiqueOSTests", "EvidenceReadModelTests.swift"),
     ("PhysiqueOSTests", "EvidenceReviewHeaderDateTests.swift"),
     ("PhysiqueOSTests", "EvidenceHubUsageTests.swift"),
+    ("PhysiqueOSTests", "SleepEvidencePrototypeTests.swift"),
     ("PhysiqueOSTests", "TrainingReadModelTests.swift"),
     ("PhysiqueOSTests", "TrainingLibraryCatalogTests.swift"),
     ("PhysiqueOSTests", "ActivityReadModelTests.swift"),
@@ -427,6 +431,7 @@ test_files = [
 ui_test_files = [
     ("PhysiqueOSUITests", "TrainingAcceptanceUITests.swift"),
     ("PhysiqueOSUITests", "GoalsAcceptanceUITests.swift"),
+    ("PhysiqueOSUITests", "SleepEvidencePrototypeScreenshotUITests.swift"),
 ]
 
 BUNDLE_ID_APP = "com.physiqueos.native.dev"

@@ -122,6 +122,18 @@ struct AppDestinationRouterView: View {
             PhotoSetDetailView(setId: setId, initialPoseId: poseId)
         case .progressStream(let streamId) where streamId == "energy":
             EnergyHistoryView()
+        // NON-SHIPPING Sleep Evidence visual prototype: DEBUG + launch
+        // argument + Sandbox only (`SleepEvidencePrototype.isActive`).
+        // Otherwise these ids fall through to the ordinary placeholder.
+        case .progressStream(let streamId) where streamId == "recovery"
+            && SleepEvidencePrototype.isActive(authority: environment.nativeAuthority):
+            RecoverySleepPrototypeView()
+        case .progressStream(let streamId) where streamId == SleepEvidencePrototype.trendsStreamId
+            && SleepEvidencePrototype.isActive(authority: environment.nativeAuthority):
+            SleepTrendsPrototypeView()
+        case .progressStream(let streamId) where streamId.hasPrefix(SleepEvidencePrototype.nightStreamPrefix)
+            && SleepEvidencePrototype.isActive(authority: environment.nativeAuthority):
+            SleepNightPrototypeView(sleepDay: String(streamId.dropFirst(SleepEvidencePrototype.nightStreamPrefix.count)))
         // The bare Training Library root (`/progress/training/library`,
         // no area/exercise segment) — the same 10 canonical areas the
         // landing page's own "Training Areas" grid shows, rendered as a
