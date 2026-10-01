@@ -2,6 +2,8 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
 const MAX_RANGE_DAYS = 3660;
 const MAX_PAGE = 100;
+const MINUTES_PER_DAY = 1_440;
+const NIGHT_CLOCK_ANCHOR_MINUTE = 18 * 60;
 
 export function createHealthKitSleepEvidenceReadService({ store, now = () => new Date() } = {}) {
   if (typeof store?.listDays !== "function") throw new Error("Sleep Evidence requires an owner-scoped day store.");
@@ -87,9 +89,18 @@ function continuity(timeline, main) {
 function projectSecondary(episode) { return Object.freeze({ start: episode.start, end: episode.end, asleepSeconds: episode.asleepSeconds, timeZone: episode.timeZone, source: family(episode.primarySource?.sourceFamily) }); }
 function consistency(nights) {
   const eligible = nights.filter((night) => night.sleepWindow && !night.timeZoneUncertain);
-  const starts = eligible.map((night) => clockMinute(night.sleepWindow.start, night.sleepWindow.timeZone));
-  const ends = eligible.map((night) => clockMinute(night.sleepWindow.end, night.sleepWindow.timeZone));
-  return Object.freeze({ medianStartMinute: median(starts), medianEndMinute: median(ends), startSpreadMinutes: mad(starts), endSpreadMinutes: mad(ends), nightsUsed: eligible.length, inferredNightsExcluded: nights.filter((night) => night.timeZoneUncertain).length });
+  const starts = eligible.map((night) => nightClockMinute(clockMinute(night.sleepWindow.start, night.sleepWindow.timeZone)));
+  const ends = eligible.map((night) => nightClockMinute(clockMinute(night.sleepWindow.end, night.sleepWindow.timeZone)));
+  const medianStart = median(starts);
+  const medianEnd = median(ends);
+  return Object.freeze({
+    medianStartMinute: wallClockMinute(medianStart),
+    medianEndMinute: wallClockMinute(medianEnd),
+    startSpreadMinutes: mad(starts),
+    endSpreadMinutes: mad(ends),
+    nightsUsed: eligible.length,
+    inferredNightsExcluded: nights.filter((night) => night.timeZoneUncertain).length,
+  });
 }
 function sourceSummary(nights) { return Object.freeze([...new Set(nights.flatMap((night) => [night.source, ...night.corroboratingSources]).filter(Boolean))].sort().map((label) => Object.freeze({ label }))); }
 function average(values) { const valid = values.filter(Number.isFinite); return Object.freeze({ seconds: valid.length ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : null, nightCount: valid.length }); }
@@ -98,6 +109,11 @@ function prefer(rows) { return [...rows].sort((a, b) => Number(b.ingestionPurpos
 function newest(rows) { const byDay = new Map(); for (const row of rows) if (!byDay.has(row.sleepDay) || row.ingestionPurpose !== "historical_evidence_import") byDay.set(row.sleepDay, row); return [...byDay.values()].sort((a, b) => b.sleepDay.localeCompare(a.sleepDay)); }
 function family(value) { return ({ oura: "Oura", apple_watch: "Apple Watch", apple_iphone: "iPhone", apple_other: "Apple Health", sleep_cycle: "Sleep Cycle", whoop: "WHOOP", autosleep: "AutoSleep", third_party_other: "Another app", manual: "Entered in Health" })[value] ?? null; }
 function clockMinute(instant, zone) { const parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(instant)); return Number(parts.find((p) => p.type === "hour")?.value) * 60 + Number(parts.find((p) => p.type === "minute")?.value); }
+// Sleep windows are linearized at 18:00 local time so midnight is an ordinary
+// interior point. Even medians and MAD values retain the established Math.round
+// integer rule. The API maps medians back to 0-1439 wall-clock minutes.
+function nightClockMinute(value) { return (value - NIGHT_CLOCK_ANCHOR_MINUTE + MINUTES_PER_DAY) % MINUTES_PER_DAY; }
+function wallClockMinute(value) { return value == null ? null : (value + NIGHT_CLOCK_ANCHOR_MINUTE) % MINUTES_PER_DAY; }
 function median(values) { if (!values.length) return null; const sorted = [...values].sort((a,b)=>a-b); return sorted.length % 2 ? sorted[(sorted.length-1)/2] : Math.round((sorted[sorted.length/2-1]+sorted[sorted.length/2])/2); }
 function mad(values) { const center = median(values); return center == null ? null : median(values.map((value) => Math.abs(value-center))); }
 function monday(value) { const d = new Date(`${value}T00:00:00Z`); return shift(value, -((d.getUTCDay()+6)%7)); }
