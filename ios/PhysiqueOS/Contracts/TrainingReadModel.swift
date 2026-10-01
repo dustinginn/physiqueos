@@ -920,9 +920,10 @@ enum WorkoutCelebrationGate {
         key: String?,
         hasRecords: Bool,
         reduceMotion: Bool,
+        presentationVisible: Bool = true,
         defaults: UserDefaults = .standard
     ) -> Bool {
-        guard hasRecords, let key, !defaults.bool(forKey: key) else { return false }
+        guard presentationVisible, hasRecords, let key, !defaults.bool(forKey: key) else { return false }
         defaults.set(true, forKey: key)
         return !reduceMotion
     }

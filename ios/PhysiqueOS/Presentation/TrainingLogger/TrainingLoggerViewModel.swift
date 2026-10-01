@@ -84,6 +84,11 @@ final class TrainingLoggerViewModel {
                 var remaining: [TrainingLoggerDraft] = []
                 var recoveredCompletions: [TrainingLoggerDraft] = []
                 for candidate in savedDrafts {
+                    if candidate.step == .complete, candidate.completionPresentationPending == true {
+                        remaining.append(candidate)
+                        recoveredCompletions.append(candidate)
+                        continue
+                    }
                     if await writeAPI.isDraftAlreadyDurable(candidate) {
                         // Exact deterministic identity/fingerprint proof
                         // clears only this residue. Same-date/category sibling
@@ -99,8 +104,23 @@ final class TrainingLoggerViewModel {
                                 await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
                             }
                         }
-                        draftStore.discard(id: candidate.id)
-                        recoveredCompletions.append(candidate)
+                        if candidate.submissionState != nil {
+                            var completed = candidate
+                            completed.step = .complete
+                            completed.submissionState = nil
+                            completed.completionPresentationPending = true
+                            draftStore.save(completed)
+                            remaining.append(completed)
+                            recoveredCompletions.append(completed)
+                        } else {
+                            // Preserve the legacy cleanup contract. Only a
+                            // draft from the explicit submitted-command
+                            // lifecycle is eligible to become a pending
+                            // presentation; an older residue must not replay
+                            // as a surprise completion after an upgrade.
+                            draftStore.discard(id: candidate.id)
+                            recoveredCompletions.append(candidate)
+                        }
                     } else {
                         remaining.append(candidate)
                         if candidate.submissionState != nil {
@@ -231,6 +251,8 @@ final class TrainingLoggerViewModel {
         guard canWrite else { return }
         guard var draft else { return }
         draft.step = .complete
+        draft.submissionState = nil
+        draft.completionPresentationPending = true
         self.draft = draft
         // When supporting evidence is attached, its files stay on disk until
         // `reconcileSupportingEvidenceAfterCommit` (running in the
@@ -240,8 +262,10 @@ final class TrainingLoggerViewModel {
         if draft.supportingEvidenceAssets.isEmpty {
             attachmentStore.removeAll(draftId: draft.id)
         }
-        draftStore.discard(id: draft.id)
+        draftStore.save(draft)
         savedDrafts.removeAll { $0.id == draft.id }
+        savedDrafts.append(draft)
+        savedDrafts = Self.sortDrafts(savedDrafts)
     }
 
     func submit() async {
@@ -340,12 +364,15 @@ final class TrainingLoggerViewModel {
         if candidate.supportingEvidenceAssets.isEmpty {
             attachmentStore.removeAll(draftId: candidate.id)
         }
-        draftStore.discard(id: candidate.id)
+        var completed = candidate
+        completed.step = .complete
+        completed.submissionState = nil
+        completed.completionPresentationPending = true
+        draftStore.save(completed)
         savedDrafts.removeAll { $0.id == candidate.id }
+        savedDrafts.append(completed)
+        savedDrafts = Self.sortDrafts(savedDrafts)
         if draft?.id == candidate.id {
-            var completed = candidate
-            completed.step = .complete
-            completed.submissionState = nil
             draft = completed
             completedPerformanceRecords = []
             processingMessage = nil
@@ -354,6 +381,18 @@ final class TrainingLoggerViewModel {
         Task { [writeAPI] in
             await writeAPI.reconcileSupportingEvidenceAfterCommit(for: candidate)
         }
+    }
+
+    /// The only local acknowledgement boundary for a durable completion.
+    /// Until this is called, the exact completed draft remains recoverable so
+    /// its authoritative Server records can be re-read after navigation or a
+    /// process restart.
+    func acknowledgeCompletion() {
+        guard canWrite, let draft, draft.step == .complete else { return }
+        draftStore.discard(id: draft.id)
+        savedDrafts.removeAll { $0.id == draft.id }
+        self.draft = nil
+        completedPerformanceRecords = []
     }
 
     /// Save & Leave: keep the workout, and stop the Log tab routing into it.

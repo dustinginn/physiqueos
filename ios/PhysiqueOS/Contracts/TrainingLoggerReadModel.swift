@@ -147,6 +147,11 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// from Log's saved workouts, but the Log tab no longer routes into it.
     /// Cleared when the workout is resumed.
     var leftAt: String? = nil
+    /// Set only after this exact draft is proven durable and before the
+    /// Founder explicitly leaves Workout Complete. Keeping that narrow
+    /// acknowledgement boundary durable lets a late PR read survive a tab
+    /// switch or process restart without replaying historical workouts.
+    var completionPresentationPending: Bool? = nil
 
     static func fresh(mode: TrainingLoggerMode, workoutDate: String, startedAt: String? = nil) -> Self {
         .init(
@@ -209,6 +214,19 @@ extension TrainingLoggerDraft {
                 return age >= -5 * 60 && age <= activeLiveSessionWindow
             }
             .max { (started($0) ?? .distantPast) < (started($1) ?? .distantPast) }
+    }
+
+    /// A completion written by the current Native lifecycle that has not yet
+    /// been acknowledged from Workout Complete. Legacy completed drafts do
+    /// not carry the marker and therefore never become surprise celebrations.
+    static func pendingCompletion(in drafts: [TrainingLoggerDraft]) -> TrainingLoggerDraft? {
+        drafts
+            .filter { $0.step == .complete && $0.completionPresentationPending == true }
+            .max {
+                let left = $0.finishedAt ?? $0.startedAt ?? $0.workoutDate
+                let right = $1.finishedAt ?? $1.startedAt ?? $1.workoutDate
+                return left == right ? $0.id < $1.id : left < right
+            }
     }
 }
 

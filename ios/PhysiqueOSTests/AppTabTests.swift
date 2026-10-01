@@ -90,6 +90,21 @@ final class AppTabTests: XCTestCase {
                      "Completed/abandoned/submitted sessions immediately restore normal Log behavior.")
     }
 
+    func testOnlyExplicitlyPendingCompletionRoutesBackToWorkoutComplete() {
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        var legacy = draft("legacy-complete", step: .complete, now: now)
+        XCTAssertNil(TrainingLoggerDraft.pendingCompletion(in: [legacy]),
+                     "A historical or legacy completion is never replayed.")
+
+        legacy.completionPresentationPending = true
+        let newer = draft("newer-active", startedMinutesAgo: 5, now: now)
+        XCTAssertEqual(
+            TrainingLoggerDraft.pendingCompletion(in: [newer, legacy])?.id,
+            "legacy-complete",
+            "An unacknowledged durable completion wins over ordinary active-session routing."
+        )
+    }
+
     func testSaveAndLeaveEndsLogTabRoutingUntilTheWorkoutIsResumed() {
         let now = Date(timeIntervalSince1970: 1_790_000_000)
         var left = draft("left", now: now)
@@ -106,6 +121,7 @@ final class AppTabTests: XCTestCase {
         XCTAssertTrue(tabs.contains("TabView(selection: Binding(get: { selectedTab }, set: selectTab))"))
         // Only when switching INTO Log from another tab with Log at its root: no trap, no bounce.
         XCTAssertTrue(tabs.contains("guard newTab == .log, previous != .log, logPath.isEmpty,"))
+        XCTAssertTrue(tabs.contains("TrainingLoggerDraft.pendingCompletion(in: drafts)"))
         // Pushed on top of Log (never replacing it), so Back returns to the ordinary Log page.
         XCTAssertTrue(tabs.contains("logPath.append(AppDestination.trainingLogger)"))
         let logger = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"), encoding: .utf8)

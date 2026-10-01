@@ -114,16 +114,18 @@ struct RootTabView: View {
         }
     }
 
-    /// Tab bar selection. Entering Log from another tab while a Workout
-    /// Logger session is in progress opens that session directly, pushed on
-    /// top of Log so Back (or Save & Leave) returns to the ordinary Log page.
+    /// Tab bar selection. An unacknowledged durable completion wins so its
+    /// Server-owned records cannot be lost behind a tab switch or relaunch;
+    /// otherwise the existing in-progress-workout routing applies.
     /// Re-tapping Log while already there, or a Log stack that is already
     /// somewhere, never redirects -- so the Founder can always reach Log.
     private func selectTab(_ newTab: AppTab) {
         let previous = selectedTab
         selectedTab = newTab
+        let drafts = environment.trainingLoggerDraftStore.loadAll()
         guard newTab == .log, previous != .log, logPath.isEmpty,
-              let session = TrainingLoggerDraft.activeLiveSession(in: environment.trainingLoggerDraftStore.loadAll())
+              let session = TrainingLoggerDraft.pendingCompletion(in: drafts) ??
+                TrainingLoggerDraft.activeLiveSession(in: drafts)
         else { return }
         environment.pendingTrainingLoggerResumeDraftId = session.id
         noteNavigation(.trainingLogger)

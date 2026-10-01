@@ -945,11 +945,15 @@ final class TrainingLoggerTests: XCTestCase {
             Self.record("b", exerciseId: "back_squat", exercise: "Squat"),
         ]
         let writeAPI = RecordsTrainingWriteAPI(resultRecords: .init(status: "completed", records: records), readBackRecords: nil)
-        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, draftStore: MemoryTrainingLoggerDraftStore(), authority: .founderProduction)
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(api: api, writeAPI: writeAPI, draftStore: store, authority: .founderProduction)
         await viewModel.load()
         viewModel.start(mode: .live)
         await viewModel.submit()
         XCTAssertEqual(viewModel.completedPerformanceRecords, records)
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true,
+                       "The presentation survives navigation until the Founder acknowledges it.")
         let readBacks = await writeAPI.readBacks
         XCTAssertEqual(readBacks, 0, "An authoritative commit result needs no read-back.")
     }
@@ -1036,11 +1040,73 @@ final class TrainingLoggerTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
 
-        XCTAssertNil(store.load(), "Canonical durability clears the persisted retry draft.")
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true,
+                       "Canonical durability converts the retry draft into a durable pending presentation.")
         XCTAssertEqual(viewModel.draft?.id, pending.id)
         XCTAssertEqual(viewModel.draft?.step, .complete)
         XCTAssertNil(viewModel.draft?.submissionState)
         XCTAssertEqual(viewModel.completedPerformanceRecords, [record])
+    }
+
+    @MainActor
+    func testAcknowledgingCompletionIsTheOnlyPointThatClearsThePendingPresentation() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let record = Self.record("acknowledged")
+        let viewModel = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: RecordsTrainingWriteAPI(
+                resultRecords: .init(status: "completed", records: [record]),
+                readBackRecords: nil
+            ),
+            draftStore: store,
+            authority: .founderProduction
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        await viewModel.submit()
+
+        XCTAssertNotNil(store.load())
+        viewModel.acknowledgeCompletion()
+
+        XCTAssertNil(store.load())
+        XCTAssertNil(viewModel.draft)
+        XCTAssertTrue(viewModel.completedPerformanceRecords.isEmpty)
+    }
+
+    @MainActor
+    func testPendingCompletionSurvivesViewModelRecreationAndReadsRecordsAgain() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let record = Self.record("after-navigation")
+        let first = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: RecordsTrainingWriteAPI(
+                resultRecords: .init(status: "completed", records: [record]),
+                readBackRecords: [record]
+            ),
+            draftStore: store,
+            authority: .founderProduction
+        )
+        await first.load()
+        first.start(mode: .live)
+        let draftID = try XCTUnwrap(first.draft?.id)
+        await first.submit()
+
+        let recreated = TrainingLoggerViewModel(
+            api: api,
+            writeAPI: RecordsTrainingWriteAPI(resultRecords: nil, readBackRecords: [record]),
+            draftStore: store,
+            authority: .founderProduction
+        )
+        await recreated.load()
+        for _ in 0..<50 where recreated.completedPerformanceRecords.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(recreated.draft?.id, draftID)
+        XCTAssertEqual(recreated.draft?.step, .complete)
+        XCTAssertEqual(recreated.completedPerformanceRecords, [record])
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
     }
 
     /// Integration with the Log-tab routing: a relaunch-recovered completion of
@@ -1226,6 +1292,26 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertFalse(WorkoutCelebrationGate.claim(key: nil, hasRecords: true, reduceMotion: false, defaults: defaults))
     }
 
+    func testHiddenPresentationCannotConsumeTheCelebration() {
+        let suite = "celebration-hidden-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        XCTAssertFalse(
+            WorkoutCelebrationGate.claim(
+                key: "late-record", hasRecords: true, reduceMotion: false,
+                presentationVisible: false, defaults: defaults
+            )
+        )
+        XCTAssertTrue(
+            WorkoutCelebrationGate.claim(
+                key: "late-record", hasRecords: true, reduceMotion: false,
+                presentationVisible: true, defaults: defaults
+            ),
+            "A record arriving while Home/Evidence is visible remains eligible when Workout Complete returns."
+        )
+    }
+
     func testReduceMotionConsumesTheOneShotWithoutAnimatingLater() {
         let suite = "celebration-reduce-motion-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
@@ -1407,12 +1493,12 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(reconciledIDs, [durable.id])
     }
 
-    /// A successful canonical submission must clear the device-only draft —
-    /// there is nothing left to resume once the server holds the canonical
-    /// session. This exercises the exact `submit()` → `completeLocalCapture()`
-    /// → `draftStore.discard()` path in `TrainingLoggerViewModel.swift`.
+    /// A successful canonical submission must replace the writable draft
+    /// with a read-only pending completion. The exact identity remains only
+    /// until the Founder acknowledges Workout Complete, so a navigation or
+    /// process restart cannot lose late-arriving Server records.
     @MainActor
-    func testSuccessfulSubmissionClearsThePersistedDraft() async throws {
+    func testSuccessfulSubmissionPersistsOnlyThePendingCompletion() async throws {
         let store = MemoryTrainingLoggerDraftStore()
         let viewModel = TrainingLoggerViewModel(api: api, writeAPI: StubSucceedingTrainingWriteAPI(), draftStore: store, authority: .founderProduction)
         await viewModel.load()
@@ -1422,8 +1508,9 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load(), "A confirmed canonical submission must clear the local draft.")
-        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
+        XCTAssertEqual(viewModel.savedDraft?.step, .complete)
         XCTAssertNil(viewModel.validationMessage)
     }
 
@@ -1504,11 +1591,12 @@ final class TrainingLoggerTests: XCTestCase {
         viewModel.start(mode: .live)
 
         await viewModel.submit()
-        for _ in 0..<100 where store.load() != nil {
+        for _ in 0..<100 where store.load()?.submissionState != nil {
             try? await Task.sleep(for: .milliseconds(10))
         }
 
-        XCTAssertNil(store.load())
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
         let commitCalls = await writeAPI.commitCalls
         XCTAssertEqual(commitCalls, 1, "Readback proof must resolve the accepted command without resubmitting it.")
         XCTAssertEqual(viewModel.draft?.step, .complete)
@@ -1530,8 +1618,12 @@ final class TrainingLoggerTests: XCTestCase {
 
         await reopened.load()
 
-        XCTAssertEqual(store.loadAll().map(\.id), [sibling.id])
-        XCTAssertEqual(reopened.savedDrafts.map(\.id), [sibling.id])
+        XCTAssertEqual(Set(store.loadAll().map(\.id)), Set([pending.id, sibling.id]))
+        XCTAssertEqual(reopened.savedDrafts.first(where: { $0.id == pending.id })?.step, .complete)
+        XCTAssertEqual(
+            reopened.savedDrafts.first(where: { $0.id == pending.id })?.completionPresentationPending,
+            true
+        )
         let commitCalls = await writeAPI.commitCalls
         XCTAssertEqual(commitCalls, 0)
     }
@@ -1579,8 +1671,9 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load())
-        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
+        XCTAssertEqual(viewModel.savedDraft?.step, .complete)
         XCTAssertNil(viewModel.validationMessage)
         XCTAssertNil(viewModel.refreshWarning)
         XCTAssertEqual(viewModel.draft?.step, .complete)
@@ -1603,8 +1696,10 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load(), "A canonically-successful commit must clear the draft even if the refresh afterward fails.")
-        XCTAssertNil(viewModel.savedDraft)
+        XCTAssertEqual(store.load()?.step, .complete,
+                       "A canonically-successful commit must retain only its pending completion if refresh fails.")
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
+        XCTAssertEqual(viewModel.savedDraft?.step, .complete)
         XCTAssertNil(viewModel.validationMessage, "A post-success refresh failure must never be reported as a submission failure.")
         XCTAssertEqual(viewModel.draft?.step, .complete)
         XCTAssertNotNil(viewModel.refreshWarning, "The refresh failure must surface as a separate, non-destructive notice.")
@@ -1625,7 +1720,8 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load())
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
         XCTAssertNil(viewModel.validationMessage)
         XCTAssertEqual(viewModel.draft?.step, .complete)
         XCTAssertNotNil(viewModel.refreshWarning)
@@ -1644,7 +1740,8 @@ final class TrainingLoggerTests: XCTestCase {
 
         await viewModel.submit()
 
-        XCTAssertNil(store.load())
+        XCTAssertEqual(store.load()?.step, .complete)
+        XCTAssertEqual(store.load()?.completionPresentationPending, true)
         XCTAssertNil(viewModel.validationMessage)
         XCTAssertEqual(viewModel.draft?.step, .complete)
         XCTAssertNotNil(viewModel.refreshWarning)
