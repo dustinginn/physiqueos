@@ -460,6 +460,18 @@ describe("sleep-canon-v2 within-lane duplicate-copy resolution", () => {
     expect(value.corroboratingSampleIds).toEqual([]);
   });
 
+  it("treats a one-second stage-boundary overlap as rounding, not a duplicate copy", () => {
+    const samples = stagedCopy({ idBase: 12500 });
+    samples[1] = stored({
+      id: uuid(12501), source: "oura", stage: "deep",
+      start: new Date(Date.parse(isoAt(120)) - 1000).toISOString(), end: isoAt(240),
+    });
+    const value = episode(samples);
+    expect(value.reconciliation.copySelection).toMatchObject({ applied: false, candidateCount: 1 });
+    expect(value.asleepSeconds).toBe(8 * H);
+    expect(value.sourceSampleIds).toHaveLength(4);
+  });
+
   it("keeps the one in-bed envelope with the selected staged copy", () => {
     const inBed = stored({ id: uuid(13000), source: "oura", stage: "inBed", start: isoAt(-30), end: isoAt(495) });
     const value = episode([
