@@ -32,7 +32,12 @@ struct WorkoutLiveActivityRenderCommand {
                   let png = bitmap.representation(using: .png, properties: [:]) else {
                 throw RenderError.couldNotEncode(spec.filename)
             }
-            try png.write(to: outputURL.appendingPathComponent(spec.filename), options: .atomic)
+            let destination = outputURL.appendingPathComponent(spec.filename)
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try png.write(to: destination, options: .atomic)
             print("rendered \(spec.filename) \(Int(spec.size.width))×\(Int(spec.size.height)) @\(Int(spec.scale))x")
         }
     }
@@ -123,7 +128,76 @@ struct WorkoutLiveActivityRenderCommand {
             ),
         ]
 
-        return lock + islands
+        let revisionOne: [RenderSpec] = [
+            revisionLock("revision-1/A-lock-normal-previous-current-stopwatch.png", WorkoutActivityFixtureCatalog.normalStopwatch),
+            revisionLock("revision-1/B-lock-normal-previous-current-countdown.png", WorkoutActivityFixtureCatalog.normalCountdown),
+            revisionLock("revision-1/C-lock-final-current-up-next-stopwatch.png", WorkoutActivityFixtureCatalog.finalSet),
+            revisionLock("revision-1/D-lock-post-final-completed-up-next-stopwatch.png", WorkoutActivityFixtureCatalog.postFinalSet),
+            revisionLock("revision-1/E-lock-rest-off-two-row.png", WorkoutActivityFixtureCatalog.restOff),
+            revisionLock("revision-1/F-lock-superset-two-row.png", WorkoutActivityFixtureCatalog.superset),
+            revisionIsland(
+                "revision-1/G-island-expanded-normal-previous-current.png",
+                .expandedNormal,
+                WorkoutActivityFixtureCatalog.normalStopwatch
+            ),
+            revisionIsland(
+                "revision-1/H-island-expanded-final-current-up-next.png",
+                .expandedFinalRest,
+                WorkoutActivityFixtureCatalog.finalSet
+            ),
+            revisionIsland(
+                "revision-1/I-island-expanded-active-rest-countdown.png",
+                .expandedActiveRest,
+                WorkoutActivityFixtureCatalog.normalCountdown
+            ),
+            revisionIsland(
+                "revision-1/J1-island-compact-workout.png",
+                .compactWorkout,
+                WorkoutActivityFixtureCatalog.restOff
+            ),
+            revisionIsland(
+                "revision-1/J2-island-compact-rest.png",
+                .compactRest,
+                WorkoutActivityFixtureCatalog.normalStopwatch
+            ),
+            revisionIsland(
+                "revision-1/J3-island-minimal-rest.png",
+                .minimal,
+                WorkoutActivityFixtureCatalog.normalStopwatch
+            ),
+            revisionIsland(
+                "revision-1/K-island-expanded-post-final-completed-up-next.png",
+                .expandedPostFinal,
+                WorkoutActivityFixtureCatalog.postFinalSet
+            ),
+        ]
+
+        return lock + islands + revisionOne
+    }
+
+    private static func revisionLock(
+        _ filename: String,
+        _ fixture: WorkoutActivityFixture
+    ) -> RenderSpec {
+        RenderSpec(
+            filename: filename,
+            size: CGSize(width: 393, height: 852),
+            scale: 2,
+            view: AnyView(LockScreenScene(fixture: fixture, placement: .trailing))
+        )
+    }
+
+    private static func revisionIsland(
+        _ filename: String,
+        _ presentation: DynamicIslandPresentation,
+        _ fixture: WorkoutActivityFixture
+    ) -> RenderSpec {
+        RenderSpec(
+            filename: filename,
+            size: CGSize(width: 393, height: 300),
+            scale: 2,
+            view: AnyView(DynamicIslandScene(presentation: presentation, fixture: fixture))
+        )
     }
 
     enum RenderError: Error {

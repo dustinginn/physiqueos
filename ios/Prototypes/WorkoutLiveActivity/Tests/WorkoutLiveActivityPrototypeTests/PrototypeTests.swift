@@ -52,6 +52,17 @@ struct PrototypeTests {
         }
     }
 
+    @Test("Founder revision 1 locks the exact two-row transition semantics")
+    func founderRevisionOneContextRules() {
+        #expect(WorkoutActivityFixtureCatalog.normalStopwatch.contextRoles == [.previous, .current])
+        #expect(WorkoutActivityFixtureCatalog.normalCountdown.contextRoles == [.previous, .current])
+        #expect(WorkoutActivityFixtureCatalog.restOff.contextRoles == [.previous, .current])
+        #expect(WorkoutActivityFixtureCatalog.superset.contextRoles == [.previous, .current])
+        #expect(WorkoutActivityFixtureCatalog.finalSet.contextRoles == [.current, .upNext])
+        #expect(WorkoutActivityFixtureCatalog.postFinalSet.contextRoles == [.completed, .upNext])
+        #expect(!WorkoutActivityFixtureCatalog.finalSet.contextRoles.contains(.previous))
+    }
+
     @Test("Privacy projection cannot expose exercise or load strings")
     func privacyGate() {
         let fixture = WorkoutActivityFixtureCatalog.privacyRedacted
@@ -73,6 +84,7 @@ struct PrototypeTests {
         #expect(WorkoutActivityFixtureCatalog.finalSet.isFinalSetOfExercise)
         #expect(WorkoutActivityFixtureCatalog.finalSet.nextExerciseFirstSet?.setNumber == 1)
         #expect(WorkoutActivityFixtureCatalog.postFinalSet.previousCompletedSet?.completed == true)
+        #expect(WorkoutActivityFixtureCatalog.postFinalSet.nextExerciseFirstSet?.setNumber == 1)
     }
 
     @Test("Long-content fixture exercises label and value pressure")

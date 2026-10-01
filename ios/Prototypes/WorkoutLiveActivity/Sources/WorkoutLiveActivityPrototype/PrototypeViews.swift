@@ -119,27 +119,31 @@ public struct LockScreenActivityCard: View {
     private var contextRows: some View {
         if placement == .fullWidth, let current = fixture.currentSet {
             SetContextRow(role: .current, context: current)
-        } else if fixture.isFinalSetOfExercise,
-           let previous = fixture.previousCompletedSet,
-           let current = fixture.currentSet,
-           let next = fixture.nextExerciseFirstSet {
-            SetContextRow(role: .previous, context: previous)
-            HStack(spacing: 7) {
-                SetContextRow(role: .current, context: current)
-                compactUpNext(next)
-            }
-            .frame(height: 31)
-        } else if fixture.id == "post-final-set",
-                  let completed = fixture.previousCompletedSet,
-                  let next = fixture.currentSet {
-            SetContextRow(role: .completed, context: completed)
-            SetContextRow(role: .upNext, context: next)
         } else {
-            if let previous = fixture.previousCompletedSet {
-                SetContextRow(role: .previous, context: previous)
-            }
-            if let current = fixture.currentSet {
-                SetContextRow(role: .current, context: current)
+            switch fixture.contextPhase {
+            case .normal:
+                if let previous = fixture.previousCompletedSet {
+                    SetContextRow(role: .previous, context: previous)
+                }
+                if let current = fixture.currentSet {
+                    SetContextRow(role: .current, context: current)
+                }
+            case .finalSet:
+                if let current = fixture.currentSet {
+                    SetContextRow(role: .current, context: current)
+                }
+                if let next = fixture.nextExerciseFirstSet {
+                    SetContextRow(role: .upNext, context: next)
+                }
+            case .postFinalSet:
+                if let completed = fixture.previousCompletedSet {
+                    SetContextRow(role: .completed, context: completed)
+                }
+                if let next = fixture.nextExerciseFirstSet {
+                    SetContextRow(role: .upNext, context: next)
+                }
+            case .none:
+                EmptyView()
             }
         }
     }
@@ -161,27 +165,6 @@ public struct LockScreenActivityCard: View {
         .padding(.horizontal, 9)
         .frame(maxWidth: .infinity, minHeight: 64)
         .background(RoundedRectangle(cornerRadius: 12).fill(PrototypePalette.muted.opacity(0.9)))
-    }
-
-    private func compactUpNext(_ next: WorkoutActivityFixture.SetContext) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text("UP NEXT")
-                .font(.system(size: 8, weight: .bold))
-                .tracking(0.6)
-                .foregroundStyle(PrototypePalette.accent)
-            Text(next.exerciseName)
-                .font(.system(size: 10, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text("Set \(next.setNumber) · \(next.targetText)")
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(PrototypePalette.mutedText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .padding(.horizontal, 7)
-        .frame(width: 139, height: 31, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 9).fill(PrototypePalette.accent.opacity(0.12)))
     }
 
     private var footer: some View {
@@ -210,7 +193,7 @@ public struct LockScreenActivityCard: View {
                     .font(.system(size: compact ? 10 : 13, weight: .semibold))
                     .foregroundStyle(fixture.restMode == .countdown ? PrototypePalette.warning : PrototypePalette.success)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(fixture.restMode == .countdown ? "REST · REMAINING" : "REST · STOPWATCH")
+                    Text(fixture.restMode == .countdown ? "REST · COUNTDOWN" : "REST · STOPWATCH")
                         .font(.system(size: compact ? 7 : 8, weight: .bold))
                         .tracking(0.45)
                         .foregroundStyle(PrototypePalette.mutedText)
@@ -447,6 +430,8 @@ public enum DynamicIslandPresentation: Sendable {
     case minimal
     case expandedNormal
     case expandedFinalRest
+    case expandedPostFinal
+    case expandedActiveRest
 }
 
 public struct DynamicIslandScene: View {
@@ -500,10 +485,8 @@ public struct DynamicIslandScene: View {
             compact(restDominant: true)
         case .minimal:
             minimal
-        case .expandedNormal:
-            expanded(finalTransition: false)
-        case .expandedFinalRest:
-            expanded(finalTransition: true)
+        case .expandedNormal, .expandedFinalRest, .expandedPostFinal, .expandedActiveRest:
+            expanded
         }
     }
 
@@ -548,9 +531,8 @@ public struct DynamicIslandScene: View {
         .accessibilityLabel("Workout rest stopwatch active")
     }
 
-    private func expanded(finalTransition: Bool) -> some View {
-        let source = finalTransition ? WorkoutActivityFixtureCatalog.finalSet : fixture
-        return VStack(spacing: 7) {
+    private var expanded: some View {
+        VStack(spacing: 7) {
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "dumbbell.fill")
@@ -559,36 +541,24 @@ public struct DynamicIslandScene: View {
                         .font(.system(size: 11, weight: .semibold))
                         .lineLimit(1)
                 }
+                .frame(width: 105, alignment: .leading)
                 Spacer()
-                Text(source.workoutElapsedText)
+                Text(fixture.workoutElapsedText)
                     .font(.system(size: 11, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(PrototypePalette.secondaryText)
+                    .frame(width: 54, alignment: .trailing)
             }
-            if finalTransition,
-               let current = source.currentSet,
-               let next = source.nextExerciseFirstSet {
-                HStack(spacing: 8) {
-                    expandedContext(label: "FINAL", context: current, accent: PrototypePalette.warning)
-                    expandedContext(label: "UP NEXT", context: next, accent: PrototypePalette.accent)
-                }
-            } else if let current = source.currentSet {
-                HStack(spacing: 8) {
-                    if let previous = source.previousCompletedSet {
-                        expandedContext(label: "PREVIOUS", context: previous, accent: PrototypePalette.mutedText)
-                    }
-                    expandedContext(label: "CURRENT", context: current, accent: PrototypePalette.accent)
-                }
-            }
+            expandedContexts
             HStack(spacing: 10) {
                 HStack(spacing: 6) {
-                    Image(systemName: source.restMode == .countdown ? "timer" : "stopwatch.fill")
-                        .foregroundStyle(source.restMode == .countdown ? PrototypePalette.warning : PrototypePalette.success)
+                    Image(systemName: fixture.restMode == .countdown ? "timer" : "stopwatch.fill")
+                        .foregroundStyle(fixture.restMode == .countdown ? PrototypePalette.warning : PrototypePalette.success)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(source.restMode == .countdown ? "REST REMAINING" : "REST STOPWATCH")
+                        Text(fixture.restMode == .countdown ? "REST COUNTDOWN" : "REST STOPWATCH")
                             .font(.system(size: 7, weight: .bold))
                             .tracking(0.45)
                             .foregroundStyle(PrototypePalette.mutedText)
-                        Text(source.restTimerText ?? "—")
+                        Text(fixture.restTimerText ?? "—")
                             .font(.system(size: 17, weight: .bold, design: .rounded).monospacedDigit())
                     }
                 }
@@ -606,6 +576,37 @@ public struct DynamicIslandScene: View {
         }
     }
 
+    @ViewBuilder
+    private var expandedContexts: some View {
+        HStack(spacing: 8) {
+            switch fixture.contextPhase {
+            case .normal:
+                if let previous = fixture.previousCompletedSet {
+                    expandedContext(label: "PREVIOUS", context: previous, accent: PrototypePalette.mutedText)
+                }
+                if let current = fixture.currentSet {
+                    expandedContext(label: "CURRENT", context: current, accent: PrototypePalette.accent)
+                }
+            case .finalSet:
+                if let current = fixture.currentSet {
+                    expandedContext(label: "CURRENT · FINAL", context: current, accent: PrototypePalette.warning)
+                }
+                if let next = fixture.nextExerciseFirstSet {
+                    expandedContext(label: "UP NEXT", context: next, accent: PrototypePalette.accent)
+                }
+            case .postFinalSet:
+                if let completed = fixture.previousCompletedSet {
+                    expandedContext(label: "COMPLETED", context: completed, accent: PrototypePalette.success)
+                }
+                if let next = fixture.nextExerciseFirstSet {
+                    expandedContext(label: "UP NEXT", context: next, accent: PrototypePalette.accent)
+                }
+            case .none:
+                EmptyView()
+            }
+        }
+    }
+
     private func expandedContext(
         label: String,
         context: WorkoutActivityFixture.SetContext,
@@ -616,6 +617,8 @@ public struct DynamicIslandScene: View {
                 .font(.system(size: 7, weight: .bold))
                 .tracking(0.5)
                 .foregroundStyle(accent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
             Text(context.exerciseName)
                 .font(.system(size: 10, weight: .semibold))
                 .lineLimit(1)
@@ -626,9 +629,8 @@ public struct DynamicIslandScene: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8)
-        .frame(height: 38)
+        .frame(width: 169.5, height: 38, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 9).fill(accent.opacity(0.12)))
     }
 
@@ -673,7 +675,7 @@ public struct DensityAlternativesScene: View {
             VStack(alignment: .leading, spacing: 20) {
                 title("A · Normal density", subtitle: "Previous + Current")
                 LockScreenActivityCard(fixture: WorkoutActivityFixtureCatalog.normalStopwatch)
-                title("B · Final-set transition", subtitle: "Previous + Current + compact Up Next cue")
+                title("B · Final-set transition", subtitle: "Current + Up Next · Previous drops away")
                 LockScreenActivityCard(fixture: WorkoutActivityFixtureCatalog.finalSet)
                 title("C · After completion", subtitle: "Completed + Up Next")
                 LockScreenActivityCard(fixture: WorkoutActivityFixtureCatalog.postFinalSet)

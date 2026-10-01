@@ -25,6 +25,22 @@ public struct WorkoutActivityFixture: Identifiable, Hashable, Sendable {
         case saved
     }
 
+    /// Founder-locked presentation semantics. The authority may retain more
+    /// data, but every Live Activity surface projects at most these two roles.
+    public enum ContextPhase: String, Hashable, Sendable {
+        case normal
+        case finalSet
+        case postFinalSet
+        case none
+    }
+
+    public enum ContextRole: String, Hashable, Sendable {
+        case previous
+        case current
+        case completed
+        case upNext
+    }
+
     public struct SetContext: Hashable, Sendable {
         public enum Kind: String, Hashable, Sendable {
             case weighted
@@ -90,6 +106,7 @@ public struct WorkoutActivityFixture: Identifiable, Hashable, Sendable {
     public let restEndsAt: Date?
     public let completionState: CompletionState
     public let privacyMode: PrivacyMode
+    public let contextPhase: ContextPhase
 
     public var workoutElapsedText: String {
         Self.durationText(max(0, Int(referenceDate.timeIntervalSince(startedAt))))
@@ -118,13 +135,37 @@ public struct WorkoutActivityFixture: Identifiable, Hashable, Sendable {
     }
 
     public var fullContextRowCount: Int {
-        switch phase {
-        case .saving, .completed, .allSetsComplete, .stale:
-            return 0
-        case .active:
-            if previousCompletedSet != nil && currentSet != nil { return 2 }
-            if currentSet != nil && nextExerciseFirstSet != nil { return 2 }
-            return [previousCompletedSet, currentSet, nextExerciseFirstSet].compactMap { $0 }.count
+        contextRoles.count
+    }
+
+    public var contextRoles: [ContextRole] {
+        guard phase == .active else { return [] }
+        switch contextPhase {
+        case .normal:
+            return [
+                previousCompletedSet == nil ? nil : .previous,
+                currentSet == nil ? nil : .current,
+            ].compactMap { $0 }
+        case .finalSet:
+            return [
+                currentSet == nil ? nil : .current,
+                nextExerciseFirstSet == nil ? nil : .upNext,
+            ].compactMap { $0 }
+        case .postFinalSet:
+            return [
+                previousCompletedSet == nil ? nil : .completed,
+                nextExerciseFirstSet == nil ? nil : .upNext,
+            ].compactMap { $0 }
+        case .none:
+            return []
+        }
+    }
+
+    public func context(for role: ContextRole) -> SetContext? {
+        switch role {
+        case .previous, .completed: previousCompletedSet
+        case .current: currentSet
+        case .upNext: nextExerciseFirstSet
         }
     }
 
@@ -135,8 +176,8 @@ public struct WorkoutActivityFixture: Identifiable, Hashable, Sendable {
             return ["Workout", "Active", workoutElapsedText, progressText] + (restTimerText.map { [$0] } ?? [])
         }
         return [sessionLabel, currentExercise ?? "", progressText]
-            + [previousCompletedSet, currentSet, nextExerciseFirstSet]
-                .compactMap { $0 }
+            + contextRoles
+                .compactMap(context(for:))
                 .flatMap { [$0.exerciseName, $0.targetText] }
             + (restTimerText.map { [$0] } ?? [])
     }
@@ -210,6 +251,7 @@ public enum WorkoutActivityFixtureCatalog {
 
     public static let finalSet = make(
         id: "final-set",
+        contextPhase: .finalSet,
         previous: .init(
             exerciseName: "Incline Dumbbell Press",
             setNumber: 3,
@@ -233,6 +275,7 @@ public enum WorkoutActivityFixtureCatalog {
 
     public static let postFinalSet = make(
         id: "post-final-set",
+        contextPhase: .postFinalSet,
         previous: .init(
             exerciseName: "Incline Dumbbell Press",
             setNumber: 4,
@@ -240,8 +283,8 @@ public enum WorkoutActivityFixtureCatalog {
             targetText: "85 lb × 8",
             completed: true
         ),
-        current: nextExercise,
-        next: nil,
+        current: nil,
+        next: nextExercise,
         progress: .init(completedSets: 8, totalSets: 18),
         restMode: .stopwatch,
         restStartedAt: reference.addingTimeInterval(-12)
@@ -325,6 +368,7 @@ public enum WorkoutActivityFixtureCatalog {
     public static let allSetsComplete = make(
         id: "all-sets-complete",
         phase: .allSetsComplete,
+        contextPhase: .none,
         previous: nil,
         current: nil,
         progress: .init(completedSets: 18, totalSets: 18),
@@ -335,6 +379,7 @@ public enum WorkoutActivityFixtureCatalog {
     public static let saving = make(
         id: "saving",
         phase: .saving,
+        contextPhase: .none,
         previous: nil,
         current: nil,
         progress: .init(completedSets: 18, totalSets: 18),
@@ -345,6 +390,7 @@ public enum WorkoutActivityFixtureCatalog {
     public static let completed = make(
         id: "completed",
         phase: .completed,
+        contextPhase: .none,
         previous: nil,
         current: nil,
         progress: .init(completedSets: 18, totalSets: 18),
@@ -378,6 +424,7 @@ public enum WorkoutActivityFixtureCatalog {
     public static let stale = make(
         id: "stale",
         phase: .stale,
+        contextPhase: .none,
         previous: nil,
         current: nil,
         progress: .init(completedSets: 6, totalSets: 18),
@@ -387,6 +434,7 @@ public enum WorkoutActivityFixtureCatalog {
     public static let longContent = make(
         id: "long-content",
         sessionLabel: "Posterior Chain · Strength Endurance",
+        contextPhase: .finalSet,
         previous: .init(
             exerciseName: "Single-Leg Romanian Deadlift with Contralateral Cable Resistance",
             setNumber: 11,
@@ -436,6 +484,7 @@ public enum WorkoutActivityFixtureCatalog {
         id: String,
         sessionLabel: String = "Push · Chest & Shoulders",
         phase: WorkoutActivityFixture.Phase = .active,
+        contextPhase: WorkoutActivityFixture.ContextPhase = .normal,
         previous: WorkoutActivityFixture.SetContext?,
         current: WorkoutActivityFixture.SetContext?,
         isFinalSet: Bool = false,
@@ -464,7 +513,8 @@ public enum WorkoutActivityFixtureCatalog {
             restStartedAt: restStartedAt,
             restEndsAt: restEndsAt,
             completionState: completionState,
-            privacyMode: privacyMode
+            privacyMode: privacyMode,
+            contextPhase: contextPhase
         )
     }
 }
