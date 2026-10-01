@@ -63,6 +63,25 @@ protocol WorkoutLiveActivityClient: AnyObject {
     func observeEnablement(_ onChange: @escaping @MainActor (_ enabled: Bool) -> Void) -> WorkoutLiveActivityObservation
 }
 
+/// Does nothing. A unit-test host app must never start real Live Activities
+/// (they launch the extension process and outlive the test run).
+@MainActor
+final class InertWorkoutLiveActivityClient: WorkoutLiveActivityClient {
+    var areActivitiesEnabled: Bool { false }
+    func activities() -> [WorkoutLiveActivitySnapshot] { [] }
+    func request(attributes: WorkoutActivityAttributes, state: WorkoutActivityAttributes.ContentState, staleDate: Date?) throws -> String {
+        throw WorkoutLiveActivityRequestError.disabled
+    }
+    func update(id: String, state: WorkoutActivityAttributes.ContentState, staleDate: Date?) async {}
+    func end(id: String, state: WorkoutActivityAttributes.ContentState?, dismissal: WorkoutLiveActivityDismissal) async {}
+    func observeLifecycle(_ onChange: @escaping @MainActor (String, WorkoutLiveActivitySnapshot.Lifecycle) -> Void) -> WorkoutLiveActivityObservation {
+        WorkoutLiveActivityObservation {}
+    }
+    func observeEnablement(_ onChange: @escaping @MainActor (Bool) -> Void) -> WorkoutLiveActivityObservation {
+        WorkoutLiveActivityObservation {}
+    }
+}
+
 @MainActor
 final class ActivityKitWorkoutLiveActivityClient: WorkoutLiveActivityClient {
     var areActivitiesEnabled: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }

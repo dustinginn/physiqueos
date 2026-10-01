@@ -29,7 +29,14 @@ struct PhysiqueOSApp: App {
         // The Live Activity's Complete Set intent runs in this process, and a
         // background launch to run it still constructs the App, so the
         // handler and the coordinator are installed here, not on a view.
-        let liveActivity = WorkoutLiveActivityBridge(environment: environment)
+        // A unit-test host (XCTest configuration present) gets an inert client:
+        // it must not start real activities, which launch the extension and
+        // outlive the test run. UI tests and the shipping app use ActivityKit.
+        let isUnitTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let liveActivity = WorkoutLiveActivityBridge(
+            environment: environment,
+            client: isUnitTestHost ? InertWorkoutLiveActivityClient() : ActivityKitWorkoutLiveActivityClient()
+        )
         liveActivity.install()
         _workoutLiveActivity = State(initialValue: liveActivity)
         // HealthKit background delivery relaunches a terminated app WITHOUT
