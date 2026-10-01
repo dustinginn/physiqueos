@@ -1,0 +1,1 @@
+Start a fresh Claude Remote Control chat/worktree for the Workout Logger Live Activities discovery task at agent-handoffs/inbox/prompts/20261001T060100Z-workout-logger-live-activities-discovery.md. Use a NEW Claude chat, High reasoning. Research/audit/plan only. Ensure Claude publishes its GH report before stopping. This runs independently of Sleep.
