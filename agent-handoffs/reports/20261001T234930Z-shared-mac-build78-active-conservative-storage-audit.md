@@ -27,6 +27,7 @@ Protected state identified before cleanup:
 - Reserved DerivedData: `~/Library/Developer/Xcode/DerivedData/PhysiqueOS-aadwkavqlocxxlgpmjhxqqreoxcp` (0 KiB at both snapshots; retained)
 - Dedicated Simulator: `B78 Lane iPhone 17 Pro` (`39DED764-30F2-4E68-A351-FDC5E9BF2B70`, iOS 27.0, shutdown, 1,738,484 KiB); retained without erase, cache deletion, or shutdown command
 - Active `/private/tmp/claude-502` session paths; retained
+- After the cleanup snapshot, Build 78 resumed focused tests using `~/.claude/jobs/ade665c9/tmp/dd`; this job-local DerivedData measured 653,228 KiB and was explicitly retained as active work
 
 No `Xcode`, `xcodebuild`, Swift compiler/test, `XCBBuildService`, archive/export/upload, or Simulator app/device process was active at the two snapshots. This was treated only as a point-in-time observation; no Build 78 path was considered disposable.
 
@@ -135,6 +136,10 @@ Only stale worktree metadata was pruned afterward. No broad worktree cleanup was
 | Load averages | 8.42 / 58.16 / 46.01 | point-in-time during active work |
 
 No process was stopped. No cache, archive, Simulator data, DerivedData, application source, product code, signing material, credential, personal file, production/read tooling, or macOS swap file was deleted.
+
+### Post-publication active-work observation
+
+During the mandatory first `origin/main` verification, Build 78 resumed `xcodebuild test-without-building` against the dedicated `B78 Lane iPhone 17 Pro` and job-local DerivedData at `~/.claude/jobs/ade665c9/tmp/dd`. That path measured 653,228 KiB. Free space consequently fluctuated below the cleanup snapshot (22,822,436 KiB / about 21.765 GiB at the follow-up observation), and swap rose to 4,918.06 MiB used. This is attributable to protected active Build 78 work, not cleanup regression; nothing in the active path or Simulator was stopped or removed.
 
 ## Authority, safety, and next step
 

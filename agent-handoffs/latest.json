@@ -41,7 +41,8 @@
   "blockers": [],
   "unexpected_findings": [
     "The earlier 20261001T185023Z storage report existed only on a feature branch and was not readable from origin/main.",
-    "Build 78 remained active with local modified, untracked, and unmerged files; all were protected."
+    "Build 78 remained active with local modified, untracked, and unmerged files; all were protected.",
+    "Build 78 resumed focused tests during report publication using protected job-local DerivedData at ~/.claude/jobs/ade665c9/tmp/dd, causing expected post-cleanup disk and swap fluctuation."
   ],
   "backlog": [
     "Allow Claude to finish Native Build 78 without interference.",
