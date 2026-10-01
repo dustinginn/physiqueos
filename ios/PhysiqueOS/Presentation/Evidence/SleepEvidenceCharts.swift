@@ -160,9 +160,12 @@ extension SleepWindowChartRow {
         nights.compactMap { night in
             let clock = night.clock
             guard night.hasSleep, let start = clock.start, let end = clock.end else { return nil }
+            let startMinutes = minutesAfterSix(start, clock.zone)
+            let endMinutes = minutesAfterSix(end, clock.zone)
             return SleepWindowChartRow(
                 id: night.sleepDay, label: SleepEvidenceFormat.sleepDay(night.sleepDay, style: "MMM d"),
-                startMinutes: minutesAfterSix(start, clock.zone), endMinutes: minutesAfterSix(end, clock.zone),
+                // Clamp a sleep that began before 18:00 so the bar never inverts.
+                startMinutes: startMinutes <= endMinutes ? startMinutes : 0, endMinutes: endMinutes,
                 includedInConsistency: night.includedInConsistency
             )
         }
@@ -196,8 +199,10 @@ struct SleepWindowChart: View {
 
     var body: some View {
         // Two empty hours on the left keep row labels clear of the bars.
-        let lower = Double((rows.map(\.startMinutes).min() ?? 240) / 60 * 60 - 120)
-        let upper = Double(((rows.map(\.endMinutes).max() ?? 780) + 59) / 60 * 60 + 30)
+        let rawLower = Double((rows.map(\.startMinutes).min() ?? 240) / 60 * 60 - 120)
+        let rawUpper = Double(((rows.map(\.endMinutes).max() ?? 780) + 59) / 60 * 60 + 30)
+        let lower = min(rawLower, rawUpper - 240)
+        let upper = max(rawUpper, lower + 240)
         Chart {
             if let start = summary?.typicalStartMinutes, let end = summary?.typicalEndMinutes {
                 RectangleMark(xStart: .value("Typical start", Double(start)), xEnd: .value("Typical end", Double(end)))
@@ -277,6 +282,8 @@ struct SleepHypnogramView: View {
     let zone: TimeZone
     let inBedStart: Date?
     let inBedEnd: Date?
+    /// Server-flagged uncertain clock times: readouts are marked approximate.
+    var approximate = false
     @State private var selected: Date?
 
     private struct Parsed: Identifiable, Equatable {
@@ -335,10 +342,10 @@ struct SleepHypnogramView: View {
                 if let segment = selectedSegment {
                     HStack(spacing: 6) {
                         Circle().fill(PhysiqueOSTheme.sleepColor(segment.stage)).frame(width: 8, height: 8)
-                        Text("\(segment.stage.label) · \(SleepEvidenceFormat.clock(segment.start, in: zone))–\(SleepEvidenceFormat.clock(segment.end, in: zone))")
+                        Text("\(segment.stage.label) · \(approximate ? "≈ " : "")\(SleepEvidenceFormat.clock(segment.start, in: zone))–\(SleepEvidenceFormat.clock(segment.end, in: zone))")
                     }
                 } else {
-                    Text("Touch and drag across the timeline to inspect a stage.")
+                    Text(approximate ? "Touch and drag to inspect a stage. Clock times are approximate." : "Touch and drag across the timeline to inspect a stage.")
                 }
             }
             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)

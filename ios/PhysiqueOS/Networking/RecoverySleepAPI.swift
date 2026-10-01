@@ -60,8 +60,12 @@ enum RecoverySleepQuery {
         case .threeMonths: days = 90
         case .sixMonths: days = weeklyThresholdDays
         case .all:
-            let sinceStart = max(1, SleepEvidenceDay.span(evidenceStartSleepDay, today) ?? 1)
-            days = sinceStart <= maximumPageLimit ? sinceStart : max(sinceStart, weeklyThresholdDays)
+            // Always exactly the Evidence start through today. Between 101
+            // and 182 days the Server returns the newest 100 nights (the
+            // trends model flags that as truncated); from 183 days it is
+            // weekly and complete.
+            let start = min(evidenceStartSleepDay, today)
+            return Range(startDate: start, endDate: today, limit: maximumPageLimit)
         }
         let start = SleepEvidenceDay.shift(today, days: -(days - 1)) ?? today
         return Range(startDate: start, endDate: today, limit: maximumPageLimit)
@@ -109,9 +113,17 @@ struct ProductionRecoverySleepAPI: RecoverySleepAPI {
     /// A night is "day truth" (late samples, recomputation): always live.
     func fetchNight(sleepDay: String) async throws -> RecoverySleepNightDetail {
         guard RecoverySleepQuery.isSleepDayKey(sleepDay) else { throw RecoverySleepAPIError.nightNotFound }
-        let live = try await read(RecoverySleepResource.night, query: ["sleepDay": sleepDay], policy: .reload, as: RecoverySleepLiveNightDetail?.self)
-        guard let live else { throw RecoverySleepAPIError.nightNotFound }
-        return RecoverySleepAdapter.detail(live)
+        // The live route answers a sleep day without a record with 404
+        // RESOURCE_NOT_FOUND (it never serves `data: null`); the landing has
+        // already established that the resource family exists.
+        do {
+            let live = try await api.readResource(RecoverySleepResource.night, query: ["sleepDay": sleepDay], policy: .reload,
+                                                  as: RecoverySleepLiveNightDetail?.self).data
+            guard let live else { throw RecoverySleepAPIError.nightNotFound }
+            return RecoverySleepAdapter.detail(live)
+        } catch ProductionNativeError.notFound {
+            throw RecoverySleepAPIError.nightNotFound
+        }
     }
 
     private func read<Payload: Decodable & Sendable>(

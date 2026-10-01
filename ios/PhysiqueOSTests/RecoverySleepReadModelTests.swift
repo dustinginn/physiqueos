@@ -164,11 +164,15 @@ final class RecoverySleepReadModelTests: XCTestCase {
         XCTAssertEqual(RecoverySleepHubSummary.stream(landing, today: "2026-10-01").destination, .progressStream(streamId: "recovery"))
     }
 
-    func testWindowMedianGuardWithholdsMidnightStraddlingMedian() {
+    func testWindowMedianGuardWithholdsMidnightStraddlingMedian() throws {
         func row(_ id: String, _ start: Int, _ end: Int) -> SleepWindowChartRow {
             SleepWindowChartRow(id: id, label: id, startMinutes: start, endMinutes: end, includedInConsistency: true)
         }
         // 11:50 PM and 12:20 AM starts: a raw minute-of-day median is ~12:05 PM.
+        // A sleep that starts before 18:00 of its window is clamped, never inverted.
+        let early = try RecoverySleepDecoding.decoder().decode(RecoverySleepLiveNight.self, from: Data(#"{"sleepDay":"2026-10-03","status":"asleep_recorded","stageStatus":"unavailable","algorithmVersion":"sleep-canon-v2","sleepWindow":{"start":"2026-10-02T00:00:00.000Z","end":"2026-10-02T08:00:00.000Z","timeZone":"America/Los_Angeles"},"timeZoneUncertain":false}"#.utf8))
+        let clamped = try XCTUnwrap(RecoverySleepAdapter.windowRow(early))
+        XCTAssertLessThanOrEqual(clamped.startMinutes, clamped.endMinutes)
         let rows = [row("a", 350, 780), row("b", 380, 790), row("c", 365, 785)]
         let straddled = RecoverySleepWindowSummary(typicalStartMinutes: RecoverySleepAdapter.minutesAfterSix(fromMinuteOfDay: 725), typicalEndMinutes: 785,
                                                    startSpreadMinutes: 0, endSpreadMinutes: 5, nightsIncluded: 2, nightsExcludedUncertainTime: 0)
@@ -192,11 +196,10 @@ final class RecoverySleepReadModelTests: XCTestCase {
         let all = RecoverySleepQuery.range(.all, today: today)
         XCTAssertEqual(all.startDate, "2026-07-06", "All starts at the Evidence boundary, never earlier")
         XCTAssertEqual(all.limit, 100)
-        // Once Evidence spans more than one page, All widens to weekly so
-        // nothing is truncated, and stays bounded.
-        let later = RecoverySleepQuery.range(.all, today: "2026-12-01")
-        XCTAssertGreaterThanOrEqual(SleepEvidenceDay.span(later.startDate, later.endDate) ?? 0, RecoverySleepQuery.weeklyThresholdDays)
-        XCTAssertLessThanOrEqual(SleepEvidenceDay.span(later.startDate, later.endDate) ?? 0, 3660)
+        // All never reaches before the Evidence start, at any date.
+        for later in ["2026-12-01", "2027-02-01", "2027-06-01"] {
+            XCTAssertEqual(RecoverySleepQuery.range(.all, today: later).startDate, "2026-07-06", later)
+        }
         for selector in RecoverySleepTrendRange.allCases {
             let range = RecoverySleepQuery.range(selector, today: today)
             XCTAssertLessThanOrEqual(range.startDate, range.endDate)
@@ -340,6 +343,19 @@ final class RecoverySleepReadModelTests: XCTestCase {
         } catch { XCTAssertEqual(error as? RecoverySleepAPIError, .nightNotFound) }
         let paths = await transport.reads.map(\.path)
         XCTAssertEqual(paths, ["/api/v1/native/read/recovery-sleep-landing"])
+    }
+
+    /// The live route serves a sleep day without a record as 404
+    /// RESOURCE_NOT_FOUND; Native shows "No sleep was recorded".
+    func testProductionMissingNightIsNightNotFound() async throws {
+        let transport = RecoverySleepStubTransport(responses: [
+            "recovery-sleep-night": (404, #"{"title":"The requested resource is unavailable.","status":404,"code":"RESOURCE_NOT_FOUND","fieldErrors":[]}"#),
+        ])
+        let api = ProductionRecoverySleepAPI(api: try await pairedAPI(transport), today: { "2026-10-01" })
+        do {
+            _ = try await api.fetchNight(sleepDay: "2026-10-01")
+            XCTFail("expected nightNotFound")
+        } catch { XCTAssertEqual(error as? RecoverySleepAPIError, .nightNotFound) }
     }
 
     func testDestinationsRoundTrip() {

@@ -588,7 +588,7 @@ struct RecoveryEvidenceView: View {
                 Text(source.label)
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(counted ? "Counted on recent nights" : "Also recorded, not counted")
+                Text(counted ? "Counted on recent nights" : "Recorded in the last 30 days")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
                     .foregroundStyle(PhysiqueOSTheme.textMuted)
             }
@@ -709,6 +709,11 @@ struct RecoverySleepTrendsView: View {
                         .foregroundStyle(PhysiqueOSTheme.textMuted)
                 }
                 SleepTotalChart(points: points, isWeekly: isWeekly, selectedId: $selectedId, height: 190)
+                if trends.isTruncated {
+                    Text("Showing the latest \(trends.totalSleep.count) nights. Choose 6M for weekly averages of a longer span.")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                }
                 if let selected {
                     HStack(spacing: 8) {
                         SleepStatTile(label: isWeekly ? "Week of \(SleepEvidenceFormat.sleepDay(selected.periodStart, style: "MMM d"))" : SleepEvidenceFormat.sleepDay(selected.periodStart),
@@ -917,7 +922,8 @@ struct RecoverySleepNightView: View {
                 switch main.timeline.status {
                 case .available, .absent:
                     SleepHypnogramView(segments: main.timeline.segments, zone: night.clock.zone,
-                                       inBedStart: SleepEvidenceFormat.instant(main.inBedStart), inBedEnd: SleepEvidenceFormat.instant(main.inBedEnd))
+                                       inBedStart: SleepEvidenceFormat.instant(main.inBedStart), inBedEnd: SleepEvidenceFormat.instant(main.inBedEnd),
+                                       approximate: night.clock.isClockTimeCaution)
                     if main.timeline.status == .absent {
                         Text("This source recorded sleep without stages for this night.")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -925,7 +931,8 @@ struct RecoverySleepNightView: View {
                     }
                 case .pendingCorrection, .unknown:
                     SleepHypnogramView(segments: [.init(stage: .unspecified, start: main.start, end: main.end)], zone: night.clock.zone,
-                                       inBedStart: SleepEvidenceFormat.instant(main.inBedStart), inBedEnd: SleepEvidenceFormat.instant(main.inBedEnd))
+                                       inBedStart: SleepEvidenceFormat.instant(main.inBedStart), inBedEnd: SleepEvidenceFormat.instant(main.inBedEnd),
+                                       approximate: night.clock.isClockTimeCaution)
                     SleepRecalculatingNote(detail: "The stage timeline will appear once this night is recalculated.")
                 }
             }
@@ -1034,7 +1041,7 @@ struct RecoverySleepNightView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             if let start = SleepEvidenceFormat.instant(episode.start), let end = SleepEvidenceFormat.instant(episode.end) {
-                                Text("\(SleepEvidenceFormat.clock(start, in: zone)) – \(SleepEvidenceFormat.clock(end, in: zone))")
+                                Text("\(night.clock.isClockTimeCaution ? "≈ " : "")\(SleepEvidenceFormat.clock(start, in: zone)) – \(SleepEvidenceFormat.clock(end, in: zone))")
                                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                                     .foregroundStyle(PhysiqueOSTheme.textPrimary)
                             }

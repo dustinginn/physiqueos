@@ -430,6 +430,9 @@ struct RecoverySleepTrends: Equatable, Sendable {
     /// DISPLAY-ONLY mean of the plotted Server totals.
     let averageAsleepSeconds: Int?
     let nightsWithData: Int
+    /// Night granularity hit the Server page limit: only the newest nights
+    /// are plotted (shown explicitly in the UI, never silently).
+    let isTruncated: Bool
     let totalSleep: [TotalPoint]
     let windowRows: [WindowRow]?
     let continuity: [ContinuityRow]?
@@ -611,10 +614,14 @@ enum RecoverySleepAdapter {
         guard let window = night.sleepWindow,
               let start = SleepEvidenceInstant.parse(window.start), let end = SleepEvidenceInstant.parse(window.end) else { return nil }
         let zone = window.timeZone.flatMap(TimeZone.init(identifier:)) ?? .current
+        let endMinutes = SleepEvidenceInstant.minutesAfterSix(end, zone)
+        let startMinutes = SleepEvidenceInstant.minutesAfterSix(start, zone)
         return RecoverySleepTrends.WindowRow(
             sleepDay: night.sleepDay,
-            startMinutes: SleepEvidenceInstant.minutesAfterSix(start, zone),
-            endMinutes: SleepEvidenceInstant.minutesAfterSix(end, zone),
+            // A sleep that began before 18:00 of its window would wrap; clamp
+            // it to the window start so the bar never inverts.
+            startMinutes: startMinutes <= endMinutes ? startMinutes : 0,
+            endMinutes: endMinutes,
             timeZoneCertainty: certainty(night),
             includedInConsistency: night.timeZoneUncertain != true
         )
@@ -631,6 +638,7 @@ enum RecoverySleepAdapter {
                 startDate: live.range.startDate, endDate: live.range.endDate, granularity: .week,
                 averageAsleepSeconds: nightTotal > 0 ? weighted.reduce(0) { $0 + $1.0 * $1.1 } / nightTotal : nil,
                 nightsWithData: live.weekSeries.reduce(0) { $0 + $1.nightCount },
+                isTruncated: false,
                 totalSleep: points, windowRows: nil, continuity: nil, stageMix: nil
             )
         }
@@ -641,6 +649,7 @@ enum RecoverySleepAdapter {
             startDate: live.range.startDate, endDate: live.range.endDate, granularity: .night,
             averageAsleepSeconds: totals.isEmpty ? nil : totals.reduce(0, +) / totals.count,
             nightsWithData: totals.count,
+            isTruncated: live.page.nextCursor != nil,
             totalSleep: summaries.map {
                 RecoverySleepTrends.TotalPoint(periodStart: $0.sleepDay, asleepSeconds: $0.asleepSeconds, nightCount: $0.asleepSeconds == nil ? 0 : 1, trailingAverageSeconds: averages[$0.sleepDay])
             },
