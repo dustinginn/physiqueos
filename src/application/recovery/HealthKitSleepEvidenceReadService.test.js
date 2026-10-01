@@ -5,9 +5,9 @@ const day = (sleepDay, overrides = {}) => ({
   sleepDay, occurrenceDate: sleepDay, status: "asleep_recorded", algorithmVersion: "sleep-canon-v2",
   ingestionPurpose: "historical_evidence_import", origin: "historical_evidence_import", computedAt: "2026-10-01T12:00:00Z",
   mainEpisodeIndex: 0,
-  mainSleep: { asleepSeconds: 25_200, awakeSeconds: 1200, deepSeconds: 3600, coreSeconds: 14_400, remSeconds: 7200, unspecifiedSeconds: 0, inBedSeconds: 27_000, stageCoverage: "stage_detail_available" },
+  mainSleep: { asleepSeconds: 25_200, awakeSeconds: 1200, deepSeconds: 3600, coreSeconds: 14_400, remSeconds: 7200, unspecifiedSeconds: 0, inBedSeconds: 27_000, stageCoverage: 1 },
   totalAsleepIncludingSecondarySeconds: 25_200,
-  episodes: [{ kind: "main", start: `${sleepDay}T06:00:00Z`, end: `${sleepDay}T13:30:00Z`, timeZone: "America/Los_Angeles", timeZoneSource: "device_at_ingest", primarySource: { sourceFamily: "oura" }, corroboratingSources: [{ sourceFamily: "apple_watch" }], completeness: { stageDetail: "available" }, timeline: [
+  episodes: [{ kind: "main", start: `${sleepDay}T06:00:00Z`, end: `${sleepDay}T13:30:00Z`, timeZone: "America/Los_Angeles", timeZoneSource: "device_at_ingest", primarySource: { sourceFamily: "oura" }, corroboratingSources: [{ sourceFamily: "apple_watch" }], completeness: { stageDetail: "staged" }, timeline: [
     { stage: "asleep_core", start: `${sleepDay}T06:00:00Z`, end: `${sleepDay}T10:00:00Z` },
     { stage: "awake", start: `${sleepDay}T10:00:00Z`, end: `${sleepDay}T10:20:00Z` },
     { stage: "asleep_rem", start: `${sleepDay}T10:20:00Z`, end: `${sleepDay}T13:30:00Z` },
@@ -35,7 +35,16 @@ describe("Recovery/Sleep Evidence read model", () => {
     const historical = day("2026-09-30");
     const prospective = day("2026-09-30", { ingestionPurpose: "validation_only", origin: "validation_only" });
     const result = await service([historical, prospective]).value.night({ ownerUserId: "owner", sleepDay: "2026-09-30" });
-    expect(result).toMatchObject({ sleepDay: "2026-09-30", stages: { deepSeconds: 3600 }, continuity: { awakeInWindowSeconds: 1200, longestAsleepStretchSeconds: 14400 }, timeInBedSeconds: 27000, timeZoneBasis: "device_at_ingest", provenance: { origin: "validation_only" }, strategicEligible: false });
+    expect(result).toMatchObject({ sleepDay: "2026-09-30", stageStatus: "available", stages: { deepSeconds: 3600 }, continuity: { awakeInWindowSeconds: 1200, longestAsleepStretchSeconds: 14400 }, timeInBedSeconds: 27000, timeZoneBasis: "device_at_ingest", provenance: { origin: "validation_only" }, strategicEligible: false });
+  });
+
+  it("does not infer stage availability from a numeric zero-coverage field", async () => {
+    const unstaged = day("2026-09-30", {
+      mainSleep: { ...day("2026-09-30").mainSleep, stageCoverage: 0 },
+      episodes: [{ ...day("2026-09-30").episodes[0], completeness: { stageDetail: "stage_detail_absent" } }],
+    });
+    const result = await service([unstaged]).value.night({ ownerUserId: "owner", sleepDay: "2026-09-30" });
+    expect(result.stageStatus).toBe("unavailable");
   });
 
   it("bounds pagination and aggregates long ranges weekly", async () => {

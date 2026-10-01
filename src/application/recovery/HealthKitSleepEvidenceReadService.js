@@ -55,7 +55,7 @@ export function projectNight(row) {
     sleepDay: row.sleepDay, status: row.status, mainSleep: row.mainSleep,
     sleepWindow: main ? Object.freeze({ start: main.start, end: main.end, timeZone: main.timeZone }) : null,
     timeline: Object.freeze(timeline.map((segment) => Object.freeze({ stage: segment.stage, start: segment.start, end: segment.end }))),
-    stageStatus: row.algorithmVersion === "sleep-canon-v2" && row.mainSleep?.stageCoverage !== "stage_detail_absent" ? "available" : "unavailable",
+    stageStatus: row.algorithmVersion === "sleep-canon-v2" && main?.completeness?.stageDetail === "staged" ? "available" : "unavailable",
     stages: row.algorithmVersion === "sleep-canon-v2" ? stageValues(row.mainSleep) : null,
     continuity: row.algorithmVersion === "sleep-canon-v2" ? continuity(timeline, row.mainSleep) : null,
     timeInBedSeconds: row.mainSleep?.inBedSeconds ?? null,

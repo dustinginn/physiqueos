@@ -12,9 +12,9 @@ import { createHealthKitSleepIngestPort } from "./HealthKitSleepIngestPort.js";
 // controlled: this is not a generic backfill endpoint and cannot be widened by
 // a client request or a mutable production policy.
 export const HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT = Object.freeze({
-  runId: "sleep-evidence-2026-07-06-through-2026-10-03-v1",
+  runId: "sleep-evidence-2026-07-06-through-2026-10-06-v1",
   startSleepDay: "2026-07-06",
-  endSleepDay: "2026-10-03",
+  endSleepDay: "2026-10-06",
   timeZone: "America/Los_Angeles",
   ingestionPurpose: HealthKitSleepIngestionPurpose.HISTORICAL_EVIDENCE_IMPORT,
 });
@@ -55,6 +55,7 @@ export function createHealthKitSleepHistoricalEvidenceImportPort({ records, now 
       ...result,
       result: Object.freeze({
         ...result.result,
+        contractVersion: "healthkit-sleep-historical-evidence-v1",
         runId: authorization.runId,
         origin: authorization.ingestionPurpose,
         ingestionPurpose: authorization.ingestionPurpose,
