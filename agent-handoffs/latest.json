@@ -1,63 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T21:53:35Z",
-  "task": {
-    "id": "recovery-briefing-v1-design-architecture-20261001",
-    "title": "Recovery Briefing V1 design, architecture, zero-write calibration, and Founder prototype",
-    "agent": "codex",
-    "status": "complete"
-  },
+  "generated_at_utc": "2026-10-01T22:09:47Z",
+  "task": {"id": "workout-live-activities-phase1-implementation-20261001", "title": "Workout Live Activities Phase 1 final: Build 77 uploaded, VALID", "agent": "claude", "status": "completed"},
   "repository": "dustinginn/physiqueos",
-  "authority": {
-    "base_sha": "ad36e5bbe5419aff03bbf8f6a8a49b5c02d99ef2",
-    "final_sha": "4ade4f1d83badc192329289f85ba1b24f390f416",
-    "production_server_sha": "5804e88dac0db6bb04cf43647d6387efeab25906",
-    "production_deployment": "35f5cea0-535d-445e-8b76-1d7db5f98943",
-    "native_sha": "fcd26309",
-    "native_build": "76"
-  },
-  "result": {
-    "summary": "Recovery Briefing V1 is designed as a quiet Green/Yellow/Red/unavailable period state led by within-person Sleep, with sparse commentary, lightweight foam execution, non-causal training corroboration, and zero automatic Goal Confidence coupling. A strict read-only July-September replay rejected noisy rules, and nine synthetic/redacted Founder-review screenshots plus a versioned Server contract are pushed on the work branch. Nothing shipped or deployed.",
-    "success": true,
-    "production_mutated": false,
-    "deployed": false,
-    "testflight_uploaded": false
-  },
-  "validation": {
-    "tests": {
-      "status": "passed",
-      "summary": "Artifact verifier passed 9 prototype scenarios and policy guardrails; modeling runner syntax and git diff checks passed."
-    },
-    "review": {
-      "status": "passed",
-      "summary": "Nine non-shipping renders were visually inspected across Weekly, Midweek, Monthly, insufficient-data, foam, and training-corroboration states."
-    },
-    "zero_write_audit": {
-      "status": "passed",
-      "summary": "Production replay used REPEATABLE READ READ ONLY, verified transaction_read_only=on, emitted sanitized aggregates only, and rolled back with zero writes."
-    }
-  },
-  "decisions_required": [
-    "Founder visual approval for the quiet card and placement.",
-    "Founder approval for Green-without-commentary and Midweek no-Red semantics.",
-    "Founder approval to proceed only to prospective Server shadow calibration."
-  ],
+  "authority": {"base_sha": "2b41dc48", "final_sha": "c299fa29", "production_server_sha": null, "production_deployment": null, "native_sha": "c299fa29", "native_build": "77"},
+  "result": {"summary": "Workout Logger Live Activities Phase 1 shipped as Build 77 (1.0 (77)) from c299fa29: Widget Extension, coordinator, Complete Set LiveActivityIntent through TrainingSessionAuthority, round-aware supersets, Stopwatch-default rest preference, tap-to-open. Full unit 1832 tests (1 known Peptide failure), UI journeys green, Release archive with extension signed via release tool, delivery 2d0daa39-a6c9-4bc7-a027-1ec9243bf7e3 processing VALID. Physical-device acceptance not done.", "success": true, "production_mutated": false, "deployed": false, "testflight_uploaded": true},
+  "validation": {"tests": {"status": "passed", "summary": "Full Native unit 1832 tests with 1 known unrelated Peptide failure and 6 UI journeys green on exact c299fa29; Release archive succeeded; release-tool dry run all PASS; upload VALID. System-rendered Live Activity UI and locked-device behavior not verified (physical device)."}, "review": {"status": "approved", "summary": "Two fresh independent reviews and a delta re-review: no blockers; findings fixed."}, "zero_write_audit": {"status": "not_applicable", "summary": "No production access."}},
+  "decisions_required": ["Founder: run the minimal physical-device acceptance checklist on Build 77."],
   "blockers": [],
-  "unexpected_findings": [
-    "Without a period-average magnitude gate, 4 historically Green weeks would become Yellow; a two-consecutive-low-night rule would make 5 Green weeks Yellow.",
-    "Foam schedule authority begins September 15, so earlier missing days cannot be called misses."
-  ],
-  "backlog": [
-    "After Founder approval, implement a Server-only shadow assessment against prospective eligible Sleep; keep strategic Sleep and clients off.",
-    "Review DEXA/Photo preceding Recovery context separately after recurring cadence calibration."
-  ],
-  "recommended_next_step": "Founder reviews the nine screenshots and candidate policy; if approved, open a Server-only prospective shadow-calibration task with strategic Sleep, Confidence coupling, Native wiring, and production presentation still off.",
-  "full_report_path": "agent-handoffs/reports/20261001T215335Z-recovery-briefing-v1-design-architecture.md",
-  "safety": {
-    "contains_secrets": false,
-    "contains_credentials": false,
-    "contains_production_exports": false,
-    "contains_founder_evidence": false,
-    "safe_for_chatgpt_retrieval": true
-  }
+  "unexpected_findings": ["No Apple Account is signed into Xcode on this Mac; the release tool's API-key cloud signing handled the new extension App ID without Founder action."],
+  "backlog": ["Physical-device acceptance", "Build 78 only if the device pass finds issues"],
+  "recommended_next_step": "Install Build 77 and follow the checklist in the report.",
+  "full_report_path": "agent-handoffs/reports/20261001T220947Z-workout-live-activities-phase1-implementation.md",
+  "safety": {"contains_secrets": false, "contains_credentials": false, "contains_production_exports": false, "contains_founder_evidence": false, "safe_for_chatgpt_retrieval": true}
 }
