@@ -75,7 +75,7 @@ final class RecoverySleepAcceptanceUITests: XCTestCase {
         let window = text("Sleep Window")
         reveal(window)
         bringNearTop(window)
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "uncertain clock times")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Historical clock times are approximate.")).firstMatch.exists)
         capture("C1-landing-window")
         reveal(text("Data Sources"))
         capture("C2-landing-lower")
@@ -83,11 +83,11 @@ final class RecoverySleepAcceptanceUITests: XCTestCase {
         // Server-flagged travel night: approximate clock times, exact total.
         let travel = element("sleep.night.2026-09-29")
         reveal(travel)
-        XCTAssertTrue(travel.label.contains("Clock times uncertain"), travel.label)
+        XCTAssertTrue(travel.label.contains("Clock times approximate"), travel.label)
         travel.tap()
         XCTAssertTrue(element("sleep.night.screen").waitForExistence(timeout: 5))
         XCTAssertTrue(text("Timeline").waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Clock times uncertain"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Historical clock times are approximate.")).firstMatch.exists)
         capture("E-night-top")
         reveal(text("Continuity"))
         capture("F1-night-stages-continuity")
@@ -114,8 +114,8 @@ final class RecoverySleepAcceptanceUITests: XCTestCase {
         capture("D3-trends-stage-mix-collapsed")
         reveal(element("sleep.range.6m"), up: false)
         element("sleep.range.6m").tap()
-        XCTAssertTrue(text("Weekly view").waitForExistence(timeout: 5))
-        XCTAssertFalse(element("sleep.stageMix.toggle").exists)
+        // The Sandbox Evidence spans < 183 days, so 6M stays nightly (weekly only past the Server threshold).
+        XCTAssertTrue(text("Total Sleep").waitForExistence(timeout: 5))
         element("sleep.range.2w").tap()
         XCTAssertTrue(text("Total Sleep").waitForExistence(timeout: 5))
         app.navigationBars.buttons.firstMatch.tap()
@@ -132,6 +132,43 @@ final class RecoverySleepAcceptanceUITests: XCTestCase {
         reveal(text("Continuity"))
         XCTAssertTrue(app.staticTexts["Stage detail is being recalculated."].exists)
         capture("G-pending-correction")
+    }
+
+    func testGoalScopeBlocksTimeAndEdgeSwipeBackStillWorks() {
+        openRecovery().tap()
+        XCTAssertTrue(element("sleep.recovery.landing").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Jul 6 → Present"].waitForExistence(timeout: 5), "All Sleep starts at the Evidence boundary")
+
+        let abs = app.buttons["Visible Abs"].firstMatch
+        XCTAssertTrue(abs.waitForExistence(timeout: 5))
+        abs.tap()
+        let absRange = app.staticTexts["Jul 6 → Jul 18"].waitForExistence(timeout: 8)
+        if !absRange { print("DEBUG-TREE", app.staticTexts.allElementsBoundByIndex.prefix(40).map(\.label)) }
+        XCTAssertTrue(absRange, "completed Goal intersected with Evidence")
+        XCTAssertTrue(text("Final Night").waitForExistence(timeout: 5))
+        capture("H1-goal-visible-abs")
+
+        // The same scope applies on Trends.
+        let trends = element("sleep.trends")
+        reveal(trends)
+        trends.tap()
+        XCTAssertTrue(element("sleep.trends.screen").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Jul 6 → Jul 18"].waitForExistence(timeout: 5))
+        capture("H2-goal-trends")
+
+        // Leading-edge swipe-back still pops (native navigation untouched).
+        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5))
+        edge.withOffset(CGVector(dx: 2, dy: 0))
+            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)), withVelocity: .fast, thenHoldForDuration: 0)
+        XCTAssertTrue(element("sleep.recovery.landing").waitForExistence(timeout: 5))
+        XCTAssertFalse(element("sleep.trends.screen").exists)
+
+        let lean = app.buttons["Build Lean Mass"].firstMatch
+        reveal(lean, up: false)
+        lean.tap()
+        XCTAssertTrue(app.staticTexts["Jul 19 → Present"].waitForExistence(timeout: 8))
+        app.buttons["All Sleep"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Jul 6 → Present"].waitForExistence(timeout: 8))
     }
 
     func testAdditionalSleepAndUnstagedNight() {

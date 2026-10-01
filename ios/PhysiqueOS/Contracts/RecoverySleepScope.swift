@@ -97,6 +97,7 @@ final class RecoverySleepScopeStore {
     private(set) var windows: [RecoverySleepScope: RecoverySleepGoalWindow] = [:]
     private(set) var windowsState: WindowsState = .idle
     private var windowsAuthority: String?
+    private var inflight: Task<Void, Never>?
 
     func select(_ scope: RecoverySleepScope) {
         selected = scope
@@ -107,19 +108,32 @@ final class RecoverySleepScopeStore {
     @MainActor
     func loadWindows(api: RecoverySleepAPI, authority: String) async {
         if windowsAuthority != authority {
+            // A different authority invalidates the selection; the very first
+            // load keeps whatever the Founder already tapped.
+            if windowsAuthority != nil { selected = .all }
             windowsAuthority = authority
             windows = [:]
             windowsState = .idle
-            selected = .all
         }
-        guard windowsState == .idle || windowsState == .failed else { return }
+        guard windowsState == .idle || windowsState == .failed else {
+            // A second caller (another scope tap, Trends opening) waits for the
+            // read already in flight instead of returning with no dates.
+            if windowsState == .loading { await inflight?.value }
+            return
+        }
         windowsState = .loading
-        do {
-            windows = try await api.fetchGoalWindows()
-            windowsState = .loaded
-        } catch {
-            windowsState = .failed
+        // Unstructured so cancelling the first caller's task never fails the
+        // shared read.
+        let task = Task { @MainActor in
+            do {
+                windows = try await api.fetchGoalWindows()
+                windowsState = .loaded
+            } catch {
+                windowsState = .failed
+            }
         }
+        inflight = task
+        await task.value
     }
 
     /// The bounded range for the current selection; nil while a Goal is

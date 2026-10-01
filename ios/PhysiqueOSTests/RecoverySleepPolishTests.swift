@@ -103,8 +103,7 @@ final class RecoverySleepPolishTests: XCTestCase {
         store.select(.visibleAbs)
         XCTAssertNil(store.range(today: today), "a Goal's range is unknown until its dates load")
         await store.loadWindows(api: api, authority: "sandbox")
-        XCTAssertEqual(store.selected, .all, "the first load for an authority starts from All Sleep")
-        store.select(.visibleAbs)
+        XCTAssertEqual(store.selected, .visibleAbs, "the first load keeps a Goal tapped before the dates arrived")
         let range = try XCTUnwrap(store.range(today: today))
         XCTAssertEqual(range.startDate, "2026-07-06")
         XCTAssertEqual(range.endDate, "2026-07-18")
@@ -122,6 +121,43 @@ final class RecoverySleepPolishTests: XCTestCase {
         XCTAssertEqual(store.windowsState, .failed)
         XCTAssertNil(store.range(today: today))
         XCTAssertEqual(store.scopeContext(today: today).dateRangeLabel, "Goal dates could not be loaded")
+    }
+
+    @MainActor
+    func testSecondCallerWaitsForTheInFlightGoalDatesInsteadOfReturningEmpty() async throws {
+        let store = RecoverySleepScopeStore()
+        let api = FixtureRecoverySleepAPI(bundle: bundle)
+        store.select(.visibleAbs)
+        let first = Task { @MainActor in await store.loadWindows(api: api, authority: "sandbox") }
+        let second = Task { @MainActor in await store.loadWindows(api: api, authority: "sandbox") }
+        await first.value
+        await second.value
+        XCTAssertEqual(store.windowsState, .loaded)
+        XCTAssertNotNil(store.range(today: today), "the Goal range exists once both callers return")
+    }
+
+    @MainActor
+    func testSupersededScopeReadsNeverOverwriteTheNewerScope() async throws {
+        let api = FixtureRecoverySleepAPI(bundle: bundle)
+        let all = RecoverySleepScopeResolver.resolve(scope: .all, goalWindow: nil, today: today)
+        let abs = RecoverySleepScopeResolver.resolve(scope: .visibleAbs, goalWindow: visibleAbs, today: today)
+        let model = RecoverySleepLandingViewModel(api: api)
+        XCTAssertEqual(model.state(for: all), .loading, "nothing is shown before a scope has loaded")
+        await model.load(range: all)
+        guard case .loaded(let allLanding) = model.state(for: all) else { return XCTFail("All should load") }
+        XCTAssertEqual(allLanding.nights.first?.sleepDay, "2026-10-01")
+        XCTAssertEqual(model.state(for: abs), .loading, "another scope never shows All's nights")
+        await model.load(range: abs)
+        guard case .loaded(let absLanding) = model.state(for: abs) else { return XCTFail("Visible Abs should load") }
+        XCTAssertTrue(absLanding.nights.allSatisfy { $0.sleepDay <= "2026-07-18" })
+        XCTAssertEqual(model.state(for: all), .loading)
+
+        let trends = RecoverySleepTrendsViewModel(api: api)
+        await trends.select(.all, range: all)
+        await trends.select(.all, range: abs)
+        guard case .loaded(let scoped) = trends.state(for: abs) else { return XCTFail("scoped trends") }
+        XCTAssertTrue(scoped.totalSleep.allSatisfy { $0.periodStart <= "2026-07-18" })
+        XCTAssertEqual(trends.state(for: all), .loading)
     }
 
     // MARK: A. Requests stay inside the scope

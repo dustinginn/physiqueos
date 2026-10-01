@@ -26,20 +26,34 @@ private func loadState<Value: Equatable>(_ work: () async throws -> Value) async
 final class RecoverySleepLandingViewModel {
     private(set) var state: RecoverySleepLoadState<RecoverySleepLanding> = .loading
     private var loadedRange: RecoverySleepScopeRange?
+    /// The scope the current `state` belongs to.
+    private var stateRange: RecoverySleepScopeRange?
+    private var requestedRange: RecoverySleepScopeRange?
     private let api: RecoverySleepAPI
 
     init(api: RecoverySleepAPI) {
         self.api = api
     }
 
+    /// What to show for `range`: never another scope's nights, even for the
+    /// frame before the reload for a freshly selected scope starts.
+    func state(for range: RecoverySleepScopeRange?) -> RecoverySleepLoadState<RecoverySleepLanding> {
+        guard let range, stateRange == range else { return .loading }
+        return state
+    }
+
     /// One bounded read inside the selected scope. Switching scope shows the
     /// loading state (never another scope's nights); a plain reload keeps the
     /// last shown landing on screen until the new one arrives.
     func load(range: RecoverySleepScopeRange, policy: RecoverySleepReadPolicy = .cacheFirst) async {
-        if loadedRange != range { state = .loading }
+        requestedRange = range
+        if loadedRange != range { state = .loading; stateRange = range }
         let next = await loadState { try await api.fetchLanding(range: range, policy: policy) }
+        // A cancelled or superseded read must not overwrite a newer scope.
+        guard !Task.isCancelled, requestedRange == range else { return }
         if case .failed = next, case .loaded = state, loadedRange == range { return }
         loadedRange = range
+        stateRange = range
         state = next
     }
 }
@@ -55,10 +69,17 @@ final class RecoverySleepTrendsViewModel {
     private(set) var selector: RecoverySleepTrendRange = .oneMonth
     private(set) var state: RecoverySleepLoadState<RecoverySleepTrends> = .loading
     private var loaded: [CacheKey: RecoverySleepTrends] = [:]
+    private var stateRange: RecoverySleepScopeRange?
+    private var requestedKey: CacheKey?
     private let api: RecoverySleepAPI
 
     init(api: RecoverySleepAPI) {
         self.api = api
+    }
+
+    func state(for range: RecoverySleepScopeRange?) -> RecoverySleepLoadState<RecoverySleepTrends> {
+        guard let range, stateRange == range else { return .loading }
+        return state
     }
 
     func load(range: RecoverySleepScopeRange) async {
@@ -70,14 +91,17 @@ final class RecoverySleepTrendsViewModel {
     func select(_ selector: RecoverySleepTrendRange, range: RecoverySleepScopeRange) async {
         self.selector = selector
         let key = CacheKey(selector: selector, range: range)
+        requestedKey = key
+        stateRange = range
         if let cached = loaded[key] {
             state = .loaded(cached)
             return
         }
         state = .loading
         let next = await loadState { try await api.fetchTrends(selector: selector, range: range) }
-        guard self.selector == selector else { return }
         if case .loaded(let trends) = next { loaded[key] = trends }
+        // A cancelled or superseded read must not overwrite a newer scope or range.
+        guard !Task.isCancelled, requestedKey == key else { return }
         state = next
     }
 }

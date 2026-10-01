@@ -439,7 +439,7 @@ struct RecoveryEvidenceView: View {
     @ViewBuilder
     private var landingContent: some View {
         VStack(alignment: .leading, spacing: 24) {
-            switch viewModel?.state {
+            switch viewModel?.state(for: scopeRange) {
             case .none, .loading:
                 ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 300)
             case .notAvailable:
@@ -702,7 +702,7 @@ struct RecoverySleepTrendsView: View {
                     SleepScopeStateCard(store: store, range: scopeRange) { retryNonce += 1 }
                 } else {
                     rangeSelector
-                    switch viewModel?.state {
+                    switch viewModel?.state(for: scopeRange) {
                     case .none, .loading:
                         ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 300)
                     case .notAvailable:
