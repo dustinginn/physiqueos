@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Keeps at most one Workout Live Activity in step with the app-scoped
 /// `TrainingSessionAuthority`. It is a write-only projection: it observes
@@ -49,10 +50,15 @@ final class WorkoutLiveActivityCoordinator {
     private var syncRequested = false
     private var immediateRequested = false
 
-    /// Test visibility (bounded).
+    /// Test visibility (bounded). Also logged (event names only; never
+    /// exercise names, values or ids).
     private(set) var diagnostics: [String] = [] {
-        didSet { if diagnostics.count > 64 { diagnostics.removeFirst(diagnostics.count - 64) } }
+        didSet {
+            if let last = diagnostics.last { Self.log.info("event \(last, privacy: .public)") }
+            if diagnostics.count > 64 { diagnostics.removeFirst(diagnostics.count - 64) }
+        }
     }
+    private static let log = Logger(subsystem: "com.physiqueos.native", category: "WorkoutLiveActivity")
 
     init(
         client: WorkoutLiveActivityClient,
@@ -204,6 +210,7 @@ final class WorkoutLiveActivityCoordinator {
         } catch WorkoutLiveActivityRequestError.disabled {
             diagnostics.append("disabled")
         } catch {
+            Self.log.error("request failed: \(String(describing: error), privacy: .public)")
             diagnostics.append("request-failed")
         }
     }

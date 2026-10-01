@@ -379,6 +379,68 @@ final class TrainingAcceptanceUITests: XCTestCase {
         tapButton(identifier: "trainingLogger.inlineSaveAndLeave")
     }
 
+    /// Live Activities Phase 1: the Logger exposes the rest preference
+    /// (Stopwatch by default; Countdown and Off selectable).
+    func testRestPreferenceMenuDefaultsToStopwatchAndSwitchesMode() throws {
+        launchInSandbox()
+        openWorkoutLoggerFromLog()
+        tapButton(identifier: "trainingLogger.start")
+        tapButton(identifier: "trainingLogger.area.shoulders")
+        tapText("Choose exercises")
+        selectExercise(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        tapButton(identifier: "trainingLogger.startLogging")
+
+        let menu = app.buttons["trainingLogger.restPreference"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "Rest preference control was not reachable.")
+        XCTAssertTrue(menu.label.contains("Stopwatch"), "Stopwatch is the default rest mode (was \(menu.label)).")
+        attachScreenshot("40-rest-preference-stopwatch-default")
+
+        menu.tap()
+        let off = app.buttons["Off"].firstMatch
+        XCTAssertTrue(off.waitForExistence(timeout: 3), "Off was not offered.")
+        off.tap()
+        XCTAssertTrue(app.buttons["trainingLogger.restPreference"].label.contains("Off"))
+
+        app.buttons["trainingLogger.restPreference"].tap()
+        let countdown = app.buttons["Countdown"].firstMatch
+        XCTAssertTrue(countdown.waitForExistence(timeout: 3), "Countdown was not offered.")
+        countdown.tap()
+        XCTAssertTrue(app.buttons["trainingLogger.restPreference"].label.contains("Countdown"))
+        attachScreenshot("41-rest-preference-countdown")
+
+        // Restore the default and leave the workout saved, like the other journeys.
+        app.buttons["trainingLogger.restPreference"].tap()
+        app.buttons["Stopwatch"].firstMatch.tap()
+        tapButton(identifier: "trainingLogger.inlineSaveAndLeave")
+    }
+
+    /// Live Activities Phase 1: starting a workout and completing a set keeps
+    /// the app healthy while it is backgrounded (the Live Activity itself is
+    /// system UI; screenshots of it are captured out-of-band by the release
+    /// acceptance procedure, and the physical-device checklist covers the rest).
+    /// Holds on the Home Screen for `WORKOUT_LA_HOLD_SECONDS` (default 3).
+    func testWorkoutStartedAndSetCompletedThenBackgroundedDoesNotDisturbTheApp() throws {
+        launchInSandbox()
+        openWorkoutLoggerFromLog()
+        tapButton(identifier: "trainingLogger.start")
+        tapButton(identifier: "trainingLogger.area.shoulders")
+        tapText("Choose exercises")
+        selectExercise(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        tapButton(identifier: "trainingLogger.startLogging")
+        fillFirstSet(reps: "10", load: "100")
+        let markComplete = app.buttons["Mark set complete"].firstMatch
+        XCTAssertTrue(markComplete.waitForExistence(timeout: 3))
+        markComplete.tap()
+        XCTAssertTrue(app.buttons["Mark set incomplete"].firstMatch.waitForExistence(timeout: 3))
+
+        XCUIDevice.shared.press(.home)
+        let hold = Double(ProcessInfo.processInfo.environment["WORKOUT_LA_HOLD_SECONDS"] ?? "") ?? 3
+        Thread.sleep(forTimeInterval: hold)
+        app.activate()
+        XCTAssertTrue(app.buttons["Mark set incomplete"].firstMatch.waitForExistence(timeout: 5), "The workout was lost across backgrounding.")
+        tapButton(identifier: "trainingLogger.inlineSaveAndLeave")
+    }
+
     /// Build 21 item 1 acceptance: the screenshot-attachment card Workout
     /// Review promises ("Check every completed set and add optional Apple
     /// Health screenshots") must actually be reachable, and a workout with
