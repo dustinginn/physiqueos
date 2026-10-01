@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T04:03:11Z",
+  "generated_at_utc": "2026-10-01T04:45:41Z",
   "task": {
-    "id": "healthkit-sleep-evidence-visual-prototype-20261001",
-    "title": "Sleep Evidence NON-SHIPPING visual prototype + 11 Simulator screenshots",
+    "id": "healthkit-sleep-evidence-native-implementation-20261001",
+    "title": "Recovery/Sleep Evidence Native implementation against proposed contract v0 (not integrated, not uploaded)",
     "agent": "claude",
-    "status": "completed"
+    "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "a5041eb0",
-    "final_sha": "3a2697da",
+    "final_sha": "d550c629",
     "production_server_sha": "08aeecde",
     "production_deployment": "1e7d28e6-b142-4d8c-9fac-96dd1498ffd8",
     "native_sha": "0591267480a4e1ece98e7855ecaecfdbb4dc8944",
     "native_build": "73"
   },
   "result": {
-    "summary": "Fixture-backed (synthetic) Sleep Evidence prototype on claude/sleep-evidence-prototype-20261001 @ 3a2697da, gated DEBUG + launch argument + Sandbox. Simulator worked headlessly despite the locked Mac; 11 screenshots (hub, Recovery landing, Trends, Night detail, provenance, pending-correction state) committed under ios/Prototypes/SleepEvidence/screenshots/. Unit 7/7, UI 2/2, Evidence regressions and a5041eb0 cleanup test pass; Release compile OK. Non-shipping.",
+    "summary": "Recovery landing, Trends, Night detail and paged nights implemented on claude/sleep-evidence-native-20261001 @ d550c629 (base a5041eb0). Production reads only four bounded recovery-sleep* Server resources (404 => not available; hub row fail-soft); synthetic fixture Sandbox-only. v2-gated stages; Server-flagged uncertain clock times shown approximate and excluded from consistency. Codex read model not yet published, so contract proposal v0 documented in docs/native-contracts; integrated acceptance pending. No upload.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,11 +26,11 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Prototype unit 7/7, prototype UI 2/2, Evidence unit 15/15, corrected-Evidence journey + Founder-page cleanup UI tests pass; Debug + Release build OK."
+      "summary": "RecoverySleep unit 18/18, UI 2/2, FounderServerAPITests 243/243, Evidence + Founder-page + Evidence journey regressions pass; full unit 1651 with 1 known Peptide failure; Release compile OK."
     },
     "review": {
       "status": "not_run",
-      "summary": "Non-shipping prototype; full review deferred to Slice 1 implementation."
+      "summary": "Fresh review recommended before integrated Build 74."
     },
     "zero_write_audit": {
       "status": "not_applicable",
@@ -38,17 +38,22 @@
     }
   },
   "decisions_required": [
-    "Founder: review 11 screenshots and answer 7 visual questions (or approve)."
+    "Codex: publish Server recovery-sleep read model matching contract v0 or list differences.",
+    "Coordinate integrated Build 74 (this branch + any required historical-import Native capability) under Codex rollout task."
   ],
-  "blockers": [],
+  "blockers": [
+    "Server Recovery/Sleep read-model contract not yet published by Codex (integration acceptance blocked, implementation not)."
+  ],
   "unexpected_findings": [
-    "Simulator automation works headlessly while the Mac console is locked; no unlock needed."
+    "Production Evidence Hub fails entirely if any read throws; Recovery read added fail-soft to avoid regressions."
   ],
   "backlog": [
-    "Slice 1 implementation after canon-v2 + D0 relaxation + prospective activation"
+    "Fresh review",
+    "Adapter alignment to Codex contract",
+    "Integrated Founder Production read check"
   ],
-  "recommended_next_step": "Founder visual review of ios/Prototypes/SleepEvidence/screenshots on branch claude/sleep-evidence-prototype-20261001.",
-  "full_report_path": "agent-handoffs/reports/20261001T040311Z-healthkit-sleep-evidence-visual-prototype.md",
+  "recommended_next_step": "Codex publishes the read model; Native aligns adapter and runs integrated read check before Build 74.",
+  "full_report_path": "agent-handoffs/reports/20261001T044541Z-healthkit-sleep-evidence-native-implementation.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
