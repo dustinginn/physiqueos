@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Focused safe storage cleanup for Workout Live Activities Build 77 (22.4 GiB free) (`shared-mac-safe-storage-recovery-2-20261001`)
-- Agent: claude
-- Status: completed
-- Generated (UTC): 2026-10-01T21:52:44Z
+- Task: Recovery Briefing V1 design, architecture, zero-write calibration, and Founder prototype (`recovery-briefing-v1-design-architecture-20261001`)
+- Agent: codex
+- Status: complete
+- Generated (UTC): 2026-10-01T21:53:35Z
 - Success: true
 
-Summary: Free disk raised from 14.87 GiB to 22.41 GiB by deleting 7.27 GiB of regenerated DerivedData and xcresult bundles from one finished job scratch directory, after proving no build/archive/upload was running. Idle Simulator shut down. Live Activities worktree c299fa29 verified clean and equal to origin; Build 75/76 archives, tooling worktrees, signing, credentials and swap preserved.
+Summary: Recovery Briefing V1 is designed as a quiet Green/Yellow/Red/unavailable period state led by within-person Sleep, with sparse commentary, lightweight foam execution, non-causal training corroboration, and zero automatic Goal Confidence coupling. A strict read-only July–September replay rejected noisy rules, and nine synthetic/redacted Founder-review screenshots plus a versioned Server contract are pushed on the work branch. Nothing shipped or deployed.
 
-Detailed report: `agent-handoffs/reports/20261001T215244Z-shared-mac-safe-storage-recovery-2.md`
+Detailed report: `agent-handoffs/reports/20261001T215335Z-recovery-briefing-v1-design-architecture.md`
 
 Protocol: `agent-handoffs/README.md`
