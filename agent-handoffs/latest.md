@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Workout Logger Live Activities discovery, architecture audit, and phased implementation plan (`workout-logger-live-activities-discovery-20261001`)
+- Task: Recovery/Sleep Evidence reconciled to live Server b81c784e; Build 75 VALID (`healthkit-sleep-evidence-integrated-native-20261001`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-10-01T05:58:45Z
+- Generated (UTC): 2026-10-01T14:54:08Z
 - Success: true
 
-Summary: Research/audit/plan only; no application code. A Phase 1 Workout Logger Live Activity is feasible fully local: new Widget Extension (com.physiqueos.native.dev.WorkoutActivity), NSSupportsLiveActivities on the app, shared ActivityAttributes, no App Group, no push entitlement, no Server/HealthKit change. Authority is the persisted TrainingLoggerDraft (UserDefaults via TrainingLoggerDraftStore); the Live Activity is a write-only projection driven from a decorator at the draft-store boundary through an app-scoped coordinator, with explicit lifecycle/orphan/duplicate/suppression rules. No rest timer, current-set cursor, or per-set timestamps exist today: Phase 1 derives current exercise deterministically and ships without rest; Phase 1B adds a Logger rest timer (absolute endsAt, system timer rendering); Phase 2 rest-only controls require an app-scoped session-authority refactor; Phase 3 remote push not recommended. APIs verified against the local iOS 27 SDK plus Apple docs/HIG/WWDC26. Independent of Sleep; Sleep's latest status remains in report 20261001T053235Z.
+Summary: Native Recovery/Sleep Evidence adapted to the live b81c784e contract (landing/trends/night, bounded ranges, trends paging, tolerant enums, v2 stage gating, uncertain-zone honesty). Read-only real Founder Production acceptance: 87 historical nights decode through the Native decoder/adapter across landing, all ranges (6M weekly), paging (87 unique, earliest 2026-07-06) and historical nights. Generator drift fixed (byte-identical regeneration). Fresh review findings fixed. Build 75 uploaded (delivery 82938660) VALID. Strategic OFF.
 
-Detailed report: `agent-handoffs/reports/20261001T055845Z-workout-logger-live-activities-discovery-plan.md`
+Detailed report: `agent-handoffs/reports/20261001T145408Z-healthkit-sleep-evidence-integrated-native.md`
 
 Protocol: `agent-handoffs/README.md`

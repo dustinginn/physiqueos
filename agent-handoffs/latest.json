@@ -1,77 +1,58 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T13:45:57Z",
+  "generated_at_utc": "2026-10-01T14:54:08Z",
   "task": {
-    "id": "sleep-verify-import-oct2-d0-20261001",
-    "title": "Verify historical Sleep Evidence import and activate October 2 prospective validation",
-    "agent": "codex",
+    "id": "healthkit-sleep-evidence-integrated-native-20261001",
+    "title": "Recovery/Sleep Evidence reconciled to live Server b81c784e; Build 75 VALID",
+    "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
+    "base_sha": "b6d98889a9ebac2fd6755ec126c1b5ba394545fa",
+    "final_sha": "77681cd7",
     "production_server_sha": "b81c784e5b8a6d5b82ed02a649b5fa3d0edeeff8",
     "production_deployment": "8008f928-02b6-46b0-99ab-d403b870499a",
-    "native_sha": "b6d98889a9ebac2fd6755ec126c1b5ba394545fa",
-    "native_build": "74",
-    "claude_native_proposal_sha": "d550c629e6028fef2db44e98cd51f2a4d2d6ff2f"
+    "native_sha": "77681cd7",
+    "native_build": "75"
   },
   "result": {
-    "summary": "Recovered the missing default-branch checkpoint and reran all production gates. The Build 74 historical import remains exactly 8,601 unique samples, 87 batches, and 87 sleep days from 2026-07-06 through 2026-09-30. History remains permanently quarantined, September remains 30/30 canon-v2 semantic parity, the exact 2,878-sample validation remains zero-write green, live Recovery/Sleep reads pass, and historical overlap with Oct 2 remains 0/0. The Oct 2 prospective policy is already active in validation_only with Oura preferred, no backfill, and strategic use off; strategic leakage remains zero.",
+    "summary": "Native Recovery/Sleep Evidence adapted to the live b81c784e contract (landing/trends/night, bounded ranges, trends paging, tolerant enums, v2 stage gating, uncertain-zone honesty). Read-only real Founder Production acceptance: 87 historical nights decode through the Native decoder/adapter across landing, all ranges (6M weekly), paging (87 unique, earliest 2026-07-06) and historical nights. Generator drift fixed (byte-identical regeneration). Fresh review findings fixed. Build 75 uploaded (delivery 82938660) VALID. Strategic OFF.",
     "success": true,
     "production_mutated": false,
-    "previously_applied_production_policy_verified": true,
     "deployed": false,
-    "testflight_uploaded": false,
-    "founder_device_operated": false
+    "testflight_uploaded": true
   },
   "validation": {
-    "historical_import": {
+    "tests": {
       "status": "passed",
-      "summary": "8,601 unique samples; 87 unique batches/days; first 2026-07-06; last 2026-09-30; v2 and permanent quarantine on all records; ordinary Sleep 0/0; D0 overlap 0/0."
+      "summary": "Sleep unit 23/23 incl. real-capture acceptance; full unit 1660 (1 known Peptide failure, 1 env-gated skip); Sleep UI 2/2; Founder-page and Evidence journey UI pass; Release compile OK."
     },
-    "september_v2": {
+    "review": {
+      "status": "approved",
+      "summary": "Fresh independent review: no blockers; 5 findings fixed in c03aaf56."
+    },
+    "zero_write_audit": {
       "status": "passed",
-      "summary": "30/30 exact semantic parity; 11 duplicate-copy nights resolved to one conflict-free copy within tolerance; 19/19 unaffected equivalent; exact 2,878-sample zero-write audit passed again during recovery."
-    },
-    "read_model": {
-      "status": "passed",
-      "summary": "Landing, ranged trends, weekly aggregation, paging, night detail, stages, continuity, timeline, provenance/timezone, scoped queries, and prospective-over-historical day precedence passed against production data."
-    },
-    "strategic_quarantine": {
-      "status": "passed",
-      "summary": "No historical V3, Goal, Briefing/Narrative/recommendation, Confidence, or strategic Evidence mutation/reference; source audit leak total 0."
-    },
-    "prospective_policy": {
-      "status": "passed",
-      "summary": "Oct 2 D0 remains enabled in validation_only; floor 2026-10-02T01:00:00Z; Oura preference; historicalBackfill false; strategic quarantine; no strategicEffectiveAt; served capability enabled."
-    },
-    "native_contract": {
-      "status": "reconciliation_required",
-      "summary": "Claude d550c629 proposal is not decode-compatible with the live resource names, query parameters, envelopes, enum values, trends arrays, or flat night-detail shape. Exact adapter differences are in the full report."
-    },
-    "github_publication": {
-      "status": "passed",
-      "summary": "Recovered from branch-only publication and republished the complete report as a report-only change based on current origin/main."
+      "summary": "Read-only acceptance capture: READ ONLY txn, 0 non-SELECT statements, rolled back."
     }
   },
-  "decisions_required": [],
+  "decisions_required": [
+    "Founder: install Build 75 and run the acceptance steps in the report.",
+    "Codex/Founder: Server window medians are not midnight-safe (fix suggested); sleep day 2026-10-01 is in neither historical nor prospective lane."
+  ],
   "blockers": [],
   "unexpected_findings": [
-    "The original complete report was pushed only to the reviewed Native branch and therefore was absent from origin/main; this recovery publishes it from current main history.",
-    "Claude's Native Recovery/Sleep UI is cleanly separated behind models/APIs but targets its proposed v0 contract, not the deployed Server contract; it must be adapted before integrated Native acceptance."
+    "Server window median computed on raw minute-of-day (not midnight-safe); Native guards display.",
+    "Sleep day 2026-10-01 uncovered (historical ends Sep 30, D0 Oct 2).",
+    "Live night route returns 404 RESOURCE_NOT_FOUND, never data:null."
   ],
   "backlog": [
-    "Observe 2-3 prospective nights for background delivery, Oura primary selection, late-update reconciliation, recent-window behavior, one canonical day, v2 stage/continuity display, Evidence updates, and zero strategic leakage.",
-    "Adapt Claude RecoverySleepReadModel.swift and RecoverySleepAPI.swift plus fixtures/tests to the exact live Server contract; do not merge the proposal unchanged.",
-    "Keep strategic Sleep off until prospective sync acceptance, Recovery Briefing design/review, and a separate explicit Founder authorization."
+    "Oct 2-4 prospective empirical acceptance (separate gate)",
+    "Server midnight-safe window median"
   ],
-  "recommended_next_step": "Run the defined 2-3-night prospective acceptance beginning with sleep day 2026-10-02. Do not rerun a destructive historical operation, do not enable strategic Sleep, and do not merge Claude's Native read models without the documented contract adapter.",
-  "full_report_path": "agent-handoffs/reports/20261001T061329Z-sleep-historical-import-verified-prospective-d0.md",
-  "related_report_paths": [
-    "agent-handoffs/reports/20261001T053235Z-healthkit-sleep-v2-server-deployed-founder-import-gate.md",
-    "agent-handoffs/reports/20261001T050828Z-healthkit-sleep-v2-historical-evidence-prospective-prep.md",
-    "agent-handoffs/reports/20261001T044541Z-healthkit-sleep-evidence-native-implementation.md"
-  ],
+  "recommended_next_step": "Founder installs Build 75 and follows the acceptance flow; prospective nights accrue naturally.",
+  "full_report_path": "agent-handoffs/reports/20261001T145408Z-healthkit-sleep-evidence-integrated-native.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
