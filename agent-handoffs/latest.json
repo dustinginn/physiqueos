@@ -1,59 +1,16 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T21:17:29Z",
-  "task": {
-    "id": "healthkit-sleep-server-midnight-window-closeout-20261001",
-    "title": "HealthKit Sleep Server midnight-safe Sleep Window closeout",
-    "agent": "codex",
-    "status": "complete"
-  },
+  "generated_at_utc": "2026-10-01T21:43:04Z",
+  "task": {"id": "workout-live-activities-phase1-implementation-20261001", "title": "Workout Live Activities Phase 1: checkpoint 2 (paused at disk floor before archive)", "agent": "claude", "status": "blocked"},
   "repository": "dustinginn/physiqueos",
-  "authority": {
-    "base_sha": "b81c784e5b8a6d5b82ed02a649b5fa3d0edeeff8",
-    "final_sha": "5804e88dac0db6bb04cf43647d6387efeab25906",
-    "production_server_sha": "5804e88dac0db6bb04cf43647d6387efeab25906",
-    "production_deployment": "35f5cea0-535d-445e-8b76-1d7db5f98943",
-    "native_sha": "fcd26309",
-    "native_build": "76"
-  },
-  "result": {
-    "summary": "Server-only midnight-safe Sleep Window statistics deployed at 5804e88d. The 18:00-anchored transform preserves the Recovery/Sleep API contract and reliable-clock eligibility. Production acceptance re-proved 8,601 historical samples, 87 nights, 30/30 September parity, zero strategic leakage, bounded scoped reads, exact web/worker SHA parity, and green live/ready. Oct 2 remains validation_only with Oura preferred and strategic Sleep off; no prospective canonical day exists yet.",
-    "success": true,
-    "production_mutated": true,
-    "deployed": true,
-    "testflight_uploaded": false
-  },
-  "validation": {
-    "tests": {
-      "status": "passed",
-      "summary": "Sleep Server 10/10 files and 138/138 tests passed; focused read model 22/22; Phase 3 308/309 with only the established missing private fixture; production build passed."
-    },
-    "review": {
-      "status": "passed",
-      "summary": "Fresh independent review found no blocking math, eligibility, DST, determinism, contract, or scope issue; all three low-severity test-strengthening findings were addressed."
-    },
-    "zero_write_audit": {
-      "status": "passed",
-      "summary": "Pre/postdeploy REPEATABLE READ READ ONLY audits rolled back with 0 record-store mutations: 8,601/87 historical invariants, 2,878-sample validation parity, and strategic leak total 0."
-    }
-  },
-  "decisions_required": [],
-  "blockers": [],
-  "unexpected_findings": [
-    "Ordinary Sleep storage contains 185 deletion tombstones, 0 live samples, and 0 canonical days; the natural Oct 2 canary remains pending.",
-    "Two comprehensive postdeploy audits observed isolated 3.8-4.8 second provider/database latency outliers; a separate three-round benchmark remained fully scoped with a 1.134 second worst call and no query-shape regression."
-  ],
-  "backlog": [
-    "Observe the natural 2-3-night Oct 2-4 validation_only canary without manual triggering.",
-    "Defer diagnostic/validation cleanup until empirical canary acceptance."
-  ],
-  "recommended_next_step": "Observe the natural Oct 2 prospective canary only; keep Oura preference, validation_only policy, historical quarantine, validation corpus, and strategic Sleep OFF unchanged.",
-  "full_report_path": "agent-handoffs/reports/20261001T203806Z-healthkit-sleep-server-midnight-window-closeout.md",
-  "safety": {
-    "contains_secrets": false,
-    "contains_credentials": false,
-    "contains_production_exports": false,
-    "contains_founder_evidence": false,
-    "safe_for_chatgpt_retrieval": true
-  }
+  "authority": {"base_sha": "2b41dc48", "final_sha": "c299fa29", "production_server_sha": null, "production_deployment": null, "native_sha": "c299fa29", "native_build": "77"},
+  "result": {"summary": "Phase 1 implementation complete and Build 77 prepared at c299fa29; two independent reviews addressed (suppression rule corrected, flush waiters, presentation parity, deep-link guard); full unit 1832 tests (1 known Peptide failure) at 596e3731. Paused before archive/upload because free disk fell below the 15 GiB floor.", "success": false, "production_mutated": false, "deployed": false, "testflight_uploaded": false},
+  "validation": {"tests": {"status": "passed", "summary": "Full unit 1832 tests, 1 known unrelated failure at 596e3731; Live Activity suites green; UI journeys green at 734741af; final head c299fa29 builds but full suite/UI not re-run; Release compile and archive not run."}, "review": {"status": "approved", "summary": "Two fresh independent reviews: no blockers; findings fixed; delta review's real finding corrected."}, "zero_write_audit": {"status": "not_applicable", "summary": "No production access."}},
+  "decisions_required": ["Founder: free about 6+ GiB (target >=20 GiB free) and say resume, OR waive the 15 GiB floor for the archive, OR stop here."],
+  "blockers": ["Free disk 14.9 GiB (<15 GiB floor) and falling; archive not started."],
+  "unexpected_findings": ["A unit-test host that started a real Live Activity launched the extension and hung xcodebuild after the run; fixed with an inert client under XCTest."],
+  "backlog": ["Rerun gates at c299fa29", "Release archive + signing validation", "Upload build 77 and wait VALID", "Physical-device acceptance (Founder)"],
+  "recommended_next_step": "Founder frees disk or waives the floor; agent then archives, validates signing, uploads build 77 and publishes the final report.",
+  "full_report_path": "agent-handoffs/reports/20261001T214304Z-workout-live-activities-phase1-checkpoint-2.md",
+  "safety": {"contains_secrets": false, "contains_credentials": false, "contains_production_exports": false, "contains_founder_evidence": false, "safe_for_chatgpt_retrieval": true}
 }
