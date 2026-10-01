@@ -1,67 +1,77 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T05:58:45Z",
+  "generated_at_utc": "2026-10-01T13:45:57Z",
   "task": {
-    "id": "workout-logger-live-activities-discovery-20261001",
-    "title": "Workout Logger Live Activities discovery, architecture audit, and phased implementation plan",
-    "agent": "claude",
+    "id": "sleep-verify-import-oct2-d0-20261001",
+    "title": "Verify historical Sleep Evidence import and activate October 2 prospective validation",
+    "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "b6d98889a9ebac2fd6755ec126c1b5ba394545fa",
-    "final_sha": null,
-    "production_deployment": "8008f928-02b6-46b0-99ab-d403b870499a",
     "production_server_sha": "b81c784e5b8a6d5b82ed02a649b5fa3d0edeeff8",
-    "native_sha": "b6d98889",
-    "native_build": "74"
+    "production_deployment": "8008f928-02b6-46b0-99ab-d403b870499a",
+    "native_sha": "b6d98889a9ebac2fd6755ec126c1b5ba394545fa",
+    "native_build": "74",
+    "claude_native_proposal_sha": "d550c629e6028fef2db44e98cd51f2a4d2d6ff2f"
   },
   "result": {
-    "summary": "Research/audit/plan only; no application code. A Phase 1 Workout Logger Live Activity is feasible fully local: new Widget Extension (com.physiqueos.native.dev.WorkoutActivity), NSSupportsLiveActivities on the app, shared ActivityAttributes, no App Group, no push entitlement, no Server/HealthKit change. Authority is the persisted TrainingLoggerDraft (UserDefaults via TrainingLoggerDraftStore); the Live Activity is a write-only projection driven from a decorator at the draft-store boundary through an app-scoped coordinator, with explicit lifecycle/orphan/duplicate/suppression rules. No rest timer, current-set cursor, or per-set timestamps exist today: Phase 1 derives current exercise deterministically and ships without rest; Phase 1B adds a Logger rest timer (absolute endsAt, system timer rendering); Phase 2 rest-only controls require an app-scoped session-authority refactor; Phase 3 remote push not recommended. APIs verified against the local iOS 27 SDK plus Apple docs/HIG/WWDC26. Independent of Sleep; Sleep's latest status remains in report 20261001T053235Z.",
+    "summary": "Recovered the missing default-branch checkpoint and reran all production gates. The Build 74 historical import remains exactly 8,601 unique samples, 87 batches, and 87 sleep days from 2026-07-06 through 2026-09-30. History remains permanently quarantined, September remains 30/30 canon-v2 semantic parity, the exact 2,878-sample validation remains zero-write green, live Recovery/Sleep reads pass, and historical overlap with Oct 2 remains 0/0. The Oct 2 prospective policy is already active in validation_only with Oura preferred, no backfill, and strategic use off; strategic leakage remains zero.",
     "success": true,
     "production_mutated": false,
+    "previously_applied_production_policy_verified": true,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": false,
+    "founder_device_operated": false
   },
   "validation": {
-    "tests": {
-      "status": "not_run",
-      "summary": "No code changed; plan includes a 52-item deterministic test plan and a 17-step physical-device acceptance checklist."
+    "historical_import": {
+      "status": "passed",
+      "summary": "8,601 unique samples; 87 unique batches/days; first 2026-07-06; last 2026-09-30; v2 and permanent quarantine on all records; ordinary Sleep 0/0; D0 overlap 0/0."
     },
-    "review": {
-      "status": "not_run",
-      "summary": "Subagent audit claims spot-checked directly against source (draft store, view model, activeLiveSession, generator drift, verifier counts, upload appex check) and against SDK swiftinterfaces."
+    "september_v2": {
+      "status": "passed",
+      "summary": "30/30 exact semantic parity; 11 duplicate-copy nights resolved to one conflict-free copy within tolerance; 19/19 unaffected equivalent; exact 2,878-sample zero-write audit passed again during recovery."
     },
-    "zero_write_audit": {
-      "status": "not_applicable",
-      "summary": "Read-only production authority check only (deployment 8008f928, b81c784e, health ok)."
+    "read_model": {
+      "status": "passed",
+      "summary": "Landing, ranged trends, weekly aggregation, paging, night detail, stages, continuity, timeline, provenance/timezone, scoped queries, and prospective-over-historical day precedence passed against production data."
+    },
+    "strategic_quarantine": {
+      "status": "passed",
+      "summary": "No historical V3, Goal, Briefing/Narrative/recommendation, Confidence, or strategic Evidence mutation/reference; source audit leak total 0."
+    },
+    "prospective_policy": {
+      "status": "passed",
+      "summary": "Oct 2 D0 remains enabled in validation_only; floor 2026-10-02T01:00:00Z; Oura preference; historicalBackfill false; strategic quarantine; no strategicEffectiveAt; served capability enabled."
+    },
+    "native_contract": {
+      "status": "reconciliation_required",
+      "summary": "Claude d550c629 proposal is not decode-compatible with the live resource names, query parameters, envelopes, enum values, trends arrays, or flat night-detail shape. Exact adapter differences are in the full report."
+    },
+    "github_publication": {
+      "status": "passed",
+      "summary": "Recovered from branch-only publication and republished the complete report as a report-only change based on current origin/main."
     }
   },
-  "decisions_required": [
-    "D1 (blocking): which iPhone model/iOS will do physical acceptance (Dynamic Island availability).",
-    "D2: build the Logger rest timer (Phase 1B)? auto-start vs manual, default duration, end-of-rest notification.",
-    "D3: add optional per-set completedAt to the draft (recommended).",
-    "D4-D9: stale timeout, Lock Screen privacy toggle, Watch Smart Stack layout, font, Phase 2 rest controls, completion dismissal duration."
-  ],
-  "blockers": [
-    "Project generator is missing three hand-added Sleep files present in the committed pbxproj; any regeneration would drop them. Sleep-lane owner must reconcile before Live Activities implementation.",
-    "verify_release_configuration.py requires CURRENT_PROJECT_VERSION exactly twice; any extension needs a target-aware verifier update.",
-    "First provisioning of a new extension App ID via automatic signing is unproven; if Apple ID re-auth is needed the Founder must do it."
-  ],
+  "decisions_required": [],
+  "blockers": [],
   "unexpected_findings": [
-    "Generator/pbxproj drift: HealthKitSleepHistoricalEvidence Contracts/Presentation/Tests files are in the pbxproj but not in generate_project.py.",
-    "The physiqueos-audit doctl context returns 401; physiqueos-final-cutover-config still reads.",
-    "The in-app Workout Logger header shows a static 'Started now' regardless of elapsed time.",
-    "Multiple concurrent live drafts are allowed by design; 'active' is a derived selector, so the Live Activity must enforce at most one activity itself."
+    "The original complete report was pushed only to the reviewed Native branch and therefore was absent from origin/main; this recovery publishes it from current main history.",
+    "Claude's Native Recovery/Sleep UI is cleanly separated behind models/APIs but targets its proposed v0 contract, not the deployed Server contract; it must be adapted before integrated Native acceptance."
   ],
   "backlog": [
-    "Phase 0: Sleep-lane generator reconciliation proving byte-identical regeneration.",
-    "Phase 1: local Live Activity per plan section 10 with tests 1-46 and 52.",
-    "Phase 1B: Logger rest timer authority + rest presentation.",
-    "Phase 2 (optional): TrainingSessionAuthority refactor, then Skip rest / +30 s LiveActivityIntents."
+    "Observe 2-3 prospective nights for background delivery, Oura primary selection, late-update reconciliation, recent-window behavior, one canonical day, v2 stage/continuity display, Evidence updates, and zero strategic leakage.",
+    "Adapt Claude RecoverySleepReadModel.swift and RecoverySleepAPI.swift plus fixtures/tests to the exact live Server contract; do not merge the proposal unchanged.",
+    "Keep strategic Sleep off until prospective sync acceptance, Recovery Briefing design/review, and a separate explicit Founder authorization."
   ],
-  "recommended_next_step": "Founder answers D1-D9 (D1 blocking); Sleep lane reconciles the generator drift; then a new Claude Remote Control chat (Opus, high reasoning) implements Phase 1 only on a fresh Native worktree, followed by Codex adversarial review and a Founder-authorized TestFlight build for physical-device acceptance.",
-  "full_report_path": "agent-handoffs/reports/20261001T055845Z-workout-logger-live-activities-discovery-plan.md",
+  "recommended_next_step": "Run the defined 2-3-night prospective acceptance beginning with sleep day 2026-10-02. Do not rerun a destructive historical operation, do not enable strategic Sleep, and do not merge Claude's Native read models without the documented contract adapter.",
+  "full_report_path": "agent-handoffs/reports/20261001T061329Z-sleep-historical-import-verified-prospective-d0.md",
+  "related_report_paths": [
+    "agent-handoffs/reports/20261001T053235Z-healthkit-sleep-v2-server-deployed-founder-import-gate.md",
+    "agent-handoffs/reports/20261001T050828Z-healthkit-sleep-v2-historical-evidence-prospective-prep.md",
+    "agent-handoffs/reports/20261001T044541Z-healthkit-sleep-evidence-native-implementation.md"
+  ],
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
