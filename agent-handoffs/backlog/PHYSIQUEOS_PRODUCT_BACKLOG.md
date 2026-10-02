@@ -17,6 +17,15 @@ Agent handoff reports describe implementation state. This backlog describes what
 
 ACTIVE / NEXT
 
+0. Progress Photos flexible cadence (Every N Weeks / Months) — SHIPPED, pending Founder acceptance
+Status: Server 4ffde0f5 deployed and verified; Native Build 81 (source 6a093251) release in progress — see report agent-handoffs/reports/20261002T070000Z-progress-photos-flexible-cadence.md for deployment/delivery ids and VALID state.
+What changed:
+- Coaching Updates > Progress Photos: "Every [1-12] [Weeks | Months]" + "On [day]" / "On the [first..fourth|last] [day]"; monthly = weekday of the month (not day of month).
+- Existing Every 2 weeks schedule unchanged (no migration); cadence changes are future-only with a predictable first date; same-day changes amend with audit, and a same-day revert restores the original dates.
+- Photo Event briefing semantics unchanged (completed confirmed session only).
+Acceptance (Build 81): Every 2 weeks loads; 3 weeks and 1 month save/reopen retained; set the wanted cadence before Saturday; specific time, reminder toggle, Photo Event toggle unchanged; exactly one pending Progress Photos reminder.
+Note: after a 3+ week or monthly cadence is saved, Builds <=80 cannot open Coaching Updates (fail closed by design).
+
 1. Workout Logger Live Activities — physical-device acceptance
 Status: Build 77 VALID; implementation complete; natural workout acceptance pending. Builds 78 and 79 (both VALID) carry the same Live Activity behavior unchanged (in Build 79 the same extension also hosts the Home Screen widget); acceptance can be done on Build 79.
 Authority:
@@ -101,6 +110,16 @@ Next:
 - only later consider additive recoveryAssessment on NEW Weekly/Midweek/Monthly artifacts;
 - historical Briefings remain unchanged;
 - strategic Sleep/V3 graduation remains a separate Founder decision.
+
+FUTURE MAJOR PROJECTS (roadmap only — NOT started; do not implement without a separate Founder-authorized prompt)
+
+F1. App-wide UI/design polish
+Position: next major maturity project after the Apple Watch daily-driver is accepted.
+Scope placeholder: consistent PhysiqueOS design language across Native surfaces (spacing, typography, control patterns, empty/loading states, settings/editor consistency), informed by the accumulated small polish requests. Not started; no audit or implementation authorized yet.
+
+F2. Briefing Narrative + Confidence quality/tuning audit
+Position: next major strategic-quality project.
+Scope placeholder: audit and tune Briefing narrative quality and Goal Confidence behavior across Daily/Midweek/Weekly/Monthly/Event briefings (accuracy, calibration, tone, repetition, evidence grounding). Not started; no audit or implementation authorized yet.
 
 PARKED / LATER
 

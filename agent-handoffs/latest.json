@@ -1,51 +1,56 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T06:41:45Z",
+  "generated_at_utc": "2026-10-02T07:05:00Z",
   "task": {
-    "id": "apple-watch-workout-v1-phase1a-checkpoint1-20261002",
-    "title": "Apple Watch Workout V1 Phase 1A checkpoint 1",
-    "agent": "codex",
-    "status": "checkpoint_candidate_continuing"
+    "id": "progress-photos-flexible-cadence-20261002",
+    "title": "Progress Photos flexible cadence (Every N Weeks / Months)",
+    "agent": "claude",
+    "status": "checkpoint_server_deployed_native_release_in_progress"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "shipping_native_sha_reverified_at_start": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
-    "shipping_native_build": 80,
-    "phase0_sha": "9dea5d2e2d13afcabfcb1c810172cc2ad972a8c0",
-    "implementation_branch": "codex/apple-watch-workout-v1-phase1a-overnight",
-    "implementation_sha": "e9c7b3cbb7669ecbc49e3a3ff1e96884f55ff608",
-    "production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486",
-    "production_deployment": "421cae1a-dbc6-494c-9f73-9b8778e45efd"
+    "production_server_sha": "4ffde0f5faf1832decfbc09d822088aeba0dca89",
+    "production_deployment": "faaf66bd-930f-46a2-9b8e-77e604c23a86",
+    "previous_production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486",
+    "server_branch": "claude/progress-photos-flexible-cadence-server-20261002",
+    "native_base_sha": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
+    "native_base_build": 80,
+    "native_branch": "claude/progress-photos-flexible-cadence-20261002",
+    "native_candidate_sha": "6a0932517cbd8de165bf25c7637a2d2d6fea03dc",
+    "native_candidate_build": 81
   },
   "result": {
-    "summary": "Checkpoint 1 adds the generator-owned Watch target, strict phone-authority WCSession transport, Ready-for-Watch affordance and locked PhysiqueOS split-metrics execution UI.",
-    "checkpoint_success": true,
-    "release_candidate": false,
+    "summary": "Progress Photos cadence is now Every [1-12] [Weeks|Months] (monthly = weekday of the month). Server additive contract deployed and verified on the Founder's real data (Every 2 weeks unchanged: next 10-03, 10-17, 10-31; no migration). Native Build 81 editor ready; release in progress.",
+    "success": true,
     "production_mutated": false,
-    "deployed": false,
-    "native_build_uploaded": false,
-    "watch_testflight_uploaded": false,
-    "shipping_watch_ui_implemented": true
+    "deployed": true,
+    "testflight_uploaded": false
   },
   "validation": {
-    "project_generator": "two consecutive byte-identical runs",
-    "paired_iphone_scheme_build": "passed",
-    "watch_scheme_build": "passed",
-    "phone_transport_tests": "passed",
-    "watch_tests": "bundle built; simulator XCTest bootstrap failed before tests ran",
-    "full_native_regression": "not yet run"
+    "server_full_unit_suite": {
+      "status": "passed",
+      "summary": "4ffde0f5: 9562 passed / 304 failed, identical failure set to 2d967e48 baseline; 0 new"
+    },
+    "server_independent_review": {
+      "status": "passed",
+      "summary": "3 rounds; final no P0/P1/P2; 81,896-change sweep"
+    },
+    "native_full_unit_suite": {
+      "status": "passed_on_a210fafa",
+      "summary": "1902 tests, 1 known pre-existing failure; final run on 6a093251 pending"
+    },
+    "production_probe": {
+      "status": "passed",
+      "summary": "read-only pre/post deploy; Founder schedule unchanged"
+    }
   },
   "open_gates": [
-    "recoverable finish saga",
-    "paired interactive simulator proof",
-    "Watch XCTest runtime",
-    "latest shipping Native reconciliation",
-    "full regression and independent review",
-    "signed archive inspection",
-    "physical Watch authorization and workout acceptance"
+    "Native final full suite on 6a093251",
+    "Build 81 archive + guarded upload + VALID",
+    "Founder physical acceptance"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T064145Z-apple-watch-workout-v1-phase1a-checkpoint1.md",
-  "parent_report_path": "agent-handoffs/reports/20261002T055516Z-apple-watch-workout-v1-phase0-foundation.md",
+  "full_report_path": "agent-handoffs/reports/20261002T070000Z-progress-photos-flexible-cadence.md",
+  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T060000Z-progress-photos-flexible-cadence.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

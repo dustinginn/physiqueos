@@ -2,16 +2,15 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Apple Watch Workout V1 Phase 1A checkpoint 1 (`apple-watch-workout-v1-phase1a-checkpoint1-20261002`)
-- Agent: Codex
-- Status: checkpoint candidate; overnight implementation continuing
-- Generated (UTC): 2026-10-02T06:41:45Z
-- Success: true for checkpoint 1; release gates remain open
-- Implementation: `codex/apple-watch-workout-v1-phase1a-overnight` at `e9c7b3cbb7669ecbc49e3a3ff1e96884f55ff608`
-- Production/TestFlight: no deploy, no Native build, no Watch TestFlight
+- Task: Progress Photos flexible cadence (`progress-photos-flexible-cadence-20261002`)
+- Agent: Claude
+- Status: checkpoint_server_deployed_native_release_in_progress
+- Generated (UTC): 2026-10-02T07:05:00Z
+- Server: 4ffde0f5faf1832decfbc09d822088aeba0dca89 (deployment faaf66bd-930f-46a2-9b8e-77e604c23a86)
+- Native: 6a0932517cbd8de165bf25c7637a2d2d6fea03dc — Build 81 candidate; archive/upload in progress
 
-Summary: The generator-owned paired Watch target, strict phone-authority transport, Ready-for-Watch control and locked PhysiqueOS split-metrics execution UI compile on the paired simulators. Finish recovery, full regression, signing/archive and physical Watch gates remain open.
+Summary: Progress Photos cadence is now Every [1-12] [Weeks|Months] (monthly = weekday of the month). Server additive contract deployed and verified on the Founder's real data (Every 2 weeks unchanged: next 10-03, 10-17, 10-31; no migration). Native Build 81 editor ready; release in progress.
 
-Detailed report: `agent-handoffs/reports/20261002T064145Z-apple-watch-workout-v1-phase1a-checkpoint1.md`
+Detailed report: `agent-handoffs/reports/20261002T070000Z-progress-photos-flexible-cadence.md`
 
 Protocol: `agent-handoffs/README.md`
