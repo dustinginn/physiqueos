@@ -119,3 +119,66 @@ final class CompletionFeedbackAndNotificationCapabilityTests: XCTestCase {
         ], "No haptics on navigation, charts, read-only screens, HealthKit or Workout set completion.")
     }
 }
+
+extension CompletionFeedbackAndNotificationCapabilityTests {
+    private actor SplitWrites: PriorityCompletionWriteAPI {
+        private(set) var completions: [PriorityCompletionContext?] = []
+        private(set) var skips: [String] = []
+        func complete(priorityId: String, occurrenceDate: String, context: PriorityCompletionContext?, expectedVersion: Int) async throws {
+            completions.append(context)
+        }
+        func skip(priorityId: String, occurrenceDate: String, expectedVersion: Int) async throws {
+            skips.append("\(priorityId)|\(occurrenceDate)|\(expectedVersion)")
+        }
+    }
+
+    private func peptide() -> PriorityOccurrence {
+        var occurrence = PriorityOccurrence(
+            id: "tesamorelin", routePriorityId: "reminder_tesamorelin", executionItemId: "execution_tesamorelin",
+            date: "2026-10-02", title: "Tesamorelin", subtitle: "Evening", metadata: nil, changeLabel: nil,
+            icon: .activity, color: .primary, urgency: .available, completed: false, completable: true,
+            expectedVersion: 9, actionLabel: nil,
+            completionContext: .init(occurrenceDate: "2026-10-02", dose: "0.5 mg", protocolId: "protocol_tesamorelin"),
+            continueActionDestination: nil
+        )
+        occurrence.doseAdjustableState = true
+        occurrence.skippable = true
+        occurrence.skipExpectedVersion = 9
+        return occurrence
+    }
+
+    @MainActor
+    func testPeptideDetailSkipRecordsNoDoseAndLeavesCompletionDoseAware() async {
+        let feedback = RecordingFeedbackClient()
+        let writes = SplitWrites()
+        let viewModel = PriorityDetailViewModel(
+            api: PriorityReads(peptide()), writeAPI: writes,
+            morningCheckInAPI: NotAvailableMorningCheckInAPI(), store: LoggingSandboxStore(),
+            authority: .founderProduction, priorityId: "reminder_tesamorelin", occurrenceDate: "2026-10-02",
+            feedback: feedback
+        )
+        await viewModel.load()
+        await viewModel.skip()
+        let skips = await writes.skips
+        let completions = await writes.completions
+        XCTAssertEqual(skips, ["reminder_tesamorelin|2026-10-02|9"], "priority.skip.v1 carries identity and version only.")
+        XCTAssertTrue(completions.isEmpty, "Skipping never records a dose or a completion.")
+        XCTAssertEqual(feedback.events, [.prioritySkipped])
+
+        let completing = PriorityDetailViewModel(
+            api: PriorityReads(peptide()), writeAPI: writes,
+            morningCheckInAPI: NotAvailableMorningCheckInAPI(), store: LoggingSandboxStore(),
+            authority: .founderProduction, priorityId: "reminder_tesamorelin", occurrenceDate: "2026-10-02"
+        )
+        await completing.load()
+        await completing.complete(dose: "0.4 mg")
+        let after = await writes.completions
+        XCTAssertEqual(after.first??.dose, "0.4 mg", "Took a different amount is unchanged.")
+        XCTAssertEqual(after.first??.protocolId, "protocol_tesamorelin")
+    }
+
+    func testPeptideSkipConfirmationSaysNoAmountIsRecorded() {
+        XCTAssertTrue(PriorityDetailView.skipConfirmationMessage(isDose: true).contains("No amount is recorded"))
+        XCTAssertFalse(PriorityDetailView.skipConfirmationMessage(isDose: false).contains("dose"))
+    }
+}

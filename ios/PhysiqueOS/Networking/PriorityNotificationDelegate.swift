@@ -115,9 +115,10 @@ final class NotificationDeepLinkCoordinator {
 /// `Complete` submits the exact same `priority.complete.v1` command (same
 /// canonical identity, same `expectedVersion`/If-Match, same idempotency
 /// discipline) the in-app completion path already uses — nothing here
-/// re-derives completion semantics. `Skip` (offered only on the
-/// `simpleCompletion` category) submits the same `priority.skip.v1` command
-/// Priority Detail's Mark Skipped uses. `Snooze 1 hour` never touches the
+/// re-derives completion semantics. `Skip` (offered only where the Server's
+/// `notificationAction.skipCommand` exists: `simpleCompletion`,
+/// `specializedSkippable`, `skipOnly`) submits the same `priority.skip.v1`
+/// command Priority Detail's Mark Skipped uses, never with a dose. `Snooze 1 hour` never touches the
 /// server at all — see `PriorityNotificationScheduler.scheduleSnooze`.
 /// Tapping the notification body (or a category with no custom actions —
 /// specialized/open-only) always opens the exact same `AppDestination`
@@ -155,6 +156,49 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         }
     }
 
+    /// What a notification Skip submits: the exact occurrence identity and
+    /// the version from the Server's skip command. No dose, no protocol.
+    struct SkipActionPayload: Sendable, Equatable {
+        let priorityId: String
+        let occurrenceDate: String
+        let expectedVersion: Int
+
+        /// The Server's `skipCommand` fields. Notifications delivered by
+        /// Build 78 (before the Server published `skipCommand`) carried Skip
+        /// only on `simpleCompletion`, against the plain completion command's
+        /// identity and version; those keep working. Nothing else falls back.
+        init?(
+            skip: PriorityNotificationSkipFields,
+            complete: CompleteActionPayload,
+            categoryIdentifier: String,
+            notificationPriorityId: String? = nil,
+            notificationOccurrenceDate: String? = nil
+        ) {
+            if skip.isComplete, let priorityId = skip.priorityId, let occurrenceDate = skip.occurrenceDate,
+               let version = skip.expectedVersion {
+                // The skip must target this notification's own occurrence
+                // (and the completion command's, when there is one).
+                for expected in [complete.priorityId, notificationPriorityId].compactMap({ $0 }) where expected != priorityId { return nil }
+                for expected in [complete.occurrenceDate, notificationOccurrenceDate].compactMap({ $0 }) where expected != occurrenceDate { return nil }
+                self.init(priorityId: priorityId, occurrenceDate: occurrenceDate, expectedVersion: version)
+                return
+            }
+            guard categoryIdentifier == PriorityNotificationCategory.simpleCompletion,
+                  complete.commandType == ProductionCommandType.completePriority,
+                  complete.dose == nil, complete.protocolId == nil,
+                  let priorityId = complete.priorityId, let occurrenceDate = complete.occurrenceDate,
+                  let version = complete.expectedVersion
+            else { return nil }
+            self.init(priorityId: priorityId, occurrenceDate: occurrenceDate, expectedVersion: version)
+        }
+
+        init(priorityId: String, occurrenceDate: String, expectedVersion: Int) {
+            self.priorityId = priorityId
+            self.occurrenceDate = occurrenceDate
+            self.expectedVersion = expectedVersion
+        }
+    }
+
     struct OpenActionPayload: Sendable {
         let requestIdentifier: String
         let categoryIdentifier: String
@@ -182,6 +226,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         let actionIdentifier: String
         let requestIdentifier: String
         let complete: CompleteActionPayload
+        let skip: SkipActionPayload?
         let open: OpenActionPayload
         let snooze: PriorityNotificationScheduler.SnoozePayload?
 
@@ -191,6 +236,13 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             actionIdentifier = response.actionIdentifier
             requestIdentifier = request.identifier
             complete = CompleteActionPayload(userInfo: userInfo)
+            skip = SkipActionPayload(
+                skip: PriorityNotificationSkipFields(userInfo: userInfo),
+                complete: complete,
+                categoryIdentifier: request.content.categoryIdentifier,
+                notificationPriorityId: userInfo["priorityId"] as? String,
+                notificationOccurrenceDate: userInfo["occurrenceDate"] as? String
+            )
             open = OpenActionPayload(
                 userInfo: userInfo,
                 requestIdentifier: request.identifier,
@@ -209,6 +261,13 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             self.actionIdentifier = actionIdentifier
             self.requestIdentifier = requestIdentifier
             complete = CompleteActionPayload(userInfo: userInfo)
+            skip = SkipActionPayload(
+                skip: PriorityNotificationSkipFields(userInfo: userInfo),
+                complete: complete,
+                categoryIdentifier: categoryIdentifier,
+                notificationPriorityId: userInfo["priorityId"] as? String,
+                notificationOccurrenceDate: userInfo["occurrenceDate"] as? String
+            )
             open = OpenActionPayload(
                 userInfo: userInfo,
                 requestIdentifier: requestIdentifier,
@@ -224,7 +283,8 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     /// the main actor.
     private let environment: AppEnvironment?
     private let completeActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)?
-    private let skipActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)?
+    private let skipActionHandler: (@MainActor @Sendable (SkipActionPayload) async throws -> Void)?
+    private let staleSkipResolver: (@MainActor @Sendable (SkipActionPayload) async -> SkipActionPayload?)?
     private let feedbackHandler: (@MainActor @Sendable (PhysiqueOSFeedbackEvent) -> Void)?
     private let completionCleanup: @MainActor @Sendable (String, String) async -> Void
     private let snoozeHandler: @MainActor @Sendable (PriorityNotificationScheduler.SnoozePayload) async -> PriorityNotificationScheduler.SnoozeResult
@@ -242,7 +302,8 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             await PriorityNotificationScheduler.scheduleSnooze(payload: $0)
         },
         completeActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)? = nil,
-        skipActionHandler: (@MainActor @Sendable (CompleteActionPayload) async throws -> Void)? = nil,
+        skipActionHandler: (@MainActor @Sendable (SkipActionPayload) async throws -> Void)? = nil,
+        staleSkipResolver: (@MainActor @Sendable (SkipActionPayload) async -> SkipActionPayload?)? = nil,
         feedbackHandler: (@MainActor @Sendable (PhysiqueOSFeedbackEvent) -> Void)? = nil,
         openActionHandler: (@MainActor @Sendable (String, AppDestination) async -> Bool)? = nil,
         staleCompletionResolver: (@MainActor @Sendable (CompleteActionPayload) async -> CompleteActionPayload?)? = nil,
@@ -258,6 +319,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         self.environment = environment
         self.completeActionHandler = completeActionHandler
         self.skipActionHandler = skipActionHandler
+        self.staleSkipResolver = staleSkipResolver
         self.feedbackHandler = feedbackHandler
         self.openActionHandler = openActionHandler
         self.completionCleanup = completionCleanup
@@ -346,7 +408,7 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             }
             recordActionStage(snapshot: snapshot, operation: "action decoded",
                               reason: "Skip was decoded and dispatched on the main actor.")
-            let skipped = await handleSkip(payload: snapshot.complete)
+            let skipped = await handleSkip(payload: snapshot.skip)
             if !skipped {
                 releaseAction(identifier: snapshot.requestIdentifier, action: snapshot.actionIdentifier)
             }
@@ -515,23 +577,18 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     }
 
     /// Notification Skip: the same canonical `priority.skip.v1` command as
-    /// Priority Detail's Mark Skipped, against the identity and version the
-    /// notification's completion contract carries (the Server's skip command
-    /// uses exactly those). The Server still owns eligibility and "today":
-    /// a past, future or unsupported occurrence is refused there and changes
-    /// nothing (iOS has already dismissed the banner; the occurrence stays
-    /// open in the app and its other pending reminders are kept). Never a
-    /// local-only skip state.
+    /// Priority Detail's Mark Skipped, against the identity and version of the
+    /// Server's own skip command for this occurrence. A skip never sends a
+    /// dose or protocol, so nothing is recorded as taken. The Server still
+    /// owns eligibility and "today": a past, future or unsupported occurrence
+    /// is refused there and changes nothing (iOS has already dismissed the
+    /// banner; the occurrence stays open in the app and its other pending
+    /// reminders are kept). Never a local-only skip state.
     @MainActor
-    private func handleSkip(payload: CompleteActionPayload) async -> Bool {
-        guard payload.commandType == ProductionCommandType.completePriority,
-              let expectedVersion = payload.expectedVersion,
-              let priorityId = payload.priorityId,
-              let occurrenceDate = payload.occurrenceDate,
-              payload.dose == nil, payload.protocolId == nil
-        else {
+    private func handleSkip(payload: SkipActionPayload?) async -> Bool {
+        guard let payload else {
             recordSkip(identifier: "action.skip.invalid-payload", operation: "skip not dispatched",
-                       reason: "The notification did not carry a plain canonical occurrence identity and version.")
+                       reason: "The notification did not carry the Server's skip command for this occurrence.")
             return false
         }
         guard skipActionHandler != nil || environment != nil else {
@@ -539,10 +596,10 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
                        reason: "The application environment was not available; canonical state remains unchanged.")
             return false
         }
+        let priorityId = payload.priorityId, occurrenceDate = payload.occurrenceDate
         let identifier = "action.skip.\(priorityId).\(occurrenceDate)"
         do {
-            try await performSkip(payload: payload, priorityId: priorityId,
-                                  occurrenceDate: occurrenceDate, expectedVersion: expectedVersion)
+            try await performSkip(payload)
             recordSkip(identifier: identifier, operation: "skip accepted",
                        reason: "The canonical skip command succeeded.")
             await completionCleanup(priorityId, occurrenceDate)
@@ -558,13 +615,9 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             await reconcileAfterAction()
             return true
         } catch {
-            if Self.isStaleVersion(error),
-               let refreshed = await resolveStaleCompletion(payload),
-               refreshed.dose == nil, refreshed.protocolId == nil,
-               let refreshedVersion = refreshed.expectedVersion {
+            if Self.isStaleVersion(error), let refreshed = await resolveStaleSkip(payload) {
                 do {
-                    try await performSkip(payload: refreshed, priorityId: priorityId,
-                                          occurrenceDate: occurrenceDate, expectedVersion: refreshedVersion)
+                    try await performSkip(refreshed)
                     recordSkip(identifier: identifier, operation: "skip accepted after exact occurrence refresh",
                                reason: "The request carried a stale version; the unchanged exact occurrence was re-read and skipped once.")
                     await completionCleanup(priorityId, occurrenceDate)
@@ -584,19 +637,38 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     }
 
     @MainActor
-    private func performSkip(
-        payload: CompleteActionPayload,
-        priorityId: String,
-        occurrenceDate: String,
-        expectedVersion: Int
-    ) async throws {
+    private func performSkip(_ payload: SkipActionPayload) async throws {
         if let skipActionHandler {
             try await skipActionHandler(payload)
         } else if let environment {
             try await environment.priorityCompletionWriteAPI.skip(
-                priorityId: priorityId, occurrenceDate: occurrenceDate, expectedVersion: expectedVersion
+                priorityId: payload.priorityId, occurrenceDate: payload.occurrenceDate,
+                expectedVersion: payload.expectedVersion
             )
         }
+    }
+
+    /// A stale version is retried once, only after an exact Home re-read
+    /// shows the same open occurrence still offering the Server's skip.
+    @MainActor
+    private func resolveStaleSkip(_ stale: SkipActionPayload) async -> SkipActionPayload? {
+        if let staleSkipResolver { return await staleSkipResolver(stale) }
+        guard let environment else { return nil }
+        await environment.productionNativeAPI.invalidateReadResources(["home"])
+        guard let home = try? await ProductionHomeAPI(api: environment.productionNativeAPI).fetchHome(),
+              let occurrence = home.notificationScheduleItems.first(where: {
+                  ($0.routePriorityId ?? $0.id) == stale.priorityId && $0.date == stale.occurrenceDate
+              }),
+              occurrence.completed == false,
+              let command = occurrence.notificationAction?.skipCommand,
+              command.commandType == ProductionCommandType.skipPriority,
+              command.payload.priorityId == stale.priorityId,
+              command.payload.occurrenceDate == stale.occurrenceDate
+        else { return nil }
+        return SkipActionPayload(
+            priorityId: stale.priorityId, occurrenceDate: stale.occurrenceDate,
+            expectedVersion: command.expectedVersion
+        )
     }
 
     @MainActor

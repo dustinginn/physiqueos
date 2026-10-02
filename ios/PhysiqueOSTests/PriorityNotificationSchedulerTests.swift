@@ -1261,6 +1261,11 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
                 commandType: ProductionCommandType.completePriority,
                 expectedVersion: 7,
                 payload: .init(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-16")
+            ),
+            skipCommand: PriorityNotificationSkipCommand(
+                commandType: ProductionCommandType.skipPriority,
+                expectedVersion: 7,
+                payload: .init(priorityId: "reminder_foam_roll", occurrenceDate: "2026-09-16")
             )
         )
         return try XCTUnwrap(PriorityNotificationScheduler.reconciliationPlan(
@@ -1532,7 +1537,8 @@ extension PriorityNotificationSchedulerTests {
     }
 
     func testCapabilityResolverDerivesActionsFromTheCanonicalContractOnly() throws {
-        let simple = try Self.action(#"{"classification":"direct_completion_allowed","workflow":"priority_detail","scheduledTime":"07:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":3,"payload":{"priorityId":"reminder_foam_roll","occurrenceDate":"2026-09-13"}}}"#)
+        let simple = try Self.action(#"{"classification":"direct_completion_allowed","workflow":"priority_detail","scheduledTime":"07:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":3,"payload":{"priorityId":"reminder_foam_roll","occurrenceDate":"2026-09-13"}},"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":3,"payload":{"priorityId":"reminder_foam_roll","occurrenceDate":"2026-09-13"}}}"#)
+        let build78Simple = try Self.action(#"{"classification":"direct_completion_allowed","workflow":"priority_detail","scheduledTime":"07:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":3,"payload":{"priorityId":"reminder_foam_roll","occurrenceDate":"2026-09-13"}}}"#)
         let peptide = try Self.action(#"{"classification":"specialized_workflow_required","workflow":"peptide_protocol","scheduledTime":"21:45","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":4,"payload":{"priorityId":"reminder_retatrutide","occurrenceDate":"2026-09-15","dose":"0.5 mg","protocolId":"protocol_retatrutide"}}}"#)
         let morningCheckIn = try Self.action(#"{"classification":"specialized_workflow_required","workflow":"morning_check_in","scheduledTime":"07:00","completionCommand":null}"#)
         let openOnly = try Self.action(#"{"classification":"open_only","scheduledTime":null,"completionCommand":null}"#)
@@ -1561,6 +1567,9 @@ extension PriorityNotificationSchedulerTests {
         XCTAssertEqual(PriorityOccurrenceCapabilities.resolve(photos), .openOnly, "A non-detail workflow is never a direct action.")
 
         XCTAssertEqual(PriorityNotificationCategory.category(for: simple), PriorityNotificationCategory.simpleCompletion)
+        XCTAssertFalse(PriorityOccurrenceCapabilities.resolve(build78Simple).skipAllowed,
+                       "Without the Server's skipCommand Native never infers Skip.")
+        XCTAssertEqual(PriorityNotificationCategory.category(for: build78Simple), PriorityNotificationCategory.directCompletion)
         XCTAssertEqual(PriorityNotificationCategory.category(for: peptide), PriorityNotificationCategory.specializedActionable)
         XCTAssertEqual(PriorityNotificationCategory.category(for: mislabeled), PriorityNotificationCategory.specializedActionable)
         XCTAssertEqual(PriorityNotificationCategory.category(for: morningCheckIn), PriorityNotificationCategory.specializedWorkflow)
@@ -1602,6 +1611,17 @@ extension PriorityNotificationSchedulerTests {
             XCTAssertTrue(try actions(id).isEmpty, "\(id) offers no direct action.")
         }
         XCTAssertTrue(PriorityNotificationCategory.allowsSkip(PriorityNotificationCategory.simpleCompletion))
+        XCTAssertTrue(PriorityNotificationCategory.allowsSkip(PriorityNotificationCategory.specializedSkippable))
+        XCTAssertTrue(PriorityNotificationCategory.allowsSkip(PriorityNotificationCategory.skipOnly))
+        XCTAssertEqual(try actions(PriorityNotificationCategory.specializedSkippable).map(\.identifier), [
+            PriorityNotificationActionIdentifier.complete, PriorityNotificationActionIdentifier.skip,
+            PriorityNotificationActionIdentifier.snooze,
+        ], "Dose-aware Complete and Skip coexist.")
+        XCTAssertNil(try actions(PriorityNotificationCategory.specializedSkippable)[0].icon,
+                     "The planned-dose Complete is not the simple check-circle action.")
+        XCTAssertEqual(try actions(PriorityNotificationCategory.skipOnly).map(\.identifier), [
+            PriorityNotificationActionIdentifier.skip, PriorityNotificationActionIdentifier.snooze,
+        ])
         XCTAssertFalse(PriorityNotificationCategory.allowsSkip(PriorityNotificationCategory.directCompletion))
         XCTAssertFalse(PriorityNotificationCategory.allowsSkip(PriorityNotificationCategory.specializedActionable))
     }
@@ -1622,7 +1642,7 @@ extension PriorityNotificationSchedulerTests {
     @MainActor
     func testNotificationSkipUsesTheCanonicalSkipOnceAndReconciles() async throws {
         let request = try Self.directCompletionRequest()
-        var skips: [PriorityNotificationDelegate.CompleteActionPayload] = []
+        var skips: [PriorityNotificationDelegate.SkipActionPayload] = []
         var completes = 0
         var cleaned: [String] = []
         var reconciled = 0
@@ -1677,13 +1697,13 @@ extension PriorityNotificationSchedulerTests {
             userInfo: ["priorityId": "legacy", "occurrenceDate": "2026-09-16"],
             categoryIdentifier: PriorityNotificationCategory.simpleCompletion
         ))
-        // A dose in the payload is never skipped from a notification.
-        var dosed = direct.content.userInfo
-        dosed["payloadDose"] = "5 mg"
+        // A skip command for a different occurrence than the notification's.
+        var mismatched = direct.content.userInfo
+        mismatched["skipPayloadOccurrenceDate"] = "2026-09-17"
         await delegate.handle(snapshot: .init(
             actionIdentifier: PriorityNotificationActionIdentifier.skip,
-            requestIdentifier: "priority.scheduled.dosed.2026-09-16",
-            userInfo: dosed,
+            requestIdentifier: "priority.scheduled.mismatched.2026-09-16",
+            userInfo: mismatched,
             categoryIdentifier: PriorityNotificationCategory.simpleCompletion
         ))
         XCTAssertEqual(skips, 0)
@@ -1716,16 +1736,14 @@ extension PriorityNotificationSchedulerTests {
         let delegate = PriorityNotificationDelegate(
             environment: nil,
             skipActionHandler: { payload in
-                versions.append(try XCTUnwrap(payload.expectedVersion))
+                versions.append(payload.expectedVersion)
                 if versions.count == 1 { throw ProductionNativeError.failedPrecondition(Self.staleProblem) }
             },
-            feedbackHandler: { _ in },
-            staleCompletionResolver: { original in
+            staleSkipResolver: { original in
                 resolverCalls += 1
-                return .init(commandType: original.commandType, expectedVersion: 9,
-                             priorityId: original.priorityId, occurrenceDate: original.occurrenceDate,
-                             dose: nil, protocolId: nil)
+                return .init(priorityId: original.priorityId, occurrenceDate: original.occurrenceDate, expectedVersion: 9)
             },
+            feedbackHandler: { _ in },
             postActionReconciliation: {},
             completionCleanup: { _, _ in cleaned += 1 }
         )
@@ -1810,5 +1828,229 @@ extension PriorityNotificationSchedulerTests {
         XCTAssertFalse(appleCompletionCalled, "Apple's window is held while the canonical skip runs.")
         skipGate.open()
         await fulfillment(of: [appleCompleted], timeout: 1)
+    }
+}
+
+// MARK: - Server-owned skipCommand: peptides + Foam Rolling
+
+extension PriorityNotificationSchedulerTests {
+    private static let peptideWithSkipJSON = #"{"classification":"specialized_workflow_required","workflow":"peptide_protocol","scheduledTime":"17:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":7,"payload":{"priorityId":"reminder_tesamorelin","occurrenceDate":"2026-09-16","dose":"0.5 mg","protocolId":"protocol_tesamorelin"}},"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":7,"payload":{"priorityId":"reminder_tesamorelin","occurrenceDate":"2026-09-16"}}}"#
+    private static let foamWithSkipJSON = #"{"classification":"specialized_workflow_required","workflow":"priority_detail","scheduledTime":"20:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":4,"payload":{"priorityId":"reminder_foam","occurrenceDate":"2026-09-16","dose":null,"protocolId":"protocol_foam"}},"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":4,"payload":{"priorityId":"reminder_foam","occurrenceDate":"2026-09-16"}}}"#
+    private static let supplementJSON = #"{"classification":"specialized_workflow_required","workflow":"priority_detail","scheduledTime":"08:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":2,"payload":{"priorityId":"reminder_creatine","occurrenceDate":"2026-09-16","dose":"5 g","protocolId":"protocol_creatine"}},"skipCommand":null}"#
+    private static let pausedPeptideJSON = #"{"classification":"open_only","workflow":"peptide_protocol","scheduledTime":"17:00","completionCommand":null,"skipCommand":null}"#
+    private static let skipOnlyJSON = #"{"classification":"specialized_workflow_required","workflow":"priority_detail","scheduledTime":"09:00","completionCommand":null,"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":5,"payload":{"priorityId":"reminder_x","occurrenceDate":"2026-09-16"}}}"#
+
+    private static func request(id: String, json: String, time: String) throws -> UNNotificationRequest {
+        var item = foamRolling(scheduledTime: time)
+        item.id = id
+        item.date = "2026-09-16"
+        item.notificationAction = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(json.utf8))
+        return try XCTUnwrap(PriorityNotificationScheduler.reconciliationPlan(
+            items: [item], existingScheduledIdentifiers: [],
+            now: ISO8601DateFormatter().date(from: "2026-09-16T00:00:00Z")!, calendar: utcCalendar
+        ).toAdd.first)
+    }
+
+    func testServerSkipCommandMakesSpecializedCompleteAndSkipCoexist() throws {
+        let peptide = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.peptideWithSkipJSON.utf8))
+        let caps = PriorityOccurrenceCapabilities.resolve(peptide)
+        XCTAssertTrue(caps.specializedCompleteAllowed)
+        XCTAssertFalse(caps.plainCompleteAllowed, "A peptide is never a plain completion.")
+        XCTAssertTrue(caps.skipAllowed, "Specialized completion does not imply skip = false.")
+        XCTAssertTrue(caps.snoozeAllowed)
+        XCTAssertEqual(peptide.skipCommand?.expectedVersion, 7)
+
+        let foam = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.foamWithSkipJSON.utf8))
+        XCTAssertEqual(PriorityNotificationCategory.category(for: foam), PriorityNotificationCategory.specializedSkippable)
+        let supplement = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.supplementJSON.utf8))
+        XCTAssertFalse(PriorityOccurrenceCapabilities.resolve(supplement).skipAllowed, "Unsupported Support gets no Skip.")
+        XCTAssertEqual(PriorityNotificationCategory.category(for: supplement), PriorityNotificationCategory.specializedActionable)
+        let paused = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.pausedPeptideJSON.utf8))
+        XCTAssertEqual(PriorityOccurrenceCapabilities.resolve(paused), .openOnly)
+        XCTAssertEqual(PriorityNotificationCategory.category(for: paused), PriorityNotificationCategory.openOnly)
+        let skipOnly = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.skipOnlyJSON.utf8))
+        XCTAssertEqual(PriorityNotificationCategory.category(for: skipOnly), PriorityNotificationCategory.skipOnly,
+                       "Skip is never a reason to broaden Complete.")
+
+        var wrongType = peptide
+        wrongType.skipCommand?.commandType = "priority.complete.v1"
+        XCTAssertFalse(PriorityOccurrenceCapabilities.resolve(wrongType).skipAllowed)
+        var otherOccurrence = peptide
+        otherOccurrence.skipCommand?.payload.occurrenceDate = "2026-09-17"
+        XCTAssertFalse(PriorityOccurrenceCapabilities.resolve(otherOccurrence).skipAllowed,
+                       "A skip command must target the same occurrence as the completion command.")
+    }
+
+    func testPeptideRequestCarriesThePlannedDoseForCompleteAndOnlyIdentityForSkip() throws {
+        let request = try Self.request(id: "reminder_tesamorelin", json: Self.peptideWithSkipJSON, time: "17:00")
+        XCTAssertEqual(request.content.categoryIdentifier, PriorityNotificationCategory.specializedSkippable)
+        let info = request.content.userInfo
+        XCTAssertEqual(info["payloadDose"] as? String, "0.5 mg")
+        XCTAssertEqual(info["skipCommandType"] as? String, ProductionCommandType.skipPriority)
+        XCTAssertEqual(info["skipExpectedVersion"] as? Int, 7)
+        XCTAssertEqual(info["skipPayloadPriorityId"] as? String, "reminder_tesamorelin")
+        XCTAssertEqual(info["skipPayloadOccurrenceDate"] as? String, "2026-09-16")
+        // A snoozed copy keeps the category, the dose-aware Complete and the Skip.
+        let snooze = try XCTUnwrap(PriorityNotificationScheduler.SnoozePayload(request: request))
+        XCTAssertEqual(snooze.categoryIdentifier, PriorityNotificationCategory.specializedSkippable)
+        XCTAssertEqual(snooze.payloadDose, "0.5 mg")
+        XCTAssertTrue(snooze.skip.isComplete)
+    }
+
+    @MainActor
+    func testPeptideNotificationSkipSendsNoDoseAndCompleteKeepsThePlannedDose() async throws {
+        let request = try Self.request(id: "reminder_tesamorelin", json: Self.peptideWithSkipJSON, time: "17:00")
+        var skips: [PriorityNotificationDelegate.SkipActionPayload] = []
+        var completes: [PriorityNotificationDelegate.CompleteActionPayload] = []
+        var feedback: [PhysiqueOSFeedbackEvent] = []
+        var cleaned: [String] = []
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            completeActionHandler: { completes.append($0) },
+            skipActionHandler: { skips.append($0) },
+            feedbackHandler: { feedback.append($0) },
+            postActionReconciliation: {},
+            completionCleanup: { cleaned.append("\($0)|\($1)") }
+        )
+        await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
+        await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
+        XCTAssertEqual(skips, [.init(priorityId: "reminder_tesamorelin", occurrenceDate: "2026-09-16", expectedVersion: 7)],
+                       "Exactly once, identity and version only: a skip records no dose.")
+        XCTAssertTrue(completes.isEmpty, "Skip never completes.")
+        XCTAssertEqual(cleaned, ["reminder_tesamorelin|2026-09-16"])
+        XCTAssertEqual(feedback, [.prioritySkipped])
+
+        // Complete from a fresh delivery of the same occurrence keeps the dose.
+        let again = PriorityNotificationDelegate(
+            environment: nil,
+            completeActionHandler: { completes.append($0) },
+            skipActionHandler: { skips.append($0) },
+            feedbackHandler: { _ in },
+            postActionReconciliation: {},
+            completionCleanup: { _, _ in }
+        )
+        await again.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.complete, request))
+        XCTAssertEqual(completes.map(\.dose), ["0.5 mg"])
+        XCTAssertEqual(completes.map(\.protocolId), ["protocol_tesamorelin"])
+    }
+
+    @MainActor
+    func testFoamRollingNotificationSkipUsesTheServerSkipCommand() async throws {
+        let request = try Self.request(id: "reminder_foam", json: Self.foamWithSkipJSON, time: "20:00")
+        var skips: [PriorityNotificationDelegate.SkipActionPayload] = []
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            skipActionHandler: { skips.append($0) },
+            feedbackHandler: { _ in },
+            postActionReconciliation: {},
+            completionCleanup: { _, _ in }
+        )
+        await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
+        XCTAssertEqual(skips, [.init(priorityId: "reminder_foam", occurrenceDate: "2026-09-16", expectedVersion: 4)])
+    }
+
+    @MainActor
+    func testSupplementAndPausedNotificationsNeverSkip() async throws {
+        var skips = 0
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            skipActionHandler: { _ in skips += 1 },
+            feedbackHandler: { _ in XCTFail("No feedback without a skip.") },
+            postActionReconciliation: {},
+            completionCleanup: { _, _ in XCTFail("Nothing is withdrawn.") }
+        )
+        for (id, json) in [("reminder_creatine", Self.supplementJSON), ("reminder_tesamorelin", Self.pausedPeptideJSON)] {
+            let request = try Self.request(id: id, json: json, time: "17:00")
+            await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
+        }
+        XCTAssertEqual(skips, 0)
+    }
+
+    @MainActor
+    func testBuild78DeliveredSimpleNotificationWithoutSkipCommandStillSkips() async throws {
+        // Delivered before the Server published skipCommand: simpleCompletion
+        // with only the plain completion contract.
+        let userInfo: [AnyHashable: Any] = [
+            "priorityId": "reminder_stretch", "occurrenceDate": "2026-09-16",
+            "commandType": ProductionCommandType.completePriority, "expectedVersion": 3,
+            "payloadPriorityId": "reminder_stretch", "payloadOccurrenceDate": "2026-09-16",
+        ]
+        var skips: [PriorityNotificationDelegate.SkipActionPayload] = []
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            skipActionHandler: { skips.append($0) },
+            feedbackHandler: { _ in },
+            postActionReconciliation: {},
+            completionCleanup: { _, _ in }
+        )
+        await delegate.handle(snapshot: .init(
+            actionIdentifier: PriorityNotificationActionIdentifier.skip,
+            requestIdentifier: "priority.scheduled.reminder_stretch.2026-09-16",
+            userInfo: userInfo,
+            categoryIdentifier: PriorityNotificationCategory.simpleCompletion
+        ))
+        XCTAssertEqual(skips, [.init(priorityId: "reminder_stretch", occurrenceDate: "2026-09-16", expectedVersion: 3)])
+    }
+}
+
+extension PriorityNotificationSchedulerTests {
+    @MainActor
+    func testSpecializedNotificationsWithoutSkipFieldsNeverFallBack() async throws {
+        let peptide = try Self.request(id: "reminder_tesamorelin", json: Self.peptideWithSkipJSON, time: "17:00")
+        var info = peptide.content.userInfo
+        for key in ["skipCommandType", "skipExpectedVersion", "skipPayloadPriorityId", "skipPayloadOccurrenceDate"] { info[key] = nil }
+        var skips = 0
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            skipActionHandler: { _ in skips += 1 },
+            feedbackHandler: { _ in },
+            postActionReconciliation: {},
+            completionCleanup: { _, _ in }
+        )
+        for category in [PriorityNotificationCategory.specializedSkippable, PriorityNotificationCategory.specializedActionable,
+                         PriorityNotificationCategory.skipOnly] {
+            await delegate.handle(snapshot: .init(
+                actionIdentifier: PriorityNotificationActionIdentifier.skip,
+                requestIdentifier: "priority.scheduled.\(category)",
+                userInfo: info, categoryIdentifier: category
+            ))
+        }
+        XCTAssertEqual(skips, 0, "Only the plain Build 78 category may fall back to the completion identity.")
+    }
+
+    @MainActor
+    func testSkipCommandForAnotherOccurrenceThanTheNotificationIsRefused() async throws {
+        let request = try Self.request(id: "reminder_x", json: Self.skipOnlyJSON, time: "09:00")
+        var info = request.content.userInfo
+        info["occurrenceDate"] = "2026-09-17"
+        var skips = 0
+        let delegate = PriorityNotificationDelegate(
+            environment: nil, skipActionHandler: { _ in skips += 1 }, feedbackHandler: { _ in },
+            postActionReconciliation: {}, completionCleanup: { _, _ in }
+        )
+        await delegate.handle(snapshot: .init(
+            actionIdentifier: PriorityNotificationActionIdentifier.skip, requestIdentifier: request.identifier,
+            userInfo: info, categoryIdentifier: PriorityNotificationCategory.skipOnly
+        ))
+        XCTAssertEqual(skips, 0)
+        await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
+        XCTAssertEqual(skips, 1, "The matching skip-only notification skips.")
+    }
+
+    @MainActor
+    func testPeptideSkipOfAnAlreadyCompletedDoseWithdrawsTheReminderWithoutFeedback() async throws {
+        let request = try Self.request(id: "reminder_tesamorelin", json: Self.peptideWithSkipJSON, time: "17:00")
+        var cleaned: [String] = []
+        var feedback: [PhysiqueOSFeedbackEvent] = []
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            skipActionHandler: { _ in throw PrioritySkipError.alreadyCompleted },
+            feedbackHandler: { feedback.append($0) },
+            postActionReconciliation: {},
+            completionCleanup: { cleaned.append("\($0)|\($1)") }
+        )
+        await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
+        XCTAssertEqual(cleaned, ["reminder_tesamorelin|2026-09-16"])
+        XCTAssertTrue(feedback.isEmpty)
     }
 }

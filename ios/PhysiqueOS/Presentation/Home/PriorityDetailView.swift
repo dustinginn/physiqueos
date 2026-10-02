@@ -242,7 +242,7 @@ struct PriorityDetailView: View {
                             }
                             Button("Cancel", role: .cancel) {}
                         } message: {
-                            Text("Today's occurrence will be recorded as skipped and can't be completed afterwards.")
+                            Text(Self.skipConfirmationMessage(isDose: priority.doseAdjustable))
                         }
                 }
             }
@@ -271,6 +271,14 @@ struct PriorityDetailView: View {
             }
             .accessibilityIdentifier("priorityDetail.goToPeptide")
         }
+    }
+
+    /// Skipping a dose means it was intentionally not taken: no amount is
+    /// recorded (the skip command carries none).
+    static func skipConfirmationMessage(isDose: Bool) -> String {
+        isDose
+            ? "Today's dose will be recorded as skipped (not taken). No amount is recorded, and it can't be completed afterwards."
+            : "Today's occurrence will be recorded as skipped and can't be completed afterwards."
     }
 
     /// "Paused since Sep 12. Resume from the Operating Plan to continue."

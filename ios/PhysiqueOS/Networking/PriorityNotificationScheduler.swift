@@ -48,6 +48,8 @@ enum PriorityNotificationScheduler {
         let payloadOccurrenceDate: String?
         let payloadDose: String?
         let payloadProtocolId: String?
+        /// The Server's skip command, carried so a snoozed reminder keeps Skip.
+        var skip: PriorityNotificationSkipFields = .init()
 
         init?(request: UNNotificationRequest) {
             let content = request.content
@@ -79,6 +81,7 @@ enum PriorityNotificationScheduler {
             payloadOccurrenceDate = content.userInfo["payloadOccurrenceDate"] as? String
             payloadDose = content.userInfo["payloadDose"] as? String
             payloadProtocolId = content.userInfo["payloadProtocolId"] as? String
+            skip = PriorityNotificationSkipFields(userInfo: content.userInfo)
         }
 
         init(
@@ -581,6 +584,7 @@ enum PriorityNotificationScheduler {
         if let value = payload.payloadOccurrenceDate { userInfo["payloadOccurrenceDate"] = value }
         if let value = payload.payloadDose { userInfo["payloadDose"] = value }
         if let value = payload.payloadProtocolId { userInfo["payloadProtocolId"] = value }
+        payload.skip.write(into: &userInfo)
         content.userInfo = userInfo
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: snoozeInterval, repeats: false)
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
@@ -694,6 +698,53 @@ enum PriorityNotificationScheduler {
             if let dose = command.payload.dose { info["payloadDose"] = dose }
             if let protocolId = command.payload.protocolId { info["payloadProtocolId"] = protocolId }
         }
+        // Skip is its own Server-owned command (identity + version, no dose).
+        PriorityNotificationSkipFields(command: action.skipCommand).write(into: &info)
         return info
+    }
+}
+
+/// The Server's `notificationAction.skipCommand` as flat notification
+/// `userInfo` values. Never carries a dose or protocol.
+struct PriorityNotificationSkipFields: Sendable, Equatable {
+    var commandType: String?
+    var expectedVersion: Int?
+    var priorityId: String?
+    var occurrenceDate: String?
+
+    init(commandType: String? = nil, expectedVersion: Int? = nil, priorityId: String? = nil, occurrenceDate: String? = nil) {
+        self.commandType = commandType
+        self.expectedVersion = expectedVersion
+        self.priorityId = priorityId
+        self.occurrenceDate = occurrenceDate
+    }
+
+    init(command: PriorityNotificationSkipCommand?) {
+        self.init(
+            commandType: command?.commandType, expectedVersion: command?.expectedVersion,
+            priorityId: command?.payload.priorityId, occurrenceDate: command?.payload.occurrenceDate
+        )
+    }
+
+    init(userInfo: [AnyHashable: Any]) {
+        self.init(
+            commandType: userInfo["skipCommandType"] as? String,
+            expectedVersion: userInfo["skipExpectedVersion"] as? Int,
+            priorityId: userInfo["skipPayloadPriorityId"] as? String,
+            occurrenceDate: userInfo["skipPayloadOccurrenceDate"] as? String
+        )
+    }
+
+    func write(into info: inout [AnyHashable: Any]) {
+        if let commandType { info["skipCommandType"] = commandType }
+        if let expectedVersion { info["skipExpectedVersion"] = expectedVersion }
+        if let priorityId { info["skipPayloadPriorityId"] = priorityId }
+        if let occurrenceDate { info["skipPayloadOccurrenceDate"] = occurrenceDate }
+    }
+
+    /// A complete `priority.skip.v1` command.
+    var isComplete: Bool {
+        commandType == ProductionCommandType.skipPriority && expectedVersion != nil
+            && !(priorityId ?? "").isEmpty && !(occurrenceDate ?? "").isEmpty
     }
 }
