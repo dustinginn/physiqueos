@@ -237,19 +237,211 @@ struct CoachingMonthlyScheduleReadModel: Codable, Equatable {
     var localTime: String
 }
 
-enum ProgressPhotoCadence: String, Codable, CaseIterable, Identifiable {
-    case weekly
-    case everyTwoWeeks = "weekly_interval_2"
+/// Progress Photos cadence unit: "Every N weeks" or "Every N months".
+enum ProgressPhotoCadenceUnit: String, Codable, CaseIterable, Identifiable {
+    case week, month
     var id: String { rawValue }
-    var label: String { self == .weekly ? "Weekly" : "Every 2 weeks" }
+    /// Natural singular/plural: 1 Week, 2 Weeks, 1 Month, 3 Months.
+    func label(for interval: Int) -> String {
+        switch self {
+        case .week: interval == 1 ? "Week" : "Weeks"
+        case .month: interval == 1 ? "Month" : "Months"
+        }
+    }
+    var pluralLabel: String { label(for: 2) }
 }
 
+/// A monthly cadence is weekday-anchored ("the first Saturday of every
+/// month"), matching the weekday-based Progress Photos schedule. `last`
+/// covers months with a fifth occurrence. Server-owned semantics.
+enum ProgressPhotoWeekOfMonth: String, Codable, CaseIterable, Identifiable {
+    case first, second, third, fourth, last
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+}
+
+/// The Progress Photos block of the Coaching Updates editor contract. The
+/// Server owns the recurrence; Native edits `cadenceInterval` +
+/// `cadenceUnit` (+ `weekOfMonth` for months).
+///
+/// Wire compatibility: the legacy `cadence` string ("weekly" |
+/// "weekly_interval_2") is still decoded when the new fields are absent
+/// (an older Server), and is always encoded so an older Server keeps
+/// working for the two cadences it can express. A newer cadence encodes
+/// "custom", which the Server rejects unless the new fields are honored.
 struct CoachingProgressPhotosReadModel: Codable, Equatable {
-    var cadence: ProgressPhotoCadence
+    static let intervalRange = 1...12
+
+    var cadenceInterval: Int
+    var cadenceUnit: ProgressPhotoCadenceUnit
+    var weekOfMonth: ProgressPhotoWeekOfMonth?
     var day: OperatingPlanWeekday
     var timeOfDay: TimeOfDayChoice
     var specificTime: String?
     var reminderEnabled: Bool
+    /// Read-only: the Server's next scheduled photo date on or after today.
+    var nextOccurrenceDate: String?
+    /// False when the Server only sent the legacy `cadence`; such a Server
+    /// can only save Weekly / Every 2 weeks.
+    var serverSupportsFlexibleCadence: Bool = true
+
+    init(cadenceInterval: Int, cadenceUnit: ProgressPhotoCadenceUnit, weekOfMonth: ProgressPhotoWeekOfMonth? = nil,
+         day: OperatingPlanWeekday, timeOfDay: TimeOfDayChoice, specificTime: String? = nil,
+         reminderEnabled: Bool, nextOccurrenceDate: String? = nil, serverSupportsFlexibleCadence: Bool = true) {
+        self.cadenceInterval = cadenceInterval
+        self.cadenceUnit = cadenceUnit
+        self.weekOfMonth = weekOfMonth
+        self.day = day
+        self.timeOfDay = timeOfDay
+        self.specificTime = specificTime
+        self.reminderEnabled = reminderEnabled
+        self.nextOccurrenceDate = nextOccurrenceDate
+        self.serverSupportsFlexibleCadence = serverSupportsFlexibleCadence
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case cadence, cadenceInterval, cadenceUnit, weekOfMonth, day, timeOfDay, specificTime, reminderEnabled, nextOccurrenceDate
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        day = try container.decode(OperatingPlanWeekday.self, forKey: .day)
+        timeOfDay = try container.decode(TimeOfDayChoice.self, forKey: .timeOfDay)
+        specificTime = try container.decodeIfPresent(String.self, forKey: .specificTime)
+        reminderEnabled = try container.decode(Bool.self, forKey: .reminderEnabled)
+        nextOccurrenceDate = try container.decodeIfPresent(String.self, forKey: .nextOccurrenceDate)
+        if let unit = try container.decodeIfPresent(ProgressPhotoCadenceUnit.self, forKey: .cadenceUnit) {
+            let interval = try container.decode(Int.self, forKey: .cadenceInterval)
+            guard Self.intervalRange.contains(interval) else {
+                throw DecodingError.dataCorruptedError(forKey: .cadenceInterval, in: container,
+                    debugDescription: "Progress Photos interval \(interval) is outside 1...12.")
+            }
+            cadenceInterval = interval
+            cadenceUnit = unit
+            weekOfMonth = unit == .month
+                ? try container.decode(ProgressPhotoWeekOfMonth.self, forKey: .weekOfMonth)
+                : nil
+            serverSupportsFlexibleCadence = true
+        } else {
+            // Legacy Server shape: only "weekly" / "weekly_interval_2" exist.
+            let legacy = try container.decode(String.self, forKey: .cadence)
+            switch legacy {
+            case "weekly": cadenceInterval = 1
+            case "weekly_interval_2": cadenceInterval = 2
+            default:
+                throw DecodingError.dataCorruptedError(forKey: .cadence, in: container,
+                    debugDescription: "Unsupported legacy Progress Photos cadence \(legacy).")
+            }
+            cadenceUnit = .week
+            weekOfMonth = nil
+            serverSupportsFlexibleCadence = false
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(legacyCadence, forKey: .cadence)
+        try container.encode(cadenceInterval, forKey: .cadenceInterval)
+        try container.encode(cadenceUnit, forKey: .cadenceUnit)
+        if cadenceUnit == .month {
+            try container.encode(weekOfMonth ?? .first, forKey: .weekOfMonth)
+        } else {
+            try container.encodeNil(forKey: .weekOfMonth)
+        }
+        try container.encode(day, forKey: .day)
+        try container.encode(timeOfDay, forKey: .timeOfDay)
+        try container.encodeIfPresent(specificTime, forKey: .specificTime)
+        try container.encode(reminderEnabled, forKey: .reminderEnabled)
+    }
+
+    /// The legacy wire value for Servers that predate flexible cadence.
+    var legacyCadence: String {
+        guard cadenceUnit == .week else { return "custom" }
+        switch cadenceInterval {
+        case 1: return "weekly"
+        case 2: return "weekly_interval_2"
+        default: return "custom"
+        }
+    }
+
+    var isLegacyRepresentable: Bool { legacyCadence != "custom" }
+
+    /// "Every 3 weeks on Saturday" · "Every month on the first Saturday".
+    var cadenceSummary: String {
+        let every = cadenceInterval == 1
+            ? "Every \(cadenceUnit.label(for: 1).lowercased())"
+            : "Every \(cadenceInterval) \(cadenceUnit.label(for: cadenceInterval).lowercased())"
+        switch cadenceUnit {
+        case .week: return "\(every) on \(day.label)"
+        case .month: return "\(every) on the \((weekOfMonth ?? .first).rawValue) \(day.label)"
+        }
+    }
+
+    /// Whether interval, unit, weekday, or week of month differ — the
+    /// changes the Server re-anchors on (time and reminder changes do not).
+    func cadencePatternDiffers(from other: CoachingProgressPhotosReadModel) -> Bool {
+        cadenceInterval != other.cadenceInterval || cadenceUnit != other.cadenceUnit
+            || day != other.day
+            || (cadenceUnit == .month ? weekOfMonth ?? .first : nil) != (other.cadenceUnit == .month ? other.weekOfMonth ?? .first : nil)
+    }
+}
+
+/// Display-only preview of when an edited Progress Photos cadence starts,
+/// mirroring the Server's rule (`resolveCadenceChangeAnchor`): the current
+/// schedule's upcoming occurrence is kept when it still fits the new day
+/// rule; otherwise the new cadence starts on the first matching day after
+/// today. The Server remains the authority and returns the saved date.
+enum ProgressPhotoCadencePreview {
+    static func firstOccurrence(edited: CoachingProgressPhotosReadModel, saved: CoachingProgressPhotosReadModel,
+                                today: String) -> String? {
+        if !edited.cadencePatternDiffers(from: saved) { return saved.nextOccurrenceDate }
+        if let kept = saved.nextOccurrenceDate, kept >= today, matchesDayRule(edited, date: kept) { return kept }
+        guard var cursor = noonUTC(today) else { return nil }
+        for _ in 0..<62 {
+            cursor = cursor.addingTimeInterval(86_400)
+            let key = dateKey(cursor)
+            if matchesDayRule(edited, date: key) { return key }
+        }
+        return nil
+    }
+
+    static func matchesDayRule(_ photos: CoachingProgressPhotosReadModel, date: String) -> Bool {
+        guard let noon = noonUTC(date) else { return false }
+        let components = calendar.dateComponents([.weekday, .day], from: noon)
+        guard let weekday = components.weekday, let day = components.day,
+              OperatingPlanWeekday.allCases[weekday - 1] == photos.day else { return false }
+        guard photos.cadenceUnit == .month else { return true }
+        switch photos.weekOfMonth ?? .first {
+        case .first: return day <= 7
+        case .second: return (8...14).contains(day)
+        case .third: return (15...21).contains(day)
+        case .fourth: return (22...28).contains(day)
+        case .last:
+            let days = calendar.range(of: .day, in: .month, for: noon)?.count ?? 31
+            return day + 7 > days
+        }
+    }
+
+    private static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
+
+    private static let formatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static func noonUTC(_ key: String) -> Date? {
+        formatter.date(from: key).map { $0.addingTimeInterval(12 * 3600) }
+    }
+
+    private static func dateKey(_ date: Date) -> String { formatter.string(from: date) }
 }
 
 enum DexaReminderPreference: String, Codable, CaseIterable, Identifiable {

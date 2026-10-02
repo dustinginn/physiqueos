@@ -1787,7 +1787,9 @@ final class FounderServerAPITests: XCTestCase {
         let api = ProductionCoachingUpdatesAPI(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
         let fetched = try await api.fetchDetail(strategyId: "coaching")
         let detail = try XCTUnwrap(fetched)
-        XCTAssertEqual(detail.editor.photos.cadence, .everyTwoWeeks)
+        XCTAssertEqual(detail.editor.photos.cadenceInterval, 2)
+        XCTAssertEqual(detail.editor.photos.cadenceUnit, .week)
+        XCTAssertFalse(detail.editor.photos.serverSupportsFlexibleCadence, "Legacy Server shape")
         var model = detail.editor
         model.photos.day = .sunday
         model.photos.timeOfDay = .specific
@@ -1815,9 +1817,47 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual((draft["photos"] as? [String: Any])?["day"] as? String, "sunday")
         XCTAssertEqual((draft["photos"] as? [String: Any])?["timeOfDay"] as? String, "specific")
         XCTAssertEqual((draft["photos"] as? [String: Any])?["specificTime"] as? String, "17:35")
+        // An unchanged Every 2 weeks still sends the legacy value an older
+        // Server understands, alongside the structured cadence.
+        XCTAssertEqual((draft["photos"] as? [String: Any])?["cadence"] as? String, "weekly_interval_2")
+        XCTAssertEqual((draft["photos"] as? [String: Any])?["cadenceInterval"] as? Int, 2)
+        XCTAssertEqual((draft["photos"] as? [String: Any])?["cadenceUnit"] as? String, "week")
         XCTAssertEqual((draft["dexa"] as? [String: Any])?["plannedDate"] as? String, "2026-10-22")
         let affected = await native.resourcesAffected(by: ProductionCommandType.saveCoachingUpdates)
         XCTAssertTrue(affected.isSuperset(of: ["operating-plan", "operating-plan-coaching-updates", "home", "priority", "photos", "dexa"]))
+    }
+
+    func testProductionCoachingEditorSavesFlexibleProgressPhotoCadence() async throws {
+        let json = productionEnvelope(resource: "operating-plan-coaching-updates", data: #"{"protocolId":"coaching","title":"Coaching","purpose":"Timely coaching","goal":"Your current goal","startedDate":"July 25, 2026","status":"Active","fields":[],"editLabel":"Edit Coaching Updates","context":{"expectedCurrentVersionId":"coaching-v1","expectedRevision":85,"expectedSemanticDigest":"coaching-digest","photoExpectedCurrentVersionId":"photos-v1","photoExpectedSemanticDigest":"photo-digest","dexaExpectedRevision":3},"editor":{"strategyId":"coaching","midweek":{"enabled":true,"day":"wednesday","localTime":"08:15"},"weekly":{"enabled":true,"day":"sunday","localTime":"09:00"},"monthly":{"enabled":true,"dayOfMonth":1,"localTime":"08:00"},"photos":{"cadence":"custom","cadenceInterval":3,"cadenceUnit":"week","weekOfMonth":null,"nextOccurrenceDate":"2026-10-03","day":"saturday","timeOfDay":"specific","specificTime":"08:30","reminderEnabled":true},"dexa":{"plannedDate":"2026-10-15","localTime":"07:30","reminderPreferences":["day_before"],"uploadReminder":true,"preparationNote":"Arrive hydrated"},"photoEventBriefingEnabled":true,"dexaEventBriefingEnabled":false,"notificationPreference":"notify_when_ready"}}"#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")), .json(200, json),
+            .json(200, #"{"outcome":"committed","receipt":{"status":"committed","result":{"status":"updated","protocolId":"coaching","revision":86,"coachingChanged":false,"photosChanged":true,"photoReminderChanged":false,"dexaChanged":false}}}"#),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Coaching test")
+        let api = ProductionCoachingUpdatesAPI(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        let fetched = try await api.fetchDetail(strategyId: "coaching")
+        let detail = try XCTUnwrap(fetched)
+        XCTAssertEqual(detail.editor.photos.cadenceInterval, 3)
+        XCTAssertEqual(detail.editor.photos.cadenceUnit, .week)
+        XCTAssertTrue(detail.editor.photos.serverSupportsFlexibleCadence)
+        XCTAssertEqual(detail.editor.photos.nextOccurrenceDate, "2026-10-03")
+        var model = detail.editor
+        model.photos.cadenceInterval = 2
+        model.photos.cadenceUnit = .month
+        model.photos.weekOfMonth = .first
+        _ = try await api.save(detail, model: model)
+        let writes = await transport.requests.filter { $0.url?.path.hasSuffix("/commands") == true }
+        let envelope = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(writes.first?.httpBody)) as? [String: Any])
+        let photos = try XCTUnwrap(((envelope["payload"] as? [String: Any])?["draft"] as? [String: Any])?["photos"] as? [String: Any])
+        XCTAssertEqual(photos["cadence"] as? String, "custom")
+        XCTAssertEqual(photos["cadenceInterval"] as? Int, 2)
+        XCTAssertEqual(photos["cadenceUnit"] as? String, "month")
+        XCTAssertEqual(photos["weekOfMonth"] as? String, "first")
+        XCTAssertEqual(photos["day"] as? String, "saturday")
+        XCTAssertEqual(photos["specificTime"] as? String, "08:30")
+        XCTAssertEqual(photos["reminderEnabled"] as? Bool, true)
+        XCTAssertEqual((envelope["payload"] as? [String: Any]).flatMap { ($0["draft"] as? [String: Any])?["photoEventBriefingEnabled"] as? Bool }, true)
     }
 
     func testProductionPeptideEditorRoundTripsDoseScheduleAndExecutionRevision() async throws {
