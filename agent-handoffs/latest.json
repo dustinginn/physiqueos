@@ -1,56 +1,53 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T02:15:00Z",
+  "generated_at_utc": "2026-10-02T02:31:51Z",
   "task": {
-    "id": "priority-skip-peptides-foam-notification-20261002",
-    "title": "Priority Skip: peptides + Foam Rolling notification capability (Server-owned skipCommand)",
-    "agent": "claude",
+    "id": "home-screen-widget-v1-implementation",
+    "title": "Home Screen Widget V1 — square Logged Today glance + Start/Resume Logger",
+    "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "5911dd2a6f968c5a355ec68d3313f0e5e644d529",
-    "final_sha": "88d597b25d49f773a12b7dcff3930b0f237a7a46",
-    "production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486",
-    "production_deployment": "421cae1a-dbc6-494c-9f73-9b8778e45efd",
-    "native_sha": "5911dd2a6f968c5a355ec68d3313f0e5e644d529",
+    "final_sha": "820401430b154eae64821d1fd7dc9ad993826f3c",
+    "implementation_branch": "codex/home-screen-widget-v1-implementation-20261002",
+    "priority_skip_candidate_sha": "88d597b25d49f773a12b7dcff3930b0f237a7a46",
     "native_build": 78
   },
   "result": {
-    "summary": "Server 2d967e48 deployed (421cae1a, live/ready/SHA parity verified): peptides canonically skippable (skip records no dose) and explicit notificationAction.skipCommand for peptides and Foam Rolling, never supplements. Native patch 88d597b2 (on Build 78) renders Skip only from skipCommand; integration-ready, not uploaded, awaiting consolidation with the Home Screen Widget.",
+    "summary": "Home widget candidate 82040143 is pushed from exact Build 78. The four-tile square is primary (Nutrition P/C/F, Activity, optional today Weight, app-owned refresh, Start/Resume Logger); detailed large remains optional. Final widget + Build 78 regression suite passed 159/159. No TestFlight upload. Clean merge-tree verified with Claude Priority Skip 88d597b2; consolidate both into one next Native build.",
     "success": true,
     "production_mutated": false,
-    "deployed": true,
+    "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server full unit suite 0 new deterministic failures vs base (7 known label-drift failures unchanged); Native full suite 1873 tests on 88d597b2 with 1 known unrelated Peptide failure; focused suites green."
+      "summary": "159/159 final focused Home widget plus Build 78 Live Activity/session/rest tests passed; zero failures and zero skips."
     },
     "review": {
       "status": "approved",
-      "summary": "Independent Server review (no P0/P1) + delta re-review (no blockers); independent Native review (no P0, no code P1); P2s fixed."
+      "summary": "Privacy/auth, exact-day, session-authority, App Group, signing-source, render, and integration review passed; physical signed iOS 27 acceptance remains a release gate."
     },
-    "zero_write_audit": {
+    "release_configuration": {
       "status": "passed",
-      "summary": "Deploy changed code only (no migration, no data or historical record mutation); no Briefing/V3/Confidence/Sleep/Recovery changes."
+      "summary": "Generator deterministic; verifier confirms Build 78 parity, one existing extension, matching App Group, and HealthKit app-only."
     }
   },
-  "decisions_required": [
-    "Optional later scope: un-skip / Undo for a mis-tapped Skip (no un-skip exists)."
-  ],
+  "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "Build 78 already renders the Server's skippable flag generically, so peptide Priority Detail shows Mark Skipped immediately after this deploy; notifications change only with the next Native build.",
-    "Shared Mac disk fell to 12 GiB from concurrent sessions during the final Native suite; this lane's own artifacts were removed (14 GiB) and no further heavy work was run."
+    "Founder superseded the prompt's large-first direction during implementation: systemSmall is now the primary four-tile family and systemLarge remains optional.",
+    "Founder clarified the physical device is on iOS 27; the candidate compiled with the iOS 27 SDK, while the available simulator runtime was iOS 26.5."
   ],
   "backlog": [
-    "Consolidate Native 88d597b2 with the Codex Home Screen Widget into the next Native build (79 if 78 is still latest).",
-    "Supplement Skip remains a deferred product decision."
+    "Consolidate Native widget 82040143 with Priority Skip 88d597b2 into one next Native build.",
+    "Verify automatic/cloud App Group signing, archive entitlements, and physical iOS 27 widget behavior before one coordinated TestFlight upload."
   ],
-  "recommended_next_step": "Merge claude/priority-skip-peptides-foam-native-20261002 @ 88d597b2 with the Home Screen Widget candidate, then bump, test, archive and upload one consolidated Native build.",
-  "full_report_path": "agent-handoffs/reports/20261002T021500Z-priority-skip-peptides-foam-notification.md",
+  "recommended_next_step": "Merge exact candidates 88d597b25d49f773a12b7dcff3930b0f237a7a46 and 820401430b154eae64821d1fd7dc9ad993826f3c, then perform one integrated build, archive, device acceptance, and coordinated TestFlight upload.",
+  "full_report_path": "agent-handoffs/reports/20261002T023151Z-home-screen-widget-v1-implementation.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

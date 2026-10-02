@@ -1,15 +1,15 @@
 # PhysiqueOS latest agent handoff
 
-Machine-readable interface: `agent-handoffs/latest.json` (read this first).
+Machine-readable interface: agent-handoffs/latest.json (read this first).
 
-- Task: Priority Skip: peptides + Foam Rolling notification capability (Server-owned skipCommand) (`priority-skip-peptides-foam-notification-20261002`)
-- Agent: claude
-- Status: completed
-- Generated (UTC): 2026-10-02T02:15:00Z
+- Task: Home Screen Widget V1 — square Logged Today glance + Start/Resume Logger (home-screen-widget-v1-implementation)
+- Agent: codex
+- Status: completed; integration-ready, not released
+- Generated (UTC): 2026-10-02T02:31:51Z
 - Success: true
 
-Summary: Server 2d967e48 deployed (421cae1a, live/ready/SHA parity verified): peptides canonically skippable (skip records no dose) and explicit notificationAction.skipCommand for peptides and Foam Rolling, never supplements. Native patch 88d597b2 (on Build 78) renders Skip only from skipCommand; integration-ready, not uploaded, awaiting consolidation with the Home Screen Widget.
+Summary: Home widget candidate 82040143 is pushed from exact Build 78. The four-tile square is primary (Nutrition P/C/F, Activity, optional today Weight, app-owned refresh, Start/Resume Logger); detailed large remains optional. Final widget + Build 78 regression suite passed 159/159. No TestFlight upload. Clean merge-tree verified with Claude Priority Skip 88d597b2; consolidate both into one next Native build.
 
-Detailed report: `agent-handoffs/reports/20261002T021500Z-priority-skip-peptides-foam-notification.md`
+Detailed report: agent-handoffs/reports/20261002T023151Z-home-screen-widget-v1-implementation.md
 
-Protocol: `agent-handoffs/README.md`
+Protocol: agent-handoffs/README.md
