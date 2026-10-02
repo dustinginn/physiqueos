@@ -1,48 +1,52 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T21:05:00Z",
+  "generated_at_utc": "2026-10-02T21:35:00Z",
   "task": {
     "id": "build82-sleep-v3-native-integration-activation-20261002",
-    "title": "Build 82 Sleep v3 Native integration + guarded activation",
+    "title": "Build 82 (Watch + Sleep v3 compatibility) TestFlight; Sleep v3 dormant",
     "agent": "claude",
-    "status": "checkpoint_waiting_for_device_connection"
+    "status": "testflight_valid_awaiting_founder_remote_install"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "integrated_native_sha": "31988c06cf5e235260feab4176f899243df9ba2a",
-    "integrated_native_branch": "claude/build82-sleep-v3-integration-20261002",
-    "watch_base_sha": "a173f27b4a9ab208021a1f3cd7febc7402cf3b42",
+    "uploaded_native_sha": "e2cbcd0cf40dca64a4c8490bf0ebd4077b2eb69c",
+    "uploaded_native_build": 82,
+    "testflight_delivery_id": "f3d09d99-9b8e-4344-85e7-5d2ddcc04519",
     "production_server_sha": "d0ff65965233fa44e108387f01b649a2bdb476df",
-    "shipping_native_build": 81
+    "sleep_v3": "dormant"
   },
   "result": {
-    "summary": "Sleep v3 compatibility (3ed3eae7) integrated into Watch Build 82 as 31988c06; focused 603/603, Watch 7/7, full iOS 1931 with only the known peptide baseline failure; signed 1.0 (82) archive ready. Install blocked: iPhone/Watch paired but unreachable. Server v3 activation NOT run (gate). Production mutation 0.",
-    "success": false,
+    "summary": "Build 82 (Watch V1 Cancel + Sleep v2/v3 Native compatibility + Progress Photos) uploaded from e2cbcd0c and VALID (delivery f3d09d99). First upload was rejected by App Store validation for UIBackgroundModes in the Watch bundle; fixed to WKBackgroundModes. Sleep v3 still dormant (no policy; target set [2026-10-02]); production mutation 0. Next: Founder installs Build 82 from TestFlight remotely and confirms; then guarded v3 activation.",
+    "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": true
   },
   "validation": {
     "native_focused": {
       "status": "passed",
-      "summary": "603 tests, 0 failures"
-    },
-    "native_watch": {
-      "status": "passed",
-      "summary": "7/7"
+      "summary": "603/603 on 31988c06"
     },
     "native_full": {
       "status": "passed_with_known_baseline",
-      "summary": "1931 tests, 1 known peptide fixture failure"
+      "summary": "1931 tests, only the known peptide fixture failure"
+    },
+    "watch": {
+      "status": "passed",
+      "summary": "7/7 on e2cbcd0c"
+    },
+    "app_store_validation": {
+      "status": "passed",
+      "summary": "VALID, Watch bundle validated"
     }
   },
   "open_gates": [
-    "Founder connects iPhone/Watch -> install Build 82 (31988c06)",
-    "Fresh v3 activation dry-run + apply",
-    "Post-activation verification; canary FAIL -> HOLD"
+    "Founder installs Build 82 from TestFlight (iPhone + Watch) and confirms",
+    "Guarded Sleep v3 dry-run + apply + verify; canary FAIL -> HOLD",
+    "Watch V1 physical acceptance on TestFlight build"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T210500Z-build82-sleep-v3-native-integration-activation.md",
-  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T210000Z-build82-sleep-v3-native-integration-activation.md",
+  "full_report_path": "agent-handoffs/reports/20261002T213500Z-build82-sleep-v3-native-integration-activation.md",
+  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T212500Z-build82-testflight-remote-workflow-correction.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

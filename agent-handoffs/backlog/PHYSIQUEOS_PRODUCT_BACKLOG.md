@@ -15,6 +15,11 @@ Before proposing or reconstructing the PhysiqueOS backlog:
 
 Agent handoff reports describe implementation state. This backlog describes what still needs product attention.
 
+DELIVERY WORKFLOW RULE (durable, 2026-10-02)
+- Normal Native distribution is TestFlight-first: Claude/Codex archive on the Mac -> guarded App Store Connect upload -> TestFlight VALID -> Founder installs remotely -> physical acceptance.
+- Tethered (USB / same-Wi-Fi / local device tunnel) installs are exceptional bring-up/debugging only.
+- Future prompts must not make local Mac or device reachability a routine release gate.
+
 ACTIVE / NEXT
 
 0. Progress Photos flexible cadence (Every N Weeks / Months) — SHIPPED, pending Founder acceptance
@@ -77,7 +82,7 @@ Acceptance:
 - notification clears/updates appropriately.
 
 4. HealthKit Sleep — prospective canary acceptance
-Status: canary FAIL (2026-10-02 audit: P2 Oura cross-revision copy splice). Fix sleep-canon-v3 DEPLOYED DORMANT 2026-10-02 (Server d0ff6596, deployment 64533990); Oct 2 stored row is still the v2 splice until activation. Returns to HOLD (never PASS) once activated and verified. D0 2026-10-02 validation_only. Strategic Sleep OFF.
+Status: canary FAIL (P2 Oura copy splice) until v3 activation. sleep-canon-v3 deployed DORMANT (Server d0ff6596). Founder ACCEPTED the documented rare out-of-order Oura revision ambiguity as a known residual limitation (normal-order fuzz 0/7,500 splices; adversarial 2/1,500; v3 never worse than v2 without revision identity); ambiguousContinuationCount stays visible. Native v2+v3 compatibility integrated into Build 82 (e2cbcd0c) — TestFlight VALID (delivery f3d09d99). Activation waits for the Founder to install Build 82 remotely and CONFIRM; then guarded dry-run + apply (exact prospective set >= 2026-10-02) and canary -> HOLD (never PASS). D0 2026-10-02 validation_only. Strategic Sleep OFF.
 Authority:
 - Server d0ff65965233fa44e108387f01b649a2bdb476df (branch claude/healthkit-sleep-canon-v3-20261002); no canonical-algorithm policy record yet -> ordinary ingest still sleep-canon-v2.
 - report agent-handoffs/reports/20261002T201500Z-healthkit-sleep-canon-v3-copy-coherence.md
@@ -87,9 +92,9 @@ sleep-canon-v3 (authority for ordinary prospective days once activated; historic
 - zero-write audit: historical 0/87 and validation 0/30 nights change; Oct 2 v3 == Oura revision 2 alone (asleep ~455, deep ~99, REM ~118, core ~239, awake ~25 min).
 - guarded activation (buildHealthKitPayload --kind sleep-canon-v3) dry-run on live d0ff6596: target set exactly [2026-10-02]; mutation 0.
 Next gates (in order):
-1. Native: integrate patch claude/sleep-canon-v3-native-accept-20261002 @ 3ed3eae7 (Sleep Evidence accepts v2 + v3) into the next Native build; run RecoverySleepReadModelTests (not yet run: disk floor). Build 81 would show v3 nights as "Being recalculated".
-2. Founder: accept or reject the flagged residual P2 (an older revision batch received after the newer revision's first batch can attract the newer revision's small tail; counted in ambiguousContinuationCount).
-3. Activation: fresh dry-run, then apply with authorization ref + expected facts (use --max-days if > 7 prospective days exist); verify stored == fresh v3, Evidence stages corrected, strategicEligible false, 0 strategic/historical changes. Canary -> HOLD.
+1. DONE: Native v2+v3 compatibility in Build 82 (e2cbcd0c, TestFlight VALID f3d09d99; RecoverySleepReadModelTests passed). Founder installs Build 82 remotely and confirms.
+2. DONE: Founder accepted the out-of-order residual (kept visible via ambiguousContinuationCount).
+3. Activation (only after Founder install confirmation): fresh dry-run, then apply with authorization ref + expected facts (use --max-days if > 7 prospective days exist); verify stored == fresh v3, Evidence stages corrected, strategicEligible false, 0 strategic/historical changes. Canary -> HOLD.
 4. Natural gates under v3: >=2 (prefer 3) natural nights (ideally an Oura duplicate-revision night); one morning with Oura synced while PhysiqueOS stays unopened >=75 min (background delivery); Oct 4 Weekly (and Oct 7 Midweek) scanned: zero Sleep/Recovery markers, Confidence unmoved; >=14 reliable prospective nights before a Recovery baseline is meaningful.
 - no manual Sleep import; no backfill; no historical recanonicalization.
 After acceptance:
