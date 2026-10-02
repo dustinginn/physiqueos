@@ -3,6 +3,24 @@ import Observation
 import WatchConnectivity
 import WatchKit
 
+enum WatchWorkoutCallbackBridge {
+    static func reply(
+        _ receive: @escaping @MainActor @Sendable (Data) -> Void
+    ) -> @Sendable (Data) -> Void {
+        { data in
+            Task { @MainActor in receive(data) }
+        }
+    }
+
+    static func failure(
+        _ receive: @escaping @MainActor @Sendable () -> Void
+    ) -> @Sendable (any Error) -> Void {
+        { _ in
+            Task { @MainActor in receive() }
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class WatchWorkoutStore: NSObject, WCSessionDelegate {
@@ -165,14 +183,14 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             return
         }
         connectionState = .reachable
-        session.sendMessageData(data) { [weak self] data in
-            Task { @MainActor in self?.receiveAcknowledgement(data) }
-        } errorHandler: { [weak self] _ in
-            Task { @MainActor in
-                self?.connectionState = .reconnecting
-                // Keep the exact pending command for an idempotent retry.
-            }
+        let replyHandler = WatchWorkoutCallbackBridge.reply { [weak self] data in
+            self?.receiveAcknowledgement(data)
         }
+        let errorHandler = WatchWorkoutCallbackBridge.failure { [weak self] in
+            self?.connectionState = .reconnecting
+            // Keep the exact pending command for an idempotent retry.
+        }
+        session.sendMessageData(data, replyHandler: replyHandler, errorHandler: errorHandler)
     }
 
     private func receiveAcknowledgement(_ data: Data) {
