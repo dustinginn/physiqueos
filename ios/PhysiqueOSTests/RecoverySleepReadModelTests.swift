@@ -90,6 +90,18 @@ final class RecoverySleepReadModelTests: XCTestCase {
         XCTAssertNil(RecoverySleepAdapter.detail(try decode(RecoverySleepLiveNight.self, json)).main?.stages.deepSeconds)
     }
 
+    func testSleepCanonV3NightsShowStagesLikeV2() throws {
+        // sleep-canon-v3 (coherent Oura copy) is stage-capable; v1 is still not.
+        let v3 = #"{"sleepDay":"2026-10-02","status":"asleep_recorded","stageStatus":"available","algorithmVersion":"sleep-canon-v3","mainSleep":{"asleepSeconds":27300,"deepSeconds":5940,"remSeconds":7080,"coreSeconds":14340,"awakeSeconds":1500,"unspecifiedSeconds":0},"stages":{"deepSeconds":5940,"remSeconds":7080,"coreSeconds":14340,"awakeSeconds":1500,"unspecifiedSeconds":0},"sleepWindow":{"start":"2026-10-02T06:00:00.000Z","end":"2026-10-02T14:00:00.000Z","timeZone":"America/Los_Angeles"}}"#
+        let night = try decode(RecoverySleepLiveNight.self, v3)
+        XCTAssertEqual(RecoverySleepAdapter.detailStatus(night), .available)
+        XCTAssertEqual(RecoverySleepAdapter.detail(night).main?.stages.deepSeconds, 5940)
+        let unavailable = #"{"sleepDay":"2026-10-02","status":"asleep_recorded","stageStatus":"unavailable","algorithmVersion":"sleep-canon-v3","sleepWindow":{"start":"2026-10-02T06:00:00.000Z","end":"2026-10-02T14:00:00.000Z","timeZone":"America/Los_Angeles"}}"#
+        XCTAssertEqual(RecoverySleepAdapter.detailStatus(try decode(RecoverySleepLiveNight.self, unavailable)), .absent)
+        let older = #"{"sleepDay":"2026-09-01","status":"asleep_recorded","stageStatus":"available","algorithmVersion":"sleep-canon-v1","sleepWindow":{"start":"2026-09-01T06:00:00.000Z","end":"2026-09-01T13:00:00.000Z","timeZone":"America/Los_Angeles"}}"#
+        XCTAssertEqual(RecoverySleepAdapter.detailStatus(try decode(RecoverySleepLiveNight.self, older)), .pendingCorrection)
+    }
+
     // MARK: Time zone / origin / quarantine
 
     func testHistoricalUncertainNightsAreApproximateAndExcluded() throws {
