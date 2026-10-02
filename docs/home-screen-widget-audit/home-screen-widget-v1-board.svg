@@ -1,0 +1,183 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1700" viewBox="0 0 1700 1700">
+  <defs>
+    <linearGradient id="board" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#11152b"/>
+      <stop offset="1" stop-color="#050812"/>
+    </linearGradient>
+    <linearGradient id="accentButton" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c7dff"/>
+      <stop offset="1" stop-color="#9a8cff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000000" flood-opacity="0.34"/>
+    </filter>
+    <style>
+      .sans{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",sans-serif}
+      .title{font-size:44px;font-weight:760;fill:#F3F6FB}
+      .subtitle{font-size:23px;font-weight:520;fill:#9AA8BA}
+      .panelLabel{font-size:22px;font-weight:700;letter-spacing:1.6px;fill:#9AA8BA}
+      .eyebrow{font-size:18px;font-weight:760;letter-spacing:1.8px;fill:#9AA8BA}
+      .metric{font-size:56px;font-weight:770;fill:#F3F6FB}
+      .metricSmall{font-size:36px;font-weight:750;fill:#F3F6FB}
+      .unit{font-size:20px;font-weight:650;fill:#CBD5E1}
+      .body{font-size:25px;font-weight:620;fill:#CBD5E1}
+      .button{font-size:26px;font-weight:760;fill:#090D18}
+      .buttonLight{font-size:25px;font-weight:730;fill:#F3F6FB}
+      .note{font-size:18px;font-weight:560;fill:#9AA8BA}
+    </style>
+  </defs>
+
+  <rect width="1700" height="2320" fill="url(#board)"/>
+  <text x="90" y="105" class="sans title">PhysiqueOS · Home Screen Widget V1</text>
+  <text x="90" y="150" class="sans subtitle">Non-shipping audit mockups · synthetic values · iOS system families</text>
+
+  <!-- Small totals -->
+  <text x="90" y="235" class="sans panelLabel">01 · SMALL / TOTALS EMPHASIS</text>
+  <g transform="translate(90 270)" filter="url(#shadow)">
+    <rect width="460" height="460" rx="56" fill="#141F31" stroke="#29344b" stroke-width="2"/>
+    <circle cx="52" cy="54" r="14" fill="#8B8CFF"/>
+    <text x="80" y="62" class="sans eyebrow" fill="#CBD5E1">TODAY</text>
+    <text x="34" y="180" class="sans metric">2,140</text>
+    <text x="35" y="216" class="sans unit">CAL EATEN</text>
+    <line x1="34" y1="257" x2="426" y2="257" stroke="#94A3B8" stroke-opacity=".18" stroke-width="2"/>
+    <circle cx="51" cy="309" r="9" fill="#FB7185"/>
+    <text x="76" y="320" class="sans metricSmall">176 g</text>
+    <text x="76" y="350" class="sans note">PROTEIN</text>
+    <circle cx="285" cy="309" r="9" fill="#60A5FA"/>
+    <text x="310" y="320" class="sans metricSmall">648</text>
+    <text x="310" y="350" class="sans note">ACTIVE CAL</text>
+    <text x="34" y="421" class="sans note">Updated 12 min ago</text>
+  </g>
+
+  <!-- Small workout launcher -->
+  <text x="650" y="235" class="sans panelLabel">02 · SMALL / LAUNCHER EMPHASIS</text>
+  <g transform="translate(650 270)" filter="url(#shadow)">
+    <rect width="460" height="460" rx="56" fill="#20264A" stroke="#383f70" stroke-width="2"/>
+    <circle cx="60" cy="60" r="27" fill="#8B8CFF" fill-opacity=".2"/>
+    <path d="M47 60h26M54 50v20M66 50v20" stroke="#8B8CFF" stroke-width="5" stroke-linecap="round"/>
+    <text x="101" y="68" class="sans eyebrow" fill="#CBD5E1">WORKOUT LOGGER</text>
+    <text x="38" y="175" class="sans" font-size="39" font-weight="760" fill="#F3F6FB">Ready when you are.</text>
+    <text x="38" y="218" class="sans body">Open the Logger to plan</text>
+    <text x="38" y="252" class="sans body">and start safely.</text>
+    <rect x="34" y="310" width="392" height="104" rx="30" fill="url(#accentButton)"/>
+    <circle cx="89" cy="362" r="25" fill="#0A0E18" fill-opacity=".18"/>
+    <path d="M83 349l18 13-18 13z" fill="#0A0E18"/>
+    <text x="132" y="372" class="sans button">Start Workout</text>
+  </g>
+
+  <!-- rationale card -->
+  <g transform="translate(1200 270)">
+    <rect width="410" height="460" rx="36" fill="#0d1422" stroke="#29344b" stroke-width="2"/>
+    <text x="30" y="58" class="sans eyebrow" fill="#8B8CFF">V1 CONTENT RULE</text>
+    <text x="30" y="112" class="sans body">Calories eaten, protein,</text>
+    <text x="30" y="148" class="sans body">and active calories are</text>
+    <text x="30" y="184" class="sans body">the smallest trustworthy</text>
+    <text x="30" y="220" class="sans body">daily-total set.</text>
+    <line x1="30" y1="260" x2="380" y2="260" stroke="#94A3B8" stroke-opacity=".18" stroke-width="2"/>
+    <text x="30" y="307" class="sans note">No weight, Recovery score,</text>
+    <text x="30" y="337" class="sans note">or mini-Home dashboard.</text>
+    <text x="30" y="391" class="sans note">The action opens the app;</text>
+    <text x="30" y="421" class="sans note">it does not create a session.</text>
+  </g>
+
+  <!-- Medium recommended -->
+  <text x="90" y="805" class="sans panelLabel">03 · MEDIUM / RECOMMENDED V1</text>
+  <g transform="translate(90 835) scale(.72)" filter="url(#shadow)">
+    <rect width="980" height="460" rx="56" fill="#141F31" stroke="#29344b" stroke-width="2"/>
+    <circle cx="48" cy="50" r="12" fill="#8B8CFF"/>
+    <text x="72" y="58" class="sans eyebrow">TODAY</text>
+    <text x="944" y="58" text-anchor="end" class="sans note">Updated 12 min ago</text>
+
+    <g transform="translate(35 105)">
+      <rect width="286" height="142" rx="28" fill="#172235"/>
+      <circle cx="30" cy="35" r="8" fill="#4ADE80"/>
+      <text x="50" y="42" class="sans eyebrow">EATEN</text>
+      <text x="24" y="102" class="sans metric">2,140</text>
+      <text x="217" y="102" class="sans unit">cal</text>
+    </g>
+    <g transform="translate(347 105)">
+      <rect width="286" height="142" rx="28" fill="#172235"/>
+      <circle cx="30" cy="35" r="8" fill="#FB7185"/>
+      <text x="50" y="42" class="sans eyebrow">PROTEIN</text>
+      <text x="24" y="102" class="sans metric">176</text>
+      <text x="146" y="102" class="sans unit">g</text>
+    </g>
+    <g transform="translate(659 105)">
+      <rect width="286" height="142" rx="28" fill="#172235"/>
+      <circle cx="30" cy="35" r="8" fill="#60A5FA"/>
+      <text x="50" y="42" class="sans eyebrow">ACTIVE</text>
+      <text x="24" y="102" class="sans metric">648</text>
+      <text x="152" y="102" class="sans unit">cal</text>
+    </g>
+    <rect x="35" y="282" width="910" height="118" rx="32" fill="url(#accentButton)"/>
+    <circle cx="91" cy="341" r="27" fill="#0A0E18" fill-opacity=".16"/>
+    <path d="M78 341h26M85 331v20M97 331v20" stroke="#0A0E18" stroke-width="5" stroke-linecap="round"/>
+    <text x="138" y="350" class="sans button">Start Workout Logger</text>
+    <text x="908" y="350" text-anchor="end" class="sans" font-size="36" font-weight="650" fill="#0A0E18">›</text>
+  </g>
+
+  <!-- Active workout -->
+  <text x="90" y="1250" class="sans panelLabel">04 · MEDIUM / ACTIVE WORKOUT</text>
+  <g transform="translate(90 1280) scale(.72)" filter="url(#shadow)">
+    <rect width="980" height="460" rx="56" fill="#141F31" stroke="#353d76" stroke-width="2"/>
+    <circle cx="48" cy="50" r="12" fill="#4ADE80"/>
+    <text x="72" y="58" class="sans eyebrow" fill="#4ADE80">WORKOUT ACTIVE</text>
+    <text x="944" y="58" text-anchor="end" class="sans note">6 of 18 sets</text>
+    <text x="38" y="126" class="sans" font-size="38" font-weight="760" fill="#F3F6FB">Push · Chest &amp; Shoulders</text>
+    <text x="38" y="168" class="sans body">Incline Dumbbell Press · Set 3 of 4</text>
+    <g transform="translate(38 206)">
+      <circle cx="10" cy="10" r="8" fill="#4ADE80"/><text x="31" y="18" class="sans note">2,140 eaten</text>
+      <circle cx="230" cy="10" r="8" fill="#FB7185"/><text x="251" y="18" class="sans note">176 g protein</text>
+      <circle cx="495" cy="10" r="8" fill="#60A5FA"/><text x="516" y="18" class="sans note">648 active</text>
+    </g>
+    <rect x="35" y="282" width="910" height="118" rx="32" fill="url(#accentButton)"/>
+    <circle cx="91" cy="341" r="27" fill="#0A0E18" fill-opacity=".16"/>
+    <path d="M84 326v30M74 341h20" stroke="#0A0E18" stroke-width="5" stroke-linecap="round"/>
+    <text x="138" y="350" class="sans button">Resume Workout</text>
+    <text x="908" y="350" text-anchor="end" class="sans" font-size="36" font-weight="650" fill="#0A0E18">›</text>
+  </g>
+
+  <!-- Stale -->
+  <text x="880" y="805" class="sans panelLabel">05 · MEDIUM / STALE + OFFLINE</text>
+  <g transform="translate(880 835) scale(.72)" filter="url(#shadow)">
+    <rect width="980" height="460" rx="56" fill="#141F31" stroke="#4b4432" stroke-width="3"/>
+    <circle cx="48" cy="50" r="12" fill="#FBBF24"/>
+    <text x="72" y="58" class="sans eyebrow" fill="#FBBF24">OFFLINE · UPDATED 3H AGO</text>
+    <g opacity=".68">
+      <text x="40" y="145" class="sans eyebrow">EATEN</text><text x="40" y="210" class="sans metric">2,140</text>
+      <text x="352" y="145" class="sans eyebrow">PROTEIN</text><text x="352" y="210" class="sans metric">176 g</text>
+      <text x="664" y="145" class="sans eyebrow">ACTIVE</text><text x="664" y="210" class="sans metric">648</text>
+    </g>
+    <rect x="35" y="282" width="910" height="118" rx="32" fill="#20264A" stroke="#8B8CFF" stroke-opacity=".65" stroke-width="3"/>
+    <text x="78" y="352" class="sans buttonLight">Start Workout Logger</text>
+    <text x="908" y="350" text-anchor="end" class="sans" font-size="36" font-weight="650" fill="#F3F6FB">›</text>
+  </g>
+  <text x="880" y="1195" class="sans note">Keep last trusted values; never substitute zero.</text>
+
+  <!-- Privacy -->
+  <text x="880" y="1250" class="sans panelLabel">06 · MEDIUM / PRIVACY REDACTED</text>
+  <g transform="translate(880 1280) scale(.72)" filter="url(#shadow)">
+    <rect width="980" height="460" rx="56" fill="#141F31" stroke="#29344b" stroke-width="3"/>
+    <circle cx="48" cy="50" r="12" fill="#8B8CFF"/>
+    <text x="72" y="58" class="sans eyebrow">TODAY</text>
+    <text x="944" y="58" text-anchor="end" class="sans note">Totals hidden</text>
+    <g>
+      <rect x="35" y="105" width="286" height="142" rx="28" fill="#172235"/>
+      <rect x="62" y="145" width="180" height="22" rx="11" fill="#667085" opacity=".55"/>
+      <rect x="62" y="187" width="112" height="18" rx="9" fill="#667085" opacity=".32"/>
+      <rect x="347" y="105" width="286" height="142" rx="28" fill="#172235"/>
+      <rect x="374" y="145" width="180" height="22" rx="11" fill="#667085" opacity=".55"/>
+      <rect x="374" y="187" width="112" height="18" rx="9" fill="#667085" opacity=".32"/>
+      <rect x="659" y="105" width="286" height="142" rx="28" fill="#172235"/>
+      <rect x="686" y="145" width="180" height="22" rx="11" fill="#667085" opacity=".55"/>
+      <rect x="686" y="187" width="112" height="18" rx="9" fill="#667085" opacity=".32"/>
+    </g>
+    <rect x="35" y="282" width="910" height="118" rx="32" fill="url(#accentButton)"/>
+    <text x="78" y="352" class="sans button">Start Workout Logger</text>
+    <text x="908" y="350" text-anchor="end" class="sans" font-size="36" font-weight="650" fill="#0A0E18">›</text>
+  </g>
+  <text x="880" y="1640" class="sans note">Redact health totals; keep navigation usable.</text>
+
+  <!-- Footer recommendation -->
+  <text x="90" y="1672" class="sans note" fill="#8B8CFF">SHIP: medium first. Phase 1B: small variants. Large + Lock Screen deferred.</text>
+</svg>

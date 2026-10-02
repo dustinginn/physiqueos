@@ -1,55 +1,62 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T01:05:00Z",
+  "generated_at_utc": "2026-10-02T01:11:10Z",
   "task": {
-    "id": "native-build78-completion-notification-polish-20261001",
-    "title": "Native Build 78: PR celebration lifecycle, haptics, actionable notification Complete/Skip",
-    "agent": "claude",
-    "status": "completed"
+    "id": "home-screen-widget-audit-plan-20261002",
+    "title": "PhysiqueOS Home Screen widget audit and implementation plan",
+    "agent": "codex",
+    "status": "complete"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "c299fa29a14e04a4a22ac782d4610a4562e4f6e0",
-    "final_sha": "5911dd2a6f968c5a355ec68d3313f0e5e644d529",
+    "base_sha": "8b31fe2cf8ee0317d6be68665a1ac397a149b440",
+    "final_sha": null,
     "production_server_sha": null,
     "production_deployment": null,
     "native_sha": "5911dd2a6f968c5a355ec68d3313f0e5e644d529",
-    "native_build": 78
+    "native_build": 78,
+    "native_delivery_id": "32447de5-04be-459b-a795-2b8469cbeffd",
+    "native_processing_status": "VALID",
+    "intermediate_build78_sha_inspected": "b09e6819c6bc7f43b2c8f13b98eaa23c12fb5623"
   },
   "result": {
-    "summary": "Build 78 (source 5911dd2a) uploaded and VALID (delivery 32447de5): reviewed PR celebration lifecycle fix 69cad804 integrated against Build 77's session authority, celebratory/completion/skip haptics, and capability-derived notification Complete (check-circle) + Skip for simple binary Priorities; Live Activity behavior unchanged. Founder physical acceptance pending.",
+    "summary": "Recommend one medium V1 showing Calories eaten, Protein, Active calories, and a navigation-only Start/Resume Workout link, backed by a versioned App Group snapshot written by the app and the existing TrainingSessionAuthority.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": true
+    "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "passed",
-      "summary": "Full Native unit suite 1862 tests, 1 known pre-existing unrelated Peptide failure; Build 77 Live Activity regression suites passing; 5/5 Workout UI journeys on final build; Release archive + release verifier + guarded upload dry run passed."
+      "status": "not_run",
+      "summary": "Audit-only task; no shipping code changed and no Xcode build/test was run while Build 78 was active. Final Build 78 source and handoff were reconciled read-only after it became VALID."
     },
     "review": {
-      "status": "approved",
-      "summary": "Fresh independent review (no P0; P1/P2s fixed) plus delta re-review (no P0/P1; P2 fixed)."
+      "status": "completed",
+      "summary": "Read-only audit of Apple documentation, current Native/Server contracts, extension/generator/signing surface, data delivery options, and session authority. Synthetic mockup board rendered and inspected."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "No Server change, deployment or production mutation; only TestFlight upload of Build 78 as authorized."
+      "summary": "No production, Server, signing, Build 78, Simulator, DerivedData, archive, TestFlight, or shipping application/widget code was changed."
     }
   },
-  "decisions_required": [],
+  "decisions_required": [
+    "Approve Calories eaten / Protein / Active calories for V1.",
+    "Approve saved/left workout opening Logger choice rather than auto-resume.",
+    "Approve freshness copy/thresholds and medium-only Phase 1.",
+    "Confirm the App Group identifier before capability registration."
+  ],
   "blockers": [],
   "unexpected_findings": [
-    "Server Home/notification contract carries no skip capability; notification Skip uses a Native mapping (direct_completion_allowed only), so Recovery Support Skip stays in Priority Detail until the Server publishes a skip command in notificationAction.",
-    "iOS shows notification actions only on expansion; a Reminders-style inline checkbox is not available to third-party apps, so Complete is the first action with a check-circle symbol."
+    "The canonical Home read does not contain daily nutrition/activity totals; those live in separate production nutrition/activity resources.",
+    "The existing rotating refresh credential is app-Keychain-only and when-unlocked, making direct widget Server fetch a poor V1 fit.",
+    "The existing WidgetKit extension can host the Home widget as a second WidgetBundle configuration without a second target or bundle id."
   ],
   "backlog": [
-    "Founder physical acceptance of Build 78 (PR celebration, notification Complete/Skip, haptics) and the unchanged Build 77 Live Activity checklist.",
-    "Server-owned skip command in notificationAction (would enable Recovery Support Skip from notifications).",
-    "Workout set-completion haptic deferred until real-workout feedback."
+    "After Founder decisions, implement Phase 0/1 from final Build 78 authority and require physical-device widget acceptance."
   ],
-  "recommended_next_step": "Install Build 78 from TestFlight and run the Founder checklist in the report; next build number is 79.",
-  "full_report_path": "agent-handoffs/reports/20261002T010500Z-native-build78-completion-notification-polish.md",
+  "recommended_next_step": "Approve the bounded metric/behavior/signing decisions, then implement the medium widget from final Build 78 authority using an App Group snapshot and navigation-only Start/Resume links.",
+  "full_report_path": "agent-handoffs/reports/20261002T011110Z-home-screen-widget-audit-plan.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
