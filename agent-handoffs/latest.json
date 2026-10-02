@@ -1,57 +1,60 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T18:27:55Z",
+  "generated_at_utc": "2026-10-02T20:15:00Z",
   "task": {
-    "id": "healthkit-sleep-prospective-canary-audit-20261002",
-    "title": "HealthKit Sleep prospective canary audit \u2014 canary FAIL (P2 Oura copy splice); strategic isolation intact",
+    "id": "healthkit-sleep-canon-v3-copy-coherence-20261002",
+    "title": "HealthKit Sleep sleep-canon-v3 coherent Oura copy selection",
     "agent": "claude",
-    "status": "completed"
+    "status": "server_deployed_dormant_activation_pending_native"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "e6740054cf066f4ef3469177d66c571ad47b3eb1",
-    "final_sha": null,
-    "production_server_sha": "4ffde0f5faf1832decfbc09d822088aeba0dca89",
-    "production_deployment": "faaf66bd-930f-46a2-9b8e-77e604c23a86",
-    "native_sha": "6a0932517cbd8de165bf25c7637a2d2d6fea03dc",
-    "native_build": 81
+    "production_server_sha": "d0ff65965233fa44e108387f01b649a2bdb476df",
+    "production_deployment": "64533990-3f04-43bc-b710-a2d28dc1850e",
+    "previous_production_server_sha": "4ffde0f5faf1832decfbc09d822088aeba0dca89",
+    "server_branch": "claude/healthkit-sleep-canon-v3-20261002",
+    "native_patch_branch": "claude/sleep-canon-v3-native-accept-20261002",
+    "native_patch_sha": "3ed3eae7",
+    "native_shipping_build": 81,
+    "sleep_d0": "2026-10-02"
   },
   "result": {
-    "summary": "Canary FAIL. One natural prospective night (Oct 2, Oura only): exactly one canonical day, midnight-safe, a natural late Oura revision updated the same row, Evidence correct, zero strategic leakage across 40 collections, historical Sleep 87/87 unchanged. New P2 defect: sleep-canon-v2 duplicate-copy selection spliced Oura's stale and current revisions, so stage minutes and hypnogram diverge from Oura's current revision (~10 min per stage; asleep ~1%). App-closed background delivery unproven; no post-boundary Briefing generated yet. Recovery shadow plan not prepared; nothing wired.",
+    "summary": "sleep-canon-v3 (one coherent Oura revision per night via ingestion provenance; v2 selection when no provenance) deployed dormant. Zero-write audit: historical 0/87 and validation 0/30 nights change; Oct 2 v3 equals Oura revision 2 alone. Activation (policy + bounded Oct 2+ rewrite) dry-run only: target exactly [2026-10-02]; waits for a Native build accepting v3 (Founder decision). Production Sleep/historical/strategic mutation 0. Canary stays FAIL until activation, then HOLD.",
     "success": true,
     "production_mutated": false,
-    "deployed": false,
+    "deployed": true,
     "testflight_uploaded": false
   },
   "validation": {
-    "tests": {
+    "server_full_unit_suite": {
       "status": "passed",
-      "summary": "Sleep suites on exact 4ffde0f5: 9 files, 132/132 passed (secondary evidence). Synthetic splice reproduction confirmed against the production canonicalizer. Recovery shadow tests, full suite and builds not run."
+      "summary": "d0ff6596: 9596 passed / 304 failed, identical failure set to 4ffde0f5; 0 new"
     },
-    "review": {
+    "sleep_suites": {
+      "status": "passed",
+      "summary": "166/166"
+    },
+    "independent_review": {
+      "status": "passed_with_flagged_residual",
+      "summary": "3 rounds; P1 fixed; residual P2 (out-of-order receipt) flagged via ambiguousContinuationCount, must be accepted before activation"
+    },
+    "zero_write_historical_audit": {
+      "status": "passed",
+      "summary": "historical 0/87, validation 0/30 changed"
+    },
+    "native_patch_tests": {
       "status": "not_run",
-      "summary": "Audit-only task; no code change to review."
-    },
-    "zero_write_audit": {
-      "status": "passed",
-      "summary": "3 production transactions REPEATABLE READ READ ONLY, transaction_read_only=on, owner-scoped SELECTs, ROLLBACK, record-store mutation counter 0; runtime SHA 4ffde0f5 gated."
+      "summary": "disk below 15 GiB floor"
     }
   },
-  "decisions_required": [
-    "D1: authorize a Server-only sleep-canon-v3 copy-coherence fix (candidate + tests + zero-write incidence on the validation corpus + deploy + prospective-only recompute, no historical rewrite) OR accept the splice as display-only/P3 and defer."
+  "open_gates": [
+    "Native build with 3ed3eae7 (run RecoverySleepReadModelTests)",
+    "Founder accepts flagged out-of-order residual",
+    "Activation dry-run + apply + verification",
+    "Natural nights / background / Weekly leak scan under v3"
   ],
-  "blockers": [
-    "Canary cannot PASS until the P2 copy splice is resolved or explicitly accepted, >=2 natural nights accrue, app-closed background delivery is observed, and a post-boundary Weekly is generated and scanned."
-  ],
-  "unexpected_findings": [
-    "Oura rewrote the Oct 2 night 11 minutes after first sync, deleting only 22 of 66 first-revision samples; v2 greedy copy partitioning spliced 31 stale + 38 current samples into the canonical night.",
-    "September v2 validation could not detect splicing: it compared the selected samples only against themselves."
-  ],
-  "backlog": [
-    "Updated item 4 (Sleep canary: FAIL, next gate D1 + natural nights + background + Weekly scan) and item 5 (Recovery: wait; prospective-only baseline needs >=14 nights)."
-  ],
-  "recommended_next_step": "Founder decides D1. If fix authorized: Server-only sleep-canon-v3 candidate keeping coherent Oura revisions intact, then re-run this canary audit after >=2 natural nights, an app-closed background morning, and the Oct 4 Weekly.",
-  "full_report_path": "agent-handoffs/reports/20261002T182755Z-healthkit-sleep-prospective-canary-audit.md",
+  "full_report_path": "agent-handoffs/reports/20261002T201500Z-healthkit-sleep-canon-v3-copy-coherence.md",
+  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T193000Z-healthkit-sleep-canon-v3-copy-coherence.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

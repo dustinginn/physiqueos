@@ -2,14 +2,15 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Sleep prospective canary audit — canary FAIL (P2 Oura copy splice); strategic isolation intact (`healthkit-sleep-prospective-canary-audit-20261002`)
-- Agent: claude
-- Status: completed
-- Generated (UTC): 2026-10-02T18:27:55Z
-- Success: true
+- Task: HealthKit Sleep sleep-canon-v3 coherent Oura copy selection (`healthkit-sleep-canon-v3-copy-coherence-20261002`)
+- Agent: Claude
+- Status: Server deployed DORMANT; activation pending a Native build that accepts v3
+- Generated (UTC): 2026-10-02T20:15:00Z
+- Server: d0ff65965233fa44e108387f01b649a2bdb476df (deployment 64533990)
+- Native patch: claude/sleep-canon-v3-native-accept-20261002 @ 3ed3eae7 (not built)
 
-Summary: Canary FAIL. One natural prospective night (Oct 2, Oura only): exactly one canonical day, midnight-safe, a natural late Oura revision updated the same row, Evidence correct, zero strategic leakage across 40 collections, historical Sleep 87/87 unchanged. New P2 defect: sleep-canon-v2 duplicate-copy selection spliced Oura's stale and current revisions, so stage minutes and hypnogram diverge from Oura's current revision (~10 min per stage; asleep ~1%). App-closed background delivery unproven; no post-boundary Briefing generated yet. Recovery shadow plan not prepared; nothing wired.
+Summary: sleep-canon-v3 (one coherent Oura revision per night via ingestion provenance; v2 selection when no provenance) deployed dormant. Zero-write audit: historical 0/87 and validation 0/30 nights change; Oct 2 v3 equals Oura revision 2 alone. Activation (policy + bounded Oct 2+ rewrite) dry-run only: target exactly [2026-10-02]; waits for a Native build accepting v3 (Founder decision). Production Sleep/historical/strategic mutation 0. Canary stays FAIL until activation, then HOLD.
 
-Detailed report: `agent-handoffs/reports/20261002T182755Z-healthkit-sleep-prospective-canary-audit.md`
+Detailed report: `agent-handoffs/reports/20261002T201500Z-healthkit-sleep-canon-v3-copy-coherence.md`
 
 Protocol: `agent-handoffs/README.md`
