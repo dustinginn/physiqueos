@@ -1,56 +1,47 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T04:48:46Z",
+  "generated_at_utc": "2026-10-02T05:55:16Z",
   "task": {
-    "id": "apple-watch-workout-app-audit-plan-20261002",
-    "title": "Apple Watch Workout app architecture/product audit and implementation plan",
+    "id": "apple-watch-workout-v1-phase0-foundation-20261002",
+    "title": "Apple Watch Workout V1 Phase 0 foundation",
     "agent": "codex",
-    "status": "completed"
+    "status": "candidate_complete"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "main_base_sha": "7415b96fc4df2148508c90a3ff4727d17ead9c37",
-    "current_native_sha": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
-    "current_native_build": 80,
-    "audited_training_sha": "a75f93df1a84c33bbe6e9cec6d648a11ec53031d",
-    "audited_training_build": 79,
-    "build80_training_delta": "none; Build 80 is Home widget formatting plus build metadata",
-    "audited_production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486"
+    "shipping_native_sha": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
+    "shipping_native_build": 80,
+    "implementation_branch": "codex/apple-watch-workout-v1-phase0-foundation",
+    "implementation_sha": "18f4569a0be48ff4ec087f4c6a49733dbf016b4c",
+    "production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486",
+    "production_deployment": "421cae1a-dbc6-494c-9f73-9b8778e45efd"
   },
   "result": {
-    "summary": "Comprehensive non-shipping audit recommends phone-authoritative structured Logger plus Watch-authoritative HealthKit workout, revisioned/idempotent WatchConnectivity commands, mirrored-session Live Activity adoption, deterministic External UUID reconciliation, explicit pause/rest clocks, and a phone-reachable V1 start from a prepared workout. Early-finish proof confirms unfinished planned sets do not become evidence, but finds a release-blocking partial-superset edge: when one member has zero completed sets, Native sends a dangling relationship and Server rejects the entire finish atomically.",
+    "summary": "Phase 0 fixes partial-superset early-finish evidence correctness and adds deterministic pause/rest clocks, Ready-for-Watch selection, versioned pure Watch contracts, a phone authority router, Live Activity parity, dormant exact trusted HealthKit correlation with duplicate prevention, revised PhysiqueOS mockups, and a non-shipping physical Watch feasibility proof.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false,
-    "shipping_watch_code_implemented": false
+    "native_build_uploaded": false,
+    "watch_testflight_uploaded": false,
+    "shipping_watch_ui_implemented": false
   },
   "validation": {
-    "native_payload_proof": {
-      "status": "passed",
-      "summary": "Focused Build 79 simulator test with audit-only assertions proved the commit payload contained the completed set and excluded the unfinished planned set; temporary assertions were removed."
-    },
-    "server_partial_superset_proof": {
-      "status": "passed_with_blocker_found",
-      "summary": "Audit-only Vitest cases passed within a 55/55 file run: both partially performed members commit correctly; one wholly unperformed member causes atomic TRAINING_SUPERSET_INVALID with no evidence mutation. Temporary tests were removed."
-    },
-    "source_cleanliness": {
-      "status": "passed",
-      "summary": "Build 79 audit source was clean after instrumentation removal; no product code changed."
-    }
+    "native_relevant": "580 passed, 0 failed",
+    "server_training": "156 passed, 0 failed",
+    "server_command_ports": "53 passed, 0 failed",
+    "server_healthkit_focused": "116 passed, 0 failed",
+    "server_healthkit_broad": "717 passed, 6 known stale audit-sentinel failures",
+    "watchos_11_typecheck": "passed",
+    "project_generator": "reproducible"
   },
-  "decisions_required": [
-    "Approve phone-reachable structured start for V1 while removing any dependency on HealthKit synchronization.",
-    "Approve phone-prepared Ready for Watch workouts as the V1 start source.",
-    "Approve confirmation for every Finish action, including after the final planned set.",
-    "Approve Total Calories as unavailable when basal energy cannot be established.",
-    "Approve traditional indoor strength training and watchOS 11+ for V1."
+  "remaining_scope": [
+    "review and merge the Phase 0 implementation",
+    "create the signed Watch target and final bundle/App ID/profiles",
+    "implement WCSession transport and the Watch-owned HealthKit adapter",
+    "build the accepted Watch UI and run physical paired-workout acceptance",
+    "configure the trusted Watch bundle allowlist only after signed identity review"
   ],
-  "blockers": [
-    "Fix performed-session relationship projection before Watch shipping: filter each relationship to performed occurrence ids and drop groups with fewer than two performed members, then add evidence-level partial-superset tests."
-  ],
-  "recommended_next_step": "Execute Phase 0 only: repair and prove early-finish relationship projection, introduce prepared/active/paused/finishing lifecycle and pure shared protocol/clock contracts, then run a disposable Watch target/signing spike before building UI.",
-  "full_report_path": "agent-handoffs/reports/20261002T045500Z-apple-watch-workout-app-audit-plan.md",
+  "full_report_path": "agent-handoffs/reports/20261002T055516Z-apple-watch-workout-v1-phase0-foundation.md",
   "artifacts": [
     "agent-handoffs/artifacts/apple-watch-workout-v1/watch-workout-v1-board.svg",
     "agent-handoffs/artifacts/apple-watch-workout-v1/README.md"

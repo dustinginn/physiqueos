@@ -114,17 +114,25 @@ Trigger:
 - Founder begins planning actual beta onboarding, or DO cost/performance symptoms recur.
 
 7. Apple Watch companion
-Status: candidate next major feature, not started.
-Current product hypothesis:
-- Watch as execution surface: current/next set, Complete Set, Stopwatch/Countdown, workout progress;
-- phone remains planning/editing surface for reps/load/exercises;
-- Watch may become the source of the Apple Health strength workout and collect workout-time heart rate/physiology;
-- structured PhysiqueOS Logger remains authority for exercise/set/reps/load;
-- HealthKit remains physiological workout observation layer;
-- reconcile the two rather than allowing HealthKit to own strength-program structure.
-Trigger:
-- Build 77 real-workout acceptance provides enough interaction evidence;
-- Founder chooses Watch as next major feature.
+Status: PHASE 0 FOUNDATION IMPLEMENTED on `codex/apple-watch-workout-v1-phase0-foundation`; pending review/merge before Phase 1A.
+Locked V1:
+- phone is the sole structured `TrainingSessionAuthority` and planning surface; Watch starts one phone-prepared Ready-for-Watch plan only while the paired phone is reachable;
+- after start, a disconnected Watch HealthKit workout may continue, but every structured mutation fails closed until phone authority returns;
+- Watch owns `traditionalStrengthTraining` + `indoor` HealthKit lifecycle and physiology; Logger owns exercise/set/reps/load evidence;
+- Finish never happens automatically and always confirms, including after the final planned set;
+- Total Calories is active + basal only when both measurements are legitimately available; otherwise `—`;
+- watchOS 11+ and PhysiqueOS dark navy/purple visual language; Apple Workout green/orange is not the product identity.
+Phase 0 implemented:
+- partial-superset early-finish correctness blocker fixed through one performed-session projection used by commit and durability comparison; only completed sets survive, empty exercises disappear, and relationships retain only performed members when at least two remain;
+- deterministic pause/resume, active elapsed ledger, Stopwatch/Countdown freeze and re-anchor, paused Live Activity parity;
+- minimal Ready-for-Watch marker/selection, pure versioned Watch commands/acks/projections/metrics, and phone authority router with compare-and-set/idempotency semantics;
+- trusted exact PhysiqueOS Watch workout correlation seam is additive and default-disabled; trusted exact links do not create duplicate performed Training evidence, and a second exact workout claim fails closed;
+- non-shipping Watch target/signing feasibility is proven against the Founder's physical Apple Watch; no Watch target or TestFlight build was shipped.
+Phase 1A next:
+- create the reviewed Watch app/extension target, final bundle/App ID/profiles, HealthKit/background entitlements and real `HKWorkoutSession` adapter;
+- add `WCSession` transport around the Phase 0 router/contracts, projection refresh/staleness behavior and Watch/phone lifecycle integration;
+- implement the accepted Start/execution/metrics/controls/paused/final/offline/superset/single-set surfaces using the locked tokens, then run physical paired-workout acceptance;
+- configure the trusted Watch bundle allowlist only with the final signed identity; keep phone-independent structured authority out of V1.
 
 OPERATIONAL / ENVIRONMENT
 
@@ -202,18 +210,7 @@ Design direction:
 - Start/Resume remains navigation into the authoritative Workout Logger rather than creating a session inside the widget.
 
 3. Apple Watch companion
-Status: HIGH-INTEREST / likely after several days of Live Activity use, potentially next week.
-Desired direction:
-- Watch as workout execution surface;
-- current/next set context;
-- Complete Set;
-- rest Stopwatch/Countdown;
-- workout progress;
-- phone remains editing/planning surface for load/reps/exercises;
-- paired Watch app may become source of Apple Health strength workout start/end and workout-time heart rate/physiology;
-- structured PhysiqueOS Logger remains authority for exercises/sets/reps/load;
-- HealthKit remains physiological workout-observation layer.
-Use Build 77 Live Activity real-world acceptance to inform Watch V1 interaction design.
+Status: promoted to active backlog item 7; audit approved and Phase 0 foundation implemented. See item 7 for locked V1 decisions and Phase 1A next work.
 
 BUILD 80 — SHIPPED (VALID, delivery 39ae9ddd-271e-438c-80c2-f24137637e2f), Home widget formatting polish
 Source 1783691d (branch claude/native-build80-widget-number-formatting-20261002) = Build 79 a75f93df + one display-formatting patch. Report: agent-handoffs/reports/20261002T043000Z-native-build80-widget-number-formatting.md.
