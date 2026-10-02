@@ -519,6 +519,49 @@ final class TrainingAcceptanceUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Workout logged"].exists)
     }
 
+    /// Home Screen widget: Start Logger / Resume Workout links are
+    /// navigation only. Start opens the Logger without creating a workout;
+    /// a live workout is reopened (never duplicated); a stale Resume link
+    /// falls back safely to the Logger.
+    func testHomeWidgetStartAndResumeLinksOpenTheLoggerWithoutCreatingAWorkout() throws {
+        launchInSandbox()
+        let start = URL(string: "physiqueos-workout://widget?route=start&authority=sandbox")!
+        let staleResume = URL(string: "physiqueos-workout://widget?route=resume&session=missing-session&authority=sandbox")!
+
+        app.open(start)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["trainingLogger.start"].waitForExistence(timeout: 5),
+            "The widget Start link did not open the Logger landing."
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["trainingLogger.workoutIdentity"].exists, "Start must not create a workout.")
+        attachScreenshot("60-widget-start-opens-logger")
+
+        app.tabBars.buttons["Home"].tap()
+        app.open(staleResume)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["trainingLogger.start"].waitForExistence(timeout: 5),
+            "A stale Resume link did not fall back to the Logger landing."
+        )
+
+        tapButton(identifier: "trainingLogger.start")
+        tapButton(identifier: "trainingLogger.area.shoulders")
+        tapText("Choose exercises")
+        selectExercise(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        tapButton(identifier: "trainingLogger.startLogging")
+        XCTAssertTrue(app.descendants(matching: .any)["trainingLogger.workoutIdentity"].waitForExistence(timeout: 3))
+
+        app.tabBars.buttons["Home"].tap()
+        app.open(start)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["trainingLogger.exerciseCard.Shoulder Press Machine"].waitForExistence(timeout: 5),
+            "With a live workout the widget link must reopen it, not start another."
+        )
+        attachScreenshot("61-widget-link-reopens-live-workout")
+
+        // Leave the workout saved so later journeys start from the Log root.
+        tapButton(identifier: "trainingLogger.inlineSaveAndLeave")
+    }
+
     private func fillFirstSet(reps: String, load: String) {
         let repsField = app.textFields["Set 1 reps"]
         XCTAssertTrue(repsField.waitForExistence(timeout: 3), "Set 1 reps field was not reachable.")

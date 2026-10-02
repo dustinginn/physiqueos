@@ -113,9 +113,9 @@ struct RootTabView: View {
                 logPath.append(destination)
             }
         case .refreshTotals:
-            selectedTab = .log
-            logPath = NavigationPath()
-            Task { await environment.homeWidgetRefreshRelay.request() }
+            // Refresh is not navigation: an open Logger or an owed Workout
+            // Complete stays exactly where it is.
+            Task { await environment.homeWidgetRefreshRelay.request(reloadingReads: true) }
         case .startWorkout:
             openWorkoutLogger(sessionId: nil)
         case .resumeWorkout(let sessionId):

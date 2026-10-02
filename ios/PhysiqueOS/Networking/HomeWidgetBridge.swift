@@ -6,6 +6,8 @@ final class HomeWidgetBridge {
     private unowned let environment: AppEnvironment
     private var observation: TrainingSessionObservation?
     private var attachedAuthority: NativeAPIEnvironment?
+    /// Every trigger is inert until `install()` (never in a unit-test host).
+    private var isInstalled = false
 
     init(environment: AppEnvironment, coordinator: HomeWidgetSnapshotCoordinator? = nil) {
         self.environment = environment
@@ -13,19 +15,27 @@ final class HomeWidgetBridge {
     }
 
     func install() {
+        isInstalled = true
         HomeWidgetRefreshIntentRuntime.handler = { [weak self] _ in
-            await self?.refreshCanonicalSnapshot()
+            await self?.refreshCanonicalSnapshot(reloadingReads: true)
         }
         attachToSelectedAuthority()
         Task { [weak self] in
             guard let self else { return }
-            await self.environment.homeWidgetRefreshRelay.install { [weak self] in
-                await self?.refreshCanonicalSnapshot()
+            await self.environment.homeWidgetRefreshRelay.install { [weak self] reloadingReads in
+                await self?.refreshCanonicalSnapshot(reloadingReads: reloadingReads)
+            }
+            // Pairing, revocation, or a rejected refresh credential retires
+            // Founder Production's shared snapshot with the session's other
+            // last-known reads.
+            await self.environment.productionNativeAPI.setSessionBoundaryObserver { [weak self] in
+                Task { @MainActor in self?.coordinator.endSession(for: .founderProduction) }
             }
         }
     }
 
     func attachToSelectedAuthority() {
+        guard isInstalled else { return }
         observation?.cancel()
         let selectedAuthority = environment.nativeAuthority
         if let attachedAuthority, attachedAuthority != selectedAuthority {
@@ -44,7 +54,8 @@ final class HomeWidgetBridge {
         Task { await refreshCanonicalSnapshot() }
     }
 
-    func refreshCanonicalSnapshot() async {
-        await coordinator.refreshCanonicalSnapshot()
+    func refreshCanonicalSnapshot(reloadingReads: Bool = false) async {
+        guard isInstalled else { return }
+        await coordinator.refreshCanonicalSnapshot(reloadingReads: reloadingReads)
     }
 }

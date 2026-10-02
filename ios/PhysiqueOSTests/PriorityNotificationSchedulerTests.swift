@@ -1483,7 +1483,14 @@ final class PriorityNotificationSchedulerTests: XCTestCase {
         XCTAssertLessThan(hook.lowerBound, accepted.lowerBound)
         XCTAssertEqual(uploader.components(separatedBy: "onDurablyAccepted?()").count, 2)
         let environment = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/App/AppEnvironment.swift"), encoding: .utf8)
-        XCTAssertTrue(environment.contains("onDurablyAccepted: { Task { await reconciliationRefresher.requestRefresh() } }"))
+        // Build 79: the same durable-acceptance callback also refreshes the
+        // Home Screen widget; the notifier refresh must still come first.
+        let callback = try XCTUnwrap(environment.range(of: "onDurablyAccepted: {"))
+        let body = String(environment[callback.upperBound...].prefix(240))
+        let notifier = try XCTUnwrap(body.range(of: "await reconciliationRefresher.requestRefresh()"))
+        let widget = try XCTUnwrap(body.range(of: "await homeWidgetRefreshRelay.request(reloadingReads: true)"))
+        XCTAssertLessThan(notifier.lowerBound, widget.lowerBound)
+        XCTAssertEqual(environment.components(separatedBy: "onDurablyAccepted: {").count, 2)
     }
 }
 

@@ -284,7 +284,10 @@ struct MorningCheckInView: View {
                 let resolution = try await lifecycle.submit(localDate: localDate)
                 if resolution == .saved {
                     productionCheckIn = try? await environment.morningCheckInAPI.fetchMorningCheckIn()
-                    await environment.homeWidgetRefreshRelay.request()
+                    // The save is durable; the widget refresh must not hold
+                    // the confirmation behind its own Server reads.
+                    let relay = environment.homeWidgetRefreshRelay
+                    Task { await relay.request() }
                     messageIsError = false
                     message = nil
                     complete = true
@@ -365,7 +368,8 @@ struct ManualWeighInView: View {
                     }
                 )
                 let resolution = try await lifecycle.submit(localDate: localDate, value: valueInPounds)
-                await environment.homeWidgetRefreshRelay.request()
+                let relay = environment.homeWidgetRefreshRelay
+                Task { await relay.request() }
                 isError = false
                 message = resolution == .saved
                     ? "Weight saved for \(Self.mediumDate.string(from: date))."

@@ -876,7 +876,9 @@ struct ProductionEvidenceUploadView: View {
             case .training, .dexa, .progressPhotos:
                 throw ProductionNativeError.invalidResponse
             }
-            await environment.homeWidgetRefreshRelay.request()
+            // Confirmation is durable; the widget refreshes independently.
+            let relay = environment.homeWidgetRefreshRelay
+            Task { await relay.request() }
             phase = .confirmed
         } catch {
             phase = .failed(Self.errorMessage(for: error))

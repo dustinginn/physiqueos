@@ -189,16 +189,98 @@ final class HomeWidgetTests: XCTestCase {
             ),
             .resumeWorkout(sessionId: started.id)
         )
+        // A stale Resume link or a stale snapshot's Start never leads to a
+        // second workout while one is live: the live session is reopened.
         XCTAssertEqual(
             HomeWidgetNavigationResolver.resolve(
                 .resumeWorkout(sessionId: "stale", authority: "founderProduction"),
                 selectedAuthority: .founderProduction,
                 sessionAuthority: authority
             ),
-            .startWorkout
+            .resumeWorkout(sessionId: started.id)
         )
+        XCTAssertEqual(
+            HomeWidgetNavigationResolver.resolve(
+                .startWorkout(authority: "founderProduction"),
+                selectedAuthority: .founderProduction,
+                sessionAuthority: authority
+            ),
+            .resumeWorkout(sessionId: started.id)
+        )
+        XCTAssertEqual(authority.drafts.count, 1, "Resolving links never creates a session")
         _ = authority.saveAndLeave(sessionId: started.id, leftAt: TrainingSessionClock.string(from: HomeWidgetSamples.referenceDate))
         XCTAssertEqual(HomeWidgetSnapshotProjection.workoutProjection(authority.activeLiveSession()), .none)
+        // Saved-and-left is never silently resumed.
+        XCTAssertEqual(
+            HomeWidgetNavigationResolver.resolve(
+                .resumeWorkout(sessionId: started.id, authority: "founderProduction"),
+                selectedAuthority: .founderProduction,
+                sessionAuthority: authority
+            ),
+            .startWorkout
+        )
+    }
+
+    // MARK: Build 79 integration review fixes
+
+    func testSessionEndingErrorsAreClassifiedForSnapshotRetirement() {
+        XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.notPaired))
+        XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.reconnectRequired))
+        XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.unauthenticated(nil)))
+        XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(FounderServerError.notPaired))
+        XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(FounderServerError.deviceOrSessionRevoked))
+        XCTAssertFalse(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.networkFailure))
+        XCTAssertFalse(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.temporaryServer(nil)))
+        XCTAssertFalse(HomeWidgetSnapshotCoordinator.endsSession(FounderServerError.networkFailure))
+    }
+
+    @MainActor
+    func testSessionBoundaryClearsTheSharedSnapshotAndRotatesTheAccountScope() async throws {
+        let harness = try CoordinatorHarness(authority: .sandbox)
+        defer { harness.tearDown() }
+        await harness.coordinator.refreshCanonicalSnapshot()
+        let scope = harness.scopes.scope(for: .sandbox)
+        XCTAssertNotNil(harness.store.read(authority: "sandbox", accountScope: scope), "Sandbox refresh writes a snapshot")
+
+        harness.coordinator.endSession(for: .sandbox)
+        XCTAssertNil(harness.store.read(), "A session boundary removes the shared file")
+        XCTAssertNotEqual(harness.scopes.scope(for: .sandbox), scope, "A new session never reads the old scope back")
+    }
+
+    @MainActor
+    func testSessionBoundaryForTheOtherAuthorityLeavesTheVisibleSnapshot() async throws {
+        let harness = try CoordinatorHarness(authority: .sandbox)
+        defer { harness.tearDown() }
+        await harness.coordinator.refreshCanonicalSnapshot()
+        harness.coordinator.endSession(for: .founderProduction)
+        XCTAssertNotNil(harness.store.read(authority: "sandbox", accountScope: harness.scopes.scope(for: .sandbox)))
+    }
+
+    @MainActor
+    func testLockedProductionLaunchLeavesTheSnapshotUntouchedInsteadOfMarkingItOffline() async throws {
+        let harness = try CoordinatorHarness(authority: .founderProduction, protectedDataAvailable: false)
+        defer { harness.tearDown() }
+        let scope = harness.scopes.scope(for: .founderProduction)
+        var snapshot = HomeWidgetSamples.snapshot()
+        snapshot.accountScope = scope
+        try harness.store.write(snapshot)
+
+        await harness.coordinator.refreshCanonicalSnapshot()
+        XCTAssertEqual(harness.store.read(), snapshot, "No read, no offline downgrade while protected data is unavailable")
+        XCTAssertEqual(harness.reloads, 0)
+    }
+
+    @MainActor
+    func testUnchangedWorkoutProjectionDoesNotRewriteOrReload() async throws {
+        let harness = try CoordinatorHarness(authority: .sandbox)
+        defer { harness.tearDown() }
+        await harness.coordinator.refreshCanonicalSnapshot()
+        let written = harness.store.read()
+        let reloads = harness.reloads
+        harness.coordinator.refreshWorkoutProjection()
+        harness.coordinator.refreshWorkoutProjection()
+        XCTAssertEqual(harness.reloads, reloads, "A set edit that leaves the projection unchanged must not reload timelines")
+        XCTAssertEqual(harness.store.read(), written)
     }
 
     @MainActor
@@ -291,6 +373,46 @@ final class HomeWidgetTests: XCTestCase {
     private func activityDay(date: String) throws -> ActivityDayRecord {
         let json = #"{"id":"activity-1","label":"Daily Activity","value":"648 active cal / 42 min","detail":"2450 total calories","date":"\#(date)","isToday":true,"activeCalories":648,"linkedTrainingSessionCount":0,"coverage":"partial_day","isPartialDay":true,"protocolStatus":"Activity context available."}"#
         return try JSONDecoder().decode(ActivityDayRecord.self, from: Data(json.utf8))
+    }
+
+    @MainActor
+    private final class CoordinatorHarness {
+        let defaults: UserDefaults
+        let suite: String
+        let store: HomeWidgetSnapshotFileStore
+        let scopes: HomeWidgetAccountScopeStore
+        let coordinator: HomeWidgetSnapshotCoordinator
+        let environment: AppEnvironment
+        private let directory: URL
+        private(set) var reloads = 0
+
+        init(authority: NativeAPIEnvironment, protectedDataAvailable: Bool = true) throws {
+            suite = "HomeWidgetTests.coordinator.\(UUID().uuidString)"
+            defaults = UserDefaults(suiteName: suite)!
+            directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            store = HomeWidgetSnapshotFileStore(fileURL: directory.appendingPathComponent(HomeWidgetSnapshotFileStore.fileName))
+            scopes = HomeWidgetAccountScopeStore(defaults: defaults)
+            environment = AppEnvironment(
+                nativeAuthority: authority,
+                authoritySelectionStore: UserDefaultsNativeAuthoritySelectionStore(defaults: defaults, key: "authority"),
+                trainingLoggerDraftStore: MemoryTrainingLoggerDraftStore(),
+                founderProductionTrainingLoggerDraftStore: MemoryTrainingLoggerDraftStore()
+            )
+            var reloadCount: () -> Void = {}
+            coordinator = HomeWidgetSnapshotCoordinator(
+                environment: environment,
+                store: store,
+                accountScopes: scopes,
+                reload: { reloadCount() },
+                isProtectedDataAvailable: { protectedDataAvailable }
+            )
+            reloadCount = { [unowned self] in self.reloads += 1 }
+        }
+
+        func tearDown() {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: directory)
+        }
     }
 
     private func temporaryFileURL() -> URL {

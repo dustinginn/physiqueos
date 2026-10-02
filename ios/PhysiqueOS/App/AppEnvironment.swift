@@ -727,7 +727,7 @@ final class AppEnvironment {
                 onDurablyAccepted: {
                     Task {
                         await reconciliationRefresher.requestRefresh()
-                        await homeWidgetRefreshRelay.request()
+                        await homeWidgetRefreshRelay.request(reloadingReads: true)
                     }
                 },
                 onSleepIngestionDisabled: { healthKitSleepActivation.markServerDisabled(at: Date()) }

@@ -41,7 +41,9 @@ struct PhysiqueOSApp: App {
         liveActivity.install()
         _workoutLiveActivity = State(initialValue: liveActivity)
         let homeWidget = HomeWidgetBridge(environment: environment)
-        homeWidget.install()
+        // A unit-test host must not read the Server, write the real App Group
+        // file, or reload real widget timelines.
+        if !isUnitTestHost { homeWidget.install() }
         _homeWidget = State(initialValue: homeWidget)
         // HealthKit background delivery relaunches a terminated app WITHOUT
         // ever activating a scene, so the scenePhase-driven bootstrap below
@@ -53,8 +55,14 @@ struct PhysiqueOSApp: App {
         // The environment is only ever touched on the main actor (the Task
         // below hops there), exactly like the launch registration above.
         nonisolated(unsafe) let recoveryEnvironment = environment
+        nonisolated(unsafe) let recoveryWidget = homeWidget
         ProtectedDataRecoveryTrigger.install {
-            Task { @MainActor in await recoveryEnvironment.recoverHealthKitAfterProtectedDataAvailable() }
+            Task { @MainActor in
+                await recoveryEnvironment.recoverHealthKitAfterProtectedDataAvailable()
+                // A locked launch skipped the widget refresh (the credential
+                // was unreadable); refresh now that it is readable.
+                await recoveryWidget.refreshCanonicalSnapshot()
+            }
         }
     }
 

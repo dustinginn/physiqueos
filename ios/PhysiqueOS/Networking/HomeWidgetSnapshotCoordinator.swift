@@ -1,15 +1,19 @@
 import Foundation
+import UIKit
 import WidgetKit
 
 actor HomeWidgetRefreshRelay {
-    private var handler: (@Sendable () async -> Void)?
+    private var handler: (@Sendable (Bool) async -> Void)?
 
-    func install(_ handler: @escaping @Sendable () async -> Void) {
+    func install(_ handler: @escaping @Sendable (Bool) async -> Void) {
         self.handler = handler
     }
 
-    func request() async {
-        await handler?()
+    /// `reloadingReads` bypasses the short-lived read cache for the widget's
+    /// canonical reads: a HealthKit ingest or an explicit widget refresh must
+    /// not stamp a pre-ingest cached copy as freshly read.
+    func request(reloadingReads: Bool = false) async {
+        await handler?(reloadingReads)
     }
 }
 
@@ -29,6 +33,13 @@ final class HomeWidgetAccountScopeStore {
         let created = UUID().uuidString.lowercased()
         defaults.set(created, forKey: key)
         return created
+    }
+
+    /// A credential boundary (pair, revoke, rejected refresh) starts a new
+    /// opaque scope, so no earlier session's snapshot can be read back or
+    /// merged into the next session's totals.
+    func rotate(for authority: NativeAPIEnvironment) {
+        defaults.removeObject(forKey: "\(keyPrefix).\(authority.rawValue)")
     }
 }
 
@@ -119,8 +130,14 @@ final class HomeWidgetSnapshotCoordinator {
     private let now: () -> Date
     private let timeZone: () -> TimeZone
     private let reload: () -> Void
+    private let isProtectedDataAvailable: () -> Bool
     private var isRefreshing = false
     private var refreshPending = false
+    private var reloadPending = false
+
+    /// Production reads behind the widget that are served from the short-lived
+    /// read cache. Activity already reads with `.reload`.
+    static let reloadedProductionResources: Set<String> = ["evidence-review-queue", "weight", "nutrition"]
 
     init(
         environment: AppEnvironment,
@@ -128,7 +145,8 @@ final class HomeWidgetSnapshotCoordinator {
         accountScopes: HomeWidgetAccountScopeStore = HomeWidgetAccountScopeStore(),
         now: @escaping () -> Date = Date.init,
         timeZone: @escaping () -> TimeZone = { DailyDriverLocalDay.currentDeviceTimeZone() },
-        reload: @escaping () -> Void = { WidgetCenter.shared.reloadTimelines(ofKind: HomeWidgetContract.kind) }
+        reload: @escaping () -> Void = { WidgetCenter.shared.reloadTimelines(ofKind: HomeWidgetContract.kind) },
+        isProtectedDataAvailable: @escaping () -> Bool = { UIApplication.shared.isProtectedDataAvailable }
     ) {
         self.environment = environment
         self.store = store
@@ -136,9 +154,11 @@ final class HomeWidgetSnapshotCoordinator {
         self.now = now
         self.timeZone = timeZone
         self.reload = reload
+        self.isProtectedDataAvailable = isProtectedDataAvailable
     }
 
-    func refreshCanonicalSnapshot() async {
+    func refreshCanonicalSnapshot(reloadingReads: Bool = false) async {
+        if reloadingReads { reloadPending = true }
         if isRefreshing {
             refreshPending = true
             return
@@ -147,18 +167,31 @@ final class HomeWidgetSnapshotCoordinator {
         defer { isRefreshing = false }
         repeat {
             refreshPending = false
-            await performCanonicalRefresh()
+            let reloading = reloadPending
+            reloadPending = false
+            await performCanonicalRefresh(reloadingReads: reloading)
         } while refreshPending
     }
 
-    private func performCanonicalRefresh() async {
+    private func performCanonicalRefresh(reloadingReads: Bool) async {
         guard let store else { return }
         let authority = environment.nativeAuthority
+        // A locked background launch (HealthKit delivery, a notification or
+        // Live Activity action) cannot read the when-unlocked credential.
+        // That is not an offline Server: keep the last snapshot as written
+        // and refresh again when protected data becomes available.
+        if authority == .founderProduction, !isProtectedDataAvailable() { return }
         let accountScope = accountScopes.scope(for: authority)
         let zone = timeZone()
         let instant = now()
 
         do {
+            if reloadingReads, authority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(
+                    Self.reloadedProductionResources,
+                    retainingLastKnown: true
+                )
+            }
             let log = try await environment.logAPI.fetchLog()
             var nutritionDay: NutritionDayRecord?
             var activityDay: ActivityDayRecord?
@@ -204,6 +237,12 @@ final class HomeWidgetSnapshotCoordinator {
             reload()
         } catch {
             guard environment.nativeAuthority == authority else { return }
+            if Self.endsSession(error) {
+                // No paired session: the previous session's totals must not
+                // stay on the Home Screen as "offline".
+                endSession(for: authority)
+                return
+            }
             let activeWorkout = environment.trainingSessionAuthority(for: authority).activeLiveSession(at: now())
             let previous = store.read(authority: authority.rawValue, accountScope: accountScope)
             if var previous {
@@ -243,7 +282,11 @@ final class HomeWidgetSnapshotCoordinator {
             Task { await refreshCanonicalSnapshot() }
             return
         }
-        snapshot.workout = HomeWidgetSnapshotProjection.workoutProjection(activeWorkout)
+        let workout = HomeWidgetSnapshotProjection.workoutProjection(activeWorkout)
+        // Set edits do not change the widget's projection; only a real change
+        // rewrites the shared file and asks WidgetKit for a reload.
+        guard snapshot.workout != workout else { return }
+        snapshot.workout = workout
         snapshot.writtenAt = HomeWidgetSnapshotClock.string(from: instant)
         try? store.write(snapshot)
         reload()
@@ -252,5 +295,24 @@ final class HomeWidgetSnapshotCoordinator {
     func clear() {
         try? store?.clear()
         reload()
+    }
+
+    /// Pairing, revocation, or a rejected refresh credential for `authority`:
+    /// remove the shared snapshot and start a new opaque account scope.
+    func endSession(for authority: NativeAPIEnvironment) {
+        accountScopes.rotate(for: authority)
+        guard environment.nativeAuthority == authority else { return }
+        clear()
+    }
+
+    nonisolated static func endsSession(_ error: Error) -> Bool {
+        switch error {
+        case ProductionNativeError.notPaired, ProductionNativeError.reconnectRequired, ProductionNativeError.unauthenticated:
+            return true
+        case FounderServerError.notPaired, FounderServerError.deviceOrSessionRevoked:
+            return true
+        default:
+            return false
+        }
     }
 }

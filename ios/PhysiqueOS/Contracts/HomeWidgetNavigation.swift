@@ -28,14 +28,16 @@ enum HomeWidgetNavigationResolver {
             return .destination(.progressStream(streamId: "weight"))
         case .refresh:
             return .refreshTotals
-        case .startWorkout(let authority):
-            guard authority == selectedAuthority.rawValue else { return .startWorkout }
+        case .startWorkout, .resumeWorkout:
+            // Navigation only. A live workout on the selected authority is
+            // always the one reopened (a stale snapshot's Start or an old
+            // Resume link must never lead to a second workout); otherwise the
+            // Logger opens at its start. Saved-and-left drafts are never
+            // auto-resumed.
+            if let live = sessionAuthority.activeLiveSession() {
+                return .resumeWorkout(sessionId: live.id)
+            }
             return .startWorkout
-        case .resumeWorkout(let sessionId, let authority):
-            guard authority == selectedAuthority.rawValue,
-                  sessionAuthority.activeLiveSession()?.id == sessionId
-            else { return .startWorkout }
-            return .resumeWorkout(sessionId: sessionId)
         }
     }
 }

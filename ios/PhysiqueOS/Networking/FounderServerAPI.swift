@@ -696,6 +696,17 @@ actor ProductionNativeAPI {
     private func retireAllLastKnownSnapshots() {
         readCacheGeneration += 1
         snapshotStore?.removeAll()
+        sessionBoundaryObserver?()
+    }
+
+    /// Notified at the same credential boundary that retires the persisted
+    /// last-known snapshots (pairing, revocation, a rejected refresh
+    /// credential), so other on-device copies of this session's reads (the
+    /// Home Screen widget's App Group snapshot) are retired with them.
+    private var sessionBoundaryObserver: (@Sendable () -> Void)?
+
+    func setSessionBoundaryObserver(_ observer: (@Sendable () -> Void)?) {
+        sessionBoundaryObserver = observer
     }
 
     func acknowledgeAcceptedEvidenceReviewProcessing(_ value: AcceptedEvidenceReviewProcessing) {
