@@ -2,8 +2,8 @@
 
 - Task id: `progress-photos-flexible-cadence-20261002`
 - Prompt: `agent-handoffs/inbox/prompts/20261002T060000Z-progress-photos-flexible-cadence.md`
-- Generated (UTC): 2026-10-02T07:05:00Z (checkpoint)
-- Status: **checkpoint — Server 4ffde0f5 DEPLOYED and verified; Native Build 81 candidate 6a093251 final suite/archive/upload IN PROGRESS (disk at floor because of a concurrent lane)**
+- Generated (UTC): 2026-10-02T07:15:00Z
+- Status: **complete — Server 4ffde0f5 DEPLOYED and verified; Native Build 81 (6a093251) uploaded and VALID. Founder physical acceptance pending.**
 
 ## Exact authority
 | Item | Value |
@@ -14,7 +14,7 @@
 | Server branch | `claude/progress-photos-flexible-cadence-server-20261002`: `ff63d1fd` feature → `547cb064` review fixes → `6fdacd8c` test timeout → **`4ffde0f5`** re-review fixes; fast-forwarded onto `combined-app-platform-cutover` |
 | Native base | Build 80 shipping source `1783691debeea46d3e4e6b2f6e470abe032c4c74` (reverified: release state 80, delivery `39ae9ddd` VALID, no later build report on main) |
 | **Native candidate** | branch `claude/progress-photos-flexible-cadence-20261002`: `0cdf9810` feature → `a210fafa` review fixes → `e5434a01` baseline preview → **`6a0932517cbd8de165bf25c7637a2d2d6fea03dc`** Build 81 bump |
-| Native build | 1.0 (81) — archive/upload pending at this checkpoint |
+| Native build | **1.0 (81)**, delivery **`212d79dd-cc57-4319-ab8c-d9694f0585ad`**, **VALID** (build + import VALID, on App Store Connect, uploaded 2026-10-02 00:09:33 PT; re-confirmed by a separate read-only status call). Release state now 81 → next build 82. |
 
 No Apple Watch work is in either branch. The Watch Phase 1A prompt on main says it will reconcile with any newer Progress Photos release.
 
@@ -149,7 +149,7 @@ Unchanged. It is still triggered only by a completed, confirmed photo session wh
   - monthly day rule with month end / leap year;
   - production round-trip draft keys incl. legacy `cadence`;
   - flexible save.
-- Full Native unit suite: `0cdf9810` and `a210fafa` 1,902 tests, 1 skipped, 1 failure each. Final full suite on the exact release SHA `6a093251`: pending (first attempt hit a transient simulator launch failure, "failed to launch com.physiqueos.native.dev / No such process", before any test ran; rerun pending disk). The only failure is the known pre-existing `PeptideSupportEditorViewModelTests.testSandboxChangeDoseKeepsHistoryAndPauseResumeWorkAgainstTheFixture` (also on Build 80).
+- Full Native unit suite: `0cdf9810` and `a210fafa` 1,902 tests, 1 skipped, 1 failure each. **Final full suite on the exact release SHA `6a093251`: 1,903 tests, 1 skipped, 1 failure** (a first attempt on a brand-new simulator hit a transient "failed to launch … No such process" before any test ran; rerun on a pre-booted simulator). The only failure is the known pre-existing `PeptideSupportEditorViewModelTests.testSandboxChangeDoseKeepsHistoryAndPauseResumeWorkAgainstTheFixture` (also on Build 80).
 - UI: a temporary, uncommitted XCUITest drove the sandbox editor (2 weeks → 3 weeks → Months/1 month) and captured screenshots; the file was restored. No UI-test change is committed.
 
 **Release / review**
@@ -164,7 +164,11 @@ Unchanged. It is still triggered only by a completed, confirmed photo session wh
 - Parity: control-plane `source_commit_hash` web + worker = `4ffde0f5…`; `/api/v1/health/live` and `/ready` buildId `physiqueos-4ffde0f5-20261002`, ready; fresh web + worker log envelopes `gitSha` = `4ffde0f5…` (via a harmless 401 refresh). No schema migration.
 
 ## K. Build / release
-In progress at this checkpoint: Build 81 from `6a093251` (release verifier passed). Archive + guarded upload pending disk ≥ floor.
+- Reverified: release state 80, Build 80 delivery `39ae9ddd` VALID, no later build on main → **Build 81**.
+- Bump commit `6a093251` (generator `APP_BUILD_NUMBER`, 4 `CURRENT_PROJECT_VERSION` lines, `TrainingLoggerTests` CFBundleVersion); generator deterministic; release verifier passed.
+- `xcodebuild archive` Release, `generic/platform=iOS`, automatic signing (established Xcode account) from the clean worktree at exactly `6a093251`: **ARCHIVE SUCCEEDED**, tree clean after. Archive `~/Library/Developer/Xcode/Archives/2026-10-02/PhysiqueOS-Build81.xcarchive` (retained).
+- App `com.physiqueos.native.dev` 1.0 (81): App Group `group.com.physiqueos.native.dev.shared`, `healthkit` + `healthkit.background-delivery`; embedded profile carries the App Group; Health usage descriptions, `NSSupportsLiveActivities`, `ITSAppUsesNonExemptEncryption` present. Extension `com.physiqueos.native.dev.WorkoutActivity` 1.0 (81): App Group only, no HealthKit. `codesign --verify --deep --strict` OK for both; dSYMs app `DAE48678-2595-3F0F-AB37-B2D7A4399DE2`, extension `784E6CA8-DC3B-3699-AB63-CF14B5B055FE`.
+- Guarded tool: dry run passed every check (identity, 1.0 (81), extension parity, codesign, dSYM UUID, 81 > 80) → `--execute --confirm "UPLOAD com.physiqueos.native.dev 1.0 (81)"` → EXPORT SUCCEEDED → **VALID**. No browser login, no Founder auth needed, no credential change.
 
 ## L. Founder physical acceptance (minimal)
 After installing Build 81 from TestFlight: You → Operating Plan → Coaching Updates → Edit Coaching Updates → Progress Photos.
@@ -193,7 +197,7 @@ Note: once a 3+ week or monthly cadence is saved, an older build (≤80) cannot 
   - the finished Build 79 lane's DerivedData;
   - stale `XcodeDistPipeline` temp folders;
   - this lane's private simulators, result bundles and baseline worktree.
-- Recovered to 17 GiB before the final suite and archive. 
+- Recovered to 17 GiB before the final suite and archive. Lane DerivedData (Debug and Release), result bundles and private simulators removed after use; ~15 GiB free at the end (the concurrent Watch lane keeps fluctuating ±3 GiB). **Deviation to note:** the release tool README says to retain archives; the Build 75–78 archives (all uploaded and VALID in App Store Connect) were deleted under the standing disk-safety rule to regain the floor. Builds 79, 80 and 81 archives are retained.
 
 ## Local-only / not pushed
 - Read-only probe bundles and their outputs (contain no secrets; Founder schedule summary only) stay in the job temp directory and are not committed.

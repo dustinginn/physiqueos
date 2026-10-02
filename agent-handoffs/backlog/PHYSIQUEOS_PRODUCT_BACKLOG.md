@@ -18,7 +18,7 @@ Agent handoff reports describe implementation state. This backlog describes what
 ACTIVE / NEXT
 
 0. Progress Photos flexible cadence (Every N Weeks / Months) — SHIPPED, pending Founder acceptance
-Status: Server 4ffde0f5 deployed and verified; Native Build 81 (source 6a093251) release in progress — see report agent-handoffs/reports/20261002T070000Z-progress-photos-flexible-cadence.md for deployment/delivery ids and VALID state.
+Status: Server 4ffde0f5 deployed (deployment faaf66bd) and verified; Native Build 81 (source 6a093251) uploaded VALID (delivery 212d79dd-cc57-4319-ab8c-d9694f0585ad); next build 82. Report: agent-handoffs/reports/20261002T070000Z-progress-photos-flexible-cadence.md.
 What changed:
 - Coaching Updates > Progress Photos: "Every [1-12] [Weeks | Months]" + "On [day]" / "On the [first..fourth|last] [day]"; monthly = weekday of the month (not day of month).
 - Existing Every 2 weeks schedule unchanged (no migration); cadence changes are future-only with a predictable first date; same-day changes amend with audit, and a same-day revert restores the original dates.

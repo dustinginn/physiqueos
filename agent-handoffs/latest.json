@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T07:05:00Z",
+  "generated_at_utc": "2026-10-02T07:15:00Z",
   "task": {
     "id": "progress-photos-flexible-cadence-20261002",
     "title": "Progress Photos flexible cadence (Every N Weeks / Months)",
     "agent": "claude",
-    "status": "checkpoint_server_deployed_native_release_in_progress"
+    "status": "completed_pending_founder_acceptance"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -17,14 +17,16 @@
     "native_base_build": 80,
     "native_branch": "claude/progress-photos-flexible-cadence-20261002",
     "native_candidate_sha": "6a0932517cbd8de165bf25c7637a2d2d6fea03dc",
-    "native_candidate_build": 81
+    "native_candidate_build": 81,
+    "native_build81_delivery": "212d79dd-cc57-4319-ab8c-d9694f0585ad",
+    "next_native_build": 82
   },
   "result": {
-    "summary": "Progress Photos cadence is now Every [1-12] [Weeks|Months] (monthly = weekday of the month). Server additive contract deployed and verified on the Founder's real data (Every 2 weeks unchanged: next 10-03, 10-17, 10-31; no migration). Native Build 81 editor ready; release in progress.",
+    "summary": "Progress Photos cadence is now Every [1-12] [Weeks|Months] (monthly = weekday of the month). Server 4ffde0f5 deployed (faaf66bd) and verified on the Founder's real data (Every 2 weeks unchanged: next 10-03, 10-17, 10-31; no migration). Native Build 81 (6a093251) uploaded VALID. Founder physical acceptance pending.",
     "success": true,
     "production_mutated": false,
     "deployed": true,
-    "testflight_uploaded": false
+    "testflight_uploaded": true
   },
   "validation": {
     "server_full_unit_suite": {
@@ -36,18 +38,20 @@
       "summary": "3 rounds; final no P0/P1/P2; 81,896-change sweep"
     },
     "native_full_unit_suite": {
-      "status": "passed_on_a210fafa",
-      "summary": "1902 tests, 1 known pre-existing failure; final run on 6a093251 pending"
+      "status": "passed",
+      "summary": "6a093251: 1903 tests, 1 skipped, 1 known pre-existing failure (PeptideSupportEditorViewModelTests sandbox)"
     },
     "production_probe": {
       "status": "passed",
       "summary": "read-only pre/post deploy; Founder schedule unchanged"
+    },
+    "native_release": {
+      "status": "passed",
+      "summary": "archive verified; guarded dry run + upload; VALID"
     }
   },
   "open_gates": [
-    "Native final full suite on 6a093251",
-    "Build 81 archive + guarded upload + VALID",
-    "Founder physical acceptance"
+    "Founder physical acceptance of Build 81 (see report section L)"
   ],
   "full_report_path": "agent-handoffs/reports/20261002T070000Z-progress-photos-flexible-cadence.md",
   "parent_report_path": "agent-handoffs/inbox/prompts/20261002T060000Z-progress-photos-flexible-cadence.md",
