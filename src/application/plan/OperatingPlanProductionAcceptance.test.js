@@ -502,6 +502,10 @@ describe("Progress Photos flexible cadence through the Native Coaching Updates c
       cadence: "weekly_interval_2", cadenceInterval: 2, cadenceUnit: "week", weekOfMonth: null,
       nextOccurrenceDate: "2026-09-19", lastOccurrenceDate: "2026-09-05", day: "saturday", timeOfDay: "afternoon", specificTime: null,
       reminderEnabled: true,
+      cadenceChangeBaseline: {
+        cadence: "weekly_interval_2", cadenceInterval: 2, cadenceUnit: "week", weekOfMonth: null,
+        day: "saturday", nextOccurrenceDate: "2026-09-19", lastOccurrenceDate: "2026-09-05",
+      },
     });
     expect(JSON.stringify(fixture.snapshot())).toBe(before);
   });
@@ -551,6 +555,20 @@ describe("Progress Photos flexible cadence through the Native Coaching Updates c
     expect(photoDates(fixture, "2026-09-20T19:00:00.000Z")).toEqual(["2026-09-26"]);
     expect(photoDates(fixture, "2026-10-04T19:00:00.000Z")).toEqual([]);
     expect(photoDates(fixture, "2026-10-11T19:00:00.000Z")).toEqual(["2026-10-17"]);
+  });
+
+  it("restores the original schedule exactly when a same-day change is reverted", async () => {
+    const fixture = setup();
+    await save(fixture, (draft) => { draft.photos.cadenceInterval = 1; });
+    expect(photoReminder(fixture).schedule).toMatchObject({ interval: 1, anchorDate: "2026-09-19" });
+    let detail = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    // The Native preview baseline is still the schedule in force before today.
+    expect(detail.editor.photos.cadenceChangeBaseline).toMatchObject({ cadenceInterval: 2, nextOccurrenceDate: "2026-09-19", lastOccurrenceDate: "2026-09-05" });
+    await save(fixture, (draft) => { draft.photos.cadenceInterval = 2; });
+    expect(photoReminder(fixture)).toMatchObject({ nextDueAt: "2026-09-19", schedule: { interval: 2, anchorDate: "2026-07-25" } });
+    detail = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    expect(detail.editor.photos).toMatchObject({ cadence: "weekly_interval_2", nextOccurrenceDate: "2026-09-19", lastOccurrenceDate: "2026-09-05" });
+    expect(photoDates(fixture, "2026-09-15T19:00:00.000Z")).toEqual(["2026-09-19"]);
   });
 
   it("switches back from monthly to every 2 weeks weeks later without skipping or failing", async () => {

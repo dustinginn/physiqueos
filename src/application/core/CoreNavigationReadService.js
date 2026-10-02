@@ -545,6 +545,7 @@ export function createCoreNavigationReadService({
             ...photoHydration.item.cadenceFields,
             nextOccurrenceDate: photoHydration.item.preferredSchedule.nextDueAt ?? null,
             lastOccurrenceDate: photoHydration.item.preferredSchedule.lastDueAt ?? null,
+            cadenceChangeBaseline: photoHydration.item.cadenceChangeBaseline,
             day: photoHydration.item.recurrence.weekdays[0],
             timeOfDay: /^\d{2}:\d{2}$/.test(photoHydration.item.recurrence.timeOfDay ?? "")
               ? "specific" : photoHydration.item.recurrence.timeOfDay,
@@ -587,6 +588,9 @@ export function createCoreNavigationReadService({
               weekOfMonth: editor.photos.weekOfMonth,
               nextOccurrenceDate: editor.photos.nextOccurrenceDate,
               lastOccurrenceDate: editor.photos.lastOccurrenceDate,
+              // Read-only: the schedule a cadence edit is measured against
+              // (the pre-today schedule after a same-day edit).
+              cadenceChangeBaseline: editor.photos.cadenceChangeBaseline,
               day: editor.photos.day,
               timeOfDay: editor.photos.timeOfDay,
               specificTime: editor.photos.specificTime,

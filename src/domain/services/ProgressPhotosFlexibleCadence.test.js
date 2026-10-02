@@ -204,6 +204,12 @@ describe("cadence changes are future-only and predictable", () => {
     expect(firstAfterChange(weekly(2, "2026-10-03"), weekly(1, "2026-10-03"), onFour)).toBe("2026-10-10");
     expect(firstAfterChange(monthly(12, "first", "2026-10-03"), monthly(1, "first", "2026-10-03"), onFour)).toBe("2026-11-07");
     expect(firstAfterChange(monthly(3, "first", "2026-10-03"), monthly(1, "first", "2026-10-03"), onFour)).toBe("2026-11-07");
+    // Shortening never pushes back a day that is available (re-review P2).
+    const onSepOne = "2026-09-01";
+    expect(firstAfterChange(weekly(3, "2026-08-15"), weekly(2, "2026-08-15"), onSepOne)).toBe("2026-09-05");
+    expect(firstAfterChange(monthly(1, "first", "2026-08-01"), weekly(2, "2026-08-01"), onSepOne)).toBe("2026-09-05");
+    expect(firstAfterChange(monthly(1, "first", "2026-08-01"), weekly(4, "2026-08-01"), onSepOne)).toBe("2026-09-05");
+    expect(firstAfterChange(weekly(12, "2026-07-25"), weekly(4, "2026-07-25"), onSepOne)).toBe("2026-09-05");
     // Exhaustive: every legacy/new pair, every day over a year, always resolves within one period.
     const cadences = [1, 2, 3, 4, 12].map((n) => weekly(n, "2026-07-25"))
       .concat(["first", "last"].flatMap((w) => [1, 2, 12].map((n) => monthly(n, w, "2026-08-01"))));

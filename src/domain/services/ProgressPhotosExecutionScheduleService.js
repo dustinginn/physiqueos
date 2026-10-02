@@ -164,6 +164,11 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
         // before the first one); Native's change preview continues from it.
         lastDueAt: getProtocolOccurrenceOnOrBefore(recurrence, today)?.scheduledLocalDate ?? null,
       },
+      // What a cadence edit made now would be measured against (see
+      // prepareProgressPhotosScheduleSuccessor), for Native's preview.
+      cadenceChangeBaseline: describeChangeBaseline(resolveCadenceChangeBaseline(store, {
+        root, current: version, existing: recurrence, effectiveDate: today, today,
+      }), today),
       recurrence,
       recurrenceIdentity: createProtocolRecurrenceIdentity(recurrence),
       reminderEnabled: reminder?.active !== false,
@@ -278,7 +283,14 @@ export function prepareProgressPhotosScheduleSuccessor(store, command, timestamp
   if (cadencePatternChanged(existing, recurrence)) {
     // A cadence change is future-only and starts predictably (see
     // resolveCadenceChangeAnchor); an unchanged pattern keeps its anchor.
-    const anchorDate = resolveCadenceChangeAnchor(existing, recurrence, today);
+    // A further change on the same day is measured against the schedule in
+    // force before today, so change-then-revert restores it exactly.
+    const baseline = resolveCadenceChangeBaseline(store, {
+      root, current, existing, effectiveDate: command.effectiveDate, today,
+    });
+    const anchorDate = cadencePatternChanged(baseline, recurrence)
+      ? resolveCadenceChangeAnchor(baseline, recurrence, today)
+      : baseline.anchorDate;
     if (!anchorDate) return rejected("invalid", "The next occurrence could not be resolved.");
     recurrence = Object.freeze({ ...recurrence, anchorDate });
   }
@@ -375,6 +387,14 @@ function recurrenceFromVersion(version, root, execution, reminder) {
     },
   );
 }
+function describeChangeBaseline(baseline, today) {
+  return Object.freeze({
+    ...progressPhotoCadenceFields(baseline),
+    day: baseline.weekdays[0],
+    nextOccurrenceDate: getProtocolOccurrenceOnOrAfter(baseline, today)?.scheduledLocalDate ?? null,
+    lastOccurrenceDate: getProtocolOccurrenceOnOrBefore(baseline, today)?.scheduledLocalDate ?? null,
+  });
+}
 function prepareSameDateScheduleAmendment(store, { root, current, successorPayload, command, timestamp }) {
   const active = store.protocolVersions.filter((item) =>
     item.protocolId === root.id && item.status === "active" && !item.endedAt);
@@ -414,6 +434,28 @@ function prepareSameDateScheduleAmendment(store, { root, current, successorPaylo
     },
   });
 }
+/// The schedule a cadence change is measured against: the current one, or —
+/// when the current version became effective today (a same-day edit that
+/// will amend it) — the predecessor that was in force before today.
+export function resolveCadenceChangeBaseline(store, { root, current, existing, effectiveDate, today }) {
+  if (String(current?.effectiveAt ?? "").slice(0, 10) !== effectiveDate || effectiveDate < today) return existing;
+  const predecessor = (store.protocolVersions ?? [])
+    .filter((item) => item.protocolId === root.id && item.id !== current.id
+      && Number(item.versionNumber) < Number(current.versionNumber))
+    .sort((left, right) => Number(right.versionNumber) - Number(left.versionNumber))[0];
+  const source = predecessor?.recurrence ?? predecessor?.change?.reviewedChanges?.recurrence;
+  if (!source) return existing;
+  try {
+    return normalizeProtocolRecurrence(source, {
+      fallbackTimezone: existing.timezone,
+      fallbackAnchorDate: existing.anchorDate,
+      effectiveAt: predecessor.effectiveAt,
+    });
+  } catch {
+    return existing;
+  }
+}
+
 /// Interval, unit, weekday, or week-of-month changes re-anchor; time-only,
 /// reminder-only, and identical saves do not.
 function cadencePatternChanged(existing, requested) {

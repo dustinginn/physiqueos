@@ -88,10 +88,11 @@ export function getProtocolOccurrenceOnOrAfter(recurrence, localDate) {
 /// that was not already due newly due today:
 /// - today stays the first occurrence when it was due under the previous
 ///   schedule and still fits the new day rule (edit on the occurrence day);
-/// - weeks: the new interval continues from the last scheduled occurrence
-///   (L + k × interval) when that day still fits the new weekday, so
-///   shortening never skips a week and lengthening is counted from the
-///   last photo day; otherwise the first matching weekday after today;
+/// - weeks: the later of (last scheduled occurrence + the new interval)
+///   and the first matching weekday after today, when the last occurrence
+///   still fits the new weekday — lengthening is counted from the last
+///   photo day and shortening never pushes back an available day;
+///   otherwise the first matching weekday after today;
 /// - months: the first matching weekday-of-the-month after today (a
 ///   monthly cadence is calendar-anchored).
 export function resolveCadenceChangeAnchor(previous, next, todayLocalDate) {
@@ -105,16 +106,16 @@ export function resolveCadenceChangeAnchor(previous, next, todayLocalDate) {
     last = null;
   }
   if (todayWasDue && matchesProtocolDayRule(next, todayLocalDate)) return todayLocalDate;
-  if (next.frequency === "weekly" && last && matchesProtocolDayRule(next, last)) {
-    const step = next.interval * 7;
-    const elapsed = daysBetween(last, todayLocalDate);
-    return addDays(last, (Math.floor(elapsed / step) + 1) * step);
-  }
-  for (let offset = 1; offset <= 62; offset += 1) {
+  let firstAfterToday = null;
+  for (let offset = 1; offset <= 62 && !firstAfterToday; offset += 1) {
     const candidate = addDays(todayLocalDate, offset);
-    if (matchesProtocolDayRule(next, candidate)) return candidate;
+    if (matchesProtocolDayRule(next, candidate)) firstAfterToday = candidate;
   }
-  return null;
+  if (next.frequency === "weekly" && last && firstAfterToday && matchesProtocolDayRule(next, last)) {
+    const spaced = addDays(last, next.interval * 7);
+    return spaced > firstAfterToday ? spaced : firstAfterToday;
+  }
+  return firstAfterToday;
 }
 
 export function getProtocolOccurrenceOnOrBefore(recurrence, localDate) {
@@ -129,9 +130,6 @@ function lastOccurrenceOnOrBefore(recurrence, localDate) {
     if (isProtocolDateOnCycle(recurrence, candidate)) return candidate;
   }
   return null;
-}
-function daysBetween(left, right) {
-  return Math.round((dateNumber(right) - dateNumber(left)) / DAY_MS);
 }
 
 export function protocolLocalDateKey(value, timezone) {
