@@ -134,6 +134,9 @@ final class HomeWidgetSnapshotCoordinator {
     private var isRefreshing = false
     private var refreshPending = false
     private var reloadPending = false
+    /// Incremented at every session boundary. A refresh that started under an
+    /// earlier session never writes its (old-session) result afterwards.
+    private var sessionGeneration = 0
 
     /// Production reads behind the widget that are served from the short-lived
     /// read cache. Activity already reads with `.reload`.
@@ -180,7 +183,12 @@ final class HomeWidgetSnapshotCoordinator {
         // Live Activity action) cannot read the when-unlocked credential.
         // That is not an offline Server: keep the last snapshot as written
         // and refresh again when protected data becomes available.
-        if authority == .founderProduction, !isProtectedDataAvailable() { return }
+        if authority == .founderProduction, !isProtectedDataAvailable() {
+            // Keep an owed cache bypass for the refresh after unlock.
+            if reloadingReads { reloadPending = true }
+            return
+        }
+        let generation = sessionGeneration
         let accountScope = accountScopes.scope(for: authority)
         let zone = timeZone()
         let instant = now()
@@ -212,7 +220,7 @@ final class HomeWidgetSnapshotCoordinator {
             // An authority switch can happen while the Server reads are in
             // flight. The new authority clears the file and requests another
             // pass; the old pass must never repopulate it.
-            guard environment.nativeAuthority == authority else { return }
+            guard environment.nativeAuthority == authority, sessionGeneration == generation else { return }
             let activeWorkout = environment.trainingSessionAuthority(for: authority).activeLiveSession(at: now())
             let previous = store.read(authority: authority.rawValue, accountScope: accountScope)
             let fullySuccessful = !nutritionFailed && !activityFailed
@@ -236,7 +244,7 @@ final class HomeWidgetSnapshotCoordinator {
             try store.write(snapshot)
             reload()
         } catch {
-            guard environment.nativeAuthority == authority else { return }
+            guard environment.nativeAuthority == authority, sessionGeneration == generation else { return }
             if Self.endsSession(error) {
                 // No paired session: the previous session's totals must not
                 // stay on the Home Screen as "offline".
@@ -301,13 +309,17 @@ final class HomeWidgetSnapshotCoordinator {
     /// remove the shared snapshot and start a new opaque account scope.
     func endSession(for authority: NativeAPIEnvironment) {
         accountScopes.rotate(for: authority)
+        sessionGeneration += 1
+        // The next refresh must not be served the ended session's cached
+        // reads from the short-lived read cache.
+        reloadPending = true
         guard environment.nativeAuthority == authority else { return }
         clear()
     }
 
     nonisolated static func endsSession(_ error: Error) -> Bool {
         switch error {
-        case ProductionNativeError.notPaired, ProductionNativeError.reconnectRequired, ProductionNativeError.unauthenticated:
+        case ProductionNativeError.notPaired, ProductionNativeError.reconnectRequired:
             return true
         case FounderServerError.notPaired, FounderServerError.deviceOrSessionRevoked:
             return true

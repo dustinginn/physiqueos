@@ -226,7 +226,9 @@ final class HomeWidgetTests: XCTestCase {
     func testSessionEndingErrorsAreClassifiedForSnapshotRetirement() {
         XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.notPaired))
         XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.reconnectRequired))
-        XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.unauthenticated(nil)))
+        // A non-terminal 401 leaves the credential in place; only the real
+        // boundary (which also reaches the observer) ends the widget session.
+        XCTAssertFalse(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.unauthenticated(nil)))
         XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(FounderServerError.notPaired))
         XCTAssertTrue(HomeWidgetSnapshotCoordinator.endsSession(FounderServerError.deviceOrSessionRevoked))
         XCTAssertFalse(HomeWidgetSnapshotCoordinator.endsSession(ProductionNativeError.networkFailure))
@@ -245,6 +247,24 @@ final class HomeWidgetTests: XCTestCase {
         harness.coordinator.endSession(for: .sandbox)
         XCTAssertNil(harness.store.read(), "A session boundary removes the shared file")
         XCTAssertNotEqual(harness.scopes.scope(for: .sandbox), scope, "A new session never reads the old scope back")
+    }
+
+    @MainActor
+    func testARefreshInFlightAcrossASessionBoundaryNeverWritesTheOldSessionBack() async throws {
+        let harness = try CoordinatorHarness(authority: .sandbox)
+        defer { harness.tearDown() }
+        let refresh = Task { await harness.coordinator.refreshCanonicalSnapshot() }
+        // The boundary lands while the refresh awaits its reads.
+        await Task.yield()
+        harness.coordinator.endSession(for: .sandbox)
+        await refresh.value
+        XCTAssertNil(harness.store.read(), "An old-session refresh must not repopulate the cleared file")
+
+        await harness.coordinator.refreshCanonicalSnapshot()
+        XCTAssertNotNil(
+            harness.store.read(authority: "sandbox", accountScope: harness.scopes.scope(for: .sandbox)),
+            "The next session's refresh writes under the new scope"
+        )
     }
 
     @MainActor

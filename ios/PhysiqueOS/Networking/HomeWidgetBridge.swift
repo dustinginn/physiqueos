@@ -29,7 +29,13 @@ final class HomeWidgetBridge {
             // Founder Production's shared snapshot with the session's other
             // last-known reads.
             await self.environment.productionNativeAPI.setSessionBoundaryObserver { [weak self] in
-                Task { @MainActor in self?.coordinator.endSession(for: .founderProduction) }
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.coordinator.endSession(for: .founderProduction)
+                    // A same-authority re-pair changes no selection, so ask
+                    // for the new session's totals here.
+                    await self.refreshCanonicalSnapshot()
+                }
             }
         }
     }
