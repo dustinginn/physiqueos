@@ -188,10 +188,18 @@ Founder plans several days of real use before finalizing ergonomics/typography.
 
 2. Home Screen widget
 Status: HIGH-INTEREST / likely next iOS feature after Live Activities settles.
-Founder wants:
-- daily totals displayed;
-- Start Workout Logger action/button.
-Exact daily-total composition and widget sizes/layout remain to be designed.
+Founder clarified desired V1 on 2026-10-01:
+- mirror the existing Native "Logged Today" summary as closely as WidgetKit allows;
+- include Training summary;
+- include Nutrition total plus macros;
+- include Activity active calories / current-day status;
+- include today's Weight when available;
+- add a clear Start Workout Logger action that becomes Resume Workout when an active live session exists.
+Design direction:
+- preserve the existing Logged Today information hierarchy rather than reducing V1 to only three standalone totals;
+- prefer a large Home Screen widget as the primary V1 if needed for legibility; medium may be evaluated as a condensed secondary family;
+- missing current-day values must not fall back to yesterday or display as zero;
+- Start/Resume remains navigation into the authoritative Workout Logger rather than creating a session inside the widget.
 
 3. Apple Watch companion
 Status: HIGH-INTEREST / likely after several days of Live Activity use, potentially next week.
