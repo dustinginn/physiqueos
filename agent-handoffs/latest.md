@@ -1,15 +1,15 @@
 # PhysiqueOS latest agent handoff
 
-Machine-readable interface: agent-handoffs/latest.json (read this first).
+Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Home Screen Widget V1 — square Logged Today glance + Start/Resume Logger (home-screen-widget-v1-implementation)
+- Task: Founder-present Mac DigitalOcean console PAT maintenance (`mac-do-console-pat-maintenance-20261002`)
 - Agent: codex
-- Status: completed; integration-ready, not released
-- Generated (UTC): 2026-10-02T02:31:51Z
+- Status: completed
+- Generated (UTC): 2026-10-02T02:56:04Z
 - Success: true
 
-Summary: Home widget candidate 82040143 is pushed from exact Build 78. The four-tile square is primary (Nutrition P/C/F, Activity, optional today Weight, app-owned refresh, Start/Resume Logger); detailed large remains optional. Final widget + Build 78 regression suite passed 159/159. No TestFlight upload. Clean merge-tree verified with Claude Priority Skip 88d597b2; consolidate both into one next Native build.
+Summary: Recovered the byte-identical approved local App Platform console runner, reverified the current app and web component, and proved the existing least-privilege context can open the console with a harmless constant-plus-Node-version payload. No PAT rotation or permission broadening is needed, and no other current main-visible credential-maintenance blocker remains.
 
-Detailed report: agent-handoffs/reports/20261002T023151Z-home-screen-widget-v1-implementation.md
+Detailed report: `agent-handoffs/reports/20261002T025604Z-mac-do-console-pat-maintenance-final.md`
 
-Protocol: agent-handoffs/README.md
+Protocol: `agent-handoffs/README.md`

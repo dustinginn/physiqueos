@@ -1,22 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T02:31:51Z",
+  "generated_at_utc": "2026-10-02T02:56:04Z",
   "task": {
-    "id": "home-screen-widget-v1-implementation",
-    "title": "Home Screen Widget V1 — square Logged Today glance + Start/Resume Logger",
+    "id": "mac-do-console-pat-maintenance-20261002",
+    "title": "Founder-present Mac DigitalOcean console PAT maintenance",
     "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "5911dd2a6f968c5a355ec68d3313f0e5e644d529",
-    "final_sha": "820401430b154eae64821d1fd7dc9ad993826f3c",
-    "implementation_branch": "codex/home-screen-widget-v1-implementation-20261002",
-    "priority_skip_candidate_sha": "88d597b25d49f773a12b7dcff3930b0f237a7a46",
-    "native_build": 78
+    "base_sha": "2d5e8b72c584d4227f1a475931c62dba775325a7",
+    "final_sha": null,
+    "production_server_sha": null,
+    "production_deployment": "421cae1a-dbc6-494c-9f73-9b8778e45efd",
+    "native_sha": null,
+    "native_build": null
   },
   "result": {
-    "summary": "Home widget candidate 82040143 is pushed from exact Build 78. The four-tile square is primary (Nutrition P/C/F, Activity, optional today Weight, app-owned refresh, Start/Resume Logger); detailed large remains optional. Final widget + Build 78 regression suite passed 159/159. No TestFlight upload. Clean merge-tree verified with Claude Priority Skip 88d597b2; consolidate both into one next Native build.",
+    "summary": "Recovered the byte-identical approved local App Platform console runner, reverified the current app and web component, and proved the existing least-privilege context can open the console with a harmless constant-plus-Node-version payload. No PAT rotation or permission broadening is needed, and no other current main-visible credential-maintenance blocker remains.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -25,29 +26,25 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "159/159 final focused Home widget plus Build 78 Live Activity/session/rest tests passed; zero failures and zero skips."
+      "summary": "Exact runner blob equality, local dependency checks, App Platform listing, active-deployment and instance inspection, and bounded console execution all passed."
     },
     "review": {
-      "status": "approved",
-      "summary": "Privacy/auth, exact-day, session-authority, App Group, signing-source, render, and integration review passed; physical signed iOS 27 acceptance remains a release gate."
+      "status": "not_applicable",
+      "summary": "No application code changed; the recovered ignored runner is byte-identical to repository authority."
     },
-    "release_configuration": {
+    "zero_write_audit": {
       "status": "passed",
-      "summary": "Generator deterministic; verifier confirms Build 78 parity, one existing extension, matching App Group, and HealthKit app-only."
+      "summary": "Console payload printed only a fixed marker and Node version; it ran no SQL, read no production user data, and exited zero."
     }
   },
   "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "Founder superseded the prompt's large-first direction during implementation: systemSmall is now the primary four-tile family and systemLarge remains optional.",
-    "Founder clarified the physical device is on iOS 27; the candidate compiled with the iOS 27 SDK, while the available simulator runtime was iOS 26.5."
+    "The legacy physiqueos-audit context is recorded in a prior handoff as returning 401, but the standing approved physiqueos-final-cutover-config context passes both read and console access."
   ],
-  "backlog": [
-    "Consolidate Native widget 82040143 with Priority Skip 88d597b2 into one next Native build.",
-    "Verify automatic/cloud App Group signing, archive entitlements, and physical iOS 27 widget behavior before one coordinated TestFlight upload."
-  ],
-  "recommended_next_step": "Merge exact candidates 88d597b25d49f773a12b7dcff3930b0f237a7a46 and 820401430b154eae64821d1fd7dc9ad993826f3c, then perform one integrated build, archive, device acceptance, and coordinated TestFlight upload.",
-  "full_report_path": "agent-handoffs/reports/20261002T023151Z-home-screen-widget-v1-implementation.md",
+  "backlog": [],
+  "recommended_next_step": "No Founder credential action is required; preserve the existing least-privilege context and avoid speculative rotation.",
+  "full_report_path": "agent-handoffs/reports/20261002T025604Z-mac-do-console-pat-maintenance-final.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
