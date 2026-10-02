@@ -336,6 +336,8 @@ private struct CoachingUpdatesEditor: View {
     let onSaved: () -> Void
 
     @State private var model: CoachingUpdatesEditorReadModel?
+    /// The Progress Photos schedule as loaded, for the next-date preview.
+    @State private var loadedPhotos: CoachingProgressPhotosReadModel?
     @State private var productionDetail: CoachingUpdatesProductionDetail?
     @State private var isLoadingProduction = false
     @State private var isSaving = false
@@ -371,12 +373,7 @@ private struct CoachingUpdatesEditor: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Choose when you plan to take progress photos, whether Home should remind you, and whether completed photo sessions should generate a Photo Event review.")
                                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                Picker("Cadence", selection: Binding(get: { model.photos.cadence }, set: { self.model?.photos.cadence = $0 })) {
-                                    ForEach(ProgressPhotoCadence.allCases) { Text($0.label).tag($0) }
-                                }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
-                                Picker("Preferred day", selection: Binding(get: { model.photos.day }, set: { self.model?.photos.day = $0 })) {
-                                    ForEach(OperatingPlanWeekday.allCases) { Text($0.label).tag($0) }
-                                }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
+                                progressPhotoCadenceFields(model.photos)
                                 Picker("Preferred time", selection: Binding(get: { model.photos.timeOfDay }, set: { self.model?.photos.timeOfDay = $0 })) {
                                     ForEach(TimeOfDayChoice.allCases) { Text($0.label).tag($0) }
                                 }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
@@ -386,6 +383,7 @@ private struct CoachingUpdatesEditor: View {
                                         set: { self.model?.photos.specificTime = $0 }
                                     ))
                                 }
+                                progressPhotoSummary(model.photos)
                                 Divider().overlay(PhysiqueOSTheme.divider)
                                 Toggle("Remind me about Progress Photos", isOn: Binding(get: { model.photos.reminderEnabled }, set: { self.model?.photos.reminderEnabled = $0 }))
                                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy).tint(PhysiqueOSTheme.accent)
@@ -456,6 +454,7 @@ private struct CoachingUpdatesEditor: View {
         case .sandbox:
             productionDetail = nil
             model = store.coachingEditor(strategyId: strategyId)
+            loadedPhotos = model?.photos
         case .founderProduction:
             isLoadingProduction = true
             model = nil
@@ -465,6 +464,7 @@ private struct CoachingUpdatesEditor: View {
             do {
                 productionDetail = try await environment.coachingUpdatesAPI.fetchDetail(strategyId: strategyId)
                 model = productionDetail?.editor
+                loadedPhotos = model?.photos
             } catch {
                 productionDetail = nil
                 model = nil
@@ -485,12 +485,23 @@ private struct CoachingUpdatesEditor: View {
                 errorMessage = "Refresh Coaching Updates before trying again."
                 return
             }
+            // An older Server only understands Weekly / Every 2 weeks and
+            // would save anything else as Weekly. Never send it a cadence
+            // it cannot keep.
+            if !model.photos.serverSupportsFlexibleCadence, !model.photos.isLegacyRepresentable {
+                errorMessage = "This Progress Photos cadence needs the latest PhysiqueOS Server. Nothing was saved."
+                return
+            }
             Task { @MainActor in
                 isSaving = true
                 errorMessage = nil
                 defer { isSaving = false }
                 do {
                     _ = try await environment.coachingUpdatesAPI.save(detail, model: model)
+                    // Replace pending Progress Photos notifications with the
+                    // Server's new occurrence horizon now, not on the next
+                    // Home read (stale identifiers are removed there).
+                    await environment.reconcileCanonicalPriorityNotifications()
                     onSaved()
                 } catch {
                     if let productionError = error as? ProductionNativeError,
@@ -502,6 +513,71 @@ private struct CoachingUpdatesEditor: View {
                 }
             }
         }
+    }
+
+    /// Compact "Every [N] [Weeks | Months]" control, then "On [weekday]" or
+    /// "On the [week of the month] [weekday]".
+    @ViewBuilder
+    private func progressPhotoCadenceFields(_ photos: CoachingProgressPhotosReadModel) -> some View {
+        Stepper(value: Binding(
+            get: { photos.cadenceInterval },
+            set: { self.model?.photos.cadenceInterval = min(max($0, CoachingProgressPhotosReadModel.intervalRange.lowerBound), CoachingProgressPhotosReadModel.intervalRange.upperBound) }
+        ), in: CoachingProgressPhotosReadModel.intervalRange) {
+            Text("Every \(photos.cadenceInterval) \(photos.cadenceUnit.label(for: photos.cadenceInterval))")
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .contentTransition(.numericText())
+        }
+        .accessibilityIdentifier("operatingPlan.coaching.photos.interval")
+        Picker("Unit", selection: Binding(
+            get: { photos.cadenceUnit },
+            set: { unit in
+                self.model?.photos.cadenceUnit = unit
+                if unit == .month, self.model?.photos.weekOfMonth == nil { self.model?.photos.weekOfMonth = .first }
+            }
+        )) {
+            ForEach(ProgressPhotoCadenceUnit.allCases) { Text($0.pluralLabel).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("operatingPlan.coaching.photos.unit")
+        HStack(spacing: 0) {
+            Text(photos.cadenceUnit == .month ? "On the" : "On")
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            if photos.cadenceUnit == .month {
+                Picker("Week of the month", selection: Binding(get: { photos.weekOfMonth ?? .first }, set: { self.model?.photos.weekOfMonth = $0 })) {
+                    ForEach(ProgressPhotoWeekOfMonth.allCases) { Text($0.label).tag($0) }
+                }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
+                .accessibilityIdentifier("operatingPlan.coaching.photos.weekOfMonth")
+            }
+            Picker("Preferred day", selection: Binding(get: { photos.day }, set: { self.model?.photos.day = $0 })) {
+                ForEach(OperatingPlanWeekday.allCases) { Text($0.label).tag($0) }
+            }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func progressPhotoSummary(_ photos: CoachingProgressPhotosReadModel) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(photos.cadenceSummary)
+                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            if let next = progressPhotoNextDate(photos) {
+                Text(next)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("operatingPlan.coaching.photos.summary")
+    }
+
+    private func progressPhotoNextDate(_ photos: CoachingProgressPhotosReadModel) -> String? {
+        guard let saved = loadedPhotos else { return nil }
+        let today = OperatingPlanDateValues.dateKey(from: Date())
+        guard let date = ProgressPhotoCadencePreview.firstOccurrence(edited: photos, saved: saved, today: today) else { return nil }
+        let label = OperatingPlanDateValues.readableDate(date)
+        return photos.cadencePatternDiffers(from: saved) ? "Starts \(label)" : "Next: \(label)"
     }
 
     private func cadenceSection(_ title: String, schedule: Binding<CoachingUpdateScheduleReadModel>) -> some View {

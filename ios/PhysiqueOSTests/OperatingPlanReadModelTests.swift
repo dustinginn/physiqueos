@@ -483,7 +483,9 @@ final class OperatingPlanReadModelTests: XCTestCase {
         XCTAssertEqual(editor.midweek.localTime, "18:00")
         XCTAssertEqual(editor.weekly.localTime, "09:00")
         XCTAssertEqual(editor.monthly.dayOfMonth, 1)
-        XCTAssertEqual(editor.photos.cadence, .everyTwoWeeks)
+        // The sandbox fixture keeps the legacy wire shape: Every 2 weeks.
+        XCTAssertEqual(editor.photos.cadenceInterval, 2)
+        XCTAssertEqual(editor.photos.cadenceUnit, .week)
         XCTAssertEqual(Set(editor.dexa.reminderPreferences), Set(DexaReminderPreference.allCases))
         editor.monthly.enabled = false
         editor.photoEventBriefingEnabled = false
@@ -872,5 +874,115 @@ final class OperatingPlanReadModelTests: XCTestCase {
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(object["id"] as? String, "native.operating-plan.training.new")
         XCTAssertEqual(try JSONDecoder().decode(AppDestination.self, from: data), .operatingPlanTrainingStrategyBuilder)
+    }
+}
+
+// MARK: - Progress Photos flexible cadence
+
+extension OperatingPlanReadModelTests {
+    private func decodePhotos(_ json: String) throws -> CoachingProgressPhotosReadModel {
+        try JSONDecoder().decode(CoachingProgressPhotosReadModel.self, from: Data(json.utf8))
+    }
+
+    private func encodedPhotos(_ photos: CoachingProgressPhotosReadModel) throws -> [String: Any] {
+        let data = try JSONEncoder().encode(photos)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    private func photos(_ interval: Int, _ unit: ProgressPhotoCadenceUnit, _ weekOfMonth: ProgressPhotoWeekOfMonth? = nil,
+                        day: OperatingPlanWeekday = .saturday, next: String? = nil) -> CoachingProgressPhotosReadModel {
+        CoachingProgressPhotosReadModel(cadenceInterval: interval, cadenceUnit: unit, weekOfMonth: weekOfMonth, day: day,
+                                        timeOfDay: .specific, specificTime: "08:30", reminderEnabled: true, nextOccurrenceDate: next)
+    }
+
+    func testProgressPhotoLegacyWeeklyAndEveryTwoWeeksDecodeToWeekIntervals() throws {
+        let weekly = try decodePhotos(#"{"cadence":"weekly","day":"saturday","timeOfDay":"morning","reminderEnabled":true}"#)
+        XCTAssertEqual(weekly.cadenceInterval, 1)
+        XCTAssertEqual(weekly.cadenceUnit, .week)
+        XCTAssertNil(weekly.weekOfMonth)
+        XCTAssertFalse(weekly.serverSupportsFlexibleCadence)
+        let everyTwo = try decodePhotos(#"{"cadence":"weekly_interval_2","day":"saturday","timeOfDay":"afternoon","reminderEnabled":false}"#)
+        XCTAssertEqual(everyTwo.cadenceInterval, 2)
+        XCTAssertEqual(everyTwo.cadenceUnit, .week)
+        XCTAssertEqual(everyTwo.day, .saturday)
+        XCTAssertEqual(everyTwo.timeOfDay, .afternoon)
+        XCTAssertFalse(everyTwo.reminderEnabled)
+        XCTAssertThrowsError(try decodePhotos(#"{"cadence":"custom","day":"saturday","timeOfDay":"morning","reminderEnabled":true}"#))
+    }
+
+    func testProgressPhotoNewServerShapeDecodesAndRoundTripsEveryCadence() throws {
+        let decoded = try decodePhotos(#"{"cadence":"weekly_interval_2","cadenceInterval":2,"cadenceUnit":"week","weekOfMonth":null,"nextOccurrenceDate":"2026-10-03","day":"saturday","timeOfDay":"specific","specificTime":"08:30","reminderEnabled":true}"#)
+        XCTAssertEqual(decoded.cadenceInterval, 2)
+        XCTAssertTrue(decoded.serverSupportsFlexibleCadence)
+        XCTAssertEqual(decoded.nextOccurrenceDate, "2026-10-03")
+        for (interval, unit, week, legacy) in [
+            (3, ProgressPhotoCadenceUnit.week, nil as ProgressPhotoWeekOfMonth?, "custom"),
+            (4, .week, nil, "custom"),
+            (1, .week, nil, "weekly"),
+            (2, .week, nil, "weekly_interval_2"),
+            (1, .month, .first, "custom"),
+            (2, .month, .last, "custom"),
+            (3, .month, .second, "custom"),
+        ] {
+            let value = photos(interval, unit, week)
+            let object = try encodedPhotos(value)
+            XCTAssertEqual(object["cadence"] as? String, legacy)
+            XCTAssertEqual(object["cadenceInterval"] as? Int, interval)
+            XCTAssertEqual(object["cadenceUnit"] as? String, unit.rawValue)
+            XCTAssertEqual(object["weekOfMonth"] as? String, week?.rawValue)
+            XCTAssertEqual(object["day"] as? String, "saturday")
+            XCTAssertEqual(object["timeOfDay"] as? String, "specific")
+            XCTAssertEqual(object["specificTime"] as? String, "08:30")
+            XCTAssertNil(object["nextOccurrenceDate"], "Read-only next date is never sent back")
+            let reloaded = try JSONDecoder().decode(CoachingProgressPhotosReadModel.self, from: JSONEncoder().encode(value))
+            XCTAssertEqual(reloaded, value, "\(interval) \(unit) must save/reload unchanged")
+        }
+    }
+
+    func testProgressPhotoCadenceValidationFailsClosed() {
+        XCTAssertThrowsError(try decodePhotos(#"{"cadence":"custom","cadenceInterval":13,"cadenceUnit":"week","day":"saturday","timeOfDay":"morning","reminderEnabled":true}"#))
+        XCTAssertThrowsError(try decodePhotos(#"{"cadence":"custom","cadenceInterval":0,"cadenceUnit":"week","day":"saturday","timeOfDay":"morning","reminderEnabled":true}"#))
+        XCTAssertThrowsError(try decodePhotos(#"{"cadence":"custom","cadenceInterval":1,"cadenceUnit":"month","day":"saturday","timeOfDay":"morning","reminderEnabled":true}"#))
+        XCTAssertThrowsError(try decodePhotos(#"{"cadence":"custom","cadenceInterval":1,"cadenceUnit":"day","day":"saturday","timeOfDay":"morning","reminderEnabled":true}"#))
+        XCTAssertEqual(CoachingProgressPhotosReadModel.intervalRange, 1...12)
+    }
+
+    func testProgressPhotoCadenceLabelsUseNaturalSingularAndPlural() {
+        XCTAssertEqual(ProgressPhotoCadenceUnit.week.label(for: 1), "Week")
+        XCTAssertEqual(ProgressPhotoCadenceUnit.week.label(for: 2), "Weeks")
+        XCTAssertEqual(ProgressPhotoCadenceUnit.month.label(for: 1), "Month")
+        XCTAssertEqual(ProgressPhotoCadenceUnit.month.label(for: 3), "Months")
+        XCTAssertEqual(photos(1, .week).cadenceSummary, "Every week on Saturday")
+        XCTAssertEqual(photos(3, .week).cadenceSummary, "Every 3 weeks on Saturday")
+        XCTAssertEqual(photos(1, .month, .first).cadenceSummary, "Every month on the first Saturday")
+        XCTAssertEqual(photos(2, .month, .last, day: .sunday).cadenceSummary, "Every 2 months on the last Sunday")
+    }
+
+    func testProgressPhotoPreviewKeepsUpcomingOccurrenceAndStartsChangesPredictably() {
+        // Saved: every 2 weeks on Saturday, next Sat Oct 3; editing Thu Oct 1.
+        let saved = photos(2, .week, next: "2026-10-03")
+        let today = "2026-10-01"
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: saved, saved: saved, today: today), "2026-10-03")
+        var timeOnly = saved
+        timeOnly.specificTime = "18:00"
+        XCTAssertFalse(timeOnly.cadencePatternDiffers(from: saved))
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(3, .week), saved: saved, today: today), "2026-10-03")
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(2, .week, day: .sunday), saved: saved, today: today), "2026-10-04")
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(1, .month, .first), saved: saved, today: today), "2026-10-03")
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(1, .month, .last), saved: saved, today: today), "2026-10-31")
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(1, .month, .fourth), saved: saved, today: today), "2026-10-24")
+        // Editing on the occurrence day keeps today.
+        let onDay = photos(2, .week, next: "2026-10-03")
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(4, .week), saved: onDay, today: "2026-10-03"), "2026-10-03")
+    }
+
+    func testProgressPhotoMonthlyDayRuleHandlesMonthEndAndLeapYear() {
+        XCTAssertTrue(ProgressPhotoCadencePreview.matchesDayRule(photos(1, .month, .last, day: .sunday), date: "2027-01-31"))
+        XCTAssertTrue(ProgressPhotoCadencePreview.matchesDayRule(photos(1, .month, .last, day: .sunday), date: "2027-02-28"))
+        XCTAssertTrue(ProgressPhotoCadencePreview.matchesDayRule(photos(1, .month, .last, day: .tuesday), date: "2028-02-29"))
+        XCTAssertTrue(ProgressPhotoCadencePreview.matchesDayRule(photos(1, .month, .fourth, day: .tuesday), date: "2028-02-22"))
+        XCTAssertFalse(ProgressPhotoCadencePreview.matchesDayRule(photos(1, .month, .last, day: .saturday), date: "2026-10-24"))
+        XCTAssertFalse(ProgressPhotoCadencePreview.matchesDayRule(photos(1, .month, .first, day: .saturday), date: "2026-10-10"))
+        XCTAssertTrue(ProgressPhotoCadencePreview.matchesDayRule(photos(3, .week, day: .saturday), date: "2026-10-10"))
     }
 }
