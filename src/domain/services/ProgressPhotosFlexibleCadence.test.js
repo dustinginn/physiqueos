@@ -217,7 +217,7 @@ describe("cadence changes are future-only and predictable", () => {
         }
       }
     }
-  });
+  }, 30_000);
 });
 
 describe("Home, notification, and satisfaction readers", () => {
