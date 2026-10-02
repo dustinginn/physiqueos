@@ -1,9 +1,9 @@
 # Apple Watch Workout V1 Phase 1A — checkpoint 2
 
-Generated: 2026-10-02T07:38:00Z  
-Implementation branch: `codex/apple-watch-workout-v1-phase1a-overnight`  
-Implementation authority: `1b8838a4caee79daf0f77ad479d449ec7ef9a77a`  
-Shipping Native reconciled: Build 81, `6a0932517cbd8de165bf25c7637a2d2d6fea03dc`  
+Generated: 2026-10-02T07:38:00Z
+Implementation branch: `codex/apple-watch-workout-v1-phase1a-overnight`
+Implementation authority: `1b8838a40613fead6d5f8d62f1d9831cb977f83f`
+Shipping Native reconciled: Build 81, `6a0932517cbd8de165bf25c7637a2d2d6fea03dc`
 Production Server unchanged: `4ffde0f5faf1832decfbc09d822088aeba0dca89`, deployment `faaf66bd-930f-46a2-9b8e-77e604c23a86`
 
 ## Outcome

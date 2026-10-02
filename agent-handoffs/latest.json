@@ -1,23 +1,24 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T07:38:00Z",
+  "generated_at_utc": "2026-10-02T07:40:00Z",
   "task": {
     "id": "apple-watch-workout-v1-phase1a-overnight",
     "title": "Apple Watch Workout V1 Phase 1A",
     "agent": "codex",
-    "status": "checkpoint2_complete_final_release_gates_open"
+    "status": "source_test_complete_blocked_on_signing_and_physical_acceptance"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "implementation_branch": "codex/apple-watch-workout-v1-phase1a-overnight",
-    "implementation_sha": "1b8838a4caee79daf0f77ad479d449ec7ef9a77a",
+    "implementation_sha": "1b8838a40613fead6d5f8d62f1d9831cb977f83f",
     "shipping_native_sha": "6a0932517cbd8de165bf25c7637a2d2d6fea03dc",
     "shipping_native_build": 81,
+    "next_native_build": 82,
     "production_server_sha": "4ffde0f5faf1832decfbc09d822088aeba0dca89",
     "production_deployment": "faaf66bd-930f-46a2-9b8e-77e604c23a86"
   },
   "result": {
-    "summary": "Phase 1A checkpoint 2 completes Watch-owned HealthKit lifecycle, mirroring/recovery, phone-authoritative pause parity, the two-leg recoverable Finish saga, summary, haptics and actual state renders on top of reconciled Build 81. Unsigned Release packaging passes; signing stops safely because Xcode lacks an authenticated Developer account and the wildcard profile lacks Watch HealthKit.",
+    "summary": "Phase 1A source/simulator work is complete: generator-owned paired Watch app, phone-authoritative versioned transport, split Load/Reps execution UI, Watch-owned HealthKit lifecycle, recovery, two-leg Finish saga, Live Activity parity, performed-only early-finish proof, Build 81 reconciliation and actual state renders. Unsigned Release packaging passes. No upload: signing requires Founder Apple account authentication and a HealthKit-capable Watch profile, followed by physical acceptance.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -25,21 +26,25 @@
   },
   "validation": {
     "native_full": "1918 passed, 1 skipped, 1 known Build 81 baseline date-fixture failure; 0 new",
+    "native_final_focused": "72 passed, 0 failed",
     "watch_reducers": "2 passed, 0 failed",
     "server_training": "156 passed, 0 failed",
     "server_command_ports": "53 passed, 0 failed",
     "server_healthkit_focused": "116 passed, 0 failed",
     "server_healthkit_broad": "717 passed, 6 known stale audit-sentinel failures",
-    "unsigned_release_packaging": "passed"
+    "paired_simulator": "passed",
+    "unsigned_release_packaging": "passed",
+    "signed_release": "blocked: no authenticated Xcode Developer account; wildcard profile lacks Watch HealthKit"
   },
+  "release_decision": "do_not_upload",
   "open_gates": [
-    "Apple Developer account authentication and HealthKit-capable Watch provisioning profile",
-    "signed archive and entitlement/companion inspection",
+    "Apple Developer account authentication and explicit HealthKit-capable Watch provisioning profile",
+    "Build 82 version parity and signed archive entitlement/companion inspection",
     "paired physical Watch Health authorization and real-workout acceptance",
-    "physical disconnect/relaunch, recovery, correlation and battery proof",
-    "independent post-device release review before trust allowlist or TestFlight"
+    "physical disconnect/relaunch, recovery, exact-correlation and battery proof",
+    "independent post-device review before production trust allowlist or TestFlight"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T073800Z-apple-watch-workout-v1-phase1a-checkpoint2.md",
+  "full_report_path": "agent-handoffs/reports/20261002T074000Z-apple-watch-workout-v1-phase1a-final.md",
   "parent_report_path": "agent-handoffs/inbox/prompts/20261002T064500Z-apple-watch-workout-v1-phase1a-overnight.md",
   "safety": {
     "contains_secrets": false,

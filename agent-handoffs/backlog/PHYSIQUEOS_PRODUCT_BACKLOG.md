@@ -133,7 +133,7 @@ Trigger:
 - Founder begins planning actual beta onboarding, or DO cost/performance symptoms recur.
 
 7. Apple Watch companion
-Status: PHASE 1A SOURCE/TEST CANDIDATE COMPLETE on `codex/apple-watch-workout-v1-phase1a-overnight` at `1b8838a4caee79daf0f77ad479d449ec7ef9a77a`; not a signed release candidate and never uploaded.
+Status: PHASE 1A SOURCE/TEST CANDIDATE COMPLETE on `codex/apple-watch-workout-v1-phase1a-overnight` at `1b8838a40613fead6d5f8d62f1d9831cb977f83f`; not a signed release candidate and never uploaded. Final report: `agent-handoffs/reports/20261002T074000Z-apple-watch-workout-v1-phase1a-final.md`.
 Locked V1:
 - phone is the sole structured `TrainingSessionAuthority` and planning surface; Watch starts one phone-prepared Ready-for-Watch plan only while the paired phone is reachable;
 - after start, a disconnected Watch HealthKit workout may continue, but every structured mutation fails closed until phone authority returns;
