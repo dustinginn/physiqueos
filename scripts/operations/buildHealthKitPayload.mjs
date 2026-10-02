@@ -31,6 +31,9 @@
 //     [--effective <D0 YYYY-MM-DD>] [--sleep-mode validation_only|operational] [--time-zone America/Los_Angeles] \
 //     [--families oura] [--historical-days 30] --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
 //   node scripts/operations/buildHealthKitPayload.mjs --kind sleep-audit --sha <40-hex> --audit-kind dormancy|historical-shape --out <file>
+//   node scripts/operations/buildHealthKitPayload.mjs --kind sleep-canon-v3 --sha <40-hex> --effective <D0 YYYY-MM-DD> \
+//     [--max-days 7] --mode dry-run|apply [--authorization-ref <text>] [--expected <json file>] --out <file>
+//   (sleep-canon-v3) bounded prospective-only activation of sleep-canon-v3 for ORDINARY Sleep days >= D0.
 //   node scripts/operations/buildHealthKitPayload.mjs --kind deferred-workout-reconcile --sha <40-hex> \
 //     --observation-id <exact stored HealthKit observation id> --mode dry-run|apply \
 //     [--authorization-ref <text>] [--expected <json file>] --out <file>
@@ -53,6 +56,7 @@ export async function buildHealthKitPayload({
   expectedCurrentFamilies = "", expectedCurrentPolicyDigest = "", acknowledgeNarrowing = false,
   observationId = "",
   sleepMode = "validation_only", timeZone = "America/Los_Angeles", historicalDays = 30, auditKind = "dormancy",
+  maxDays = 7,
 } = {}) {
   if (!/^[0-9a-f]{40}$/.test(String(sha ?? ""))) throw new Error("--sha must be the 40-hex production commit the payload is authorized for.");
   const suffix = randomBytes(4).toString("hex");
@@ -220,6 +224,31 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
+  if (kind === "sleep-canon-v3") {
+    if (!DATE.test(effective)) throw new Error("--effective must be the YYYY-MM-DD prospective Sleep D0.");
+    if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
+    const days = Number(maxDays);
+    if (!Number.isInteger(days) || days < 1 || days > 31) throw new Error("--max-days must be an integer from 1 through 31.");
+    if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
+      throw new Error("apply mode requires --authorization-ref and --expected.");
+    }
+    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_SLEEP_CANON_V3_${mode === "apply" ? "APPLY" : "DRYRUN"}_SUCCESS_${suffix}`;
+    const result = await build({
+      entryPoints: [path.join(root, "scripts/operations/healthKitSleepOperation.entry.mjs")],
+      bundle: true, write: false, format: "esm", platform: "node", target: "node22", legalComments: "none", minify: true,
+      external: ["pg"],
+      define: {
+        __EXPECTED_GIT_SHA__: JSON.stringify(sha), __OPERATION__: JSON.stringify("canon-v3"),
+        __MODE__: JSON.stringify(mode), __ACTION__: JSON.stringify(""),
+        __AUDIT_KIND__: JSON.stringify("dormancy"), __EFFECTIVE__: JSON.stringify(String(effective)),
+        __TIME_ZONE__: JSON.stringify(timeZone), __SLEEP_MODE__: JSON.stringify(sleepMode),
+        __FAMILIES__: JSON.stringify("oura"), __HISTORICAL_DAYS__: JSON.stringify(30), __MAX_DAYS__: JSON.stringify(days),
+        __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference ?? "")), __EXPECTED_JSON__: JSON.stringify(String(expected ?? "")),
+        __MARKER__: JSON.stringify(successMarker),
+      },
+    });
+    return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
+  }
   if (kind === "sleep-policy" || kind === "sleep-audit") {
     // Guarded Sleep policy runner and zero-write Sleep audit (healthKitSleepOperation.entry.mjs).
     const operation = kind === "sleep-policy" ? "policy" : "audit";
@@ -269,7 +298,7 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
-  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, deferred-workout-reconcile, training-audit, sleep-policy, or sleep-audit.");
+  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, deferred-workout-reconcile, training-audit, sleep-policy, sleep-audit, or sleep-canon-v3.");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -289,6 +318,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     acknowledgeNarrowing: Boolean(args["acknowledge-narrowing"]), observationId: args["observation-id"] ?? "",
     sleepMode: args["sleep-mode"] ?? "validation_only", timeZone: args["time-zone"] ?? "America/Los_Angeles",
     historicalDays: args["historical-days"] ?? 30, auditKind: args["audit-kind"] ?? "dormancy",
+    maxDays: args["max-days"] ?? 7,
   });
   if (!args.out) throw new Error("--out is required.");
   fs.writeFileSync(args.out, code, { mode: 0o600 });

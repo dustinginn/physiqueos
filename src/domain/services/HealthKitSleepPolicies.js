@@ -185,3 +185,52 @@ export function sleepSourcePreferenceRank(preference, lane) {
     : entry.bundleIdentifier.toLowerCase() === String(lane.bundleIdentifier).toLowerCase());
   return index === -1 ? null : index;
 }
+
+// ---------------------------------------------------------------------------
+// Canonical algorithm for ORDINARY (prospective) Sleep days.
+//
+// Absent, disabled, or invalid -> sleep-canon-v2 everywhere (fail closed to
+// the established algorithm). Enabled -> sleep-canon-v3 for ordinary days on
+// or after effectiveSleepDay only. Historical Sleep never reads this record:
+// it is pinned to sleep-canon-v2 permanently. Written only by the guarded
+// Sleep policy runner (activate-canon-v3-prospective), together with the
+// bounded recomputation of the existing prospective days.
+export const HEALTHKIT_SLEEP_CANONICAL_ALGORITHM_POLICY_RECORD_ID = "healthkit_sleep_canonical_algorithm_policy";
+export const HEALTHKIT_SLEEP_CANONICAL_ALGORITHM_POLICY_SCHEMA_VERSION = "healthkit-sleep-canonical-algorithm-policy-v1";
+export const HEALTHKIT_SLEEP_DEFAULT_CANONICAL_ALGORITHM = "sleep-canon-v2";
+const ACTIVATABLE_CANONICAL_ALGORITHMS = Object.freeze(["sleep-canon-v3"]);
+
+export function resolveHealthKitSleepCanonicalAlgorithmPolicy(record) {
+  const fallback = (source, invalidReason = null) => Object.freeze({
+    enabled: false,
+    algorithmVersion: HEALTHKIT_SLEEP_DEFAULT_CANONICAL_ALGORITHM,
+    effectiveSleepDay: null,
+    source,
+    invalidReason,
+  });
+  if (!record) return fallback("not_configured");
+  if (record.status !== "enabled") return fallback("server_owned_configuration", "status_not_enabled");
+  if (record.schemaVersion !== HEALTHKIT_SLEEP_CANONICAL_ALGORITHM_POLICY_SCHEMA_VERSION) {
+    return fallback("invalid_configuration_fail_closed", "schema_version_unrecognized");
+  }
+  if (!ACTIVATABLE_CANONICAL_ALGORITHMS.includes(record.algorithmVersion)) {
+    return fallback("invalid_configuration_fail_closed", "algorithm_version_invalid");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(record.effectiveSleepDay ?? "")) || record.scope !== "ordinary_prospective_only") {
+    return fallback("invalid_configuration_fail_closed", "scope_invalid");
+  }
+  return Object.freeze({
+    enabled: true,
+    algorithmVersion: record.algorithmVersion,
+    effectiveSleepDay: record.effectiveSleepDay,
+    source: "server_owned_configuration",
+    invalidReason: null,
+  });
+}
+
+/** The algorithm an ordinary sleep day is computed with. */
+export function healthKitSleepAlgorithmForDay(resolvedPolicy, sleepDay) {
+  return resolvedPolicy?.enabled && sleepDay >= resolvedPolicy.effectiveSleepDay
+    ? resolvedPolicy.algorithmVersion
+    : HEALTHKIT_SLEEP_DEFAULT_CANONICAL_ALGORITHM;
+}

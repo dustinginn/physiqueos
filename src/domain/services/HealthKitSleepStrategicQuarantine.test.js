@@ -50,6 +50,8 @@ const SLEEP_ALLOWED = new Set([
   "platform/database/PostgresHealthKitSleepEvidenceReadStore.js",
   "platform/operations/HealthKitSleepPolicyRunner.js",
   "platform/operations/HealthKitSleepAudit.js",
+  // Bounded prospective-only sleep-canon-v3 activation (guarded operation).
+  "platform/operations/HealthKitSleepCanonV3Activation.js",
 ]);
 const STRATEGIC_DIRECTORIES = ["domain/intelligence", "app/briefings", "app/confidence", "application/core", "application/progress", "application/read-models"];
 

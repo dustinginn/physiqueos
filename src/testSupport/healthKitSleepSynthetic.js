@@ -47,12 +47,12 @@ export function wire({
 }
 
 /** Stored sample record (as the port would persist it). */
-export function stored(options = {}, { purpose = "operational", receivedAt = "2026-09-30T12:00:00.000Z" } = {}) {
+export function stored(options = {}, { purpose = "operational", receivedAt = "2026-09-30T12:00:00.000Z", batchId = "batch-synthetic" } = {}) {
   return createHealthKitSleepSampleRecord({
     ownerUserId: OWNER,
     sample: normalizeSleepSample(wire(options)),
     receivedAt,
-    batchId: "batch-synthetic",
+    batchId,
     deliveryDeviceId: "device-synthetic",
     ingestionPurpose: purpose,
   });

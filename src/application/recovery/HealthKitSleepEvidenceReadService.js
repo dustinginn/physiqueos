@@ -4,6 +4,9 @@ const MAX_RANGE_DAYS = 3660;
 const MAX_PAGE = 100;
 const MINUTES_PER_DAY = 1_440;
 const NIGHT_CLOCK_ANCHOR_MINUTE = 18 * 60;
+// Algorithms whose stage, awake and continuity values are trustworthy.
+// sleep-canon-v1 is not (duplicate copies could double count).
+const STAGE_CAPABLE_ALGORITHMS = new Set(["sleep-canon-v2", "sleep-canon-v3"]);
 
 export function createHealthKitSleepEvidenceReadService({ store, now = () => new Date() } = {}) {
   if (typeof store?.listDays !== "function") throw new Error("Sleep Evidence requires an owner-scoped day store.");
@@ -57,9 +60,9 @@ export function projectNight(row) {
     sleepDay: row.sleepDay, status: row.status, mainSleep: row.mainSleep,
     sleepWindow: main ? Object.freeze({ start: main.start, end: main.end, timeZone: main.timeZone }) : null,
     timeline: Object.freeze(timeline.map((segment) => Object.freeze({ stage: segment.stage, start: segment.start, end: segment.end }))),
-    stageStatus: row.algorithmVersion === "sleep-canon-v2" && main?.completeness?.stageDetail === "staged" ? "available" : "unavailable",
-    stages: row.algorithmVersion === "sleep-canon-v2" ? stageValues(row.mainSleep) : null,
-    continuity: row.algorithmVersion === "sleep-canon-v2" ? continuity(timeline, row.mainSleep) : null,
+    stageStatus: STAGE_CAPABLE_ALGORITHMS.has(row.algorithmVersion) && main?.completeness?.stageDetail === "staged" ? "available" : "unavailable",
+    stages: STAGE_CAPABLE_ALGORITHMS.has(row.algorithmVersion) ? stageValues(row.mainSleep) : null,
+    continuity: STAGE_CAPABLE_ALGORITHMS.has(row.algorithmVersion) ? continuity(timeline, row.mainSleep) : null,
     timeInBedSeconds: row.mainSleep?.inBedSeconds ?? null,
     secondarySleep: Object.freeze((row.episodes ?? []).filter((episode) => episode.kind === "secondary").map(projectSecondary)),
     totalAsleepIncludingSecondarySeconds: row.totalAsleepIncludingSecondarySeconds ?? null,

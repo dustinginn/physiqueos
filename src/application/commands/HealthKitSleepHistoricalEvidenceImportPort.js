@@ -27,6 +27,8 @@ export function createHealthKitSleepHistoricalEvidenceImportPort({ records, now 
     sampleCollection: HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_SAMPLE_COLLECTION,
     dayCollection: HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_DAY_COLLECTION,
     immutableIngestionPurpose: authorization.ingestionPurpose,
+    // Historical Sleep is permanently sleep-canon-v2.
+    pinnedAlgorithmVersion: "sleep-canon-v2",
     activationPolicy: Object.freeze({
       enabled: true,
       mode: authorization.ingestionPurpose,

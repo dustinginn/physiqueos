@@ -17,13 +17,18 @@ import {
 } from "../../domain/services/HealthKitSleepContract.js";
 import {
   HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID,
+  HEALTHKIT_SLEEP_CANONICAL_ALGORITHM_POLICY_RECORD_ID,
   HEALTHKIT_SLEEP_SOURCE_PREFERENCE_POLICY_RECORD_ID,
   assessHealthKitSleepSampleActivation,
+  healthKitSleepAlgorithmForDay,
   resolveHealthKitSleepActivationPolicy,
+  resolveHealthKitSleepCanonicalAlgorithmPolicy,
   resolveHealthKitSleepSourcePreferencePolicy,
 } from "../../domain/services/HealthKitSleepPolicies.js";
 import {
-  canonicalizeHealthKitSleep,
+  HEALTHKIT_SLEEP_CANON_V2_ALGORITHM_VERSION,
+  HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION,
+  canonicalizeHealthKitSleepWithAlgorithm,
   emptyHealthKitSleepDay,
 } from "../../domain/services/HealthKitSleepCanonicalizer.js";
 import { assertNotQuarantinedHealthKitEvidence } from "../../domain/services/HealthKitEvidenceEligibilityPolicy.js";
@@ -48,6 +53,9 @@ export function createHealthKitSleepIngestPort({
   dayCollection = HEALTHKIT_SLEEP_DAY_COLLECTION,
   activationPolicy = null,
   immutableIngestionPurpose = null,
+  // Historical import pins sleep-canon-v2 permanently. The ordinary port reads
+  // the Server-owned canonical-algorithm policy (absent -> v2).
+  pinnedAlgorithmVersion = null,
 } = {}) {
   return async function ingestHealthKitSleep(context) {
     if (typeof records?.putIfAbsent !== "function" || typeof records?.listByOccurrenceDateRange !== "function") {
@@ -80,6 +88,13 @@ export function createHealthKitSleepIngestPort({
     const preference = resolveHealthKitSleepSourcePreferencePolicy(await records.get({
       ownerUserId, collection: HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION, recordId: HEALTHKIT_SLEEP_SOURCE_PREFERENCE_POLICY_RECORD_ID,
     }));
+    const pinned = pinnedAlgorithmVersion ??
+      (immutableIngestionPurpose === "historical_evidence_import" ? HEALTHKIT_SLEEP_CANON_V2_ALGORITHM_VERSION : null);
+    const algorithmPolicy = pinned ? null : resolveHealthKitSleepCanonicalAlgorithmPolicy(await records.get({
+      ownerUserId, collection: HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION, recordId: HEALTHKIT_SLEEP_CANONICAL_ALGORITHM_POLICY_RECORD_ID,
+    }));
+    const algorithmFor = (sleepDay) => pinned ?? healthKitSleepAlgorithmForDay(algorithmPolicy, sleepDay);
+    const v3Active = !pinned && algorithmPolicy?.enabled === true;
     const receivedAt = now().toISOString();
     const deliveryDeviceId = context.principal?.deviceId ?? null;
     const touchedDays = new Set();
@@ -256,27 +271,12 @@ export function createHealthKitSleepIngestPort({
       for (const sleepDay of [...affected].sort()) {
         const recordId = getHealthKitSleepDayRecordId(sleepDay);
         const existing = await records.get({ ownerUserId, collection: dayCollection, recordId });
-        const content = pass.computed.get(sleepDay) ?? (existing ? emptyHealthKitSleepDay(sleepDay, { preference }) : null);
+        const content = pass.computed.get(sleepDay) ??
+          (existing ? emptyHealthKitSleepDay(sleepDay, { preference, algorithmVersion: algorithmFor(sleepDay) }) : null);
         if (!content) continue;
         if (existing?.inputDigest === content.inputDigest) continue;
-        const payload = assertQuarantined({
-          ...content,
-          id: recordId,
-          userId: ownerUserId,
-          occurrenceDate: sleepDay,
-          observedAt: content.windowClosesAt ?? existing?.observedAt ?? null,
-          revision: Number(existing?.revision ?? 0) + 1,
-          computedAt: receivedAt,
-          origin: immutableIngestionPurpose ?? content.ingestionPurpose,
-          ingestionPurpose: immutableIngestionPurpose ?? content.ingestionPurpose,
-          strategicEligible: false,
-          evidenceEligibility: {
-            state: "quarantined", strategic: false,
-            permanent: immutableIngestionPurpose === "historical_evidence_import",
-            decidedBy: immutableIngestionPurpose === "historical_evidence_import"
-              ? "healthkit-sleep-historical-evidence-permanent-quarantine-v1"
-              : "healthkit-strategic-evidence-quarantine-v1",
-          },
+        const payload = buildHealthKitSleepDayPayload({
+          content, existing, ownerUserId, sleepDay, computedAt: receivedAt, immutableIngestionPurpose,
         });
         await records.put({
           ownerUserId, collection: dayCollection, recordId, payload,
@@ -303,7 +303,20 @@ export function createHealthKitSleepIngestPort({
         });
         const inRun = new Set(run);
         const relevantIds = new Set(changedSampleIds);
-        for (const [sleepDay, content] of canonicalizeHealthKitSleep({ samples, preference })) {
+        // Each day is computed with its own algorithm (v2 unless the ordinary
+        // canonical-algorithm policy selects v3 for that day). Without that
+        // policy only v2 runs, exactly as before.
+        const byAlgorithm = new Map([[HEALTHKIT_SLEEP_CANON_V2_ALGORITHM_VERSION,
+          canonicalizeHealthKitSleepWithAlgorithm(pinned ?? HEALTHKIT_SLEEP_CANON_V2_ALGORITHM_VERSION, { samples, preference })]]);
+        if (v3Active) {
+          byAlgorithm.set(HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION,
+            canonicalizeHealthKitSleepWithAlgorithm(HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION, { samples, preference }));
+        }
+        const dayKeys = [...new Set([...byAlgorithm.values()].flatMap((days) => [...days.keys()]))].sort();
+        const perDay = dayKeys
+          .map((sleepDay) => [sleepDay, byAlgorithm.get(pinned ? HEALTHKIT_SLEEP_CANON_V2_ALGORITHM_VERSION : algorithmFor(sleepDay))?.get(sleepDay)])
+          .filter(([, content]) => content);
+        for (const [sleepDay, content] of perDay) {
           const buckets = content.inputSampleDays;
           if (!affected.has(sleepDay) && !buckets.some((bucket) => affected.has(bucket)) &&
             !content.inputSampleIds.some((id) => changedSampleIds.has(id))) continue;
@@ -330,6 +343,31 @@ export function createHealthKitSleepIngestPort({
       return { computed, expansion };
     }
   };
+}
+
+/// The stored canonical day: content + identity + provenance + quarantine.
+/// Shared by ingestion and the guarded prospective recanonicalization so
+/// both write exactly the same shape.
+export function buildHealthKitSleepDayPayload({ content, existing, ownerUserId, sleepDay, computedAt, immutableIngestionPurpose = null }) {
+  return assertQuarantined({
+    ...content,
+    id: getHealthKitSleepDayRecordId(sleepDay),
+    userId: ownerUserId,
+    occurrenceDate: sleepDay,
+    observedAt: content.windowClosesAt ?? existing?.observedAt ?? null,
+    revision: Number(existing?.revision ?? 0) + 1,
+    computedAt,
+    origin: immutableIngestionPurpose ?? content.ingestionPurpose,
+    ingestionPurpose: immutableIngestionPurpose ?? content.ingestionPurpose,
+    strategicEligible: false,
+    evidenceEligibility: {
+      state: "quarantined", strategic: false,
+      permanent: immutableIngestionPurpose === "historical_evidence_import",
+      decidedBy: immutableIngestionPurpose === "historical_evidence_import"
+        ? "healthkit-sleep-historical-evidence-permanent-quarantine-v1"
+        : "healthkit-strategic-evidence-quarantine-v1",
+    },
+  });
 }
 
 // The sleep day record must be recognised as HealthKit-derived and quarantined;

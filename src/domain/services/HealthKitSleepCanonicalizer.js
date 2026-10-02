@@ -47,9 +47,29 @@ import { sleepSourcePreferenceRank } from "./HealthKitSleepPolicies.js";
 //   7. Main episode = greatest asleep duration; all others are secondary and
 //      preserved. No UI labels (nap / additional sleep) are decided here.
 //   8. No sleep efficiency, awakening count, or score.
+//
+// sleep-canon-v3 changes ONLY step 4 (within-lane copy selection); every
+// other step is shared code and identical to v2. v2 is retained unchanged
+// (historical Sleep stays sleep-canon-v2 permanently).
+//   4'. A selected copy must be ONE coherent source copy, never a
+//       boundary-by-boundary splice of different revisions. Topology alone
+//       cannot tell two revisions apart where they share a boundary instant
+//       (both continuations are equally valid), so v3 builds copy chains
+//       with ingestion provenance as a hard constraint: two ingestion
+//       generations (batches) whose samples overlap each other are provably
+//       different HealthKit objects covering the same time, i.e. different
+//       copies, and a chain never mixes them. Within one generation, chains
+//       follow topology: exact end-to-start continuation, then the latest
+//       compatible end, then a stable order. Non-conflicting generations
+//       (one copy uploaded in several batches) still join one chain.
+//       Candidates are ranked exactly like v2, then by the most recently
+//       received copy. Same-generation shared-boundary continuations that
+//       topology cannot disambiguate are counted, never hidden.
 
 export const HEALTHKIT_SLEEP_CANON_V1_ALGORITHM_VERSION = "sleep-canon-v1";
 export const HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION = "sleep-canon-v2";
+export const HEALTHKIT_SLEEP_CANON_V2_ALGORITHM_VERSION = HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION;
+export const HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION = "sleep-canon-v3";
 export const HEALTHKIT_SLEEP_DAY_SCHEMA_VERSION = "healthkit-sleep-day-v1";
 
 // Versioned technical parameters. Changing any of them is a new algorithm
@@ -74,12 +94,29 @@ export const SLEEP_CANON_V2_PARAMETERS = Object.freeze({
   }),
 });
 
+export const SLEEP_CANON_V3_PARAMETERS = Object.freeze({
+  ...SLEEP_CANON_V1_PARAMETERS,
+  withinLaneCopyResolution: Object.freeze({
+    conflictStages: Object.freeze(["awake", "asleep_core", "asleep_deep", "asleep_rem"]),
+    unspecifiedMayEnvelopeSpecificStages: true,
+    copyCoherence: "coherent_chains_never_mix_overlapping_ingestion_generations",
+    chainContinuationOrder: Object.freeze([
+      "same_generation", "exact_continuation", "latest_compatible_end", "stable_chain_order",
+    ]),
+    selectionOrder: Object.freeze([
+      "usable", "asleep_coverage", "staged_coverage", "resolved_coverage", "sample_count",
+      "latest_received", "stable_content",
+    ]),
+  }),
+});
+
 const GAP_MS = SLEEP_CANON_V1_PARAMETERS.episodeGapMinutes * 60 * 1000;
 const ASLEEP = new Set(HEALTHKIT_SLEEP_ASLEEP_STAGES);
 const SPECIFIC = new Set(HEALTHKIT_SLEEP_SPECIFIC_STAGES);
 const PRECEDENCE = new Map(SLEEP_CANON_V1_PARAMETERS.lanePrecedence.map((stage, index) => [stage, index]));
 const V1_PARAMETERS_DIGEST = `sha256_${digest(stable(SLEEP_CANON_V1_PARAMETERS))}`;
 const PARAMETERS_DIGEST = `sha256_${digest(stable(SLEEP_CANON_V2_PARAMETERS))}`;
+const V3_PARAMETERS_DIGEST = `sha256_${digest(stable(SLEEP_CANON_V3_PARAMETERS))}`;
 
 export const HealthKitSleepPrimaryReason = Object.freeze({
   ONLY_CANDIDATE: "only_candidate",
@@ -108,6 +145,30 @@ export function canonicalizeHealthKitSleep({ samples = [], preference = null } =
   });
 }
 
+/**
+ * sleep-canon-v3: identical to v2 except that within-lane duplicate-copy
+ * selection keeps one coherent source copy (see 4' above). Used only for
+ * ordinary prospective days once explicitly activated; never for historical
+ * Sleep, which stays sleep-canon-v2.
+ */
+export function canonicalizeHealthKitSleepV3({ samples = [], preference = null } = {}) {
+  return canonicalize({
+    samples,
+    preference,
+    algorithmVersion: HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION,
+    parametersDigest: V3_PARAMETERS_DIGEST,
+    resolveDuplicateCopies: true,
+    coherentCopies: true,
+  });
+}
+
+/** Dispatch by algorithm version; anything but v3 is the unchanged v2. */
+export function canonicalizeHealthKitSleepWithAlgorithm(algorithmVersion, input = {}) {
+  return algorithmVersion === HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION
+    ? canonicalizeHealthKitSleepV3(input)
+    : canonicalizeHealthKitSleep(input);
+}
+
 // Retained for immutable historical comparison/audit only. Production
 // recomputation always calls canonicalizeHealthKitSleep (v2).
 export function canonicalizeHealthKitSleepV1({ samples = [], preference = null } = {}) {
@@ -120,7 +181,7 @@ export function canonicalizeHealthKitSleepV1({ samples = [], preference = null }
   });
 }
 
-function canonicalize({ samples, preference, algorithmVersion, parametersDigest, resolveDuplicateCopies }) {
+function canonicalize({ samples, preference, algorithmVersion, parametersDigest, resolveDuplicateCopies, coherentCopies = false }) {
   const live = samples
     .filter((sample) => sample && !sample.tombstone && sample.lifecycle?.state === HealthKitSleepLifecycle.LIVE)
     .filter((sample) => sample.stage && sample.stage !== HealthKitSleepStage.UNKNOWN)
@@ -133,7 +194,7 @@ function canonicalize({ samples, preference, algorithmVersion, parametersDigest,
   const groups = cluster(activity).filter((group) => group.some((sample) => ASLEEP.has(sample.stage)));
   const inBedByGroup = assignInBed(groups, inBed);
   const episodes = groups
-    .map((group, index) => buildAsleepEpisode(group, inBedByGroup[index], preference, { resolveDuplicateCopies }))
+    .map((group, index) => buildAsleepEpisode(group, inBedByGroup[index], preference, { resolveDuplicateCopies, coherentCopies }))
     .filter(Boolean);
 
   // An in-bed sample assigned to an asleep group is an input of that episode
@@ -158,10 +219,11 @@ function canonicalize({ samples, preference, algorithmVersion, parametersDigest,
 }
 
 /** Canonical content of a sleep day that has no episodes left (all deleted). */
-export function emptyHealthKitSleepDay(sleepDay, { preference = null } = {}) {
+export function emptyHealthKitSleepDay(sleepDay, { preference = null, algorithmVersion = HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION } = {}) {
+  const v3 = algorithmVersion === HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION;
   return buildDay(sleepDay, [], preference, {
-    algorithmVersion: HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION,
-    parametersDigest: PARAMETERS_DIGEST,
+    algorithmVersion: v3 ? HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION : HEALTHKIT_SLEEP_CANON_ALGORITHM_VERSION,
+    parametersDigest: v3 ? V3_PARAMETERS_DIGEST : PARAMETERS_DIGEST,
   });
 }
 
@@ -184,6 +246,9 @@ function toInterval(sample) {
     contentFingerprint: sample.contentFingerprint,
     ingestionPurpose: sample.ingestionPurpose ?? HealthKitSleepIngestionPurpose.OPERATIONAL,
     laneKey: `${sourceClass}\u0000${bundleIdentifier.toLowerCase()}`,
+    // Ingestion provenance (v3 copy coherence only; v1/v2 never read it).
+    generation: sample.ingestion?.batchId ?? null,
+    receivedAtMs: Date.parse(sample.ingestion?.firstReceivedAt ?? "") || 0,
     lane: { sourceClass, sourceFamily: sample.source?.sourceFamily ?? null, bundleIdentifier },
   };
 }
@@ -319,7 +384,7 @@ function tierOf({ usable, manual }) {
   return 3;
 }
 
-function buildAsleepEpisode(group, assignedInBed, preference, { resolveDuplicateCopies }) {
+function buildAsleepEpisode(group, assignedInBed, preference, { resolveDuplicateCopies, coherentCopies = false }) {
   const asleepAll = group.filter((sample) => ASLEEP.has(sample.stage));
   const episodeAsleepMs = unionMs(asleepAll);
   const candidates = groupLanes(group)
@@ -345,9 +410,11 @@ function buildAsleepEpisode(group, assignedInBed, preference, { resolveDuplicate
   const { ordered, reason } = rankLanes(candidates);
   const primary = ordered[0];
 
-  const copyResolution = resolveDuplicateCopies
-    ? selectAuthoritativeLaneCopy(primary.intervals)
-    : { selected: primary.intervals, corroborating: [], candidateCount: 1, applied: false };
+  const copyResolution = !resolveDuplicateCopies
+    ? { selected: primary.intervals, corroborating: [], candidateCount: 1, applied: false }
+    : coherentCopies
+      ? selectCoherentLaneCopy(primary.intervals)
+      : selectAuthoritativeLaneCopy(primary.intervals);
   const primaryActivity = copyResolution.selected;
   const primaryAsleep = primaryActivity.filter((sample) => ASLEEP.has(sample.stage));
   const extent = spanOf(primaryAsleep);
@@ -355,7 +422,7 @@ function buildAsleepEpisode(group, assignedInBed, preference, { resolveDuplicate
 
   const allLaneInBed = assignedInBed.filter((sample) => sample.laneKey === primary.key && near(sample, extent));
   const inBedResolution = resolveDuplicateCopies && copyResolution.applied
-    ? selectAuthoritativeInBedCopy(allLaneInBed, extent)
+    ? (coherentCopies ? selectCoherentInBedCopy(allLaneInBed, extent) : selectAuthoritativeInBedCopy(allLaneInBed, extent))
     : { selected: allLaneInBed, corroborating: [] };
   const laneInBed = inBedResolution.selected;
   const inBedUnion = unionMs(laneInBed);
@@ -406,7 +473,13 @@ function buildAsleepEpisode(group, assignedInBed, preference, { resolveDuplicate
             candidateCount: copyResolution.candidateCount,
             selectedSampleCount: primaryActivity.length + laneInBed.length,
             corroboratingSampleCount: sameLaneCorroboratingCount,
-            rule: "usable_then_asleep_then_staged_then_resolved_then_samples_then_stable_content",
+            rule: coherentCopies
+              ? "coherent_copy_then_usable_then_asleep_then_staged_then_resolved_then_samples_then_latest_received_then_stable_content"
+              : "usable_then_asleep_then_staged_then_resolved_then_samples_then_stable_content",
+            ...(coherentCopies ? {
+              selectedGenerationCount: copyResolution.selectedGenerationCount ?? 0,
+              ambiguousContinuationCount: copyResolution.ambiguousContinuationCount ?? 0,
+            } : {}),
           }),
         } : {}),
       }),
@@ -557,6 +630,191 @@ function compareCopies(left, right) {
     right.stagedCoverageMs - left.stagedCoverageMs ||
     right.resolvedCoverageMs - left.resolvedCoverageMs ||
     right.activity.length - left.activity.length ||
+    left.signature.localeCompare(right.signature) ||
+    left.idSignature.localeCompare(right.idSignature);
+}
+
+// ---------------------------------------------------------------------------
+// sleep-canon-v3 coherent copy selection.
+
+function selectCoherentLaneCopy(intervals) {
+  const exclusive = intervals.filter((sample) => SPECIFIC.has(sample.stage) || sample.stage === HealthKitSleepStage.AWAKE);
+  const unspecified = intervals.filter((sample) => sample.stage === HealthKitSleepStage.ASLEEP_UNSPECIFIED);
+  const basis = exclusive.length > 0 ? exclusive : unspecified;
+  // No two samples of the basis overlap: there is exactly one copy, and v3 is
+  // identical to v2 (everything is selected).
+  if (!hasOverlap(basis)) {
+    return { selected: intervals, corroborating: [], candidateCount: 1, applied: false, selectedGenerationCount: generationCount(basis), ambiguousContinuationCount: 0 };
+  }
+  const { chains, ambiguousContinuationCount } = buildCoherentChains(basis);
+  const allAsleepCoverage = unionMs(intervals.filter((sample) => ASLEEP.has(sample.stage)));
+  const candidates = chains.map((chain) => {
+    const activity = exclusive.length > 0 ? [...chain, ...unspecified] : chain;
+    const asleep = activity.filter((sample) => ASLEEP.has(sample.stage));
+    const extent = spanOf(asleep.length > 0 ? asleep : activity);
+    const resolved = resolveLaneTimeline(activity, extent);
+    const coverageMs = unionMs(asleep);
+    return {
+      chain,
+      activity,
+      coverageMs,
+      stagedCoverageMs: unionMs(activity.filter((sample) => SPECIFIC.has(sample.stage))),
+      resolvedCoverageMs: resolved.totals.asleep + resolved.totals.awake,
+      usable: coverageMs > 0 && coverageMs >= SLEEP_CANON_V1_PARAMETERS.minimumUsableCoverageRatio * allAsleepCoverage,
+      receivedAtMs: Math.max(0, ...chain.map((sample) => sample.receivedAtMs)),
+      signature: copySignature(activity),
+      idSignature: activity.map((sample) => String(sample.id)).sort().join("\u0000"),
+    };
+  }).filter((candidate) => candidate.coverageMs > 0).sort(compareCoherentCopies);
+  if (candidates.length === 0) {
+    return { selected: intervals, corroborating: [], candidateCount: 1, applied: false, selectedGenerationCount: generationCount(basis), ambiguousContinuationCount };
+  }
+  const selectedCandidate = candidates[0];
+  const selectedIds = new Set(selectedCandidate.activity.map((sample) => sample.id));
+  return {
+    selected: selectedCandidate.activity,
+    corroborating: intervals.filter((sample) => !selectedIds.has(sample.id)),
+    candidateCount: chains.length,
+    applied: true,
+    selectedGenerationCount: generationCount(selectedCandidate.chain),
+    ambiguousContinuationCount,
+  };
+}
+
+function selectCoherentInBedCopy(intervals, extent) {
+  if (intervals.length <= 1 || !hasOverlap(intervals)) return { selected: intervals, corroborating: [] };
+  const { chains } = buildCoherentChains(intervals);
+  const selectedCandidate = chains.map((chain) => ({
+    activity: chain,
+    coverageMs: unionMs(chain, extent),
+    stagedCoverageMs: 0,
+    resolvedCoverageMs: unionMs(chain),
+    usable: unionMs(chain, extent) > 0,
+    receivedAtMs: Math.max(0, ...chain.map((sample) => sample.receivedAtMs)),
+    signature: copySignature(chain),
+    idSignature: chain.map((sample) => String(sample.id)).sort().join("\u0000"),
+  })).sort(compareCoherentCopies)[0];
+  const selectedIds = new Set(selectedCandidate.activity.map((sample) => sample.id));
+  return {
+    selected: selectedCandidate.activity,
+    corroborating: intervals.filter((sample) => !selectedIds.has(sample.id)),
+  };
+}
+
+function hasOverlap(intervals) {
+  const sorted = [...intervals].sort(byStartThenId);
+  let maxEnd = -Infinity;
+  for (const interval of sorted) {
+    if (interval.start < maxEnd) return true;
+    maxEnd = Math.max(maxEnd, interval.end);
+  }
+  return false;
+}
+
+function generationKey(sample) {
+  return sample.generation === null || sample.generation === undefined ? "\u0000unknown" : `g:${sample.generation}`;
+}
+function generationCount(samples) {
+  return new Set(samples.map(generationKey)).size;
+}
+
+// A generation (ingestion batch) is a RELIABLE copy identity only when it is
+// known and internally non-overlapping, i.e. it carries at most one copy. Two
+// reliable generations conflict when any of their samples overlap: they are
+// different HealthKit objects covering the same time, i.e. different copies.
+// A batch that itself carries two copies (or unknown provenance) proves
+// nothing about identity, so it is separated by topology alone.
+function generationStructure(intervals) {
+  const conflicts = new Set();
+  const selfOverlapping = new Set();
+  const sorted = [...intervals].sort(byStartThenId);
+  for (let left = 0; left < sorted.length; left += 1) {
+    for (let right = left + 1; right < sorted.length && sorted[right].start < sorted[left].end; right += 1) {
+      if (!overlaps(sorted[left], sorted[right])) continue;
+      const a = generationKey(sorted[left]);
+      const b = generationKey(sorted[right]);
+      if (a === b) selfOverlapping.add(a);
+      else conflicts.add(a < b ? `${a}\u0001${b}` : `${b}\u0001${a}`);
+    }
+  }
+  const reliable = (generation) => generation !== "\u0000unknown" && !selfOverlapping.has(generation);
+  return {
+    reliable,
+    conflict: (a, b) => a !== b && reliable(a) && reliable(b) && conflicts.has(a < b ? `${a}\u0001${b}` : `${b}\u0001${a}`),
+  };
+}
+
+// Deterministic coherent chain construction. Samples are taken in
+// (start, end desc, stage, id) order; all samples that start at one instant
+// are matched together, globally best pair first, so input order can never
+// change the result. A sample may continue a chain only when it does not
+// overlap the chain and its generation conflicts with none of the chain's.
+function buildCoherentChains(intervals) {
+  const { reliable, conflict } = generationStructure(intervals);
+  const compatible = (generation, chain) => [...chain.generations].every((other) => !conflict(generation, other));
+  const sorted = [...intervals].sort(byCopyInterval);
+  const chains = [];
+  let ambiguousContinuationCount = 0;
+  for (let index = 0; index < sorted.length;) {
+    let next = index;
+    while (next < sorted.length && sorted[next].start === sorted[index].start) next += 1;
+    const pending = sorted.slice(index, next).map((sample, order) => ({ sample, order, generation: generationKey(sample) }));
+    const used = new Set();
+    for (;;) {
+      let best = null;
+      for (const item of pending) {
+        if (item.assigned) continue;
+        for (const chain of chains) {
+          if (used.has(chain.index) || chain.lastEnd > item.sample.start || !compatible(item.generation, chain)) continue;
+          const key = [
+            reliable(item.generation) && chain.generations.has(item.generation) ? 0 : 1,
+            chain.lastEnd === item.sample.start ? 0 : 1,
+            -chain.lastEnd,
+            chain.index,
+            item.order,
+          ];
+          if (best === null || compareKeys(key, best.key) < 0) best = { item, chain, key };
+        }
+      }
+      if (best === null) break;
+      // Count a same-generation continuation that topology alone could not
+      // single out: another eligible chain of the same generation ends at
+      // exactly the same instant.
+      // (best.key[0] === 1 means no reliable same-generation evidence chose it.)
+      const ties = chains.filter((chain) => chain !== best.chain && !used.has(chain.index) &&
+        chain.lastEnd === best.chain.lastEnd && best.key[1] === 0 && best.key[0] === 1 &&
+        compatible(best.item.generation, chain));
+      if (ties.length > 0) ambiguousContinuationCount += 1;
+      best.chain.samples.push(best.item.sample);
+      best.chain.lastEnd = best.item.sample.end;
+      best.chain.generations.add(best.item.generation);
+      best.item.assigned = true;
+      used.add(best.chain.index);
+    }
+    for (const item of pending) {
+      if (item.assigned) continue;
+      chains.push({ index: chains.length, samples: [item.sample], lastEnd: item.sample.end, generations: new Set([item.generation]) });
+    }
+    index = next;
+  }
+  return { chains: chains.map((chain) => chain.samples), ambiguousContinuationCount };
+}
+
+function compareKeys(left, right) {
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] < right[index]) return -1;
+    if (left[index] > right[index]) return 1;
+  }
+  return 0;
+}
+
+function compareCoherentCopies(left, right) {
+  return Number(right.usable) - Number(left.usable) ||
+    right.coverageMs - left.coverageMs ||
+    right.stagedCoverageMs - left.stagedCoverageMs ||
+    right.resolvedCoverageMs - left.resolvedCoverageMs ||
+    right.activity.length - left.activity.length ||
+    right.receivedAtMs - left.receivedAtMs ||
     left.signature.localeCompare(right.signature) ||
     left.idSignature.localeCompare(right.idSignature);
 }
@@ -720,3 +978,43 @@ function buildDay(sleepDay, dayEpisodes, preference, { algorithmVersion, paramet
 
 function seconds(ms) { return Math.round(ms / 1000); }
 function iso(ms) { return new Date(ms).toISOString(); }
+
+/**
+ * Zero-write audit support (never used to store anything): for each sleep
+ * day, the v2 and v3 selections of the main episode's primary lane and the
+ * coherent v3 copy chains of that lane. A v2 selection whose staged/awake
+ * samples span more than one coherent chain is a cross-copy splice.
+ */
+export function analyzeHealthKitSleepCopyCoherence({ samples = [], preference = null } = {}) {
+  const v2 = canonicalizeHealthKitSleep({ samples, preference });
+  const v3 = canonicalizeHealthKitSleepV3({ samples, preference });
+  const byId = new Map(samples.map((sample) => [sample.id, sample]));
+  const analysis = new Map();
+  for (const sleepDay of [...new Set([...v2.keys(), ...v3.keys()])].sort()) {
+    const two = v2.get(sleepDay) ?? null;
+    const three = v3.get(sleepDay) ?? null;
+    const mainTwo = two?.episodes?.[two.mainEpisodeIndex] ?? null;
+    const mainThree = three?.episodes?.[three.mainEpisodeIndex] ?? null;
+    let chains = [];
+    if (mainThree) {
+      const lane = mainThree.primarySource;
+      const laneIntervals = [...mainThree.sourceSampleIds, ...mainThree.corroboratingSampleIds]
+        .map((id) => byId.get(id)).filter(Boolean).map(toInterval).filter(Boolean)
+        .filter((interval) => interval.lane.sourceClass === lane.sourceClass &&
+          interval.lane.bundleIdentifier.toLowerCase() === String(lane.bundleIdentifier).toLowerCase());
+      const exclusive = laneIntervals.filter((sample) => SPECIFIC.has(sample.stage) || sample.stage === HealthKitSleepStage.AWAKE);
+      const basis = exclusive.length > 0 ? exclusive : laneIntervals.filter((sample) => sample.stage === HealthKitSleepStage.ASLEEP_UNSPECIFIED);
+      chains = hasOverlap(basis) ? buildCoherentChains(basis).chains.map((chain) => chain.map((sample) => sample.id)) : [basis.map((sample) => sample.id)];
+    }
+    const chainOf = new Map(chains.flatMap((chain, index) => chain.map((id) => [id, index])));
+    const v2Chains = new Set((mainTwo?.sourceSampleIds ?? []).filter((id) => chainOf.has(id)).map((id) => chainOf.get(id)));
+    analysis.set(sleepDay, Object.freeze({
+      v2: two, v3: three,
+      duplicateCopies: Boolean(mainTwo?.reconciliation?.copySelection?.applied),
+      v2SpansCoherentChains: v2Chains.size,
+      v2CrossCopySplice: v2Chains.size > 1,
+      coherentChainCount: chains.length,
+    }));
+  }
+  return analysis;
+}

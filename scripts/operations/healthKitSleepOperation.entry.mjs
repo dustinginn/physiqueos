@@ -1,7 +1,8 @@
 // Bounded HealthKit Sleep production operation: the guarded Sleep policy runner
 // (activate-prospective | deactivate-prospective | set-source-preference |
-// open-historical-validation | close-historical-validation) and the zero-write
-// Sleep audit (dormancy | historical-shape).
+// open-historical-validation | close-historical-validation), the zero-write
+// Sleep audit (dormancy | historical-shape), and the bounded prospective-only
+// sleep-canon-v3 activation (canon-v3: dry-run | apply).
 //
 // Transported into the App Platform `web` component by the accepted console runner
 // (bundled by buildHealthKitPayload.mjs --kind sleep-policy|sleep-audit). Same contract as
@@ -19,10 +20,12 @@
 import { createRequire } from "node:module";
 import { runHealthKitSleepPolicy } from "../../src/platform/operations/HealthKitSleepPolicyRunner.js";
 import { auditHealthKitSleep } from "../../src/platform/operations/HealthKitSleepAudit.js";
+import { runHealthKitSleepCanonV3Activation } from "../../src/platform/operations/HealthKitSleepCanonV3Activation.js";
 import { createPhase4CanonicalRecordStore } from "../../src/platform/database/Phase4CanonicalRecordStore.js";
 
 const EXPECTED_GIT_SHA = typeof __EXPECTED_GIT_SHA__ === "undefined" ? "" : __EXPECTED_GIT_SHA__;
-const OPERATION = typeof __OPERATION__ === "undefined" ? "" : __OPERATION__; // "policy" | "audit"
+const OPERATION = typeof __OPERATION__ === "undefined" ? "" : __OPERATION__; // "policy" | "audit" | "canon-v3"
+const MAX_DAYS = typeof __MAX_DAYS__ === "undefined" ? 7 : __MAX_DAYS__;
 const MODE = typeof __MODE__ === "undefined" ? "dry-run" : __MODE__;
 const ACTION = typeof __ACTION__ === "undefined" ? "" : __ACTION__;
 const AUDIT_KIND = typeof __AUDIT_KIND__ === "undefined" ? "dormancy" : __AUDIT_KIND__;
@@ -45,7 +48,7 @@ function stop(code, status = 1) {
 }
 const sanitizedCode = (error) => (/^[A-Za-z0-9_]{3,60}$/.test(String(error?.code ?? "")) ? String(error.code) : "SLEEP_OPERATION_ERROR");
 
-if (!["policy", "audit"].includes(OPERATION)) stop("OPERATION_INVALID");
+if (!["policy", "audit", "canon-v3"].includes(OPERATION)) stop("OPERATION_INVALID");
 if (OPERATION === "audit" && MODE !== "dry-run") stop("AUDIT_IS_READ_ONLY");
 if (!["dry-run", "apply"].includes(MODE)) stop("MODE_INVALID");
 if (MODE === "apply" && !AUTHORIZATION_REFERENCE.trim()) stop("AUTHORIZATION_REFERENCE_REQUIRED");
@@ -84,7 +87,7 @@ let client;
 let open = false;
 let failure = null;
 let result = null;
-const apply = OPERATION === "policy" && MODE === "apply";
+const apply = (OPERATION === "policy" || OPERATION === "canon-v3") && MODE === "apply";
 try {
   client = await pool.connect();
   await client.query(apply ? "BEGIN ISOLATION LEVEL READ COMMITTED" : "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
@@ -98,7 +101,19 @@ try {
   const records = createPhase4CanonicalRecordStore({ query: (text, values) => client.query(text, values) });
   result = OPERATION === "audit"
     ? await auditHealthKitSleep({ records, ownerUserId: OWNER, kind: AUDIT_KIND })
-    : await runHealthKitSleepPolicy({
+    : OPERATION === "canon-v3"
+      ? await runHealthKitSleepCanonV3Activation({
+        records,
+        authorization: {
+          ownerUserId: OWNER,
+          effectiveSleepDay: EFFECTIVE,
+          maxDays: Number(MAX_DAYS),
+          authorizationReference: AUTHORIZATION_REFERENCE,
+        },
+        apply,
+        expected,
+      })
+      : await runHealthKitSleepPolicy({
       records,
       authorization: {
         ownerUserId: OWNER,
@@ -125,7 +140,7 @@ try {
 }
 if (failure || !result) stop(failure ?? "SLEEP_OPERATION_INCOMPLETE");
 process.stdout.write(`PHYSIQUEOS_HEALTHKIT_SLEEP_OPERATION_JSON:${JSON.stringify({ operation: OPERATION, mode: MODE, action: ACTION || null, auditKind: OPERATION === "audit" ? AUDIT_KIND : null, ...result })}\n`);
-if (OPERATION === "policy") {
+if (OPERATION === "policy" || OPERATION === "canon-v3") {
   const acceptable = MODE === "apply" ? ["applied", "already_applied"] : ["dry_run", "already_applied"];
   if (!acceptable.includes(result.outcome)) stop(`OUTCOME_${String(result.outcome).toUpperCase().replace(/[^A-Z0-9_]/g, "_")}`, 2);
 }
