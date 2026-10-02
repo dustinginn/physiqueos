@@ -12,6 +12,7 @@ struct PhysiqueOSApp: App {
     @State private var environment: AppEnvironment
     @State private var notificationDelegate: PriorityNotificationDelegate
     @State private var workoutLiveActivity: WorkoutLiveActivityBridge
+    @State private var homeWidget: HomeWidgetBridge
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -39,6 +40,9 @@ struct PhysiqueOSApp: App {
         )
         liveActivity.install()
         _workoutLiveActivity = State(initialValue: liveActivity)
+        let homeWidget = HomeWidgetBridge(environment: environment)
+        homeWidget.install()
+        _homeWidget = State(initialValue: homeWidget)
         // HealthKit background delivery relaunches a terminated app WITHOUT
         // ever activating a scene, so the scenePhase-driven bootstrap below
         // cannot be what re-registers the observers. Do it here, in the
@@ -104,7 +108,10 @@ struct PhysiqueOSApp: App {
                     // activation, under every authority.
                     if phase == .active {
                         workoutLiveActivity.reconcile()
-                        Task { await environment.reevaluateDailyDriverDay() }
+                        Task {
+                            _ = await environment.reevaluateDailyDriverDay()
+                            await homeWidget.refreshCanonicalSnapshot()
+                        }
                     } else {
                         // Leaving the foreground right after typing must not
                         // leave the first Lock Screen tap on a stale revision.
@@ -117,17 +124,25 @@ struct PhysiqueOSApp: App {
                         }
                     }
                     guard phase == .active, environment.nativeAuthority == .founderProduction else { return }
-                    Task { await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap() }
+                    Task {
+                        await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap()
+                        await homeWidget.refreshCanonicalSnapshot()
+                    }
                 }
                 // Switching Sandbox <-> Founder Production moves the Live
                 // Activity to the other authority's workout (or ends it).
                 .onChange(of: environment.nativeAuthority) { _, _ in
                     workoutLiveActivity.attachToSelectedAuthority()
+                    homeWidget.attachToSelectedAuthority()
                 }
                 // Foregrounded across local midnight, a manual clock / DST /
                 // carrier time change, or a zone change while running.
                 .onReceive(DailyDriverDayTrigger.publisher()) { _ in
-                    Task { await environment.reevaluateDailyDriverDay() }
+                    Task {
+                        if await environment.reevaluateDailyDriverDay() {
+                            await homeWidget.refreshCanonicalSnapshot()
+                        }
+                    }
                 }
         }
     }

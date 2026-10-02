@@ -426,6 +426,28 @@ build78_test_files = [
 ]
 BUILD78_BLOCK = 0x16FF
 
+# Home Screen Logged Today widget V1. Separate pinned block keeps Build 78
+# and the existing Live Activity object ids stable for concurrent integration.
+home_widget_app_files = [
+    ("Contracts", "HomeWidgetNavigation.swift"),
+    ("Networking", "HomeWidgetSnapshotCoordinator.swift"),
+    ("Networking", "HomeWidgetBridge.swift"),
+]
+home_widget_test_files = [
+    ("PhysiqueOSTests", "HomeWidgetTests.swift"),
+]
+home_widget_shared_files = [
+    ("PhysiqueOSShared", "HomeWidgetSnapshot.swift"),
+    ("PhysiqueOSShared", "HomeWidgetDeepLink.swift"),
+    ("PhysiqueOSShared", "RefreshHomeWidgetTotalsIntent.swift"),
+    ("PhysiqueOSShared", "HomeLoggedTodayWidgetView.swift"),
+]
+home_widget_extension_files = [
+    ("PhysiqueOSLiveActivity", "HomeLoggedTodayWidget.swift"),
+]
+LIVE_ACTIVITY_ENTITLEMENTS = ("PhysiqueOSLiveActivity", "PhysiqueOSLiveActivity.entitlements")
+HOME_WIDGET_BLOCK = 0x17FF
+
 # Daily-driver local-day authority. Allocated after every established object
 # (including the N1 tests) so adding it renumbers nothing.
 dd_app_files = [
@@ -580,7 +602,7 @@ for group, fname in test_files:
 # Groups (every distinct directory that needs a PBXGroup)
 group_names = sorted(set(
     ["App", "Contracts", "Networking", "SharedUI", "Resources", "Presentation", "Supporting"]
-    + [g for g, _ in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files]
+    + [g for g, _ in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files]
     + [g for g, _ in resource_files]
     + [g for g, _ in reference_only_files + late_reference_only_files]
 ), key=lambda g: (g.count("/"), g))
@@ -696,11 +718,11 @@ _counter[0] = LIVE_ACTIVITY_BLOCK
 for group, fname in live_activity_app_files + live_activity_test_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:{group}/{fname}")
-for group, fname in live_activity_shared_files:
+for group, fname in live_activity_shared_files + home_widget_shared_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:app:{group}/{fname}")
     I(f"buildfile:ext:{group}/{fname}")
-for group, fname in live_activity_extension_files:
+for group, fname in live_activity_extension_files + home_widget_extension_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:ext:{group}/{fname}")
 I(f"fileref:{LIVE_ACTIVITY_PLIST[0]}/{LIVE_ACTIVITY_PLIST[1]}")
@@ -718,6 +740,19 @@ _counter[0] = BUILD78_BLOCK
 for group, fname in build78_app_files + build78_test_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:{group}/{fname}")
+assert _counter[0] < HOME_WIDGET_BLOCK, "Home widget ID block would collide with earlier objects"
+_counter[0] = HOME_WIDGET_BLOCK
+for group, fname in home_widget_app_files + home_widget_test_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:{group}/{fname}")
+for group, fname in home_widget_shared_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:app:{group}/{fname}")
+    I(f"buildfile:ext:{group}/{fname}")
+for group, fname in home_widget_extension_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:ext:{group}/{fname}")
+I(f"fileref:{LIVE_ACTIVITY_ENTITLEMENTS[0]}/{LIVE_ACTIVITY_ENTITLEMENTS[1]}")
 _counter[0] = _resume_counter
 
 # ---------------- PBXBuildFile ----------------
@@ -743,10 +778,10 @@ for group, fname in late_app_files:
 for group, fname in late_test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
-for group, fname in n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files:
+for group, fname in n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
-for group, fname in [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files:
+for group, fname in [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
 for framework in system_frameworks:
@@ -771,7 +806,7 @@ container_proxy = f"""\t\t{I('testContainerProxy')} /* PBXContainerItemProxy */ 
 
 # ---------------- PBXFileReference ----------------
 fileref_lines = []
-for group, fname in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + resource_files + late_resource_files + recovery_sleep_resource_files + reference_only_files + late_reference_only_files + test_files + late_test_files + [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + ui_test_files + recovery_sleep_ui_test_files:
+for group, fname in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files + resource_files + late_resource_files + recovery_sleep_resource_files + reference_only_files + late_reference_only_files + test_files + late_test_files + [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files + ui_test_files + recovery_sleep_ui_test_files:
     fr = I(f"fileref:{group}/{fname}")
     fileref_lines.append(f"\t\t{fr} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};")
 for framework in system_frameworks:
@@ -814,7 +849,7 @@ frameworks_phases = f"""\t\t{I('appFrameworksPhase')} /* Frameworks */ = {{
 
 # ---------------- PBXGroup ----------------
 all_members = (
-    [(g, f) for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files]
+    [(g, f) for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files]
     + [(g, f) for g, f in resource_files]
     + [(g, f) for g, f in late_resource_files + recovery_sleep_resource_files]
     + [(g, f) for g, f in reference_only_files + late_reference_only_files]
@@ -868,7 +903,7 @@ for g in group_names:
 \t\t\tsourceTree = "<group>";
 \t\t}};""")
 
-test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files)
+test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files)
 group_lines.append(f"""\t\t{I('group:PhysiqueOSTests')} /* PhysiqueOSTests */ = {{
 \t\t\tisa = PBXGroup;
 \t\t\tchildren = (
@@ -911,12 +946,12 @@ group_lines.append(f"""\t\t{I('group:main')} /* Main */ = {{
 \t\t}};""")
 
 # ---------------- PBXNativeTarget ----------------
-app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files)
+app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files)
 app_resource_build_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Resources */,"
     for g, f in resource_files + late_resource_files + recovery_sleep_resource_files
 )
-test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files)
+test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files)
 ui_test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in ui_test_files + recovery_sleep_ui_test_files)
 
 sources_phases = f"""\t\t{I('appSourcesPhase')} /* Sources */ = {{
@@ -1290,10 +1325,10 @@ def _bf_sources(bf_name, group, fname):
     fr = I(f"fileref:{group}/{fname}")
     return f"\t\t{I(bf_name)} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};"
 
-for group, fname in live_activity_shared_files:
+for group, fname in live_activity_shared_files + home_widget_shared_files:
     buildfile_lines.append(_bf_sources(f"buildfile:app:{group}/{fname}", group, fname))
     buildfile_lines.append(_bf_sources(f"buildfile:ext:{group}/{fname}", group, fname))
-for group, fname in live_activity_extension_files:
+for group, fname in live_activity_extension_files + home_widget_extension_files:
     buildfile_lines.append(_bf_sources(f"buildfile:ext:{group}/{fname}", group, fname))
 for framework in LIVE_ACTIVITY_FRAMEWORKS:
     buildfile_lines.append(
@@ -1327,9 +1362,10 @@ copy_phase = f"""\t\t{I('embedExtensionsPhase')} /* Embed Foundation Extensions 
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};"""
 
-for group, fname in live_activity_shared_files + live_activity_extension_files:
+for group, fname in live_activity_shared_files + home_widget_shared_files + live_activity_extension_files + home_widget_extension_files:
     fileref_lines.append(f"\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};")
 fileref_lines.append(f"\t\t{I(f'fileref:{LIVE_ACTIVITY_PLIST[0]}/{LIVE_ACTIVITY_PLIST[1]}')} /* Info.plist */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = \"Info.plist\"; sourceTree = \"<group>\"; }};")
+fileref_lines.append(f"\t\t{I(f'fileref:{LIVE_ACTIVITY_ENTITLEMENTS[0]}/{LIVE_ACTIVITY_ENTITLEMENTS[1]}')} /* PhysiqueOSLiveActivity.entitlements */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = \"PhysiqueOSLiveActivity.entitlements\"; sourceTree = \"<group>\"; }};")
 for framework in LIVE_ACTIVITY_FRAMEWORKS:
     fileref_lines.append(
         f"\t\t{I(f'fileref:framework:{framework}')} /* {framework} */ = "
@@ -1365,8 +1401,8 @@ def _group_block(name, files, extra_children=()):
 \t\t\tsourceTree = "<group>";
 \t\t}};"""
 
-group_lines.append(_group_block("PhysiqueOSShared", live_activity_shared_files))
-group_lines.append(_group_block("PhysiqueOSLiveActivity", live_activity_extension_files, [LIVE_ACTIVITY_PLIST]))
+group_lines.append(_group_block("PhysiqueOSShared", live_activity_shared_files + home_widget_shared_files))
+group_lines.append(_group_block("PhysiqueOSLiveActivity", live_activity_extension_files + home_widget_extension_files, [LIVE_ACTIVITY_PLIST, LIVE_ACTIVITY_ENTITLEMENTS]))
 
 _new_children_main = (
     f"\t\t\t\t{I('group:PhysiqueOSShared')} /* PhysiqueOSShared */,\n"
@@ -1384,13 +1420,13 @@ group_lines[_products_index[0]] = group_lines[_products_index[0]].replace(
 
 # App target: compile the shared files, embed the extension, depend on it.
 _shared_app_ids = "\n".join(
-    f"\t\t\t\t{I(f'buildfile:app:{g}/{f}')} /* {f} in Sources */," for g, f in live_activity_shared_files
+    f"\t\t\t\t{I(f'buildfile:app:{g}/{f}')} /* {f} in Sources */," for g, f in live_activity_shared_files + home_widget_shared_files
 )
 sources_phases = sources_phases.replace(
     f"{app_source_build_ids}\n", f"{app_source_build_ids}\n{_shared_app_ids}\n", 1)
 _ext_source_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:ext:{g}/{f}')} /* {f} in Sources */,"
-    for g, f in live_activity_shared_files + live_activity_extension_files
+    for g, f in live_activity_shared_files + home_widget_shared_files + live_activity_extension_files + home_widget_extension_files
 )
 sources_phases += f"""
 \t\t{I('extSourcesPhase')} /* Sources */ = {{
@@ -1470,6 +1506,7 @@ project_obj = project_obj.replace(_targets_anchor, _targets_anchor + f"\t\t\t\t{
 
 ext_common = f"""
 \t\t\t\tAPPLICATION_EXTENSION_API_ONLY = YES;
+\t\t\t\tCODE_SIGN_ENTITLEMENTS = "PhysiqueOSLiveActivity/PhysiqueOSLiveActivity.entitlements";
 \t\t\t\tCODE_SIGN_STYLE = Automatic;
 \t\t\t\tCURRENT_PROJECT_VERSION = {APP_BUILD_NUMBER};
 \t\t\t\tDEVELOPMENT_TEAM = {DEVELOPMENT_TEAM};
@@ -1591,7 +1628,7 @@ with open(f"{ROOT}/PhysiqueOS.xcodeproj/project.pbxproj", "w") as f:
 print("wrote project.pbxproj,", len(pbxproj), "bytes")
 print("appTarget id:", I('appTarget'))
 print("testTarget id:", I('testTarget'))
-print("app files:", len(app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files), "resources:", len(resource_files + late_resource_files + recovery_sleep_resource_files),
+print("app files:", len(app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files), "resources:", len(resource_files + late_resource_files + recovery_sleep_resource_files),
       "reference-only:", len(reference_only_files + late_reference_only_files),
-      "test files:", len(test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files))
+      "test files:", len(test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files))
 print("development team:", DEVELOPMENT_TEAM)

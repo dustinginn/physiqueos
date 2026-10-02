@@ -284,6 +284,7 @@ struct MorningCheckInView: View {
                 let resolution = try await lifecycle.submit(localDate: localDate)
                 if resolution == .saved {
                     productionCheckIn = try? await environment.morningCheckInAPI.fetchMorningCheckIn()
+                    await environment.homeWidgetRefreshRelay.request()
                     messageIsError = false
                     message = nil
                     complete = true
@@ -364,6 +365,7 @@ struct ManualWeighInView: View {
                     }
                 )
                 let resolution = try await lifecycle.submit(localDate: localDate, value: valueInPounds)
+                await environment.homeWidgetRefreshRelay.request()
                 isError = false
                 message = resolution == .saved
                     ? "Weight saved for \(Self.mediumDate.string(from: date))."
