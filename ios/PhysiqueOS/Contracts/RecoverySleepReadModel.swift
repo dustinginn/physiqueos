@@ -241,11 +241,11 @@ enum RecoverySleepNightStatus: Equatable, Sendable {
 
 /// Whether stage / Awake / continuity values may be shown for a night.
 enum RecoverySleepDetailStatus: Equatable, Sendable {
-    /// Server `stageStatus == available` (sleep-canon-v2, staged).
+    /// Server `stageStatus == available` (sleep-canon-v2 or v3, staged).
     case available
     /// Computed by an older algorithm whose stage/Awake values are not shown.
     case pendingCorrection
-    /// Server `stageStatus == unavailable` under v2: no stage detail.
+    /// Server `stageStatus == unavailable` under v2/v3: no stage detail.
     case absent
     case unknown
 }
@@ -505,13 +505,18 @@ struct RecoverySleepNightDetail: Equatable, Sendable {
 // MARK: - Adapter (live -> presentation)
 
 enum RecoverySleepAdapter {
-    static let canonicalAlgorithm = "sleep-canon-v2"
+    /// Algorithms whose stage, Awake and continuity values may be shown:
+    /// sleep-canon-v2 (historical, permanently) and sleep-canon-v3 (ordinary
+    /// prospective nights once the Server activates coherent Oura copy
+    /// selection). Anything else (sleep-canon-v1) is still "Being recalculated".
+    static let stageCapableAlgorithms: Set<String> = ["sleep-canon-v2", "sleep-canon-v3"]
 
     static func detailStatus(_ night: RecoverySleepLiveNight) -> RecoverySleepDetailStatus {
         // Numbers are only ever shown when the Server says `available`.
+        let stageCapable = night.algorithmVersion.map { stageCapableAlgorithms.contains($0) } ?? false
         switch night.stageStatus {
-        case .available: return night.algorithmVersion == canonicalAlgorithm ? .available : .pendingCorrection
-        case .unavailable: return night.algorithmVersion == canonicalAlgorithm ? .absent : .pendingCorrection
+        case .available: return stageCapable ? .available : .pendingCorrection
+        case .unavailable: return stageCapable ? .absent : .pendingCorrection
         case .unknown: return .unknown
         }
     }
