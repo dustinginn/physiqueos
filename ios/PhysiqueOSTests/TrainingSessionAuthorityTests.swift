@@ -928,4 +928,21 @@ extension TrainingSessionAuthorityTests {
         XCTAssertNil(unwritable.pendingCompletion())
         XCTAssertTrue(failing.drafts.isEmpty, "The durable workout is the Server's; only the presentation is lost.")
     }
+
+    func testStalePresentationIsPrunedWhenTheAuthorityIsCreatedAtLaunch() {
+        var stale = finishableSession()
+        stale.step = .complete
+        stale.completionPresentationPending = true
+        stale.completionRecordedAt = "2026-09-30T08:00:00Z"
+        var recent = finishableSession()
+        recent.id = "session-recent"
+        recent.step = .complete
+        recent.completionPresentationPending = true
+        recent.completionRecordedAt = TrainingSessionClock.string(from: t0.addingTimeInterval(-60))
+        let store = RecordingStore([stale, recent])
+        let (authority, _) = makeAuthority(store, environment: .founderProduction)
+        XCTAssertEqual(store.drafts.map(\.id), ["session-recent"], "Older than the in-progress window: discarded.")
+        XCTAssertEqual(authority.pendingCompletion()?.id, "session-recent")
+        XCTAssertTrue(authority.drafts.isEmpty)
+    }
 }

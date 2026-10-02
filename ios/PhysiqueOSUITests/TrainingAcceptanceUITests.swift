@@ -473,6 +473,50 @@ final class TrainingAcceptanceUITests: XCTestCase {
 
         tapButton(identifier: "trainingLogger.completeLocal")
         assertText("Workout logged")
+        // Build 78: Workout Complete is owed until Return to Log, so leave
+        // it explicitly (later journeys start from an ordinary Log tab).
+        tapText("Return to Log")
+    }
+
+    /// Build 78 (Performance Record lifecycle): a finished workout's Workout
+    /// Complete survives a tab switch -- entering Log again routes back to
+    /// it -- and Return to Log is the only acknowledgement, after which Log
+    /// behaves normally again.
+    func testWorkoutCompleteSurvivesATabSwitchUntilReturnToLog() throws {
+        launchInSandbox()
+        openWorkoutLoggerFromLog()
+        tapButton(identifier: "trainingLogger.start")
+        tapButton(identifier: "trainingLogger.area.shoulders")
+        tapText("Choose exercises")
+        selectExercise(identifier: "trainingLogger.exercise.shoulder_press_machine")
+        tapButton(identifier: "trainingLogger.startLogging")
+        fillFirstSet(reps: "8", load: "50")
+        app.buttons["Mark set complete"].firstMatch.tap()
+        tapButton(identifier: "trainingLogger.finishWorkout")
+        tapButton(identifier: "trainingLogger.finishReview")
+        tapButton(identifier: "trainingLogger.completeLocal")
+        assertText("Workout logged")
+        attachScreenshot("50-workout-complete")
+
+        // Leave without acknowledging (system Back), as if the Founder moved
+        // on before the records arrived; Log is at its root again.
+        let back = app.navigationBars.buttons.element(boundBy: 0)
+        XCTAssertTrue(back.waitForExistence(timeout: 3), "Workout Complete had no Back control.")
+        back.tap()
+        let loggerEntry = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Training Logger")).firstMatch
+        XCTAssertTrue(loggerEntry.waitForExistence(timeout: 5))
+        app.tabBars.buttons["Home"].tap()
+        app.tabBars.buttons["Log"].tap()
+        assertText("Workout logged")
+        attachScreenshot("51-workout-complete-routed-after-tab-switch")
+
+        tapText("Return to Log")
+        let logger = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Training Logger")).firstMatch
+        XCTAssertTrue(logger.waitForExistence(timeout: 5), "Return to Log did not return to the ordinary Log page.")
+        app.tabBars.buttons["Home"].tap()
+        app.tabBars.buttons["Log"].tap()
+        XCTAssertTrue(logger.waitForExistence(timeout: 5), "An acknowledged completion must not route Log again.")
+        XCTAssertFalse(app.staticTexts["Workout logged"].exists)
     }
 
     private func fillFirstSet(reps: String, load: String) {

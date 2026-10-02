@@ -1988,7 +1988,8 @@ extension TrainingLoggerTests {
     func testWorkoutCompleteWiresTheVisibleSurfaceHapticAndReturnToLogBoundary() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let logger = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"), encoding: .utf8)
-        XCTAssertTrue(logger.contains("isPresentationVisible: isSurfaceVisible"))
+        XCTAssertTrue(logger.contains("isPresentationVisible: isSurfaceVisible && scenePhase == .active"),
+                      "Neither a hidden tab nor a backgrounded app can consume the one-shot.")
         XCTAssertTrue(logger.contains("feedback: environment.feedback"))
         XCTAssertTrue(logger.contains("viewModel.acknowledgeCompletion()\n                dismiss()"))
         XCTAssertFalse(logger.contains("UIImpactFeedbackGenerator") || logger.contains("UINotificationFeedbackGenerator"),

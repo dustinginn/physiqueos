@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct TrainingLoggerView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: TrainingLoggerViewModel?
     /// The authority `viewModel` was built for; guards against rebuilding
     /// (and losing the on-screen workout) when the tab is revisited.
@@ -1045,7 +1046,9 @@ struct TrainingLoggerView: View {
                 NewPerformanceRecordsCard(
                     records: viewModel.completedPerformanceRecords,
                     celebrationKey: viewModel.draft.map { "physiqueos.workoutComplete.celebrated.\($0.id)" },
-                    isPresentationVisible: isSurfaceVisible
+                    // Hidden behind another tab, or the app is not on screen
+                    // (phone locked / app switched): the one-shot must wait.
+                    isPresentationVisible: isSurfaceVisible && scenePhase == .active
                 )
             }
             PrimaryActionButton(title: "Return to Log") {

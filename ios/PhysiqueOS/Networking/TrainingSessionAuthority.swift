@@ -58,6 +58,9 @@ final class TrainingSessionAuthority {
         let stored = store.loadAll()
         self.drafts = Self.sorted(stored.filter { !$0.isPendingCompletionPresentation })
         self.pendingCompletions = stored.filter(\.isPendingCompletionPresentation)
+        // Created at launch: drop stale presentations even if the Logger is
+        // never opened again.
+        reloadFromStore()
     }
 
     var canWrite: Bool {
@@ -117,20 +120,15 @@ final class TrainingSessionAuthority {
         pendingCompletions.first { $0.id == id && isCurrentPendingCompletion($0) }
     }
 
-    /// Where entering the Log tab routes: whichever is newer of an
-    /// unacknowledged durable completion and the live session in progress.
-    /// A completion that happened after a workout was started wins, so a
-    /// late performance-record read is never lost behind the tab switch; a
-    /// workout started after the completion wins, so the Founder always
-    /// lands in the workout they are doing.
+    /// Where entering the Log tab routes. A live workout in progress always
+    /// wins (exactly the Build 77 routing), so the Founder lands in the
+    /// workout they are doing. Otherwise an unacknowledged durable
+    /// completion is routed back to, so a late performance-record read is
+    /// never lost behind a tab switch. The completion stays owed either way
+    /// and is shown when the Logger next opens without a live workout.
     func logTabRoutingTarget(at date: Date? = nil) -> TrainingLoggerDraft? {
         let reference = date ?? now()
-        let active = activeLiveSession(at: reference)
-        guard let completion = pendingCompletion(at: reference) else { return active }
-        guard let active, let started = active.startedAt.flatMap(TrainingSessionClock.date(from:)),
-              let recorded = completion.completionRecordedAt.flatMap(TrainingSessionClock.date(from:))
-        else { return completion }
-        return started > recorded ? active : completion
+        return activeLiveSession(at: reference) ?? pendingCompletion(at: reference)
     }
 
     /// `Return to Log`: the only point that clears a pending presentation.

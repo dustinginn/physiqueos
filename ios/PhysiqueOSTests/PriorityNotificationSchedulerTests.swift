@@ -1754,7 +1754,7 @@ extension PriorityNotificationSchedulerTests {
         )
         await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
         XCTAssertEqual(attempts, 1)
-        XCTAssertEqual(cleaned, 0, "A failed skip never clears its notification.")
+        XCTAssertEqual(cleaned, 0, "A failed skip never withdraws the occurrence's other reminders.")
         XCTAssertTrue(feedback.isEmpty)
 
         reject = false

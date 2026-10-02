@@ -7,12 +7,17 @@ import Foundation
 ///
 /// Server mapping it mirrors (current canonical contract):
 /// - `direct_completion_allowed` is produced only for an ordinary
-///   `priority_detail` reminder that is completable with a known version.
-///   That is exactly the family `isPrioritySkipSupportedReminder` accepts
-///   (not Morning Check-In / weight, Progress Photos, DEXA, peptide or
-///   supplement Support), and `prioritySkipCommand` uses the same
-///   identity and version as its completion command. So it is a simple
-///   binary Priority: plain completion and canonical Skip.
+///   `priority_detail` reminder that is completable with a known version
+///   (never Morning Check-In / weight, Progress Photos, DEXA, or peptide /
+///   supplement / recovery Support, which are specialized). That is the
+///   family `isPrioritySkipSupportedReminder` accepts, and
+///   `prioritySkipCommand` uses the same identity and version as its
+///   completion command. So it is a simple binary Priority: plain
+///   completion and canonical Skip. This is a Native mapping, not a Server
+///   capability: the Server still decides at write time and refuses a
+///   skip it does not support (e.g. a past-day occurrence, or an orphaned
+///   Support-type reminder), which changes nothing. Future migration: the
+///   Server publishes a skip command in `notificationAction`.
 /// - `specialized_workflow_required` with a completion command is Protocol
 ///   Support (peptide, supplement, recovery). Its completion carries the
 ///   Server-planned context (dose/protocol) — the same command Home's check

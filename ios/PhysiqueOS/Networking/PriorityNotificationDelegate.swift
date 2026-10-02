@@ -518,9 +518,10 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
     /// Priority Detail's Mark Skipped, against the identity and version the
     /// notification's completion contract carries (the Server's skip command
     /// uses exactly those). The Server still owns eligibility and "today":
-    /// a past, future or unsupported occurrence is refused there, changes
-    /// nothing, and leaves the notification in place. Never a local-only
-    /// skip state.
+    /// a past, future or unsupported occurrence is refused there and changes
+    /// nothing (iOS has already dismissed the banner; the occurrence stays
+    /// open in the app and its other pending reminders are kept). Never a
+    /// local-only skip state.
     @MainActor
     private func handleSkip(payload: CompleteActionPayload) async -> Bool {
         guard payload.commandType == ProductionCommandType.completePriority,

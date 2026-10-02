@@ -105,10 +105,10 @@ final class AppTabTests: XCTestCase {
         )
     }
 
-    /// The Log tab routes into whichever is newer: an unacknowledged durable
-    /// completion, or a live workout started after it.
+    /// The Log tab routes into a live workout in progress first (Build 77
+    /// routing), otherwise back to an unacknowledged durable completion.
     @MainActor
-    func testLogTabRoutingPrefersTheNewerOfPendingCompletionAndLiveSession() {
+    func testLogTabRoutingPrefersTheLiveWorkoutThenThePendingCompletion() {
         let now = Date(timeIntervalSince1970: 1_790_000_000)
         func stamp(_ minutesAgo: Double) -> String { TrainingSessionClock.string(from: now.addingTimeInterval(-minutesAgo * 60)) }
         var completion = draft("completion", step: .complete, startedMinutesAgo: 80, now: now)
@@ -122,10 +122,14 @@ final class AppTabTests: XCTestCase {
                 .logTabRoutingTarget(at: now)?.id
         }
         XCTAssertEqual(target([completion]), "completion")
-        XCTAssertEqual(target([completion, olderLive]), "completion",
-                       "A completion that happened after the live workout started is not lost behind the tab switch.")
+        XCTAssertEqual(target([completion, olderLive]), "older-live",
+                       "A resumed older workout is where the Founder lands, even after a newer completion.")
         XCTAssertEqual(target([completion, newerLive]), "newer-live",
                        "A workout started after the completion is where the Founder lands.")
+        var lateRecovered = completion
+        lateRecovered.completionRecordedAt = stamp(1)
+        XCTAssertEqual(target([lateRecovered, newerLive]), "newer-live",
+                       "A completion resolved in the background never takes over a live workout.")
 
         var stale = completion
         stale.completionRecordedAt = stamp(13 * 60)
