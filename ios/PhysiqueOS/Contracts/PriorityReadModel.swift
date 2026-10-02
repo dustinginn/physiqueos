@@ -350,6 +350,24 @@ struct PriorityNotificationAction: Codable, Equatable {
     /// nothing schedulable is known; Native must not invent a time.
     var scheduledTime: String?
     var completionCommand: PriorityNotificationCompletionCommand?
+    /// Server-owned Skip capability (`priority.skip.v1`) for this exact
+    /// occurrence, independent of the completion mode: a specialized,
+    /// dose-aware Priority (a peptide) may be skippable even though plain
+    /// completion is never allowed. Absent on Build 78-era payloads, where
+    /// the field did not exist; Native then offers no Skip.
+    var skipCommand: PriorityNotificationSkipCommand? = nil
+}
+
+/// `notificationAction.skipCommand`: identity and version only. A skip never
+/// carries a dose or protocol context.
+struct PriorityNotificationSkipCommand: Codable, Equatable {
+    struct Payload: Codable, Equatable {
+        var priorityId: String
+        var occurrenceDate: String
+    }
+    var commandType: String
+    var expectedVersion: Int
+    var payload: Payload
 }
 
 struct PriorityNotificationCompletionCommand: Codable, Equatable {

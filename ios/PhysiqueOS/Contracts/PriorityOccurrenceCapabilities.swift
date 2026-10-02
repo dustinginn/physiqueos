@@ -5,28 +5,22 @@ import Foundation
 /// contract (`PriorityNotificationAction`, `ReminderOccurrenceCompletion.js`).
 /// Notification categories are chosen from this, never from Priority names.
 ///
-/// Server mapping it mirrors (current canonical contract):
-/// - `direct_completion_allowed` is produced only for an ordinary
-///   `priority_detail` reminder that is completable with a known version
-///   (never Morning Check-In / weight, Progress Photos, DEXA, or peptide /
-///   supplement / recovery Support, which are specialized). That is the
-///   family `isPrioritySkipSupportedReminder` accepts, and
-///   `prioritySkipCommand` uses the same identity and version as its
-///   completion command. So it is a simple binary Priority: plain
-///   completion and canonical Skip. This is a Native mapping, not a Server
-///   capability: the Server still decides at write time and refuses a
-///   skip it does not support (e.g. a past-day occurrence, or an orphaned
-///   Support-type reminder), which changes nothing. Future migration: the
-///   Server publishes a skip command in `notificationAction`.
-/// - `specialized_workflow_required` with a completion command is Protocol
-///   Support (peptide, supplement, recovery). Its completion carries the
-///   Server-planned context (dose/protocol) — the same command Home's check
-///   and Priority Detail's default "Mark Complete" send. It is never a plain
-///   completion and never offers Skip here: the contract does not say which
-///   Support family may skip (supplements may not), so that stays in
-///   Priority Detail until the Server exposes skip in this contract.
-/// - Everything else (Morning Check-In, Photos, DEXA, open-only) has no
-///   direct action and opens its proper flow.
+/// Completion and Skip are independent capabilities:
+/// - Completion comes from `classification` + `completionCommand`:
+///   - `direct_completion_allowed` (an ordinary `priority_detail` reminder,
+///     no dose/protocol) is a plain binary completion;
+///   - `specialized_workflow_required` with a completion command is Protocol
+///     Support (peptide, supplement, recovery): completion carries the
+///     Server-planned context (dose/protocol), exactly what Home's check and
+///     Priority Detail's default Mark Complete send. Never plain;
+///   - anything else (Morning Check-In / weight, Photos, DEXA, open-only)
+///     has no direct completion and opens its proper flow.
+/// - Skip comes only from the Server's explicit `skipCommand`
+///   (`priority.skip.v1`, identity + version, never a dose). The Server
+///   offers it for ordinary reminders, peptides and recovery Support (e.g.
+///   Foam Rolling) and withholds it from supplements, Morning Check-In,
+///   Photos, DEXA and paused occurrences. Native never infers Skip from a
+///   Priority type; a payload without `skipCommand` offers no Skip.
 struct PriorityOccurrenceCapabilities: Equatable, Sendable {
     enum Completion: Equatable, Sendable {
         /// No completion outside the app's own flow.
@@ -42,32 +36,55 @@ struct PriorityOccurrenceCapabilities: Equatable, Sendable {
     var skipAllowed: Bool
 
     var plainCompleteAllowed: Bool { completion == .plain }
-    /// Completion needs the app (detail/form/input); no direct action.
-    var requiresDetail: Bool { completion == .none }
-    var specializedCompletion: Bool { completion == .plannedContext }
+    var specializedCompleteAllowed: Bool { completion == .plannedContext }
+    /// Kept for Build 78 call sites.
+    var specializedCompletion: Bool { specializedCompleteAllowed }
+    /// Snooze is offered wherever a direct action is (it never touches the
+    /// Server).
+    var snoozeAllowed: Bool { completion != .none || skipAllowed }
+    /// No direct action at all: the notification only opens the app.
+    var requiresDetail: Bool { completion == .none && !skipAllowed }
 
     static let openOnly = Self(completion: .none, skipAllowed: false)
 
     static func resolve(_ action: PriorityNotificationAction?) -> Self {
         guard let action else { return .openOnly }
+        return Self(completion: completion(action), skipAllowed: skipAllowed(action))
+    }
+
+    private static func completion(_ action: PriorityNotificationAction) -> Completion {
         let command = action.completionCommand.flatMap { command in
             command.commandType == ProductionCommandType.completePriority ? command : nil
         }
         switch action.classification {
         case .openOnly:
-            return .openOnly
+            return .none
         case .specializedWorkflowRequired:
-            return command == nil ? .openOnly : Self(completion: .plannedContext, skipAllowed: false)
+            return command == nil ? .none : .plannedContext
         case .directCompletionAllowed:
             guard let command, action.workflow == nil || action.workflow == "priority_detail" else {
-                return .openOnly
+                return .none
             }
             // A dose/protocol context means specialized semantics even if a
             // future payload were mislabeled; never treat it as plain.
             guard command.payload.dose == nil, command.payload.protocolId == nil else {
-                return Self(completion: .plannedContext, skipAllowed: false)
+                return .plannedContext
             }
-            return Self(completion: .plain, skipAllowed: true)
+            return .plain
         }
+    }
+
+    /// A Server skip command for this exact occurrence (same identity as the
+    /// completion command, when there is one).
+    private static func skipAllowed(_ action: PriorityNotificationAction) -> Bool {
+        guard let skip = action.skipCommand,
+              skip.commandType == ProductionCommandType.skipPriority,
+              !skip.payload.priorityId.isEmpty, !skip.payload.occurrenceDate.isEmpty
+        else { return false }
+        if let completion = action.completionCommand {
+            return completion.payload.priorityId == skip.payload.priorityId
+                && completion.payload.occurrenceDate == skip.payload.occurrenceDate
+        }
+        return true
     }
 }

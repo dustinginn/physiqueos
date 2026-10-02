@@ -5,8 +5,13 @@ import UserNotifications
 /// the Server-owned classification), never from Priority names:
 /// - `simpleCompletion`: a simple binary Priority — Complete (check-circle),
 ///   Skip, Snooze.
-/// - `specializedActionable`: completion with the Server-planned context
-///   (peptide dose) — Complete, Snooze; never Skip, never plain completion.
+/// - `specializedSkippable`: completion with the Server-planned context
+///   (peptide dose, recovery Support such as Foam Rolling) plus the Server's
+///   Skip — Complete, Skip, Snooze. Never plain completion.
+/// - `specializedActionable`: planned-context completion without Skip
+///   (e.g. a supplement) — Complete, Snooze.
+/// - `skipOnly`: no direct completion, but the Server offers Skip — Skip,
+///   Snooze.
 /// - `specializedWorkflow` / `openOnly`: no custom actions; tapping the
 ///   notification opens the proper flow (Morning Check-In, Photos, ...).
 /// - `directCompletion`: the pre-Build 78 simple category (Complete,
@@ -20,6 +25,8 @@ import UserNotifications
 /// Complete action with a check-circle symbol.
 enum PriorityNotificationCategory {
     static let simpleCompletion = "priority.simpleCompletion"
+    static let specializedSkippable = "priority.specializedSkippable"
+    static let skipOnly = "priority.skipOnly"
     static let directCompletion = "priority.directCompletion"
     static let specializedWorkflow = "priority.specializedWorkflow"
     static let specializedActionable = "priority.specializedActionable"
@@ -38,8 +45,9 @@ enum PriorityNotificationCategory {
         let capabilities = PriorityOccurrenceCapabilities.resolve(action)
         switch capabilities.completion {
         case .plain: return capabilities.skipAllowed ? simpleCompletion : directCompletion
-        case .plannedContext: return specializedActionable
+        case .plannedContext: return capabilities.skipAllowed ? specializedSkippable : specializedActionable
         case .none:
+            if capabilities.skipAllowed { return skipOnly }
             return action.classification == .openOnly ? openOnly : specializedWorkflow
         }
     }
@@ -47,7 +55,7 @@ enum PriorityNotificationCategory {
     /// The categories whose Skip action may reach canonical Skip. A Skip
     /// response from any other category is refused before any write.
     static func allowsSkip(_ categoryIdentifier: String) -> Bool {
-        categoryIdentifier == simpleCompletion
+        [simpleCompletion, specializedSkippable, skipOnly].contains(categoryIdentifier)
     }
 }
 
@@ -108,6 +116,18 @@ enum PriorityNotificationCategoryRegistrar {
             intentIdentifiers: [],
             options: []
         )
+        let specializedSkippable = UNNotificationCategory(
+            identifier: PriorityNotificationCategory.specializedSkippable,
+            actions: [complete, skip, snooze],
+            intentIdentifiers: [],
+            options: []
+        )
+        let skipOnly = UNNotificationCategory(
+            identifier: PriorityNotificationCategory.skipOnly,
+            actions: [skip, snooze],
+            intentIdentifiers: [],
+            options: []
+        )
         let specializedWorkflow = UNNotificationCategory(
             identifier: PriorityNotificationCategory.specializedWorkflow,
             actions: [],
@@ -139,7 +159,8 @@ enum PriorityNotificationCategoryRegistrar {
             options: []
         )
         return [
-            simpleCompletion, directCompletion, specializedWorkflow, specializedActionable,
+            simpleCompletion, directCompletion, specializedSkippable, skipOnly,
+            specializedWorkflow, specializedActionable,
             openOnly, evidenceReviewReady, briefingReady,
         ]
     }
