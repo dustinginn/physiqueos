@@ -1,54 +1,60 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T15:26:26Z",
+  "generated_at_utc": "2026-10-02T16:31:09Z",
   "task": {
-    "id": "apple-watch-workout-v1-phase1a-signed-archive-install",
-    "title": "Apple Watch Workout V1 Phase 1A signed archive and physical install",
+    "id": "apple-watch-workout-v1-phase1a-physical-install-launch",
+    "title": "Apple Watch Workout V1 Phase 1A physical Watch install and launch",
     "agent": "codex",
-    "status": "signed_archive_and_iphone_install_complete_awaiting_watch_developer_mode"
+    "status": "physical_watch_install_launch_complete_awaiting_founder_health_authorization"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "implementation_branch": "codex/apple-watch-workout-v1-phase1a-overnight",
-    "implementation_sha": "1b8838a40613fead6d5f8d62f1d9831cb977f83f",
+    "starting_implementation_sha": "1b8838a40613fead6d5f8d62f1d9831cb977f83f",
+    "implementation_sha": "831f74d0482906e34b5fcbb306cff3a4e7af2742",
     "shipping_native_sha": "6a0932517cbd8de165bf25c7637a2d2d6fea03dc",
     "shipping_native_build": 81,
     "next_native_build": 82,
     "production_server_sha": "4ffde0f5faf1832decfbc09d822088aeba0dca89",
     "production_deployment": "faaf66bd-930f-46a2-9b8e-77e604c23a86",
-    "archive_path": "/private/tmp/PhysiqueOS-Phase1A.xcarchive"
+    "prior_archive_path": "/private/tmp/PhysiqueOS-Phase1A.xcarchive",
+    "installed_watch_profile_uuid": "f4ef7d4e-c707-4127-9741-b2d7d2f9c6c8"
   },
   "result": {
-    "summary": "Founder-authenticated Xcode automatic signing created the explicit HealthKit-capable Watch profile, produced and fully inspected a clean signed Release archive, and installed the Build 81 candidate on the Founder iPhone. Direct Watch install is now blocked only by Apple Watch Developer Mode being disabled; iPhone launch is waiting for the phone to be unlocked. Health consent and a real workout were not automated.",
+    "summary": "The Build 81 development candidate is installed and launches on the paired physical Founder Watch. Physical launch exposed a WatchConnectivity callback actor-isolation trap; it was symbolicated, fixed at 831f74d0, covered by off-main tests, rebuilt, re-signed, reinstalled and proven stable with no new crash log. The Watch shows the phone-reachable Prepare a workout on iPhone state. Health authorization and workout start remain an explicit Founder tap gate.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
     "iphone_candidate_installed": true,
-    "watch_candidate_installed": false
+    "watch_candidate_installed": true,
+    "watch_candidate_launched": true,
+    "health_authorized": false,
+    "workout_started": false
   },
   "validation": {
-    "origin_authority": "branch and remote both 1b8838a40613fead6d5f8d62f1d9831cb977f83f; origin/main still Build 81 latest VALID",
-    "generator": "two passes byte-identical, SHA-256 18f619f9a57313892d4ee06d2f639fd5b8d203f1cba8009d8ce9bddba7886020",
-    "signed_archive": "passed; recursive strict code signature verification passed",
-    "iphone_entitlements": "HealthKit + background delivery + existing App Group unchanged",
-    "widget_entitlements": "existing App Group only; HealthKit absent",
-    "watch_entitlements": "HealthKit present; workout-processing and companion metadata present",
-    "version_build_parity": "all products 1.0 (81)",
-    "iphone_install": "passed",
-    "watch_install": "blocked by physical Watch Developer Mode disabled",
-    "iphone_launch": "blocked by physical iPhone locked"
+    "origin_authority": "implementation branch and remote both 831f74d0482906e34b5fcbb306cff3a4e7af2742; origin/main still identifies Build 81 as latest VALID shipping Native",
+    "generator": "byte-identical to committed authority, SHA-256 18f619f9a57313892d4ee06d2f639fd5b8d203f1cba8009d8ce9bddba7886020",
+    "watch_unit_tests": "4/4 passed, including reply/failure callbacks invoked from Task.detached",
+    "physical_release_build": "passed for arm64 and arm64_32 with Watch-authorized automatic signing profile",
+    "signature": "strict verification passed",
+    "watch_identity": "com.physiqueos.native.dev.watchkitapp 1.0 (81)",
+    "companion_identity": "com.physiqueos.native.dev 1.0 (81); Watch is non-independent",
+    "pairing": "physical Watch connected, paired, booted and Developer Mode enabled",
+    "watch_connectivity": "phone-reachable Prepare a workout on iPhone state after automatic interactive refresh",
+    "runtime": "Watch process remained alive on delayed readback; no post-fix crash report",
+    "duplicate_authority": "no Ready-for-Watch draft, structured start, Health authorization, HealthKit workout or performed Training write occurred"
   },
   "release_decision": "do_not_upload",
   "open_gates": [
-    "Founder enables Developer Mode on Apple Watch and unlocks the paired iPhone",
-    "Install and launch the signed Watch app without automating Health consent",
-    "Founder grants Health authorization on device",
-    "Physical workout, disconnect/relaunch, recovery, exact-correlation and battery acceptance",
-    "Build 82 parity, fresh archive and independent review before production trust allowlist or TestFlight"
+    "Founder prepares a short phone workout and taps Ready for Watch",
+    "Founder taps Start Workout once and grants Workouts, Heart Rate, Active Energy and Basal Energy authorization on-device",
+    "Physical Complete Set, Pause/Resume, disconnect/reconnect, relaunch, early-finish and full-finish acceptance",
+    "Exact HealthKit-to-structured correlation, duplicate prevention, Always-On and battery proof",
+    "Build 82 parity, fresh full archive containing 831f74d0 and independent review before production trust allowlist or TestFlight"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T152626Z-apple-watch-workout-v1-phase1a-signed-archive-install-checkpoint.md",
-  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T064500Z-apple-watch-workout-v1-phase1a-overnight.md",
+  "full_report_path": "agent-handoffs/reports/20261002T163109Z-apple-watch-workout-v1-phase1a-physical-install-launch-checkpoint.md",
+  "parent_report_path": "agent-handoffs/reports/20261002T152626Z-apple-watch-workout-v1-phase1a-signed-archive-install-checkpoint.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
