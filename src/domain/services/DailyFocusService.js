@@ -6,7 +6,7 @@ import {
   shiftLocalDateKey,
 } from "../utils/localDate";
 import { normalizeProtocolRecurrence } from "./ProtocolRecurrenceNormalizationService";
-import { isProtocolDateOnCycle } from "./ProtocolOccurrenceResolver";
+import { isProtocolDateOnCycle, requiresProtocolCycleEvaluation } from "./ProtocolOccurrenceResolver";
 import {
   ExecutionPriorityOperationalReason,
   ExecutionPriorityOperationalState,
@@ -1175,7 +1175,9 @@ function reminderAppliesToday(reminder, dayName, localDate = null) {
 
   if (daysOfWeek.length > 0 && !daysOfWeek.includes(dayName)) return false;
 
-  if (Number(reminder.schedule?.interval ?? 1) > 1 && localDate) {
+  // Interval > 1 and every monthly schedule are anchored cycles; a plain
+  // weekday match would surface a monthly reminder every week.
+  if (requiresProtocolCycleEvaluation(reminder.schedule) && localDate) {
     try {
       const recurrence = normalizeProtocolRecurrence(reminder.schedule, {
         fallbackTimezone: reminder.schedule.timezone,

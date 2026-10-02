@@ -136,6 +136,8 @@ function projectProgressPhotoExecution(value = {}) {
     cadence: value.cadence ? {
       type: nullable(value.cadence.type),
       interval: positiveNumber(value.cadence.interval),
+      ...(value.cadence.weekOfMonth != null
+        ? { weekOfMonth: nullable(value.cadence.weekOfMonth) } : {}),
     } : null,
     preferredSchedule: projectPreferredSchedule(value.preferredSchedule),
   };
@@ -190,6 +192,8 @@ function projectRecurrence(value) {
     unit: nullable(value.unit),
     interval: positiveNumber(value.interval),
     weekdays: normalizedStrings(value.weekdays ?? value.daysOfWeek),
+    // Monthly-only; omitted otherwise so existing digests are unchanged.
+    ...(value.weekOfMonth != null ? { weekOfMonth: nullable(value.weekOfMonth) } : {}),
     dayOfWeek: nullable(value.dayOfWeek),
     preferredDay: nullable(value.preferredDay),
     timeOfDay: nullable(value.timeOfDay),

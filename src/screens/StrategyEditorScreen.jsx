@@ -27,7 +27,8 @@ function CoachingUpdatesFields({ model }) {
     </Section>
     <Section title="Progress Photos">
       <p className="text-sm leading-6 text-[var(--text-secondary)]">Choose when you plan to take progress photos, whether Home should remind you, and whether completed photo sessions should generate a Photo Event review.</p>
-      <Select defaultValue={model.photos.cadence} label="Cadence" name="photoCadence" options={["weekly","weekly_interval_2"]}/>
+      <div className="grid grid-cols-[auto_1fr_1fr] items-end gap-2"><span className="pb-3 text-sm font-bold">Every</span><Select defaultValue={String(model.photos.cadenceInterval ?? 1)} label="Interval" name="photoCadenceInterval" options={PHOTO_INTERVALS}/><Select defaultValue={model.photos.cadenceUnit ?? "week"} label="Unit" name="photoCadenceUnit" options={["week","month"]}/></div>
+      <Select defaultValue={model.photos.weekOfMonth ?? "first"} label="Week of the month (monthly only)" name="photoWeekOfMonth" options={["first","second","third","fourth","last"]}/>
       <Select defaultValue={model.photos.day} label="Preferred day" name="photoDay" options={model.options.weekdays}/>
       <Select defaultValue={model.photos.timeOfDay} label="Preferred time" name="photoTimeOfDay" options={model.photos.timeOptions}/>
       <div className="space-y-2 border-t border-[var(--divider)] pt-3"><p className="text-xs font-bold text-[var(--text-secondary)]">Reminder</p><label className="flex min-h-12 items-center gap-3"><input defaultChecked={model.photos.reminderEnabled} name="photoReminderEnabled" type="checkbox"/><span className="text-sm font-bold">Remind me about Progress Photos</span></label></div>
@@ -95,4 +96,5 @@ function Field({ label: fieldLabel, ...props }) { return <label className="block
 function Checkbox({ label: checkboxLabel, ...props }) { return <label className="flex min-h-12 items-center gap-3"><input type="checkbox" {...props}/><span className="text-sm font-bold">{checkboxLabel}</span></label>; }
 function Select({ defaultValue, label: selectLabel, name, options }) { return <label className="block"><span className="mb-2 block text-xs font-bold text-[var(--text-secondary)]">{selectLabel}</span><select className="min-h-12 w-full rounded-xl border border-[var(--divider)] bg-[var(--surface-muted)] px-3 text-sm font-semibold" defaultValue={defaultValue} name={name}>{options.map((option)=><option key={option} value={option}>{label(option)}</option>)}</select></label>; }
 function SubmitButton(){const{pending}=useFormStatus();return <button className="min-h-12 w-full rounded-2xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white disabled:opacity-60" disabled={pending} type="submit">{pending?"Saving…":"Save Strategy"}</button>;}
-function label(value){if(value==="weekly_interval_2")return "Every 2 weeks";return String(value).replaceAll("_"," ").replace(/\b\w/g,(letter)=>letter.toUpperCase());}
+const PHOTO_INTERVALS=Array.from({length:12},(_,index)=>String(index+1));
+function label(value){if(value==="weekly_interval_2")return "Every 2 weeks";if(value==="week")return "Weeks";if(value==="month")return "Months";return String(value).replaceAll("_"," ").replace(/\b\w/g,(letter)=>letter.toUpperCase());}

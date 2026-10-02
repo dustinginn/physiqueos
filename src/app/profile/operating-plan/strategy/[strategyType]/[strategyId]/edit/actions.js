@@ -18,6 +18,11 @@ import {
 } from "../../../../../../../domain/services/CoachingUpdatesEditorService";
 import { createCoachingUpdatesStrategyManagementService } from "../../../../../../../domain/services/CoachingUpdatesStrategyManagementService";
 import { coachingUpdatesEditorMessage } from "../../../../../../../domain/services/StrategyEditorService";
+import {
+  ProgressPhotosCadenceError,
+  applyProgressPhotoCadence,
+  resolveRequestedProgressPhotoCadence,
+} from "../../../../../../../domain/services/ProgressPhotosCadence";
 
 export async function saveStrategy(context, _priorState, formData) {
   const protocolId = String(context?.protocolId ?? "");
@@ -46,6 +51,13 @@ export async function saveStrategy(context, _priorState, formData) {
     const photoRecurrence = context.coachingContext?.photoRecurrence;
     const photoContext = context.coachingContext?.photo;
     if (!photoRecurrence || !photoContext) return { message: "The Progress Photos schedule is unavailable. Reload and try again." };
+    let photoCadence;
+    try {
+      photoCadence = resolveRequestedProgressPhotoCadence(requested.photos);
+    } catch (error) {
+      if (!(error instanceof ProgressPhotosCadenceError)) throw error;
+      return { message: error.message };
+    }
     const result = await createCoachingUpdatesStrategyManagementService({
       ...bindings,
     }).save({
@@ -68,12 +80,10 @@ export async function saveStrategy(context, _priorState, formData) {
         ...photoContext,
         reminderEnabled: requested.photos.reminderEnabled,
         effectiveDate: getLocalDateKey(),
-        recurrence: {
-          ...photoRecurrence,
-          interval: requested.photos.cadence === "weekly_interval_2" ? 2 : 1,
-          weekdays: [requested.photos.day],
+        recurrence: applyProgressPhotoCadence(photoRecurrence, photoCadence, {
+          day: requested.photos.day,
           timeOfDay: requested.photos.timeOfDay,
-        },
+        }),
         author: { type: "user", id: user.id, displayName: user.displayName ?? "Founder" },
       },
       dexa: {

@@ -4,6 +4,14 @@ export const PROTOCOL_RECURRENCE_VERSION = "protocol_recurrence_v1";
 export const CANONICAL_WEEKDAYS = Object.freeze([
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
 ]);
+/// Monthly recurrences are weekday-anchored ("the first Saturday of every
+/// N months"), matching the weekday-based Progress Photos product: the same
+/// preferred day keeps photo conditions comparable, and every weekday
+/// filter downstream (Home, notifications, satisfaction) stays truthful.
+/// `last` covers months with a fifth occurrence without a skipped month.
+export const WEEK_OF_MONTH_VALUES = Object.freeze([
+  "first", "second", "third", "fourth", "last",
+]);
 
 export class ProtocolRecurrenceError extends Error {
   constructor(code, message) {
@@ -72,6 +80,59 @@ export function normalizeProtocolRecurrence(input = {}, {
       endDate: dateKey(source.endDate) ?? null,
     });
   }
+  if (frequency === "monthly") {
+    const interval = source.interval == null ? 1 : Number(source.interval);
+    if (!Number.isInteger(interval) || interval < 1) {
+      throw new ProtocolRecurrenceError(
+        "INVALID_MONTHLY_INTERVAL",
+        "Monthly interval must be a positive integer.",
+      );
+    }
+    const weekdays = normalizeWeekdays(
+      source.weekdays ?? source.daysOfWeek ??
+      [source.preferredDay ?? source.dayOfWeek].filter(Boolean),
+    );
+    if (weekdays.length !== 1) {
+      throw new ProtocolRecurrenceError(
+        "WEEKDAY_REQUIRED",
+        "A monthly recurrence requires exactly one weekday.",
+      );
+    }
+    const weekOfMonth = String(source.weekOfMonth ?? "").toLowerCase();
+    if (!WEEK_OF_MONTH_VALUES.includes(weekOfMonth)) {
+      throw new ProtocolRecurrenceError(
+        "WEEK_OF_MONTH_REQUIRED",
+        "A monthly recurrence requires the week of the month.",
+      );
+    }
+    const timezone = source.timezone ?? fallbackTimezone;
+    if (!timezone) {
+      throw new ProtocolRecurrenceError(
+        "TIMEZONE_REQUIRED",
+        "A monthly recurrence requires an explicit timezone.",
+      );
+    }
+    const anchorDate = dateKey(source.anchorDate ?? fallbackAnchorDate);
+    if (!anchorDate) {
+      throw new ProtocolRecurrenceError(
+        "ANCHOR_REQUIRED",
+        "A monthly recurrence requires an anchor date.",
+      );
+    }
+    return Object.freeze({
+      recurrenceVersion: PROTOCOL_RECURRENCE_VERSION,
+      frequency,
+      interval,
+      weekdays,
+      weekOfMonth,
+      timeOfDay: source.timeOfDay ?? source.daypart ?? null,
+      localTime: source.localTime ?? exactTime(source.timeOfDay) ?? null,
+      timezone,
+      anchorDate,
+      effectiveAt: source.effectiveAt ?? effectiveAt ?? null,
+      endDate: dateKey(source.endDate) ?? null,
+    });
+  }
   if (frequency === "daily") {
     return Object.freeze({
       recurrenceVersion: PROTOCOL_RECURRENCE_VERSION,
@@ -119,6 +180,8 @@ export function createProtocolRecurrenceIdentity(recurrence) {
     frequency: normalized.frequency,
     interval: normalized.interval,
     weekdays: normalized.weekdays,
+    // Monthly-only, so every pre-existing weekly identity hashes unchanged.
+    ...(normalized.frequency === "monthly" ? { weekOfMonth: normalized.weekOfMonth } : {}),
     timeOfDay: normalized.timeOfDay,
     localTime: normalized.localTime,
     timezone: normalized.timezone,
@@ -132,6 +195,7 @@ export function createProtocolRecurrenceIdentity(recurrence) {
 export function hydrateCadenceFromRecurrence(recurrence) {
   if (recurrence?.frequency === "daily") return "daily";
   if (recurrence?.frequency === "scheduled_date") return "scheduled_date";
+  if (recurrence?.frequency === "monthly") return "monthly";
   if (recurrence?.frequency !== "weekly") return "custom";
   if (recurrence.interval === 1) return "weekly";
   if (recurrence.interval === 2) return "weekly_interval_2";
@@ -145,6 +209,12 @@ export function formatProtocolRecurrenceSummary(recurrence) {
     const time = recurrence.timeOfDay ? ` ${String(recurrence.timeOfDay).toLowerCase()}` : "";
     return `${cadence} · ${day}${time}`;
   }
+  if (recurrence.frequency === "monthly") {
+    const cadence = recurrence.interval === 1 ? "Every month" : `Every ${recurrence.interval} months`;
+    const day = `${title(recurrence.weekOfMonth)} ${title(recurrence.weekdays[0])}`;
+    const time = recurrence.timeOfDay ? ` ${String(recurrence.timeOfDay).toLowerCase()}` : "";
+    return `${cadence} · ${day}${time}`;
+  }
   if (recurrence.frequency === "daily") return "Every day";
   return "Scheduled date";
 }
@@ -154,6 +224,7 @@ function normalizeFrequency(value) {
   if (["weekly", "once_a_week"].includes(normalized)) return "weekly";
   if (["daily", "every_day"].includes(normalized)) return "daily";
   if (["scheduled_date", "once"].includes(normalized)) return "scheduled_date";
+  if (["monthly", "month"].includes(normalized)) return "monthly";
   return normalized;
 }
 function normalizeWeekdays(values = []) {

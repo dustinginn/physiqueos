@@ -36,7 +36,7 @@ export default async function StrategyEditPage({ params }) {
       readModel,
       policy: resolveCoachingUpdatesGoalCadencePolicy(goal),
       photos: photoHydration ? {
-        cadence: photoHydration.item.recurrence.interval === 2 ? "weekly_interval_2" : "weekly",
+        ...photoHydration.item.cadenceFields,
         day: photoHydration.item.recurrence.weekdays[0],
         timeOfDay: photoHydration.item.recurrence.timeOfDay,
         reminderEnabled: photoHydration.item.reminderEnabled,

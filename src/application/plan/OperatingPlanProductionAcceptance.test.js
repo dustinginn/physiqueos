@@ -273,11 +273,18 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     expect(protectedSnapshot(fixture.snapshot())).toBe(before);
     const readback = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
     // The saved delivery time is the shared 03:00 generation time, whatever the editor sent.
-    expect(readback.editor).toEqual({ ...draft, monthly: { ...draft.monthly, localTime: "03:00" } });
+    // Changing the photo weekday (Saturday -> Sunday) on Tue Sep 15 is a
+    // cadence change: the old next occurrence (Sat Sep 19) no longer matches,
+    // so the new schedule starts on the first Sunday after today.
+    expect(readback.editor).toEqual({
+      ...draft,
+      monthly: { ...draft.monthly, localTime: "03:00" },
+      photos: { ...draft.photos, nextOccurrenceDate: "2026-09-20" },
+    });
     expect(readback.context).toMatchObject({ expectedRevision: 86, dexaExpectedRevision: 2 });
     expect(readback.context.expectedCurrentVersionId).not.toBe("coaching-v1");
     expect(fixture.snapshot().reminders.find((item) => item.id === "reminder_weekly_progress_photo_set"))
-      .toMatchObject({ active: false, schedule: { daysOfWeek: ["sunday"], timeOfDay: "evening", anchorDate: "2026-07-25" } });
+      .toMatchObject({ active: false, nextDueAt: "2026-09-20", schedule: { daysOfWeek: ["sunday"], timeOfDay: "evening", anchorDate: "2026-09-20" } });
     const homePriorities = createDailyFocusService().getDailyFocus({
       ...fixture.snapshot(), now: new Date("2026-10-22T14:00:00.000Z"), timeZone: "America/Los_Angeles",
     });
@@ -462,6 +469,113 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
       transaction: { canonicalRecords: fixture.records, client: { query: async () => ({ rows: [] }) } },
     });
     expect((await fixture.records.getRuntimeMetadata()).revision).toBe(86);
+  });
+});
+
+describe("Progress Photos flexible cadence through the Native Coaching Updates contract", () => {
+  const photoReminder = (fixture) => fixture.snapshot().reminders.find((item) => item.id === "reminder_weekly_progress_photo_set");
+  const photoVersions = (fixture) => fixture.snapshot().protocolVersions.filter((item) => item.protocolId === "photos");
+  const save = async (fixture, mutate) => {
+    const detail = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    const draft = structuredClone(detail.editor);
+    mutate(draft);
+    const payload = { protocolId: detail.protocolId, ...detail.context, draft };
+    delete payload.expectedRevision;
+    return fixture.ports.saveCoachingUpdates(context(payload, detail.context.expectedRevision));
+  };
+  // The production-shaped fixture omits the store-normalized photo reminder
+  // identity fields Home keys on; add them so Home reads the saved schedule.
+  const photoDates = (fixture, now) => createDailyFocusService().getNotificationOccurrences({
+    reminders: [{
+      ...photoReminder(fixture), type: "evidence_reminder", linkedEntityType: "progress_photo_set",
+      linkedEvidenceType: "progress_photo", title: "Weekly Progress Photo Set", expectedViews: [],
+    }],
+    now: new Date(now), timeZone: "America/Los_Angeles",
+  }).filter((item) => /photo/i.test(item.label ?? ""))
+    .map((item) => item.occurrenceDate ?? item.date);
+
+  it("loads the existing Every 2 weeks schedule unchanged, with the next date counted from today", async () => {
+    const fixture = setup();
+    const before = JSON.stringify(fixture.snapshot());
+    const detail = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    expect(detail.editor.photos).toEqual({
+      cadence: "weekly_interval_2", cadenceInterval: 2, cadenceUnit: "week", weekOfMonth: null,
+      nextOccurrenceDate: "2026-09-19", day: "saturday", timeOfDay: "afternoon", specificTime: null,
+      reminderEnabled: true,
+    });
+    expect(JSON.stringify(fixture.snapshot())).toBe(before);
+  });
+
+  it("treats a Build 80 legacy draft and an echoed new draft as no photo change", async () => {
+    const fixture = setup();
+    const legacy = await save(fixture, (draft) => {
+      for (const key of ["cadenceInterval", "cadenceUnit", "weekOfMonth", "nextOccurrenceDate"]) delete draft.photos[key];
+      draft.monthly.enabled = !draft.monthly.enabled;
+    });
+    expect(legacy.result).toMatchObject({ photosChanged: false, photoReminderChanged: false });
+    expect(photoVersions(fixture)).toHaveLength(1);
+    expect(photoReminder(fixture).schedule).toMatchObject({ interval: 2, anchorDate: "2026-07-25" });
+    const echoed = await save(fixture, (draft) => { draft.monthly.enabled = !draft.monthly.enabled; });
+    expect(echoed.result).toMatchObject({ photosChanged: false });
+    expect(photoVersions(fixture)).toHaveLength(1);
+  });
+
+  it("rejects an unknown legacy cadence and invalid new cadences without mutation", async () => {
+    const fixture = setup();
+    const before = JSON.stringify(fixture.snapshot());
+    for (const mutate of [
+      (draft) => { draft.photos = { ...draft.photos, cadence: "custom", cadenceInterval: undefined, cadenceUnit: undefined }; },
+      (draft) => { draft.photos.cadenceInterval = 0; },
+      (draft) => { draft.photos.cadenceInterval = 13; },
+      (draft) => { draft.photos.cadenceUnit = "day"; },
+      (draft) => { draft.photos.cadenceUnit = "month"; draft.photos.weekOfMonth = null; },
+    ]) {
+      await expect(save(fixture, mutate)).rejects.toMatchObject({ code: "COACHING_UPDATES_INVALID" });
+      expect(JSON.stringify(fixture.snapshot())).toBe(before);
+    }
+  });
+
+  it("saves every 3 weeks without moving the upcoming occurrence, and projects Home/notifications from it", async () => {
+    const fixture = setup();
+    const before = protectedSnapshot(fixture.snapshot());
+    const saved = await save(fixture, (draft) => { draft.photos.cadenceInterval = 3; });
+    expect(saved.result).toMatchObject({ photosChanged: true, coachingChanged: false, photoReminderChanged: false });
+    expect(protectedSnapshot(fixture.snapshot())).toBe(before);
+    const readback = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    expect(readback.editor.photos).toMatchObject({ cadence: "custom", cadenceInterval: 3, cadenceUnit: "week", weekOfMonth: null, nextOccurrenceDate: "2026-09-19", day: "saturday" });
+    expect(readback.editor.photoEventBriefingEnabled).toBe(true);
+    expect(photoReminder(fixture)).toMatchObject({ active: true, nextDueAt: "2026-09-19", schedule: { frequency: "weekly", interval: 3, anchorDate: "2026-09-19", daysOfWeek: ["saturday"] } });
+    expect(photoVersions(fixture).filter((item) => item.status === "active" && !item.endedAt)).toHaveLength(1);
+    expect(photoDates(fixture, "2026-09-15T19:00:00.000Z")).toEqual(["2026-09-19"]);
+    expect(photoDates(fixture, "2026-09-27T19:00:00.000Z")).toEqual([]);
+    expect(photoDates(fixture, "2026-10-04T19:00:00.000Z")).toEqual(["2026-10-10"]);
+  });
+
+  it("saves every 1 month (first Saturday), then every 2 weeks again, with clean reminder state", async () => {
+    const fixture = setup();
+    await save(fixture, (draft) => { draft.photos.cadenceInterval = 1; draft.photos.cadenceUnit = "month"; draft.photos.weekOfMonth = "first"; });
+    let readback = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    expect(readback.editor.photos).toMatchObject({ cadence: "custom", cadenceInterval: 1, cadenceUnit: "month", weekOfMonth: "first", nextOccurrenceDate: "2026-10-03" });
+    expect(photoReminder(fixture)).toMatchObject({ nextDueAt: "2026-10-03", schedule: { frequency: "monthly", type: "monthly", unit: "month", weekOfMonth: "first", interval: 1, anchorDate: "2026-10-03" } });
+    // The old every-2-weeks Saturday (Sep 19) is no longer scheduled.
+    expect(photoDates(fixture, "2026-09-15T19:00:00.000Z")).toEqual([]);
+    expect(photoDates(fixture, "2026-09-28T19:00:00.000Z")).toEqual(["2026-10-03"]);
+    expect(photoDates(fixture, "2026-10-04T19:00:00.000Z")).toEqual([]);
+
+    await save(fixture, (draft) => { draft.photos.cadenceInterval = 2; draft.photos.cadenceUnit = "week"; draft.photos.weekOfMonth = null; });
+    readback = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
+    expect(readback.editor.photos).toMatchObject({ cadence: "weekly_interval_2", cadenceInterval: 2, cadenceUnit: "week", weekOfMonth: null });
+    expect(photoReminder(fixture).schedule).not.toHaveProperty("weekOfMonth");
+    expect(photoReminder(fixture).schedule).toMatchObject({ frequency: "weekly", unit: "week", interval: 2 });
+    expect(photoVersions(fixture).filter((item) => item.status === "active" && !item.endedAt)).toHaveLength(1);
+    // Two changes on the same day: one successor (effective today) amended
+    // with audited provenance; the historical v1 is ended, never rewritten.
+    const versions = photoVersions(fixture);
+    expect(versions).toHaveLength(2);
+    expect(versions.find((item) => item.id === "photos-v1")).toMatchObject({ recurrence: { interval: 2, anchorDate: "2026-07-25" } });
+    const successor = versions.find((item) => item.id !== "photos-v1");
+    expect(successor).toMatchObject({ effectiveAt: "2026-09-15", status: "active", recurrence: { frequency: "weekly", interval: 2 } });
+    expect(successor.change.sameDayAmendments).toHaveLength(1);
   });
 });
 

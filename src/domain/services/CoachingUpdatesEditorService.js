@@ -40,6 +40,12 @@ export function buildCoachingUpdatesRequest(form, model) {
     notificationPreference: "notify_when_ready",
     photos: {
       cadence: String(form.get("photoCadence") ?? ""),
+      // Absent from legacy drafts; when present they are authoritative.
+      cadenceInterval: form.get("photoCadenceInterval") == null || form.get("photoCadenceInterval") === ""
+        ? null : Number(form.get("photoCadenceInterval")),
+      cadenceUnit: form.get("photoCadenceUnit") == null ? null : String(form.get("photoCadenceUnit")),
+      weekOfMonth: form.get("photoWeekOfMonth") == null || form.get("photoWeekOfMonth") === ""
+        ? null : String(form.get("photoWeekOfMonth")),
       day: String(form.get("photoDay") ?? ""),
       timeOfDay: String(form.get("photoTimeOfDay") ?? ""),
       reminderEnabled: form.has("photoReminderEnabled"),

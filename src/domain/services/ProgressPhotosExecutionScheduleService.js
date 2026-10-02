@@ -20,8 +20,11 @@ import {
 } from "./ProtocolRecurrenceNormalizationService.js";
 import {
   formatNextProtocolOccurrence,
-  getNextProtocolOccurrence,
+  getProtocolOccurrenceOnOrAfter,
+  protocolLocalDateKey,
+  resolveCadenceChangeAnchor,
 } from "./ProtocolOccurrenceResolver.js";
+import { progressPhotoCadenceFields } from "./ProgressPhotosCadence.js";
 
 export const PROGRESS_PHOTOS_EXECUTION_ID = "execution_progress_photos";
 export const PROGRESS_PHOTOS_REMINDER_ID = "reminder_weekly_progress_photo_set";
@@ -39,7 +42,7 @@ export function createProgressPhotosExecutionScheduleService({
   return {
     hydrate() {
       const baseline = readPersistedBaseline();
-      return createProgressPhotosExecutionHydrationModel(baseline.store, baseline);
+      return createProgressPhotosExecutionHydrationModel(baseline.store, baseline, { now: now() });
     },
     prepare(command) {
       return prepareProgressPhotosScheduleSuccessor(liveStore, command, now());
@@ -105,7 +108,9 @@ export function createProgressPhotosExecutionScheduleService({
   };
 }
 
-export function createProgressPhotosExecutionHydrationModel(store, baseline = null) {
+export function createProgressPhotosExecutionHydrationModel(store, baseline = null, {
+  now = new Date(),
+} = {}) {
   const execution = store.executionItems?.find((item) => item.id === PROGRESS_PHOTOS_EXECUTION_ID);
   const root = store.protocols?.find((item) =>
     item.status === "active" && item.protocolType === "photos");
@@ -113,16 +118,22 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
   const reminder = store.reminders?.find((item) => item.id === PROGRESS_PHOTOS_REMINDER_ID);
   if (!execution || !root || !version) return null;
   const recurrence = recurrenceFromVersion(version, root, execution, reminder);
-  const nextOccurrence = getNextProtocolOccurrence(recurrence, recurrence.anchorDate);
-  const intervalTwoRecurrence = normalizeProtocolRecurrence({
-    ...recurrence, interval: 2,
+  // The next occurrence is counted from today (on or after), not from the
+  // anchor: an old anchor would otherwise report a long-past "next" date.
+  const today = protocolLocalDateKey(now, recurrence.timezone);
+  const nextOccurrence = getProtocolOccurrenceOnOrAfter(recurrence, today);
+  // The legacy Web execution editor's weekly / Every 2 weeks previews. Only
+  // meaningful for a weekly recurrence; a monthly one has no such sibling.
+  const weeklyRecurrence = recurrence.frequency === "weekly" ? recurrence : null;
+  const intervalTwoRecurrence = weeklyRecurrence ? normalizeProtocolRecurrence({
+    ...weeklyRecurrence, interval: 2,
   }, {
     fallbackTimezone: recurrence.timezone,
     fallbackAnchorDate: recurrence.anchorDate,
     effectiveAt: recurrence.effectiveAt,
-  });
-  const intervalTwoNextOccurrence = getNextProtocolOccurrence(
-    intervalTwoRecurrence, intervalTwoRecurrence.anchorDate);
+  }) : null;
+  const intervalTwoNextOccurrence = intervalTwoRecurrence
+    ? getProtocolOccurrenceOnOrAfter(intervalTwoRecurrence, today) : null;
   return Object.freeze({
     item: {
       ...structuredClone(execution),
@@ -131,6 +142,7 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
         type: hydrateCadenceFromRecurrence(recurrence),
         interval: recurrence.interval,
       },
+      cadenceFields: progressPhotoCadenceFields(recurrence),
       preferredSchedule: {
         ...structuredClone(execution.preferredSchedule ?? {}),
         daysOfWeek: recurrence.weekdays,
@@ -152,10 +164,12 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
           summary: formatProtocolRecurrenceSummary(recurrence),
           next: formatNextProtocolOccurrence(nextOccurrence),
         },
-        weekly_interval_2: {
-          summary: formatProtocolRecurrenceSummary(intervalTwoRecurrence),
-          next: formatNextProtocolOccurrence(intervalTwoNextOccurrence),
-        },
+        ...(intervalTwoRecurrence ? {
+          weekly_interval_2: {
+            summary: formatProtocolRecurrenceSummary(intervalTwoRecurrence),
+            next: formatNextProtocolOccurrence(intervalTwoNextOccurrence),
+          },
+        } : {}),
       },
     },
     context: {
@@ -233,20 +247,29 @@ export function prepareProgressPhotosScheduleSuccessor(store, command, timestamp
     return rejected("version_conflict", "The Progress Photos schedule changed while editing.");
   }
   let recurrence;
+  let existing;
   try {
     recurrence = normalizeProtocolRecurrence(command.recurrence, {
       fallbackTimezone: "America/Los_Angeles",
       fallbackAnchorDate: "2026-07-25",
       effectiveAt: command.effectiveDate,
     });
+    existing = recurrenceFromVersion(current, root, execution, reminder);
   } catch (error) {
     return rejected("invalid", error.message);
   }
-  const existing = recurrenceFromVersion(current, root, execution, reminder);
+  const today = protocolLocalDateKey(timestamp, recurrence.timezone);
+  if (cadencePatternChanged(existing, recurrence)) {
+    // A cadence change is future-only and starts predictably (see
+    // resolveCadenceChangeAnchor); an unchanged pattern keeps its anchor.
+    const anchorDate = resolveCadenceChangeAnchor(existing, recurrence, today);
+    if (!anchorDate) return rejected("invalid", "The next occurrence could not be resolved.");
+    recurrence = Object.freeze({ ...recurrence, anchorDate });
+  }
   if (createProtocolRecurrenceIdentity(existing) === createProtocolRecurrenceIdentity(recurrence)) {
     return Object.freeze({ ok: true, outcome: "unchanged", committed: false, recurrence });
   }
-  const nextOccurrence = getNextProtocolOccurrence(recurrence, recurrence.anchorDate);
+  const nextOccurrence = getProtocolOccurrenceOnOrAfter(recurrence, today);
   if (!nextOccurrence) return rejected("invalid", "The next occurrence could not be resolved.");
   const successorPayload = {
     intent: current.intent?.summary ? structuredClone(current.intent)
@@ -266,6 +289,30 @@ export function prepareProgressPhotosScheduleSuccessor(store, command, timestamp
       },
     },
   };
+  // A second schedule save on the current version's own (today/future)
+  // effective date amends that version with audited provenance, mirroring
+  // Coaching Updates; an equal-date successor is impossible. Older versions
+  // stay immutable: their dates still go through the successor validator.
+  const currentEffectiveDate = String(current.effectiveAt ?? "").slice(0, 10);
+  if (currentEffectiveDate === command.effectiveDate && command.effectiveDate >= today) {
+    const amendment = prepareSameDateScheduleAmendment(store, {
+      root, current, successorPayload, command, timestamp,
+    });
+    if (!amendment.ok) return amendment;
+    return Object.freeze({
+      ok: true,
+      outcome: "ready",
+      protocolId: root.id,
+      currentVersionId: current.id,
+      successorVersionId: current.id,
+      recurrence,
+      recurrenceIdentity: successorPayload.recurrenceIdentity,
+      nextOccurrence,
+      amendment,
+      executionId: execution.id,
+      reminderId: reminder.id,
+    });
+  }
   const transition = prepareActiveProtocolSuccessorTransition(store, {
     protocolId: root.id,
     expectedCurrentVersionId: current.id,
@@ -312,11 +359,58 @@ function recurrenceFromVersion(version, root, execution, reminder) {
     },
   );
 }
+function prepareSameDateScheduleAmendment(store, { root, current, successorPayload, command, timestamp }) {
+  const active = store.protocolVersions.filter((item) =>
+    item.protocolId === root.id && item.status === "active" && !item.endedAt);
+  if (root.status !== "active" || root.currentVersionId !== current.id
+      || current.status !== "active" || current.endedAt
+      || active.length !== 1 || active[0].id !== current.id) {
+    return rejected("current_version_conflict", "The Progress Photos schedule changed. Reload it before saving.");
+  }
+  if (!command.author?.id) return rejected("invalid", "An explicit author is required.");
+  const amendedAt = timestamp.toISOString();
+  return Object.freeze({
+    ok: true,
+    timestamp: amendedAt,
+    amended: {
+      ...structuredClone(current),
+      recurrence: successorPayload.recurrence,
+      recurrenceIdentity: successorPayload.recurrenceIdentity,
+      change: {
+        ...(structuredClone(current.change ?? {})),
+        reviewedChanges: {
+          ...(structuredClone(current.change?.reviewedChanges ?? {})),
+          recurrence: successorPayload.recurrence,
+        },
+        sameDayAmendments: [
+          ...(structuredClone(current.change?.sameDayAmendments ?? [])),
+          {
+            amendedAt,
+            reason: "Update Progress Photos execution schedule.",
+            author: structuredClone(command.author),
+            provenance: { source: "progress_photos_execution_editor" },
+          },
+        ],
+      },
+      updatedAt: amendedAt,
+    },
+  });
+}
+/// Interval, unit, weekday, or week-of-month changes re-anchor; time-only,
+/// reminder-only, and identical saves do not.
+function cadencePatternChanged(existing, requested) {
+  return existing.frequency !== requested.frequency
+    || existing.interval !== requested.interval
+    || existing.weekdays.join(",") !== requested.weekdays.join(",")
+    || (existing.weekOfMonth ?? null) !== (requested.weekOfMonth ?? null);
+}
 function reconcileProjection(store, prepared) {
   const item = store.executionItems.find((entry) => entry.id === prepared.executionId);
+  const monthly = prepared.recurrence.frequency === "monthly";
   item.cadence = {
-    type: "weekly",
+    type: monthly ? "monthly" : "weekly",
     interval: prepared.recurrence.interval,
+    ...(monthly ? { unit: "month", weekOfMonth: prepared.recurrence.weekOfMonth } : {}),
     recurrenceVersion: prepared.recurrence.recurrenceVersion,
   };
   item.preferredSchedule = {
@@ -332,7 +426,14 @@ function reconcileProjection(store, prepared) {
 }
 
 export function applyPreparedProgressPhotosScheduleSuccessor(store, prepared) {
-  applyPreparedActiveProtocolSuccessor(store, prepared.successorTransition);
+  if (prepared.amendment) {
+    const current = store.protocolVersions.find((item) => item.id === prepared.currentVersionId);
+    const root = store.protocols.find((item) => item.id === prepared.protocolId);
+    Object.assign(current, structuredClone(prepared.amendment.amended));
+    Object.assign(root, { updatedAt: prepared.amendment.timestamp });
+  } else {
+    applyPreparedActiveProtocolSuccessor(store, prepared.successorTransition);
+  }
   reconcileProjection(store, prepared);
   reconcileReminder(store, prepared);
 }
@@ -342,13 +443,16 @@ export function verifyPreparedProgressPhotosScheduleSuccessor(store, prepared) {
 }
 function reconcileReminder(store, prepared) {
   const reminder = store.reminders.find((entry) => entry.id === prepared.reminderId);
+  const frequency = prepared.recurrence.frequency === "monthly" ? "monthly" : "weekly";
+  const { weekOfMonth: _staleWeekOfMonth, ...previousSchedule } = reminder.schedule ?? {};
   reminder.schedule = {
-    ...(reminder.schedule ?? {}),
-    type: "weekly",
-    cadence: "weekly",
-    frequency: "weekly",
+    ...previousSchedule,
+    type: frequency,
+    cadence: frequency,
+    frequency,
     interval: prepared.recurrence.interval,
-    unit: "week",
+    unit: frequency === "monthly" ? "month" : "week",
+    ...(frequency === "monthly" ? { weekOfMonth: prepared.recurrence.weekOfMonth } : {}),
     daysOfWeek: prepared.recurrence.weekdays,
     preferredDay: prepared.recurrence.weekdays[0],
     dayOfWeek: prepared.recurrence.weekdays[0],
@@ -366,6 +470,8 @@ function verifyCandidate(store, prepared) {
   return root?.currentVersionId === prepared.successorVersionId
     && versions.filter((item) => item.status === "active" && !item.endedAt).length === 1
     && reminder?.schedule?.interval === prepared.recurrence.interval
+    && reminder?.schedule?.frequency === prepared.recurrence.frequency
+    && (reminder?.schedule?.weekOfMonth ?? null) === (prepared.recurrence.weekOfMonth ?? null)
     && reminder?.nextDueAt === prepared.nextOccurrence.scheduledLocalDate;
 }
 function validateCommandBaseline(baseline, command) {

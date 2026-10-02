@@ -165,6 +165,11 @@ import {
 import { buildCoachingUpdatesRequest } from "../../domain/services/CoachingUpdatesEditorService.js";
 import { resolveCoachingUpdatesReadModel } from "../../domain/services/CoachingUpdatesReadService.js";
 import { createProgressPhotosExecutionHydrationModel } from "../../domain/services/ProgressPhotosExecutionScheduleService.js";
+import {
+  ProgressPhotosCadenceError,
+  applyProgressPhotoCadence,
+  resolveRequestedProgressPhotoCadence,
+} from "../../domain/services/ProgressPhotosCadence.js";
 import { selectCanonicalActiveGoal } from "../../domain/services/CanonicalGoalRelationshipService.js";
 import { createSessionPerformanceRecordsReadModel } from "../../domain/services/TrainingLibraryExerciseRecordsService.js";
 
@@ -218,6 +223,9 @@ function coachingUpdatesDraftForm(draft) {
     monthlyTime: draft.monthly?.localTime,
     notificationPreference: draft.notificationPreference,
     photoCadence: draft.photos?.cadence,
+    photoCadenceInterval: draft.photos?.cadenceInterval,
+    photoCadenceUnit: draft.photos?.cadenceUnit,
+    photoWeekOfMonth: draft.photos?.weekOfMonth,
     photoDay: draft.photos?.day,
     photoTimeOfDay: draft.photos?.timeOfDay === "specific"
       ? draft.photos?.specificTime
@@ -1214,11 +1222,18 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     const readModel = resolveCoachingUpdatesReadModel({
       protocol, version, goal, timeZone: candidate.user?.timeZone ?? "America/Los_Angeles",
     });
-    const photos = createProgressPhotosExecutionHydrationModel(candidate);
+    const photos = createProgressPhotosExecutionHydrationModel(candidate, null, { now: now() });
     if (!protocol || !version || !goal || !readModel || !photos) {
       throw problem(404, "COACHING_UPDATES_UNAVAILABLE", "These coaching settings are no longer available.");
     }
     const requested = buildCoachingUpdatesRequest(coachingUpdatesDraftForm(context.payload.draft ?? {}), readModel);
+    let photoCadence;
+    try {
+      photoCadence = resolveRequestedProgressPhotoCadence(requested.photos);
+    } catch (error) {
+      if (!(error instanceof ProgressPhotosCadenceError)) throw error;
+      throw problem(400, "COACHING_UPDATES_INVALID", error.message);
+    }
     const effectiveDate = getLocalDateKey(
       now(), resolveLocalTimeZone(candidate.user?.timeZone ?? candidate.user?.timezone)
     );
@@ -1253,12 +1268,10 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         expectedSemanticDigest: context.payload.photoExpectedSemanticDigest,
         effectiveDate,
         reminderEnabled: requested.photos.reminderEnabled,
-        recurrence: {
-          ...photos.item.recurrence,
-          interval: requested.photos.cadence === "weekly_interval_2" ? 2 : 1,
-          weekdays: [requested.photos.day],
+        recurrence: applyProgressPhotoCadence(photos.item.recurrence, photoCadence, {
+          day: requested.photos.day,
           timeOfDay: requested.photos.timeOfDay,
-        },
+        }),
         author,
       },
       dexa: {

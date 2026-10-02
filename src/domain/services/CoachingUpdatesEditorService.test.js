@@ -100,6 +100,9 @@ describe("Coaching Updates editor model", () => {
       notificationPreference: "notify_when_ready",
       photos: {
         cadence: "weekly_interval_2",
+        cadenceInterval: null,
+        cadenceUnit: null,
+        weekOfMonth: null,
         day: "saturday",
         timeOfDay: "afternoon",
         reminderEnabled: true,

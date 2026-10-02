@@ -178,7 +178,9 @@ describe("Coaching Updates cross-owner strategy save", () => {
       weekdays: ["sunday"],
       timeOfDay: "evening",
       timezone: "America/Los_Angeles",
-      anchorDate: "2026-07-25",
+      // Saturday -> Sunday on Fri Aug 7: the kept Sat Aug 8 occurrence no
+      // longer matches, so the schedule restarts on the next Sunday.
+      anchorDate: "2026-08-09",
     });
     expect(fixture.live.executionItems.filter((item) => item.id === "execution_progress_photos")).toHaveLength(1);
     expect(fixture.live.reminders.filter((item) => item.id === "reminder_weekly_progress_photo_set")).toHaveLength(1);
@@ -191,8 +193,9 @@ describe("Coaching Updates cross-owner strategy save", () => {
           daysOfWeek: ["sunday"],
           timeOfDay: "evening",
           timezone: "America/Los_Angeles",
-          anchorDate: "2026-07-25",
+          anchorDate: "2026-08-09",
         },
+        nextDueAt: "2026-08-09",
       });
     expect(fixture.live.executionItems.find((item) => item.id === "execution_next_dexa")).toMatchObject({
       preferredSchedule: { date: "2026-08-22", timeOfDay: "08:30" },

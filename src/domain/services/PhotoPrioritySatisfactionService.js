@@ -1,6 +1,6 @@
 import { isConfirmedUsablePhoto } from "../models/progressPhotoPoseVocabulary";
 import { normalizeProtocolRecurrence } from "./ProtocolRecurrenceNormalizationService";
-import { isProtocolDateOnCycle } from "./ProtocolOccurrenceResolver";
+import { isProtocolDateOnCycle, requiresProtocolCycleEvaluation } from "./ProtocolOccurrenceResolver";
 
 export const PHOTO_PRIORITY_SATISFACTION_TYPE = "progress_photo_session_confirmed";
 
@@ -63,7 +63,7 @@ function reminderMatchesDate(reminder, dateKey) {
   const day = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"][date.getUTCDay()];
   const schedule = reminder.schedule ?? {};
   if (schedule.type === "daily" || schedule.cadence === "daily") return true;
-  if (Number(schedule.interval ?? 1) > 1) {
+  if (requiresProtocolCycleEvaluation(schedule)) {
     try {
       const recurrence = normalizeProtocolRecurrence(schedule, {
         fallbackTimezone: schedule.timezone,

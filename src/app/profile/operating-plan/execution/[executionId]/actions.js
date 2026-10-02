@@ -154,6 +154,16 @@ export async function saveProgressPhotosExecution(formData, {
   const user = await repositories.users.getCurrentUser();
   const cadence = String(formData.get("cadence"));
   const timeChoice = String(formData.get("timeChoice") || "");
+  // This legacy editor can only express Weekly / Every 2 weeks. A 3+ week or
+  // monthly schedule hydrates here as "custom"/"monthly"; saving it would
+  // silently reset it to weekly, so refuse and point to Coaching Updates.
+  if (cadence !== "weekly" && cadence !== "weekly_interval_2") {
+    return {
+      outcome: "validation_failure",
+      committed: false,
+      reason: "Edit this Progress Photos cadence in Coaching Updates.",
+    };
+  }
 
   return createService({ runtimeStorePath, liveStore, createUnitOfWork }).save({
     protocolId: String(formData.get("protocolId")),

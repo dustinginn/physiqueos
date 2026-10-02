@@ -530,7 +530,7 @@ export function createCoreNavigationReadService({
           repositories.goals.getActiveGoal(ownerUserId),
           createCoachingUpdatesReadService({ repositories }).getCurrent({ protocolId: protocol.id, userId: ownerUserId }),
         ]);
-        const photoHydration = createProgressPhotosExecutionHydrationModel(runtime);
+        const photoHydration = createProgressPhotosExecutionHydrationModel(runtime, null, { now: now() });
         const dexa = runtime.executionItems?.find((item) => item.id === DEXA_APPOINTMENT_ID);
         if (!version || !goal || !readModel || !photoHydration || !dexa) return null;
         // A completed DEXA execution is history, not the next appointment.
@@ -542,7 +542,8 @@ export function createCoreNavigationReadService({
           readModel,
           policy: resolveCoachingUpdatesGoalCadencePolicy(goal),
           photos: {
-            cadence: photoHydration.item.recurrence.interval === 2 ? "weekly_interval_2" : "weekly",
+            ...photoHydration.item.cadenceFields,
+            nextOccurrenceDate: photoHydration.item.preferredSchedule.nextDueAt ?? null,
             day: photoHydration.item.recurrence.weekdays[0],
             timeOfDay: /^\d{2}:\d{2}$/.test(photoHydration.item.recurrence.timeOfDay ?? "")
               ? "specific" : photoHydration.item.recurrence.timeOfDay,
@@ -577,7 +578,13 @@ export function createCoreNavigationReadService({
             weekly: editor.weekly,
             monthly: editor.monthly,
             photos: Object.freeze({
+              // `cadence` is the legacy Build ≤80 field ("custom" fails
+              // closed there); interval/unit/weekOfMonth are authoritative.
               cadence: editor.photos.cadence,
+              cadenceInterval: editor.photos.cadenceInterval,
+              cadenceUnit: editor.photos.cadenceUnit,
+              weekOfMonth: editor.photos.weekOfMonth,
+              nextOccurrenceDate: editor.photos.nextOccurrenceDate,
               day: editor.photos.day,
               timeOfDay: editor.photos.timeOfDay,
               specificTime: editor.photos.specificTime,
