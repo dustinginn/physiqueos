@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T22:00:00Z",
+  "generated_at_utc": "2026-10-02T23:54:05Z",
   "task": {
-    "id": "build82-sleep-v3-native-integration-activation-20261002",
-    "title": "sleep-canon-v3 prospective activation",
+    "id": "dexa-healthkit-writeback-audit-plan-20261002",
+    "title": "DEXA -> Apple Health writeback audit + implementation plan",
     "agent": "claude",
     "status": "completed"
   },
@@ -17,38 +17,28 @@
     "sleep_canonical_algorithm": "sleep-canon-v3 (ordinary, effective 2026-10-02)"
   },
   "result": {
-    "summary": "After Founder confirmed Build 82 remote install, guarded sleep-canon-v3 activation applied: policy enabled (effective 2026-10-02) and Oct 2 recanonicalized v2 rev2 -> v3 rev3 (455/98.5/117.5/239/25 min, 73 segments, one coherent revision). Exactly 2 of 52 collections changed; historical 0; strategic 0. Canary FAIL -> HOLD.",
+    "summary": "Audit + plan only. No body measurements are written to Apple Health today; PhysiqueOS Weight is manual-only, so DEXA writeback cannot contaminate PhysiqueOS Weight. Accepted point = active canonical DEXA after canonical_commit. Recommended V1: automatic prospective-only (scan date >= 2026-10-09) Native reconciler writing Body Fat % (+ Lean Body Mass as fat-free mass total-fat), sync-identifier exact-once/replace, own samples never re-ingested; do NOT write Weight/RMR/BMI. Founder decisions pending (7). Implementation not started.",
     "success": true,
-    "production_mutated": true,
+    "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": false,
+    "healthkit_written": false
   },
   "validation": {
-    "preflight": {
-      "status": "passed",
-      "summary": "authority, D0, quarantine, v3 dormant, markers 0"
-    },
-    "dry_run": {
-      "status": "passed",
-      "summary": "target exactly [2026-10-02]"
-    },
-    "apply_in_transaction": {
-      "status": "passed",
-      "summary": "all verification checks true"
-    },
-    "post_apply_independent": {
-      "status": "passed",
-      "summary": "2/52 collections changed (config + Oct 2); stored == fresh v3; Evidence stages served; strategicEligible false"
+    "static_audit": {
+      "status": "completed",
+      "summary": "Native e2cbcd0c + Server src (identical to d0ff6596 for DEXA/weight) + iOS 27.0 SDK headers; no builds/tests/production reads"
     }
   },
   "open_gates": [
-    ">=2-3 natural v3 nights",
-    "closed-app background delivery proof",
-    "Oct 4 Weekly / Oct 7 Midweek leakage scan",
-    "14 reliable nights before Recovery baseline"
+    "Founder decisions \u00a7P 1-7 (review request 20261002T235405Z)",
+    "Phase B implementation (Server dormant + Native Build 83 on e2cbcd0c)",
+    "disk >= 20 GiB before Phase C Native testing (16 GiB at audit)",
+    "Oct 9 real-scan acceptance"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T220000Z-healthkit-sleep-canon-v3-prospective-activation.md",
-  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T212500Z-build82-testflight-remote-workflow-correction.md",
+  "full_report_path": "agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md",
+  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T233000Z-dexa-healthkit-writeback-audit-plan.md",
+  "previous_latest_report_path": "agent-handoffs/reports/20261002T220000Z-healthkit-sleep-canon-v3-prospective-activation.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

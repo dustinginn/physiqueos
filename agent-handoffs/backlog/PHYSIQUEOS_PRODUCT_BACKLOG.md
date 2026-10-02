@@ -22,6 +22,21 @@ DELIVERY WORKFLOW RULE (durable, 2026-10-02)
 
 ACTIVE / NEXT
 
+00. DEXA -> Apple Health writeback — DUE before Founder DEXA Fri 2026-10-09
+Status: AUDIT + PLAN COMPLETE (2026-10-02); Founder decisions PENDING; implementation NOT started; nothing written to HealthKit; no production mutation; no backfill.
+Report: agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md
+Audit result (summary):
+- No body measurement is written to Apple Health today (iPhone writes nothing; Watch writes workouts only). A dormant write registry exists (bodyMass + bodyFatPercentage); leanBodyMass is test-excluded.
+- PhysiqueOS daily Weight is manual Morning Check-In only; HealthKit bodyMass is never ingested, so DEXA writeback cannot contaminate PhysiqueOS Weight today. It WOULD add a second scan-day point to Apple Health / third-party Weight.
+- Accepted write point = active canonical DEXA record after the canonical_commit transaction (dexa_scan|owner|date + dexaRevision), not review status and not the dexaScans compatibility rows.
+- Apple Health has no type for BMC, VAT, android/gynoid, regional, BMD; RMR must never map to cumulative basalEnergyBurned.
+- PhysiqueOS leanMass = lean soft tissue (excludes BMC); Apple Lean Body Mass ≈ fat-free mass -> if written, write totalMass − fatMass.
+Recommended V1: automatic, prospective-only (scan date >= 2026-10-09) Native reconciler converging to Server-owned writeback intents; HKMetadataKeySyncIdentifier/SyncVersion exact-once + correction replace; own samples never re-ingested; write Body Fat % (+ Lean Body Mass as fat-free mass if approved); do NOT write Weight/RMR/BMI.
+Founder decisions pending (report §P): 1 measurement set; 2 DEXA Weight write (rec. No); 3 prospective-only vs backfill; 4 automatic vs manual; 5 correction auto-replace; 6 opt-in + toggle; 7 Phase D synthetic canary authorization.
+Delivery: Server additive deploy (dormant policy) + Native Build 83 on e2cbcd0c (iPhone-only). Phases A decide Oct 3 / B implement Oct 3-5 / C synthetic validation + TestFlight Oct 5-6 / D physical opt-in + canary Oct 7-8 / E real scan Oct 9. Scan-date eligibility means a late Build 83 still writes the Oct 9 scan exactly once.
+Pre-scan prep: make sure the Oct 9 DEXA appointment in PhysiqueOS has its local time set (used as the sample timestamp).
+Incidental (not fixed): web Evidence Review discard lacks status guard; possible briefing-step lookup issue on same-date DEXA re-import (unverified).
+
 0. Progress Photos flexible cadence (Every N Weeks / Months) — SHIPPED, pending Founder acceptance
 Status: Server 4ffde0f5 deployed (deployment faaf66bd) and verified; Native Build 81 (source 6a093251) uploaded VALID (delivery 212d79dd-cc57-4319-ab8c-d9694f0585ad); next build 82. Report: agent-handoffs/reports/20261002T070000Z-progress-photos-flexible-cadence.md.
 What changed:
