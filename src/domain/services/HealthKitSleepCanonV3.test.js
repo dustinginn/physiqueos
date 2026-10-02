@@ -289,6 +289,15 @@ describe("sleep-canon-v3 coherent copy selection", () => {
     expect(main(day).reconciliation.copySelection.coherenceBasis).toBe("ingestion_revision");
   });
 
+  it("known limitation, flagged: an older revision received after the newer revision's first batch", () => {
+    const a = revision("A", [["core", 0, 60], ["deep", 240, 300]], { idBase: 49_300, receivedAt: "2026-10-02T14:40:00.000Z" });
+    const b1 = revision("B1", [["core", 30, 120], ["deep", 120, 200], ["rem", 200, 300]], { idBase: 49_400, batchId: "batch-B1", receivedAt: "2026-10-02T14:30:00.000Z" });
+    const b2 = revision("B2", [["core", 300, 360], ["rem", 360, 480]], { idBase: 49_500, batchId: "batch-B2", receivedAt: "2026-10-02T14:41:00.000Z" });
+    const episode = main(v3([...a, ...b1, ...b2]));
+    // Whatever is chosen, the decision rested on weaker evidence and is counted.
+    expect(episode.reconciliation.copySelection.ambiguousContinuationCount).toBeGreaterThan(0);
+  });
+
   it("fuzz: partial old revision + new revision split across two batches never splices or loses the new revision", () => {
     let state = 2026;
     const random = (n) => { state = (state * 1103515245 + 12345) % 2147483648; return state % n; };

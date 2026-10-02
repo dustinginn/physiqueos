@@ -835,11 +835,14 @@ function buildCoherentChains(intervals) {
         }
       }
       if (best === null) break;
-      // A continuation decided only by chain order: another eligible chain is
-      // equal on every evidence criterion. Reported, never hidden.
+      // A continuation NOT decided by revision identity: another compatible
+      // chain was also eligible and only weaker evidence (ingestion time,
+      // topology, order) chose between them. Reported, never hidden: e.g. an
+      // older revision's batch received after the newer revision's first
+      // batch can attract the newer revision's small tail.
       const ties = chains.filter((chain) => chain !== best.chain && !used.has(chain.index) &&
         chain.lastEnd <= best.item.sample.start && compatible(best.item.generation, chain) &&
-        compareKeys(continuationKey(best.item, chain).slice(0, 4), best.key.slice(0, 4)) === 0);
+        continuationKey(best.item, chain)[0] === best.key[0]);
       if (ties.length > 0) ambiguousContinuationCount += 1;
       best.chain.samples.push(best.item.sample);
       best.chain.lastEnd = best.item.sample.end;
