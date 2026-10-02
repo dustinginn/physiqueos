@@ -1,55 +1,55 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-01T23:49:30Z",
+  "generated_at_utc": "2026-10-02T01:05:00Z",
   "task": {
-    "id": "shared-mac-build78-active-conservative-storage-audit-20261001",
-    "title": "Shared Mac conservative storage audit during active Native Build 78",
-    "agent": "codex",
-    "status": "complete"
+    "id": "native-build78-completion-notification-polish-20261001",
+    "title": "Native Build 78: PR celebration lifecycle, haptics, actionable notification Complete/Skip",
+    "agent": "claude",
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "cbed38b4dd063003fc451810c0e7d560c5e9ad4d",
-    "final_sha": null,
+    "base_sha": "c299fa29a14e04a4a22ac782d4610a4562e4f6e0",
+    "final_sha": "5911dd2a6f968c5a355ec68d3313f0e5e644d529",
     "production_server_sha": null,
     "production_deployment": null,
-    "native_sha": "c299fa29a14e04a4a22ac782d4610a4562e4f6e0",
-    "native_build": 77
+    "native_sha": "5911dd2a6f968c5a355ec68d3313f0e5e644d529",
+    "native_build": 78
   },
   "result": {
-    "summary": "Protected active Build 78 and reclaimed 0.416 GiB by removing only five clean, pushed, completed-session worktrees; free space ended at 22.746 GiB.",
+    "summary": "Build 78 (source 5911dd2a) uploaded and VALID (delivery 32447de5): reviewed PR celebration lifecycle fix 69cad804 integrated against Build 77's session authority, celebratory/completion/skip haptics, and capability-derived notification Complete (check-circle) + Skip for simple binary Priorities; Live Activity behavior unchanged. Founder physical acceptance pending.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": true
   },
   "validation": {
     "tests": {
-      "status": "not_run",
-      "summary": "Operations-only storage audit; no product tests or builds were run."
+      "status": "passed",
+      "summary": "Full Native unit suite 1862 tests, 1 known pre-existing unrelated Peptide failure; Build 77 Live Activity regression suites passing; 5/5 Workout UI journeys on final build; Release archive + release verifier + guarded upload dry run passed."
     },
     "review": {
-      "status": "not_applicable",
-      "summary": "No application or product source changes."
+      "status": "approved",
+      "summary": "Fresh independent review (no P0; P1/P2s fixed) plus delta re-review (no P0/P1; P2 fixed)."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "No production access or writes; no product source, Build 78 artifact, archive, Simulator data, signing material, credential, or personal file was changed."
+      "summary": "No Server change, deployment or production mutation; only TestFlight upload of Build 78 as authorized."
     }
   },
   "decisions_required": [],
   "blockers": [],
   "unexpected_findings": [
-    "The earlier 20261001T185023Z storage report existed only on a feature branch and was not readable from origin/main.",
-    "Build 78 remained active with local modified, untracked, and unmerged files; all were protected.",
-    "Build 78 resumed focused tests during report publication using protected job-local DerivedData at ~/.claude/jobs/ade665c9/tmp/dd, causing expected post-cleanup disk and swap fluctuation."
+    "Server Home/notification contract carries no skip capability; notification Skip uses a Native mapping (direct_completion_allowed only), so Recovery Support Skip stays in Priority Detail until the Server publishes a skip command in notificationAction.",
+    "iOS shows notification actions only on expansion; a Reminders-style inline checkbox is not available to third-party apps, so Complete is the first action with a check-circle symbol."
   ],
   "backlog": [
-    "Allow Claude to finish Native Build 78 without interference.",
-    "Restart the Mac after Build 78 completes to clear residual swap."
+    "Founder physical acceptance of Build 78 (PR celebration, notification Complete/Skip, haptics) and the unchanged Build 77 Live Activity checklist.",
+    "Server-owned skip command in notificationAction (would enable Recovery Support Skip from notifications).",
+    "Workout set-completion haptic deferred until real-workout feedback."
   ],
-  "recommended_next_step": "Let Claude finish Build 78, then restart the shared Mac as planned.",
-  "full_report_path": "agent-handoffs/reports/20261001T234930Z-shared-mac-build78-active-conservative-storage-audit.md",
+  "recommended_next_step": "Install Build 78 from TestFlight and run the Founder checklist in the report; next build number is 79.",
+  "full_report_path": "agent-handoffs/reports/20261002T010500Z-native-build78-completion-notification-polish.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
