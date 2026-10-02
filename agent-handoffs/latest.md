@@ -2,15 +2,13 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: HealthKit Sleep sleep-canon-v3 coherent Oura copy selection (`healthkit-sleep-canon-v3-copy-coherence-20261002`)
+- Task: Shared Mac safe storage cleanup before Sleep Native integration (`shared-mac-safe-storage-cleanup-before-sleep-native-20261002`)
 - Agent: Claude
-- Status: Server deployed DORMANT; activation pending a Native build that accepts v3
-- Generated (UTC): 2026-10-02T20:15:00Z
-- Server: d0ff65965233fa44e108387f01b649a2bdb476df (deployment 64533990)
-- Native patch: claude/sleep-canon-v3-native-accept-20261002 @ 3ed3eae7 (not built)
+- Status: completed
+- Generated (UTC): 2026-10-02T20:25:00Z
 
-Summary: sleep-canon-v3 (one coherent Oura revision per night via ingestion provenance; v2 selection when no provenance) deployed dormant. Zero-write audit: historical 0/87 and validation 0/30 nights change; Oct 2 v3 equals Oura revision 2 alone. Activation (policy + bounded Oct 2+ rewrite) dry-run only: target exactly [2026-10-02]; waits for a Native build accepting v3 (Founder decision). Production Sleep/historical/strategic mutation 0. Canary stays FAIL until activation, then HOLD.
+Summary: Free disk 12.81 -> 21.33 GiB by deleting only reproducible build output: 4 temporary Watch DerivedData folders in /private/tmp (~1.7 GiB) and git-ignored node_modules/.next in 7 inactive ~/GitHub clones (~6.8 GiB). No source, worktree, archive, simulator, signing, device, swap or production change. Watch a173f27b and Sleep 3ed3eae7 intact; devices paired.
 
-Detailed report: `agent-handoffs/reports/20261002T201500Z-healthkit-sleep-canon-v3-copy-coherence.md`
+Detailed report: `agent-handoffs/reports/20261002T202500Z-shared-mac-safe-storage-cleanup-before-sleep-native.md`
 
 Protocol: `agent-handoffs/README.md`

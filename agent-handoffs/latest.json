@@ -1,60 +1,41 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T20:15:00Z",
+  "generated_at_utc": "2026-10-02T20:25:00Z",
   "task": {
-    "id": "healthkit-sleep-canon-v3-copy-coherence-20261002",
-    "title": "HealthKit Sleep sleep-canon-v3 coherent Oura copy selection",
+    "id": "shared-mac-safe-storage-cleanup-before-sleep-native-20261002",
+    "title": "Shared Mac safe storage cleanup before Sleep Native integration",
     "agent": "claude",
-    "status": "server_deployed_dormant_activation_pending_native"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "production_server_sha": "d0ff65965233fa44e108387f01b649a2bdb476df",
-    "production_deployment": "64533990-3f04-43bc-b710-a2d28dc1850e",
-    "previous_production_server_sha": "4ffde0f5faf1832decfbc09d822088aeba0dca89",
-    "server_branch": "claude/healthkit-sleep-canon-v3-20261002",
-    "native_patch_branch": "claude/sleep-canon-v3-native-accept-20261002",
-    "native_patch_sha": "3ed3eae7",
-    "native_shipping_build": 81,
-    "sleep_d0": "2026-10-02"
+    "watch_build82_sha": "a173f27b4a9ab208021a1f3cd7febc7402cf3b42",
+    "sleep_native_candidate_sha": "3ed3eae7",
+    "shipping_native_build": 81
   },
   "result": {
-    "summary": "sleep-canon-v3 (one coherent Oura revision per night via ingestion provenance; v2 selection when no provenance) deployed dormant. Zero-write audit: historical 0/87 and validation 0/30 nights change; Oct 2 v3 equals Oura revision 2 alone. Activation (policy + bounded Oct 2+ rewrite) dry-run only: target exactly [2026-10-02]; waits for a Native build accepting v3 (Founder decision). Production Sleep/historical/strategic mutation 0. Canary stays FAIL until activation, then HOLD.",
+    "summary": "Free disk 12.81 -> 21.33 GiB by deleting only reproducible build output: 4 temporary Watch DerivedData folders in /private/tmp (~1.7 GiB) and git-ignored node_modules/.next in 7 inactive ~/GitHub clones (~6.8 GiB). No source, worktree, archive, simulator, signing, device, swap or production change. Watch a173f27b and Sleep 3ed3eae7 intact; devices paired.",
     "success": true,
     "production_mutated": false,
-    "deployed": true,
+    "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
-    "server_full_unit_suite": {
+    "free_space": {
       "status": "passed",
-      "summary": "d0ff6596: 9596 passed / 304 failed, identical failure set to 4ffde0f5; 0 new"
+      "summary": "21.33 GiB >= 20"
     },
-    "sleep_suites": {
+    "preservation": {
       "status": "passed",
-      "summary": "166/166"
-    },
-    "independent_review": {
-      "status": "passed_with_flagged_residual",
-      "summary": "3 rounds; P1 fixed; residual P2 (out-of-order receipt) flagged via ambiguousContinuationCount, must be accepted before activation"
-    },
-    "zero_write_historical_audit": {
-      "status": "passed",
-      "summary": "historical 0/87, validation 0/30 changed"
-    },
-    "native_patch_tests": {
-      "status": "not_run",
-      "summary": "disk below 15 GiB floor"
+      "summary": "Watch/Sleep authorities, 24 worktrees, archives 79/80/81/B82/Phase1A, 6 profiles + 1 identity, paired devices, 6 simulators verified"
     }
   },
   "open_gates": [
-    "Native build with 3ed3eae7 (run RecoverySleepReadModelTests)",
-    "Founder accepts flagged out-of-order residual",
-    "Activation dry-run + apply + verification",
-    "Natural nights / background / Weekly leak scan under v3"
+    "Integrate 3ed3eae7 into the next Native build and run RecoverySleepReadModelTests"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T201500Z-healthkit-sleep-canon-v3-copy-coherence.md",
-  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T193000Z-healthkit-sleep-canon-v3-copy-coherence.md",
+  "full_report_path": "agent-handoffs/reports/20261002T202500Z-shared-mac-safe-storage-cleanup-before-sleep-native.md",
+  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T203000Z-shared-mac-safe-storage-cleanup-before-sleep-native.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
