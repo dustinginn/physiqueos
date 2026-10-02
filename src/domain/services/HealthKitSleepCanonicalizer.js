@@ -99,7 +99,9 @@ export const SLEEP_CANON_V3_PARAMETERS = Object.freeze({
   withinLaneCopyResolution: Object.freeze({
     conflictStages: Object.freeze(["awake", "asleep_core", "asleep_deep", "asleep_rem"]),
     unspecifiedMayEnvelopeSpecificStages: true,
-    copyCoherence: "coherent_chains_never_mix_overlapping_ingestion_generations",
+    copyCoherence: "coherent_chains_never_mix_a_reliable_revision_generation_with_an_overlapping_generation",
+    reliableGenerationMinimumBasisCoverageRatio: 0.5,
+    withoutReliableGeneration: "v2_selection",
     chainContinuationOrder: Object.freeze([
       "same_generation", "exact_continuation", "latest_compatible_end", "stable_chain_order",
     ]),
@@ -477,6 +479,7 @@ function buildAsleepEpisode(group, assignedInBed, preference, { resolveDuplicate
               ? "coherent_copy_then_usable_then_asleep_then_staged_then_resolved_then_samples_then_latest_received_then_stable_content"
               : "usable_then_asleep_then_staged_then_resolved_then_samples_then_stable_content",
             ...(coherentCopies ? {
+              coherenceBasis: copyResolution.coherenceBasis ?? "single_copy",
               selectedGenerationCount: copyResolution.selectedGenerationCount ?? 0,
               ambiguousContinuationCount: copyResolution.ambiguousContinuationCount ?? 0,
             } : {}),
@@ -644,9 +647,22 @@ function selectCoherentLaneCopy(intervals) {
   // No two samples of the basis overlap: there is exactly one copy, and v3 is
   // identical to v2 (everything is selected).
   if (!hasOverlap(basis)) {
-    return { selected: intervals, corroborating: [], candidateCount: 1, applied: false, selectedGenerationCount: generationCount(basis), ambiguousContinuationCount: 0 };
+    return { selected: intervals, corroborating: [], candidateCount: 1, applied: false, coherenceBasis: "single_copy", selectedGenerationCount: generationCount(basis), ambiguousContinuationCount: 0 };
   }
-  const { chains, ambiguousContinuationCount } = buildCoherentChains(basis);
+  const { chains, ambiguousContinuationCount, reliableGenerationCount } = buildCoherentChains(basis);
+  // Without ingestion provenance that proves distinct revisions, topology is
+  // all there is, and v3 knows nothing v2 does not: keep v2's established
+  // selection exactly (reporting any ambiguity), so v3 changes a night only
+  // where it has real evidence.
+  if (reliableGenerationCount === 0) {
+    const fallback = selectAuthoritativeLaneCopy(intervals);
+    return {
+      ...fallback,
+      coherenceBasis: "topology_v2_selection",
+      selectedGenerationCount: generationCount(fallback.selected.filter((sample) => basis.includes(sample))),
+      ambiguousContinuationCount,
+    };
+  }
   const allAsleepCoverage = unionMs(intervals.filter((sample) => ASLEEP.has(sample.stage)));
   const candidates = chains.map((chain) => {
     const activity = exclusive.length > 0 ? [...chain, ...unspecified] : chain;
@@ -667,7 +683,7 @@ function selectCoherentLaneCopy(intervals) {
     };
   }).filter((candidate) => candidate.coverageMs > 0).sort(compareCoherentCopies);
   if (candidates.length === 0) {
-    return { selected: intervals, corroborating: [], candidateCount: 1, applied: false, selectedGenerationCount: generationCount(basis), ambiguousContinuationCount };
+    return { selected: intervals, corroborating: [], candidateCount: 1, applied: false, coherenceBasis: "ingestion_revision", selectedGenerationCount: generationCount(basis), ambiguousContinuationCount };
   }
   const selectedCandidate = candidates[0];
   const selectedIds = new Set(selectedCandidate.activity.map((sample) => sample.id));
@@ -676,6 +692,7 @@ function selectCoherentLaneCopy(intervals) {
     corroborating: intervals.filter((sample) => !selectedIds.has(sample.id)),
     candidateCount: chains.length,
     applied: true,
+    coherenceBasis: "ingestion_revision",
     selectedGenerationCount: generationCount(selectedCandidate.chain),
     ambiguousContinuationCount,
   };
@@ -683,7 +700,8 @@ function selectCoherentLaneCopy(intervals) {
 
 function selectCoherentInBedCopy(intervals, extent) {
   if (intervals.length <= 1 || !hasOverlap(intervals)) return { selected: intervals, corroborating: [] };
-  const { chains } = buildCoherentChains(intervals);
+  const { chains, reliableGenerationCount } = buildCoherentChains(intervals);
+  if (reliableGenerationCount === 0) return selectAuthoritativeInBedCopy(intervals, extent);
   const selectedCandidate = chains.map((chain) => ({
     activity: chain,
     coverageMs: unionMs(chain, extent),
@@ -719,13 +737,25 @@ function generationCount(samples) {
 }
 
 // A generation (ingestion batch) is a RELIABLE copy identity only when it is
-// known and internally non-overlapping, i.e. it carries at most one copy. Two
-// reliable generations conflict when any of their samples overlap: they are
-// different HealthKit objects covering the same time, i.e. different copies.
-// A batch that itself carries two copies (or unknown provenance) proves
-// nothing about identity, so it is separated by topology alone.
+// known, internally non-overlapping (it carries at most one copy), and covers
+// at least half of the lane's basis union, i.e. it looks like one revision of
+// the night as delivered (the prospective Native observer case). Historical
+// imports page through HealthKit in small batches that can each hold a sample
+// or two of different copies; such batches prove nothing about identity.
+//
+// Overlapping samples always belong to different copies. Two generations
+// conflict when their samples overlap and at least one of them is a reliable
+// identity: a chain then never mixes them. Without any reliable generation,
+// chains follow topology alone (exact continuation, then latest end).
 function generationStructure(intervals) {
-  const conflicts = new Set();
+  const byGeneration = new Map();
+  for (const interval of intervals) {
+    const key = generationKey(interval);
+    if (!byGeneration.has(key)) byGeneration.set(key, []);
+    byGeneration.get(key).push(interval);
+  }
+  const basisUnion = unionMs(intervals);
+  const overlapping = new Set();
   const selfOverlapping = new Set();
   const sorted = [...intervals].sort(byStartThenId);
   for (let left = 0; left < sorted.length; left += 1) {
@@ -734,13 +764,18 @@ function generationStructure(intervals) {
       const a = generationKey(sorted[left]);
       const b = generationKey(sorted[right]);
       if (a === b) selfOverlapping.add(a);
-      else conflicts.add(a < b ? `${a}\u0001${b}` : `${b}\u0001${a}`);
+      else overlapping.add(a < b ? `${a}\u0001${b}` : `${b}\u0001${a}`);
     }
   }
-  const reliable = (generation) => generation !== "\u0000unknown" && !selfOverlapping.has(generation);
+  const reliableSet = new Set([...byGeneration].filter(([key, members]) => key !== "\u0000unknown" &&
+    !selfOverlapping.has(key) && basisUnion > 0 &&
+    unionMs(members) >= SLEEP_CANON_V1_PARAMETERS.minimumUsableCoverageRatio * basisUnion).map(([key]) => key));
+  const reliable = (generation) => reliableSet.has(generation);
   return {
     reliable,
-    conflict: (a, b) => a !== b && reliable(a) && reliable(b) && conflicts.has(a < b ? `${a}\u0001${b}` : `${b}\u0001${a}`),
+    reliableCount: reliableSet.size,
+    conflict: (a, b) => a !== b && a !== "\u0000unknown" && b !== "\u0000unknown" &&
+      (reliable(a) || reliable(b)) && overlapping.has(a < b ? `${a}\u0001${b}` : `${b}\u0001${a}`),
   };
 }
 
@@ -750,7 +785,7 @@ function generationStructure(intervals) {
 // change the result. A sample may continue a chain only when it does not
 // overlap the chain and its generation conflicts with none of the chain's.
 function buildCoherentChains(intervals) {
-  const { reliable, conflict } = generationStructure(intervals);
+  const { reliable, conflict, reliableCount } = generationStructure(intervals);
   const compatible = (generation, chain) => [...chain.generations].every((other) => !conflict(generation, other));
   const sorted = [...intervals].sort(byCopyInterval);
   const chains = [];
@@ -797,7 +832,7 @@ function buildCoherentChains(intervals) {
     }
     index = next;
   }
-  return { chains: chains.map((chain) => chain.samples), ambiguousContinuationCount };
+  return { chains: chains.map((chain) => chain.samples), ambiguousContinuationCount, reliableGenerationCount: reliableCount };
 }
 
 function compareKeys(left, right) {
@@ -996,6 +1031,9 @@ export function analyzeHealthKitSleepCopyCoherence({ samples = [], preference = 
     const mainTwo = two?.episodes?.[two.mainEpisodeIndex] ?? null;
     const mainThree = three?.episodes?.[three.mainEpisodeIndex] ?? null;
     let chains = [];
+    let chainStats = [];
+    let generationStats = null;
+    let laneAsleepUnionSeconds = null;
     if (mainThree) {
       const lane = mainThree.primarySource;
       const laneIntervals = [...mainThree.sourceSampleIds, ...mainThree.corroboratingSampleIds]
@@ -1004,7 +1042,21 @@ export function analyzeHealthKitSleepCopyCoherence({ samples = [], preference = 
           interval.lane.bundleIdentifier.toLowerCase() === String(lane.bundleIdentifier).toLowerCase());
       const exclusive = laneIntervals.filter((sample) => SPECIFIC.has(sample.stage) || sample.stage === HealthKitSleepStage.AWAKE);
       const basis = exclusive.length > 0 ? exclusive : laneIntervals.filter((sample) => sample.stage === HealthKitSleepStage.ASLEEP_UNSPECIFIED);
-      chains = hasOverlap(basis) ? buildCoherentChains(basis).chains.map((chain) => chain.map((sample) => sample.id)) : [basis.map((sample) => sample.id)];
+      const chainSamples = hasOverlap(basis) ? buildCoherentChains(basis).chains : [basis];
+      chains = chainSamples.map((chain) => chain.map((sample) => sample.id));
+      chainStats = chainSamples.map((chain) => Object.freeze({
+        samples: chain.length,
+        asleepCoverageSeconds: seconds(unionMs(chain.filter((sample) => ASLEEP.has(sample.stage)))),
+        spanSeconds: seconds(spanOf(chain).end - spanOf(chain).start),
+        generations: generationCount(chain),
+      })).sort((left, right) => right.asleepCoverageSeconds - left.asleepCoverageSeconds);
+      const structure = generationStructure(basis);
+      const generations = [...new Set(basis.map(generationKey))];
+      generationStats = Object.freeze({
+        generations: generations.length,
+        reliable: generations.filter((generation) => structure.reliable(generation)).length,
+      });
+      laneAsleepUnionSeconds = seconds(unionMs(laneIntervals.filter((sample) => ASLEEP.has(sample.stage))));
     }
     const chainOf = new Map(chains.flatMap((chain, index) => chain.map((id) => [id, index])));
     const v2Chains = new Set((mainTwo?.sourceSampleIds ?? []).filter((id) => chainOf.has(id)).map((id) => chainOf.get(id)));
@@ -1014,6 +1066,9 @@ export function analyzeHealthKitSleepCopyCoherence({ samples = [], preference = 
       v2SpansCoherentChains: v2Chains.size,
       v2CrossCopySplice: v2Chains.size > 1,
       coherentChainCount: chains.length,
+      chainStats: Object.freeze(chainStats),
+      generationStats,
+      laneAsleepUnionSeconds,
     }));
   }
   return analysis;

@@ -98,7 +98,7 @@ describe("sleep-canon-v3 coherent copy selection", () => {
     expect(selected(after)).toEqual(ids(b));
     expect(stageTotals(episode)).toEqual(stageTotals(alone(b)));
     expect(episode.timeline).toEqual(alone(b).timeline);
-    expect(episode.reconciliation.copySelection).toMatchObject({ applied: true, selectedGenerationCount: 1, ambiguousContinuationCount: 0 });
+    expect(episode.reconciliation.copySelection).toMatchObject({ applied: true, coherenceBasis: "ingestion_revision", selectedGenerationCount: 1, ambiguousContinuationCount: 0 });
     // Every live sample is preserved either as the selected copy or as corroboration.
     expect(new Set([...episode.sourceSampleIds, ...episode.corroboratingSampleIds])).toEqual(ids(live(samples)));
   });
@@ -209,7 +209,7 @@ describe("sleep-canon-v3 coherent copy selection", () => {
         ...rest,
         episodes: episodes.map(({ reconciliation, ...episode }) => {
           const { copySelection, ...reconciled } = reconciliation;
-          const { rule, selectedGenerationCount, ambiguousContinuationCount, ...copy } = copySelection;
+          const { rule, coherenceBasis, selectedGenerationCount, ambiguousContinuationCount, ...copy } = copySelection;
           return { ...episode, reconciliation: { ...reconciled, copySelection: copy } };
         }),
       };
@@ -257,12 +257,38 @@ describe("sleep-canon-v3 coherent copy selection", () => {
     expect(main(day).asleepSeconds).toBe(8 * 3600);
   });
 
+  it("historical import shape: one or two samples per batch never fragment a complete copy", () => {
+    const { a, b } = productionShape();
+    const liveA = live(a);
+    // Every sample in its own tiny batch, both copies interleaved: batches are not identities.
+    const tiny = [...liveA, ...b].map((sample, index) => ({ ...sample, ingestion: { ...sample.ingestion, batchId: `import-${index % 37}` } }));
+    const two = main(v2(tiny));
+    const three = main(v3(tiny));
+    // Without a reliable revision identity, v3 keeps v2's selection exactly.
+    expect(three.reconciliation.copySelection.coherenceBasis).toBe("topology_v2_selection");
+    expect(stageTotals(three)).toEqual(stageTotals(two));
+    expect(three.timeline).toEqual(two.timeline);
+    expect(selected(v3(tiny))).toEqual(selected(v2(tiny)));
+  });
+
+  it("a small surviving old revision (< half the night) still never splices into the reliable new revision", () => {
+    const { a, b } = productionShape();
+    const keep = new Set(live(a).slice(0, 18).map((sample) => sample.id));
+    const smallA = a.map((sample) => keep.has(sample.id) ? sample : { ...sample, status: HealthKitSleepLifecycle.DELETED, lifecycle: { state: HealthKitSleepLifecycle.DELETED } });
+    const chosen = selected(v3([...smallA, ...b]));
+    expect(chosen).toEqual(ids(b));
+  });
+
   it("reports, never hides, same-batch shared-boundary continuations that topology cannot disambiguate", () => {
     const a = revision("A", [["rem", 0, 60], ["deep", 60, 180], ["core", 180, 240], ["core", 240, 420]], { idBase: 47_000, batchId: "batch-one", receivedAt: "2026-10-02T14:45:00.000Z" });
     const b = revision("B", [["core", 0, 60], ["core", 60, 120], ["rem", 120, 240], ["deep", 240, 420]], { idBase: 47_100, batchId: "batch-one", receivedAt: "2026-10-02T14:45:00.000Z" });
     const episode = main(v3([...a, ...b]));
+    // One batch carrying both copies proves nothing: v3 keeps v2's selection
+    // and reports the ambiguity instead of guessing.
+    expect(episode.reconciliation.copySelection).toMatchObject({ coherenceBasis: "topology_v2_selection" });
     expect(episode.reconciliation.copySelection.ambiguousContinuationCount).toBeGreaterThan(0);
-    expect(episode.asleepSeconds).toBe(420 * MIN); // still one non-overlapping chain, no double count
+    expect(stageTotals(episode)).toEqual(stageTotals(main(v2([...a, ...b]))));
+    expect(episode.asleepSeconds).toBe(420 * MIN); // one non-overlapping chain, no double count
   });
 
   it("zero-write analysis flags the v2 cross-copy splice and nothing on a single-copy night", () => {
