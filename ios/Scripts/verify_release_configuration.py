@@ -20,6 +20,7 @@ WIDGET_BUNDLE = IOS_ROOT / "PhysiqueOSLiveActivity" / "PhysiqueOSLiveActivityBun
 HOME_WIDGET = IOS_ROOT / "PhysiqueOSLiveActivity" / "HomeLoggedTodayWidget.swift"
 APP_GROUP = "group.com.physiqueos.native.dev.shared"
 WATCH_APP_ICON = IOS_ROOT / "PhysiqueOSWatch" / "Assets.xcassets" / "AppIcon.appiconset"
+WATCH_INFO = IOS_ROOT / "PhysiqueOSWatch" / "Info.plist"
 
 
 def main() -> None:
@@ -52,6 +53,16 @@ def main() -> None:
         raise SystemExit("AppIcon is not wired in both iPhone and Watch configurations")
     if project.count('CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";') != 2:
         raise SystemExit("Watch HealthKit entitlements are not wired in both configurations")
+    # watchOS declares workout background execution with WKBackgroundModes.
+    # App Store validation rejects UIBackgroundModes in a watchOS bundle.
+    with WATCH_INFO.open("rb") as handle:
+        watch_info = plistlib.load(handle)
+    if "UIBackgroundModes" in watch_info:
+        raise SystemExit("Watch Info.plist must not declare UIBackgroundModes (App Store validation rejects it)")
+    if watch_info.get("WKBackgroundModes") != ["workout-processing"]:
+        raise SystemExit("Watch Info.plist must declare WKBackgroundModes = [workout-processing]")
+    if watch_info.get("WKCompanionAppBundleIdentifier") != "com.physiqueos.native.dev" or watch_info.get("WKRunsIndependentlyOfCompanionApp") is not False:
+        raise SystemExit("Watch app must remain a non-independent companion of com.physiqueos.native.dev")
     with (WATCH_APP_ICON / "Contents.json").open() as handle:
         watch_icon_manifest = json.load(handle)
     watch_icon_files = {entry.get("filename") for entry in watch_icon_manifest.get("images", [])}

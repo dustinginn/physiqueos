@@ -8,7 +8,7 @@
 	<string>PhysiqueOS uses workout heart rate and energy to show live training metrics on Apple Watch.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>PhysiqueOS saves the strength workout recorded by Apple Watch to Apple Health.</string>
-	<key>UIBackgroundModes</key>
+	<key>WKBackgroundModes</key>
 	<array>
 		<string>workout-processing</string>
 	</array>
