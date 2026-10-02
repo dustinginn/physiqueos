@@ -133,7 +133,7 @@ Trigger:
 - Founder begins planning actual beta onboarding, or DO cost/performance symptoms recur.
 
 7. Apple Watch companion
-Status: PHASE 1A SOURCE/TEST CANDIDATE COMPLETE on `codex/apple-watch-workout-v1-phase1a-overnight` at `1b8838a40613fead6d5f8d62f1d9831cb977f83f`; not a signed release candidate and never uploaded. Final report: `agent-handoffs/reports/20261002T074000Z-apple-watch-workout-v1-phase1a-final.md`.
+Status: PHASE 1A SIGNED ARCHIVE + FOUNDER IPHONE INSTALL COMPLETE on `codex/apple-watch-workout-v1-phase1a-overnight` at `1b8838a40613fead6d5f8d62f1d9831cb977f83f`; not uploaded. Signed checkpoint: `agent-handoffs/reports/20261002T152626Z-apple-watch-workout-v1-phase1a-signed-archive-install-checkpoint.md`.
 Locked V1:
 - phone is the sole structured `TrainingSessionAuthority` and planning surface; Watch starts one phone-prepared Ready-for-Watch plan only while the paired phone is reachable;
 - after start, a disconnected Watch HealthKit workout may continue, but every structured mutation fails closed until phone authority returns;
@@ -153,13 +153,13 @@ Phase 1A implemented:
 - Ready-for-Watch phone affordance and locked PhysiqueOS Watch Start/execution/metrics/controls/paused/final/offline/superset/single-set surfaces with split Load/Reps;
 - real Watch-owned HealthKit strength lifecycle, metrics, mirroring/recovery, phone-authoritative pause parity, two-leg recoverable Finish saga, completion summary, haptics and Always-On treatment;
 - latest shipping Build 81 Progress Photos authority reconciled; paired simulator builds/renders and full/focused regressions complete with no new deterministic failures;
-- unsigned Release packaging contains iPhone + Live Activity/Widget + embedded Watch with version/build parity.
+- signed Release archive contains iPhone + Live Activity/Widget + embedded Watch with version/build parity; every signature/profile/entitlement/companion boundary was inspected cleanly;
+- automatic signing created the explicit HealthKit-capable Watch profile and the signed candidate is installed on the Founder iPhone.
 Phase 1A remaining physical/release gates:
-- Founder signs into the Apple Developer account in Xcode and creates/refreshes a HealthKit-capable profile for `com.physiqueos.native.dev.watchkitapp` (current wildcard profile is not sufficient);
-- signed archive entitlement/companion inspection and safe paired iPhone/Watch install;
+- Founder enables Developer Mode on Apple Watch and unlocks the paired iPhone so the signed Watch app can be installed/launched;
 - Health authorization plus one physical prepared-workout Start/Complete/Pause/Resume/Finish acceptance, including disconnect/reconnect and relaunch recovery;
 - battery/Always-On observation and exact HealthKit-to-structured correlation proof on the saved workout;
-- independent post-device review before enabling the production trusted Watch bundle allowlist or uploading a Watch TestFlight build.
+- Build 82 parity, fresh signed archive and independent post-device review before enabling the production trusted Watch bundle allowlist or uploading a Watch TestFlight build.
 
 OPERATIONAL / ENVIRONMENT
 

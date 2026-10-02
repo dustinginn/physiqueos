@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T07:40:00Z",
+  "generated_at_utc": "2026-10-02T15:26:26Z",
   "task": {
-    "id": "apple-watch-workout-v1-phase1a-overnight",
-    "title": "Apple Watch Workout V1 Phase 1A",
+    "id": "apple-watch-workout-v1-phase1a-signed-archive-install",
+    "title": "Apple Watch Workout V1 Phase 1A signed archive and physical install",
     "agent": "codex",
-    "status": "source_test_complete_blocked_on_signing_and_physical_acceptance"
+    "status": "signed_archive_and_iphone_install_complete_awaiting_watch_developer_mode"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -15,36 +15,39 @@
     "shipping_native_build": 81,
     "next_native_build": 82,
     "production_server_sha": "4ffde0f5faf1832decfbc09d822088aeba0dca89",
-    "production_deployment": "faaf66bd-930f-46a2-9b8e-77e604c23a86"
+    "production_deployment": "faaf66bd-930f-46a2-9b8e-77e604c23a86",
+    "archive_path": "/private/tmp/PhysiqueOS-Phase1A.xcarchive"
   },
   "result": {
-    "summary": "Phase 1A source/simulator work is complete: generator-owned paired Watch app, phone-authoritative versioned transport, split Load/Reps execution UI, Watch-owned HealthKit lifecycle, recovery, two-leg Finish saga, Live Activity parity, performed-only early-finish proof, Build 81 reconciliation and actual state renders. Unsigned Release packaging passes. No upload: signing requires Founder Apple account authentication and a HealthKit-capable Watch profile, followed by physical acceptance.",
+    "summary": "Founder-authenticated Xcode automatic signing created the explicit HealthKit-capable Watch profile, produced and fully inspected a clean signed Release archive, and installed the Build 81 candidate on the Founder iPhone. Direct Watch install is now blocked only by Apple Watch Developer Mode being disabled; iPhone launch is waiting for the phone to be unlocked. Health consent and a real workout were not automated.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": false,
+    "iphone_candidate_installed": true,
+    "watch_candidate_installed": false
   },
   "validation": {
-    "native_full": "1918 passed, 1 skipped, 1 known Build 81 baseline date-fixture failure; 0 new",
-    "native_final_focused": "72 passed, 0 failed",
-    "watch_reducers": "2 passed, 0 failed",
-    "server_training": "156 passed, 0 failed",
-    "server_command_ports": "53 passed, 0 failed",
-    "server_healthkit_focused": "116 passed, 0 failed",
-    "server_healthkit_broad": "717 passed, 6 known stale audit-sentinel failures",
-    "paired_simulator": "passed",
-    "unsigned_release_packaging": "passed",
-    "signed_release": "blocked: no authenticated Xcode Developer account; wildcard profile lacks Watch HealthKit"
+    "origin_authority": "branch and remote both 1b8838a40613fead6d5f8d62f1d9831cb977f83f; origin/main still Build 81 latest VALID",
+    "generator": "two passes byte-identical, SHA-256 18f619f9a57313892d4ee06d2f639fd5b8d203f1cba8009d8ce9bddba7886020",
+    "signed_archive": "passed; recursive strict code signature verification passed",
+    "iphone_entitlements": "HealthKit + background delivery + existing App Group unchanged",
+    "widget_entitlements": "existing App Group only; HealthKit absent",
+    "watch_entitlements": "HealthKit present; workout-processing and companion metadata present",
+    "version_build_parity": "all products 1.0 (81)",
+    "iphone_install": "passed",
+    "watch_install": "blocked by physical Watch Developer Mode disabled",
+    "iphone_launch": "blocked by physical iPhone locked"
   },
   "release_decision": "do_not_upload",
   "open_gates": [
-    "Apple Developer account authentication and explicit HealthKit-capable Watch provisioning profile",
-    "Build 82 version parity and signed archive entitlement/companion inspection",
-    "paired physical Watch Health authorization and real-workout acceptance",
-    "physical disconnect/relaunch, recovery, exact-correlation and battery proof",
-    "independent post-device review before production trust allowlist or TestFlight"
+    "Founder enables Developer Mode on Apple Watch and unlocks the paired iPhone",
+    "Install and launch the signed Watch app without automating Health consent",
+    "Founder grants Health authorization on device",
+    "Physical workout, disconnect/relaunch, recovery, exact-correlation and battery acceptance",
+    "Build 82 parity, fresh archive and independent review before production trust allowlist or TestFlight"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T074000Z-apple-watch-workout-v1-phase1a-final.md",
+  "full_report_path": "agent-handoffs/reports/20261002T152626Z-apple-watch-workout-v1-phase1a-signed-archive-install-checkpoint.md",
   "parent_report_path": "agent-handoffs/inbox/prompts/20261002T064500Z-apple-watch-workout-v1-phase1a-overnight.md",
   "safety": {
     "contains_secrets": false,
