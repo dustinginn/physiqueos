@@ -1,4 +1,4 @@
-Apple Watch V1 physical-acceptance patch — add Cancel Workout parity
+Apple Watch V1 physical-acceptance patch — Cancel parity, terminal reconciliation, and app icon
 
 Context:
 Physical Founder acceptance found a real lifecycle gap in the current Watch Phase 1A candidate.
@@ -12,6 +12,8 @@ After canceling/stopping the test workflow from the phone / while the Watch work
 
 Founder requirement:
 The Watch must have the same ability to CANCEL a workout as the phone.
+
+This prompt is the COMPLETE current assignment. No earlier prompt was sent to the coder. Treat every requirement below, including the physical-evidence and app-icon addendum, as part of the initial implementation scope.
 
 This is V1-required lifecycle parity.
 
