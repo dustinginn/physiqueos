@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Native Build 79: Home Screen Widget V1 + Priority Skip consolidation (uploaded, VALID) (`native-build79-widget-priority-skip-integration-20261002`)
+- Task: Native Build 80: Home Screen widget whole-number Nutrition/Activity formatting (uploaded, VALID) (`native-build80-widget-number-formatting-20261002`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-10-02T04:05:00Z
+- Generated (UTC): 2026-10-02T04:30:00Z
 - Success: true
 
-Summary: Build 79 (1.0 (79)) from a75f93df uploaded and VALID, delivery 8937b165-e7df-4f46-87b5-63efd3ce8244. Integrates Priority Skip 88d597b2 + Home Widget 82040143 on Build 78 with reviewed fixes. Signed archive proven: app App Group + HealthKit; extension same App Group, no HealthKit; Home widget + Workout Live Activity in one extension. Server 2d967e48 skipCommand contract verified read-only. Backlog updated (main 9a295700). Physical acceptance pending.
+Summary: Build 80 (1.0 (80)) from 1783691d uploaded and VALID, delivery 39ae9ddd-271e-438c-80c2-f24137637e2f. One HomeWidgetValueFormatter: calories/active calories whole with grouping, macros whole grams, Weight one decimal; display only. Renders regenerated; entitlements verified (app App Group + HealthKit, extension App Group only); backlog updated (main a8ef512a).
 
-Detailed report: `agent-handoffs/reports/20261002T040500Z-native-build79-widget-priority-skip-integration.md`
+Detailed report: `agent-handoffs/reports/20261002T043000Z-native-build80-widget-number-formatting.md`
 
 Protocol: `agent-handoffs/README.md`

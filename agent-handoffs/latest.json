@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T04:05:00Z",
+  "generated_at_utc": "2026-10-02T04:30:00Z",
   "task": {
-    "id": "native-build79-widget-priority-skip-integration-20261002",
-    "title": "Native Build 79: Home Screen Widget V1 + Priority Skip consolidation (uploaded, VALID)",
+    "id": "native-build80-widget-number-formatting-20261002",
+    "title": "Native Build 80: Home Screen widget whole-number Nutrition/Activity formatting (uploaded, VALID)",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "5911dd2a6f968c5a355ec68d3313f0e5e644d529",
-    "final_sha": "a75f93df1a84c33bbe6e9cec6d648a11ec53031d",
+    "base_sha": "a75f93df1a84c33bbe6e9cec6d648a11ec53031d",
+    "final_sha": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
     "production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486",
     "production_deployment": "421cae1a-dbc6-494c-9f73-9b8778e45efd",
-    "native_sha": "a75f93df1a84c33bbe6e9cec6d648a11ec53031d",
-    "native_build": 79
+    "native_sha": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
+    "native_build": 80
   },
   "result": {
-    "summary": "Build 79 (1.0 (79)) from a75f93df uploaded and VALID, delivery 8937b165-e7df-4f46-87b5-63efd3ce8244. Integrates Priority Skip 88d597b2 + Home Widget 82040143 on Build 78 with reviewed fixes. Signed archive proven: app App Group + HealthKit; extension same App Group, no HealthKit; Home widget + Workout Live Activity in one extension. Server 2d967e48 skipCommand contract verified read-only. Backlog updated (main 9a295700). Physical acceptance pending.",
+    "summary": "Build 80 (1.0 (80)) from 1783691d uploaded and VALID, delivery 39ae9ddd-271e-438c-80c2-f24137637e2f. One HomeWidgetValueFormatter: calories/active calories whole with grouping, macros whole grams, Weight one decimal; display only. Renders regenerated; entitlements verified (app App Group + HealthKit, extension App Group only); backlog updated (main a8ef512a).",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,31 +26,27 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Full Native unit suite on final code: 1889 tests, 1 skipped, 1 known pre-existing Peptide sandbox failure, no new failures; UI journeys 6/6; signed archive entitlements inspected; guarded dry run passed."
+      "summary": "Focused widget/Live Activity regression 171/171; full Native suite 1895 tests, 1 skipped, only the known pre-existing Peptide sandbox failure; release verifier green; generator deterministic."
     },
     "review": {
-      "status": "approved",
-      "summary": "Independent integrated review (no P0/P1; 4 widget P2s fixed), delta re-review (residual P2 fixed), final delta review: no P0/P1/P2, nothing blocks release."
+      "status": "not_applicable",
+      "summary": "Tiny display-only formatting patch; self-reviewed with source-scan and render verification (no independent review requested by the prompt)."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Server contract check was a single READ ONLY transaction (3 SELECTs, rollback); no Founder data, deployment, credential, portal or TestFlight change."
+      "summary": "No Server, data, credential or canonical-precision change; Native display only."
     }
   },
   "decisions_required": [
-    "Founder physical-device acceptance of Build 79 (checklist in report): Home widget, peptide/Foam Skip, carried PR celebration and Live Activity."
+    "Founder acceptance: Build 80 small + large widgets show whole Nutrition/Activity/macros and one-decimal Weight."
   ],
   "blockers": [],
-  "unexpected_findings": [
-    "Opening the project in Xcode for the signing refresh re-serialized project.pbxproj and dropped HealthKit usage descriptions, NSSupportsLiveActivities and ITSAppUsesNonExemptEncryption from Info.plist; discarded (restored to a75f93df) and archived from a clean checkout. Do not commit those Xcode edits if they reappear.",
-    "The Widget candidate broke a Build 78 source-scan test; fixed in the integration."
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Backlog updated on main 9a295700: Build 79 shipped pending acceptance; widget + peptide/Foam Skip shipped pending acceptance.",
-    "Residual P3s listed in the report."
+    "Backlog updated on main a8ef512a: Build 80 shipped; Build 79 physical finding recorded; remaining widget acceptance pending."
   ],
-  "recommended_next_step": "Founder installs Build 79 from TestFlight and runs the compact acceptance checklist; mark backlog items complete only after confirmation.",
-  "full_report_path": "agent-handoffs/reports/20261002T040500Z-native-build79-widget-priority-skip-integration.md",
+  "recommended_next_step": "Founder installs Build 80 and confirms widget number formatting; next Native build number is 81.",
+  "full_report_path": "agent-handoffs/reports/20261002T043000Z-native-build80-widget-number-formatting.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
