@@ -187,7 +187,7 @@ Status: IN PROGRESS / Build 77 real-workout acceptance.
 Founder plans several days of real use before finalizing ergonomics/typography.
 
 2. Home Screen widget
-Status: SHIPPED in Build 79 (VALID, delivery 8937b165), pending Founder physical acceptance — see BUILD 79 below. Founder-approved V1 = systemSmall four-tile square (primary) + optional systemLarge detailed Logged Today alternate.
+Status: SHIPPED in Build 79 (VALID, delivery 8937b165); Build 79 physically verified working on the Founder's device. Number formatting polished in Build 80 (VALID, delivery 39ae9ddd); remaining physical acceptance pending — see BUILD 80 / BUILD 79 below. Founder-approved V1 = systemSmall four-tile square (primary) + optional systemLarge detailed Logged Today alternate.
 Founder clarified desired V1 on 2026-10-01:
 - mirror the existing Native "Logged Today" summary as closely as WidgetKit allows;
 - include Training summary;
@@ -215,7 +215,14 @@ Desired direction:
 - HealthKit remains physiological workout-observation layer.
 Use Build 77 Live Activity real-world acceptance to inform Watch V1 interaction design.
 
+BUILD 80 — SHIPPED (VALID, delivery 39ae9ddd-271e-438c-80c2-f24137637e2f), Home widget formatting polish
+Source 1783691d (branch claude/native-build80-widget-number-formatting-20261002) = Build 79 a75f93df + one display-formatting patch. Report: agent-handoffs/reports/20261002T043000Z-native-build80-widget-number-formatting.md.
+Trigger (Build 79 physical acceptance finding): the widget worked on device but showed decimal fractions (Nutrition 2463.3 cal, P 182.2 C 166.7 F 110.1, Active 890.1 cal).
+Shipped: one HomeWidgetValueFormatter for every widget family/state — calories and active calories as whole numbers with grouping (2,463 / 890), macros as whole grams (P 182 C 167 F 110), Weight keeps one decimal (176.1 lb). Display only; canonical precision unchanged.
+Acceptance pending: Founder confirms small + large show whole Nutrition/Activity/macros and one-decimal Weight. All other Build 79 items below keep their status (carried unchanged into Build 80).
+
 BUILD 79 — SHIPPED (VALID, delivery 8937b165-e7df-4f46-87b5-63efd3ce8244), pending Founder physical acceptance
+Physical finding 2026-10-02: Home Screen widget verified working on device; requested whole-number Nutrition/Activity formatting → shipped in Build 80.
 Source a75f93df (branch claude/native-build79-widget-priority-skip-integration-20261002) = Build 78 + Priority Skip 88d597b2 + Home Screen Widget 82040143 + integration review fixes. Production Server 2d967e48 (skipCommand contract verified read-only). Report: agent-handoffs/reports/20261002T040500Z-native-build79-widget-priority-skip-integration.md.
 Keep each item until the Founder confirms on device:
 - Home Screen widget V1: gallery discovery; small square (Nutrition cal + P/C/F, active cal, today's Weight); optional large (adds Training); no-weight; refresh; Start Logger / Resume Workout; stale/offline and locked/privacy; real App Group population; widget empties after Production revoke/re-pair, then refills.
