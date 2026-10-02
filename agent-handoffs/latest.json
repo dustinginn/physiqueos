@@ -1,60 +1,57 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T17:30:31Z",
+  "generated_at_utc": "2026-10-02T18:27:55Z",
   "task": {
-    "id": "watch-v1-cancel-workout-parity",
-    "title": "Apple Watch Workout V1 Cancel parity and terminal reconciliation",
-    "agent": "codex",
-    "status": "build_82_signed_installed_launched_awaiting_founder_cancel_acceptance"
+    "id": "healthkit-sleep-prospective-canary-audit-20261002",
+    "title": "HealthKit Sleep prospective canary audit \u2014 canary FAIL (P2 Oura copy splice); strategic isolation intact",
+    "agent": "claude",
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_main_sha": "50323d7f2f264c46cb8aa122e2e8877f10bb0a83",
-    "implementation_branch": "codex/apple-watch-workout-v1-phase1a-overnight",
-    "implementation_sha": "a173f27b4a9ab208021a1f3cd7febc7402cf3b42",
-    "shipping_native_sha": "6a0932517cbd8de165bf25c7637a2d2d6fea03dc",
-    "shipping_native_build": 81,
-    "candidate_build": 82,
+    "base_sha": "e6740054cf066f4ef3469177d66c571ad47b3eb1",
+    "final_sha": null,
     "production_server_sha": "4ffde0f5faf1832decfbc09d822088aeba0dca89",
     "production_deployment": "faaf66bd-930f-46a2-9b8e-77e604c23a86",
-    "archive_path": "/private/tmp/PhysiqueOS-WatchCancel-B82.xcarchive",
-    "installed_watch_profile_uuid": "f4ef7d4e-c707-4127-9741-b2d7d2f9c6c8"
+    "native_sha": "6a0932517cbd8de165bf25c7637a2d2d6fea03dc",
+    "native_build": 81
   },
   "result": {
-    "summary": "Watch Cancel parity, phone-originated terminal reconciliation and the PhysiqueOS Watch icon are implemented. Build 82 is signed, installed and launched on the paired physical devices. Cancel creates no Training evidence, discards Watch HealthKit and clears stale Watch execution/metrics. Founder physical Cancel acceptance remains.",
+    "summary": "Canary FAIL. One natural prospective night (Oct 2, Oura only): exactly one canonical day, midnight-safe, a natural late Oura revision updated the same row, Evidence correct, zero strategic leakage across 40 collections, historical Sleep 87/87 unchanged. New P2 defect: sleep-canon-v2 duplicate-copy selection spliced Oura's stale and current revisions, so stage minutes and hypnogram diverge from Oura's current revision (~10 min per stage; asleep ~1%). App-closed background delivery unproven; no post-boundary Briefing generated yet. Recovery shadow plan not prepared; nothing wired.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false,
-    "iphone_candidate_installed": true,
-    "watch_candidate_installed": true,
-    "watch_candidate_launched": true,
-    "health_authorized": false,
-    "workout_started": false,
-    "founder_cancel_acceptance_complete": false
+    "testflight_uploaded": false
   },
   "validation": {
-    "origin_authority": "implementation branch and remote both a173f27b4a9ab208021a1f3cd7febc7402cf3b42",
-    "tests": "108/108 focused phone, 275/275 broader Training/Live Activity/HealthKit/reconciliation, 7/7 Watch",
-    "generator": "byte-identical SHA-256 cf7cd2f8d32d3f2bb538cc44a71ebd42faf392af58111f3445a2e9089bb39ca8",
-    "signed_archive": "iPhone + Live Activity/Home Widget + Watch, all 1.0 (82), strict verification passed",
-    "watch_identity": "com.physiqueos.native.dev.watchkitapp 1.0 (82)",
-    "companion_identity": "com.physiqueos.native.dev 1.0 (82); Watch is non-independent",
-    "watch_icon": "physical Watch returned installed 216x216 PhysiqueOS icon with Is Placeholder=false",
-    "watch_connectivity": "phone-reachable Prepare a workout on iPhone state after paired launch",
-    "duplicate_authority": "no prepared start, Health authorization, HealthKit workout or structured Training mutation occurred"
+    "tests": {
+      "status": "passed",
+      "summary": "Sleep suites on exact 4ffde0f5: 9 files, 132/132 passed (secondary evidence). Synthetic splice reproduction confirmed against the production canonicalizer. Recovery shadow tests, full suite and builds not run."
+    },
+    "review": {
+      "status": "not_run",
+      "summary": "Audit-only task; no code change to review."
+    },
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "3 production transactions REPEATABLE READ READ ONLY, transaction_read_only=on, owner-scoped SELECTs, ROLLBACK, record-store mutation counter 0; runtime SHA 4ffde0f5 gated."
+    }
   },
-  "release_decision": "do_not_upload",
-  "open_gates": [
-    "Founder verifies Watch Cancel while active",
-    "Founder verifies Watch Cancel while paused without Resume",
-    "Founder verifies phone Cancel immediately clears Watch execution and metrics",
-    "Founder Health authorization and physical Start/Complete/Pause/Resume/Finish acceptance",
-    "Disconnect/reconnect, relaunch, exact correlation, duplicate-prevention, Always-On and battery proof",
-    "Independent post-acceptance review before production allowlist or TestFlight"
+  "decisions_required": [
+    "D1: authorize a Server-only sleep-canon-v3 copy-coherence fix (candidate + tests + zero-write incidence on the validation corpus + deploy + prospective-only recompute, no historical rewrite) OR accept the splice as display-only/P3 and defer."
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T173031Z-watch-v1-cancel-workout-parity-physical-checkpoint.md",
-  "parent_report_path": "agent-handoffs/reports/20261002T163109Z-apple-watch-workout-v1-phase1a-physical-install-launch-checkpoint.md",
+  "blockers": [
+    "Canary cannot PASS until the P2 copy splice is resolved or explicitly accepted, >=2 natural nights accrue, app-closed background delivery is observed, and a post-boundary Weekly is generated and scanned."
+  ],
+  "unexpected_findings": [
+    "Oura rewrote the Oct 2 night 11 minutes after first sync, deleting only 22 of 66 first-revision samples; v2 greedy copy partitioning spliced 31 stale + 38 current samples into the canonical night.",
+    "September v2 validation could not detect splicing: it compared the selected samples only against themselves."
+  ],
+  "backlog": [
+    "Updated item 4 (Sleep canary: FAIL, next gate D1 + natural nights + background + Weekly scan) and item 5 (Recovery: wait; prospective-only baseline needs >=14 nights)."
+  ],
+  "recommended_next_step": "Founder decides D1. If fix authorized: Server-only sleep-canon-v3 candidate keeping coherent Oura revisions intact, then re-run this canary audit after >=2 natural nights, an app-closed background morning, and the Oct 4 Weekly.",
+  "full_report_path": "agent-handoffs/reports/20261002T182755Z-healthkit-sleep-prospective-canary-audit.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
