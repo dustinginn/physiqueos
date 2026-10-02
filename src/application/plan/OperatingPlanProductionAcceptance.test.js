@@ -279,7 +279,7 @@ describe("Build 33 production-shaped Operating Plan acceptance", () => {
     expect(readback.editor).toEqual({
       ...draft,
       monthly: { ...draft.monthly, localTime: "03:00" },
-      photos: { ...draft.photos, nextOccurrenceDate: "2026-09-20" },
+      photos: { ...draft.photos, nextOccurrenceDate: "2026-09-20", lastOccurrenceDate: null },
     });
     expect(readback.context).toMatchObject({ expectedRevision: 86, dexaExpectedRevision: 2 });
     expect(readback.context.expectedCurrentVersionId).not.toBe("coaching-v1");
@@ -500,7 +500,7 @@ describe("Progress Photos flexible cadence through the Native Coaching Updates c
     const detail = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
     expect(detail.editor.photos).toEqual({
       cadence: "weekly_interval_2", cadenceInterval: 2, cadenceUnit: "week", weekOfMonth: null,
-      nextOccurrenceDate: "2026-09-19", day: "saturday", timeOfDay: "afternoon", specificTime: null,
+      nextOccurrenceDate: "2026-09-19", lastOccurrenceDate: "2026-09-05", day: "saturday", timeOfDay: "afternoon", specificTime: null,
       reminderEnabled: true,
     });
     expect(JSON.stringify(fixture.snapshot())).toBe(before);
@@ -535,20 +535,32 @@ describe("Progress Photos flexible cadence through the Native Coaching Updates c
     }
   });
 
-  it("saves every 3 weeks without moving the upcoming occurrence, and projects Home/notifications from it", async () => {
+  it("saves every 3 weeks counted from the last scheduled photo day, and projects Home/notifications from it", async () => {
     const fixture = setup();
     const before = protectedSnapshot(fixture.snapshot());
     const saved = await save(fixture, (draft) => { draft.photos.cadenceInterval = 3; });
     expect(saved.result).toMatchObject({ photosChanged: true, coachingChanged: false, photoReminderChanged: false });
     expect(protectedSnapshot(fixture.snapshot())).toBe(before);
+    // Tue Sep 15: the last every-2-weeks photo day was Sat Sep 5, so every 3 weeks starts Sep 26.
     const readback = await fixture.reads().getCoachingUpdatesDetail({ strategyId: "coaching" });
-    expect(readback.editor.photos).toMatchObject({ cadence: "custom", cadenceInterval: 3, cadenceUnit: "week", weekOfMonth: null, nextOccurrenceDate: "2026-09-19", day: "saturday" });
+    expect(readback.editor.photos).toMatchObject({ cadence: "custom", cadenceInterval: 3, cadenceUnit: "week", weekOfMonth: null, nextOccurrenceDate: "2026-09-26", day: "saturday" });
     expect(readback.editor.photoEventBriefingEnabled).toBe(true);
-    expect(photoReminder(fixture)).toMatchObject({ active: true, nextDueAt: "2026-09-19", schedule: { frequency: "weekly", interval: 3, anchorDate: "2026-09-19", daysOfWeek: ["saturday"] } });
+    expect(photoReminder(fixture)).toMatchObject({ active: true, nextDueAt: "2026-09-26", schedule: { frequency: "weekly", interval: 3, anchorDate: "2026-09-26", daysOfWeek: ["saturday"] } });
     expect(photoVersions(fixture).filter((item) => item.status === "active" && !item.endedAt)).toHaveLength(1);
-    expect(photoDates(fixture, "2026-09-15T19:00:00.000Z")).toEqual(["2026-09-19"]);
-    expect(photoDates(fixture, "2026-09-27T19:00:00.000Z")).toEqual([]);
-    expect(photoDates(fixture, "2026-10-04T19:00:00.000Z")).toEqual(["2026-10-10"]);
+    expect(photoDates(fixture, "2026-09-15T19:00:00.000Z")).toEqual([]);
+    expect(photoDates(fixture, "2026-09-20T19:00:00.000Z")).toEqual(["2026-09-26"]);
+    expect(photoDates(fixture, "2026-10-04T19:00:00.000Z")).toEqual([]);
+    expect(photoDates(fixture, "2026-10-11T19:00:00.000Z")).toEqual(["2026-10-17"]);
+  });
+
+  it("switches back from monthly to every 2 weeks weeks later without skipping or failing", async () => {
+    const fixture = setup();
+    await save(fixture, (draft) => { draft.photos.cadenceInterval = 1; draft.photos.cadenceUnit = "month"; draft.photos.weekOfMonth = "first"; });
+    for (let day = 0; day < 19; day += 1) fixture.advanceDay(); // Sun Oct 4, after the Oct 3 photo day
+    const saved = await save(fixture, (draft) => { draft.photos.cadenceInterval = 2; draft.photos.cadenceUnit = "week"; draft.photos.weekOfMonth = null; });
+    expect(saved.result).toMatchObject({ photosChanged: true });
+    expect(photoReminder(fixture)).toMatchObject({ nextDueAt: "2026-10-17", schedule: { frequency: "weekly", interval: 2, anchorDate: "2026-10-17" } });
+    expect(photoReminder(fixture).schedule).not.toHaveProperty("weekOfMonth");
   });
 
   it("saves every 1 month (first Saturday), then every 2 weeks again, with clean reminder state", async () => {
@@ -576,6 +588,10 @@ describe("Progress Photos flexible cadence through the Native Coaching Updates c
     const successor = versions.find((item) => item.id !== "photos-v1");
     expect(successor).toMatchObject({ effectiveAt: "2026-09-15", status: "active", recurrence: { frequency: "weekly", interval: 2 } });
     expect(successor.change.sameDayAmendments).toHaveLength(1);
+    expect(successor.change.sameDayAmendments[0]).toMatchObject({
+      previousRecurrence: { frequency: "monthly", weekOfMonth: "first", anchorDate: "2026-10-03" },
+      author: { id: OWNER },
+    });
   });
 });
 

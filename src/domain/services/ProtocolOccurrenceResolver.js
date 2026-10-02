@@ -73,37 +73,65 @@ export function getNextProtocolOccurrence(recurrence, afterLocalDate) {
 /// monthly schedule) rather than a plain every-matching-weekday schedule.
 export function requiresProtocolCycleEvaluation(schedule = {}) {
   const frequency = String(schedule?.frequency ?? schedule?.type ?? schedule?.cadence ?? "").toLowerCase();
-  return Number(schedule?.interval ?? 1) > 1 || frequency === "monthly";
+  // Only weekday-anchored monthly schedules (with a week of the month) are
+  // cycles; any other "monthly" shape keeps its previous weekday handling.
+  return Number(schedule?.interval ?? 1) > 1
+    || (frequency === "monthly" && schedule?.weekOfMonth != null);
 }
 
 export function getProtocolOccurrenceOnOrAfter(recurrence, localDate) {
   return getNextProtocolOccurrence(recurrence, addDays(localDate, -1));
 }
 
-/// The anchor a cadence change starts from, so a change only affects the
-/// future and the next occurrence is predictable:
-/// 1. the previous schedule's current-or-next occurrence (today when today
-///    is on cycle) is kept when it still satisfies the new day rule — an
-///    interval change never moves or drops the upcoming occurrence;
-/// 2. otherwise the new schedule starts on the first date strictly after
-///    today that satisfies its day rule — a change never makes today newly
-///    due (no immediate reminder) and never re-dates history.
+/// The anchor (= first occurrence) of a changed cadence. Changes are
+/// future-only, never skip or double an occurrence, and never make a day
+/// that was not already due newly due today:
+/// - today stays the first occurrence when it was due under the previous
+///   schedule and still fits the new day rule (edit on the occurrence day);
+/// - weeks: the new interval continues from the last scheduled occurrence
+///   (L + k × interval) when that day still fits the new weekday, so
+///   shortening never skips a week and lengthening is counted from the
+///   last photo day; otherwise the first matching weekday after today;
+/// - months: the first matching weekday-of-the-month after today (a
+///   monthly cadence is calendar-anchored).
 export function resolveCadenceChangeAnchor(previous, next, todayLocalDate) {
-  let kept = null;
+  let todayWasDue = false;
+  let last = null;
   try {
-    kept = previous && isProtocolDateOnCycle(previous, todayLocalDate)
-      ? todayLocalDate
-      : previous ? getNextProtocolOccurrence(previous, todayLocalDate)?.scheduledLocalDate ?? null
-        : null;
+    todayWasDue = Boolean(previous) && isProtocolDateOnCycle(previous, todayLocalDate);
+    last = previous ? lastOccurrenceOnOrBefore(previous, todayLocalDate) : null;
   } catch {
-    kept = null;
+    todayWasDue = false;
+    last = null;
   }
-  if (kept && matchesProtocolDayRule(next, kept)) return kept;
+  if (todayWasDue && matchesProtocolDayRule(next, todayLocalDate)) return todayLocalDate;
+  if (next.frequency === "weekly" && last && matchesProtocolDayRule(next, last)) {
+    const step = next.interval * 7;
+    const elapsed = daysBetween(last, todayLocalDate);
+    return addDays(last, (Math.floor(elapsed / step) + 1) * step);
+  }
   for (let offset = 1; offset <= 62; offset += 1) {
     const candidate = addDays(todayLocalDate, offset);
     if (matchesProtocolDayRule(next, candidate)) return candidate;
   }
   return null;
+}
+
+export function getProtocolOccurrenceOnOrBefore(recurrence, localDate) {
+  const date = lastOccurrenceOnOrBefore(recurrence, localDate);
+  return date ? occurrence(recurrence, date) : null;
+}
+
+function lastOccurrenceOnOrBefore(recurrence, localDate) {
+  for (let offset = 0; offset <= searchWindowDays(recurrence); offset += 1) {
+    const candidate = addDays(localDate, -offset);
+    if (candidate < recurrence.anchorDate) return null;
+    if (isProtocolDateOnCycle(recurrence, candidate)) return candidate;
+  }
+  return null;
+}
+function daysBetween(left, right) {
+  return Math.round((dateNumber(right) - dateNumber(left)) / DAY_MS);
 }
 
 export function protocolLocalDateKey(value, timezone) {

@@ -21,6 +21,7 @@ import {
 import {
   formatNextProtocolOccurrence,
   getProtocolOccurrenceOnOrAfter,
+  getProtocolOccurrenceOnOrBefore,
   protocolLocalDateKey,
   resolveCadenceChangeAnchor,
 } from "./ProtocolOccurrenceResolver.js";
@@ -122,18 +123,27 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
   // anchor: an old anchor would otherwise report a long-past "next" date.
   const today = protocolLocalDateKey(now, recurrence.timezone);
   const nextOccurrence = getProtocolOccurrenceOnOrAfter(recurrence, today);
-  // The legacy Web execution editor's weekly / Every 2 weeks previews. Only
-  // meaningful for a weekly recurrence; a monthly one has no such sibling.
-  const weeklyRecurrence = recurrence.frequency === "weekly" ? recurrence : null;
-  const intervalTwoRecurrence = weeklyRecurrence ? normalizeProtocolRecurrence({
-    ...weeklyRecurrence, interval: 2,
-  }, {
-    fallbackTimezone: recurrence.timezone,
-    fallbackAnchorDate: recurrence.anchorDate,
-    effectiveAt: recurrence.effectiveAt,
-  }) : null;
-  const intervalTwoNextOccurrence = intervalTwoRecurrence
-    ? getProtocolOccurrenceOnOrAfter(intervalTwoRecurrence, today) : null;
+  // The legacy Web execution editor's Once a week / Every 2 weeks previews,
+  // resolved exactly as a save would re-anchor them. Only meaningful for a
+  // weekly recurrence; that editor refuses to save any other cadence.
+  const weeklyPreview = (interval) => {
+    if (recurrence.frequency !== "weekly") return null;
+    let candidate = normalizeProtocolRecurrence({ ...recurrence, interval }, {
+      fallbackTimezone: recurrence.timezone,
+      fallbackAnchorDate: recurrence.anchorDate,
+      effectiveAt: recurrence.effectiveAt,
+    });
+    if (cadencePatternChanged(recurrence, candidate)) {
+      const anchorDate = resolveCadenceChangeAnchor(recurrence, candidate, today);
+      if (!anchorDate) return null;
+      candidate = Object.freeze({ ...candidate, anchorDate });
+    }
+    return { recurrence: candidate, next: getProtocolOccurrenceOnOrAfter(candidate, today) };
+  };
+  const intervalOnePreview = weeklyPreview(1);
+  const intervalTwoPreview = weeklyPreview(2);
+  const intervalTwoRecurrence = intervalTwoPreview?.recurrence ?? null;
+  const intervalTwoNextOccurrence = intervalTwoPreview?.next ?? null;
   return Object.freeze({
     item: {
       ...structuredClone(execution),
@@ -150,6 +160,9 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
         timezone: recurrence.timezone,
         anchorDate: recurrence.anchorDate,
         nextDueAt: nextOccurrence?.scheduledLocalDate ?? null,
+        // The most recent scheduled occurrence on or before today (null
+        // before the first one); Native's change preview continues from it.
+        lastDueAt: getProtocolOccurrenceOnOrBefore(recurrence, today)?.scheduledLocalDate ?? null,
       },
       recurrence,
       recurrenceIdentity: createProtocolRecurrenceIdentity(recurrence),
@@ -160,7 +173,10 @@ export function createProgressPhotosExecutionHydrationModel(store, baseline = nu
       intervalTwoNextOccurrenceSummary:
         formatNextProtocolOccurrence(intervalTwoNextOccurrence),
       schedulePreviews: {
-        weekly: {
+        weekly: intervalOnePreview ? {
+          summary: formatProtocolRecurrenceSummary(intervalOnePreview.recurrence),
+          next: formatNextProtocolOccurrence(intervalOnePreview.next),
+        } : {
           summary: formatProtocolRecurrenceSummary(recurrence),
           next: formatNextProtocolOccurrence(nextOccurrence),
         },
@@ -388,7 +404,9 @@ function prepareSameDateScheduleAmendment(store, { root, current, successorPaylo
             amendedAt,
             reason: "Update Progress Photos execution schedule.",
             author: structuredClone(command.author),
-            provenance: { source: "progress_photos_execution_editor" },
+            provenance: { source: command.source ?? "progress_photos_schedule" },
+            previousRecurrence: structuredClone(current.recurrence ?? null),
+            previousRecurrenceIdentity: current.recurrenceIdentity ?? null,
           },
         ],
       },

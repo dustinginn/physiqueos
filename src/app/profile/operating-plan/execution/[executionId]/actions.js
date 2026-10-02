@@ -12,6 +12,7 @@ import {
   loadApplicationRuntimeBindings,
 } from "../../../../../application/runtime/ApplicationCanonicalRuntime";
 import { validateExecutionItem } from "../../../../../domain/models/executionItem";
+import { protocolLocalDateKey } from "../../../../../domain/services/ProtocolOccurrenceResolver";
 import {
   createProgressPhotosExecutionScheduleService,
 } from "../../../../../domain/services/ProgressPhotosExecutionScheduleService";
@@ -134,6 +135,7 @@ export async function saveProgressPhotosExecution(formData, {
   liveStore = null,
   createUnitOfWork = null,
   createService = createProgressPhotosExecutionScheduleService,
+  now = () => new Date(),
 } = {}) {
   if (!runtimeStorePath || !liveStore || !createUnitOfWork) {
     const bindings = await loadApplicationRuntimeBindings();
@@ -172,7 +174,10 @@ export async function saveProgressPhotosExecution(formData, {
     expectedSemanticDigest: String(formData.get("expectedSemanticDigest")),
     expectedLastCommitId: String(formData.get("expectedLastCommitId") || ""),
     expectedFileHash: String(formData.get("expectedFileHash") || ""),
-    effectiveDate: String(formData.get("effectiveDate")),
+    // Effective today in the schedule's timezone: the save itself re-anchors
+    // the first occurrence. A future effective date (the old next due date)
+    // would block every other photo-schedule edit until that date.
+    effectiveDate: protocolLocalDateKey(now(), String(formData.get("timezone") || "") || "America/Los_Angeles"),
     recurrence: {
       frequency: "weekly",
       interval: cadence === "weekly_interval_2" ? 2 : 1,

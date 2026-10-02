@@ -160,32 +160,63 @@ describe("monthly recurrence math (weekday of the month)", () => {
     expect(getNextProtocolOccurrence(monthly(12, "last", "2027-02-27"), "2027-02-27").scheduledLocalDate).toBe("2028-02-26");
   });
 
-  it("routes every monthly schedule through the anchored cycle", () => {
+  it("routes every weekday-anchored monthly schedule through the anchored cycle", () => {
     expect(requiresProtocolCycleEvaluation({ type: "weekly", interval: 1 })).toBe(false);
     expect(requiresProtocolCycleEvaluation({ type: "weekly", interval: 3 })).toBe(true);
-    expect(requiresProtocolCycleEvaluation({ frequency: "monthly", interval: 1 })).toBe(true);
+    expect(requiresProtocolCycleEvaluation({ frequency: "monthly", interval: 1, weekOfMonth: "first" })).toBe(true);
+    // Any other (non-photo) monthly shape keeps its previous weekday handling.
+    expect(requiresProtocolCycleEvaluation({ frequency: "monthly", interval: 1 })).toBe(false);
   });
 });
 
 describe("cadence changes are future-only and predictable", () => {
-  it("keeps the upcoming occurrence when only the interval changes (edit before the next occurrence)", () => {
-    // Every 2 weeks anchored Jul 25: Oct 3 is on cycle. Edit on Thu Oct 1.
-    expect(resolveCadenceChangeAnchor(weekly(2), weekly(3), "2026-10-01")).toBe("2026-10-03");
+  const firstAfterChange = (previous, next, today) => {
+    const anchorDate = resolveCadenceChangeAnchor(previous, next, today);
+    const recurrence = normalizeProtocolRecurrence({ ...next, anchorDate });
+    return getProtocolOccurrenceOnOrAfter(recurrence, today)?.scheduledLocalDate ?? null;
+  };
+
+  it("continues weekly spacing from the last scheduled photo day", () => {
+    // Every 2 weeks anchored Jul 25: last occurrence Sep 19, upcoming Oct 3. Edit Thu Oct 1.
+    expect(resolveCadenceChangeAnchor(weekly(2), weekly(3), "2026-10-01")).toBe("2026-10-10");
+    expect(resolveCadenceChangeAnchor(weekly(2), weekly(4), "2026-10-01")).toBe("2026-10-17");
     expect(resolveCadenceChangeAnchor(weekly(2), weekly(1), "2026-10-01")).toBe("2026-10-03");
   });
 
   it("keeps today on the occurrence day, and never makes an off-cycle today newly due", () => {
     expect(resolveCadenceChangeAnchor(weekly(2), weekly(3), "2026-10-03")).toBe("2026-10-03");
-    // Sep 26 is an off week for the every-2-weeks schedule: the change starts next Saturday.
+    // Sep 26 is an off week for the every-2-weeks schedule: weekly starts next Saturday.
     expect(resolveCadenceChangeAnchor(weekly(2), weekly(1), "2026-09-26")).toBe("2026-10-03");
   });
 
   it("starts a weekday or unit change on the first matching day after today", () => {
     expect(resolveCadenceChangeAnchor(weekly(2), weekly(2, "2026-07-25", "sunday"), "2026-10-01")).toBe("2026-10-04");
-    // Oct 3 is the first Saturday of October, so a first-Saturday monthly keeps it.
     expect(resolveCadenceChangeAnchor(weekly(2), monthly(1, "first", "2026-07-25"), "2026-10-01")).toBe("2026-10-03");
-    // Last Saturday: Oct 3 does not qualify; the schedule starts Oct 31.
     expect(resolveCadenceChangeAnchor(weekly(2), monthly(2, "last", "2026-07-25"), "2026-10-01")).toBe("2026-10-31");
+  });
+
+  it("never skips an occurrence or fails to resolve when shortening (review regressions)", () => {
+    const onFour = "2026-10-04";
+    expect(firstAfterChange(monthly(1, "first", "2026-10-03"), weekly(1, "2026-10-03"), onFour)).toBe("2026-10-10");
+    expect(firstAfterChange(monthly(1, "first", "2026-10-03"), weekly(2, "2026-10-03"), onFour)).toBe("2026-10-17");
+    expect(firstAfterChange(weekly(3, "2026-10-03"), weekly(1, "2026-10-03"), onFour)).toBe("2026-10-10");
+    expect(firstAfterChange(weekly(12, "2026-10-03"), weekly(1, "2026-10-03"), onFour)).toBe("2026-10-10");
+    expect(firstAfterChange(weekly(2, "2026-10-03"), weekly(1, "2026-10-03"), onFour)).toBe("2026-10-10");
+    expect(firstAfterChange(monthly(12, "first", "2026-10-03"), monthly(1, "first", "2026-10-03"), onFour)).toBe("2026-11-07");
+    expect(firstAfterChange(monthly(3, "first", "2026-10-03"), monthly(1, "first", "2026-10-03"), onFour)).toBe("2026-11-07");
+    // Exhaustive: every legacy/new pair, every day over a year, always resolves within one period.
+    const cadences = [1, 2, 3, 4, 12].map((n) => weekly(n, "2026-07-25"))
+      .concat(["first", "last"].flatMap((w) => [1, 2, 12].map((n) => monthly(n, w, "2026-08-01"))));
+    for (let day = 0; day < 370; day += 3) {
+      const today = addDays("2026-08-01", day);
+      for (const previous of cadences) {
+        for (const next of cadences) {
+          const first = firstAfterChange(previous, next, today);
+          expect(first, `${today} ${previous.frequency}${previous.interval} -> ${next.frequency}${next.interval}`).not.toBeNull();
+          expect(first >= today).toBe(true);
+        }
+      }
+    }
   });
 });
 
