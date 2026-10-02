@@ -221,6 +221,71 @@ final class HomeWidgetTests: XCTestCase {
         )
     }
 
+    // MARK: Build 80 display formatting (display only; canonical precision kept)
+
+    func testWholeNumberRoundsToNearestNeverTruncates() {
+        let us = Locale(identifier: "en_US")
+        XCTAssertEqual(HomeWidgetValueFormatter.wholeNumber(182.0, locale: us), "182")
+        XCTAssertEqual(HomeWidgetValueFormatter.wholeNumber(182.1, locale: us), "182")
+        XCTAssertEqual(HomeWidgetValueFormatter.wholeNumber(182.49, locale: us), "182")
+        XCTAssertEqual(HomeWidgetValueFormatter.wholeNumber(182.5, locale: us), "183")
+        XCTAssertEqual(HomeWidgetValueFormatter.wholeNumber(182.9, locale: us), "183")
+        XCTAssertEqual(HomeWidgetValueFormatter.wholeNumber(0.5, locale: us), "1")
+        XCTAssertEqual(HomeWidgetValueFormatter.wholeNumber(999.5, locale: us), "1,000")
+    }
+
+    func testFounderPhysicalExampleFormatsAsRequested() {
+        let us = Locale(identifier: "en_US")
+        XCTAssertEqual(HomeWidgetValueFormatter.calories(2_463.3, locale: us), "2,463")
+        XCTAssertEqual(HomeWidgetValueFormatter.grams(182.2, locale: us), "182")
+        XCTAssertEqual(HomeWidgetValueFormatter.grams(166.7, locale: us), "167")
+        XCTAssertEqual(HomeWidgetValueFormatter.grams(110.1, locale: us), "110")
+        XCTAssertEqual(HomeWidgetValueFormatter.activeCalories(890.1, locale: us), "890")
+        XCTAssertEqual(HomeWidgetValueFormatter.weight(.init(displayValue: "176.1 lb")), "176.1 lb")
+    }
+
+    func testThousandsGroupingIsLocaleAware() {
+        XCTAssertEqual(HomeWidgetValueFormatter.calories(12_345.6, locale: Locale(identifier: "en_US")), "12,346")
+        XCTAssertEqual(HomeWidgetValueFormatter.activeCalories(1_000, locale: Locale(identifier: "en_US")), "1,000")
+        XCTAssertEqual(HomeWidgetValueFormatter.calories(2_463.3, locale: Locale(identifier: "de_DE")), "2.463")
+    }
+
+    func testZeroMissingAndNonFiniteValues() {
+        let us = Locale(identifier: "en_US")
+        XCTAssertEqual(HomeWidgetValueFormatter.calories(0, locale: us), "0", "A canonical zero is shown as zero")
+        XCTAssertEqual(HomeWidgetValueFormatter.grams(0.4, locale: us), "0")
+        XCTAssertEqual(HomeWidgetValueFormatter.grams(-0.4, locale: us), "0", "Never a signed zero")
+        XCTAssertEqual(HomeWidgetValueFormatter.calories(nil, locale: us), "—", "Missing never becomes 0")
+        XCTAssertEqual(HomeWidgetValueFormatter.activeCalories(.nan, locale: us), "—")
+        XCTAssertNil(HomeWidgetValueFormatter.weight(nil))
+    }
+
+    func testWeightDisplayKeepsItsOneDecimalString() {
+        for value in ["176.1 lb", "176.0 lb", "79.9 kg"] {
+            XCTAssertEqual(HomeWidgetValueFormatter.weight(.init(displayValue: value)), value)
+        }
+    }
+
+    func testSnapshotKeepsCanonicalPrecisionAndFormattingIsDisplayOnly() throws {
+        let snapshot = HomeWidgetSamples.snapshot()
+        XCTAssertEqual(snapshot.nutrition?.calories, 2_463.3)
+        XCTAssertEqual(snapshot.nutrition?.proteinG, 182.2)
+        XCTAssertEqual(snapshot.activity?.activeCalories, 890.1)
+        let url = temporaryFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = HomeWidgetSnapshotFileStore(fileURL: url)
+        try store.write(snapshot)
+        XCTAssertEqual(store.read()?.nutrition?.carbsG, 166.7, "The shared file stores full precision")
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("PhysiqueOSShared/HomeLoggedTodayWidgetView.swift"),
+            encoding: .utf8
+        )
+        // Every family/state renders numbers through the one formatter.
+        XCTAssertFalse(source.contains("String(format:"), "No ad-hoc numeric formatting in the widget view")
+        XCTAssertFalse(source.contains(".displayValue ??"), "Weight renders through the formatter")
+    }
+
     // MARK: Build 79 integration review fixes
 
     func testSessionEndingErrorsAreClassifiedForSnapshotRetirement() {

@@ -1,6 +1,48 @@
 import SwiftUI
 import WidgetKit
 
+/// The single display formatter for every Home Screen widget family and
+/// state. Display only: snapshot, Server and HealthKit values keep their
+/// canonical precision; only the rendered text is rounded.
+enum HomeWidgetValueFormatter {
+    static let missing = "—"
+
+    /// Calories eaten: nearest whole number, locale grouping (2463.3 → "2,463").
+    static func calories(_ value: Double?, locale: Locale = .autoupdatingCurrent) -> String {
+        wholeNumber(value, locale: locale)
+    }
+
+    /// Protein / carbs / fat: nearest whole gram (166.7 → "167").
+    static func grams(_ value: Double?, locale: Locale = .autoupdatingCurrent) -> String {
+        wholeNumber(value, locale: locale)
+    }
+
+    /// Active calories: nearest whole number, locale grouping (890.1 → "890").
+    static func activeCalories(_ value: Double?, locale: Locale = .autoupdatingCurrent) -> String {
+        wholeNumber(value, locale: locale)
+    }
+
+    /// Weight keeps the canonical display string exactly as the app's Log
+    /// presents it (one decimal, e.g. "176.1 lb"); it is never re-rounded.
+    static func weight(_ weight: HomeWidgetWeightSummary?) -> String? {
+        weight?.displayValue
+    }
+
+    /// Nearest whole (half away from zero), never truncation. Missing or
+    /// non-finite stays missing, never "0"; a value that rounds to zero
+    /// shows "0" without a sign.
+    static func wholeNumber(_ value: Double?, locale: Locale) -> String {
+        guard let value, value.isFinite else { return missing }
+        let rounded = value.rounded(.toNearestOrAwayFromZero)
+        return (rounded == 0 ? 0 : rounded).formatted(
+            .number
+                .precision(.fractionLength(0))
+                .grouping(.automatic)
+                .locale(locale)
+        )
+    }
+}
+
 struct HomeLoggedTodayWidgetView: View {
     let snapshot: HomeWidgetSnapshot?
     let date: Date
@@ -141,14 +183,14 @@ struct HomeLoggedTodayWidgetView: View {
                 .foregroundStyle(secondary)
             if let nutrition {
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(number(nutrition.calories))
+                    Text(HomeWidgetValueFormatter.calories(nutrition.calories))
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                     Text("cal")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .foregroundStyle(secondary)
                 }
                 .foregroundStyle(.white)
-                Text("P \(number(nutrition.proteinG))  C \(number(nutrition.carbsG))  F \(number(nutrition.fatG))")
+                Text("P \(HomeWidgetValueFormatter.grams(nutrition.proteinG))  C \(HomeWidgetValueFormatter.grams(nutrition.carbsG))  F \(HomeWidgetValueFormatter.grams(nutrition.fatG))")
                     .font(.system(size: 8, weight: .semibold, design: .rounded))
                     .foregroundStyle(secondary)
                     .lineLimit(1)
@@ -168,11 +210,11 @@ struct HomeLoggedTodayWidgetView: View {
         HStack(alignment: .top, spacing: 7) {
             smallMetric(
                 label: "ACTIVE",
-                value: activity?.activeCalories.map { "\(number($0)) cal" } ?? "—"
+                value: activity?.activeCalories.map { "\(HomeWidgetValueFormatter.activeCalories($0)) cal" } ?? HomeWidgetValueFormatter.missing
             )
-            if let weight {
+            if let weight = HomeWidgetValueFormatter.weight(weight) {
                 Divider().overlay(Color.white.opacity(0.10)).frame(height: 25)
-                smallMetric(label: "WEIGHT", value: weight.displayValue)
+                smallMetric(label: "WEIGHT", value: weight)
             }
         }
     }
@@ -206,7 +248,7 @@ struct HomeLoggedTodayWidgetView: View {
                     activityValue(snapshot.activity)
                 }
                 row(icon: "scalemass", label: "Weight", destination: .weight(localDate: snapshot.localDate)) {
-                    Text(snapshot.weight?.displayValue ?? "—  Not logged today")
+                    Text(HomeWidgetValueFormatter.weight(snapshot.weight) ?? "—  Not logged today")
                         .valueStyle(present: snapshot.weight != nil)
                 }
             }
@@ -277,10 +319,10 @@ struct HomeLoggedTodayWidgetView: View {
     private func nutritionValue(_ nutrition: HomeWidgetNutritionSummary?) -> some View {
         if let nutrition {
             HStack(spacing: 9) {
-                metric(number(nutrition.calories), unit: "cal")
-                metric(number(nutrition.proteinG), unit: "P")
-                metric(number(nutrition.carbsG), unit: "C")
-                metric(number(nutrition.fatG), unit: "F")
+                metric(HomeWidgetValueFormatter.calories(nutrition.calories), unit: "cal")
+                metric(HomeWidgetValueFormatter.grams(nutrition.proteinG), unit: "P")
+                metric(HomeWidgetValueFormatter.grams(nutrition.carbsG), unit: "C")
+                metric(HomeWidgetValueFormatter.grams(nutrition.fatG), unit: "F")
             }
         } else {
             Text("—  Nothing logged yet").valueStyle(present: false)
@@ -290,7 +332,7 @@ struct HomeLoggedTodayWidgetView: View {
     @ViewBuilder
     private func activityValue(_ activity: HomeWidgetActivitySummary?) -> some View {
         if let activity, let calories = activity.activeCalories {
-            Text("\(number(calories)) active cal\(activity.isPartialDay ? " so far" : "")")
+            Text("\(HomeWidgetValueFormatter.activeCalories(calories)) active cal\(activity.isPartialDay ? " so far" : "")")
                 .valueStyle(present: true)
         } else {
             Text("—  Nothing logged yet").valueStyle(present: false)
@@ -407,11 +449,6 @@ struct HomeLoggedTodayWidgetView: View {
         let label = workout.label ?? "Workout in progress"
         guard let completed = workout.completedSets, let total = workout.totalSets, total > 0 else { return label }
         return "\(label) · \(completed)/\(total) sets"
-    }
-
-    private func number(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 }
 

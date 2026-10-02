@@ -243,9 +243,9 @@ enum HomeWidgetSamples {
             lastSuccessfulReadAt: HomeWidgetSnapshotClock.string(from: success),
             refreshState: stale ? .offline : .success,
             training: .init(summary: trainingLines.joined(separator: ", "), lines: trainingLines, context: nil, isPresent: true),
-            nutrition: .init(calories: 2_140, proteinG: 176, carbsG: 218, fatG: 71),
-            activity: .init(activeCalories: 648, isPartialDay: true),
-            weight: weight ? .init(displayValue: "167.4 lb") : nil,
+            nutrition: .init(calories: 2_463.3, proteinG: 182.2, carbsG: 166.7, fatG: 110.1),
+            activity: .init(activeCalories: 890.1, isPartialDay: true),
+            weight: weight ? .init(displayValue: "176.1 lb") : nil,
             workout: activeWorkout
                 ? .init(state: .active, sessionId: "preview-session", label: "Chest & Shoulders", completedSets: 6, totalSets: 18)
                 : .none
