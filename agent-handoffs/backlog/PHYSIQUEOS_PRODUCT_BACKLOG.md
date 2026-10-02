@@ -77,14 +77,22 @@ Acceptance:
 - notification clears/updates appropriately.
 
 4. HealthKit Sleep — prospective canary acceptance
-Status: historical Evidence + Build 76 UI + Server architecture complete. D0 2026-10-02 validation_only. Strategic Sleep OFF.
+Status: canary audited 2026-10-02 11:27 PDT — FAIL (one new P2 Sleep correctness defect); strategic isolation intact. D0 2026-10-02 validation_only. Strategic Sleep OFF.
 Authority:
-- Server 5804e88dac0db6bb04cf43647d6387efeab25906
+- Server 4ffde0f5faf1832decfbc09d822088aeba0dca89 (deployment faaf66bd; Sleep code unchanged since 5804e88d)
+- canary audit agent-handoffs/reports/20261002T182755Z-healthkit-sleep-prospective-canary-audit.md
 - Sleep closeout agent-handoffs/reports/20261001T203806Z-healthkit-sleep-server-midnight-window-closeout.md
-Next:
-- observe 2–3 naturally arriving prospective nights;
-- no manual Sleep import;
-- verify Oura preferred, background delivery without Log dependency, one canonical night/day, late update/reconciliation, stages/continuity, Evidence update, and strategic leakage zero.
+Audit result:
+- 1 natural prospective night (Oct 2), Oura only; exactly one canonical day, midnight-safe, natural late revision r1 -> r2 on the same row; Evidence correct; leakage 0 across 40 collections; historical 87/87 unchanged.
+- P2 defect: sleep-canon-v2 duplicate-copy selection spliced two Oura revisions (Oura left 44 of 66 first-revision samples live after rewriting the night). Stage minutes/hypnogram diverge from Oura's current revision (~10 min per stage); asleep total ~1% off; synthetic repro can zero a stage. No double count, no strategic effect.
+- Background (app-closed) delivery unproven: 07:34 PDT Sleep upload coincided with Founder app use. Log-independence holds structurally.
+- No post-boundary Briefing generated yet (first: Weekly Sun Oct 4 3 AM).
+Next gate:
+- Founder decision D1: authorize a Server-only sleep-canon-v3 copy-coherence fix (prospective-only recompute, no historical rewrite) OR accept the splice as display-only/P3.
+- then observe >=2 (prefer 3) natural nights under the final algorithm, ideally including an Oura duplicate-revision night;
+- one morning with Oura synced while PhysiqueOS stays unopened >=75 min (proves background delivery);
+- Oct 4 Weekly (and Oct 7 Midweek) scanned: zero Sleep/Recovery markers, Confidence unmoved;
+- no manual Sleep import; no backfill.
 After acceptance:
 - authorize prospective validation-only Sleep as input to Recovery shadow assessment through a separately reviewed non-strategic composition boundary.
 
@@ -104,7 +112,8 @@ Accepted product direction:
 - Recovery status does not automatically move Goal Confidence;
 - training corroboration is non-causal.
 Next:
-- wait for prospective Sleep canary acceptance;
+- wait for prospective Sleep canary acceptance (2026-10-02 audit: FAIL on P2 copy splice; see item 4);
+- note: a prospective-only prior-28 baseline needs >=14 reliable nights, so non-"Not enough data" shadow output is not possible before ~Oct 15 even once authorized;
 - review/authorize prospective-only non-strategic shadow input boundary;
 - run shadow calibration;
 - only later consider additive recoveryAssessment on NEW Weekly/Midweek/Monthly artifacts;
