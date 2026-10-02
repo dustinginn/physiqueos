@@ -281,13 +281,16 @@ struct CoachingProgressPhotosReadModel: Codable, Equatable {
     var reminderEnabled: Bool
     /// Read-only: the Server's next scheduled photo date on or after today.
     var nextOccurrenceDate: String?
+    /// Read-only: the most recent scheduled photo date on or before today.
+    var lastOccurrenceDate: String?
     /// False when the Server only sent the legacy `cadence`; such a Server
     /// can only save Weekly / Every 2 weeks.
     var serverSupportsFlexibleCadence: Bool = true
 
     init(cadenceInterval: Int, cadenceUnit: ProgressPhotoCadenceUnit, weekOfMonth: ProgressPhotoWeekOfMonth? = nil,
          day: OperatingPlanWeekday, timeOfDay: TimeOfDayChoice, specificTime: String? = nil,
-         reminderEnabled: Bool, nextOccurrenceDate: String? = nil, serverSupportsFlexibleCadence: Bool = true) {
+         reminderEnabled: Bool, nextOccurrenceDate: String? = nil, lastOccurrenceDate: String? = nil,
+         serverSupportsFlexibleCadence: Bool = true) {
         self.cadenceInterval = cadenceInterval
         self.cadenceUnit = cadenceUnit
         self.weekOfMonth = weekOfMonth
@@ -296,11 +299,13 @@ struct CoachingProgressPhotosReadModel: Codable, Equatable {
         self.specificTime = specificTime
         self.reminderEnabled = reminderEnabled
         self.nextOccurrenceDate = nextOccurrenceDate
+        self.lastOccurrenceDate = lastOccurrenceDate
         self.serverSupportsFlexibleCadence = serverSupportsFlexibleCadence
     }
 
     private enum CodingKeys: String, CodingKey {
-        case cadence, cadenceInterval, cadenceUnit, weekOfMonth, day, timeOfDay, specificTime, reminderEnabled, nextOccurrenceDate
+        case cadence, cadenceInterval, cadenceUnit, weekOfMonth, day, timeOfDay, specificTime, reminderEnabled
+        case nextOccurrenceDate, lastOccurrenceDate
     }
 
     init(from decoder: Decoder) throws {
@@ -310,6 +315,7 @@ struct CoachingProgressPhotosReadModel: Codable, Equatable {
         specificTime = try container.decodeIfPresent(String.self, forKey: .specificTime)
         reminderEnabled = try container.decode(Bool.self, forKey: .reminderEnabled)
         nextOccurrenceDate = try container.decodeIfPresent(String.self, forKey: .nextOccurrenceDate)
+        lastOccurrenceDate = try container.decodeIfPresent(String.self, forKey: .lastOccurrenceDate)
         if let unit = try container.decodeIfPresent(ProgressPhotoCadenceUnit.self, forKey: .cadenceUnit) {
             let interval = try container.decode(Int.self, forKey: .cadenceInterval)
             guard Self.intervalRange.contains(interval) else {
@@ -381,21 +387,35 @@ struct CoachingProgressPhotosReadModel: Codable, Equatable {
     /// changes the Server re-anchors on (time and reminder changes do not).
     func cadencePatternDiffers(from other: CoachingProgressPhotosReadModel) -> Bool {
         cadenceInterval != other.cadenceInterval || cadenceUnit != other.cadenceUnit
-            || day != other.day
-            || (cadenceUnit == .month ? weekOfMonth ?? .first : nil) != (other.cadenceUnit == .month ? other.weekOfMonth ?? .first : nil)
+            || day != other.day || effectiveWeekOfMonth != other.effectiveWeekOfMonth
+    }
+
+    /// The week of the month that applies (months only).
+    var effectiveWeekOfMonth: ProgressPhotoWeekOfMonth? {
+        cadenceUnit == .month ? weekOfMonth ?? .first : nil
     }
 }
 
 /// Display-only preview of when an edited Progress Photos cadence starts,
-/// mirroring the Server's rule (`resolveCadenceChangeAnchor`): the current
-/// schedule's upcoming occurrence is kept when it still fits the new day
-/// rule; otherwise the new cadence starts on the first matching day after
-/// today. The Server remains the authority and returns the saved date.
+/// mirroring the Server's rule (`resolveCadenceChangeAnchor`): today stays
+/// when it is already the scheduled day and still fits; weeks continue
+/// from the last scheduled photo day (last + k × interval) when it fits the
+/// weekday; otherwise the first matching day after today. The Server
+/// remains the authority and returns the saved date.
 enum ProgressPhotoCadencePreview {
     static func firstOccurrence(edited: CoachingProgressPhotosReadModel, saved: CoachingProgressPhotosReadModel,
                                 today: String) -> String? {
-        if !edited.cadencePatternDiffers(from: saved) { return saved.nextOccurrenceDate }
-        if let kept = saved.nextOccurrenceDate, kept >= today, matchesDayRule(edited, date: kept) { return kept }
+        if !edited.cadencePatternDiffers(from: saved) {
+            guard let next = saved.nextOccurrenceDate, next >= today else { return nil }
+            return next
+        }
+        if saved.nextOccurrenceDate == today, matchesDayRule(edited, date: today) { return today }
+        if edited.cadenceUnit == .week, let last = saved.lastOccurrenceDate, last <= today,
+           matchesDayRule(edited, date: last), let lastDate = noonUTC(last), let todayDate = noonUTC(today) {
+            let step = edited.cadenceInterval * 7
+            let elapsed = Int((todayDate.timeIntervalSince(lastDate) / 86_400).rounded())
+            return dateKey(lastDate.addingTimeInterval(Double((elapsed / step + 1) * step) * 86_400))
+        }
         guard var cursor = noonUTC(today) else { return nil }
         for _ in 0..<62 {
             cursor = cursor.addingTimeInterval(86_400)

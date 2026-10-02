@@ -374,7 +374,12 @@ private struct CoachingUpdatesEditor: View {
                                 Text("Choose when you plan to take progress photos, whether Home should remind you, and whether completed photo sessions should generate a Photo Event review.")
                                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
                                 progressPhotoCadenceFields(model.photos)
-                                Picker("Preferred time", selection: Binding(get: { model.photos.timeOfDay }, set: { self.model?.photos.timeOfDay = $0 })) {
+                                Picker("Preferred time", selection: Binding(get: { model.photos.timeOfDay }, set: { choice in
+                                    self.model?.photos.timeOfDay = choice
+                                    // The picker below shows 08:00 for an unset time; persist
+                                    // what is shown rather than sending no time at all.
+                                    if choice == .specific, self.model?.photos.specificTime == nil { self.model?.photos.specificTime = "08:00" }
+                                })) {
                                     ForEach(TimeOfDayChoice.allCases) { Text($0.label).tag($0) }
                                 }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
                                 if model.photos.timeOfDay == .specific {

@@ -911,10 +911,11 @@ extension OperatingPlanReadModelTests {
     }
 
     func testProgressPhotoNewServerShapeDecodesAndRoundTripsEveryCadence() throws {
-        let decoded = try decodePhotos(#"{"cadence":"weekly_interval_2","cadenceInterval":2,"cadenceUnit":"week","weekOfMonth":null,"nextOccurrenceDate":"2026-10-03","day":"saturday","timeOfDay":"specific","specificTime":"08:30","reminderEnabled":true}"#)
+        let decoded = try decodePhotos(#"{"cadence":"weekly_interval_2","cadenceInterval":2,"cadenceUnit":"week","weekOfMonth":null,"nextOccurrenceDate":"2026-10-03","lastOccurrenceDate":"2026-09-19","day":"saturday","timeOfDay":"specific","specificTime":"08:30","reminderEnabled":true}"#)
         XCTAssertEqual(decoded.cadenceInterval, 2)
         XCTAssertTrue(decoded.serverSupportsFlexibleCadence)
         XCTAssertEqual(decoded.nextOccurrenceDate, "2026-10-03")
+        XCTAssertEqual(decoded.lastOccurrenceDate, "2026-09-19")
         for (interval, unit, week, legacy) in [
             (3, ProgressPhotoCadenceUnit.week, nil as ProgressPhotoWeekOfMonth?, "custom"),
             (4, .week, nil, "custom"),
@@ -934,6 +935,7 @@ extension OperatingPlanReadModelTests {
             XCTAssertEqual(object["timeOfDay"] as? String, "specific")
             XCTAssertEqual(object["specificTime"] as? String, "08:30")
             XCTAssertNil(object["nextOccurrenceDate"], "Read-only next date is never sent back")
+            XCTAssertNil(object["lastOccurrenceDate"], "Read-only last date is never sent back")
             let reloaded = try JSONDecoder().decode(CoachingProgressPhotosReadModel.self, from: JSONEncoder().encode(value))
             XCTAssertEqual(reloaded, value, "\(interval) \(unit) must save/reload unchanged")
         }
@@ -958,22 +960,36 @@ extension OperatingPlanReadModelTests {
         XCTAssertEqual(photos(2, .month, .last, day: .sunday).cadenceSummary, "Every 2 months on the last Sunday")
     }
 
-    func testProgressPhotoPreviewKeepsUpcomingOccurrenceAndStartsChangesPredictably() {
-        // Saved: every 2 weeks on Saturday, next Sat Oct 3; editing Thu Oct 1.
-        let saved = photos(2, .week, next: "2026-10-03")
+    func testProgressPhotoPreviewMatchesServerChangeRule() {
+        // Saved: every 2 weeks on Saturday; last Sat Sep 19, next Sat Oct 3; editing Thu Oct 1.
+        var saved = photos(2, .week, next: "2026-10-03")
+        saved.lastOccurrenceDate = "2026-09-19"
         let today = "2026-10-01"
         XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: saved, saved: saved, today: today), "2026-10-03")
         var timeOnly = saved
         timeOnly.specificTime = "18:00"
         XCTAssertFalse(timeOnly.cadencePatternDiffers(from: saved))
-        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(3, .week), saved: saved, today: today), "2026-10-03")
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(3, .week), saved: saved, today: today), "2026-10-10")
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(4, .week), saved: saved, today: today), "2026-10-17")
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(1, .week), saved: saved, today: today), "2026-10-03")
         XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(2, .week, day: .sunday), saved: saved, today: today), "2026-10-04")
         XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(1, .month, .first), saved: saved, today: today), "2026-10-03")
         XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(1, .month, .last), saved: saved, today: today), "2026-10-31")
         XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(1, .month, .fourth), saved: saved, today: today), "2026-10-24")
-        // Editing on the occurrence day keeps today.
-        let onDay = photos(2, .week, next: "2026-10-03")
+        // Editing on the occurrence day keeps today; an off-cycle Saturday does not become due.
+        var onDay = photos(2, .week, next: "2026-10-03")
+        onDay.lastOccurrenceDate = "2026-10-03"
         XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(4, .week), saved: onDay, today: "2026-10-03"), "2026-10-03")
+        var offWeek = photos(2, .week, next: "2026-10-03")
+        offWeek.lastOccurrenceDate = "2026-09-19"
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(1, .week), saved: offWeek, today: "2026-09-26"), "2026-10-03")
+        // Monthly -> weekly continues from the last monthly photo day without skipping.
+        var monthly = photos(1, .month, .first, next: "2026-11-07")
+        monthly.lastOccurrenceDate = "2026-10-03"
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(1, .week), saved: monthly, today: "2026-10-04"), "2026-10-10")
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(2, .week), saved: monthly, today: "2026-10-04"), "2026-10-17")
+        // A stale "next" (editor left open past the date) is not shown.
+        XCTAssertNil(ProgressPhotoCadencePreview.firstOccurrence(edited: saved, saved: saved, today: "2026-10-04"))
     }
 
     func testProgressPhotoMonthlyDayRuleHandlesMonthEndAndLeapYear() {
