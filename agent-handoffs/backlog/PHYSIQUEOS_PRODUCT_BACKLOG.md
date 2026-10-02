@@ -233,6 +233,38 @@ Initial accepted candidates:
 - Workout set completion: DEFERRED (not in Build 78); consider subtle confirmation, especially interactive system surfaces, after real-use acceptance.
 Avoid haptics on ordinary read-only navigation/charts/browsing.
 
+
+E. Priority Skip capability expansion — peptides + Foam Rolling notifications
+Status: accepted follow-up after Build 78; include in the next consolidated Native/Server-compatible release.
+
+Peptides:
+- peptide occurrences must support canonical Skip even though Complete remains specialized/dose-aware;
+- Skip means intentionally not taken for that occurrence;
+- no dose should be recorded on Skip;
+- planned-dose / took-a-different-amount completion semantics remain unchanged;
+- peptide notifications should expose Skip once the occurrence contract advertises it safely.
+
+Foam Rolling:
+- Foam Rolling already supports canonical Skip from Priority Detail;
+- actionable notifications should expose Skip as well;
+- do not rely on Native guessing that all Recovery Support priorities are skippable.
+
+Architecture direction:
+- make Skip capability independent from completion mode;
+- a Priority may be specialized for Complete and still support Skip;
+- prefer Server-owned explicit skip capability/skipCommand in notificationAction so Native does not infer by Priority name/type;
+- Native renders Skip only when the occurrence contract authorizes it;
+- use the same canonical priority.skip.v1 mutation path as in-app Skip;
+- stale/duplicate Skip remains idempotent and reconciles Home/Priority Detail/notifications.
+
+Acceptance:
+- peptide detail screen exposes Skip;
+- peptide notification exposes Skip without weakening dose-aware Complete;
+- skipped peptide records no dose;
+- Foam Rolling notification exposes Skip;
+- Home/Priority Detail reflect canonical Skipped state;
+- unsupported Support priorities do not accidentally inherit Skip.
+
 PARKED IOS FEATURES
 
 Native capture / quick intake
