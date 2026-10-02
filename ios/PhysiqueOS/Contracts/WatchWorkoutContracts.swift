@@ -7,6 +7,7 @@ enum WatchWorkoutContract {
     static let schemaVersion = 1
     static let maximumIdentifierLength = 96
     static let maximumRows = 2
+    static let applicationContextProjectionKey = "physiqueos.watchWorkout.projection.v1"
 }
 
 protocol WatchWorkoutSafeStringEnum: RawRepresentable, Codable where RawValue == String {
@@ -111,6 +112,10 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
         var setNumber: Int
         var setCount: Int
         var valueText: String?
+        /// Split execution values. These stay presentation-only; Watch V1
+        /// never edits them and only completes the exact set named here.
+        var loadText: String? = nil
+        var repsText: String? = nil
         var supersetLabel: String?
         var partnerName: String?
         var isCompletionTarget: Bool
@@ -148,6 +153,42 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
     var stalenessReason: StalenessReason?
     var lastAcknowledgedMutationId: String?
     var metrics: WatchWorkoutMetrics?
+}
+
+/// Small deterministic delivery gate shared by transport tests and the
+/// Watch client. Only one interactive mutation can be in flight. A retry
+/// reuses the exact command (and therefore mutation id); an out-of-order ack
+/// can refresh authoritative state but cannot clear a newer command.
+struct WatchWorkoutCommandDeliveryGate: Equatable, Sendable {
+    private(set) var pending: WatchWorkoutCommand?
+
+    mutating func begin(_ command: WatchWorkoutCommand) -> Bool {
+        guard pending == nil else { return false }
+        pending = command
+        return true
+    }
+
+    mutating func acknowledge(_ acknowledgement: WatchWorkoutAcknowledgement) -> Bool {
+        guard acknowledgement.commandId == pending?.commandId else { return false }
+        pending = nil
+        return true
+    }
+
+    mutating func reset() { pending = nil }
+}
+
+enum WatchWorkoutWireCodec {
+    static func encode<T: Encodable>(_ value: T) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(value)
+    }
+
+    static func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(type, from: data)
+    }
 }
 
 /// Metrics rendered by the Crown page. Total Calories is intentionally nil

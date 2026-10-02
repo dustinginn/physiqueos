@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>PhysiqueOS uses workout heart rate and energy to show live training metrics on Apple Watch.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>PhysiqueOS saves the strength workout recorded by Apple Watch to Apple Health.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
+	<key>WKCompanionAppBundleIdentifier</key>
+	<string>com.physiqueos.native.dev</string>
+	<key>WKRunsIndependentlyOfCompanionApp</key>
+	<false/>
+</dict>
+</plist>

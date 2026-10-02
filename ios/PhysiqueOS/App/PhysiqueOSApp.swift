@@ -13,6 +13,7 @@ struct PhysiqueOSApp: App {
     @State private var notificationDelegate: PriorityNotificationDelegate
     @State private var workoutLiveActivity: WorkoutLiveActivityBridge
     @State private var homeWidget: HomeWidgetBridge
+    @State private var watchWorkoutConnectivity: PhoneWatchWorkoutConnectivityBridge
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -45,6 +46,9 @@ struct PhysiqueOSApp: App {
         // file, or reload real widget timelines.
         if !isUnitTestHost { homeWidget.install() }
         _homeWidget = State(initialValue: homeWidget)
+        let watchWorkoutConnectivity = PhoneWatchWorkoutConnectivityBridge(environment: environment)
+        if !isUnitTestHost { watchWorkoutConnectivity.install() }
+        _watchWorkoutConnectivity = State(initialValue: watchWorkoutConnectivity)
         // HealthKit background delivery relaunches a terminated app WITHOUT
         // ever activating a scene, so the scenePhase-driven bootstrap below
         // cannot be what re-registers the observers. Do it here, in the
@@ -116,6 +120,7 @@ struct PhysiqueOSApp: App {
                     // activation, under every authority.
                     if phase == .active {
                         workoutLiveActivity.reconcile()
+                        watchWorkoutConnectivity.reconcile()
                         Task {
                             _ = await environment.reevaluateDailyDriverDay()
                             await homeWidget.refreshCanonicalSnapshot()
@@ -142,6 +147,7 @@ struct PhysiqueOSApp: App {
                 .onChange(of: environment.nativeAuthority) { _, _ in
                     workoutLiveActivity.attachToSelectedAuthority()
                     homeWidget.attachToSelectedAuthority()
+                    watchWorkoutConnectivity.attachToSelectedAuthority()
                 }
                 // Foregrounded across local midnight, a manual clock / DST /
                 // carrier time change, or a zone change while running.

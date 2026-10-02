@@ -42,6 +42,8 @@ extension WatchWorkoutProjection {
                     setNumber: row.set.setNumber,
                     setCount: row.set.setCount,
                     valueText: row.set.valueText,
+                    loadText: Self.loadText(row.set),
+                    repsText: Self.number(row.set.reps),
                     supersetLabel: row.exercise?.supersetLabel,
                     partnerName: row.exercise?.supersetPartnerName,
                     isCompletionTarget: canComplete && row.isCompletionTarget
@@ -68,5 +70,18 @@ extension WatchWorkoutProjection {
             lastAcknowledgedMutationId: draft.appliedMutationIds?.last,
             metrics: nil
         )
+    }
+
+    private static func number(_ value: Double?) -> String? {
+        guard let value else { return nil }
+        return value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+    }
+
+    private static func loadText(_ set: TrainingSessionLiveProjection.SetCue) -> String? {
+        if set.isBodyweight {
+            guard let load = set.load, load > 0 else { return "BW" }
+            return "BW + \(number(load) ?? "—")"
+        }
+        return number(set.load)
     }
 }

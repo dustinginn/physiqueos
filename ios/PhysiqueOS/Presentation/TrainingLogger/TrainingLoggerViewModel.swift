@@ -269,6 +269,16 @@ final class TrainingLoggerViewModel {
         ))
     }
 
+    func setReadyForWatch(_ ready: Bool) {
+        guard canWrite, completedDraft == nil, let selectedDraftId else { return }
+        validationMessage = nil
+        let outcome = sessionAuthority.setReadyForWatch(sessionId: selectedDraftId, ready: ready)
+        noteRejection(outcome)
+        if case .rejected = outcome {
+            validationMessage = "Finish preparing the workout before making it available on Watch."
+        }
+    }
+
     /// Only a failed device write is worth telling the Founder about; the
     /// screen already reflects authoritative state for every other outcome.
     private func noteRejection(_ outcome: TrainingSessionMutationOutcome) {

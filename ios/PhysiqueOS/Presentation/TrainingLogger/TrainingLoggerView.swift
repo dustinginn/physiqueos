@@ -567,6 +567,21 @@ struct TrainingLoggerView: View {
             if let draft = viewModel.draft, let presentation = viewModel.workoutPresentation {
                 workoutIdentity(draft: draft, presentation: presentation)
 
+                if draft.completedSetCount == 0, !draft.exercises.isEmpty {
+                    Button {
+                        viewModel.setReadyForWatch(draft.readyForWatchAt == nil)
+                    } label: {
+                        Label(
+                            draft.readyForWatchAt == nil ? "Ready for Watch" : "Ready on Watch",
+                            systemImage: draft.readyForWatchAt == nil ? "applewatch" : "checkmark.circle.fill"
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(PhysiqueOSTheme.accent)
+                    .accessibilityIdentifier("trainingLogger.readyForWatch")
+                }
+
                 HStack(spacing: 8) {
                     Button {
                         viewModel.saveAndLeave()

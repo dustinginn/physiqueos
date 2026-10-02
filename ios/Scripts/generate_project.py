@@ -454,6 +454,32 @@ home_widget_extension_files = [
 LIVE_ACTIVITY_ENTITLEMENTS = ("PhysiqueOSLiveActivity", "PhysiqueOSLiveActivity.entitlements")
 HOME_WIDGET_BLOCK = 0x17FF
 
+# Paired Apple Watch Workout V1 Phase 1A. One final pinned block keeps the
+# shipping phone/widget object ids stable while making the real watchOS app,
+# phone transport, and watch unit-test target fully generator-owned.
+watch_phase1a_phone_files = [
+    ("Networking", "WatchWorkoutConnectivityBridge.swift"),
+]
+watch_phase1a_phone_test_files = [
+    ("PhysiqueOSTests", "WatchWorkoutTransportTests.swift"),
+]
+watch_app_files = [
+    ("PhysiqueOSWatch", "PhysiqueOSWatchApp.swift"),
+    ("PhysiqueOSWatch", "WatchWorkoutStore.swift"),
+    ("PhysiqueOSWatch", "WatchWorkoutHealthController.swift"),
+    ("PhysiqueOSWatch", "WatchWorkoutViews.swift"),
+]
+watch_shared_files = [
+    ("Contracts", "WatchWorkoutContracts.swift"),
+]
+watch_test_files = [
+    ("PhysiqueOSWatchTests", "WatchWorkoutReducerTests.swift"),
+]
+WATCH_PLIST = ("PhysiqueOSWatch", "Info.plist")
+WATCH_ENTITLEMENTS = ("PhysiqueOSWatch", "PhysiqueOSWatch.entitlements")
+WATCH_FRAMEWORKS = ["HealthKit.framework", "WatchConnectivity.framework"]
+WATCH_APP_BLOCK = 0x18FF
+
 # Daily-driver local-day authority. Allocated after every established object
 # (including the N1 tests) so adding it renumbers nothing.
 dd_app_files = [
@@ -495,7 +521,7 @@ late_reference_only_files = [
     ("Supporting", "PhysiqueOS.entitlements"),
 ]
 
-system_frameworks = ["HealthKit.framework"]
+system_frameworks = ["HealthKit.framework", "WatchConnectivity.framework"]
 
 # Files that must be visible/navigable in Xcode and resolvable by path (an
 # Info.plist referenced via the INFOPLIST_FILE build setting) but are NOT
@@ -562,7 +588,10 @@ BUNDLE_ID_APP = "com.physiqueos.native.dev"
 BUNDLE_ID_TEST = "com.physiqueos.native.dev.Tests"
 BUNDLE_ID_UI_TEST = "com.physiqueos.native.dev.UITests"
 BUNDLE_ID_LIVE_ACTIVITY = "com.physiqueos.native.dev.WorkoutActivity"
+BUNDLE_ID_WATCH = "com.physiqueos.native.dev.watchkitapp"
+BUNDLE_ID_WATCH_TEST = "com.physiqueos.native.dev.watchkitapp.Tests"
 DEPLOYMENT_TARGET = "18.0"
+WATCH_DEPLOYMENT_TARGET = "11.0"
 
 # One authoritative TestFlight build number. Increment this value, run this
 # generator, then build/archive. Never edit CURRENT_PROJECT_VERSION in the
@@ -759,6 +788,34 @@ for group, fname in home_widget_extension_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:ext:{group}/{fname}")
 I(f"fileref:{LIVE_ACTIVITY_ENTITLEMENTS[0]}/{LIVE_ACTIVITY_ENTITLEMENTS[1]}")
+assert _counter[0] < WATCH_APP_BLOCK, "Watch app ID block would collide with earlier objects"
+_counter[0] = WATCH_APP_BLOCK
+for group, fname in watch_phase1a_phone_files + watch_phase1a_phone_test_files + watch_app_files + watch_test_files:
+    I(f"fileref:{group}/{fname}")
+for group, fname in watch_phase1a_phone_files:
+    I(f"buildfile:{group}/{fname}")
+for group, fname in watch_phase1a_phone_test_files:
+    I(f"buildfile:{group}/{fname}")
+for group, fname in watch_app_files + watch_shared_files:
+    I(f"buildfile:watch:{group}/{fname}")
+for group, fname in watch_test_files:
+    I(f"buildfile:watchtest:{group}/{fname}")
+for item in (WATCH_PLIST, WATCH_ENTITLEMENTS):
+    I(f"fileref:{item[0]}/{item[1]}")
+I("group:PhysiqueOSWatch")
+I("group:PhysiqueOSWatchTests")
+I("fileref:PhysiqueOSWatch.app")
+I("fileref:PhysiqueOSWatchTests.xctest")
+for framework in WATCH_FRAMEWORKS:
+    I(f"buildfile:watch:framework:{framework}")
+for name in (
+    "watchTarget", "watchConfigList", "watchDebug", "watchRelease", "watchSourcesPhase",
+    "watchFrameworksPhase", "watchResourcesPhase", "embedWatchPhase", "buildfile:embed:watch",
+    "watchDependency", "watchContainerProxy", "watchTestTarget", "watchTestConfigList",
+    "watchTestDebug", "watchTestRelease", "watchTestSourcesPhase", "watchTestFrameworksPhase",
+    "watchTestResourcesPhase", "watchTestDependency", "watchTestContainerProxy"
+):
+    I(name)
 _counter[0] = _resume_counter
 
 # ---------------- PBXBuildFile ----------------
@@ -1554,6 +1611,293 @@ config_lists += f"""
 \t\t\tdefaultConfigurationName = Release;
 \t\t}};"""
 
+# ---------------- Paired Watch app + transport (Phase 1A) ----------------
+_watch_app_ref = I("fileref:PhysiqueOSWatch.app")
+_watch_test_ref = I("fileref:PhysiqueOSWatchTests.xctest")
+
+for group, fname in watch_phase1a_phone_files + watch_phase1a_phone_test_files + watch_app_files + watch_test_files:
+    fileref_lines.append(
+        f"\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */ = "
+        f"{{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};"
+    )
+for group, fname in (WATCH_PLIST, WATCH_ENTITLEMENTS):
+    fileref_lines.append(
+        f"\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */ = "
+        f"{{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};"
+    )
+fileref_lines.append(f"\t\t{_watch_app_ref} /* PhysiqueOSWatch.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOSWatch.app; sourceTree = BUILT_PRODUCTS_DIR; }};")
+fileref_lines.append(f"\t\t{_watch_test_ref} /* PhysiqueOSWatchTests.xctest */ = {{isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; }};")
+
+for group, fname in watch_phase1a_phone_files:
+    buildfile_lines.append(_bf_sources(f"buildfile:{group}/{fname}", group, fname))
+for group, fname in watch_phase1a_phone_test_files:
+    buildfile_lines.append(_bf_sources(f"buildfile:{group}/{fname}", group, fname))
+for group, fname in watch_app_files + watch_shared_files:
+    buildfile_lines.append(_bf_sources(f"buildfile:watch:{group}/{fname}", group, fname))
+for group, fname in watch_test_files:
+    buildfile_lines.append(_bf_sources(f"buildfile:watchtest:{group}/{fname}", group, fname))
+for framework in WATCH_FRAMEWORKS:
+    buildfile_lines.append(
+        f"\t\t{I(f'buildfile:watch:framework:{framework}')} /* {framework} in Frameworks */ = "
+        f"{{isa = PBXBuildFile; fileRef = {I(f'fileref:framework:{framework}')} /* {framework} */; }};"
+    )
+buildfile_lines.append(
+    f"\t\t{I('buildfile:embed:watch')} /* PhysiqueOSWatch.app in Embed Watch Content */ = "
+    f"{{isa = PBXBuildFile; fileRef = {_watch_app_ref} /* PhysiqueOSWatch.app */; settings = {{ATTRIBUTES = (RemoveHeadersOnCopy, ); }}; }};"
+)
+
+def _append_group_child(group_key, child_line):
+    indexes = [i for i, line in enumerate(group_lines) if line.startswith(f"\t\t{I(group_key)} ")]
+    assert len(indexes) == 1
+    group_lines[indexes[0]] = group_lines[indexes[0]].replace("\t\t\tchildren = (\n", "\t\t\tchildren = (\n" + child_line, 1)
+
+for group, fname in watch_phase1a_phone_files:
+    _append_group_child("group:Networking", f"\t\t\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */,\n")
+for group, fname in watch_phase1a_phone_test_files:
+    _append_group_child("group:PhysiqueOSTests", f"\t\t\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */,\n")
+group_lines.append(_group_block("PhysiqueOSWatch", watch_app_files, [WATCH_PLIST, WATCH_ENTITLEMENTS]))
+group_lines.append(_group_block("PhysiqueOSWatchTests", watch_test_files))
+_append_group_child("group:main", f"\t\t\t\t{I('group:PhysiqueOSWatch')} /* PhysiqueOSWatch */,\n\t\t\t\t{I('group:PhysiqueOSWatchTests')} /* PhysiqueOSWatchTests */,\n")
+_append_group_child("group:products", f"\t\t\t\t{_watch_app_ref} /* PhysiqueOSWatch.app */,\n\t\t\t\t{_watch_test_ref} /* PhysiqueOSWatchTests.xctest */,\n")
+
+_phone_source_anchor = f"\t\t\t\t{I(f'buildfile:{app_files[0][0]}/{app_files[0][1]}')} /* {app_files[0][1]} in Sources */,\n"
+assert sources_phases.count(_phone_source_anchor) == 1
+sources_phases = sources_phases.replace(
+    _phone_source_anchor,
+    _phone_source_anchor + "".join(
+        f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */,\n" for g, f in watch_phase1a_phone_files
+    ), 1
+)
+_phone_test_anchor = f"\t\t\t\t{I(f'buildfile:{test_files[0][0]}/{test_files[0][1]}')} /* {test_files[0][1]} in Sources */,\n"
+assert sources_phases.count(_phone_test_anchor) == 1
+sources_phases = sources_phases.replace(
+    _phone_test_anchor,
+    _phone_test_anchor + "".join(
+        f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */,\n" for g, f in watch_phase1a_phone_test_files
+    ), 1
+)
+_watch_source_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:watch:{g}/{f}')} /* {f} in Sources */," for g, f in watch_app_files + watch_shared_files
+)
+_watch_test_source_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:watchtest:{g}/{f}')} /* {f} in Sources */," for g, f in watch_test_files
+)
+sources_phases += f"""
+\t\t{I('watchSourcesPhase')} /* Sources */ = {{
+\t\t\tisa = PBXSourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+{_watch_source_ids}
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};
+\t\t{I('watchTestSourcesPhase')} /* Sources */ = {{
+\t\t\tisa = PBXSourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+{_watch_test_source_ids}
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};"""
+
+_watch_framework_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:watch:framework:{framework}')} /* {framework} in Frameworks */," for framework in WATCH_FRAMEWORKS
+)
+frameworks_phases += f"""
+\t\t{I('watchFrameworksPhase')} /* Frameworks */ = {{
+\t\t\tisa = PBXFrameworksBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+{_watch_framework_ids}
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};
+\t\t{I('watchTestFrameworksPhase')} /* Frameworks */ = {{
+\t\t\tisa = PBXFrameworksBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = ();
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};"""
+resources_phases += f"""
+\t\t{I('watchResourcesPhase')} /* Resources */ = {{
+\t\t\tisa = PBXResourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = ();
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};
+\t\t{I('watchTestResourcesPhase')} /* Resources */ = {{
+\t\t\tisa = PBXResourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = ();
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};"""
+
+copy_phase += f"""
+\t\t{I('embedWatchPhase')} /* Embed Watch Content */ = {{
+\t\t\tisa = PBXCopyFilesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tdstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+\t\t\tdstSubfolderSpec = 16;
+\t\t\tfiles = (
+\t\t\t\t{I('buildfile:embed:watch')} /* PhysiqueOSWatch.app in Embed Watch Content */,
+\t\t\t);
+\t\t\tname = "Embed Watch Content";
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};"""
+
+container_proxy += f"""
+\t\t{I('watchContainerProxy')} /* PBXContainerItemProxy */ = {{
+\t\t\tisa = PBXContainerItemProxy;
+\t\t\tcontainerPortal = {I('project')} /* Project object */;
+\t\t\tproxyType = 1;
+\t\t\tremoteGlobalIDString = {I('watchTarget')};
+\t\t\tremoteInfo = PhysiqueOSWatch;
+\t\t}};
+\t\t{I('watchTestContainerProxy')} /* PBXContainerItemProxy */ = {{
+\t\t\tisa = PBXContainerItemProxy;
+\t\t\tcontainerPortal = {I('project')} /* Project object */;
+\t\t\tproxyType = 1;
+\t\t\tremoteGlobalIDString = {I('watchTarget')};
+\t\t\tremoteInfo = PhysiqueOSWatch;
+\t\t}};"""
+
+_app_watch_old = f"""\t\t\t\t{I('appResourcesPhase')} /* Resources */,
+\t\t\t\t{I('embedExtensionsPhase')} /* Embed Foundation Extensions */,
+\t\t\t);
+\t\t\tbuildRules = (
+\t\t\t);
+\t\t\tdependencies = (
+\t\t\t\t{I('extDependency')} /* PBXTargetDependency */,
+\t\t\t);
+\t\t\tname = PhysiqueOS;"""
+_app_watch_new = f"""\t\t\t\t{I('appResourcesPhase')} /* Resources */,
+\t\t\t\t{I('embedExtensionsPhase')} /* Embed Foundation Extensions */,
+\t\t\t\t{I('embedWatchPhase')} /* Embed Watch Content */,
+\t\t\t);
+\t\t\tbuildRules = (
+\t\t\t);
+\t\t\tdependencies = (
+\t\t\t\t{I('extDependency')} /* PBXTargetDependency */,
+\t\t\t\t{I('watchDependency')} /* PBXTargetDependency */,
+\t\t\t);
+\t\t\tname = PhysiqueOS;"""
+assert native_targets.count(_app_watch_old) == 1
+native_targets = native_targets.replace(_app_watch_old, _app_watch_new, 1)
+native_targets += f"""
+\t\t{I('watchTarget')} /* PhysiqueOSWatch */ = {{
+\t\t\tisa = PBXNativeTarget;
+\t\t\tbuildConfigurationList = {I('watchConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */;
+\t\t\tbuildPhases = (
+\t\t\t\t{I('watchSourcesPhase')} /* Sources */,
+\t\t\t\t{I('watchFrameworksPhase')} /* Frameworks */,
+\t\t\t\t{I('watchResourcesPhase')} /* Resources */,
+\t\t\t);
+\t\t\tbuildRules = ();
+\t\t\tdependencies = ();
+\t\t\tname = PhysiqueOSWatch;
+\t\t\tproductName = PhysiqueOSWatch;
+\t\t\tproductReference = {_watch_app_ref} /* PhysiqueOSWatch.app */;
+\t\t\tproductType = "com.apple.product-type.application";
+\t\t}};
+\t\t{I('watchTestTarget')} /* PhysiqueOSWatchTests */ = {{
+\t\t\tisa = PBXNativeTarget;
+\t\t\tbuildConfigurationList = {I('watchTestConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */;
+\t\t\tbuildPhases = (
+\t\t\t\t{I('watchTestSourcesPhase')} /* Sources */,
+\t\t\t\t{I('watchTestFrameworksPhase')} /* Frameworks */,
+\t\t\t\t{I('watchTestResourcesPhase')} /* Resources */,
+\t\t\t);
+\t\t\tbuildRules = ();
+\t\t\tdependencies = ({I('watchTestDependency')} /* PBXTargetDependency */,);
+\t\t\tname = PhysiqueOSWatchTests;
+\t\t\tproductName = PhysiqueOSWatchTests;
+\t\t\tproductReference = {_watch_test_ref} /* PhysiqueOSWatchTests.xctest */;
+\t\t\tproductType = "com.apple.product-type.bundle.unit-test";
+\t\t}};"""
+
+target_dependency += f"""
+\t\t{I('watchDependency')} /* PBXTargetDependency */ = {{
+\t\t\tisa = PBXTargetDependency;
+\t\t\ttarget = {I('watchTarget')} /* PhysiqueOSWatch */;
+\t\t\ttargetProxy = {I('watchContainerProxy')} /* PBXContainerItemProxy */;
+\t\t}};
+\t\t{I('watchTestDependency')} /* PBXTargetDependency */ = {{
+\t\t\tisa = PBXTargetDependency;
+\t\t\ttarget = {I('watchTarget')} /* PhysiqueOSWatch */;
+\t\t\ttargetProxy = {I('watchTestContainerProxy')} /* PBXContainerItemProxy */;
+\t\t}};"""
+
+_ext_attr = f"""\t\t\t\t\t{I('extTarget')} = {{
+\t\t\t\t\t\tCreatedOnToolsVersion = 27.0;
+\t\t\t\t\t}};
+"""
+assert project_obj.count(_ext_attr) == 1
+project_obj = project_obj.replace(_ext_attr, _ext_attr + f"""\t\t\t\t\t{I('watchTarget')} = {{
+\t\t\t\t\t\tCreatedOnToolsVersion = 27.0;
+\t\t\t\t\t}};
+\t\t\t\t\t{I('watchTestTarget')} = {{
+\t\t\t\t\t\tCreatedOnToolsVersion = 27.0;
+\t\t\t\t\t\tTestTargetID = {I('watchTarget')};
+\t\t\t\t\t}};
+""", 1)
+_ext_target_entry = f"\t\t\t\t{I('extTarget')} /* PhysiqueOSLiveActivity */,\n"
+assert project_obj.count(_ext_target_entry) == 1
+project_obj = project_obj.replace(_ext_target_entry, _ext_target_entry + f"\t\t\t\t{I('watchTarget')} /* PhysiqueOSWatch */,\n\t\t\t\t{I('watchTestTarget')} /* PhysiqueOSWatchTests */,\n", 1)
+
+watch_common = f"""
+\t\t\t\tCODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
+\t\t\t\tCODE_SIGN_STYLE = Automatic;
+\t\t\t\tCURRENT_PROJECT_VERSION = {APP_BUILD_NUMBER};
+\t\t\t\tDEVELOPMENT_TEAM = {DEVELOPMENT_TEAM};
+\t\t\t\tGENERATE_INFOPLIST_FILE = YES;
+\t\t\t\tINFOPLIST_FILE = "PhysiqueOSWatch/Info.plist";
+\t\t\t\tINFOPLIST_KEY_CFBundleDisplayName = "PhysiqueOS";
+\t\t\t\tINFOPLIST_KEY_WKCompanionAppBundleIdentifier = {BUNDLE_ID_APP};
+\t\t\t\tLD_RUNPATH_SEARCH_PATHS = (
+\t\t\t\t\t"$(inherited)",
+\t\t\t\t\t"@executable_path/Frameworks",
+\t\t\t\t);
+\t\t\t\tMARKETING_VERSION = 1.0;
+\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = {BUNDLE_ID_WATCH};
+\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";
+\t\t\t\tSDKROOT = watchos;
+\t\t\t\tSKIP_INSTALL = YES;
+\t\t\t\tSUPPORTED_PLATFORMS = "watchos watchsimulator";
+\t\t\t\tSWIFT_EMIT_LOC_STRINGS = YES;
+\t\t\t\tTARGETED_DEVICE_FAMILY = 4;
+\t\t\t\tWATCHOS_DEPLOYMENT_TARGET = {WATCH_DEPLOYMENT_TARGET};"""
+watch_test_common = f"""
+\t\t\t\tBUNDLE_LOADER = "$(TEST_HOST)";
+\t\t\t\tCODE_SIGN_STYLE = Automatic;
+\t\t\t\tCURRENT_PROJECT_VERSION = {APP_BUILD_NUMBER};
+\t\t\t\tDEVELOPMENT_TEAM = {DEVELOPMENT_TEAM};
+\t\t\t\tGENERATE_INFOPLIST_FILE = YES;
+\t\t\t\tMARKETING_VERSION = 1.0;
+\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = {BUNDLE_ID_WATCH_TEST};
+\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";
+\t\t\t\tSDKROOT = watchos;
+\t\t\t\tSUPPORTED_PLATFORMS = "watchos watchsimulator";
+\t\t\t\tTARGETED_DEVICE_FAMILY = 4;
+\t\t\t\tTEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhysiqueOSWatch.app/PhysiqueOSWatch";
+\t\t\t\tWATCHOS_DEPLOYMENT_TARGET = {WATCH_DEPLOYMENT_TARGET};"""
+watch_debug = f"""\t\t{I('watchDebug')} /* Debug */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_common}\n\t\t\t}}; name = Debug; }};"""
+watch_release = f"""\t\t{I('watchRelease')} /* Release */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_common}\n\t\t\t}}; name = Release; }};"""
+watch_test_debug = f"""\t\t{I('watchTestDebug')} /* Debug */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_test_common}\n\t\t\t}}; name = Debug; }};"""
+watch_test_release = f"""\t\t{I('watchTestRelease')} /* Release */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_test_common}\n\t\t\t}}; name = Release; }};"""
+config_lists += f"""
+\t\t{I('watchConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */ = {{
+\t\t\tisa = XCConfigurationList;
+\t\t\tbuildConfigurations = ({I('watchDebug')} /* Debug */, {I('watchRelease')} /* Release */,);
+\t\t\tdefaultConfigurationIsVisible = 0;
+\t\t\tdefaultConfigurationName = Release;
+\t\t}};
+\t\t{I('watchTestConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */ = {{
+\t\t\tisa = XCConfigurationList;
+\t\t\tbuildConfigurations = ({I('watchTestDebug')} /* Debug */, {I('watchTestRelease')} /* Release */,);
+\t\t\tdefaultConfigurationIsVisible = 0;
+\t\t\tdefaultConfigurationName = Release;
+\t\t}};"""
+
 pbxproj = f"""// !$*UTF8*$!
 {{
 \tarchiveVersion = 1;
@@ -1617,6 +1961,10 @@ pbxproj = f"""// !$*UTF8*$!
 {ui_test_release}
 {ext_debug}
 {ext_release}
+{watch_debug}
+{watch_release}
+{watch_test_debug}
+{watch_test_release}
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */

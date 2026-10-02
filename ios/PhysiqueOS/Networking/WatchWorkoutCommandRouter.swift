@@ -27,6 +27,9 @@ final class WatchWorkoutCommandRouter {
         if let prepared = authority.preparedWorkout() {
             return .make(draft: prepared, authority: authority, now: date, prepared: true, stalenessReason: stalenessReason)
         }
+        if let completed = authority.pendingCompletion(at: date) {
+            return .make(draft: completed, authority: authority, now: date, stalenessReason: stalenessReason)
+        }
         return nil
     }
 
