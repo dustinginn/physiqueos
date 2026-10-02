@@ -20,6 +20,7 @@ import {
 import {
   HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION,
   canonicalizeHealthKitSleepV3,
+  emptyHealthKitSleepDay,
 } from "../../domain/services/HealthKitSleepCanonicalizer.js";
 import { buildHealthKitSleepDayPayload } from "../../application/commands/HealthKitSleepIngestPort.js";
 import { HEALTHKIT_SLEEP_VALIDATION_SAMPLE_COLLECTION } from "../../domain/services/HealthKitSleepHistoricalValidation.js";
@@ -90,6 +91,13 @@ export async function runHealthKitSleepCanonV3Activation({
   // v3 over the ordinary stream only. Historical samples are never an input.
   const computed = canonicalizeHealthKitSleepV3({ samples, preference });
   const stored = new Map(days.map((day) => [day.sleepDay, day]));
+  // A stored day whose samples were all deleted is an empty canonical day,
+  // exactly as ingestion would recompute it (v3 identity, no episodes).
+  for (const day of days) {
+    if (day.sleepDay >= effectiveSleepDay && !computed.has(day.sleepDay) && day.status === "no_sleep_recorded") {
+      computed.set(day.sleepDay, emptyHealthKitSleepDay(day.sleepDay, { preference, algorithmVersion: HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION }));
+    }
+  }
   const targetDays = [...new Set([
     ...days.map((day) => day.sleepDay).filter((day) => day >= effectiveSleepDay),
     ...[...computed.keys()].filter((day) => day >= effectiveSleepDay),
@@ -193,6 +201,11 @@ export async function runHealthKitSleepCanonV3Activation({
   ]);
   const resolvedAfter = resolveHealthKitSleepCanonicalAlgorithmPolicy(policyAfter);
   const recomputed = canonicalizeHealthKitSleepV3({ samples: samplesAfter, preference });
+  for (const entry of ledger) {
+    if (!recomputed.has(entry.sleepDay) && entry.after?.status === "no_sleep_recorded") {
+      recomputed.set(entry.sleepDay, emptyHealthKitSleepDay(entry.sleepDay, { preference, algorithmVersion: HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION }));
+    }
+  }
   const storedAfter = new Map(daysAfter.map((day) => [day.sleepDay, day]));
   const verification = Object.freeze({
     policyEnabledV3: resolvedAfter.enabled && resolvedAfter.algorithmVersion === HEALTHKIT_SLEEP_CANON_V3_ALGORITHM_VERSION &&

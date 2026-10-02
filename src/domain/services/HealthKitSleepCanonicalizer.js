@@ -103,8 +103,9 @@ export const SLEEP_CANON_V3_PARAMETERS = Object.freeze({
     reliableGenerationMinimumBasisCoverageRatio: 0.5,
     withoutReliableGeneration: "v2_selection",
     chainContinuationOrder: Object.freeze([
-      "same_generation", "exact_continuation", "latest_compatible_end", "stable_chain_order",
+      "same_reliable_generation", "closest_ingestion_time", "exact_continuation", "latest_compatible_end", "stable_chain_order",
     ]),
+    identityCapableGeneration: "known_and_internally_single_copy",
     selectionOrder: Object.freeze([
       "usable", "asleep_coverage", "staged_coverage", "resolved_coverage", "sample_count",
       "latest_received", "stable_content",
@@ -424,7 +425,9 @@ function buildAsleepEpisode(group, assignedInBed, preference, { resolveDuplicate
 
   const allLaneInBed = assignedInBed.filter((sample) => sample.laneKey === primary.key && near(sample, extent));
   const inBedResolution = resolveDuplicateCopies && copyResolution.applied
-    ? (coherentCopies ? selectCoherentInBedCopy(allLaneInBed, extent) : selectAuthoritativeInBedCopy(allLaneInBed, extent))
+    ? (coherentCopies && copyResolution.coherenceBasis === "ingestion_revision"
+      ? selectCoherentInBedCopy(allLaneInBed, extent, copyResolution.selectedGenerations)
+      : selectAuthoritativeInBedCopy(allLaneInBed, extent))
     : { selected: allLaneInBed, corroborating: [] };
   const laneInBed = inBedResolution.selected;
   const inBedUnion = unionMs(laneInBed);
@@ -693,13 +696,21 @@ function selectCoherentLaneCopy(intervals) {
     candidateCount: chains.length,
     applied: true,
     coherenceBasis: "ingestion_revision",
+    selectedGenerations: new Set(selectedCandidate.chain.map(generationKey)),
     selectedGenerationCount: generationCount(selectedCandidate.chain),
     ambiguousContinuationCount,
   };
 }
 
-function selectCoherentInBedCopy(intervals, extent) {
+function selectCoherentInBedCopy(intervals, extent, selectedGenerations = null) {
   if (intervals.length <= 1 || !hasOverlap(intervals)) return { selected: intervals, corroborating: [] };
+  // In-bed time follows the selected revision when that revision carries its
+  // own non-overlapping in-bed samples.
+  const sameRevision = selectedGenerations ? intervals.filter((sample) => selectedGenerations.has(generationKey(sample))) : [];
+  if (sameRevision.length > 0 && !hasOverlap(sameRevision) && unionMs(sameRevision, extent) > 0) {
+    const keep = new Set(sameRevision.map((sample) => sample.id));
+    return { selected: sameRevision, corroborating: intervals.filter((sample) => !keep.has(sample.id)) };
+  }
   const { chains, reliableGenerationCount } = buildCoherentChains(intervals);
   if (reliableGenerationCount === 0) return selectAuthoritativeInBedCopy(intervals, extent);
   const selectedCandidate = chains.map((chain) => ({
@@ -771,11 +782,18 @@ function generationStructure(intervals) {
     !selfOverlapping.has(key) && basisUnion > 0 &&
     unionMs(members) >= SLEEP_CANON_V1_PARAMETERS.minimumUsableCoverageRatio * basisUnion).map(([key]) => key));
   const reliable = (generation) => reliableSet.has(generation);
+  // Identity-capable: known and internally single-copy. Two such generations
+  // whose samples overlap are provably different copies. (Whether provenance
+  // is used at all is decided by the presence of a RELIABLE generation; with
+  // none, v3 keeps v2's selection, so small historical paging batches never
+  // reach this rule.)
+  const identityCapable = (generation) => generation !== "\u0000unknown" && byGeneration.has(generation) &&
+    !selfOverlapping.has(generation);
   return {
     reliable,
     reliableCount: reliableSet.size,
-    conflict: (a, b) => a !== b && a !== "\u0000unknown" && b !== "\u0000unknown" &&
-      (reliable(a) || reliable(b)) && overlapping.has(a < b ? `${a}\u0001${b}` : `${b}\u0001${a}`),
+    conflict: (a, b) => a !== b && identityCapable(a) && identityCapable(b) &&
+      overlapping.has(a < b ? `${a}\u0001${b}` : `${b}\u0001${a}`),
   };
 }
 
@@ -787,6 +805,17 @@ function generationStructure(intervals) {
 function buildCoherentChains(intervals) {
   const { reliable, conflict, reliableCount } = generationStructure(intervals);
   const compatible = (generation, chain) => [...chain.generations].every((other) => !conflict(generation, other));
+  // Evidence order for continuing a chain: the same reliable revision, then
+  // the closest ingestion time (one revision's batches arrive together), then
+  // exact end-to-start continuation, then the latest compatible end.
+  const continuationKey = (item, chain) => [
+    reliable(item.generation) && chain.generations.has(item.generation) ? 0 : 1,
+    Math.min(...[...chain.receivedAts].map((receivedAt) => Math.abs(receivedAt - item.sample.receivedAtMs))),
+    chain.lastEnd === item.sample.start ? 0 : 1,
+    -chain.lastEnd,
+    chain.index,
+    item.order,
+  ];
   const sorted = [...intervals].sort(byCopyInterval);
   const chains = [];
   let ambiguousContinuationCount = 0;
@@ -801,34 +830,30 @@ function buildCoherentChains(intervals) {
         if (item.assigned) continue;
         for (const chain of chains) {
           if (used.has(chain.index) || chain.lastEnd > item.sample.start || !compatible(item.generation, chain)) continue;
-          const key = [
-            reliable(item.generation) && chain.generations.has(item.generation) ? 0 : 1,
-            chain.lastEnd === item.sample.start ? 0 : 1,
-            -chain.lastEnd,
-            chain.index,
-            item.order,
-          ];
+          const key = continuationKey(item, chain);
           if (best === null || compareKeys(key, best.key) < 0) best = { item, chain, key };
         }
       }
       if (best === null) break;
-      // Count a same-generation continuation that topology alone could not
-      // single out: another eligible chain of the same generation ends at
-      // exactly the same instant.
-      // (best.key[0] === 1 means no reliable same-generation evidence chose it.)
+      // A continuation decided only by chain order: another eligible chain is
+      // equal on every evidence criterion. Reported, never hidden.
       const ties = chains.filter((chain) => chain !== best.chain && !used.has(chain.index) &&
-        chain.lastEnd === best.chain.lastEnd && best.key[1] === 0 && best.key[0] === 1 &&
-        compatible(best.item.generation, chain));
+        chain.lastEnd <= best.item.sample.start && compatible(best.item.generation, chain) &&
+        compareKeys(continuationKey(best.item, chain).slice(0, 4), best.key.slice(0, 4)) === 0);
       if (ties.length > 0) ambiguousContinuationCount += 1;
       best.chain.samples.push(best.item.sample);
       best.chain.lastEnd = best.item.sample.end;
+      best.chain.receivedAts.add(best.item.sample.receivedAtMs);
       best.chain.generations.add(best.item.generation);
       best.item.assigned = true;
       used.add(best.chain.index);
     }
     for (const item of pending) {
       if (item.assigned) continue;
-      chains.push({ index: chains.length, samples: [item.sample], lastEnd: item.sample.end, generations: new Set([item.generation]) });
+      chains.push({
+        index: chains.length, samples: [item.sample], lastEnd: item.sample.end,
+        generations: new Set([item.generation]), receivedAts: new Set([item.sample.receivedAtMs]),
+      });
     }
     index = next;
   }

@@ -279,6 +279,38 @@ describe("sleep-canon-v3 coherent copy selection", () => {
     expect(chosen).toEqual(ids(b));
   });
 
+  it("review repro: a small old remainder never joins the small second batch of the new revision", () => {
+    const a = revision("A", [["core", 0, 60], ["deep", 240, 300]], { idBase: 49_000, receivedAt: "2026-10-02T14:34:00.000Z" });
+    const b1 = revision("B1", [["core", 30, 120], ["deep", 120, 200], ["rem", 200, 300]], { idBase: 49_100, batchId: "batch-B1", receivedAt: "2026-10-02T14:45:00.000Z" });
+    const b2 = revision("B2", [["core", 300, 360], ["rem", 360, 480]], { idBase: 49_200, batchId: "batch-B2", receivedAt: "2026-10-02T14:45:04.000Z" });
+    const day = v3([...a, ...b1, ...b2]);
+    expect(selected(day)).toEqual(ids([...b1, ...b2]));
+    expect(main(day).asleepSeconds).toBe(450 * MIN);
+    expect(main(day).reconciliation.copySelection.coherenceBasis).toBe("ingestion_revision");
+  });
+
+  it("fuzz: partial old revision + new revision split across two batches never splices or loses the new revision", () => {
+    let state = 2026;
+    const random = (n) => { state = (state * 1103515245 + 12345) % 2147483648; return state % n; };
+    for (let night = 0; night < 300; night += 1) {
+      const aBounds = boundariesFrom(1 + random(10_000), 0, 330 + random(120), { min: 3, max: 12 });
+      const shared = aBounds.filter((_, index) => index > 0 && index < aBounds.length - 1 && random(3) === 0);
+      const bBounds = [...new Set([...boundariesFrom(1 + random(10_000), 0, 450, { min: 3, max: 14 }), ...shared])].sort((x, y) => x - y);
+      const aSegments = contiguous(aBounds, PATTERN_A).map(([stage, from, to]) => [stageName(stage), from, to]);
+      const deleted = aSegments.map((_, index) => index).filter(() => random(100) < 20 + random(70));
+      const a = revision("A", aSegments, { idBase: 100_000 + night * 1_000, receivedAt: "2026-10-02T14:34:00.000Z", deleted });
+      const bSegments = contiguous(bBounds, PATTERN_B).map(([stage, from, to]) => [stageName(stage), from, to]);
+      const split = 1 + random(bSegments.length - 1);
+      const b1 = revision("B1", bSegments.slice(0, split), { idBase: 100_000 + night * 1_000 + 300, batchId: `b1-${night}`, receivedAt: "2026-10-02T14:45:00.000Z" });
+      const b2 = revision("B2", bSegments.slice(split), { idBase: 100_000 + night * 1_000 + 600, batchId: `b2-${night}`, receivedAt: "2026-10-02T14:45:03.000Z" });
+      const day = v3([...a, ...b1, ...b2]);
+      const chosen = selected(day);
+      const bIds = ids([...b1, ...b2]);
+      expect(isSubset(chosen, ids(a)) || isSubset(chosen, bIds), `night ${night}`).toBe(true);
+      expect(chosen, `night ${night}`).toEqual(bIds);
+    }
+  }, 60_000);
+
   it("reports, never hides, same-batch shared-boundary continuations that topology cannot disambiguate", () => {
     const a = revision("A", [["rem", 0, 60], ["deep", 60, 180], ["core", 180, 240], ["core", 240, 420]], { idBase: 47_000, batchId: "batch-one", receivedAt: "2026-10-02T14:45:00.000Z" });
     const b = revision("B", [["core", 0, 60], ["core", 60, 120], ["rem", 120, 240], ["deep", 240, 420]], { idBase: 47_100, batchId: "batch-one", receivedAt: "2026-10-02T14:45:00.000Z" });

@@ -13,6 +13,7 @@ import {
 import {
   canonicalizeHealthKitSleep,
   canonicalizeHealthKitSleepV3,
+  emptyHealthKitSleepDay,
 } from "../../domain/services/HealthKitSleepCanonicalizer.js";
 import { getHealthKitSleepDayRecordId } from "../../domain/services/HealthKitSleepContract.js";
 import { createHealthKitSleepEvidenceReadService } from "../../application/recovery/HealthKitSleepEvidenceReadService.js";
@@ -36,6 +37,10 @@ function spliceNight(base = START, idBase = 50_000, day = "a") {
 function storedDays(samples, preference) {
   return [...canonicalizeHealthKitSleep({ samples, preference })].map(([sleepDay, content]) =>
     ({ ...buildHealthKitSleepDayPayload({ content, existing: null, ownerUserId: OWNER, sleepDay, computedAt: "2026-10-02T14:45:01.000Z" }) }));
+}
+
+function emptyDay() {
+  return emptyHealthKitSleepDay(D0, { preference: preferring("oura") });
 }
 
 function setup({ samples, days = null, historicalDays = [], historicalSamples = [], algorithmPolicy = null } = {}) {
@@ -136,6 +141,23 @@ describe("sleep-canon-v3 bounded prospective activation", () => {
   });
 });
 
+describe("sleep-canon-v3 activation edge cases", () => {
+  it("rewrites a stored emptied prospective day to an empty v3 day instead of refusing", async () => {
+    const { a, b } = spliceNight();
+    const deleted = [...a, ...b].map((sample) => ({ ...sample, status: "deleted", lifecycle: { state: "deleted", deletedAt: "2026-10-02T16:00:00.000Z" } }));
+    const days = storedDays([...a, ...b], preferring("oura")).map((day) => ({ ...day, ...buildHealthKitSleepDayPayload({
+      content: emptyDay(), existing: day, ownerUserId: OWNER, sleepDay: D0, computedAt: "2026-10-02T16:00:01.000Z",
+    }) }));
+    const current = setup({ samples: deleted, days });
+    const dryRun = await runHealthKitSleepCanonV3Activation({ records: current.store, authorization: current.authorization });
+    expect(dryRun.outcome).toBe("dry_run");
+    expect(dryRun.ledger[0].after).toMatchObject({ algorithmVersion: "sleep-canon-v3", status: "no_sleep_recorded" });
+    const applied = await runHealthKitSleepCanonV3Activation({ records: current.store, authorization: current.authorization, apply: true, expected: dryRun.facts });
+    expect(applied.outcome).toBe("applied");
+    expect(await current.day()).toMatchObject({ algorithmVersion: "sleep-canon-v3", status: "no_sleep_recorded" });
+  });
+});
+
 describe("sleep-canon-v3 ingest selection", () => {
   const nightWire = (overrides = {}) => wire({ source: "oura", stage: "core", start: "2026-10-01T23:00:00-07:00", end: "2026-10-02T06:00:00-07:00", ...overrides });
   function ingestSetup(algorithmPolicy = null) {
@@ -165,6 +187,39 @@ describe("sleep-canon-v3 ingest selection", () => {
     for (const record of [{ ...v3Policy, status: "disabled" }, { ...v3Policy, algorithmVersion: "sleep-canon-v9" }, { ...v3Policy, scope: "everything" }]) {
       expect(resolveHealthKitSleepCanonicalAlgorithmPolicy(record)).toMatchObject({ enabled: false, algorithmVersion: "sleep-canon-v2" });
     }
+  });
+
+  it("end to end: two Oura revisions in two real ingest batches (with deletions) store the coherent latest revision", async () => {
+    const current = ingestSetup(v3Policy);
+    const at2 = (minutes) => new Date(Date.parse("2026-10-02T06:00:00.000Z") + minutes * 60_000).toISOString();
+    const r1 = [["rem", 0, 60], ["deep", 60, 180], ["core", 180, 240], ["core", 240, 400]].map(([stage, from, to], index) =>
+      wire({ id: uuid(70_000 + index), source: "oura", stage, start: at2(from), end: at2(to) }));
+    const r2 = [["core", 0, 60], ["core", 60, 120], ["rem", 120, 240], ["deep", 240, 420]].map(([stage, from, to], index) =>
+      wire({ id: uuid(70_100 + index), source: "oura", stage, start: at2(from), end: at2(to) }));
+    await current.run({ batchId: "rev-1", samples: r1 });
+    await current.run({ batchId: "rev-2", samples: r2, deletions: [{ externalId: r1[0].externalId }] });
+    const day = current.store.snapshot().healthKitSleepDays.find((row) => row.sleepDay === D0);
+    expect(day).toMatchObject({ algorithmVersion: "sleep-canon-v3", revision: 2 });
+    const episode = day.episodes[day.mainEpisodeIndex];
+    expect(new Set(episode.sourceSampleIds)).toEqual(new Set(current.store.snapshot().healthKitSleepSamples
+      .filter((sample) => sample.ingestion?.batchId === "rev-2").map((sample) => sample.id)));
+    expect(day.mainSleep.deepSeconds).toBe(180 * 60);
+    expect(current.store.snapshot().healthKitSleepDays.filter((row) => row.sleepDay === D0)).toHaveLength(1);
+  });
+
+  it("days before the v3 effective day stay sleep-canon-v2 while later days use v3", async () => {
+    const configuration = [
+      { ...activationPolicy({ effectiveSleepDay: "2026-10-01", mode: "validation_only" }), id: HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID },
+      { ...v3Policy, id: HEALTHKIT_SLEEP_CANONICAL_ALGORITHM_POLICY_RECORD_ID },
+    ];
+    const store = createInMemoryCanonicalRecordStore({ healthKitConfiguration: configuration });
+    const port = createHealthKitSleepIngestPort({ records: store, now: () => new Date("2026-10-02T15:00:00.000Z") });
+    await port({ ownerUserId: OWNER, principal: { deviceId: "d" }, metadata: {}, payload: { batchId: "b", samples: [
+      wire({ source: "oura", stage: "core", start: "2026-09-30T23:00:00-07:00", end: "2026-10-01T06:00:00-07:00" }),
+      wire({ source: "oura", stage: "core", start: "2026-10-01T23:00:00-07:00", end: "2026-10-02T06:00:00-07:00" }),
+    ] } });
+    const byDay = Object.fromEntries(store.snapshot().healthKitSleepDays.map((row) => [row.sleepDay, row.algorithmVersion]));
+    expect(byDay).toEqual({ "2026-10-01": "sleep-canon-v2", "2026-10-02": "sleep-canon-v3" });
   });
 
   it("historical Sleep import is pinned to sleep-canon-v2 even when v3 is enabled", async () => {
