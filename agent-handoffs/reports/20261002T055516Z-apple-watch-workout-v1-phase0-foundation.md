@@ -4,7 +4,7 @@ Status: **candidate complete; implementation pushed for review**
 Repository: `dustinginn/physiqueos`  
 Agent: Codex  
 Implementation branch: `codex/apple-watch-workout-v1-phase0-foundation`  
-Implementation SHA: `18f4569a0be48ff4ec087f4c6a49733dbf016b4c`  
+Implementation SHA: `9dea5d2e2d13afcabfcb1c810172cc2ad972a8c0`
 Shipping Native base: Build 80, `1783691debeea46d3e4e6b2f6e470abe032c4c74`  
 Coordination baseline at task start: `6b2fd58bde7ca2322467b5c362f217c26bb1f039`  
 Report-main base: `ef9388a962590fa2939c13f0a8066dfafbdd0530`  
@@ -104,6 +104,8 @@ Updated artifacts on the implementation branch:
 
 Locked tokens: background `#080D18`, raised surface `#141F31`, secondary surface `#172235`, primary purple `#8B8CFF`, primary text `#F4F6FF`, secondary text `#9AA4BA`, with green/amber/red reserved for semantic success/warning/error/heart-rate states. The twelve accepted states remain: Start, normal set, final-set transition, final workout, Crown metrics, swipe-left controls and confirmation, paused, Countdown, offline, stale/conflict, supersets and single-set.
 
+Post-report Founder selection: the normal-set execution surface now uses the **split-metrics** treatment, with separate large Load and Reps tiles. This is the Phase 1A visual baseline and deliberately leaves a clean future interaction seam where a user could focus one tile and adjust it with the Digital Crown. Crown editing itself is not authorized for Phase 0 or the initial V1; ordinary Crown vertical navigation must remain unambiguous until that later interaction is designed and approved.
+
 ## Non-shipping target/signing feasibility
 
 - Xcode: 27.0 (`27A266a`); watchOS SDK: 27.0.
@@ -113,7 +115,9 @@ Locked tokens: background `#080D18`, raised surface `#141F31`, secondary surface
 - The current project intentionally has no Watch target, so it is correctly incompatible with a Watch destination today.
 - Phase 1A still must create/review the final Watch app/extension bundle IDs, App IDs/profiles, companion relationship, HealthKit entitlement, workout-processing background mode, version/build parity and archive packaging. No Apple Developer browser login or production identifier mutation occurred.
 
-## Validation on exact implementation SHA
+## Validation
+
+The full source regression matrix below ran on `18f4569a0be48ff4ec087f4c6a49733dbf016b4c`. The selected-design follow-up `9dea5d2e2d13afcabfcb1c810172cc2ad972a8c0` changes only the non-shipping Watch SVG/README and durable backlog: no Native or Server source changed. The follow-up passed `xmllint --noout` for the updated board and `git diff --check`.
 
 Passed:
 
@@ -173,6 +177,6 @@ No shipping correctness blocker remains in Phase 0. The broad stale audit sentin
 
 ## Integration and rollback
 
-Review/merge `18f4569a0be48ff4ec087f4c6a49733dbf016b4c` as one Phase 0 candidate. The Server correlation path is inert unless a trusted Watch bundle allowlist is explicitly injected. Reverting the feature commit removes all Phase 0 source, mockup and feature-branch backlog changes; the main-branch durable backlog/report commit contains documentation only.
+Review/merge `9dea5d2e2d13afcabfcb1c810172cc2ad972a8c0` as one Phase 0 candidate. The Server correlation path is inert unless a trusted Watch bundle allowlist is explicitly injected. Reverting the feature commits removes all Phase 0 source, mockup and feature-branch backlog changes; the main-branch durable backlog/report commits contain documentation only.
 
 Local-only state: no implementation work remains untracked in the feature worktree. Build/test derived data and the inline conversation visualization remain local artifacts. No private Founder evidence, credentials, exports or harness data were added or pushed.

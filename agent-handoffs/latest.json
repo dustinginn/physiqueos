@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T05:55:16Z",
+  "generated_at_utc": "2026-10-02T06:10:39Z",
   "task": {
-    "id": "apple-watch-workout-v1-phase0-foundation-20261002",
-    "title": "Apple Watch Workout V1 Phase 0 foundation",
+    "id": "apple-watch-workout-v1-split-metrics-design-lock-20261002",
+    "title": "Apple Watch Workout V1 split-metrics design lock",
     "agent": "codex",
     "status": "candidate_complete"
   },
@@ -12,12 +12,12 @@
     "shipping_native_sha": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
     "shipping_native_build": 80,
     "implementation_branch": "codex/apple-watch-workout-v1-phase0-foundation",
-    "implementation_sha": "18f4569a0be48ff4ec087f4c6a49733dbf016b4c",
+    "implementation_sha": "9dea5d2e2d13afcabfcb1c810172cc2ad972a8c0",
     "production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486",
     "production_deployment": "421cae1a-dbc6-494c-9f73-9b8778e45efd"
   },
   "result": {
-    "summary": "Phase 0 fixes partial-superset early-finish evidence correctness and adds deterministic pause/rest clocks, Ready-for-Watch selection, versioned pure Watch contracts, a phone authority router, Live Activity parity, dormant exact trusted HealthKit correlation with duplicate prevention, revised PhysiqueOS mockups, and a non-shipping physical Watch feasibility proof.",
+    "summary": "Founder selected separate large Load and Reps tiles as the Phase 1A normal-set baseline, preserving the accepted hierarchy and a future focus-and-Crown editing seam without adding Crown editing to Phase 0 or initial V1 scope.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -34,6 +34,11 @@
     "watchos_11_typecheck": "passed",
     "project_generator": "reproducible"
   },
+  "design_decisions": {
+    "normal_set_metrics": "split_load_and_reps_tiles",
+    "future_crown_editing_seam": true,
+    "crown_editing_in_phase0_or_initial_v1": false
+  },
   "remaining_scope": [
     "review and merge the Phase 0 implementation",
     "create the signed Watch target and final bundle/App ID/profiles",
@@ -41,7 +46,8 @@
     "build the accepted Watch UI and run physical paired-workout acceptance",
     "configure the trusted Watch bundle allowlist only after signed identity review"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T055516Z-apple-watch-workout-v1-phase0-foundation.md",
+  "full_report_path": "agent-handoffs/reports/20261002T061039Z-apple-watch-workout-v1-split-metrics-design-lock.md",
+  "parent_report_path": "agent-handoffs/reports/20261002T055516Z-apple-watch-workout-v1-phase0-foundation.md",
   "artifacts": [
     "agent-handoffs/artifacts/apple-watch-workout-v1/watch-workout-v1-board.svg",
     "agent-handoffs/artifacts/apple-watch-workout-v1/README.md"

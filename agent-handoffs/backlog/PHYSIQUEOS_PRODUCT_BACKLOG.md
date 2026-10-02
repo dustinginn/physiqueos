@@ -122,6 +122,7 @@ Locked V1:
 - Finish never happens automatically and always confirms, including after the final planned set;
 - Total Calories is active + basal only when both measurements are legitimately available; otherwise `—`;
 - watchOS 11+ and PhysiqueOS dark navy/purple visual language; Apple Workout green/orange is not the product identity.
+- Founder-selected normal-set treatment is split metrics: separate large Load and Reps tiles are the Phase 1A baseline. Preserve a future focus-then-Crown adjustment seam, but do not ship Crown editing in Phase 0 or initial V1 without separate authorization and conflict/navigation design.
 Phase 0 implemented:
 - partial-superset early-finish correctness blocker fixed through one performed-session projection used by commit and durability comparison; only completed sets survive, empty exercises disappear, and relationships retain only performed members when at least two remain;
 - deterministic pause/resume, active elapsed ledger, Stopwatch/Countdown freeze and re-anchor, paused Live Activity parity;
