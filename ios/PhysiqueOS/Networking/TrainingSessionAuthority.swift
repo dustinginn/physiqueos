@@ -249,8 +249,11 @@ final class TrainingSessionAuthority {
         presentation.completionPresentationPending = true
         presentation.completionRecordedAt = TrainingSessionClock.string(from: now())
         if retainingPresentation, reason == .committed, (try? store.persist(presentation)) != nil {
-            pendingCompletions.removeAll { $0.id == sessionId }
-            pendingCompletions.append(presentation)
+            // Only the just-completed session is owed: a newer completion
+            // supersedes any older unacknowledged one, which therefore can
+            // never resurface after this one is acknowledged.
+            for older in pendingCompletions where older.id != sessionId { store.discard(id: older.id) }
+            pendingCompletions = [presentation]
         } else {
             // A presentation that cannot be written is lost, never the
             // durable workout; the Server already owns it.

@@ -929,6 +929,20 @@ extension TrainingSessionAuthorityTests {
         XCTAssertTrue(failing.drafts.isEmpty, "The durable workout is the Server's; only the presentation is lost.")
     }
 
+    func testANewerCompletionSupersedesAnOlderOwedOne() {
+        var second = finishableSession()
+        second.id = "session-2"
+        let store = RecordingStore([finishableSession(), second])
+        let (authority, _) = makeAuthority(store, environment: .founderProduction)
+        XCTAssertTrue(authority.endCommittedSession(sessionId: "session-1", retainingPresentation: true).isAccepted)
+        XCTAssertTrue(authority.endCommittedSession(sessionId: "session-2", retainingPresentation: true).isAccepted)
+        XCTAssertEqual(authority.pendingCompletions.map(\.id), ["session-2"])
+        XCTAssertTrue(authority.acknowledgeCompletion(sessionId: "session-2"))
+        XCTAssertNil(authority.pendingCompletion(), "The older completion never resurfaces.")
+        XCTAssertNil(authority.logTabRoutingTarget())
+        XCTAssertTrue(store.drafts.isEmpty)
+    }
+
     func testStalePresentationIsPrunedWhenTheAuthorityIsCreatedAtLaunch() {
         var stale = finishableSession()
         stale.step = .complete

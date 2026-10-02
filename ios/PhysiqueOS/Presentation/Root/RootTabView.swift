@@ -134,10 +134,10 @@ struct RootTabView: View {
     }
 
     /// Tab bar selection. Entering Log from another tab routes into the
-    /// newer of an unacknowledged durable completion (so its Server-owned
-    /// records cannot be lost behind a tab switch or relaunch) and the
-    /// in-progress live session, pushed on top of Log so Back returns to
-    /// the ordinary Log page (`TrainingSessionAuthority.logTabRoutingTarget`).
+    /// in-progress live session, or otherwise into an unacknowledged durable
+    /// completion (so its Server-owned records cannot be lost behind a tab
+    /// switch or relaunch), pushed on top of Log so Back returns to the
+    /// ordinary Log page (`TrainingSessionAuthority.logTabRoutingTarget`).
     /// Re-tapping Log while already there, or a Log stack that is already
     /// somewhere, never redirects -- so the Founder can always reach Log.
     private func selectTab(_ newTab: AppTab) {
