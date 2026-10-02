@@ -82,3 +82,49 @@ Publish a short physical checklist:
 Preserve all accepted Watch UI; do not redesign previous-set presentation or other surfaces.
 
 Follow mandatory GH protocol. Before stopping, push implementation authority, publish report to origin/main, update latest pointers, fetch/reverify main, re-read exact report, and provide exact main report SHA.
+
+
+PHYSICAL EVIDENCE ADDENDUM
+
+Founder supplied physical Watch photos after canceling the active workout from the iPhone.
+
+Observed stranded state:
+- execution page still shows PAUSED;
+- previous/current Bench Press rows remain;
+- current set remains 2/4 with Load 135 / Reps 12;
+- rest stopwatch remains at 4:23;
+- lower status reports "Not recorded · sessionUnavailable";
+- metrics page still renders elapsed 5:45, HR 68 BPM, active 21 CAL, total 30 CAL.
+
+This is authoritative physical evidence of a terminal-projection reconciliation bug.
+
+Required correction:
+- phone Cancel is an authoritative terminal event;
+- Watch must not retain/render the stale execution or metrics projection after cancellation;
+- terminate/reconcile Watch HealthKit session according to canonical Cancel policy;
+- clear pending command/rest/pause/metrics state;
+- dismiss execution/metrics/control pages;
+- return to idle or current prepared-plan state;
+- if transport is temporarily unavailable, do not misleadingly render the canceled session as paused/active once the phone has authoritatively reported sessionUnavailable/terminal cancellation;
+- add exact regression reproducing this state transition.
+
+APP ICON — V1 RELEASE REQUIREMENT
+
+Founder also observed the Watch app needs a proper app icon.
+
+Audit the existing shipping PhysiqueOS iOS app icon/brand asset and use it as source of truth.
+
+Implement the correct watchOS AppIcon asset/catalog entries required by the actual Watch target and current Xcode/watchOS SDK.
+
+Requirements:
+- unmistakably PhysiqueOS;
+- preserve existing brand identity; do not invent a separate Apple-Watch-specific logo;
+- correct watchOS icon slots/sizes/scales/appearance requirements;
+- generator/project integration deterministic;
+- no stretched/raster-degraded source;
+- no Apple Workout visual identity;
+- validate asset catalog compile;
+- verify installed physical Watch app shows the icon in app launcher/list after reinstall;
+- include icon in signed archive inspection before eventual release.
+
+If the existing iOS source icon cannot legally/technically generate a high-quality Watch icon without a new source asset, stop and report rather than fabricating one.
