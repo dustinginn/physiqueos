@@ -144,6 +144,9 @@ struct HealthKitQueryWorkout: Equatable, Codable, Sendable {
     /// value. Never derived from GPS/location/distance/speed/date -- only
     /// this exact metadata key.
     let isIndoorWorkout: Bool?
+    /// Exact structured-session UUID, populated only by
+    /// `HealthKitTrustedWorkoutCorrelation` after all trust checks pass.
+    var physiqueOSSessionId: String?
 
     init(
         activityType: String,
@@ -154,7 +157,8 @@ struct HealthKitQueryWorkout: Equatable, Codable, Sendable {
         distanceUnit: String?,
         averageHeartRate: Double?,
         telemetryTypeIdentifiers: [String],
-        isIndoorWorkout: Bool? = nil
+        isIndoorWorkout: Bool? = nil,
+        physiqueOSSessionId: String? = nil
     ) {
         self.activityType = activityType
         self.durationSeconds = durationSeconds
@@ -165,6 +169,7 @@ struct HealthKitQueryWorkout: Equatable, Codable, Sendable {
         self.averageHeartRate = averageHeartRate
         self.telemetryTypeIdentifiers = telemetryTypeIdentifiers
         self.isIndoorWorkout = isIndoorWorkout
+        self.physiqueOSSessionId = physiqueOSSessionId
     }
 }
 

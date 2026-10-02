@@ -410,8 +410,10 @@ final class TrainingSessionLiveProjectionTests: XCTestCase {
         XCTAssertEqual(try project(draft).phase, .reviewing)
         draft.submissionState = .acceptedProcessing
         XCTAssertEqual(try project(draft).phase, .finishing)
-        draft.submissionState = nil; draft.leftAt = "2026-10-01T16:59:00Z"
+        draft.submissionState = nil; draft.pausedAt = "2026-10-01T16:59:00Z"
         XCTAssertEqual(try project(draft).phase, .paused)
+        draft.pausedAt = nil; draft.leftAt = "2026-10-01T17:00:00Z"
+        XCTAssertEqual(try project(draft).phase, .planning, "Save & Leave is not a paused live workout.")
         draft.step = .complete
         XCTAssertEqual(try project(draft).phase, .complete)
         draft.mode = .past

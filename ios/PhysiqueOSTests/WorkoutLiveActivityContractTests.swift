@@ -158,10 +158,15 @@ final class WorkoutLiveActivityContractTests: XCTestCase {
         XCTAssertEqual(state(draft).phase, .finishing)
 
         draft.submissionState = nil
-        draft.leftAt = "2026-10-01T16:59:00Z"
-        XCTAssertEqual(state(draft).phase, .paused)
+        draft.pausedAt = "2026-10-01T16:59:00Z"
+        mapped = state(draft)
+        XCTAssertEqual(mapped.phase, .paused)
+        XCTAssertFalse(mapped.rows.isEmpty, "Paused Live Activity keeps the same authoritative set context.")
+        XCTAssertNil(mapped.target)
+        XCTAssertNil(mapped.rest, "ActivityKit timers must not animate while paused.")
+        XCTAssertFalse(mapped.canCompleteSet)
 
-        draft.leftAt = nil
+        draft.pausedAt = nil
         draft.step = .complete
         XCTAssertEqual(state(draft).phase, .saved)
     }

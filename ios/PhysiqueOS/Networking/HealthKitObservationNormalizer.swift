@@ -1,6 +1,8 @@
 import Foundation
 
 struct HealthKitObservationNormalizer: Sendable {
+    var trustedWorkoutCorrelations: HealthKitTrustedWorkoutCorrelationContext = .disabled
+
     func normalize(
         _ addition: HealthKitQueryAddition,
         externalIDNamespace: String? = nil
@@ -16,13 +18,26 @@ struct HealthKitObservationNormalizer: Sendable {
         } else {
             externalID = "source-object:\(addition.objectTypeIdentifier):\(addition.occurrence.localDate)"
         }
+        var payload = addition.payload
+        if case var .workout(workout) = payload {
+            workout.physiqueOSSessionId = HealthKitTrustedWorkoutCorrelation.extract(
+                externalUUID: addition.allowlistedMetadata["HKExternalUUID"],
+                sourceBundleIdentifier: addition.source.bundleIdentifier,
+                activityType: workout.activityType,
+                isIndoorWorkout: workout.isIndoorWorkout,
+                startedAt: addition.occurrence.startedAt,
+                endedAt: addition.occurrence.endedAt,
+                context: trustedWorkoutCorrelations
+            )
+            payload = .workout(workout)
+        }
         return NormalizedHealthKitObservation(
             immutableExternalID: externalID,
             healthKitUUID: addition.healthKitUUID,
             objectTypeIdentifier: addition.objectTypeIdentifier,
             source: addition.source,
             occurrence: addition.occurrence,
-            payload: addition.payload,
+            payload: payload,
             allowlistedMetadata: addition.allowlistedMetadata
         )
     }
@@ -372,6 +387,7 @@ struct HealthKitS1WireObservation: Encodable, Sendable {
         /// for indoor, `false` for outdoor. See
         /// `HealthKitQueryWorkout.isIndoorWorkout`.
         let isIndoorWorkout: Bool?
+        let physiqueOSSessionId: String?
     }
 
     struct QuantitySample: Encodable, Sendable {
@@ -492,7 +508,8 @@ enum HealthKitS1WireMapper {
                     distance: workout.distance,
                     distanceUnit: workout.distanceUnit,
                     averageHeartRate: workout.averageHeartRate,
-                    isIndoorWorkout: workout.isIndoorWorkout
+                    isIndoorWorkout: workout.isIndoorWorkout,
+                    physiqueOSSessionId: workout.physiqueOSSessionId
                 ),
                 quantitySample: nil
             )

@@ -55,6 +55,10 @@ struct TrainingSessionRestState: Codable, Equatable, Sendable {
     var durationSeconds: Int?
     var sourceExerciseId: String
     var sourceSetId: String
+    /// Frozen clock values while the structured workout is paused. Anchors
+    /// are re-created on resume so clocks never advance during the pause.
+    var frozenElapsedSeconds: Double? = nil
+    var frozenRemainingSeconds: Double? = nil
 
     var startedAtDate: Date? { TrainingSessionClock.date(from: startedAt) }
     var endsAtDate: Date? { endsAt.flatMap(TrainingSessionClock.date(from:)) }
@@ -229,6 +233,8 @@ enum TrainingSessionMutationRejection: Error, Equatable, Sendable {
     /// Not an in-progress live session at the set-entry step, or a Finish
     /// is in flight.
     case sessionNotMutable
+    /// The structured session is paused; mutations fail closed until resume.
+    case sessionPaused
     /// The operation is not available to this origin.
     case originNotPermitted
     /// An intent may only complete a set whose entered values are valid.
@@ -395,6 +401,7 @@ enum TrainingSessionInvariants {
             && (draft.step == .workout || draft.isAddingExercises)
             && draft.submissionState == nil
             && draft.leftAt == nil
+            && draft.pausedAt == nil
     }
 
     /// Equality ignoring the bookkeeping the authority itself advances.

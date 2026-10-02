@@ -24,7 +24,8 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         case reviewing
         /// Finish accepted by the Server but not yet durable.
         case finishing
-        /// Save & Leave.
+        /// Explicit structured-workout pause. Save & Leave has no live
+        /// projection and therefore no Live Activity/Watch subject.
         case paused
         /// Durably committed.
         case complete
@@ -116,6 +117,8 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         var durationSeconds: Int?
         var sourceExerciseId: String
         var sourceSetId: String
+        var frozenElapsedSeconds: Double?
+        var frozenRemainingSeconds: Double?
         /// Countdown past `endsAt` at projection time. Presentation only.
         var isExpired: Bool
     }
@@ -148,7 +151,8 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
     /// Every set is complete (and there is at least one).
     var isWorkoutComplete: Bool
     var contextLayout: ContextLayout
-    /// Present only while `phase == .inProgress`.
+    /// Present while in progress or paused. A paused renderer uses the
+    /// frozen values and must not animate from the absolute anchors.
     var rest: Rest?
 
     /// `nil` for retrospective (past) entries, which have no live session.
@@ -168,11 +172,14 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         let label = labels.isEmpty ? "Workout" : labels.joined(separator: " · ")
 
         var restCue: Rest?
-        if phase == .inProgress, let rest = draft.rest, let started = rest.startedAtDate {
+        if (phase == .inProgress || phase == .paused), let rest = draft.rest, let started = rest.startedAtDate {
             restCue = Rest(
                 id: rest.id, mode: rest.mode, startedAt: started, endsAt: rest.endsAtDate,
                 durationSeconds: rest.durationSeconds, sourceExerciseId: rest.sourceExerciseId,
-                sourceSetId: rest.sourceSetId, isExpired: rest.isExpired(at: now)
+                sourceSetId: rest.sourceSetId,
+                frozenElapsedSeconds: rest.frozenElapsedSeconds,
+                frozenRemainingSeconds: rest.frozenRemainingSeconds,
+                isExpired: phase == .paused ? false : rest.isExpired(at: now)
             )
         }
 
@@ -270,7 +277,8 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
     static func phase(of draft: TrainingLoggerDraft) -> Phase {
         if draft.step == .complete { return .complete }
         if draft.submissionState != nil { return .finishing }
-        if draft.leftAt != nil { return .paused }
+        if draft.pausedAt != nil { return .paused }
+        if draft.leftAt != nil { return .planning }
         if draft.step == .workout || draft.isAddingExercises { return .inProgress }
         switch draft.step {
         case .summary, .evidence, .review: return .reviewing

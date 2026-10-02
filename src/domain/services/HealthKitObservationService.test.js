@@ -295,6 +295,71 @@ describe("HealthKitObservationService V1 compatibility", () => {
     expect(existing.payload.exercises[0].sets).toEqual([{ reps: 8, weight: 185 }]);
   });
 
+  it("uses a trusted exact PhysiqueOS session id instead of a temporal guess", () => {
+    const sessionId = "a18d53bb-674a-4d3f-8b23-561bf102da11";
+    const observation = normalize("watch", [workout({
+      activityType: "50",
+      sourceBundleIdentifier: "com.physiqueos.watch",
+      physiqueOSSessionId: sessionId,
+      isIndoorWorkout: true,
+    })]).observations[0];
+    const canonicalId = `training|authoritative|training_logger_draft_${sessionId}`;
+    const result = reconcileHealthKitWorkoutObservation({
+      observation,
+      canonicalObjects: [detailedSession(canonicalId)],
+      trustedPhysiqueOSWatchBundleIdentifiers: ["com.physiqueos.watch"],
+    });
+    expect(result).toMatchObject({
+      state: HealthKitReconciliationState.TRAINING_SESSION_LINKED,
+      canonicalTrainingSessionId: canonicalId,
+      associationAuthority: "trusted_physiqueos_session_id_v1",
+    });
+  });
+
+  it("fails exact correlation closed for an untrusted source or missing session", () => {
+    const sessionId = "a18d53bb-674a-4d3f-8b23-561bf102da11";
+    const untrusted = normalize("watch", [workout({ physiqueOSSessionId: sessionId })]).observations[0];
+    expect(reconcileHealthKitWorkoutObservation({
+      observation: untrusted,
+      canonicalObjects: [detailedSession(`training|authoritative|training_logger_draft_${sessionId}`)],
+      trustedPhysiqueOSWatchBundleIdentifiers: ["com.physiqueos.watch"],
+    }).associationAuthority).not.toBe("trusted_physiqueos_session_id_v1");
+
+    const trusted = normalize("watch-2", [workout({
+      activityType: "50", sourceBundleIdentifier: "com.physiqueos.watch",
+      physiqueOSSessionId: sessionId, isIndoorWorkout: true,
+    })]).observations[0];
+    expect(reconcileHealthKitWorkoutObservation({
+      observation: trusted,
+      canonicalObjects: [],
+      trustedPhysiqueOSWatchBundleIdentifiers: ["com.physiqueos.watch"],
+    })).toMatchObject({ state: HealthKitReconciliationState.TRAINING_MATCH_AMBIGUOUS, reason: "trusted_session_not_found" });
+  });
+
+  it("fails a second exact Watch workout claim for the same structured session closed", () => {
+    const sessionId = "a18d53bb-674a-4d3f-8b23-561bf102da11";
+    const canonicalId = `training|authoritative|training_logger_draft_${sessionId}`;
+    const observation = normalize("watch-duplicate", [workout({
+      activityType: "50", sourceBundleIdentifier: "com.physiqueos.watch",
+      physiqueOSSessionId: sessionId, isIndoorWorkout: true,
+    })]).observations[0];
+    expect(reconcileHealthKitWorkoutObservation({
+      observation,
+      canonicalObjects: [detailedSession(canonicalId)],
+      trustedPhysiqueOSWatchBundleIdentifiers: ["com.physiqueos.watch"],
+      claimedPhysiqueOSSessionIds: [canonicalId],
+    })).toMatchObject({
+      state: HealthKitReconciliationState.TRAINING_MATCH_AMBIGUOUS,
+      reason: "trusted_session_already_claimed",
+      confirmationRequired: false,
+    });
+  });
+
+  it("rejects malformed exact correlation ids at the ingestion boundary", () => {
+    expect(() => normalize("watch", [workout({ physiqueOSSessionId: "not-a-uuid" })]))
+      .toThrowError(expect.objectContaining({ code: "HEALTHKIT_CONTRACT_INVALID" }));
+  });
+
   it("keeps ambiguous strength matches unlinked", () => {
     const observation = normalize("batch-one", [workout()]).observations[0];
     const second = detailedSession("training-session-two");
@@ -344,11 +409,13 @@ function workout({
   activityType = "Traditional Strength Training",
   externalId = "hk-workout-001",
   isIndoorWorkout,
+  physiqueOSSessionId,
+  sourceBundleIdentifier,
 } = {}) {
   return {
     observationType: "workout",
     externalId,
-    source: source(),
+    source: { ...source(), ...(sourceBundleIdentifier ? { bundleIdentifier: sourceBundleIdentifier } : {}) },
     occurrence: {
       localDate: "2026-09-12",
       timeZone: "America/Los_Angeles",
@@ -358,6 +425,7 @@ function workout({
     workout: {
       activityType, durationSeconds: 3600, activeCalories: 400, averageHeartRate: 122,
       ...(isIndoorWorkout !== undefined ? { isIndoorWorkout } : {}),
+      ...(physiqueOSSessionId !== undefined ? { physiqueOSSessionId } : {}),
     },
   };
 }

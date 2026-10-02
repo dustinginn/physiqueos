@@ -311,6 +311,7 @@ late_app_files = [
 
 n1_app_files = [
     ("Contracts", "HealthKitSynchronizationModels.swift"),
+    ("Contracts", "HealthKitWorkoutCorrelationContract.swift"),
     ("Contracts", "HealthKitFounderCanaryModels.swift"),
     ("Networking", "HealthKitSyncPersistence.swift"),
     ("Networking", "ProtectedDataRecoveryTrigger.swift"),
@@ -373,9 +374,14 @@ sleep_polish_test_files = [
 # and concurrent lanes that keep appending after 0x13B7 never renumber each
 # other; integrating either side is a list merge only.
 session_authority_app_files = [
+    ("Contracts", "TrainingPerformedSessionProjection.swift"),
     ("Contracts", "TrainingSessionState.swift"),
     ("Contracts", "TrainingSessionLiveProjection.swift"),
+    ("Contracts", "WatchWorkoutContracts.swift"),
+    ("Contracts", "WatchHealthKitWorkoutContract.swift"),
     ("Networking", "TrainingSessionAuthority.swift"),
+    ("Networking", "WatchWorkoutCommandRouter.swift"),
+    ("Networking", "WatchWorkoutProjectionMapper.swift"),
 ]
 session_authority_test_files = [
     ("PhysiqueOSTests", "TrainingSessionAuthorityTests.swift"),

@@ -884,6 +884,45 @@ describe("daily Activity is never double counted", () => {
   });
 });
 
+describe("trusted PhysiqueOS Watch correlation", () => {
+  it("wins over active workout canonicalization and refuses a second workout claim", async () => {
+    const sessionId = "a18d53bb-674a-4d3f-8b23-561bf102da11";
+    const canonicalId = `training|authoritative|training_logger_draft_${sessionId}`;
+    const records = store({ evidence: [logger(canonicalId, "10:00", "11:00", 3600)] });
+    const watchWorkout = {
+      ...workout({ externalId: "physiqueos-watch-workout-one" }),
+      source: { bundleIdentifier: "com.physiqueos.watch", sourceName: "PhysiqueOS", productType: "Watch7,12" },
+      workout: {
+        ...workout().workout,
+        isIndoorWorkout: true,
+        physiqueOSSessionId: sessionId,
+      },
+    };
+
+    const first = await ingest(records, [watchWorkout], "exact-one", {
+      trustedBundleIdentifiers: ["com.physiqueos.watch"],
+    });
+    expect(first.result.observations[0].reconciliation).toMatchObject({
+      state: "training_session_linked",
+      canonicalTrainingSessionId: canonicalId,
+      associationAuthority: "trusted_physiqueos_session_id_v1",
+    });
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
+    expect(records.snapshot().trainingPerformanceEvents).toEqual([{ id: "trainingPerformanceEvents-sentinel", version: 1 }]);
+
+    const conflict = await ingest(records, [{
+      ...watchWorkout,
+      externalId: "physiqueos-watch-workout-two",
+    }], "exact-two", { trustedBundleIdentifiers: ["com.physiqueos.watch"] });
+    expect(conflict.result.observations[0].reconciliation).toMatchObject({
+      state: "training_match_ambiguous",
+      reason: "trusted_session_already_claimed",
+      confirmationRequired: false,
+    });
+    expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
+  });
+});
+
 describe("strategic quarantine", () => {
   it("keeps Apple workouts and links out of V3, Evidence, and every strategic reader", async () => {
     const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
@@ -915,8 +954,15 @@ async function occupyReviewIdentity(records, reviewId, payload) {
   }
 }
 
-async function ingest(records, observations, batchId = "batch-one", { receivedAt = "2026-09-23T23:30:00.000Z" } = {}) {
-  return createCanonicalPersistenceCommandPorts({ records, now: () => new Date(receivedAt) })
+async function ingest(records, observations, batchId = "batch-one", {
+  receivedAt = "2026-09-23T23:30:00.000Z",
+  trustedBundleIdentifiers = [],
+} = {}) {
+  return createCanonicalPersistenceCommandPorts({
+    records,
+    now: () => new Date(receivedAt),
+    trustedPhysiqueOSWatchBundleIdentifiers: trustedBundleIdentifiers,
+  })
     .ingestHealthKitObservations({
       ownerUserId: OWNER,
       principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },

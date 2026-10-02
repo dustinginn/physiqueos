@@ -68,8 +68,8 @@ struct WorkoutActivityAttributes: ActivityAttributes, Hashable {
             case reviewing
             case finishing
             case saved
-            /// Unknown future phase: render the safe "open the Logger" state
-            /// and never offer Complete Set.
+            /// Explicit workout pause, and the safe fallback for unknown
+            /// future phases. Never offers Complete Set.
             case paused
             static var fallback: Self { .paused }
         }

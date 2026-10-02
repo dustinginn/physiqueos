@@ -119,7 +119,7 @@ export const HEALTHKIT_OBSERVATION_WIRE_FIELDS = Object.freeze({
   workout: Object.freeze({
     activityType: "text", durationSeconds: "numeric", activeCalories: "numeric", totalCalories: "numeric",
     distance: "numeric", distanceUnit: "text", averageHeartRate: "numeric", sourceRevision: "numeric",
-    isIndoorWorkout: "boolean",
+    isIndoorWorkout: "boolean", physiqueOSSessionId: "text",
   }),
   quantitySample: Object.freeze({
     sampleType: "text", value: "numeric", unit: "text", workoutExternalId: "text",

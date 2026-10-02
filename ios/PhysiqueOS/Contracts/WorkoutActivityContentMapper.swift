@@ -31,7 +31,7 @@ extension WorkoutActivityAttributes.ContentState {
             }
         }()
         let canComplete = phase == .inProgress
-        let rows: [Row] = canComplete || phase == .allSetsComplete
+        let rows: [Row] = canComplete || phase == .allSetsComplete || phase == .paused
             ? projection.contextRows.map { row in
                 Row(
                     role: Row.Role(rawValue: row.role.rawValue) ?? .current,

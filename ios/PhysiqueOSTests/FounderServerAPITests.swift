@@ -4820,7 +4820,10 @@ final class FounderServerAPITests: XCTestCase {
             exercises: [TrainingLoggerDraftExercise(
                 id: "occurrence-1", canonicalExerciseId: "barbell_bench_press", name: "Barbell Bench Press",
                 areaId: "chest", measurement: .repsLoad, executionVariant: nil,
-                sets: [TrainingLoggerDraftSet(id: "set-1", setNumber: 1, reps: 8, load: 185, durationSeconds: nil, isCompleted: true)],
+                sets: [
+                    TrainingLoggerDraftSet(id: "set-1", setNumber: 1, reps: 8, load: 185, durationSeconds: nil, isCompleted: true),
+                    TrainingLoggerDraftSet(id: "set-1-unfinished", setNumber: 2, reps: 8, load: 190, durationSeconds: nil, isCompleted: false),
+                ],
                 previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
                 isProvisional: false, provenance: nil
             ), TrainingLoggerDraftExercise(
@@ -4834,8 +4837,14 @@ final class FounderServerAPITests: XCTestCase {
                 ],
                 previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
                 isProvisional: false, provenance: nil
+            ), TrainingLoggerDraftExercise(
+                id: "occurrence-3", canonicalExerciseId: "cable_fly", name: "Cable Fly",
+                areaId: "chest", measurement: .repsLoad, executionVariant: nil,
+                sets: [TrainingLoggerDraftSet(id: "set-never-performed", setNumber: 1, reps: 12, load: 35, durationSeconds: nil, isCompleted: false)],
+                previousPerformance: nil, progressionRecommendation: nil, progressionChoice: nil,
+                isProvisional: false, provenance: nil
             )],
-            relationships: [], step: .review, exercisePickerReturnStep: nil,
+            relationships: [.init(id: "partial-superset", relationshipType: "superset", memberExerciseIds: ["occurrence-1", "occurrence-3"])], step: .review, exercisePickerReturnStep: nil,
             exercisePickerExistingExerciseIds: nil, supportingEvidence: nil, supportingWorkouts: nil,
             supportingWorkoutFailureAssetIds: nil
         )
@@ -4858,7 +4867,9 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(payload["startedAt"] as? String, "2026-09-11T14:00:00Z")
         XCTAssertEqual(payload["finishedAt"] as? String, "2026-09-11T15:05:00Z")
         let exercises = try XCTUnwrap(payload["exercises"] as? [[String: Any]])
+        XCTAssertEqual(exercises.count, 2, "An entirely unfinished planned exercise is not performed evidence.")
         XCTAssertEqual(exercises.first?["canonicalExerciseId"] as? String, "barbell_bench_press")
+        XCTAssertEqual((exercises.first?["sets"] as? [[String: Any]])?.map { $0["setId"] as? String }, ["set-1"], "Only actually completed sets cross Finish.")
         XCTAssertEqual((exercises.first?["sets"] as? [[String: Any]])?.first?["unit"] as? String, "lb")
         let bodyweightSets = try XCTUnwrap(exercises.last?["sets"] as? [[String: Any]])
         XCTAssertEqual(bodyweightSets[0]["loadType"] as? String, "bodyweight")
@@ -4869,6 +4880,7 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(bodyweightSets[2]["loadType"] as? String, "bodyweight")
         XCTAssertNil(bodyweightSets[2]["load"], "unweighted bodyweight carries no external load value")
         XCTAssertEqual(bodyweightSets[2]["unit"] as? String, "bodyweight")
+        XCTAssertEqual((payload["supersets"] as? [[String: Any]])?.count, 0, "A one-sided partial superset is not a performed relationship.")
     }
 
     /// Session-local authority state (revision, mutation ledger, rest, rest

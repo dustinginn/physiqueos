@@ -173,11 +173,164 @@ final class TrainingSessionAuthority {
         mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { $0.leftAt = nil }
     }
 
+    /// Freezes structured elapsed/rest time. The HealthKit workout lifecycle
+    /// is driven by the Watch adapter, but it uses this same accepted pause.
+    @discardableResult
+    func pause(
+        sessionId: String,
+        context: TrainingSessionMutationContext = .ui
+    ) -> TrainingSessionMutationOutcome {
+        return mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
+            guard draft.mode == .live, draft.leftAt == nil, draft.submissionState == nil,
+                  draft.step == .workout || draft.isAddingExercises
+            else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            guard draft.pausedAt == nil else { return }
+            let pausedAt = self.now()
+            draft.pausedAt = TrainingSessionClock.string(from: pausedAt)
+            if var rest = draft.rest, let started = rest.startedAtDate {
+                rest.frozenElapsedSeconds = max(0, pausedAt.timeIntervalSince(started))
+                if rest.mode == .countdown, let end = rest.endsAtDate {
+                    rest.frozenRemainingSeconds = max(0, end.timeIntervalSince(pausedAt))
+                }
+                draft.rest = rest
+            }
+        }
+    }
+
+    /// Re-anchors every frozen clock at the accepted resume instant. The
+    /// accumulated pause ledger makes elapsed workout time deterministic
+    /// across relaunches and repeated commands.
+    @discardableResult
+    func resumePaused(
+        sessionId: String,
+        context: TrainingSessionMutationContext = .ui
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
+            guard draft.mode == .live, draft.leftAt == nil,
+                  draft.submissionState == nil, draft.finishedAt == nil
+            else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            guard let paused = draft.pausedAt.flatMap(TrainingSessionClock.date(from:)) else { return }
+            let resumedAt = self.now()
+            draft.accumulatedPausedSeconds = (draft.accumulatedPausedSeconds ?? 0)
+                + max(0, resumedAt.timeIntervalSince(paused))
+            draft.pausedAt = nil
+            if var rest = draft.rest {
+                let elapsed = max(0, rest.frozenElapsedSeconds ?? 0)
+                rest.startedAt = TrainingSessionClock.string(from: resumedAt.addingTimeInterval(-elapsed))
+                if rest.mode == .countdown {
+                    rest.endsAt = TrainingSessionClock.string(
+                        from: resumedAt.addingTimeInterval(max(0, rest.frozenRemainingSeconds ?? 0))
+                    )
+                }
+                rest.frozenElapsedSeconds = nil
+                rest.frozenRemainingSeconds = nil
+                draft.rest = rest
+            }
+        }
+    }
+
+    func activeElapsedSeconds(sessionId: String, at date: Date? = nil) -> TimeInterval? {
+        guard let draft = draft(id: sessionId),
+              let started = draft.startedAt.flatMap(TrainingSessionClock.date(from:)) else { return nil }
+        let reference = draft.finishedAt.flatMap(TrainingSessionClock.date(from:)) ?? date ?? now()
+        let openPause = draft.pausedAt.flatMap(TrainingSessionClock.date(from:))
+            .map { max(0, reference.timeIntervalSince($0)) } ?? 0
+        return max(0, reference.timeIntervalSince(started) - (draft.accumulatedPausedSeconds ?? 0) - openPause)
+    }
+
+    /// Marks one phone-authored plan as the deterministic Watch start
+    /// candidate. No Watch code can create or edit this plan.
+    @discardableResult
+    func setReadyForWatch(sessionId: String, ready: Bool) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { draft in
+            guard draft.mode == .live, draft.completedSetCount == 0,
+                  !draft.exercises.isEmpty, draft.submissionState == nil
+            else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            draft.readyForWatchAt = ready ? TrainingSessionClock.string(from: self.now()) : nil
+            if ready {
+                draft.startedAt = nil
+                draft.finishedAt = nil
+                draft.pausedAt = nil
+                draft.accumulatedPausedSeconds = nil
+                draft.leftAt = nil
+                draft.rest = nil
+            }
+        }
+    }
+
+    /// The newest explicitly prepared plan wins; ties are broken by session
+    /// id. This keeps selection stable without a second authority/store.
+    func preparedWorkout() -> TrainingLoggerDraft? {
+        drafts.filter { $0.readyForWatchAt != nil && $0.completedSetCount == 0 }
+            .sorted {
+                let left = $0.readyForWatchAt ?? ""
+                let right = $1.readyForWatchAt ?? ""
+                return left == right ? $0.id < $1.id : left > right
+            }.first
+    }
+
+    @discardableResult
+    func startPreparedWorkout(
+        sessionId: String,
+        context: TrainingSessionMutationContext
+    ) -> TrainingSessionMutationOutcome {
+        guard preparedWorkout()?.id == sessionId,
+              activeLiveSession() == nil
+        else { return .rejected(.sessionNotMutable) }
+        return mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
+            guard draft.readyForWatchAt != nil, draft.completedSetCount == 0,
+                  !draft.exercises.isEmpty, draft.mode == .live
+            else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            draft.startedAt = TrainingSessionClock.string(from: self.now())
+            draft.readyForWatchAt = nil
+            draft.leftAt = nil
+        }
+    }
+
+    @discardableResult
+    func requestFinishConfirmation(
+        sessionId: String,
+        context: TrainingSessionMutationContext = .ui
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
+            guard draft.mode == .live, draft.startedAt != nil, draft.submissionState == nil
+            else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            if draft.finishConfirmationRequestedAt == nil {
+                draft.finishConfirmationRequestedAt = TrainingSessionClock.string(from: self.now())
+            }
+        }
+    }
+
+    @discardableResult
+    func cancelFinishConfirmation(
+        sessionId: String,
+        context: TrainingSessionMutationContext = .ui
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .lifecycle) {
+            $0.finishConfirmationRequestedAt = nil
+        }
+    }
+
+    @discardableResult
+    func confirmFinish(
+        sessionId: String,
+        context: TrainingSessionMutationContext = .ui
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
+            guard draft.finishConfirmationRequestedAt != nil
+            else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            if draft.finishedAt == nil { draft.finishedAt = TrainingSessionClock.string(from: self.now()) }
+            draft.finishConfirmationRequestedAt = nil
+            draft.rest = nil
+        }
+    }
+
     /// Save & Leave: keep the draft, stop Log-tab routing into it, end rest.
     @discardableResult
     func saveAndLeave(sessionId: String, leftAt: String) -> TrainingSessionMutationOutcome {
         mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { draft in
             draft.leftAt = leftAt
+            draft.pausedAt = nil
             draft.rest = nil
         }
     }
@@ -409,6 +562,9 @@ final class TrainingSessionAuthority {
         if context.origin == .intent, context.expectedRevision == nil { return .rejected(.revisionRequired) }
         if let mutationId = context.mutationId, current.appliedMutationIds?.contains(mutationId) == true {
             return .duplicate(revision: current.currentRevision)
+        }
+        if scope == .content, current.pausedAt != nil {
+            return .rejected(.sessionPaused)
         }
         if scope == .content, context.origin != .ui {
             guard TrainingSessionInvariants.acceptsExternalContentMutation(current),

@@ -160,6 +160,17 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// The active rest interval, owned by `TrainingSessionAuthority`. Absolute
     /// timestamps only; nothing ticks. Local-only.
     var rest: TrainingSessionRestState? = nil
+    /// Structured workout pause, distinct from Save & Leave. While present,
+    /// no set/rest mutation is accepted and elapsed workout/rest clocks are
+    /// frozen. Optional keeps every older persisted draft decodable.
+    var pausedAt: String? = nil
+    var accumulatedPausedSeconds: Double? = nil
+    /// Explicit phone-created eligibility for the paired Watch. This is a
+    /// planning marker, not an independently executable Watch plan.
+    var readyForWatchAt: String? = nil
+    /// Persisted two-step finish gate shared by phone/Watch commands. Finish
+    /// is never inferred from progress, including after the final set.
+    var finishConfirmationRequestedAt: String? = nil
     /// Session-level rest override. `nil` defers to the rest preference
     /// provider (exercise, then global), and finally to Off.
     var restConfiguration: TrainingRestConfiguration? = nil

@@ -103,9 +103,8 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
 
     func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
         try NativeProductWriteGuard.authorize(.workoutLogger, in: .founderProduction)
-        let exercises = try draft.exercises.compactMap { exercise -> Exercise? in
-            let completed = exercise.sets.filter(\.isCompleted)
-            guard !completed.isEmpty else { return nil }
+        let performed = TrainingPerformedSessionProjection.make(from: draft)
+        let exercises = try performed.exercises.map { exercise -> Exercise in
             let canonicalID = exercise.canonicalExerciseId?.isEmpty == false ? exercise.canonicalExerciseId : nil
             let provisional: ProvisionalExercise?
             if canonicalID == nil {
@@ -122,7 +121,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                 provisionalExercise: provisional,
                 occurrenceId: exercise.id,
                 executionVariant: exercise.executionVariant,
-                sets: completed.map { set in
+                sets: exercise.sets.map { set in
                     let write = set.writeRepresentation(defaultLoadType: exercise.defaultLoadType)
                     return SetPayload(
                         setId: set.id,
@@ -137,7 +136,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         }
         guard !exercises.isEmpty else { throw TrainingWriteError.noCompletedSets }
 
-        let supersets = draft.relationships.map {
+        let supersets = performed.relationships.map {
             Superset(id: $0.id, memberExerciseIds: $0.memberExerciseIds)
         }
         // The structured TrainingSession must become durable immediately —
@@ -319,9 +318,8 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
               session.date == draft.workoutDate
         else { return false }
 
-        let expectedExercises = draft.exercises.compactMap { exercise -> TrainingLoggerDraftExercise? in
-            exercise.sets.contains(where: \.isCompleted) ? exercise : nil
-        }
+        let performed = TrainingPerformedSessionProjection.make(from: draft)
+        let expectedExercises = performed.exercises
         guard session.exercises.count == expectedExercises.count else { return false }
         for expected in expectedExercises {
             guard let actual = session.exercises.first(where: { $0.id == expected.id }),
@@ -329,7 +327,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                   (expected.canonicalExerciseId != nil || actual.name == expected.name),
                   actual.executionVariant?.key == expected.executionVariant?.key
             else { return false }
-            let expectedSets = expected.sets.filter(\.isCompleted).sorted { $0.setNumber < $1.setNumber }
+            let expectedSets = expected.sets.sorted { $0.setNumber < $1.setNumber }
             let actualSets = actual.sets.sorted { $0.setNumber < $1.setNumber }
             guard expectedSets.count == actualSets.count else { return false }
             for (left, right) in zip(expectedSets, actualSets) {
@@ -343,7 +341,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                 else { return false }
             }
         }
-        let expectedRelationships = draft.relationships.map {
+        let expectedRelationships = performed.relationships.map {
             ($0.id, $0.relationshipType, $0.memberExerciseIds)
         }.sorted { $0.0 < $1.0 }
         let actualRelationships = session.exerciseRelationshipGroups.map {

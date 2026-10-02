@@ -106,6 +106,55 @@ final class TrainingSessionAuthorityTests: XCTestCase {
 
     // MARK: Load / selection
 
+    func testPerformedProjectionDropsUnfinishedSetsAndExercises() {
+        var draft = liveSession()
+        draft.exercises[0].sets[0].isCompleted = true
+
+        let performed = TrainingPerformedSessionProjection.make(from: draft)
+
+        XCTAssertEqual(performed.exercises.map(\.id), ["bench"])
+        XCTAssertEqual(performed.exercises[0].sets.map(\.id), ["b1"])
+        XCTAssertTrue(performed.relationships.isEmpty)
+    }
+
+    func testPerformedProjectionDropsPartialSupersetButKeepsCompletedMembers() {
+        var draft = liveSession()
+        draft.relationships = [
+            .init(id: "super-1", relationshipType: "superset", memberExerciseIds: ["bench", "fly"]),
+        ]
+        draft.exercises[0].sets[0].isCompleted = true
+
+        var performed = TrainingPerformedSessionProjection.make(from: draft)
+        XCTAssertEqual(performed.exercises.map(\.id), ["bench"])
+        XCTAssertTrue(performed.relationships.isEmpty, "One performed member is not a performed superset.")
+
+        draft.exercises[1].sets[0].isCompleted = true
+        performed = TrainingPerformedSessionProjection.make(from: draft)
+        XCTAssertEqual(performed.exercises.map(\.id), ["bench", "fly"])
+        XCTAssertEqual(performed.relationships.first?.memberExerciseIds, ["bench", "fly"])
+        XCTAssertEqual(performed.exercises.flatMap(\.sets).map(\.id), ["b1", "f1"])
+    }
+
+    func testPerformedProjectionRetainsOnlyTwoPerformedMembersOfThreeWithoutRenumbering() {
+        var draft = liveSession(exercises: [
+            exercise("bench", sets: [set("b1", 1, done: true), set("b2", 2)]),
+            exercise("fly", measurement: .duration, sets: [set("f1", 1, reps: nil, load: nil, duration: 45, done: true)]),
+            exercise("dip", measurement: .bodyweightReps, defaultLoadType: "bodyweight", sets: [set("d1", 1, reps: 10, load: nil)]),
+        ])
+        draft.relationships = [
+            .init(id: "super-3", relationshipType: "superset", memberExerciseIds: ["bench", "fly", "dip"]),
+        ]
+
+        let performed = TrainingPerformedSessionProjection.make(from: draft)
+
+        XCTAssertEqual(performed.exercises.map(\.id), ["bench", "fly"])
+        XCTAssertEqual(performed.exercises.flatMap(\.sets).map(\.id), ["b1", "f1"])
+        XCTAssertEqual(performed.exercises[1].sets[0].durationSeconds, 45)
+        XCTAssertEqual(performed.relationships, [
+            .init(id: "super-3", relationshipType: "superset", memberExerciseIds: ["bench", "fly"]),
+        ])
+    }
+
     func testLoadRecoversPersistedSessionsWithoutBackfillingTimestamps() {
         var legacy = liveSession()
         legacy.exercises[0].sets[0].isCompleted = true // completed before completedAt existed
@@ -129,6 +178,149 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     // MARK: completeSet / identity / idempotency / revision
+
+    func testPauseFreezesAndResumeReanchorsWorkoutAndStopwatchRest() throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1"), .applied(revision: 1))
+        clock.advance(25)
+        XCTAssertEqual(authority.pause(sessionId: "session-1"), .applied(revision: 2))
+        let frozen = try XCTUnwrap(authority.draft(id: "session-1")?.rest)
+        XCTAssertEqual(try XCTUnwrap(frozen.frozenElapsedSeconds), 25, accuracy: 0.001)
+        let elapsedAtPause = try XCTUnwrap(authority.activeElapsedSeconds(sessionId: "session-1"))
+
+        clock.advance(120)
+        XCTAssertEqual(try XCTUnwrap(authority.activeElapsedSeconds(sessionId: "session-1")), elapsedAtPause, accuracy: 0.001)
+        XCTAssertEqual(
+            authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2"),
+            .rejected(.sessionPaused)
+        )
+        XCTAssertEqual(authority.resumePaused(sessionId: "session-1"), .applied(revision: 3))
+        let resumed = try XCTUnwrap(authority.draft(id: "session-1")?.rest)
+        XCTAssertNil(resumed.frozenElapsedSeconds)
+        XCTAssertEqual(clock.now.timeIntervalSince(try XCTUnwrap(resumed.startedAtDate)), 25, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(authority.draft(id: "session-1")?.accumulatedPausedSeconds), 120, accuracy: 0.001)
+    }
+
+    func testCountdownPauseFreezesRemainingAndResumeReanchorsDeadline() throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store, rest: .countdown(seconds: 90))
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
+        clock.advance(20)
+        authority.pause(sessionId: "session-1")
+        XCTAssertEqual(try XCTUnwrap(authority.draft(id: "session-1")?.rest?.frozenRemainingSeconds), 70, accuracy: 0.001)
+        clock.advance(300)
+        authority.resumePaused(sessionId: "session-1")
+        let end = try XCTUnwrap(authority.draft(id: "session-1")?.rest?.endsAtDate)
+        XCTAssertEqual(end.timeIntervalSince(clock.now), 70, accuracy: 0.001)
+    }
+
+    func testPreparedWorkoutSelectionAndRouterFailClosedWhenPhoneUnreachable() throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        XCTAssertEqual(authority.setReadyForWatch(sessionId: "session-1", ready: true), .applied(revision: 1))
+        XCTAssertNil(authority.draft(id: "session-1")?.startedAt)
+        XCTAssertEqual(authority.preparedWorkout()?.id, "session-1")
+        var reachable = false
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { reachable }, now: { clock.now })
+        let command = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "c1", mutationId: "m1",
+            kind: .startPreparedWorkout, sessionId: "session-1", expectedRevision: 1,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+        XCTAssertEqual(router.route(command).reason, .phoneUnreachable)
+        XCTAssertNil(authority.draft(id: "session-1")?.startedAt)
+        reachable = true
+        XCTAssertEqual(router.route(command).status, .applied)
+        XCTAssertNotNil(authority.draft(id: "session-1")?.startedAt)
+        XCTAssertNil(authority.draft(id: "session-1")?.readyForWatchAt)
+    }
+
+    func testWatchRouterReturnsMutationIdentityAndAuthoritativeStaleProjection() throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        let first = WatchWorkoutCommand(
+            schemaVersion: 1, commandId: "command-1", mutationId: "mutation-1", kind: .completeSet,
+            sessionId: "session-1", expectedRevision: 0, exerciseId: "bench", setId: "b1", issuedAt: clock.now
+        )
+        let accepted = router.route(first)
+        XCTAssertEqual(accepted.status, .applied)
+        XCTAssertEqual(accepted.mutationId, "mutation-1")
+        XCTAssertEqual(accepted.projection?.lastAcknowledgedMutationId, "mutation-1")
+
+        let stale = WatchWorkoutCommand(
+            schemaVersion: 1, commandId: "command-2", mutationId: "mutation-2", kind: .completeSet,
+            sessionId: "session-1", expectedRevision: 0, exerciseId: "bench", setId: "b2", issuedAt: clock.now
+        )
+        let refused = router.route(stale)
+        XCTAssertEqual(refused.status, .stale)
+        XCTAssertEqual(refused.reason, .staleRevision)
+        XCTAssertEqual(refused.acknowledgedRevision, 1)
+        XCTAssertEqual(refused.projection?.stalenessReason, .revisionMismatch)
+        XCTAssertFalse(authority.draft(id: "session-1")!.exercises[0].sets[1].isCompleted)
+    }
+
+    func testFinishAlwaysRequiresExplicitRequestBeforeConfirmEvenAfterFinalSet() {
+        var draft = liveSession(exercises: [exercise("bench", sets: [set("b1", 1)])])
+        draft.exercises[0].sets[0].isCompleted = true
+        let (authority, _) = makeAuthority(RecordingStore([draft]))
+        XCTAssertEqual(authority.confirmFinish(sessionId: "session-1"), .rejected(.sessionNotMutable))
+        XCTAssertNil(authority.draft(id: "session-1")?.finishedAt)
+        XCTAssertEqual(authority.requestFinishConfirmation(sessionId: "session-1"), .applied(revision: 1))
+        XCTAssertEqual(authority.confirmFinish(sessionId: "session-1"), .applied(revision: 2))
+        XCTAssertNotNil(authority.draft(id: "session-1")?.finishedAt)
+    }
+
+    func testWatchMetricsTotalRequiresActiveAndBasalEnergy() {
+        XCTAssertNil(WatchWorkoutMetrics(elapsedActiveSeconds: 60, currentHeartRateBPM: 120, activeCalories: 50, basalCalories: nil).totalCalories)
+        XCTAssertEqual(WatchWorkoutMetrics(elapsedActiveSeconds: 60, currentHeartRateBPM: 120, activeCalories: 50, basalCalories: 12).totalCalories, 62)
+    }
+
+    func testWatchContractUnknownCommandDecodesToSafeNonMutatingCase() throws {
+        let data = Data(#"{"schemaVersion":1,"commandId":"c","mutationId":"m","kind":"futureCommand","sessionId":"s","expectedRevision":0,"issuedAt":0}"#.utf8)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        XCTAssertEqual(try decoder.decode(WatchWorkoutCommand.self, from: data).kind, .unknown)
+    }
+
+    func testWatchHealthKitLifecycleRequiresExplicitEndAndUsesLockedV1Semantics() throws {
+        XCTAssertEqual(WatchHealthKitWorkoutContract.activityType, "traditionalStrengthTraining")
+        XCTAssertEqual(WatchHealthKitWorkoutContract.locationType, "indoor")
+        var state = try WatchHealthKitWorkoutContract.transition(.notStarted, event: .start)
+        state = try WatchHealthKitWorkoutContract.transition(state, event: .pause)
+        state = try WatchHealthKitWorkoutContract.transition(state, event: .resume)
+        XCTAssertThrowsError(try WatchHealthKitWorkoutContract.transition(state, event: .finishSaving))
+        state = try WatchHealthKitWorkoutContract.transition(state, event: .requestEnd)
+        XCTAssertEqual(try WatchHealthKitWorkoutContract.transition(state, event: .finishSaving), .ended)
+    }
+
+    func testHealthKitExactCorrelationRequiresTrustedStrengthIndoorOwnerAndEnvelope() {
+        let sessionId = UUID()
+        let context = HealthKitTrustedWorkoutCorrelationContext(
+            trustedSourceBundleIdentifiers: ["com.physiqueos.watch"],
+            traditionalStrengthTrainingActivityTypes: ["50"],
+            ownerKey: "founder",
+            sessions: [.init(sessionId: sessionId, ownerKey: "founder", startedAt: t0, endedAt: t0.addingTimeInterval(3_600))],
+            clockToleranceSeconds: 30
+        )
+        func extract(source: String = "com.physiqueos.watch", activity: String = "50", indoor: Bool? = true) -> String? {
+            HealthKitTrustedWorkoutCorrelation.extract(
+                externalUUID: sessionId.uuidString, sourceBundleIdentifier: source,
+                activityType: activity, isIndoorWorkout: indoor,
+                startedAt: t0.addingTimeInterval(5), endedAt: t0.addingTimeInterval(3_590), context: context
+            )
+        }
+        XCTAssertEqual(extract(), sessionId.uuidString.lowercased())
+        XCTAssertNil(extract(source: "com.other.watch"))
+        XCTAssertNil(extract(activity: "13"))
+        XCTAssertNil(extract(indoor: false))
+        XCTAssertNil(HealthKitTrustedWorkoutCorrelation.extract(
+            externalUUID: sessionId.uuidString, sourceBundleIdentifier: "com.physiqueos.watch",
+            activityType: "50", isIndoorWorkout: true,
+            startedAt: t0.addingTimeInterval(-60), endedAt: t0.addingTimeInterval(3_590), context: context
+        ))
+    }
 
     func testCompleteSetStampsCompletedAtAdvancesRevisionAndPersistsBeforePublishing() {
         let store = RecordingStore([liveSession()])

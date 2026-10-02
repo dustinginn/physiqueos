@@ -240,7 +240,11 @@ function coachingUpdatesDraftForm(draft) {
   });
 }
 
-export function createCanonicalPersistenceCommandPorts({ records, now = () => new Date() } = {}) {
+export function createCanonicalPersistenceCommandPorts({
+  records,
+  now = () => new Date(),
+  trustedPhysiqueOSWatchBundleIdentifiers = [],
+} = {}) {
   if (!records?.get || !records?.put) throw new Error("Canonical command ports require a record store.");
   const edit = (collection, idField) => async (context) => mutateExisting(
     context,
@@ -450,6 +454,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       }
       : null;
     const existingById = new Map(existingObservations.map((record) => [record.id, record]));
+    const exactCorrelationClaims = new Map(existingObservations
+      .filter((record) => record.reconciliation?.associationAuthority === "trusted_physiqueos_session_id_v1")
+      .map((record) => [record.reconciliation.canonicalTrainingSessionId, record.id]));
     const canonicalDayById = new Map(existingCanonicalDays.map((record) => [record.id, record]));
     const receivedAt = () => context.metadata.clientOccurredAt ?? now().toISOString();
     const results = [];
@@ -518,6 +525,18 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         }
       } else if (observation.observationType === HealthKitObservationType.WORKOUT) {
         const classification = classifyHealthKitWorkoutType(observation.measurement.activityType);
+        const exactReconciliation = observation.measurement.physiqueOSSessionId
+          ? reconcileHealthKitWorkoutObservation({
+            observation,
+            canonicalObjects,
+            trustedPhysiqueOSWatchBundleIdentifiers,
+            claimedPhysiqueOSSessionIds: [...exactCorrelationClaims.entries()]
+              .filter(([, sourceObservationId]) => sourceObservationId !== observation.id)
+              .map(([canonicalSessionId]) => canonicalSessionId),
+          })
+          : null;
+        const exactCorrelationHandled = exactReconciliation?.associationAuthority === "trusted_physiqueos_session_id_v1" ||
+          String(exactReconciliation?.reason ?? "").startsWith("trusted_session_");
         // The effective day is the workout's own start in its own time zone.
         const effectiveLocalDate = deriveHealthKitWorkoutLocalDate({
           startedAt: observation.occurrence.startedAt,
@@ -526,7 +545,14 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         const workoutAssessment = assessHealthKitWorkoutCanonicalization({
           observation, effectiveLocalDate, family: classification.family, activationPolicy: workoutPolicyRecord,
         });
-        if (existing && (WORKOUT_TERMINAL_STATES.has(existing.reconciliation?.state) ||
+        if (existing?.reconciliation?.associationAuthority === "trusted_physiqueos_session_id_v1") {
+          reconciliation = structuredClone(existing.reconciliation);
+        } else if (!existing && exactCorrelationHandled) {
+          // Exact trusted correlation takes precedence over Workout activation:
+          // the source observation becomes physiology on the structured Logger
+          // event and never creates duplicate performed Training evidence.
+          reconciliation = exactReconciliation;
+        } else if (existing && (WORKOUT_TERMINAL_STATES.has(existing.reconciliation?.state) ||
           existing.reconciliation?.reason === WORKOUT_FAMILY_OUT_OF_SCOPE_REASON)) {
           // A canonicalized (or superseded) workout is never reconsidered on
           // replay, and a workout a family scope kept raw keeps saying so.
@@ -559,7 +585,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
               canonicalizationPermitted: true,
             };
         } else {
-          reconciliation = reconcileHealthKitWorkoutObservation({ observation, canonicalObjects });
+          reconciliation = reconcileHealthKitWorkoutObservation({
+            observation,
+            canonicalObjects,
+            trustedPhysiqueOSWatchBundleIdentifiers,
+          });
         }
       } else {
         reconciliation = { state: HealthKitReconciliationState.SOURCE_ONLY };
@@ -578,6 +608,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         payload: sourceRecord,
       });
       let stored = existing ?? insertion.record;
+      if (reconciliation.associationAuthority === "trusted_physiqueos_session_id_v1") {
+        exactCorrelationClaims.set(reconciliation.canonicalTrainingSessionId, observation.id);
+      }
       if (!stored || !isCompatibleHealthKitReplay(stored, observation)) {
         // Same rule at the write boundary: a concurrent first delivery of the
         // same workout wins and this drifted copy is acknowledged, not fought.

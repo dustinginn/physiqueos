@@ -414,6 +414,8 @@ export function isCompatibleHealthKitReplay(existing, incoming) {
 export function reconcileHealthKitWorkoutObservation({
   observation,
   canonicalObjects = [],
+  trustedPhysiqueOSWatchBundleIdentifiers = [],
+  claimedPhysiqueOSSessionIds = [],
 } = {}) {
   if (observation?.observationType !== HealthKitObservationType.WORKOUT) {
     return Object.freeze({ state: HealthKitReconciliationState.SOURCE_ONLY });
@@ -423,6 +425,37 @@ export function reconcileHealthKitWorkoutObservation({
       state: HealthKitReconciliationState.WORKOUT_CANONICALIZATION_DEFERRED,
       reason: "canonical_workout_evidence_eligibility_boundary_not_yet_separate",
       canonicalCandidate: createCanonicalWorkoutCandidate(observation),
+    });
+  }
+
+  const exactSessionId = observation.measurement.physiqueOSSessionId;
+  if (exactSessionId && trustedPhysiqueOSWatchBundleIdentifiers.includes(observation.source.bundleIdentifier)) {
+    const expectedCanonicalId = `training|authoritative|training_logger_draft_${exactSessionId}`;
+    if (claimedPhysiqueOSSessionIds.includes(expectedCanonicalId)) {
+      return Object.freeze({
+        state: HealthKitReconciliationState.TRAINING_MATCH_AMBIGUOUS,
+        reason: "trusted_session_already_claimed",
+        candidates: Object.freeze([]),
+        confirmationRequired: false,
+      });
+    }
+    const exactSessions = canonicalObjects.filter((record) => {
+      const payload = record.payload ?? record;
+      return (record.canonicalId ?? payload.id) === expectedCanonicalId && isActiveDetailedStrengthSession(record);
+    });
+    if (exactSessions.length === 1) {
+      return Object.freeze({
+        state: HealthKitReconciliationState.TRAINING_SESSION_LINKED,
+        canonicalTrainingSessionId: expectedCanonicalId,
+        candidates: Object.freeze([{ canonicalId: expectedCanonicalId, outcome: "duplicate", confidence: 100, reasons: Object.freeze(["trusted_physiqueos_session_id"]) }]),
+        associationAuthority: "trusted_physiqueos_session_id_v1",
+      });
+    }
+    return Object.freeze({
+      state: HealthKitReconciliationState.TRAINING_MATCH_AMBIGUOUS,
+      reason: exactSessions.length === 0 ? "trusted_session_not_found" : "trusted_session_identity_conflict",
+      candidates: Object.freeze([]),
+      confirmationRequired: false,
     });
   }
 
@@ -636,6 +669,13 @@ function normalizeMeasurement(value, observationType, index) {
       // `false` (explicitly outdoor) is preserved: `compact` only drops
       // null/undefined/"", never `false`.
       isIndoorWorkout: typeof workout.isIndoorWorkout === "boolean" ? workout.isIndoorWorkout : null,
+      // Native emits this only after trusted-bundle, UUID, strength/indoor,
+      // owner, and time-envelope checks. Server still validates syntax and
+      // requires its independently configured source allowlist before it can
+      // become association authority.
+      physiqueOSSessionId: workout.physiqueOSSessionId == null
+        ? null
+        : uuidText(workout.physiqueOSSessionId, `observations[${index}].workout.physiqueOSSessionId`),
       // A first revision is the same observation whether stated or not.
       sourceRevision: workout.sourceRevision == null
         ? null
@@ -678,6 +718,7 @@ export function createCanonicalWorkoutCandidate(observation) {
       distance: measurement.distance,
       distance_unit: measurement.distanceUnit,
       average_heart_rate: measurement.averageHeartRate,
+      physiqueos_session_id: measurement.physiqueOSSessionId,
       source_workout_id: observation.externalId,
     }),
     exercises: [],
@@ -686,6 +727,14 @@ export function createCanonicalWorkoutCandidate(observation) {
       source_observation_ids: [observation.id],
     },
   });
+}
+
+function uuidText(value, field) {
+  const text = requiredText(value, field).toLowerCase();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(text)) {
+    throw invalid(field, `${field} must be a UUID.`);
+  }
+  return text;
 }
 
 export function isActiveDetailedStrengthSession(record) {
