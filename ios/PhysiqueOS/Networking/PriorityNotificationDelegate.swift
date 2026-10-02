@@ -115,9 +115,10 @@ final class NotificationDeepLinkCoordinator {
 /// `Complete` submits the exact same `priority.complete.v1` command (same
 /// canonical identity, same `expectedVersion`/If-Match, same idempotency
 /// discipline) the in-app completion path already uses — nothing here
-/// re-derives completion semantics. `Skip` (offered only on the
-/// `simpleCompletion` category) submits the same `priority.skip.v1` command
-/// Priority Detail's Mark Skipped uses. `Snooze 1 hour` never touches the
+/// re-derives completion semantics. `Skip` (offered only where the Server's
+/// `notificationAction.skipCommand` exists: `simpleCompletion`,
+/// `specializedSkippable`, `skipOnly`) submits the same `priority.skip.v1`
+/// command Priority Detail's Mark Skipped uses, never with a dose. `Snooze 1 hour` never touches the
 /// server at all — see `PriorityNotificationScheduler.scheduleSnooze`.
 /// Tapping the notification body (or a category with no custom actions —
 /// specialized/open-only) always opens the exact same `AppDestination`
@@ -166,11 +167,19 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
         /// Build 78 (before the Server published `skipCommand`) carried Skip
         /// only on `simpleCompletion`, against the plain completion command's
         /// identity and version; those keep working. Nothing else falls back.
-        init?(skip: PriorityNotificationSkipFields, complete: CompleteActionPayload, categoryIdentifier: String) {
+        init?(
+            skip: PriorityNotificationSkipFields,
+            complete: CompleteActionPayload,
+            categoryIdentifier: String,
+            notificationPriorityId: String? = nil,
+            notificationOccurrenceDate: String? = nil
+        ) {
             if skip.isComplete, let priorityId = skip.priorityId, let occurrenceDate = skip.occurrenceDate,
                let version = skip.expectedVersion {
-                if let completionId = complete.priorityId, completionId != priorityId { return nil }
-                if let completionDate = complete.occurrenceDate, completionDate != occurrenceDate { return nil }
+                // The skip must target this notification's own occurrence
+                // (and the completion command's, when there is one).
+                for expected in [complete.priorityId, notificationPriorityId].compactMap({ $0 }) where expected != priorityId { return nil }
+                for expected in [complete.occurrenceDate, notificationOccurrenceDate].compactMap({ $0 }) where expected != occurrenceDate { return nil }
                 self.init(priorityId: priorityId, occurrenceDate: occurrenceDate, expectedVersion: version)
                 return
             }
@@ -230,7 +239,9 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             skip = SkipActionPayload(
                 skip: PriorityNotificationSkipFields(userInfo: userInfo),
                 complete: complete,
-                categoryIdentifier: request.content.categoryIdentifier
+                categoryIdentifier: request.content.categoryIdentifier,
+                notificationPriorityId: userInfo["priorityId"] as? String,
+                notificationOccurrenceDate: userInfo["occurrenceDate"] as? String
             )
             open = OpenActionPayload(
                 userInfo: userInfo,
@@ -253,7 +264,9 @@ final class PriorityNotificationDelegate: NSObject, UNUserNotificationCenterDele
             skip = SkipActionPayload(
                 skip: PriorityNotificationSkipFields(userInfo: userInfo),
                 complete: complete,
-                categoryIdentifier: categoryIdentifier
+                categoryIdentifier: categoryIdentifier,
+                notificationPriorityId: userInfo["priorityId"] as? String,
+                notificationOccurrenceDate: userInfo["occurrenceDate"] as? String
             )
             open = OpenActionPayload(
                 userInfo: userInfo,

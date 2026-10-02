@@ -242,7 +242,7 @@ struct PriorityDetailView: View {
                             }
                             Button("Cancel", role: .cancel) {}
                         } message: {
-                            Text(Self.skipConfirmationMessage(isDose: priority.completionContext?.dose != nil))
+                            Text(Self.skipConfirmationMessage(isDose: priority.doseAdjustable))
                         }
                 }
             }

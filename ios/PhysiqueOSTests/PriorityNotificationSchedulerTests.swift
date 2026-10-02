@@ -1992,3 +1992,65 @@ extension PriorityNotificationSchedulerTests {
         XCTAssertEqual(skips, [.init(priorityId: "reminder_stretch", occurrenceDate: "2026-09-16", expectedVersion: 3)])
     }
 }
+
+extension PriorityNotificationSchedulerTests {
+    @MainActor
+    func testSpecializedNotificationsWithoutSkipFieldsNeverFallBack() async throws {
+        let peptide = try Self.request(id: "reminder_tesamorelin", json: Self.peptideWithSkipJSON, time: "17:00")
+        var info = peptide.content.userInfo
+        for key in ["skipCommandType", "skipExpectedVersion", "skipPayloadPriorityId", "skipPayloadOccurrenceDate"] { info[key] = nil }
+        var skips = 0
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            skipActionHandler: { _ in skips += 1 },
+            feedbackHandler: { _ in },
+            postActionReconciliation: {},
+            completionCleanup: { _, _ in }
+        )
+        for category in [PriorityNotificationCategory.specializedSkippable, PriorityNotificationCategory.specializedActionable,
+                         PriorityNotificationCategory.skipOnly] {
+            await delegate.handle(snapshot: .init(
+                actionIdentifier: PriorityNotificationActionIdentifier.skip,
+                requestIdentifier: "priority.scheduled.\(category)",
+                userInfo: info, categoryIdentifier: category
+            ))
+        }
+        XCTAssertEqual(skips, 0, "Only the plain Build 78 category may fall back to the completion identity.")
+    }
+
+    @MainActor
+    func testSkipCommandForAnotherOccurrenceThanTheNotificationIsRefused() async throws {
+        let request = try Self.request(id: "reminder_x", json: Self.skipOnlyJSON, time: "09:00")
+        var info = request.content.userInfo
+        info["occurrenceDate"] = "2026-09-17"
+        var skips = 0
+        let delegate = PriorityNotificationDelegate(
+            environment: nil, skipActionHandler: { _ in skips += 1 }, feedbackHandler: { _ in },
+            postActionReconciliation: {}, completionCleanup: { _, _ in }
+        )
+        await delegate.handle(snapshot: .init(
+            actionIdentifier: PriorityNotificationActionIdentifier.skip, requestIdentifier: request.identifier,
+            userInfo: info, categoryIdentifier: PriorityNotificationCategory.skipOnly
+        ))
+        XCTAssertEqual(skips, 0)
+        await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
+        XCTAssertEqual(skips, 1, "The matching skip-only notification skips.")
+    }
+
+    @MainActor
+    func testPeptideSkipOfAnAlreadyCompletedDoseWithdrawsTheReminderWithoutFeedback() async throws {
+        let request = try Self.request(id: "reminder_tesamorelin", json: Self.peptideWithSkipJSON, time: "17:00")
+        var cleaned: [String] = []
+        var feedback: [PhysiqueOSFeedbackEvent] = []
+        let delegate = PriorityNotificationDelegate(
+            environment: nil,
+            skipActionHandler: { _ in throw PrioritySkipError.alreadyCompleted },
+            feedbackHandler: { feedback.append($0) },
+            postActionReconciliation: {},
+            completionCleanup: { cleaned.append("\($0)|\($1)") }
+        )
+        await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
+        XCTAssertEqual(cleaned, ["reminder_tesamorelin|2026-09-16"])
+        XCTAssertTrue(feedback.isEmpty)
+    }
+}
