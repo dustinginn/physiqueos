@@ -5,8 +5,11 @@ import Observation
 @MainActor
 @Observable
 final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuilderDelegate {
+    enum CancellationDisposition: Equatable { case discard }
+    static let cancellationDisposition: CancellationDisposition = .discard
+
     enum Lifecycle: String, Equatable {
-        case idle, authorizing, starting, running, paused, ending, saved, failed
+        case idle, authorizing, starting, running, paused, ending, cancelled, saved, failed
     }
 
     enum ControllerError: Error { case anotherSessionActive, missingTypes, notRunning, saveFailed }
@@ -28,6 +31,7 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
     private let healthStore = HKHealthStore()
     private var workoutSession: HKWorkoutSession?
     private var builder: HKLiveWorkoutBuilder?
+    private var cancellationInFlight = false
     private let correlationKey = "physiqueos.watchWorkout.activeCorrelation.v1"
     private let savedCorrelationKey = "physiqueos.watchWorkout.savedCorrelationPendingReport.v1"
 
@@ -99,6 +103,45 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         return workout
     }
 
+    /// Canonical Cancel policy: end the active workout session and discard
+    /// its builder rather than creating an Apple Health workout. Recovery is
+    /// attempted first so a phone-originated Cancel received after a Watch
+    /// relaunch still tears down the Watch-owned workout.
+    func cancel() async {
+        guard !cancellationInFlight else { return }
+        cancellationInFlight = true
+        defer { cancellationInFlight = false }
+
+        if workoutSession == nil,
+           let stored = UserDefaults.standard.string(forKey: correlationKey),
+           let recovered = try? await healthStore.recoverActiveWorkoutSession() {
+            let recoveredBuilder = recovered.associatedWorkoutBuilder()
+            recovered.delegate = self
+            recoveredBuilder.delegate = self
+            workoutSession = recovered
+            builder = recoveredBuilder
+            correlationId = stored
+        }
+
+        lifecycle = .ending
+        workoutSession?.end()
+        switch Self.cancellationDisposition {
+        case .discard: builder?.discardWorkout()
+        }
+        workoutSession = nil
+        builder = nil
+        correlationId = nil
+        currentHeartRateBPM = nil
+        activeCalories = nil
+        basalCalories = nil
+        averageHeartRateBPM = nil
+        rawDurationSeconds = nil
+        lastErrorDescription = nil
+        UserDefaults.standard.removeObject(forKey: correlationKey)
+        UserDefaults.standard.removeObject(forKey: savedCorrelationKey)
+        lifecycle = .cancelled
+    }
+
     func markSavedCorrelationReported(_ structuredSessionId: String) {
         guard savedCorrelationPendingReport == structuredSessionId else { return }
         UserDefaults.standard.removeObject(forKey: savedCorrelationKey)
@@ -161,7 +204,7 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
             switch toState {
             case .running: lifecycle = .running
             case .paused: lifecycle = .paused
-            case .ended where lifecycle != .saved: lifecycle = .ending
+            case .ended where lifecycle != .saved && lifecycle != .cancelled: lifecycle = .ending
             default: break
             }
         }

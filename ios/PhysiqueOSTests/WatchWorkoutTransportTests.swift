@@ -29,7 +29,7 @@ final class WatchWorkoutTransportTests: XCTestCase {
         var gate = WatchWorkoutCommandDeliveryGate()
         XCTAssertTrue(gate.begin(command(id: "new")))
         let stale = WatchWorkoutAcknowledgement(
-            schemaVersion: 1,
+            schemaVersion: WatchWorkoutContract.schemaVersion,
             commandId: "old",
             mutationId: "old",
             status: .applied,
@@ -46,7 +46,7 @@ final class WatchWorkoutTransportTests: XCTestCase {
         let pending = command(id: "same")
         XCTAssertTrue(gate.begin(pending))
         let acknowledgement = WatchWorkoutAcknowledgement(
-            schemaVersion: 1,
+            schemaVersion: WatchWorkoutContract.schemaVersion,
             commandId: "same",
             mutationId: "same",
             status: .stale,

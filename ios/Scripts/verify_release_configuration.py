@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Read-only regression check for source-controlled release metadata."""
 
+import json
 import pathlib
 import plistlib
 import re
@@ -12,11 +13,13 @@ PROJECT = IOS_ROOT / "PhysiqueOS.xcodeproj" / "project.pbxproj"
 INFO = IOS_ROOT / "PhysiqueOS" / "Supporting" / "Info.plist"
 EXTENSION_INFO = IOS_ROOT / "PhysiqueOSLiveActivity" / "Info.plist"
 EXTENSION_BUNDLE_ID = "com.physiqueos.native.dev.WorkoutActivity"
+WATCH_BUNDLE_ID = "com.physiqueos.native.dev.watchkitapp"
 ENTITLEMENTS = IOS_ROOT / "PhysiqueOS" / "Supporting" / "PhysiqueOS.entitlements"
 EXTENSION_ENTITLEMENTS = IOS_ROOT / "PhysiqueOSLiveActivity" / "PhysiqueOSLiveActivity.entitlements"
 WIDGET_BUNDLE = IOS_ROOT / "PhysiqueOSLiveActivity" / "PhysiqueOSLiveActivityBundle.swift"
 HOME_WIDGET = IOS_ROOT / "PhysiqueOSLiveActivity" / "HomeLoggedTodayWidget.swift"
 APP_GROUP = "group.com.physiqueos.native.dev.shared"
+WATCH_APP_ICON = IOS_ROOT / "PhysiqueOSWatch" / "Assets.xcassets" / "AppIcon.appiconset"
 
 
 def main() -> None:
@@ -27,24 +30,35 @@ def main() -> None:
         raise SystemExit("APP_BUILD_NUMBER is missing from generate_project.py")
     build_number = match.group(1)
     expected_project_line = f"CURRENT_PROJECT_VERSION = {build_number};"
-    # App + Workout Live Activity extension, Debug + Release each. The App Store
-    # export requires the embedded extension's version to equal the app's.
-    if project.count(expected_project_line) != 4:
-        raise SystemExit("Generated Debug/Release app and extension build numbers do not match APP_BUILD_NUMBER")
+    # App + Workout Live Activity extension + Watch app + Watch tests, Debug +
+    # Release each. Embedded products must share the containing app's version.
+    if project.count(expected_project_line) != 8:
+        raise SystemExit("Generated app, extension, and Watch build numbers do not match APP_BUILD_NUMBER")
     if project.count("MARKETING_VERSION = 1.0;") < 4:
         raise SystemExit("Marketing version 1.0 is not preserved")
     if project.count("PRODUCT_BUNDLE_IDENTIFIER = com.physiqueos.native.dev;") != 2:
         raise SystemExit("App bundle identifier changed or is not present in both app configurations")
     if project.count(f"PRODUCT_BUNDLE_IDENTIFIER = {EXTENSION_BUNDLE_ID};") != 2:
         raise SystemExit("Workout Live Activity extension bundle identifier is missing or changed")
+    if project.count(f"PRODUCT_BUNDLE_IDENTIFIER = {WATCH_BUNDLE_ID};") != 2:
+        raise SystemExit("Watch app bundle identifier is missing or changed")
     if "Embed Foundation Extensions" not in project or "PhysiqueOSLiveActivity.appex in Embed Foundation Extensions" not in project:
         raise SystemExit("The app does not embed the Workout Live Activity extension")
     if project.count("APPLICATION_EXTENSION_API_ONLY = YES;") != 2:
         raise SystemExit("The extension must be built extension-API-only in both configurations")
-    if "com.physiqueos.native.dev.WorkoutActivity" not in project or project.count("SKIP_INSTALL = YES;") != 2:
-        raise SystemExit("The extension must set SKIP_INSTALL in both configurations")
-    if project.count("ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;") != 2:
-        raise SystemExit("AppIcon is not wired in both app configurations")
+    if "com.physiqueos.native.dev.WorkoutActivity" not in project or project.count("SKIP_INSTALL = YES;") != 4:
+        raise SystemExit("The extension and Watch app must set SKIP_INSTALL in both configurations")
+    if project.count("ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;") != 4:
+        raise SystemExit("AppIcon is not wired in both iPhone and Watch configurations")
+    if project.count('CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";') != 2:
+        raise SystemExit("Watch HealthKit entitlements are not wired in both configurations")
+    with (WATCH_APP_ICON / "Contents.json").open() as handle:
+        watch_icon_manifest = json.load(handle)
+    watch_icon_files = {entry.get("filename") for entry in watch_icon_manifest.get("images", [])}
+    if len(watch_icon_files - {None}) != 14:
+        raise SystemExit("Watch AppIcon must declare all 14 required generated icon files")
+    if any(not (WATCH_APP_ICON / filename).is_file() for filename in watch_icon_files - {None}):
+        raise SystemExit("Watch AppIcon manifest references a missing generated icon")
     if project.count('CODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";') != 2:
         raise SystemExit("HealthKit entitlements are not wired in both app configurations")
     if project.count('CODE_SIGN_ENTITLEMENTS = "PhysiqueOSLiveActivity/PhysiqueOSLiveActivity.entitlements";') != 2:

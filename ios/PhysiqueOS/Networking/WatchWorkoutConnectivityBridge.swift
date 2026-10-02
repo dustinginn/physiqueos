@@ -41,8 +41,18 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
     func attachToSelectedAuthority() {
         observation?.cancel()
         let authority = environment.trainingSessionAuthority(for: environment.nativeAuthority)
-        observation = authority.observeChanges { [weak self] _ in
-            self?.publishCurrentProjection()
+        observation = authority.observeChanges { [weak self] change in
+            if change.kind == .ended(.cancelled) {
+                self?.publish(
+                    .terminal(
+                        sessionId: change.sessionId,
+                        revision: change.revision,
+                        phase: .cancelled
+                    )
+                )
+            } else {
+                self?.publishCurrentProjection()
+            }
             self?.finishCoordinator.reconcile()
         }
         publishCurrentProjection()
@@ -63,10 +73,13 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
     }
 
     private func publishCurrentProjection() {
+        let router = router()
+        publish(router.currentProjection() ?? router.unavailableProjection())
+    }
+
+    private func publish(_ projection: WatchWorkoutProjection) {
         guard let session, session.activationState == .activated,
-              let projection = router().currentProjection(),
-              let data = try? WatchWorkoutWireCodec.encode(projection)
-        else { return }
+              let data = try? WatchWorkoutWireCodec.encode(projection) else { return }
         try? session.updateApplicationContext([
             WatchWorkoutContract.applicationContextProjectionKey: data
         ])

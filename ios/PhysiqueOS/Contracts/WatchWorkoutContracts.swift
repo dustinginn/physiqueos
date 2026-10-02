@@ -4,9 +4,11 @@ import Foundation
 /// imports neither WatchConnectivity nor HealthKit so both app targets can
 /// compile/test the exact same deterministic contract.
 enum WatchWorkoutContract {
-    static let schemaVersion = 1
+    static let schemaVersion = 2
     static let maximumIdentifierLength = 96
     static let maximumRows = 2
+    // Keep the transport slot stable across schema revisions so the newest
+    // authoritative payload replaces an older cached projection in place.
     static let applicationContextProjectionKey = "physiqueos.watchWorkout.projection.v1"
 }
 
@@ -35,6 +37,7 @@ struct WatchWorkoutCommand: Codable, Equatable, Sendable {
         case requestFinish
         case cancelFinish
         case confirmFinish
+        case cancelWorkout
         case reportHealthSaved
         case reportHealthSaveFailed
         case unknown
@@ -96,7 +99,7 @@ struct WatchWorkoutAcknowledgement: Codable, Equatable, Sendable {
 
 struct WatchWorkoutProjection: Codable, Equatable, Sendable {
     enum Phase: String, WatchWorkoutSafeStringEnum, Sendable {
-        case unavailable, prepared, active, paused, finishing, committed
+        case unavailable, prepared, active, paused, finishing, committed, cancelled
         static let fallback: Self = .unavailable
     }
 
@@ -161,6 +164,42 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
     var metrics: WatchWorkoutMetrics?
     var finish: WatchWorkoutFinishStatus? = nil
     var summary: WatchWorkoutSummary? = nil
+
+    var isTerminalAuthorityState: Bool {
+        phase == .cancelled || phase == .unavailable
+    }
+
+    static func terminal(
+        sessionId: String,
+        revision: Int,
+        phase: Phase,
+        stalenessReason: StalenessReason? = nil
+    ) -> Self {
+        precondition(phase == .cancelled || phase == .unavailable)
+        return .init(
+            schemaVersion: WatchWorkoutContract.schemaVersion,
+            sessionId: sessionId,
+            revision: revision,
+            phase: phase,
+            title: "",
+            completedSets: 0,
+            totalSets: 0,
+            rows: [],
+            rest: nil,
+            canCompleteSet: false,
+            finishEligibility: .unavailable,
+            isFinalPlannedSetTransition: false,
+            startedAt: nil,
+            pausedAt: nil,
+            accumulatedPausedSeconds: 0,
+            elapsedWorkoutSeconds: nil,
+            stalenessReason: stalenessReason,
+            lastAcknowledgedMutationId: nil,
+            metrics: nil,
+            finish: nil,
+            summary: nil
+        )
+    }
 }
 
 struct WatchWorkoutFinishStatus: Codable, Equatable, Sendable {

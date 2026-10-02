@@ -37,6 +37,27 @@ private let outputDirectory = scriptURL
     .deletingLastPathComponent()
     .deletingLastPathComponent()
     .appendingPathComponent("PhysiqueOS/Resources/Assets.xcassets/AppIcon.appiconset")
+private let watchOutputDirectory = scriptURL
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .appendingPathComponent("PhysiqueOSWatch/Assets.xcassets/AppIcon.appiconset")
+
+private let watchOutputs: [IconOutput] = [
+    .init(filename: "AppIcon-24x24@2x.png", pixels: 48),
+    .init(filename: "AppIcon-27.5x27.5@2x.png", pixels: 55),
+    .init(filename: "AppIcon-29x29@2x.png", pixels: 58),
+    .init(filename: "AppIcon-29x29@3x.png", pixels: 87),
+    .init(filename: "AppIcon-40x40@2x.png", pixels: 80),
+    .init(filename: "AppIcon-44x44@2x.png", pixels: 88),
+    .init(filename: "AppIcon-46x46@2x.png", pixels: 92),
+    .init(filename: "AppIcon-50x50@2x.png", pixels: 100),
+    .init(filename: "AppIcon-51x51@2x.png", pixels: 102),
+    .init(filename: "AppIcon-54x54@2x.png", pixels: 108),
+    .init(filename: "AppIcon-86x86@2x.png", pixels: 172),
+    .init(filename: "AppIcon-98x98@2x.png", pixels: 196),
+    .init(filename: "AppIcon-108x108@2x.png", pixels: 216),
+    .init(filename: "AppIcon-1024x1024@1x.png", pixels: 1024),
+]
 
 private func makeIcon(pixels: Int) throws -> Data {
     let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -119,4 +140,10 @@ for output in outputs {
     let data = try makeIcon(pixels: output.pixels)
     try data.write(to: outputDirectory.appendingPathComponent(output.filename), options: .atomic)
     print("\(output.filename): \(output.pixels)x\(output.pixels)")
+}
+
+for output in watchOutputs {
+    let data = try makeIcon(pixels: output.pixels)
+    try data.write(to: watchOutputDirectory.appendingPathComponent(output.filename), options: .atomic)
+    print("Watch \(output.filename): \(output.pixels)x\(output.pixels)")
 }

@@ -30,7 +30,7 @@ struct WatchWorkoutRootView: View {
                     execution(projection)
                 case .committed:
                     WatchWorkoutSummaryView(store: store, projection: projection)
-                case .unavailable:
+                case .unavailable, .cancelled:
                     unavailable
                 }
             } else {
@@ -322,14 +322,24 @@ struct WatchWorkoutControlsView: View {
         ScrollView {
         VStack(spacing: 8) {
             Text("WORKOUT CONTROLS").font(.system(size: 9, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.muted)
-            if store.projection?.finishEligibility == .confirmable {
+            if store.cancelConfirmationVisible {
+                Text("Cancel this workout?")
+                    .font(.headline).multilineTextAlignment(.center)
+                Text("This discards the workout. Completed sets will not be saved to training history.")
+                    .font(.caption2).foregroundStyle(WatchPhysiqueOSTheme.muted).multilineTextAlignment(.center)
+                Button("Keep Workout") { store.dismissCancelWorkout() }
+                    .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.purple)
+                Button("Cancel Workout", role: .destructive) { store.confirmCancelWorkout() }
+                    .buttonStyle(.borderedProminent).tint(WatchPhysiqueOSTheme.destructive)
+                    .disabled(store.isMutationPending || store.connectionState != .reachable)
+            } else if store.projection?.finishEligibility == .confirmable {
                 let remaining = max(0, (store.projection?.totalSets ?? 0) - (store.projection?.completedSets ?? 0))
                 Text(remaining == 0
                      ? "Finish this workout?"
                      : "Finish with \(remaining) incomplete set\(remaining == 1 ? "" : "s")? Only completed sets count.")
                     .font(.caption2).foregroundStyle(WatchPhysiqueOSTheme.muted).multilineTextAlignment(.center)
                 HStack {
-                    Button("Cancel") { store.cancelFinish() }
+                    Button("Not Yet") { store.cancelFinish() }
                     Button("Finish", role: .destructive) { store.confirmFinish() }
                 }
                 .disabled(store.isMutationPending)
@@ -338,6 +348,9 @@ struct WatchWorkoutControlsView: View {
                     .buttonStyle(.borderedProminent).tint(WatchPhysiqueOSTheme.purple)
                     .disabled(store.isMutationPending || store.connectionState != .reachable)
                 Button("Finish Workout", role: .destructive) { store.requestFinish() }
+                    .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.destructive)
+                    .disabled(store.isMutationPending || store.connectionState != .reachable)
+                Button("Cancel Workout", role: .destructive) { store.requestCancelWorkout() }
                     .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.destructive)
                     .disabled(store.isMutationPending || store.connectionState != .reachable)
                 if store.notice == .healthStartFailed {

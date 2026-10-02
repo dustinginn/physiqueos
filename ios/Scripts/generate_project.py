@@ -479,6 +479,7 @@ watch_test_files = [
 ]
 WATCH_PLIST = ("PhysiqueOSWatch", "Info.plist")
 WATCH_ENTITLEMENTS = ("PhysiqueOSWatch", "PhysiqueOSWatch.entitlements")
+WATCH_ASSETS = ("PhysiqueOSWatch", "Assets.xcassets")
 WATCH_FRAMEWORKS = ["HealthKit.framework", "WatchConnectivity.framework"]
 WATCH_APP_BLOCK = 0x18FF
 
@@ -598,7 +599,7 @@ WATCH_DEPLOYMENT_TARGET = "11.0"
 # One authoritative TestFlight build number. Increment this value, run this
 # generator, then build/archive. Never edit CURRENT_PROJECT_VERSION in the
 # generated project by hand.
-APP_BUILD_NUMBER = 81
+APP_BUILD_NUMBER = 82
 
 # The Founder's existing, paid Apple Developer Program team ("DUSTIN JOSEPH
 # GINN" in Xcode's Signing & Capabilities UI). Recovered from a real Xcode
@@ -802,8 +803,9 @@ for group, fname in watch_app_files + watch_shared_files:
     I(f"buildfile:watch:{group}/{fname}")
 for group, fname in watch_test_files:
     I(f"buildfile:watchtest:{group}/{fname}")
-for item in (WATCH_PLIST, WATCH_ENTITLEMENTS):
+for item in (WATCH_PLIST, WATCH_ENTITLEMENTS, WATCH_ASSETS):
     I(f"fileref:{item[0]}/{item[1]}")
+I(f"buildfile:watch:{WATCH_ASSETS[0]}/{WATCH_ASSETS[1]}")
 I("group:PhysiqueOSWatch")
 I("group:PhysiqueOSWatchTests")
 I("fileref:PhysiqueOSWatch.app")
@@ -1622,7 +1624,7 @@ for group, fname in watch_phase1a_phone_files + watch_phase1a_phone_test_files +
         f"\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */ = "
         f"{{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};"
     )
-for group, fname in (WATCH_PLIST, WATCH_ENTITLEMENTS):
+for group, fname in (WATCH_PLIST, WATCH_ENTITLEMENTS, WATCH_ASSETS):
     fileref_lines.append(
         f"\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */ = "
         f"{{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};"
@@ -1647,6 +1649,10 @@ buildfile_lines.append(
     f"\t\t{I('buildfile:embed:watch')} /* PhysiqueOSWatch.app in Embed Watch Content */ = "
     f"{{isa = PBXBuildFile; fileRef = {_watch_app_ref} /* PhysiqueOSWatch.app */; settings = {{ATTRIBUTES = (RemoveHeadersOnCopy, ); }}; }};"
 )
+buildfile_lines.append(
+    f"\t\t{I(f'buildfile:watch:{WATCH_ASSETS[0]}/{WATCH_ASSETS[1]}')} /* {WATCH_ASSETS[1]} in Resources */ = "
+    f"{{isa = PBXBuildFile; fileRef = {I(f'fileref:{WATCH_ASSETS[0]}/{WATCH_ASSETS[1]}')} /* {WATCH_ASSETS[1]} */; }};"
+)
 
 def _append_group_child(group_key, child_line):
     indexes = [i for i, line in enumerate(group_lines) if line.startswith(f"\t\t{I(group_key)} ")]
@@ -1657,7 +1663,7 @@ for group, fname in watch_phase1a_phone_files:
     _append_group_child("group:Networking", f"\t\t\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */,\n")
 for group, fname in watch_phase1a_phone_test_files:
     _append_group_child("group:PhysiqueOSTests", f"\t\t\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */,\n")
-group_lines.append(_group_block("PhysiqueOSWatch", watch_app_files, [WATCH_PLIST, WATCH_ENTITLEMENTS]))
+group_lines.append(_group_block("PhysiqueOSWatch", watch_app_files, [WATCH_PLIST, WATCH_ENTITLEMENTS, WATCH_ASSETS]))
 group_lines.append(_group_block("PhysiqueOSWatchTests", watch_test_files))
 _append_group_child("group:main", f"\t\t\t\t{I('group:PhysiqueOSWatch')} /* PhysiqueOSWatch */,\n\t\t\t\t{I('group:PhysiqueOSWatchTests')} /* PhysiqueOSWatchTests */,\n")
 _append_group_child("group:products", f"\t\t\t\t{_watch_app_ref} /* PhysiqueOSWatch.app */,\n\t\t\t\t{_watch_test_ref} /* PhysiqueOSWatchTests.xctest */,\n")
@@ -1724,7 +1730,9 @@ resources_phases += f"""
 \t\t{I('watchResourcesPhase')} /* Resources */ = {{
 \t\t\tisa = PBXResourcesBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
-\t\t\tfiles = ();
+\t\t\tfiles = (
+\t\t\t\t{I(f'buildfile:watch:{WATCH_ASSETS[0]}/{WATCH_ASSETS[1]}')} /* {WATCH_ASSETS[1]} in Resources */,
+\t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};
 \t\t{I('watchTestResourcesPhase')} /* Resources */ = {{
@@ -1847,6 +1855,7 @@ assert project_obj.count(_ext_target_entry) == 1
 project_obj = project_obj.replace(_ext_target_entry, _ext_target_entry + f"\t\t\t\t{I('watchTarget')} /* PhysiqueOSWatch */,\n\t\t\t\t{I('watchTestTarget')} /* PhysiqueOSWatchTests */,\n", 1)
 
 watch_common = f"""
+\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 \t\t\t\tCODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
 \t\t\t\tCODE_SIGN_STYLE = Automatic;
 \t\t\t\tCURRENT_PROJECT_VERSION = {APP_BUILD_NUMBER};

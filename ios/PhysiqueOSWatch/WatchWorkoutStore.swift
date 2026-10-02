@@ -36,6 +36,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     private(set) var connectionState: ConnectionState = .activating
     private(set) var notice: Notice?
     private(set) var controlsVisible = false
+    private(set) var cancelConfirmationVisible = false
     private(set) var debugSurface: String?
     private(set) var gate = WatchWorkoutCommandDeliveryGate()
     let health = WatchWorkoutHealthController()
@@ -44,6 +45,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     private var installed = false
     private var pendingHealthReport: (operationId: String, succeeded: Bool)?
     private var countdownHapticTask: Task<Void, Never>?
+    private var terminalSessionIds: Set<String> = []
+    private var authoritativeTerminalReceived = false
 
     override convenience init() {
         self.init(session: WCSession.isSupported() ? .default : nil)
@@ -91,6 +94,13 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     }
 
     func setControlsVisible(_ visible: Bool) { controlsVisible = visible }
+
+    func requestCancelWorkout() { cancelConfirmationVisible = true }
+    func dismissCancelWorkout() { cancelConfirmationVisible = false }
+    func confirmCancelWorkout() {
+        cancelConfirmationVisible = false
+        issue(.cancelWorkout)
+    }
 
     func refresh() {
         issue(.refreshProjection)
@@ -200,8 +210,16 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         let command = gate.pending
         let kind = command?.kind
         let matched = gate.acknowledge(acknowledgement)
+        let isTerminal = acknowledgement.projection?.isTerminalAuthorityState == true
         if let incoming = acknowledgement.projection { apply(incoming) }
         guard matched else { return }
+        if isTerminal {
+            if kind == .cancelWorkout,
+               acknowledgement.status == .applied || acknowledgement.status == .unchanged {
+                WKInterfaceDevice.current().play(.success)
+            }
+            return
+        }
 
         switch acknowledgement.status {
         case .applied, .unchanged:
@@ -284,13 +302,36 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         )
     }
 
-    private func apply(_ incoming: WatchWorkoutProjection) {
+    func apply(_ incoming: WatchWorkoutProjection) {
+        guard incoming.schemaVersion == WatchWorkoutContract.schemaVersion else { return }
+        if incoming.isTerminalAuthorityState {
+            let endedSessionId = incoming.sessionId == "current" ? projection?.sessionId : incoming.sessionId
+            if let endedSessionId { terminalSessionIds.insert(endedSessionId) }
+            authoritativeTerminalReceived = true
+            projection = nil
+            controlsVisible = false
+            cancelConfirmationVisible = false
+            notice = nil
+            gate.reset()
+            pendingHealthReport = nil
+            countdownHapticTask?.cancel()
+            countdownHapticTask = nil
+            connectionState = session?.isReachable == true ? .reachable : .phoneUnavailable
+            Task { [weak self] in
+                guard let self else { return }
+                await health.cancel()
+                if incoming.phase == .cancelled { refresh() }
+            }
+            return
+        }
+        guard !terminalSessionIds.contains(incoming.sessionId) else { return }
         if let current = projection,
            current.sessionId == incoming.sessionId,
            incoming.revision < current.revision {
             return
         }
         projection = incoming
+        authoritativeTerminalReceived = false
         connectionState = session?.isReachable == true ? .reachable : .phoneUnavailable
         scheduleCountdownHaptics(for: incoming)
     }
@@ -335,6 +376,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     private func recoverHealthKitIfNeeded() async {
         do {
             try await health.recover(structuredSessionId: projection?.sessionId)
+            if authoritativeTerminalReceived {
+                await health.cancel()
+                return
+            }
             refresh()
         } catch {
             // No recoverable session is the normal cold-launch state.

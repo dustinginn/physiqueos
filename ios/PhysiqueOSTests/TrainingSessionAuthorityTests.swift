@@ -242,7 +242,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(authority.setReadyForWatch(sessionId: "session-1", ready: true), .applied(revision: 1))
         let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
         let start = WatchWorkoutCommand(
-            schemaVersion: 1, commandId: "start-once", mutationId: "start-once",
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "start-once", mutationId: "start-once",
             kind: .startPreparedWorkout, sessionId: "session-1", expectedRevision: 1,
             exerciseId: nil, setId: nil, issuedAt: clock.now
         )
@@ -260,7 +260,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
         let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
         let complete = WatchWorkoutCommand(
-            schemaVersion: 1, commandId: "complete-once", mutationId: "complete-once",
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "complete-once", mutationId: "complete-once",
             kind: .completeSet, sessionId: "session-1", expectedRevision: 0,
             exerciseId: "bench", setId: "b1", issuedAt: clock.now
         )
@@ -274,7 +274,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     func testSimultaneousPhoneAndWatchCompleteFailsWatchStaleWithoutAdvancingAnotherSet() {
         let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
         let watch = WatchWorkoutCommand(
-            schemaVersion: 1, commandId: "watch-complete", mutationId: "watch-complete",
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "watch-complete", mutationId: "watch-complete",
             kind: .completeSet, sessionId: "session-1", expectedRevision: 0,
             exerciseId: "bench", setId: "b1", issuedAt: clock.now
         )
@@ -297,7 +297,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         let (authority, clock) = makeAuthority(store)
         let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
         let first = WatchWorkoutCommand(
-            schemaVersion: 1, commandId: "command-1", mutationId: "mutation-1", kind: .completeSet,
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "command-1", mutationId: "mutation-1", kind: .completeSet,
             sessionId: "session-1", expectedRevision: 0, exerciseId: "bench", setId: "b1", issuedAt: clock.now
         )
         let accepted = router.route(first)
@@ -306,7 +306,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(accepted.projection?.lastAcknowledgedMutationId, "mutation-1")
 
         let stale = WatchWorkoutCommand(
-            schemaVersion: 1, commandId: "command-2", mutationId: "mutation-2", kind: .completeSet,
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "command-2", mutationId: "mutation-2", kind: .completeSet,
             sessionId: "session-1", expectedRevision: 0, exerciseId: "bench", setId: "b2", issuedAt: clock.now
         )
         let refused = router.route(stale)
@@ -401,7 +401,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         _ = authority.confirmFinish(sessionId: "session-1", finishOperationId: "finish-one")
         let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
         let stale = WatchWorkoutCommand(
-            schemaVersion: 1, commandId: "health-stale", mutationId: "health-stale",
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "health-stale", mutationId: "health-stale",
             kind: .reportHealthSaved, sessionId: "session-1", expectedRevision: 1,
             exerciseId: nil, setId: nil, finishOperationId: "finish-one", issuedAt: clock.now
         )
@@ -415,6 +415,113 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(router.route(accepted).status, .applied)
         XCTAssertEqual(router.route(accepted).status, .unchanged)
         XCTAssertEqual(authority.draft(id: "session-1")?.watchHealthSaveState, .succeeded)
+    }
+
+    func testWatchCancelActiveIsCanonicalTerminalAndDuplicateIsIdempotent() {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        let cancel = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion,
+            commandId: "cancel-active", mutationId: "cancel-active", kind: .cancelWorkout,
+            sessionId: "session-1", expectedRevision: 0,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+
+        let accepted = router.route(cancel)
+        XCTAssertEqual(accepted.status, .applied)
+        XCTAssertEqual(accepted.projection?.phase, .cancelled)
+        XCTAssertNil(authority.draft(id: "session-1"))
+        XCTAssertTrue(store.drafts.isEmpty)
+        XCTAssertTrue(authority.pendingCompletions.isEmpty)
+
+        let replayed = router.route(cancel)
+        XCTAssertEqual(replayed.status, .unchanged)
+        XCTAssertEqual(replayed.projection?.phase, .cancelled)
+        XCTAssertEqual(store.discardCount, 1, "A lost acknowledgement retry cannot discard twice.")
+    }
+
+    func testWatchCancelPausedDoesNotRequireResume() {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        XCTAssertEqual(authority.pause(sessionId: "session-1"), .applied(revision: 1))
+        let cancel = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion,
+            commandId: "cancel-paused", mutationId: "cancel-paused", kind: .cancelWorkout,
+            sessionId: "session-1", expectedRevision: 1,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+
+        let response = WatchWorkoutCommandRouter(
+            authority: authority, isPhoneReachable: { true }, now: { clock.now }
+        ).route(cancel)
+        XCTAssertEqual(response.status, .applied)
+        XCTAssertEqual(response.projection?.phase, .cancelled)
+        XCTAssertNil(authority.draft(id: "session-1"))
+    }
+
+    func testWatchCancelWithStaleRevisionFailsClosedWithoutDiscarding() {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        _ = authority.pause(sessionId: "session-1")
+        let staleCancel = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion,
+            commandId: "cancel-stale", mutationId: "cancel-stale", kind: .cancelWorkout,
+            sessionId: "session-1", expectedRevision: 0,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+
+        let response = WatchWorkoutCommandRouter(
+            authority: authority, isPhoneReachable: { true }, now: { clock.now }
+        ).route(staleCancel)
+        XCTAssertEqual(response.status, .stale)
+        XCTAssertEqual(response.reason, .staleRevision)
+        XCTAssertEqual(response.projection?.phase, .paused)
+        XCTAssertNotNil(authority.draft(id: "session-1"))
+        XCTAssertEqual(store.discardCount, 0)
+    }
+
+    func testPhoneCancelRefreshPublishesTerminalProjectionInsteadOfStaleWorkout() {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        _ = authority.endSession(sessionId: "session-1", reason: .cancelled)
+        let refresh = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion,
+            commandId: "refresh-after-phone-cancel", mutationId: "refresh-after-phone-cancel",
+            kind: .refreshProjection, sessionId: "session-1", expectedRevision: 0,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+
+        let response = WatchWorkoutCommandRouter(
+            authority: authority, isPhoneReachable: { true }, now: { clock.now }
+        ).route(refresh)
+        XCTAssertEqual(response.status, .unchanged)
+        XCTAssertEqual(response.projection?.phase, .cancelled)
+        XCTAssertTrue(response.projection?.rows.isEmpty == true)
+        XCTAssertNil(response.projection?.rest)
+        XCTAssertNil(response.projection?.metrics)
+    }
+
+    func testCancelAfterCompletedSetCreatesNoPerformedTrainingEvidence() {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        XCTAssertEqual(
+            authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1"),
+            .applied(revision: 1)
+        )
+        let cancel = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion,
+            commandId: "cancel-partial", mutationId: "cancel-partial", kind: .cancelWorkout,
+            sessionId: "session-1", expectedRevision: 1,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+        let response = WatchWorkoutCommandRouter(
+            authority: authority, isPhoneReachable: { true }, now: { clock.now }
+        ).route(cancel)
+
+        XCTAssertEqual(response.status, .applied)
+        XCTAssertNil(authority.draft(id: "session-1"))
+        XCTAssertTrue(authority.pendingCompletions.isEmpty)
+        XCTAssertTrue(store.drafts.isEmpty, "Cancel cannot retain a source for volume, PRs, history, or performance records.")
     }
 
     func testWatchMetricsTotalRequiresActiveAndBasalEnergy() {

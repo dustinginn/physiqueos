@@ -28,7 +28,7 @@ final class WatchWorkoutReducerTests: XCTestCase {
 
     func testGateRequiresMatchingAcknowledgement() {
         let command = WatchWorkoutCommand(
-            schemaVersion: 1,
+            schemaVersion: WatchWorkoutContract.schemaVersion,
             commandId: "command",
             mutationId: "mutation",
             kind: .pause,
@@ -41,7 +41,7 @@ final class WatchWorkoutReducerTests: XCTestCase {
         var gate = WatchWorkoutCommandDeliveryGate()
         XCTAssertTrue(gate.begin(command))
         XCTAssertFalse(gate.acknowledge(.init(
-            schemaVersion: 1,
+            schemaVersion: WatchWorkoutContract.schemaVersion,
             commandId: "late-command",
             mutationId: "late-mutation",
             status: .applied,
@@ -58,5 +58,65 @@ final class WatchWorkoutReducerTests: XCTestCase {
         XCTAssertNil(metrics.totalCalories)
         metrics.basalCalories = 20
         XCTAssertEqual(metrics.totalCalories, 100)
+    }
+
+    @MainActor
+    func testCancelConfirmationCanBeDismissedWithoutChangingWorkout() throws {
+        let store = WatchWorkoutStore(session: nil)
+        let active = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("normal")?.projection)
+        store.apply(active)
+        store.setControlsVisible(true)
+
+        store.requestCancelWorkout()
+        XCTAssertTrue(store.cancelConfirmationVisible)
+        store.dismissCancelWorkout()
+
+        XCTAssertFalse(store.cancelConfirmationVisible)
+        XCTAssertEqual(store.projection?.sessionId, active.sessionId)
+        XCTAssertTrue(store.controlsVisible)
+    }
+
+    @MainActor
+    func testTerminalCancellationClearsExecutionControlsMetricsAndPendingPresentation() async throws {
+        let store = WatchWorkoutStore(session: nil)
+        let active = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("paused")?.projection)
+        store.apply(active)
+        store.setControlsVisible(true)
+        store.requestCancelWorkout()
+        store.health.installDebugMetrics(
+            heartRate: 68, activeCalories: 21, basalCalories: 9, averageHeartRate: 70
+        )
+
+        store.apply(.terminal(
+            sessionId: active.sessionId,
+            revision: active.revision,
+            phase: .cancelled
+        ))
+        await Task.yield()
+
+        XCTAssertNil(store.projection)
+        XCTAssertFalse(store.controlsVisible)
+        XCTAssertFalse(store.cancelConfirmationVisible)
+        XCTAssertNil(store.notice)
+        XCTAssertNil(store.health.currentHeartRateBPM)
+        XCTAssertNil(store.health.activeCalories)
+        XCTAssertNil(store.health.basalCalories)
+        XCTAssertEqual(store.health.lifecycle, .cancelled)
+
+        var late = active
+        late.revision += 1
+        store.apply(late)
+        XCTAssertNil(store.projection, "A delayed pre-cancel projection cannot resurrect the workout.")
+
+        var prepared = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("start")?.projection)
+        prepared.sessionId = "next-prepared-session"
+        store.apply(prepared)
+        XCTAssertEqual(store.projection?.sessionId, "next-prepared-session")
+        XCTAssertEqual(store.projection?.phase, .prepared)
+    }
+
+    @MainActor
+    func testHealthKitCancelPolicyDiscardsInsteadOfSavingWorkout() {
+        XCTAssertEqual(WatchWorkoutHealthController.cancellationDisposition, .discard)
     }
 }

@@ -275,6 +275,35 @@ final class WorkoutLiveActivityCoordinatorTests: XCTestCase {
         XCTAssertNil(h.client.ends.last?.state)
     }
 
+    func testWatchCancelCommandEndsLiveActivityWithoutSavedState() async {
+        let h = harness(drafts: [liveDraft()])
+        await settle(h)
+        let command = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion,
+            commandId: "watch-cancel-live-activity",
+            mutationId: "watch-cancel-live-activity",
+            kind: .cancelWorkout,
+            sessionId: "session-1",
+            expectedRevision: h.authority.draft(id: "session-1")?.currentRevision ?? 0,
+            exerciseId: nil,
+            setId: nil,
+            issuedAt: F.now
+        )
+
+        let response = WatchWorkoutCommandRouter(
+            authority: h.authority,
+            isPhoneReachable: { true },
+            now: { F.now }
+        ).route(command)
+        await settle(h)
+
+        XCTAssertEqual(response.status, .applied)
+        XCTAssertEqual(response.projection?.phase, .cancelled)
+        XCTAssertTrue(h.client.live.isEmpty)
+        XCTAssertEqual(h.client.ends.last?.dismissal, .immediate)
+        XCTAssertNil(h.client.ends.last?.state)
+    }
+
     func testDurableCommitShowsSavedThenDismissesAfterFifteenMinutes() async throws {
         let h = harness(drafts: [liveDraft()])
         await settle(h)

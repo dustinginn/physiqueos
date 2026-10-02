@@ -29,6 +29,10 @@ final class TrainingSessionAuthority {
     /// Sessions ended in this process. A late whole-draft write can never
     /// bring one back.
     @ObservationIgnored private var endedSessionIds: Set<String> = []
+    /// In-process command tombstones make a lost Watch Cancel acknowledgement
+    /// replay idempotent after the draft itself has been removed. A cold phone
+    /// launch still fails closed with an explicit terminal projection.
+    @ObservationIgnored private var cancelledMutationIdsBySession: [String: String] = [:]
 
     /// Every saved (editable) draft for this authority, newest first (store
     /// order). Pending completion presentations are held separately.
@@ -410,6 +414,52 @@ final class TrainingSessionAuthority {
     @discardableResult
     func endSession(sessionId: String, reason: TrainingSessionEndReason) -> TrainingSessionMutationOutcome {
         endSession(sessionId: sessionId, reason: reason, retainingPresentation: false)
+    }
+
+    /// Canonical Watch Cancel boundary. It validates the same revision and
+    /// mutation identity rules as every Watch mutation, then delegates to the
+    /// existing phone Cancel semantics: remove the draft without creating a
+    /// performed projection, completion presentation, or durable commit.
+    @discardableResult
+    func cancelWorkout(
+        sessionId: String,
+        context: TrainingSessionMutationContext
+    ) -> TrainingSessionMutationOutcome {
+        guard canWrite else { return .rejected(.writesNotAuthorized) }
+        guard let current = draft(id: sessionId) else {
+            if cancelledMutationIdsBySession[sessionId] == context.mutationId {
+                return .duplicate(revision: lastChange?.revision ?? 0)
+            }
+            return .rejected(endedSessionIds.contains(sessionId) ? .sessionEnded : .sessionNotFound)
+        }
+        guard context.origin == .intent, let expectedRevision = context.expectedRevision else {
+            return .rejected(.revisionRequired)
+        }
+        if current.appliedMutationIds?.contains(context.mutationId ?? "") == true {
+            return .duplicate(revision: current.currentRevision)
+        }
+        guard expectedRevision == current.currentRevision else {
+            return .rejected(.staleRevision(current: current.currentRevision))
+        }
+        guard current.mode == .live, current.leftAt == nil,
+              current.finishedAt == nil, current.submissionState == nil,
+              !submittingSessionIds.contains(sessionId)
+        else { return .rejected(.sessionNotMutable) }
+
+        if let mutationId = context.mutationId {
+            cancelledMutationIdsBySession[sessionId] = mutationId
+        }
+        let outcome = endSession(sessionId: sessionId, reason: .cancelled)
+        if case .rejected = outcome { cancelledMutationIdsBySession[sessionId] = nil }
+        return outcome
+    }
+
+    func isCancelled(sessionId: String, mutationId: String? = nil) -> Bool {
+        guard lastChange?.sessionId == sessionId,
+              lastChange?.kind == .ended(.cancelled)
+        else { return false }
+        guard let mutationId else { return true }
+        return cancelledMutationIdsBySession[sessionId] == mutationId
     }
 
     /// A durable commit. Ends the session exactly like

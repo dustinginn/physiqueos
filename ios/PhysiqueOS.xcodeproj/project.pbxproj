@@ -427,9 +427,10 @@
 		000000000000000000001910 /* WatchWorkoutPreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001907 /* WatchWorkoutPreviewFixtures.swift */; };
 		000000000000000000001911 /* WatchWorkoutContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001506 /* WatchWorkoutContracts.swift */; };
 		000000000000000000001912 /* WatchWorkoutReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001908 /* WatchWorkoutReducerTests.swift */; };
-		000000000000000000001919 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
-		00000000000000000000191A /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B4 /* WatchConnectivity.framework */; };
-		000000000000000000001923 /* PhysiqueOSWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 000000000000000000001917 /* PhysiqueOSWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		00000000000000000000191B /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
+		00000000000000000000191C /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B4 /* WatchConnectivity.framework */; };
+		000000000000000000001925 /* PhysiqueOSWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 000000000000000000001919 /* PhysiqueOSWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		000000000000000000001916 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001915 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -454,18 +455,18 @@
 			remoteGlobalIDString = 000000000000000000001637;
 			remoteInfo = PhysiqueOSLiveActivity;
 		};
-		000000000000000000001925 /* PBXContainerItemProxy */ = {
+		000000000000000000001927 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 000000000000000000001282 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 00000000000000000000191B;
+			remoteGlobalIDString = 00000000000000000000191D;
 			remoteInfo = PhysiqueOSWatch;
 		};
-		00000000000000000000192E /* PBXContainerItemProxy */ = {
+		000000000000000000001930 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 000000000000000000001282 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 00000000000000000000191B;
+			remoteGlobalIDString = 00000000000000000000191D;
 			remoteInfo = PhysiqueOSWatch;
 		};
 /* End PBXContainerItemProxy section */
@@ -482,13 +483,13 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001922 /* Embed Watch Content */ = {
+		000000000000000000001924 /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
-				000000000000000000001923 /* PhysiqueOSWatch.app in Embed Watch Content */,
+				000000000000000000001925 /* PhysiqueOSWatch.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -917,8 +918,9 @@
 		000000000000000000001908 /* WatchWorkoutReducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutReducerTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001913 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		000000000000000000001914 /* PhysiqueOSWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "PhysiqueOSWatch.entitlements"; sourceTree = "<group>"; };
-		000000000000000000001917 /* PhysiqueOSWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOSWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000001918 /* PhysiqueOSWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001915 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
+		000000000000000000001919 /* PhysiqueOSWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOSWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		00000000000000000000191A /* PhysiqueOSWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -954,16 +956,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001920 /* Frameworks */ = {
+		000000000000000000001922 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001919 /* HealthKit.framework in Frameworks */,
-				00000000000000000000191A /* WatchConnectivity.framework in Frameworks */,
+				00000000000000000000191B /* HealthKit.framework in Frameworks */,
+				00000000000000000000191C /* WatchConnectivity.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000192B /* Frameworks */ = {
+		00000000000000000000192D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = ();
@@ -1549,8 +1551,8 @@
 		000000000000000000001269 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001917 /* PhysiqueOSWatch.app */,
-				000000000000000000001918 /* PhysiqueOSWatchTests.xctest */,
+				000000000000000000001919 /* PhysiqueOSWatch.app */,
+				00000000000000000000191A /* PhysiqueOSWatchTests.xctest */,
 				000000000000000000001280 /* PhysiqueOS.app */,
 				000000000000000000001281 /* PhysiqueOSTests.xctest */,
 				00000000000000000000129A /* PhysiqueOSUITests.xctest */,
@@ -1562,8 +1564,8 @@
 		000000000000000000001268 /* Main */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001915 /* PhysiqueOSWatch */,
-				000000000000000000001916 /* PhysiqueOSWatchTests */,
+				000000000000000000001917 /* PhysiqueOSWatch */,
+				000000000000000000001918 /* PhysiqueOSWatchTests */,
 				00000000000000000000126A /* PhysiqueOS */,
 				00000000000000000000126B /* PhysiqueOSTests */,
 				00000000000000000000129B /* PhysiqueOSUITests */,
@@ -1599,7 +1601,7 @@
 			path = PhysiqueOSLiveActivity;
 			sourceTree = "<group>";
 		};
-		000000000000000000001915 /* PhysiqueOSWatch */ = {
+		000000000000000000001917 /* PhysiqueOSWatch */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001903 /* PhysiqueOSWatchApp.swift */,
@@ -1609,11 +1611,12 @@
 				000000000000000000001907 /* WatchWorkoutPreviewFixtures.swift */,
 				000000000000000000001913 /* Info.plist */,
 				000000000000000000001914 /* PhysiqueOSWatch.entitlements */,
+				000000000000000000001915 /* Assets.xcassets */,
 			);
 			path = PhysiqueOSWatch;
 			sourceTree = "<group>";
 		};
-		000000000000000000001916 /* PhysiqueOSWatchTests */ = {
+		000000000000000000001918 /* PhysiqueOSWatchTests */ = {
 			isa = PBXGroup;
 			children = (
 				000000000000000000001908 /* WatchWorkoutReducerTests.swift */,
@@ -1632,13 +1635,13 @@
 				00000000000000000000128B /* Frameworks */,
 				00000000000000000000128C /* Resources */,
 				00000000000000000000163E /* Embed Foundation Extensions */,
-				000000000000000000001922 /* Embed Watch Content */,
+				000000000000000000001924 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				000000000000000000001640 /* PBXTargetDependency */,
-				000000000000000000001924 /* PBXTargetDependency */,
+				000000000000000000001926 /* PBXTargetDependency */,
 			);
 			name = PhysiqueOS;
 			productName = PhysiqueOS;
@@ -1698,34 +1701,34 @@
 			productReference = 000000000000000000001632 /* PhysiqueOSLiveActivity.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
-		00000000000000000000191B /* PhysiqueOSWatch */ = {
+		00000000000000000000191D /* PhysiqueOSWatch */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 00000000000000000000191C /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */;
+			buildConfigurationList = 00000000000000000000191E /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */;
 			buildPhases = (
-				00000000000000000000191F /* Sources */,
-				000000000000000000001920 /* Frameworks */,
-				000000000000000000001921 /* Resources */,
+				000000000000000000001921 /* Sources */,
+				000000000000000000001922 /* Frameworks */,
+				000000000000000000001923 /* Resources */,
 			);
 			buildRules = ();
 			dependencies = ();
 			name = PhysiqueOSWatch;
 			productName = PhysiqueOSWatch;
-			productReference = 000000000000000000001917 /* PhysiqueOSWatch.app */;
+			productReference = 000000000000000000001919 /* PhysiqueOSWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
-		000000000000000000001926 /* PhysiqueOSWatchTests */ = {
+		000000000000000000001928 /* PhysiqueOSWatchTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001927 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */;
+			buildConfigurationList = 000000000000000000001929 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */;
 			buildPhases = (
-				00000000000000000000192A /* Sources */,
-				00000000000000000000192B /* Frameworks */,
-				00000000000000000000192C /* Resources */,
+				00000000000000000000192C /* Sources */,
+				00000000000000000000192D /* Frameworks */,
+				00000000000000000000192E /* Resources */,
 			);
 			buildRules = ();
-			dependencies = (00000000000000000000192D /* PBXTargetDependency */,);
+			dependencies = (00000000000000000000192F /* PBXTargetDependency */,);
 			name = PhysiqueOSWatchTests;
 			productName = PhysiqueOSWatchTests;
-			productReference = 000000000000000000001918 /* PhysiqueOSWatchTests.xctest */;
+			productReference = 00000000000000000000191A /* PhysiqueOSWatchTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -1752,12 +1755,12 @@
 					000000000000000000001637 = {
 						CreatedOnToolsVersion = 27.0;
 					};
-					00000000000000000000191B = {
+					00000000000000000000191D = {
 						CreatedOnToolsVersion = 27.0;
 					};
-					000000000000000000001926 = {
+					000000000000000000001928 = {
 						CreatedOnToolsVersion = 27.0;
-						TestTargetID = 00000000000000000000191B;
+						TestTargetID = 00000000000000000000191D;
 					};
 				};
 			};
@@ -1778,8 +1781,8 @@
 				00000000000000000000128D /* PhysiqueOSTests */,
 				00000000000000000000129C /* PhysiqueOSUITests */,
 				000000000000000000001637 /* PhysiqueOSLiveActivity */,
-				00000000000000000000191B /* PhysiqueOSWatch */,
-				000000000000000000001926 /* PhysiqueOSWatchTests */,
+				00000000000000000000191D /* PhysiqueOSWatch */,
+				000000000000000000001928 /* PhysiqueOSWatchTests */,
 			);
 		};
 /* End PBXProject section */
@@ -1833,13 +1836,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001921 /* Resources */ = {
+		000000000000000000001923 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+				000000000000000000001916 /* Assets.xcassets in Resources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000192C /* Resources */ = {
+		00000000000000000000192E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = ();
@@ -2264,7 +2269,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000191F /* Sources */ = {
+		000000000000000000001921 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -2277,7 +2282,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000192A /* Sources */ = {
+		00000000000000000000192C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -2303,15 +2308,15 @@
 			target = 000000000000000000001637 /* PhysiqueOSLiveActivity */;
 			targetProxy = 000000000000000000001641 /* PBXContainerItemProxy */;
 		};
-		000000000000000000001924 /* PBXTargetDependency */ = {
+		000000000000000000001926 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 00000000000000000000191B /* PhysiqueOSWatch */;
-			targetProxy = 000000000000000000001925 /* PBXContainerItemProxy */;
+			target = 00000000000000000000191D /* PhysiqueOSWatch */;
+			targetProxy = 000000000000000000001927 /* PBXContainerItemProxy */;
 		};
-		00000000000000000000192D /* PBXTargetDependency */ = {
+		00000000000000000000192F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 00000000000000000000191B /* PhysiqueOSWatch */;
-			targetProxy = 00000000000000000000192E /* PBXContainerItemProxy */;
+			target = 00000000000000000000191D /* PhysiqueOSWatch */;
+			targetProxy = 000000000000000000001930 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2439,7 +2444,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 82;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOS/Supporting/Info.plist";
@@ -2467,7 +2472,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 82;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOS/Supporting/Info.plist";
@@ -2560,7 +2565,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSLiveActivity/PhysiqueOSLiveActivity.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 82;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSLiveActivity/Info.plist";
@@ -2586,7 +2591,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSLiveActivity/PhysiqueOSLiveActivity.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 82;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSLiveActivity/Info.plist";
@@ -2606,10 +2611,11 @@
 			};
 			name = Release;
 		};
-		00000000000000000000191D /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
+		00000000000000000000191F /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 82;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSWatch/Info.plist";
@@ -2629,10 +2635,11 @@
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
 			}; name = Debug; };
-		00000000000000000000191E /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
+		000000000000000000001920 /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 82;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSWatch/Info.plist";
@@ -2652,10 +2659,10 @@
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
 			}; name = Release; };
-		000000000000000000001928 /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
+		00000000000000000000192A /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 82;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -2667,10 +2674,10 @@
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhysiqueOSWatch.app/PhysiqueOSWatch";
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
 			}; name = Debug; };
-		000000000000000000001929 /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
+		00000000000000000000192B /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 81;
+				CURRENT_PROJECT_VERSION = 82;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -2730,15 +2737,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		00000000000000000000191C /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */ = {
+		00000000000000000000191E /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */ = {
 			isa = XCConfigurationList;
-			buildConfigurations = (00000000000000000000191D /* Debug */, 00000000000000000000191E /* Release */,);
+			buildConfigurations = (00000000000000000000191F /* Debug */, 000000000000000000001920 /* Release */,);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001927 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */ = {
+		000000000000000000001929 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */ = {
 			isa = XCConfigurationList;
-			buildConfigurations = (000000000000000000001928 /* Debug */, 000000000000000000001929 /* Release */,);
+			buildConfigurations = (00000000000000000000192A /* Debug */, 00000000000000000000192B /* Release */,);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};

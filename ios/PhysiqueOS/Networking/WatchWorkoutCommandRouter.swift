@@ -33,6 +33,19 @@ final class WatchWorkoutCommandRouter {
         return nil
     }
 
+    func unavailableProjection() -> WatchWorkoutProjection {
+        .terminal(
+            sessionId: "current",
+            revision: 0,
+            phase: .unavailable,
+            stalenessReason: .authorityUnavailable
+        )
+    }
+
+    func cancelledProjection(sessionId: String, revision: Int) -> WatchWorkoutProjection {
+        .terminal(sessionId: sessionId, revision: revision, phase: .cancelled)
+    }
+
     func route(_ command: WatchWorkoutCommand) -> WatchWorkoutAcknowledgement {
         guard command.isBoundedAndSupported else {
             return acknowledgement(command, .rejected, .unsupportedContract, nil)
@@ -45,10 +58,34 @@ final class WatchWorkoutCommandRouter {
             )
         }
         if command.kind == .refreshProjection {
-            return acknowledgement(command, .unchanged, nil, authority.draft(id: command.sessionId)?.currentRevision)
+            let revision = authority.draft(id: command.sessionId)?.currentRevision
+            if authority.isCancelled(sessionId: command.sessionId) {
+                return acknowledgement(
+                    command, .unchanged, nil, revision ?? command.expectedRevision,
+                    projection: cancelledProjection(
+                        sessionId: command.sessionId,
+                        revision: revision ?? command.expectedRevision
+                    )
+                )
+            }
+            return acknowledgement(
+                command, .unchanged, nil, revision,
+                projection: currentProjection() ?? unavailableProjection()
+            )
         }
         guard let current = authority.draft(id: command.sessionId) else {
-            return acknowledgement(command, .rejected, .sessionUnavailable, nil)
+            let replayedCancel = command.kind == .cancelWorkout
+                && authority.isCancelled(sessionId: command.sessionId, mutationId: command.mutationId)
+            return acknowledgement(
+                command,
+                replayedCancel ? .unchanged : .rejected,
+                replayedCancel ? nil : .sessionUnavailable,
+                command.expectedRevision,
+                projection: cancelledProjection(
+                    sessionId: command.sessionId,
+                    revision: command.expectedRevision
+                )
+            )
         }
         if current.appliedMutationIds?.contains(command.mutationId) == true {
             return acknowledgement(command, .unchanged, nil, current.currentRevision)
@@ -90,6 +127,8 @@ final class WatchWorkoutCommandRouter {
                 finishOperationId: command.mutationId,
                 context: context
             )
+        case .cancelWorkout:
+            outcome = authority.cancelWorkout(sessionId: command.sessionId, context: context)
         case .reportHealthSaved, .reportHealthSaveFailed:
             guard let finishOperationId = command.finishOperationId else {
                 return acknowledgement(command, .rejected, .invalidCommand, command.expectedRevision)
@@ -104,9 +143,27 @@ final class WatchWorkoutCommandRouter {
             return acknowledgement(command, .rejected, .unsupportedContract, command.expectedRevision)
         }
         switch outcome {
-        case .applied(let revision): return acknowledgement(command, .applied, nil, revision)
-        case .unchanged(let revision): return acknowledgement(command, .unchanged, nil, revision)
-        case .duplicate(let revision): return acknowledgement(command, .unchanged, nil, revision)
+        case .applied(let revision):
+            return acknowledgement(
+                command, .applied, nil, revision,
+                projection: command.kind == .cancelWorkout
+                    ? cancelledProjection(sessionId: command.sessionId, revision: revision)
+                    : nil
+            )
+        case .unchanged(let revision):
+            return acknowledgement(
+                command, .unchanged, nil, revision,
+                projection: command.kind == .cancelWorkout
+                    ? cancelledProjection(sessionId: command.sessionId, revision: revision)
+                    : nil
+            )
+        case .duplicate(let revision):
+            return acknowledgement(
+                command, .unchanged, nil, revision,
+                projection: command.kind == .cancelWorkout
+                    ? cancelledProjection(sessionId: command.sessionId, revision: revision)
+                    : nil
+            )
         case .rejected(let rejection):
             let mappedReason: WatchWorkoutAcknowledgement.Reason =
                 command.kind == .confirmFinish && current.finishConfirmationRequestedAt == nil
@@ -123,7 +180,8 @@ final class WatchWorkoutCommandRouter {
         _ status: WatchWorkoutAcknowledgement.Status,
         _ reason: WatchWorkoutAcknowledgement.Reason?,
         _ revision: Int?,
-        stalenessReason: WatchWorkoutProjection.StalenessReason? = nil
+        stalenessReason: WatchWorkoutProjection.StalenessReason? = nil,
+        projection: WatchWorkoutProjection? = nil
     ) -> WatchWorkoutAcknowledgement {
         .init(
             schemaVersion: WatchWorkoutContract.schemaVersion,
@@ -132,7 +190,7 @@ final class WatchWorkoutCommandRouter {
             status: status,
             reason: reason,
             acknowledgedRevision: revision,
-            projection: currentProjection(stalenessReason: stalenessReason)
+            projection: projection ?? currentProjection(stalenessReason: stalenessReason)
         )
     }
 
