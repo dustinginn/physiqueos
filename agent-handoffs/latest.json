@@ -1,57 +1,51 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T06:10:39Z",
+  "generated_at_utc": "2026-10-02T06:41:45Z",
   "task": {
-    "id": "apple-watch-workout-v1-split-metrics-design-lock-20261002",
-    "title": "Apple Watch Workout V1 split-metrics design lock",
+    "id": "apple-watch-workout-v1-phase1a-checkpoint1-20261002",
+    "title": "Apple Watch Workout V1 Phase 1A checkpoint 1",
     "agent": "codex",
-    "status": "candidate_complete"
+    "status": "checkpoint_candidate_continuing"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "shipping_native_sha": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
+    "shipping_native_sha_reverified_at_start": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
     "shipping_native_build": 80,
-    "implementation_branch": "codex/apple-watch-workout-v1-phase0-foundation",
-    "implementation_sha": "9dea5d2e2d13afcabfcb1c810172cc2ad972a8c0",
+    "phase0_sha": "9dea5d2e2d13afcabfcb1c810172cc2ad972a8c0",
+    "implementation_branch": "codex/apple-watch-workout-v1-phase1a-overnight",
+    "implementation_sha": "e9c7b3cbb7669ecbc49e3a3ff1e96884f55ff608",
     "production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486",
     "production_deployment": "421cae1a-dbc6-494c-9f73-9b8778e45efd"
   },
   "result": {
-    "summary": "Founder selected separate large Load and Reps tiles as the Phase 1A normal-set baseline, preserving the accepted hierarchy and a future focus-and-Crown editing seam without adding Crown editing to Phase 0 or initial V1 scope.",
-    "success": true,
+    "summary": "Checkpoint 1 adds the generator-owned Watch target, strict phone-authority WCSession transport, Ready-for-Watch affordance and locked PhysiqueOS split-metrics execution UI.",
+    "checkpoint_success": true,
+    "release_candidate": false,
     "production_mutated": false,
     "deployed": false,
     "native_build_uploaded": false,
     "watch_testflight_uploaded": false,
-    "shipping_watch_ui_implemented": false
+    "shipping_watch_ui_implemented": true
   },
   "validation": {
-    "native_relevant": "580 passed, 0 failed",
-    "server_training": "156 passed, 0 failed",
-    "server_command_ports": "53 passed, 0 failed",
-    "server_healthkit_focused": "116 passed, 0 failed",
-    "server_healthkit_broad": "717 passed, 6 known stale audit-sentinel failures",
-    "watchos_11_typecheck": "passed",
-    "project_generator": "reproducible"
+    "project_generator": "two consecutive byte-identical runs",
+    "paired_iphone_scheme_build": "passed",
+    "watch_scheme_build": "passed",
+    "phone_transport_tests": "passed",
+    "watch_tests": "bundle built; simulator XCTest bootstrap failed before tests ran",
+    "full_native_regression": "not yet run"
   },
-  "design_decisions": {
-    "normal_set_metrics": "split_load_and_reps_tiles",
-    "future_crown_editing_seam": true,
-    "crown_editing_in_phase0_or_initial_v1": false
-  },
-  "remaining_scope": [
-    "review and merge the Phase 0 implementation",
-    "create the signed Watch target and final bundle/App ID/profiles",
-    "implement WCSession transport and the Watch-owned HealthKit adapter",
-    "build the accepted Watch UI and run physical paired-workout acceptance",
-    "configure the trusted Watch bundle allowlist only after signed identity review"
+  "open_gates": [
+    "recoverable finish saga",
+    "paired interactive simulator proof",
+    "Watch XCTest runtime",
+    "latest shipping Native reconciliation",
+    "full regression and independent review",
+    "signed archive inspection",
+    "physical Watch authorization and workout acceptance"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T061039Z-apple-watch-workout-v1-split-metrics-design-lock.md",
+  "full_report_path": "agent-handoffs/reports/20261002T064145Z-apple-watch-workout-v1-phase1a-checkpoint1.md",
   "parent_report_path": "agent-handoffs/reports/20261002T055516Z-apple-watch-workout-v1-phase0-foundation.md",
-  "artifacts": [
-    "agent-handoffs/artifacts/apple-watch-workout-v1/watch-workout-v1-board.svg",
-    "agent-handoffs/artifacts/apple-watch-workout-v1/README.md"
-  ],
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
