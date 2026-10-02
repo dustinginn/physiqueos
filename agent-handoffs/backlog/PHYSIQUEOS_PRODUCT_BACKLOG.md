@@ -133,7 +133,7 @@ Trigger:
 - Founder begins planning actual beta onboarding, or DO cost/performance symptoms recur.
 
 7. Apple Watch companion
-Status: PHASE 1A PHYSICAL WATCH INSTALL + LAUNCH COMPLETE on `codex/apple-watch-workout-v1-phase1a-overnight` at `831f74d0482906e34b5fcbb306cff3a4e7af2742`; not uploaded. Physical checkpoint: `agent-handoffs/reports/20261002T163109Z-apple-watch-workout-v1-phase1a-physical-install-launch-checkpoint.md`.
+Status: PHASE 1A CANCEL PARITY BUILD 82 PHYSICALLY INSTALLED + LAUNCHED on `codex/apple-watch-workout-v1-phase1a-overnight` at `a173f27b4a9ab208021a1f3cd7febc7402cf3b42`; not uploaded. Physical checkpoint: `agent-handoffs/reports/20261002T173031Z-watch-v1-cancel-workout-parity-physical-checkpoint.md`.
 Locked V1:
 - phone is the sole structured `TrainingSessionAuthority` and planning surface; Watch starts one phone-prepared Ready-for-Watch plan only while the paired phone is reachable;
 - after start, a disconnected Watch HealthKit workout may continue, but every structured mutation fails closed until phone authority returns;
@@ -149,7 +149,7 @@ Phase 0 implemented:
 - trusted exact PhysiqueOS Watch workout correlation seam is additive and default-disabled; trusted exact links do not create duplicate performed Training evidence, and a second exact workout claim fails closed;
 - non-shipping Watch target/signing feasibility is proven against the Founder's physical Apple Watch; no Watch target or TestFlight build was shipped.
 Phase 1A implemented:
-- generator-owned watchOS target/test target, shared schema-v1 contracts, phone `WCSession` bridge and deterministic latest-projection delivery;
+- generator-owned watchOS target/test target, shared schema-v2 contracts, phone `WCSession` bridge and deterministic latest-projection delivery;
 - Ready-for-Watch phone affordance and locked PhysiqueOS Watch Start/execution/metrics/controls/paused/final/offline/superset/single-set surfaces with split Load/Reps;
 - real Watch-owned HealthKit strength lifecycle, metrics, mirroring/recovery, phone-authoritative pause parity, two-leg recoverable Finish saga, completion summary, haptics and Always-On treatment;
 - latest shipping Build 81 Progress Photos authority reconciled; paired simulator builds/renders and full/focused regressions complete with no new deterministic failures;
@@ -157,11 +157,16 @@ Phase 1A implemented:
 - automatic signing created the explicit HealthKit-capable Watch profile and the signed candidate is installed on the Founder iPhone.
 - physical Watch Developer Mode/pairing, Watch-authorized provisioning, signed installation, launch and phone-reachable empty-state proof are complete;
 - physical launch exposed and fixed a WatchConnectivity reply-callback actor-isolation trap; off-main regression tests pass and the fixed Watch app remains running without a new crash log.
+- canonical confirmed Cancel Workout is available while active and paused without Resume; it abandons the structured draft, creates no Training evidence, discards the Watch HealthKit workout and ends the Live Activity;
+- phone Cancel now publishes an authoritative terminal projection that clears Watch execution, metrics, controls, pending/rest/pause state and prevents delayed same-session resurrection across reconnect/relaunch;
+- generator-owned PhysiqueOS Watch AppIcon is compiled into the signed archive and the physical Watch returns the installed 216x216 icon as non-placeholder;
+- fresh paired Build 82 archive, strict signature/profile/entitlement inspection, physical iPhone+Watch install, launch and idle reachability proof are complete.
 Phase 1A remaining physical/release gates:
 - Founder prepares a short phone workout, marks it Ready for Watch, taps Start on Watch, and grants the requested Health authorization on-device;
 - one physical Start/Complete/Pause/Resume/Finish acceptance, including disconnect/reconnect and relaunch recovery;
+- physical Cancel acceptance while active, while paused without Resume, and from phone with immediate Watch terminal teardown;
 - battery/Always-On observation and exact HealthKit-to-structured correlation proof on the saved workout;
-- Build 82 parity, a fresh signed archive containing the `831f74d0` runtime fix, and independent post-device review before enabling the production trusted Watch bundle allowlist or uploading a Watch TestFlight build.
+- independent post-acceptance review before enabling the production trusted Watch bundle allowlist or uploading a Watch TestFlight build.
 
 OPERATIONAL / ENVIRONMENT
 

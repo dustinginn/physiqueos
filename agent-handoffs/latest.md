@@ -2,19 +2,19 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Apple Watch Workout V1 Phase 1A physical install/launch (`apple-watch-workout-v1-phase1a-physical-install-launch`)
+- Task: Apple Watch Workout V1 Cancel parity and terminal reconciliation (`watch-v1-cancel-workout-parity`)
 - Agent: Codex
-- Status: physical Watch install, launch and phone reachability complete; awaiting Founder Health authorization/start taps
-- Generated (UTC): 2026-10-02T16:31:09Z
-- Implementation: `831f74d0482906e34b5fcbb306cff3a4e7af2742` on `codex/apple-watch-workout-v1-phase1a-overnight`
-- Shipping Native remains: Build 81 `6a0932517cbd8de165bf25c7637a2d2d6fea03dc`; next upload build 82
+- Status: Build 82 patch implemented, signed, installed and launched; awaiting Founder physical Cancel acceptance
+- Generated (UTC): 2026-10-02T17:30:31Z
+- Implementation: `a173f27b4a9ab208021a1f3cd7febc7402cf3b42` on `codex/apple-watch-workout-v1-phase1a-overnight`
+- Shipping Native remains: Build 81 `6a0932517cbd8de165bf25c7637a2d2d6fea03dc`
 - Production Server unchanged: `4ffde0f5faf1832decfbc09d822088aeba0dca89` (deployment `faaf66bd-930f-46a2-9b8e-77e604c23a86`)
 - Release decision: DO NOT UPLOAD
 
-Summary: The Build 81 Watch development candidate is installed and launches on the paired physical Watch. A real WatchConnectivity actor-isolation crash was found on first launch, symbolicated, fixed at `831f74d0`, covered by off-main tests, rebuilt/re-signed/reinstalled and proven stable without a new crash log. The Watch shows the phone-reachable **Prepare a workout on iPhone** state. No Health permission or workout was started.
+Summary: Watch Cancel is now confirmed and available while active or paused without Resume. It uses canonical phone abandonment, creates no Training evidence, discards Watch HealthKit, ends Live Activity, and terminally clears stale Watch execution/metrics across phone Cancel, retry, reconnect and relaunch. Build 82 is signed and physically installed/launched on both devices. The physical Watch returns the new PhysiqueOS icon as non-placeholder. No workout or Health consent was automated.
 
-Founder action: on iPhone prepare the short acceptance workout and tap **Ready for Watch**; on Watch open PhysiqueOS, tap **Start Workout** once, allow **Workouts**, **Heart Rate**, **Active Energy**, and **Basal Energy**, then stop and tell Codex authorization is complete before completing any set.
+Founder action: physically verify (1) active Watch Cancel, (2) paused Watch Cancel without Resume, and (3) phone Cancel automatically clearing Watch execution/metrics. Do not enable production correlation or upload TestFlight yet.
 
-Detailed report: `agent-handoffs/reports/20261002T163109Z-apple-watch-workout-v1-phase1a-physical-install-launch-checkpoint.md`
+Detailed report: `agent-handoffs/reports/20261002T173031Z-watch-v1-cancel-workout-parity-physical-checkpoint.md`
 
 Protocol: `agent-handoffs/README.md`
