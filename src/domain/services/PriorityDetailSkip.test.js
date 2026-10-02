@@ -263,3 +263,94 @@ describe("Priority Detail skip contract", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 });
+
+// Peptides: skip is independent of the dose-aware completion. 2026-09-16 is a
+// Wednesday. Synthetic ids and versions only.
+describe("execution-backed peptide Support skip contract", () => {
+  const PEPTIDE_PROTOCOL = { id: "protocol-peptide", userId: "user", category: "peptide", status: "active", name: "Peptide" };
+  const PEPTIDE_EXECUTION = {
+    id: "execution_peptide", userId: "user", type: "peptide", title: "Peptide", active: true,
+    protocolRootId: "protocol-peptide", cadence: { type: "specific_days" },
+    preferredSchedule: { daysOfWeek: ["wednesday"], timeOfDay: "21:00", startDate: "2026-05-01", endDate: null },
+    timeline: [{ startDate: "2026-07-01", endDate: null, dose: { amount: "0.5", unit: "mg" }, notes: "" }],
+  };
+  function peptideReminder(overrides = {}) {
+    return {
+      id: "reminder_peptide_weekly", userId: "user", title: "Peptide", type: "protocol_reminder",
+      linkedEntityType: "protocol", linkedEntityId: "protocol-peptide", active: true,
+      schedule: { type: "weekly", daysOfWeek: ["wednesday"], timeOfDay: "21:00" }, completionHistory: [], version: 12,
+      ...overrides,
+    };
+  }
+  const peptideService = ({ reminder = peptideReminder(), checkIn = null, executionItems = [PEPTIDE_EXECUTION] } = {}) =>
+    detailService({ reminder, checkIn, protocols: [PEPTIDE_PROTOCOL], executionItems });
+
+  it("offers Skip for today's open peptide while completion stays dose-aware", async () => {
+    const { service } = peptideService();
+    const detail = await service.getPriorityDetail("reminder_peptide_weekly", "user");
+    expect(detail).toMatchObject({
+      status: "Open",
+      completable: true,
+      completionContext: { occurrenceDate: TODAY, dose: "0.5 mg", protocolId: "protocol-peptide" },
+      doseAdjustable: true,
+      skippable: true,
+      skipCommand: {
+        commandType: "priority.skip.v1", expectedVersion: 12,
+        payload: { priorityId: "reminder_peptide_weekly", occurrenceDate: TODAY },
+      },
+      notificationAction: {
+        classification: "specialized_workflow_required",
+        workflow: "peptide_protocol",
+        completionCommand: { payload: { dose: "0.5 mg", protocolId: "protocol-peptide" } },
+        skipCommand: { commandType: "priority.skip.v1", expectedVersion: 12 },
+      },
+    });
+    expect(detail.skipCommand.payload).not.toHaveProperty("dose");
+  });
+
+  it("reads a skipped peptide as Skipped with no dose, completion or amount field", async () => {
+    const { service } = peptideService({ checkIn: skippedCheckIn("reminder_peptide_weekly", TODAY, null) });
+    const detail = await service.getPriorityDetail("reminder_peptide_weekly", "user");
+    expect(detail).toMatchObject({
+      status: "Skipped",
+      completable: false,
+      completionContext: null,
+      skippable: false,
+      skipCommand: null,
+      skipContext: { occurrenceDate: TODAY, note: null, skippedAt: `${TODAY}T18:00:00.000Z` },
+      notificationAction: { completionCommand: null, skipCommand: null },
+    });
+    expect(detail.doseAdjustable).toBeUndefined();
+    expect(section(detail, "Completion")).toBeUndefined();
+    expect(section(detail, "What").items[0].detail).toContain("No dose was recorded");
+  });
+
+  it("is not skippable when paused, past, or completed", async () => {
+    const paused = peptideService({ executionItems: [{ ...PEPTIDE_EXECUTION, scheduleSuspensions: [{ pausedFrom: "2026-09-10", resumedOn: null }] }] });
+    expect(await paused.service.getPriorityDetail("reminder_peptide_weekly", "user")).toMatchObject({
+      status: "Paused", skippable: false, skipCommand: null,
+      notificationAction: { classification: "open_only", completionCommand: null, skipCommand: null },
+    });
+    const past = peptideService();
+    expect(await past.service.getPriorityDetail("reminder_peptide_weekly", "user", { occurrenceDate: "2026-09-09" }))
+      .toMatchObject({ skippable: false, skipCommand: null });
+    const completed = peptideService({ reminder: peptideReminder({
+      completionHistory: [{ occurrenceDate: TODAY, completedAt: `${TODAY}T17:30:00.000Z`, effectiveDose: "0.5 mg" }],
+    }) });
+    expect(await completed.service.getPriorityDetail("reminder_peptide_weekly", "user"))
+      .toMatchObject({ status: "Completed", skippable: false, skipCommand: null });
+  });
+
+  it("adds the Foam Rolling notification skipCommand while keeping its completion", async () => {
+    const { service } = recoveryDetailService();
+    const detail = await service.getPriorityDetail("reminder_foam_roll_daily", "user");
+    expect(detail.notificationAction).toMatchObject({
+      classification: "specialized_workflow_required",
+      completionCommand: { commandType: "priority.complete.v1", expectedVersion: 53 },
+      skipCommand: {
+        commandType: "priority.skip.v1", expectedVersion: 53,
+        payload: { priorityId: "reminder_foam_roll_daily", occurrenceDate: TODAY },
+      },
+    });
+  });
+});

@@ -147,9 +147,11 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           // exactly as it does to a plain reminder: read the dated
           // reconciliation entry (completed wins over a skip) so a skipped
           // occurrence never re-reads as Open/completable, and offer the
-          // Server-owned skip contract for today's open occurrence. Peptide
-          // (dose-aware) and supplement (deferred) Support stay unchanged.
-          const recoverySkipEntry = protocol.category === "recovery" &&
+          // Server-owned skip contract for today's open occurrence. A peptide
+          // is skippable too (the skip records no dose; completion stays
+          // dose-aware); supplement Support stays unchanged (deferred).
+          const skipSupported = isPrioritySkipSupportedReminder(reminder, { protocol });
+          const supportSkipEntry = skipSupported &&
             projection.occurrenceCompleted !== true &&
             isPriorityOccurrenceSkipped(occurrenceCheckIn, reminder.id, projection.localDate)
               ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, reminder.id, projection.localDate)
@@ -161,7 +163,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                 operatingPlan,
                 projection,
                 protocol,
-                skipEntry: recoverySkipEntry,
+                skipEntry: supportSkipEntry,
               })
             : protocol.category === "supplement"
               ? createSupplementSupportPriorityDetail({
@@ -177,6 +179,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                   operatingPlan,
                   projection,
                   protocol,
+                  skipEntry: supportSkipEntry,
                 });
           const supportDetail = withDoseAdjustable(withPausedOccurrence(withProtocolSupportNotificationAction(
             withExecutionContract(detail, reminder, projection.localDate),
@@ -185,14 +188,16 @@ export function createPriorityDetailService({ repositories, now = () => new Date
               priorityId: projection.priorityId,
               occurrenceDate: projection.localDate,
               timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
+              skippable: skipSupported,
             }
           ), projection), protocol.category);
-          if (protocol.category !== "recovery") return supportDetail;
+          if (!skipSupported) return supportDetail;
           // `completable` is already false for a completed, skipped, setup
           // required (missing Execution) or inactive occurrence, so none of
           // those can be offered a skip.
           return withSkipContract(supportDetail, {
             reminder,
+            protocol,
             occurrenceDate: projection.localDate,
             today,
             open: supportDetail?.completable === true,
@@ -241,7 +246,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           occurrenceDate,
           completed,
           skipEntry,
-        }), reminder, occurrenceDate, open), { reminder, occurrenceDate, today, open });
+        }), reminder, occurrenceDate, open, null, isPrioritySkipSupportedReminder(reminder)), { reminder, occurrenceDate, today, open });
       }
 
       return createFallbackPriorityDetail(priorityId, goals, occurrenceDate);
@@ -255,19 +260,20 @@ export function createPriorityDetailService({ repositories, now = () => new Date
 // occurrence of a `priority_detail` reminder the shared eligibility rule
 // (`isPrioritySkipSupportedReminder`) accepts — the same rule
 // `priority.skip.v1` enforces on the write side.
-function withSkipContract(detail, { reminder, occurrenceDate, today, open }) {
+function withSkipContract(detail, { reminder, protocol, occurrenceDate, today, open }) {
   if (!detail) return null;
   const skippable = open === true &&
     occurrenceDate === today &&
     detail.executionContract?.workflow === "priority_detail" &&
-    isPrioritySkipSupportedReminder(reminder);
+    isPrioritySkipSupportedReminder(reminder, { protocol });
   const skipCommand = skippable ? prioritySkipCommand(detail.executionContract) : null;
   return { ...detail, skippable: Boolean(skipCommand), skipCommand };
 }
 
 // Every Priority Detail carries the Server-owned skip contract. Only the
 // paths that run `withSkipContract` above — an ordinary reminder and an
-// execution-backed recovery Support reminder — can ever set `skippable: true`.
+// execution-backed recovery or peptide Support reminder — can ever set
+// `skippable: true`.
 function withSkipDefaults(detail) {
   if (!detail) return detail;
   return {
@@ -310,7 +316,7 @@ function withPausedOccurrence(detail, projection) {
     completionContext: null,
     executionContract,
     notificationAction: detail.notificationAction
-      ? Object.freeze({ ...detail.notificationAction, classification: "open_only", completionCommand: null })
+      ? Object.freeze({ ...detail.notificationAction, classification: "open_only", completionCommand: null, skipCommand: null })
       : openOnlyNotificationAction({
           priorityId: projection.priorityId,
           occurrenceDate: projection.localDate,
@@ -333,13 +339,18 @@ function withExecutionContract(detail, reminder, occurrenceDate) {
 // execution contract's own `workflow` (set by `resolvePriorityExecutionContract`)
 // is what actually routes Morning Weigh-in/Progress Photos to
 // `specialized_workflow_required` here, not a second classification.
-function withExecutionContractAndNotificationAction(detail, reminder, occurrenceDate, completable = false, timeOfDay = null) {
+function withExecutionContractAndNotificationAction(detail, reminder, occurrenceDate, completable = false, timeOfDay = null, skippable = false) {
   if (!detail) return null;
   const executionContract = resolvePriorityExecutionContract({ reminder, occurrenceDate });
   return {
     ...detail,
     executionContract,
-    notificationAction: resolveNotificationAction({ executionContract, completable, timeOfDay: timeOfDay ?? reminder?.schedule?.timeOfDay }),
+    notificationAction: resolveNotificationAction({
+      executionContract,
+      completable,
+      timeOfDay: timeOfDay ?? reminder?.schedule?.timeOfDay,
+      skippable,
+    }),
   };
 }
 
@@ -357,21 +368,26 @@ function withProtocolSupportNotificationAction(detail, occurrence) {
   } : null;
 }
 
+// `skipEntry`: as for non-dosing Support below — a peptide occurrence skipped
+// today (`priority.skip.v1`) or for a prior day (Morning Check-In) reads
+// Skipped: non-completable, no completion context, no dose recorded.
 function createExecutionPriorityDetail({
   executionItem,
   goals,
   operatingPlan,
   projection,
   protocol,
+  skipEntry = null,
 }) {
   if (!protocol || !projection) return null;
   const completed = projection.occurrenceCompleted === true;
-  const actionable = !completed &&
+  const skipped = !completed && Boolean(skipEntry);
+  const actionable = !completed && !skipped &&
     projection.operationalState ===
     ExecutionPriorityOperationalState.ACTIONABLE;
   // Completed wins over Paused; a paused occurrence is neither actionable nor
   // a setup problem, it is simply suspended until the plan is resumed.
-  const paused = !completed &&
+  const paused = !completed && !skipped &&
     projection.operationalState === ExecutionPriorityOperationalState.PAUSED;
   const setupRequired = [
     ExecutionPriorityOperationalState.MISSING_EXECUTION,
@@ -401,6 +417,8 @@ function createExecutionPriorityDetail({
     subtitle: projection.timeOfDayLabel,
     status: completed
       ? "Completed"
+      : skipped
+        ? "Skipped"
       : paused
         ? "Paused"
       : actionable
@@ -417,6 +435,15 @@ function createExecutionPriorityDetail({
             protocolId: projection.protocolRootId,
           }
         : null,
+    ...(skipped
+      ? {
+          skipContext: {
+            occurrenceDate: projection.localDate,
+            note: skipEntry.note ?? null,
+            skippedAt: skipEntry.recordedAt ?? null,
+          },
+        }
+      : {}),
     action: {
       label: setupRequired ? "Review Execution" : "View Execution",
       href: projection.executionHref,
@@ -428,13 +455,15 @@ function createExecutionPriorityDetail({
         title: "What",
         items: [
           {
-            label: actionable
+            label: actionable || skipped
               ? projection.title
               : paused
                 ? `${projection.title} is paused`
                 : setupCopy,
             detail: actionable
               ? "Complete the scheduled Execution action."
+              : skipped
+                ? "Skipped for this occurrence. No dose was recorded."
               : paused
                 ? "Resume it from the Operating Plan to record doses again."
                 : "Review the canonical Execution plan before recording a dose.",

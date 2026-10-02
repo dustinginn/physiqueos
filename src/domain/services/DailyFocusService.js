@@ -34,6 +34,7 @@ import {
   resolvePriorityExecutionContract,
   specializedNotificationAction,
   protocolSupportNotificationAction,
+  isPrioritySkipSupportedReminder,
 } from "./ReminderOccurrenceCompletion.js";
 
 const DAY_NAMES = [
@@ -284,6 +285,7 @@ function buildDailyFocusCandidates({
     ...executionProtocolItems,
     ...getPersistentReminderItems({
       reminders,
+      protocols,
       today,
       dayName,
       excludedReminderIds: new Set([
@@ -530,6 +532,7 @@ function getDayName(dateKey) {
 
 function getPersistentReminderItems({
   reminders,
+  protocols = [],
   today,
   dayName,
   excludedReminderIds = new Set(),
@@ -561,7 +564,14 @@ function getPersistentReminderItems({
         completable: true,
         completionId: reminder.id,
         executionContract,
-        notificationAction: resolveNotificationAction({ executionContract, completable: true, timeOfDay: reminder.schedule?.timeOfDay }),
+        notificationAction: resolveNotificationAction({
+          executionContract,
+          completable: true,
+          timeOfDay: reminder.schedule?.timeOfDay,
+          skippable: isPrioritySkipSupportedReminder(reminder, {
+            protocol: protocols.find((item) => String(item.id) === String(reminder.linkedEntityId)) ?? null,
+          }),
+        }),
         state: state.name,
         priority: state.priorityOffset + 18,
       };
@@ -969,6 +979,9 @@ function getExecutionBackedProtocolItems({
           completionContext: projection.completable
             ? { occurrenceDate: today, dose: doseText, protocolId }
             : null,
+          // Peptide and recovery Support (not supplements) may be skipped;
+          // the skip carries no dose.
+          skippable: Boolean(reminder) && isPrioritySkipSupportedReminder(reminder, { protocol }),
         }),
         state: state.name,
         priority: state.priorityOffset + (recoverySupport ? 18 : 22) + index,

@@ -187,6 +187,8 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
 ]);
 
 const RECURRING_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "executionItems", "reminders"]);
+// Reminder types whose skip eligibility depends on the linked protocol.
+const SKIP_SUPPORT_REMINDER_TYPES = new Set(["protocol_reminder", "recovery_reminder", "supplement_reminder"]);
 const RECURRING_SUPPORT_READ_COLLECTIONS = Object.freeze(["user", ...RECURRING_SUPPORT_BOUNDED_COLLECTIONS]);
 
 const NUTRITION_STRATEGY_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "protocolVersions"]);
@@ -2134,7 +2136,13 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         recovery: { today },
       });
     }
-    if (!isPrioritySkipSupportedReminder(current)) {
+    // A Support reminder's linked protocol decides (peptide and recovery
+    // yes, supplement no), exactly as the read contract does.
+    const protocol = SKIP_SUPPORT_REMINDER_TYPES.has(current?.type)
+      ? (await records.list({ ownerUserId: context.ownerUserId, collection: "protocols" }))
+        .find((item) => String(item?.id) === String(current.linkedEntityId)) ?? null
+      : undefined;
+    if (!isPrioritySkipSupportedReminder(current, { protocol })) {
       throw new ApplicationProblem({
         status: 422,
         code: "PRIORITY_SKIP_UNSUPPORTED",
@@ -2178,6 +2186,8 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         outbox: [],
       };
     }
+    // A paused peptide date is refused exactly as completion is.
+    await assertPriorityOccurrenceNotPaused(context, current, occurrenceDate);
     requireExpectedVersion(context, current, `priority:${id}`);
     const recordedAt = now().toISOString();
     const updated = await records.put({

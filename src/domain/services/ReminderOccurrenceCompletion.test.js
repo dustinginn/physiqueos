@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  isPrioritySkipSupportedReminder,
   isReminderOccurrenceCompleted,
+  resolveNotificationAction,
   resolveReminderOccurrenceDate,
   protocolSupportNotificationAction,
 } from "./ReminderOccurrenceCompletion.js";
@@ -14,7 +16,62 @@ describe("Reminder occurrence completion", () => {
     expect(protocolSupportNotificationAction({ category, priorityId: "reminder", occurrenceDate: "2026-09-15", timeOfDay: "12:21" }))
       .toEqual({ classification: "specialized_workflow_required", workflow,
         destination: { priorityId: "reminder", occurrenceDate: "2026-09-15" },
-        completionCommand: null, scheduledTime: "12:21" });
+        completionCommand: null, skipCommand: null, scheduledTime: "12:21" });
+  });
+  it("adds an explicit dose-free skipCommand beside the dose-aware peptide completion", () => {
+    const action = protocolSupportNotificationAction({
+      category: "peptide", priorityId: "reminder", occurrenceDate: "2026-09-15", timeOfDay: "21:45",
+      executionContract: { priorityId: "reminder", occurrenceDate: "2026-09-15", expectedVersion: 33 },
+      completable: true,
+      completionContext: { dose: "0.5 mg", protocolId: "retatrutide" },
+      skippable: true,
+    });
+    expect(action.classification).toBe("specialized_workflow_required");
+    expect(action.completionCommand.payload).toEqual({
+      priorityId: "reminder", occurrenceDate: "2026-09-15", dose: "0.5 mg", protocolId: "retatrutide",
+    });
+    expect(action.skipCommand).toEqual({
+      commandType: "priority.skip.v1", expectedVersion: 33,
+      payload: { priorityId: "reminder", occurrenceDate: "2026-09-15" },
+    });
+  });
+  it("offers no skipCommand unless the occurrence is open, versioned and skippable", () => {
+    const base = {
+      category: "recovery", priorityId: "reminder", occurrenceDate: "2026-09-15", timeOfDay: "20:00",
+      executionContract: { priorityId: "reminder", occurrenceDate: "2026-09-15", expectedVersion: 4 },
+      completionContext: { dose: null, protocolId: "foam" },
+    };
+    expect(protocolSupportNotificationAction({ ...base, completable: true, skippable: true }).skipCommand)
+      .toMatchObject({ commandType: "priority.skip.v1", expectedVersion: 4 });
+    expect(protocolSupportNotificationAction({ ...base, completable: true, skippable: false }).skipCommand).toBeNull();
+    expect(protocolSupportNotificationAction({ ...base, completable: false, skippable: true }).skipCommand).toBeNull();
+    expect(protocolSupportNotificationAction({
+      ...base, completable: true, skippable: true,
+      executionContract: { ...base.executionContract, expectedVersion: null },
+    }).skipCommand).toBeNull();
+    const direct = { executionContract: { priorityId: "p", occurrenceDate: "2026-09-15", expectedVersion: 2, workflow: "priority_detail" }, completable: true, timeOfDay: "07:00" };
+    expect(resolveNotificationAction({ ...direct, skippable: true }).skipCommand)
+      .toEqual({ commandType: "priority.skip.v1", expectedVersion: 2, payload: { priorityId: "p", occurrenceDate: "2026-09-15" } });
+    expect(resolveNotificationAction(direct).skipCommand).toBeNull();
+    expect(resolveNotificationAction({ executionContract: { ...direct.executionContract, workflow: "morning_check_in" }, completable: true, skippable: true }).skipCommand)
+      .toBeNull();
+  });
+  it("decides Support skip eligibility from the linked protocol, never supplements", () => {
+    const support = (type, linkedEntityId = "protocol") => ({ id: "r", type, linkedEntityId, active: true });
+    const protocol = (category, id = "protocol") => ({ id, category });
+    expect(isPrioritySkipSupportedReminder({ id: "r", type: "other", active: true })).toBe(true);
+    expect(isPrioritySkipSupportedReminder(support("protocol_reminder"), { protocol: protocol("peptide") })).toBe(true);
+    expect(isPrioritySkipSupportedReminder(support("recovery_reminder"), { protocol: protocol("recovery") })).toBe(true);
+    expect(isPrioritySkipSupportedReminder(support("supplement_reminder"), { protocol: protocol("supplement") })).toBe(false);
+    expect(isPrioritySkipSupportedReminder(support("protocol_reminder"), { protocol: protocol("supplement") })).toBe(false);
+    expect(isPrioritySkipSupportedReminder(support("protocol_reminder"), { protocol: protocol("peptide", "other") })).toBe(false);
+    expect(isPrioritySkipSupportedReminder(support("protocol_reminder"), { protocol: null })).toBe(false);
+    // Without the protocol the pre-capability type rule applies.
+    expect(isPrioritySkipSupportedReminder(support("protocol_reminder"))).toBe(false);
+    expect(isPrioritySkipSupportedReminder(support("recovery_reminder"))).toBe(true);
+    expect(isPrioritySkipSupportedReminder({ ...support("protocol_reminder"), active: false }, { protocol: protocol("peptide") })).toBe(false);
+    expect(isPrioritySkipSupportedReminder({ id: "reminder_morning_weight", type: "morning_weigh_in", linkedEvidenceType: "weight", active: true })).toBe(false);
+    expect(isPrioritySkipSupportedReminder({ id: "photos", type: "other", linkedEvidenceType: "progress_photo", active: true })).toBe(false);
   });
   it("carries the canonical dose-aware completion command for an actionable peptide", () => {
     expect(protocolSupportNotificationAction({

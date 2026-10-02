@@ -422,3 +422,44 @@ describe("Execution-backed Daily Focus honours pause windows (S3)", () => {
       .toMatchObject({ completable: true });
   });
 });
+
+describe("Execution-backed Daily Focus skip capability", () => {
+  it("adds a dose-free skipCommand beside the dose-aware peptide completion", () => {
+    const item = priority(focus());
+    expect(item.notificationAction.completionCommand.payload).toMatchObject({ dose: "1 mg", protocolId: protocol.id });
+    expect(item.notificationAction.skipCommand).toEqual({
+      commandType: "priority.skip.v1", expectedVersion: 4,
+      payload: { priorityId: reminder.id, occurrenceDate: "2026-07-30" },
+    });
+  });
+
+  it("drops a peptide occurrence skipped today from Home", () => {
+    const skipped = [...recentCheckIns.slice(0, -1), {
+      date: "2026-07-30",
+      reconciliation: [{
+        key: `${reminder.id}:2026-07-30`, reminderId: reminder.id, occurrenceDate: "2026-07-30",
+        status: "skipped", note: null, recordedAt: "2026-07-30T18:00:00.000Z",
+      }],
+    }];
+    expect(priority(focus({ checkIns: skipped }))).toBeUndefined();
+  });
+
+  it("never offers skip for supplement Support", () => {
+    const supplementProtocol = { id: "protocol_creatine", userId: "user", name: "Creatine", category: "supplement", status: "active" };
+    const supplementReminder = {
+      id: "reminder_creatine", title: "Creatine", type: "supplement_reminder", linkedEntityId: supplementProtocol.id,
+      active: true, version: 2, schedule: { type: "daily", timeOfDay: "08:00" },
+    };
+    const supplementExecution = {
+      id: "execution_creatine", type: "supplement", title: "Creatine", linkedProtocolId: supplementProtocol.id, active: true,
+      cadence: { type: "daily" }, preferredSchedule: schedule([], "08:00"), completionMethod: "manual",
+    };
+    const items = focus({
+      protocols: [protocol, supplementProtocol], reminders: [reminder, supplementReminder],
+      executionItems: [execution(), supplementExecution],
+    });
+    const creatine = priority(items, "Creatine");
+    if (creatine) expect(creatine.notificationAction.skipCommand).toBeNull();
+    expect(priority(items).notificationAction.skipCommand).not.toBeNull();
+  });
+});

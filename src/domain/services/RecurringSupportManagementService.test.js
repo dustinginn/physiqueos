@@ -38,7 +38,7 @@ describe("recurring Support management", () => {
     expect(detail.notificationAction).toEqual({
       classification: "specialized_workflow_required", workflow: "priority_detail",
       destination: { priorityId: reminder.id, occurrenceDate: "2026-09-15" },
-      scheduledTime: "12:21", completionCommand: null,
+      scheduledTime: "12:21", completionCommand: null, skipCommand: null,
     });
     expect(execution.preferredSchedule.timeOfDay).toBe("12:21");
     expect(fixture.live.protocols[0].schedule.timeOfDay).toBe("17:00");
