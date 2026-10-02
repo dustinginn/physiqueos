@@ -2,13 +2,13 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Shared Mac safe storage cleanup before Sleep Native integration (`shared-mac-safe-storage-cleanup-before-sleep-native-20261002`)
+- Task: Build 82 Sleep v3 Native integration + guarded activation (`build82-sleep-v3-native-integration-activation-20261002`)
 - Agent: Claude
-- Status: completed
-- Generated (UTC): 2026-10-02T20:25:00Z
+- Status: checkpoint — waiting for Founder iPhone/Watch connection to install; Server v3 activation not run
+- Generated (UTC): 2026-10-02T21:05:00Z
 
-Summary: Free disk 12.81 -> 21.33 GiB by deleting only reproducible build output: 4 temporary Watch DerivedData folders in /private/tmp (~1.7 GiB) and git-ignored node_modules/.next in 7 inactive ~/GitHub clones (~6.8 GiB). No source, worktree, archive, simulator, signing, device, swap or production change. Watch a173f27b and Sleep 3ed3eae7 intact; devices paired.
+Summary: Sleep v3 compatibility (3ed3eae7) integrated into Watch Build 82 as 31988c06; focused 603/603, Watch 7/7, full iOS 1931 with only the known peptide baseline failure; signed 1.0 (82) archive ready. Install blocked: iPhone/Watch paired but unreachable. Server v3 activation NOT run (gate). Production mutation 0.
 
-Detailed report: `agent-handoffs/reports/20261002T202500Z-shared-mac-safe-storage-cleanup-before-sleep-native.md`
+Detailed report: `agent-handoffs/reports/20261002T210500Z-build82-sleep-v3-native-integration-activation.md`
 
 Protocol: `agent-handoffs/README.md`

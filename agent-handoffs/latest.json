@@ -1,41 +1,48 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T20:25:00Z",
+  "generated_at_utc": "2026-10-02T21:05:00Z",
   "task": {
-    "id": "shared-mac-safe-storage-cleanup-before-sleep-native-20261002",
-    "title": "Shared Mac safe storage cleanup before Sleep Native integration",
+    "id": "build82-sleep-v3-native-integration-activation-20261002",
+    "title": "Build 82 Sleep v3 Native integration + guarded activation",
     "agent": "claude",
-    "status": "completed"
+    "status": "checkpoint_waiting_for_device_connection"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
+    "integrated_native_sha": "31988c06cf5e235260feab4176f899243df9ba2a",
+    "integrated_native_branch": "claude/build82-sleep-v3-integration-20261002",
+    "watch_base_sha": "a173f27b4a9ab208021a1f3cd7febc7402cf3b42",
     "production_server_sha": "d0ff65965233fa44e108387f01b649a2bdb476df",
-    "watch_build82_sha": "a173f27b4a9ab208021a1f3cd7febc7402cf3b42",
-    "sleep_native_candidate_sha": "3ed3eae7",
     "shipping_native_build": 81
   },
   "result": {
-    "summary": "Free disk 12.81 -> 21.33 GiB by deleting only reproducible build output: 4 temporary Watch DerivedData folders in /private/tmp (~1.7 GiB) and git-ignored node_modules/.next in 7 inactive ~/GitHub clones (~6.8 GiB). No source, worktree, archive, simulator, signing, device, swap or production change. Watch a173f27b and Sleep 3ed3eae7 intact; devices paired.",
-    "success": true,
+    "summary": "Sleep v3 compatibility (3ed3eae7) integrated into Watch Build 82 as 31988c06; focused 603/603, Watch 7/7, full iOS 1931 with only the known peptide baseline failure; signed 1.0 (82) archive ready. Install blocked: iPhone/Watch paired but unreachable. Server v3 activation NOT run (gate). Production mutation 0.",
+    "success": false,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
-    "free_space": {
+    "native_focused": {
       "status": "passed",
-      "summary": "21.33 GiB >= 20"
+      "summary": "603 tests, 0 failures"
     },
-    "preservation": {
+    "native_watch": {
       "status": "passed",
-      "summary": "Watch/Sleep authorities, 24 worktrees, archives 79/80/81/B82/Phase1A, 6 profiles + 1 identity, paired devices, 6 simulators verified"
+      "summary": "7/7"
+    },
+    "native_full": {
+      "status": "passed_with_known_baseline",
+      "summary": "1931 tests, 1 known peptide fixture failure"
     }
   },
   "open_gates": [
-    "Integrate 3ed3eae7 into the next Native build and run RecoverySleepReadModelTests"
+    "Founder connects iPhone/Watch -> install Build 82 (31988c06)",
+    "Fresh v3 activation dry-run + apply",
+    "Post-activation verification; canary FAIL -> HOLD"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T202500Z-shared-mac-safe-storage-cleanup-before-sleep-native.md",
-  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T203000Z-shared-mac-safe-storage-cleanup-before-sleep-native.md",
+  "full_report_path": "agent-handoffs/reports/20261002T210500Z-build82-sleep-v3-native-integration-activation.md",
+  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T210000Z-build82-sleep-v3-native-integration-activation.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
