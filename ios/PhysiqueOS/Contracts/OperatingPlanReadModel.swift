@@ -283,6 +283,10 @@ struct CoachingProgressPhotosReadModel: Codable, Equatable {
     var nextOccurrenceDate: String?
     /// Read-only: the most recent scheduled photo date on or before today.
     var lastOccurrenceDate: String?
+    /// Read-only: the schedule a cadence edit is measured against (after a
+    /// same-day edit, the schedule in force before today). Nil from an
+    /// older Server; the preview then uses this model's own dates.
+    var cadenceChangeBaseline: ProgressPhotoCadenceBaseline?
     /// False when the Server only sent the legacy `cadence`; such a Server
     /// can only save Weekly / Every 2 weeks.
     var serverSupportsFlexibleCadence: Bool = true
@@ -305,7 +309,7 @@ struct CoachingProgressPhotosReadModel: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case cadence, cadenceInterval, cadenceUnit, weekOfMonth, day, timeOfDay, specificTime, reminderEnabled
-        case nextOccurrenceDate, lastOccurrenceDate
+        case nextOccurrenceDate, lastOccurrenceDate, cadenceChangeBaseline
     }
 
     init(from decoder: Decoder) throws {
@@ -316,6 +320,8 @@ struct CoachingProgressPhotosReadModel: Codable, Equatable {
         reminderEnabled = try container.decode(Bool.self, forKey: .reminderEnabled)
         nextOccurrenceDate = try container.decodeIfPresent(String.self, forKey: .nextOccurrenceDate)
         lastOccurrenceDate = try container.decodeIfPresent(String.self, forKey: .lastOccurrenceDate)
+        // Display-only: an unreadable baseline must never fail the editor.
+        cadenceChangeBaseline = try? container.decodeIfPresent(ProgressPhotoCadenceBaseline.self, forKey: .cadenceChangeBaseline)
         if let unit = try container.decodeIfPresent(ProgressPhotoCadenceUnit.self, forKey: .cadenceUnit) {
             let interval = try container.decode(Int.self, forKey: .cadenceInterval)
             guard Self.intervalRange.contains(interval) else {
@@ -396,33 +402,59 @@ struct CoachingProgressPhotosReadModel: Codable, Equatable {
     }
 }
 
+/// The Server's read-only description of the schedule a cadence edit is
+/// measured against.
+struct ProgressPhotoCadenceBaseline: Decodable, Equatable {
+    var cadenceInterval: Int
+    var cadenceUnit: ProgressPhotoCadenceUnit
+    var weekOfMonth: ProgressPhotoWeekOfMonth?
+    var day: OperatingPlanWeekday
+    var nextOccurrenceDate: String?
+    var lastOccurrenceDate: String?
+}
+
 /// Display-only preview of when an edited Progress Photos cadence starts,
-/// mirroring the Server's rule (`resolveCadenceChangeAnchor`): today stays
-/// when it is already the scheduled day and still fits; weeks continue
-/// from the last scheduled photo day (last + k × interval) when it fits the
-/// weekday; otherwise the first matching day after today. The Server
-/// remains the authority and returns the saved date.
+/// mirroring the Server's rule (`resolveCadenceChangeAnchor`), measured
+/// against the Server's change baseline: an unchanged pattern keeps the
+/// saved schedule (a same-day revert restores the baseline); today stays
+/// when it is already the scheduled day and still fits; weeks start on the
+/// later of (last scheduled photo day + the new interval) and the first
+/// matching weekday after today when the last day fits the weekday;
+/// otherwise the first matching day after today. The Server remains the
+/// authority and returns the saved date.
 enum ProgressPhotoCadencePreview {
     static func firstOccurrence(edited: CoachingProgressPhotosReadModel, saved: CoachingProgressPhotosReadModel,
                                 today: String) -> String? {
-        if !edited.cadencePatternDiffers(from: saved) {
-            guard let next = saved.nextOccurrenceDate, next >= today else { return nil }
-            return next
+        if !edited.cadencePatternDiffers(from: saved) { return upcoming(saved.nextOccurrenceDate, today: today) }
+        var base = saved
+        if let baseline = saved.cadenceChangeBaseline {
+            base.cadenceInterval = baseline.cadenceInterval
+            base.cadenceUnit = baseline.cadenceUnit
+            base.weekOfMonth = baseline.weekOfMonth
+            base.day = baseline.day
+            base.nextOccurrenceDate = baseline.nextOccurrenceDate
+            base.lastOccurrenceDate = baseline.lastOccurrenceDate
+            if !edited.cadencePatternDiffers(from: base) { return upcoming(base.nextOccurrenceDate, today: today) }
         }
-        if saved.nextOccurrenceDate == today, matchesDayRule(edited, date: today) { return today }
-        if edited.cadenceUnit == .week, let last = saved.lastOccurrenceDate, last <= today,
-           matchesDayRule(edited, date: last), let lastDate = noonUTC(last), let todayDate = noonUTC(today) {
-            let step = edited.cadenceInterval * 7
-            let elapsed = Int((todayDate.timeIntervalSince(lastDate) / 86_400).rounded())
-            return dateKey(lastDate.addingTimeInterval(Double((elapsed / step + 1) * step) * 86_400))
-        }
+        if base.nextOccurrenceDate == today, matchesDayRule(edited, date: today) { return today }
         guard var cursor = noonUTC(today) else { return nil }
-        for _ in 0..<62 {
+        var firstAfterToday: String?
+        for _ in 0..<62 where firstAfterToday == nil {
             cursor = cursor.addingTimeInterval(86_400)
             let key = dateKey(cursor)
-            if matchesDayRule(edited, date: key) { return key }
+            if matchesDayRule(edited, date: key) { firstAfterToday = key }
         }
-        return nil
+        if edited.cadenceUnit == .week, let first = firstAfterToday, let last = base.lastOccurrenceDate, last <= today,
+           matchesDayRule(edited, date: last), let lastDate = noonUTC(last) {
+            let spaced = dateKey(lastDate.addingTimeInterval(Double(edited.cadenceInterval * 7) * 86_400))
+            return max(spaced, first)
+        }
+        return firstAfterToday
+    }
+
+    private static func upcoming(_ date: String?, today: String) -> String? {
+        guard let date, date >= today else { return nil }
+        return date
     }
 
     static func matchesDayRule(_ photos: CoachingProgressPhotosReadModel, date: String) -> Bool {

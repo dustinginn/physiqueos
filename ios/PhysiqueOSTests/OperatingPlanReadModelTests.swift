@@ -990,6 +990,25 @@ extension OperatingPlanReadModelTests {
         XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(2, .week), saved: monthly, today: "2026-10-04"), "2026-10-17")
         // A stale "next" (editor left open past the date) is not shown.
         XCTAssertNil(ProgressPhotoCadencePreview.firstOccurrence(edited: saved, saved: saved, today: "2026-10-04"))
+        // Shortening never pushes back an available day: every 3 weeks (last Aug 15) -> 2 weeks on Sep 1.
+        var threeWeeks = photos(3, .week, next: "2026-09-05")
+        threeWeeks.lastOccurrenceDate = "2026-08-15"
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(2, .week), saved: threeWeeks, today: "2026-09-01"), "2026-09-05")
+    }
+
+    func testProgressPhotoPreviewUsesServerBaselineForSameDayEdits() throws {
+        // Earlier today every 2 weeks (last Sep 19, next Oct 3) was changed to weekly
+        // (saved next Oct 3, no past occurrence yet). Baseline = the pre-today schedule.
+        let json = #"{"cadence":"weekly","cadenceInterval":1,"cadenceUnit":"week","weekOfMonth":null,"nextOccurrenceDate":"2026-10-03","lastOccurrenceDate":null,"cadenceChangeBaseline":{"cadence":"weekly_interval_2","cadenceInterval":2,"cadenceUnit":"week","weekOfMonth":null,"day":"saturday","nextOccurrenceDate":"2026-10-03","lastOccurrenceDate":"2026-09-19"},"day":"saturday","timeOfDay":"specific","specificTime":"10:00","reminderEnabled":true}"#
+        let saved = try decodePhotos(json)
+        XCTAssertEqual(saved.cadenceChangeBaseline?.cadenceInterval, 2)
+        // Reverting to every 2 weeks restores the original next date.
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(2, .week), saved: saved, today: "2026-10-01"), "2026-10-03")
+        // Changing again to every 3 weeks is counted from the original last photo day.
+        XCTAssertEqual(ProgressPhotoCadencePreview.firstOccurrence(edited: photos(3, .week), saved: saved, today: "2026-10-01"), "2026-10-10")
+        // A malformed baseline never fails the editor.
+        let malformed = try decodePhotos(#"{"cadence":"weekly","cadenceInterval":1,"cadenceUnit":"week","cadenceChangeBaseline":{"cadenceUnit":"fortnight"},"day":"saturday","timeOfDay":"morning","reminderEnabled":true}"#)
+        XCTAssertNil(malformed.cadenceChangeBaseline)
     }
 
     func testProgressPhotoMonthlyDayRuleHandlesMonthEndAndLeapYear() {
