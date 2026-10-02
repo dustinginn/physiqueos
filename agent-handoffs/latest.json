@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T03:45:00Z",
+  "generated_at_utc": "2026-10-02T04:05:00Z",
   "task": {
     "id": "native-build79-widget-priority-skip-integration-20261002",
-    "title": "Native Build 79: consolidate Home Screen Widget V1 + Priority Skip (blocked at App Group signing)",
+    "title": "Native Build 79: Home Screen Widget V1 + Priority Skip consolidation (uploaded, VALID)",
     "agent": "claude",
-    "status": "blocked"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -17,16 +17,16 @@
     "native_build": 79
   },
   "result": {
-    "summary": "Priority Skip 88d597b2 and Home Widget 82040143 integrated on Build 78 (branch claude/native-build79-widget-priority-skip-integration-20261002, final a75f93df, build 79). Prod Server 2d967e48 skipCommand contract verified read-only. Review fixes applied and re-reviewed (no blockers). Full suite 1889 tests, only the known Peptide failure; UI 6/6; renders regenerated. Release archive BLOCKED: new App Group needs development provisioning; the API key is rejected by Xcode for it and no Apple Account is in Xcode. Founder must sign into Xcode (team 33GMTRM6G9) and let automatic signing update both targets. Nothing uploaded.",
-    "success": false,
+    "summary": "Build 79 (1.0 (79)) from a75f93df uploaded and VALID, delivery 8937b165-e7df-4f46-87b5-63efd3ce8244. Integrates Priority Skip 88d597b2 + Home Widget 82040143 on Build 78 with reviewed fixes. Signed archive proven: app App Group + HealthKit; extension same App Group, no HealthKit; Home widget + Workout Live Activity in one extension. Server 2d967e48 skipCommand contract verified read-only. Backlog updated (main 9a295700). Physical acceptance pending.",
+    "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Full Native unit suite on final code: 1889 tests, 1 skipped, 1 known pre-existing Peptide sandbox failure, no new failures; widget/priority/Live Activity/TrainingSessionAuthority suites green; UI journeys 6/6 on a private iOS 27 simulator."
+      "summary": "Full Native unit suite on final code: 1889 tests, 1 skipped, 1 known pre-existing Peptide sandbox failure, no new failures; UI journeys 6/6; signed archive entitlements inspected; guarded dry run passed."
     },
     "review": {
       "status": "approved",
@@ -38,21 +38,19 @@
     }
   },
   "decisions_required": [
-    "Founder: sign into Xcode > Settings > Accounts with the team 33GMTRM6G9 Apple Account on this Mac, open ios/PhysiqueOS.xcodeproj in the Build 79 worktree, and let automatic signing finish for targets PhysiqueOS and PhysiqueOSLiveActivity (registers group.com.physiqueos.native.dev.shared on both App IDs); then tell Claude 'signing done' to archive a75f93df, upload Build 79 and wait for VALID."
+    "Founder physical-device acceptance of Build 79 (checklist in report): Home widget, peptide/Foam Skip, carried PR celebration and Live Activity."
   ],
-  "blockers": [
-    "Release archive signing: development profiles lack App Group group.com.physiqueos.native.dev.shared; xcodebuild -allowProvisioningUpdates with the approved ASC API key fails 'Authentication failed: ... bearer token'; no Apple Account in Xcode."
-  ],
+  "blockers": [],
   "unexpected_findings": [
-    "The ASC API key that does distribution cloud signing at export is not accepted by Xcode for development provisioning during archive.",
-    "The Widget candidate broke a Build 78 source-scan test (exact durable-ingest callback text); fixed in the integration."
+    "Opening the project in Xcode for the signing refresh re-serialized project.pbxproj and dropped HealthKit usage descriptions, NSSupportsLiveActivities and ITSAppUsesNonExemptEncryption from Info.plist; discarded (restored to a75f93df) and archived from a clean checkout. Do not commit those Xcode edits if they reappear.",
+    "The Widget candidate broke a Build 78 source-scan test; fixed in the integration."
   ],
   "backlog": [
-    "Backlog update deferred until Build 79 is VALID (per prompt).",
-    "Residual P3s listed in the report (Keychain-delete refresh loop edge, in-memory read cache not emptied at session boundary, training-day fallback cache, Weight try? read)."
+    "Backlog updated on main 9a295700: Build 79 shipped pending acceptance; widget + peptide/Foam Skip shipped pending acceptance.",
+    "Residual P3s listed in the report."
   ],
-  "recommended_next_step": "After the Founder's Xcode sign-in and automatic signing update, re-run the Release archive from exact a75f93df, inspect app/extension entitlements, guarded dry run, upload Build 79, wait for VALID, then update the backlog.",
-  "full_report_path": "agent-handoffs/reports/20261002T034500Z-native-build79-widget-priority-skip-integration.md",
+  "recommended_next_step": "Founder installs Build 79 from TestFlight and runs the compact acceptance checklist; mark backlog items complete only after confirmation.",
+  "full_report_path": "agent-handoffs/reports/20261002T040500Z-native-build79-widget-priority-skip-integration.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
