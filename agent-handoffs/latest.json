@@ -1,80 +1,59 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-09-29T08:30:00Z",
+  "generated_at_utc": "2026-10-02T04:48:46Z",
   "task": {
-    "id": "peptide-protocol-native-ux-redesign-next-batch-20260929",
-    "title": "DESIGN PUBLISHED: simplified peptide editor + canonical Pause/Resume (execution-item suspension window) + 3 Build 69 roll-forwards; implementation starting",
-    "agent": "claude",
-    "status": "in_progress"
+    "id": "apple-watch-workout-app-audit-plan-20261002",
+    "title": "Apple Watch Workout app architecture/product audit and implementation plan",
+    "agent": "codex",
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "production_server_sha": "98534bf8e91dd48da62fc807beae5d14c282aa04",
-    "native_build67_final_sha": "8359bdcb",
-    "native_reviewed_candidate_sha": "dc7763e5",
-    "native_build68_final_sha": "537f538b",
-    "native_build68_delivery_id": "fdd63617-ae8b-4fa5-b8f6-507b91703271",
-    "native_build68_processing_status": "VALID",
-    "native_build68_dsym_uuid": "6D40FE7E-B267-3778-A569-4B6445B03E0E",
-    "server_candidate_sha": "98534bf8",
-    "server_candidate_branch": "claude/server-records-on-prod-20260929",
-    "production_deployment_id": "ab7fe481-abd9-4334-bfcd-f224560bb801",
-    "previous_production_server_sha": "faa9151a8118acf48fda6541e8e23898f1148246",
-    "native_candidate_sha": "efa65db1",
-    "native_candidate_branch": "claude/native-build69-integrated-20260929",
-    "native_recommended_build": "69",
-    "codex_celebration_branch": "codex/native-workout-complete-record-celebration-20260928",
-    "codex_celebration_sha": "ef54e482",
-    "native_build69_final_sha": "efa65db1",
-    "native_build69_delivery_id": "91831873-845e-46af-aa6a-bb9629cf9999",
-    "native_build69_processing_status": "VALID",
-    "native_build69_dsym_uuid": "A621757F-1B2A-31FF-9D2D-62FD831781E6",
-    "last_uploaded_build": "69"
+    "main_base_sha": "7415b96fc4df2148508c90a3ff4727d17ead9c37",
+    "current_native_sha": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
+    "current_native_build": 80,
+    "audited_training_sha": "a75f93df1a84c33bbe6e9cec6d648a11ec53031d",
+    "audited_training_build": 79,
+    "build80_training_delta": "none; Build 80 is Home widget formatting plus build metadata",
+    "audited_production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486"
   },
   "result": {
-    "summary": "Audit (8 readers + critic + 3-lens adversarial critique) established the execution item as the sole peptide authority (versionless protocol roots; protocol.status must stay active). Design: history-preserving timeline rule (S1), Change dose = steady dose from a date (S2), pause/resume as a dated suspension window on the execution item enforced at the projection choke point plus Priority Detail, nextDue, completion ports and Morning Check-In (S3), additive read keys (S4). Native: one screen, tappable rows + focused sheets, Advanced disclosure, no generator vocabulary. Roll-forwards confirmed Server-only (provenance caption, Foam Rolling skip two layers, Weekly Averages six-week cap).",
+    "summary": "Comprehensive non-shipping audit recommends phone-authoritative structured Logger plus Watch-authoritative HealthKit workout, revisioned/idempotent WatchConnectivity commands, mirrored-session Live Activity adoption, deterministic External UUID reconciliation, explicit pause/rest clocks, and a phone-reachable V1 start from a prepared workout. Early-finish proof confirms unfinished planned sets do not become evidence, but finds a release-blocking partial-superset edge: when one member has zero completed sets, Native sends a dangling relationship and Server rejects the entire finish atomically.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
-    "founder_device_operated": false
+    "shipping_watch_code_implemented": false
   },
   "validation": {
-    "tests": {
-      "status": "pending",
-      "summary": "Implementation not started at publish time."
-    },
-    "review": {
+    "native_payload_proof": {
       "status": "passed",
-      "summary": "Design critique: 3 lenses, sound-with-changes; blockers folded into the map."
+      "summary": "Focused Build 79 simulator test with audit-only assertions proved the commit payload contained the completed set and excluded the unfinished planned set; temporary assertions were removed."
     },
-    "replay_fidelity": {
+    "server_partial_superset_proof": {
+      "status": "passed_with_blocker_found",
+      "summary": "Audit-only Vitest cases passed within a 55/55 file run: both partially performed members commit correctly; one wholly unperformed member causes atomic TRAINING_SUPERSET_INVALID with no evidence mutation. Temporary tests were removed."
+    },
+    "source_cleanliness": {
       "status": "passed",
-      "summary": "Read-only production shapes (peptides, Foam Rolling protocol, weight weeks) verified; no production change."
+      "summary": "Build 79 audit source was clean after instrumentation removal; no product code changed."
     }
   },
   "decisions_required": [
-    "Optional Founder input (not blocking): should briefings say 'paused' for a paused peptide (today they keep treating it as part of the plan)?",
-    "Optional: include supplement reminders in Mark Skipped (deferred in this build)."
+    "Approve phone-reachable structured start for V1 while removing any dependency on HealthKit synchronization.",
+    "Approve phone-prepared Ready for Watch workouts as the V1 start source.",
+    "Approve confirmation for every Finish action, including after the final planned set.",
+    "Approve Total Calories as unavailable when basal energy cannot be established.",
+    "Approve traditional indoor strength training and watchOS 11+ for V1."
   ],
-  "blockers": [],
-  "unexpected_findings": [
-    "Sep 28 Activity is still frozen in production (supersedes continue to 837 cal); self-heals at the next-morning complete_day summary."
+  "blockers": [
+    "Fix performed-session relationship projection before Watch shipping: filter each relationship to performed occurrence ids and drop groups with fewer than two performed members, then add evidence-level partial-superset tests."
   ],
-  "backlog": [
-    "Workout Complete performance-record celebration: Codex, pending; integrate on its GH report.",
-    "Cross-device freeze residuals: time-based takeover / missing-metric guard / long-supersede alert.",
-    "Duplicate Logger instance guard; skip 412 auto-refetch; prune notifier/celebration keys.",
-    "Session-renewal resilience; Face ID evaluation; peptide items; Photo magnitude producer; Sleep.",
-    "Low-protein runs as a Weekly/Midweek insight; spanning-month Energy prose window."
-  ],
-  "recommended_next_step": "Claude implements Server (gated) and Native candidates per the map, then publishes the combined candidate for review.",
-  "full_report_path": "agent-handoffs/reports/20260929T083000Z-peptide-protocol-editor-pause-resume-design-map.md",
-  "related_report_paths": [
-    "agent-handoffs/reports/20260929T050000Z-server-98534bf8-and-native-build69-distribution.md",
-    "agent-handoffs/reports/20260929T060000Z-native-build69-final-integrated-candidate.md",
-    "agent-handoffs/reports/20260929T043000Z-daily-driver-server-faa9151a-production-deploy.md",
-    "agent-handoffs/reports/20260929T050000Z-native-consolidated-daily-driver-candidate-build69.md"
+  "recommended_next_step": "Execute Phase 0 only: repair and prove early-finish relationship projection, introduce prepared/active/paused/finishing lifecycle and pure shared protocol/clock contracts, then run a disposable Watch target/signing spike before building UI.",
+  "full_report_path": "agent-handoffs/reports/20261002T045500Z-apple-watch-workout-app-audit-plan.md",
+  "artifacts": [
+    "agent-handoffs/artifacts/apple-watch-workout-v1/watch-workout-v1-board.svg",
+    "agent-handoffs/artifacts/apple-watch-workout-v1/README.md"
   ],
   "safety": {
     "contains_secrets": false,
