@@ -133,7 +133,7 @@ Trigger:
 - Founder begins planning actual beta onboarding, or DO cost/performance symptoms recur.
 
 7. Apple Watch companion
-Status: PHASE 1A IN PROGRESS on `codex/apple-watch-workout-v1-phase1a-overnight`; checkpoint 1 target/transport/execution UI is pushed at `e9c7b3cbb7669ecbc49e3a3ff1e96884f55ff608` and is not a release candidate.
+Status: PHASE 1A SOURCE/TEST CANDIDATE COMPLETE on `codex/apple-watch-workout-v1-phase1a-overnight` at `1b8838a4caee79daf0f77ad479d449ec7ef9a77a`; not a signed release candidate and never uploaded.
 Locked V1:
 - phone is the sole structured `TrainingSessionAuthority` and planning surface; Watch starts one phone-prepared Ready-for-Watch plan only while the paired phone is reachable;
 - after start, a disconnected Watch HealthKit workout may continue, but every structured mutation fails closed until phone authority returns;
@@ -148,15 +148,18 @@ Phase 0 implemented:
 - minimal Ready-for-Watch marker/selection, pure versioned Watch commands/acks/projections/metrics, and phone authority router with compare-and-set/idempotency semantics;
 - trusted exact PhysiqueOS Watch workout correlation seam is additive and default-disabled; trusted exact links do not create duplicate performed Training evidence, and a second exact workout claim fails closed;
 - non-shipping Watch target/signing feasibility is proven against the Founder's physical Apple Watch; no Watch target or TestFlight build was shipped.
-Phase 1A checkpoint 1 implemented:
+Phase 1A implemented:
 - generator-owned watchOS target/test target, shared schema-v1 contracts, phone `WCSession` bridge and deterministic latest-projection delivery;
 - Ready-for-Watch phone affordance and locked PhysiqueOS Watch Start/execution/metrics/controls/paused/final/offline/superset/single-set surfaces with split Load/Reps;
-- real Watch-owned HealthKit strength session adapter and recovery entry point compile for watchOS 11+.
-Phase 1A remaining gates:
-- complete and test the recoverable finish/HealthKit/Server saga, mirroring, summary and correlation state;
-- repair Watch simulator XCTest bootstrap and prove paired disconnect/relaunch/failure scenarios;
-- reconcile latest shipping Native, run full regressions and fresh review;
-- prove signed archive identity/packaging and physical paired-workout acceptance before enabling trusted correlation or uploading any Watch build.
+- real Watch-owned HealthKit strength lifecycle, metrics, mirroring/recovery, phone-authoritative pause parity, two-leg recoverable Finish saga, completion summary, haptics and Always-On treatment;
+- latest shipping Build 81 Progress Photos authority reconciled; paired simulator builds/renders and full/focused regressions complete with no new deterministic failures;
+- unsigned Release packaging contains iPhone + Live Activity/Widget + embedded Watch with version/build parity.
+Phase 1A remaining physical/release gates:
+- Founder signs into the Apple Developer account in Xcode and creates/refreshes a HealthKit-capable profile for `com.physiqueos.native.dev.watchkitapp` (current wildcard profile is not sufficient);
+- signed archive entitlement/companion inspection and safe paired iPhone/Watch install;
+- Health authorization plus one physical prepared-workout Start/Complete/Pause/Resume/Finish acceptance, including disconnect/reconnect and relaunch recovery;
+- battery/Always-On observation and exact HealthKit-to-structured correlation proof on the saved workout;
+- independent post-device review before enabling the production trusted Watch bundle allowlist or uploading a Watch TestFlight build.
 
 OPERATIONAL / ENVIRONMENT
 

@@ -1,60 +1,46 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T07:15:00Z",
+  "generated_at_utc": "2026-10-02T07:38:00Z",
   "task": {
-    "id": "progress-photos-flexible-cadence-20261002",
-    "title": "Progress Photos flexible cadence (Every N Weeks / Months)",
-    "agent": "claude",
-    "status": "completed_pending_founder_acceptance"
+    "id": "apple-watch-workout-v1-phase1a-overnight",
+    "title": "Apple Watch Workout V1 Phase 1A",
+    "agent": "codex",
+    "status": "checkpoint2_complete_final_release_gates_open"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
+    "implementation_branch": "codex/apple-watch-workout-v1-phase1a-overnight",
+    "implementation_sha": "1b8838a4caee79daf0f77ad479d449ec7ef9a77a",
+    "shipping_native_sha": "6a0932517cbd8de165bf25c7637a2d2d6fea03dc",
+    "shipping_native_build": 81,
     "production_server_sha": "4ffde0f5faf1832decfbc09d822088aeba0dca89",
-    "production_deployment": "faaf66bd-930f-46a2-9b8e-77e604c23a86",
-    "previous_production_server_sha": "2d967e48cb6a01e4a327934bbd81a405d3c26486",
-    "server_branch": "claude/progress-photos-flexible-cadence-server-20261002",
-    "native_base_sha": "1783691debeea46d3e4e6b2f6e470abe032c4c74",
-    "native_base_build": 80,
-    "native_branch": "claude/progress-photos-flexible-cadence-20261002",
-    "native_candidate_sha": "6a0932517cbd8de165bf25c7637a2d2d6fea03dc",
-    "native_candidate_build": 81,
-    "native_build81_delivery": "212d79dd-cc57-4319-ab8c-d9694f0585ad",
-    "next_native_build": 82
+    "production_deployment": "faaf66bd-930f-46a2-9b8e-77e604c23a86"
   },
   "result": {
-    "summary": "Progress Photos cadence is now Every [1-12] [Weeks|Months] (monthly = weekday of the month). Server 4ffde0f5 deployed (faaf66bd) and verified on the Founder's real data (Every 2 weeks unchanged: next 10-03, 10-17, 10-31; no migration). Native Build 81 (6a093251) uploaded VALID. Founder physical acceptance pending.",
+    "summary": "Phase 1A checkpoint 2 completes Watch-owned HealthKit lifecycle, mirroring/recovery, phone-authoritative pause parity, the two-leg recoverable Finish saga, summary, haptics and actual state renders on top of reconciled Build 81. Unsigned Release packaging passes; signing stops safely because Xcode lacks an authenticated Developer account and the wildcard profile lacks Watch HealthKit.",
     "success": true,
     "production_mutated": false,
-    "deployed": true,
-    "testflight_uploaded": true
+    "deployed": false,
+    "testflight_uploaded": false
   },
   "validation": {
-    "server_full_unit_suite": {
-      "status": "passed",
-      "summary": "4ffde0f5: 9562 passed / 304 failed, identical failure set to 2d967e48 baseline; 0 new"
-    },
-    "server_independent_review": {
-      "status": "passed",
-      "summary": "3 rounds; final no P0/P1/P2; 81,896-change sweep"
-    },
-    "native_full_unit_suite": {
-      "status": "passed",
-      "summary": "6a093251: 1903 tests, 1 skipped, 1 known pre-existing failure (PeptideSupportEditorViewModelTests sandbox)"
-    },
-    "production_probe": {
-      "status": "passed",
-      "summary": "read-only pre/post deploy; Founder schedule unchanged"
-    },
-    "native_release": {
-      "status": "passed",
-      "summary": "archive verified; guarded dry run + upload; VALID"
-    }
+    "native_full": "1918 passed, 1 skipped, 1 known Build 81 baseline date-fixture failure; 0 new",
+    "watch_reducers": "2 passed, 0 failed",
+    "server_training": "156 passed, 0 failed",
+    "server_command_ports": "53 passed, 0 failed",
+    "server_healthkit_focused": "116 passed, 0 failed",
+    "server_healthkit_broad": "717 passed, 6 known stale audit-sentinel failures",
+    "unsigned_release_packaging": "passed"
   },
   "open_gates": [
-    "Founder physical acceptance of Build 81 (see report section L)"
+    "Apple Developer account authentication and HealthKit-capable Watch provisioning profile",
+    "signed archive and entitlement/companion inspection",
+    "paired physical Watch Health authorization and real-workout acceptance",
+    "physical disconnect/relaunch, recovery, correlation and battery proof",
+    "independent post-device release review before trust allowlist or TestFlight"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T070000Z-progress-photos-flexible-cadence.md",
-  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T060000Z-progress-photos-flexible-cadence.md",
+  "full_report_path": "agent-handoffs/reports/20261002T073800Z-apple-watch-workout-v1-phase1a-checkpoint2.md",
+  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T064500Z-apple-watch-workout-v1-phase1a-overnight.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
