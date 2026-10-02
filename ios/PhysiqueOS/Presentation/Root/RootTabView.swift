@@ -83,7 +83,55 @@ struct RootTabView: View {
         }
         // Tapping the Workout Live Activity. Navigation only: the URL never
         // mutates a workout, and the session must exist on this device.
-        .onOpenURL { openWorkoutFromLiveActivity($0) }
+        .onOpenURL { openExternalURL($0) }
+    }
+
+    private func openExternalURL(_ url: URL) {
+        if let route = HomeWidgetDeepLink.parse(url) {
+            openFromHomeWidget(route)
+        } else {
+            openWorkoutFromLiveActivity(url)
+        }
+    }
+
+    private func openFromHomeWidget(_ route: HomeWidgetDeepLink) {
+        let authority = environment.trainingSessionAuthority(for: environment.nativeAuthority)
+        switch HomeWidgetNavigationResolver.resolve(
+            route,
+            selectedAuthority: environment.nativeAuthority,
+            sessionAuthority: authority
+        ) {
+        case .logRoot:
+            selectedTab = .log
+            logPath = NavigationPath()
+        case .destination(let destination):
+            selectedTab = .log
+            Task { @MainActor in
+                await Task.yield()
+                logPath = NavigationPath()
+                noteNavigation(destination)
+                logPath.append(destination)
+            }
+        case .refreshTotals:
+            selectedTab = .log
+            logPath = NavigationPath()
+            Task { await environment.homeWidgetRefreshRelay.request() }
+        case .startWorkout:
+            openWorkoutLogger(sessionId: nil)
+        case .resumeWorkout(let sessionId):
+            openWorkoutLogger(sessionId: sessionId)
+        }
+    }
+
+    private func openWorkoutLogger(sessionId: String?) {
+        selectedTab = .log
+        Task { @MainActor in
+            await Task.yield()
+            logPath = NavigationPath()
+            environment.pendingTrainingLoggerResumeDraftId = sessionId
+            noteNavigation(.trainingLogger)
+            logPath.append(AppDestination.trainingLogger)
+        }
     }
 
     private func openWorkoutFromLiveActivity(_ url: URL) {

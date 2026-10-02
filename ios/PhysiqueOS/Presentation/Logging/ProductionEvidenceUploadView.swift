@@ -876,6 +876,7 @@ struct ProductionEvidenceUploadView: View {
             case .training, .dexa, .progressPhotos:
                 throw ProductionNativeError.invalidResponse
             }
+            await environment.homeWidgetRefreshRelay.request()
             phase = .confirmed
         } catch {
             phase = .failed(Self.errorMessage(for: error))

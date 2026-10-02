@@ -13,6 +13,10 @@ INFO = IOS_ROOT / "PhysiqueOS" / "Supporting" / "Info.plist"
 EXTENSION_INFO = IOS_ROOT / "PhysiqueOSLiveActivity" / "Info.plist"
 EXTENSION_BUNDLE_ID = "com.physiqueos.native.dev.WorkoutActivity"
 ENTITLEMENTS = IOS_ROOT / "PhysiqueOS" / "Supporting" / "PhysiqueOS.entitlements"
+EXTENSION_ENTITLEMENTS = IOS_ROOT / "PhysiqueOSLiveActivity" / "PhysiqueOSLiveActivity.entitlements"
+WIDGET_BUNDLE = IOS_ROOT / "PhysiqueOSLiveActivity" / "PhysiqueOSLiveActivityBundle.swift"
+HOME_WIDGET = IOS_ROOT / "PhysiqueOSLiveActivity" / "HomeLoggedTodayWidget.swift"
+APP_GROUP = "group.com.physiqueos.native.dev.shared"
 
 
 def main() -> None:
@@ -43,6 +47,8 @@ def main() -> None:
         raise SystemExit("AppIcon is not wired in both app configurations")
     if project.count('CODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";') != 2:
         raise SystemExit("HealthKit entitlements are not wired in both app configurations")
+    if project.count('CODE_SIGN_ENTITLEMENTS = "PhysiqueOSLiveActivity/PhysiqueOSLiveActivity.entitlements";') != 2:
+        raise SystemExit("App Group entitlements are not wired in both extension configurations")
     if "HealthKit.framework in Frameworks" not in project:
         raise SystemExit("HealthKit.framework is not linked by the app target")
     with INFO.open("rb") as handle:
@@ -68,9 +74,25 @@ def main() -> None:
         raise SystemExit("HealthKit entitlement is missing")
     if entitlements.get("com.apple.developer.healthkit.background-delivery") is not True:
         raise SystemExit("Future HealthKit background-delivery entitlement is missing")
+    if entitlements.get("com.apple.security.application-groups") != [APP_GROUP]:
+        raise SystemExit("The app must carry exactly the approved Home widget App Group")
+    with EXTENSION_ENTITLEMENTS.open("rb") as handle:
+        extension_entitlements = plistlib.load(handle)
+    if extension_entitlements.get("com.apple.security.application-groups") != [APP_GROUP]:
+        raise SystemExit("The extension App Group does not match the app")
+    if "com.apple.developer.healthkit" in extension_entitlements:
+        raise SystemExit("The widget extension must not inherit the app's HealthKit entitlement")
+    widget_bundle = WIDGET_BUNDLE.read_text()
+    home_widget = HOME_WIDGET.read_text()
+    if "HomeLoggedTodayWidget()" not in widget_bundle:
+        raise SystemExit("The existing WidgetBundle does not register the Home widget")
+    if '.supportedFamilies([.systemSmall, .systemLarge])' not in home_widget:
+        raise SystemExit("Home widget V1 must explicitly support its square primary and large detail families")
+    if "StaticConfiguration" not in home_widget:
+        raise SystemExit("Home widget configuration is missing")
     print(
         f"release configuration verified: version 1.0 ({build_number}), AppIcon, "
-        "HealthKit capability declarations, exempt encryption, Workout Live Activity extension"
+        "HealthKit app-only capability, matching App Group, Workout Live Activity + Home widget extension"
     )
 
 

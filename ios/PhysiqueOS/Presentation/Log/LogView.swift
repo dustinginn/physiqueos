@@ -34,6 +34,7 @@ struct LogView: View {
             }
             await viewModel?.load()
             await syncWorkoutReconciliationNotifications()
+            await environment.homeWidgetRefreshRelay.request()
         }
         // Logged Today is a daily-driver "Today" surface: it reloads when the
         // local day or zone changes (the environment invalidates the cached

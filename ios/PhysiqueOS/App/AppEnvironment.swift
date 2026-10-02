@@ -301,6 +301,9 @@ final class AppEnvironment {
     /// remain fixture-backed and cannot silently mix this sandbox read.
     let founderServerAPI: FounderServerAPI
     let productionNativeAPI: ProductionNativeAPI
+    /// App-owned refresh requests from successful background HealthKit
+    /// ingestion and app surfaces. The widget never performs these reads.
+    let homeWidgetRefreshRelay: HomeWidgetRefreshRelay
     /// Runs the Strength reconciliation-review notifier after every durably
     /// accepted HealthKit ingest, whatever tab is open.
     let workoutReconciliationNotificationRefresher: WorkoutReconciliationNotificationRefresher
@@ -698,6 +701,8 @@ final class AppEnvironment {
         self.briefingSandboxStore = briefingSandboxStore
         self.founderServerAPI = founderServerAPI
         self.productionNativeAPI = productionNativeAPI
+        let homeWidgetRefreshRelay = HomeWidgetRefreshRelay()
+        self.homeWidgetRefreshRelay = homeWidgetRefreshRelay
         self.founderPhotoMediaStore = founderPhotoMediaStore ?? FounderPhotoMediaStore(api: founderServerAPI)
         self.founderProductionPhotoMediaStore = FounderProductionPhotoMediaStore(api: productionNativeAPI)
         self.productionIdempotencyKeyStore = ProductionIdempotencyKeyStore()
@@ -719,7 +724,12 @@ final class AppEnvironment {
             ?? ProductionHealthKitObservationUploader(
                 api: productionNativeAPI,
                 ledger: canonicalizationLedger,
-                onDurablyAccepted: { Task { await reconciliationRefresher.requestRefresh() } },
+                onDurablyAccepted: {
+                    Task {
+                        await reconciliationRefresher.requestRefresh()
+                        await homeWidgetRefreshRelay.request()
+                    }
+                },
                 onSleepIngestionDisabled: { healthKitSleepActivation.markServerDisabled(at: Date()) }
             )
         // The automatic engine alone carries the Workout activation floor
