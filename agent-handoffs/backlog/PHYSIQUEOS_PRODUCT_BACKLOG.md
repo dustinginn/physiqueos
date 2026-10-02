@@ -82,21 +82,18 @@ Acceptance:
 - notification clears/updates appropriately.
 
 4. HealthKit Sleep — prospective canary acceptance
-Status: canary FAIL (P2 Oura copy splice) until v3 activation. sleep-canon-v3 deployed DORMANT (Server d0ff6596). Founder ACCEPTED the documented rare out-of-order Oura revision ambiguity as a known residual limitation (normal-order fuzz 0/7,500 splices; adversarial 2/1,500; v3 never worse than v2 without revision identity); ambiguousContinuationCount stays visible. Native v2+v3 compatibility integrated into Build 82 (e2cbcd0c) — TestFlight VALID (delivery f3d09d99). Activation waits for the Founder to install Build 82 remotely and CONFIRM; then guarded dry-run + apply (exact prospective set >= 2026-10-02) and canary -> HOLD (never PASS). D0 2026-10-02 validation_only. Strategic Sleep OFF.
+Status: HOLD (not PASS) since 2026-10-02 22:00Z. sleep-canon-v3 ACTIVE for ordinary prospective Sleep (effective 2026-10-02; policy healthkit_sleep_canonical_algorithm_policy). P2 Oura copy splice resolved prospectively: Oct 2 corrected v2 rev2 -> v3 rev3 (asleep ~455, deep ~98.5, REM ~117.5, core ~239, awake ~25 min, 73 segments; one coherent revision, 0 ambiguity). Activation changed exactly 2 of 52 collections (config + Oct 2 day); historical mutation 0; strategic mutation 0. Founder accepted the rare out-of-order Oura revision ambiguity as a known residual (visible via ambiguousContinuationCount). D0 2026-10-02 validation_only. Strategic Sleep OFF.
 Authority:
-- Server d0ff65965233fa44e108387f01b649a2bdb476df (branch claude/healthkit-sleep-canon-v3-20261002); no canonical-algorithm policy record yet -> ordinary ingest still sleep-canon-v2.
-- report agent-handoffs/reports/20261002T201500Z-healthkit-sleep-canon-v3-copy-coherence.md
+- Server d0ff65965233fa44e108387f01b649a2bdb476df (deployment 64533990); Native Build 82 e2cbcd0c (TestFlight f3d09d99, Founder-installed, v2+v3 stage-capable).
+- activation report agent-handoffs/reports/20261002T220000Z-healthkit-sleep-canon-v3-prospective-activation.md
+- v3 design report agent-handoffs/reports/20261002T201500Z-healthkit-sleep-canon-v3-copy-coherence.md
 - canary audit agent-handoffs/reports/20261002T182755Z-healthkit-sleep-prospective-canary-audit.md
-sleep-canon-v3 (authority for ordinary prospective days once activated; historical Sleep permanently v2):
-- one coherent Oura revision per night using ingestion provenance (reliable revision batches never mixed); no provenance -> exactly v2's selection; ambiguity counted, never hidden.
-- zero-write audit: historical 0/87 and validation 0/30 nights change; Oct 2 v3 == Oura revision 2 alone (asleep ~455, deep ~99, REM ~118, core ~239, awake ~25 min).
-- guarded activation (buildHealthKitPayload --kind sleep-canon-v3) dry-run on live d0ff6596: target set exactly [2026-10-02]; mutation 0.
-Next gates (in order):
-1. DONE: Native v2+v3 compatibility in Build 82 (e2cbcd0c, TestFlight VALID f3d09d99; RecoverySleepReadModelTests passed). Founder installs Build 82 remotely and confirms.
-2. DONE: Founder accepted the out-of-order residual (kept visible via ambiguousContinuationCount).
-3. Activation (only after Founder install confirmation): fresh dry-run, then apply with authorization ref + expected facts (use --max-days if > 7 prospective days exist); verify stored == fresh v3, Evidence stages corrected, strategicEligible false, 0 strategic/historical changes. Canary -> HOLD.
-4. Natural gates under v3: >=2 (prefer 3) natural nights (ideally an Oura duplicate-revision night); one morning with Oura synced while PhysiqueOS stays unopened >=75 min (background delivery); Oct 4 Weekly (and Oct 7 Midweek) scanned: zero Sleep/Recovery markers, Confidence unmoved; >=14 reliable prospective nights before a Recovery baseline is meaningful.
-- no manual Sleep import; no backfill; no historical recanonicalization.
+Remaining natural gates (canary -> PASS only after all):
+1. >=2 (prefer 3) natural prospective nights (Oct 3+) accepted under sleep-canon-v3; ideally one Oura duplicate-revision night (check copySelection diagnostics).
+2. Closed-app background delivery: Oura syncs while PhysiqueOS stays unopened >=75 min; Sleep receipt precedes any Founder command.
+3. Post-boundary strategic-leakage checks: Sun Oct 4 Weekly (and Wed Oct 7 Midweek if needed) scanned — zero Sleep/Recovery markers; Goal/Strategy Confidence unmoved by Sleep.
+4. 14 reliable prospective nights before any Recovery baseline interpretation (~Oct 15 at the earliest).
+- no manual Sleep import; no backfill; no historical recanonicalization (historical stays sleep-canon-v2).
 After acceptance:
 - authorize prospective validation-only Sleep as input to Recovery shadow assessment through a separately reviewed non-strategic composition boundary.
 
@@ -116,7 +113,7 @@ Accepted product direction:
 - Recovery status does not automatically move Goal Confidence;
 - training corroboration is non-causal.
 Next:
-- wait for prospective Sleep canary acceptance (2026-10-02 audit: FAIL on P2 copy splice; v3 fix deployed dormant, activation pending Native v3 acceptance; see item 4);
+- wait for prospective Sleep canary acceptance (HOLD since 2026-10-02: v3 active, natural-night/background/leakage gates pending; see item 4);
 - note: a prospective-only prior-28 baseline needs >=14 reliable nights, so non-"Not enough data" shadow output is not possible before ~Oct 15 even once authorized;
 - review/authorize prospective-only non-strategic shadow input boundary;
 - run shadow calibration;

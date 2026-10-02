@@ -1,51 +1,53 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T21:35:00Z",
+  "generated_at_utc": "2026-10-02T22:00:00Z",
   "task": {
     "id": "build82-sleep-v3-native-integration-activation-20261002",
-    "title": "Build 82 (Watch + Sleep v3 compatibility) TestFlight; Sleep v3 dormant",
+    "title": "sleep-canon-v3 prospective activation",
     "agent": "claude",
-    "status": "testflight_valid_awaiting_founder_remote_install"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "uploaded_native_sha": "e2cbcd0cf40dca64a4c8490bf0ebd4077b2eb69c",
-    "uploaded_native_build": 82,
-    "testflight_delivery_id": "f3d09d99-9b8e-4344-85e7-5d2ddcc04519",
     "production_server_sha": "d0ff65965233fa44e108387f01b649a2bdb476df",
-    "sleep_v3": "dormant"
+    "production_deployment": "64533990-3f04-43bc-b710-a2d28dc1850e",
+    "native_build": 82,
+    "native_sha": "e2cbcd0cf40dca64a4c8490bf0ebd4077b2eb69c",
+    "testflight_delivery_id": "f3d09d99-9b8e-4344-85e7-5d2ddcc04519",
+    "sleep_canonical_algorithm": "sleep-canon-v3 (ordinary, effective 2026-10-02)"
   },
   "result": {
-    "summary": "Build 82 (Watch V1 Cancel + Sleep v2/v3 Native compatibility + Progress Photos) uploaded from e2cbcd0c and VALID (delivery f3d09d99). First upload was rejected by App Store validation for UIBackgroundModes in the Watch bundle; fixed to WKBackgroundModes. Sleep v3 still dormant (no policy; target set [2026-10-02]); production mutation 0. Next: Founder installs Build 82 from TestFlight remotely and confirms; then guarded v3 activation.",
+    "summary": "After Founder confirmed Build 82 remote install, guarded sleep-canon-v3 activation applied: policy enabled (effective 2026-10-02) and Oct 2 recanonicalized v2 rev2 -> v3 rev3 (455/98.5/117.5/239/25 min, 73 segments, one coherent revision). Exactly 2 of 52 collections changed; historical 0; strategic 0. Canary FAIL -> HOLD.",
     "success": true,
-    "production_mutated": false,
+    "production_mutated": true,
     "deployed": false,
-    "testflight_uploaded": true
+    "testflight_uploaded": false
   },
   "validation": {
-    "native_focused": {
+    "preflight": {
       "status": "passed",
-      "summary": "603/603 on 31988c06"
+      "summary": "authority, D0, quarantine, v3 dormant, markers 0"
     },
-    "native_full": {
-      "status": "passed_with_known_baseline",
-      "summary": "1931 tests, only the known peptide fixture failure"
-    },
-    "watch": {
+    "dry_run": {
       "status": "passed",
-      "summary": "7/7 on e2cbcd0c"
+      "summary": "target exactly [2026-10-02]"
     },
-    "app_store_validation": {
+    "apply_in_transaction": {
       "status": "passed",
-      "summary": "VALID, Watch bundle validated"
+      "summary": "all verification checks true"
+    },
+    "post_apply_independent": {
+      "status": "passed",
+      "summary": "2/52 collections changed (config + Oct 2); stored == fresh v3; Evidence stages served; strategicEligible false"
     }
   },
   "open_gates": [
-    "Founder installs Build 82 from TestFlight (iPhone + Watch) and confirms",
-    "Guarded Sleep v3 dry-run + apply + verify; canary FAIL -> HOLD",
-    "Watch V1 physical acceptance on TestFlight build"
+    ">=2-3 natural v3 nights",
+    "closed-app background delivery proof",
+    "Oct 4 Weekly / Oct 7 Midweek leakage scan",
+    "14 reliable nights before Recovery baseline"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T213500Z-build82-sleep-v3-native-integration-activation.md",
+  "full_report_path": "agent-handoffs/reports/20261002T220000Z-healthkit-sleep-canon-v3-prospective-activation.md",
   "parent_report_path": "agent-handoffs/inbox/prompts/20261002T212500Z-build82-testflight-remote-workflow-correction.md",
   "safety": {
     "contains_secrets": false,
