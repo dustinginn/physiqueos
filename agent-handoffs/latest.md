@@ -2,14 +2,18 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Native Build 80: Home Screen widget whole-number Nutrition/Activity formatting (uploaded, VALID) (`native-build80-widget-number-formatting-20261002`)
-- Agent: claude
+- Task: Apple Watch Workout app architecture/product audit and implementation plan (`apple-watch-workout-app-audit-plan-20261002`)
+- Agent: Codex
 - Status: completed
-- Generated (UTC): 2026-10-02T04:30:00Z
+- Generated (UTC): 2026-10-02T04:48:46Z
 - Success: true
+- Production/TestFlight/shipping Watch changes: none
+- Current shipping Native: Build 80 (`1783691debeea46d3e4e6b2f6e470abe032c4c74`); training paths audited from unchanged Build 79 authority (`a75f93df1a84c33bbe6e9cec6d648a11ec53031d`)
 
-Summary: Build 80 (1.0 (80)) from 1783691d uploaded and VALID, delivery 39ae9ddd-271e-438c-80c2-f24137637e2f. One HomeWidgetValueFormatter: calories/active calories whole with grouping, macros whole grams, Weight one decimal; display only. Renders regenerated; entitlements verified (app App Group + HealthKit, extension App Group only); backlog updated (main a8ef512a).
+Summary: The recommended V1 keeps the phone authoritative for the structured Logger and the Watch authoritative for the HealthKit workout, connected by revisioned/idempotent commands and deterministic session-id reconciliation. Early-finish proof confirms unfinished planned sets do not become evidence, but a partial superset with one wholly unperformed member currently rejects finish atomically; fixing the relationship projection is a Watch release blocker.
 
-Detailed report: `agent-handoffs/reports/20261002T043000Z-native-build80-widget-number-formatting.md`
+Detailed report: `agent-handoffs/reports/20261002T045500Z-apple-watch-workout-app-audit-plan.md`
+
+Mockups: `agent-handoffs/artifacts/apple-watch-workout-v1/watch-workout-v1-board.svg`
 
 Protocol: `agent-handoffs/README.md`

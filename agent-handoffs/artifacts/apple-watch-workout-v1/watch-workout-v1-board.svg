@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1050" viewBox="0 0 1500 1050" role="img" aria-labelledby="title desc">
+  <title id="title">PhysiqueOS Apple Watch Workout V1 state mockups</title>
+  <desc id="desc">Twelve non-shipping Apple Watch mockups: Start, normal set, final set, finish available, metrics, controls, paused, countdown, offline, stale, superset, and single-set exercise.</desc>
+  <defs>
+    <style>
+      .canvas{fill:#111317}.frame{fill:#24272d}.screen{fill:#050607}.label{fill:#eef0f2;font:600 18px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif}.cap{fill:#7f8792;font:500 13px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;letter-spacing:.5px}.eyebrow{fill:#9ca3ad;font:600 10px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;letter-spacing:.9px}.title{fill:#f7f8f9;font:700 16px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif}.body{fill:#d3d7dc;font:500 12px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}.muted{fill:#828a95;font:500 10px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}.num{fill:#f7f8f9;font:700 27px -apple-system,BlinkMacSystemFont,"SF Pro Rounded",sans-serif}.smallnum{fill:#f7f8f9;font:700 20px -apple-system,BlinkMacSystemFont,"SF Pro Rounded",sans-serif}.green{fill:#b8f34a}.greenText{fill:#b8f34a;font:700 12px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}.orange{fill:#ff9f32}.orangeText{fill:#ff9f32;font:700 12px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}.red{fill:#ff5a5f}.redText{fill:#ff6b70;font:700 12px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}.blue{fill:#59b8ff}.blueText{fill:#59b8ff;font:700 12px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}.button{fill:#b8f34a}.buttonText{fill:#111317;font:800 13px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif}.soft{fill:#1b1e23}.divider{stroke:#30343a;stroke-width:1}.track{fill:#282c31}.heart{fill:none;stroke:#ff6268;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+    <g id="watch">
+      <rect class="frame" x="0" y="24" width="230" height="278" rx="60"/>
+      <rect class="screen" x="13" y="37" width="204" height="252" rx="49"/>
+      <rect class="frame" x="228" y="104" width="9" height="51" rx="4.5"/>
+      <circle class="frame" cx="233" cy="89" r="9"/>
+    </g>
+  </defs>
+  <rect class="canvas" width="1500" height="1050"/>
+  <text class="label" x="55" y="42">PhysiqueOS Workout on Apple Watch</text>
+  <text class="cap" x="55" y="66">NON-SHIPPING PRODUCT MOCKUPS · 45 MM REFERENCE · V1 RECOMMENDATION</text>
+
+  <!-- 1 Start -->
+  <g transform="translate(55 85)"><use href="#watch"/><text class="cap" x="8" y="18">START</text>
+    <text class="eyebrow" x="34" y="67">READY ON IPHONE</text><text class="title" x="34" y="92">Push + Pull A</text>
+    <text class="body" x="34" y="114">6 exercises · 18 sets</text><text class="muted" x="34" y="135">Estimated 52 min</text>
+    <rect class="button" x="34" y="166" width="162" height="55" rx="27"/><text class="buttonText" x="115" y="199" text-anchor="middle">START WORKOUT</text>
+    <text class="muted" x="115" y="250" text-anchor="middle">Starts Logger + Health workout</text>
+  </g>
+
+  <!-- 2 Normal set -->
+  <g transform="translate(405 85)"><use href="#watch"/><text class="cap" x="8" y="18">NORMAL SET</text>
+    <text class="eyebrow" x="32" y="62">PREVIOUS · BENCH PRESS</text><text class="body" x="32" y="80">185 lb × 8</text>
+    <line class="divider" x1="32" y1="91" x2="198" y2="91"/><text class="eyebrow" x="32" y="110">CURRENT · SET 3 OF 4</text><text class="title" x="32" y="132">Bench Press</text>
+    <text class="num" x="32" y="166">190 × 8</text><text class="orangeText" x="198" y="164" text-anchor="end">01:18</text>
+    <rect class="button" x="32" y="187" width="166" height="51" rx="25"/><text class="buttonText" x="115" y="218" text-anchor="middle">COMPLETE SET</text>
+    <rect class="track" x="32" y="255" width="166" height="4" rx="2"/><rect class="green" x="32" y="255" width="72" height="4" rx="2"/>
+  </g>
+
+  <!-- 3 Final set -->
+  <g transform="translate(755 85)"><use href="#watch"/><text class="cap" x="8" y="18">FINAL SET TRANSITION</text>
+    <text class="eyebrow" x="32" y="63">CURRENT · SET 3 OF 3</text><text class="title" x="32" y="86">Cable Fly</text>
+    <text class="num" x="32" y="123">35 × 12</text><text class="orangeText" x="198" y="121" text-anchor="end">00:42</text>
+    <rect class="soft" x="32" y="141" width="166" height="46" rx="15"/><text class="eyebrow" x="45" y="159">UP NEXT</text><text class="body" x="45" y="178">Triceps Pressdown · 45 × 10</text>
+    <rect class="button" x="32" y="202" width="166" height="46" rx="23"/><text class="buttonText" x="115" y="230" text-anchor="middle">COMPLETE SET</text>
+    <text class="muted" x="115" y="269" text-anchor="middle">15 / 18 complete</text>
+  </g>
+
+  <!-- 4 Finished plan -->
+  <g transform="translate(1105 85)"><use href="#watch"/><text class="cap" x="8" y="18">FINAL WORKOUT</text>
+    <circle cx="115" cy="91" r="34" fill="#18210e"/><path d="M96 91l13 13 25-29" fill="none" stroke="#b8f34a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <text class="title" x="115" y="145" text-anchor="middle">Plan complete</text><text class="body" x="115" y="166" text-anchor="middle">18 of 18 sets</text>
+    <rect class="button" x="32" y="188" width="166" height="55" rx="27"/><text class="buttonText" x="115" y="221" text-anchor="middle">FINISH WORKOUT</text>
+    <text class="muted" x="115" y="269" text-anchor="middle">Does not finish automatically</text>
+  </g>
+
+  <!-- 5 Metrics -->
+  <g transform="translate(55 405)"><use href="#watch"/><text class="cap" x="8" y="18">CROWN METRICS</text>
+    <text class="eyebrow" x="33" y="64">WORKOUT METRICS</text><text class="smallnum" x="33" y="95">38:24</text><text class="muted" x="198" y="93" text-anchor="end">ELAPSED</text>
+    <path class="heart" d="M35 124c0-11 14-14 20-4 6-10 20-7 20 4 0 9-20 22-20 22s-20-13-20-22z"/><text class="smallnum" x="82" y="141">128</text><text class="muted" x="198" y="138" text-anchor="end">BPM</text>
+    <text class="orangeText" x="33" y="181">ACTIVE</text><text class="smallnum" x="198" y="183" text-anchor="end">286 kcal</text>
+    <text class="blueText" x="33" y="219">TOTAL</text><text class="smallnum" x="198" y="221" text-anchor="end">—</text>
+    <text class="muted" x="115" y="266" text-anchor="middle">Crown ↑ returns to workout</text>
+  </g>
+
+  <!-- 6 Controls -->
+  <g transform="translate(405 405)"><use href="#watch"/><text class="cap" x="8" y="18">SWIPE-LEFT CONTROLS</text>
+    <text class="eyebrow" x="32" y="65">WORKOUT CONTROLS</text>
+    <rect class="soft" x="32" y="86" width="76" height="78" rx="24"/><circle class="orange" cx="70" cy="116" r="13"/><rect x="65" y="108" width="4" height="16" fill="#111317"/><rect x="72" y="108" width="4" height="16" fill="#111317"/><text class="body" x="70" y="151" text-anchor="middle">Pause</text>
+    <rect class="soft" x="122" y="86" width="76" height="78" rx="24"/><circle class="red" cx="160" cy="116" r="13"/><rect x="154" y="110" width="12" height="12" rx="2" fill="#111317"/><text class="body" x="160" y="151" text-anchor="middle">Finish</text>
+    <rect x="32" y="184" width="166" height="65" rx="20" fill="#231315"/><text class="title" x="115" y="207" text-anchor="middle">Finish now?</text><text class="muted" x="115" y="225" text-anchor="middle">7 planned sets remain</text><text class="redText" x="115" y="243" text-anchor="middle">CONFIRM FINISH</text>
+  </g>
+
+  <!-- 7 Paused -->
+  <g transform="translate(755 405)"><use href="#watch"/><text class="cap" x="8" y="18">PAUSED</text>
+    <circle class="orange" cx="115" cy="92" r="33"/><rect x="103" y="75" width="8" height="34" rx="3" fill="#111317"/><rect x="119" y="75" width="8" height="34" rx="3" fill="#111317"/>
+    <text class="title" x="115" y="145" text-anchor="middle">Workout paused</text><text class="body" x="115" y="166" text-anchor="middle">Elapsed 38:24 · Rest frozen</text>
+    <rect class="button" x="32" y="190" width="166" height="55" rx="27"/><text class="buttonText" x="115" y="223" text-anchor="middle">RESUME</text>
+    <text class="muted" x="115" y="269" text-anchor="middle">Set completion disabled</text>
+  </g>
+
+  <!-- 8 Countdown -->
+  <g transform="translate(1105 405)"><use href="#watch"/><text class="cap" x="8" y="18">COUNTDOWN</text>
+    <text class="eyebrow" x="115" y="70" text-anchor="middle">REST ENDING</text><circle cx="115" cy="139" r="51" fill="#17191d" stroke="#ff9f32" stroke-width="7" stroke-dasharray="270 51" stroke-linecap="round"/>
+    <text class="num" x="115" y="149" text-anchor="middle">0:10</text><text class="body" x="115" y="211" text-anchor="middle">Up next · Lat Pulldown</text><text class="greenText" x="115" y="231" text-anchor="middle">120 lb × 10</text>
+    <text class="muted" x="115" y="269" text-anchor="middle">Haptic at 10 · 5 · 0</text>
+  </g>
+
+  <!-- 9 Offline -->
+  <g transform="translate(55 725)"><use href="#watch"/><text class="cap" x="8" y="18">OFFLINE</text>
+    <path d="M81 94c19-16 49-16 68 0M94 108c12-10 30-10 42 0M108 122c4-4 10-4 14 0" fill="none" stroke="#ff6b70" stroke-width="5" stroke-linecap="round"/><line x1="79" y1="72" x2="153" y2="141" stroke="#ff6b70" stroke-width="5" stroke-linecap="round"/>
+    <text class="title" x="115" y="171" text-anchor="middle">iPhone unavailable</text><text class="body" x="115" y="193" text-anchor="middle">Workout continues in Health</text>
+    <rect class="soft" x="32" y="211" width="166" height="43" rx="21"/><text class="body" x="115" y="237" text-anchor="middle">Retry connection</text>
+    <text class="redText" x="115" y="274" text-anchor="middle">Set logging disabled</text>
+  </g>
+
+  <!-- 10 Stale -->
+  <g transform="translate(405 725)"><use href="#watch"/><text class="cap" x="8" y="18">STALE / CONFLICT</text>
+    <circle cx="115" cy="101" r="40" fill="#231d10"/><path d="M115 76v30l19 11" fill="none" stroke="#ff9f32" stroke-width="6" stroke-linecap="round"/>
+    <text class="title" x="115" y="160" text-anchor="middle">Workout changed</text><text class="body" x="115" y="181" text-anchor="middle">Phone is on revision 24</text>
+    <rect class="button" x="32" y="202" width="166" height="51" rx="25"/><text class="buttonText" x="115" y="233" text-anchor="middle">REFRESH WORKOUT</text>
+    <text class="muted" x="115" y="273" text-anchor="middle">No duplicate set was recorded</text>
+  </g>
+
+  <!-- 11 Superset -->
+  <g transform="translate(755 725)"><use href="#watch"/><text class="cap" x="8" y="18">SUPERSET</text>
+    <text class="purpleText" x="32" y="64" style="fill:#c59cff;font:700 12px -apple-system">SUPERSET · ROUND 2 OF 3</text><text class="title" x="32" y="91">A1 · Incline Press</text><text class="num" x="32" y="129">65 × 10</text>
+    <rect class="soft" x="32" y="145" width="166" height="46" rx="15"/><text class="eyebrow" x="45" y="163">UP NEXT · A2</text><text class="body" x="45" y="182">Chest-supported Row · 70 × 10</text>
+    <rect class="button" x="32" y="205" width="166" height="46" rx="23"/><text class="buttonText" x="115" y="233" text-anchor="middle">COMPLETE A1</text>
+    <text class="muted" x="115" y="271" text-anchor="middle">Rest after A2</text>
+  </g>
+
+  <!-- 12 Single set -->
+  <g transform="translate(1105 725)"><use href="#watch"/><text class="cap" x="8" y="18">SINGLE-SET EXERCISE</text>
+    <text class="eyebrow" x="32" y="65">ONLY SET</text><text class="title" x="32" y="91">Farmer Carry</text><text class="num" x="32" y="129">70 × 45s</text>
+    <rect class="soft" x="32" y="146" width="166" height="47" rx="15"/><text class="eyebrow" x="45" y="164">UP NEXT</text><text class="body" x="45" y="183">Cable Curl · 35 × 12</text>
+    <rect class="button" x="32" y="207" width="166" height="46" rx="23"/><text class="buttonText" x="115" y="235" text-anchor="middle">COMPLETE SET</text>
+    <text class="muted" x="115" y="273" text-anchor="middle">Exercise completes with this set</text>
+  </g>
+</svg>
