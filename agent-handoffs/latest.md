@@ -2,20 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: PhysiqueOS Home Screen widget audit and implementation plan (`home-screen-widget-audit-plan-20261002`)
-- Agent: codex
-- Status: complete
-- Generated (UTC): 2026-10-02T01:11:10Z
+- Task: Priority Skip: peptides + Foam Rolling notification capability (Server-owned skipCommand) (`priority-skip-peptides-foam-notification-20261002`)
+- Agent: claude
+- Status: completed
+- Generated (UTC): 2026-10-02T02:15:00Z
 - Success: true
 
-Summary: Recommend a medium-only V1 with Calories eaten, Protein, Active calories, and a navigation-only Start/Resume Workout action. The widget should read a versioned App Group snapshot written by the app; it should not authenticate to the Server, query HealthKit, create sessions, or own a parallel workout authority. Start/Resume resolves through the existing `TrainingSessionAuthority` after the app opens.
+Summary: Server 2d967e48 deployed (421cae1a, live/ready/SHA parity verified): peptides canonically skippable (skip records no dose) and explicit notificationAction.skipCommand for peptides and Foam Rolling, never supplements. Native patch 88d597b2 (on Build 78) renders Skip only from skipCommand; integration-ready, not uploaded, awaiting consolidation with the Home Screen Widget.
 
-Detailed report: `agent-handoffs/reports/20261002T011110Z-home-screen-widget-audit-plan.md`
-
-Mockups: `docs/home-screen-widget-audit/home-screen-widget-v1-board.svg.png` (synthetic, non-shipping).
-
-Native authorities inspected: shipped Build 77 / `c299fa29a14e04a4a22ac782d4610a4562e4f6e0`; intermediate Build 78 / `b09e6819c6bc7f43b2c8f13b98eaa23c12fb5623`; final Build 78 / `5911dd2a6f968c5a355ec68d3313f0e5e644d529` (delivery `32447de5-04be-459b-a795-2b8469cbeffd`, VALID). The plan starts implementation from final Build 78 authority.
-
-No shipping code, signing, production, Server, Build 78, TestFlight, Xcode, Simulator, DerivedData, or archive change was made.
+Detailed report: `agent-handoffs/reports/20261002T021500Z-priority-skip-peptides-foam-notification.md`
 
 Protocol: `agent-handoffs/README.md`
