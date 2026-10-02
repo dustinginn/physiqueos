@@ -18,7 +18,7 @@ Agent handoff reports describe implementation state. This backlog describes what
 ACTIVE / NEXT
 
 1. Workout Logger Live Activities — physical-device acceptance
-Status: Build 77 VALID; implementation complete; natural workout acceptance pending. Build 78 (VALID) carries the same Live Activity behavior unchanged; acceptance can be done on Build 78.
+Status: Build 77 VALID; implementation complete; natural workout acceptance pending. Builds 78 and 79 (both VALID) carry the same Live Activity behavior unchanged (in Build 79 the same extension also hosts the Home Screen widget); acceptance can be done on Build 79.
 Authority:
 - shipping source c299fa29
 - final report agent-handoffs/reports/20261001T220947Z-workout-live-activities-phase1-implementation.md
@@ -27,8 +27,8 @@ Next:
 - Observe Lock Screen/Dynamic Island rendering, load/reps legibility, Complete Set, Stopwatch, final-set transitions, supersets, deep link, and lifecycle behavior.
 - Do not patch typography/density until real-workout feedback unless correctness is broken.
 
-2. Performance Record celebration — SHIPPED in Build 78 (VALID), pending physical acceptance
-Status: integrated (reconciled with Build 77 TrainingSessionAuthority) + celebratory haptic; Build 78 source 5911dd2a, delivery 32447de5 VALID. Not complete until a natural future PR workout is accepted.
+2. Performance Record celebration — SHIPPED in Build 78 (VALID), carried unchanged in Build 79 (VALID); pending physical acceptance
+Status: integrated (reconciled with Build 77 TrainingSessionAuthority) + celebratory haptic; Build 78 source 5911dd2a, delivery 32447de5 VALID; Build 79 source a75f93df, delivery 8937b165 VALID (PR lifecycle UI journey re-passed). Not complete until a natural future PR workout is accepted.
 Build 78 report: agent-handoffs/reports/20261002T010500Z-native-build78-completion-notification-polish.md
 Authority:
 - fix branch codex/workout-pr-celebration-lifecycle-fix-20261001
@@ -46,7 +46,7 @@ Acceptance:
 - no historical replay.
 
 3. Actionable Priority notifications — add Skip action
-Status: SHIPPED in Build 78 (VALID), pending physical acceptance. Simple binary Priorities get Complete (check-circle) + Skip + Snooze; peptides keep planned-dose Complete + Snooze; Morning Check-In/weight unchanged. Recovery Support (e.g. Foam Rolling) Skip remains Priority Detail only until the Server publishes a skip command in notificationAction.
+Status: SHIPPED in Build 78 (VALID), pending physical acceptance. Simple binary Priorities get Complete (check-circle) + Skip + Snooze; Morning Check-In/weight unchanged. Build 79 (VALID) extends Skip to peptides and Foam Rolling from the Server-owned skipCommand (see BUILD 79 below); supplements remain Complete + Snooze.
 Context:
 - PhysiqueOS now supports a canonical skipped state for applicable actionable Priorities.
 - Existing actionable notification flows already support actions such as completion and snooze.
@@ -187,7 +187,7 @@ Status: IN PROGRESS / Build 77 real-workout acceptance.
 Founder plans several days of real use before finalizing ergonomics/typography.
 
 2. Home Screen widget
-Status: HIGH-INTEREST / likely next iOS feature after Live Activities settles.
+Status: SHIPPED in Build 79 (VALID, delivery 8937b165), pending Founder physical acceptance — see BUILD 79 below. Founder-approved V1 = systemSmall four-tile square (primary) + optional systemLarge detailed Logged Today alternate.
 Founder clarified desired V1 on 2026-10-01:
 - mirror the existing Native "Logged Today" summary as closely as WidgetKit allows;
 - include Training summary;
@@ -215,8 +215,16 @@ Desired direction:
 - HealthKit remains physiological workout-observation layer.
 Use Build 77 Live Activity real-world acceptance to inform Watch V1 interaction design.
 
+BUILD 79 — SHIPPED (VALID, delivery 8937b165-e7df-4f46-87b5-63efd3ce8244), pending Founder physical acceptance
+Source a75f93df (branch claude/native-build79-widget-priority-skip-integration-20261002) = Build 78 + Priority Skip 88d597b2 + Home Screen Widget 82040143 + integration review fixes. Production Server 2d967e48 (skipCommand contract verified read-only). Report: agent-handoffs/reports/20261002T040500Z-native-build79-widget-priority-skip-integration.md.
+Keep each item until the Founder confirms on device:
+- Home Screen widget V1: gallery discovery; small square (Nutrition cal + P/C/F, active cal, today's Weight); optional large (adds Training); no-weight; refresh; Start Logger / Resume Workout; stale/offline and locked/privacy; real App Group population; widget empties after Production revoke/re-pair, then refills.
+- Item E peptide/Foam Skip: peptide Detail Mark Skipped; peptide notification Complete (planned dose) / Skip / Snooze; skipped peptide records no dose; Foam Rolling notification Complete / Skip / Snooze; supplement Complete / Snooze (no Skip); Morning Check-In no actions.
+- Build 78 items A-D are carried unchanged in Build 79; their acceptance can be done on Build 79.
+Residual non-blocking review notes are listed in the Build 79 report (known limitations).
+
 BUILD 78 — SHIPPED (VALID, delivery 32447de5), pending Founder physical acceptance
-Items A-D below shipped in Build 78 (source 5911dd2a). Keep until acceptance; Workout set-completion haptic intentionally deferred.
+Items A-D below shipped in Build 78 (source 5911dd2a) and are carried unchanged in Build 79. Keep until acceptance; Workout set-completion haptic intentionally deferred.
 
 A. Performance Record celebration lifecycle fix
 Authority: 69cad804e2ac7d74ed98914e1601f2e7863dadc3.
@@ -243,7 +251,7 @@ Avoid haptics on ordinary read-only navigation/charts/browsing.
 
 
 E. Priority Skip capability expansion — peptides + Foam Rolling notifications
-Status: accepted follow-up after Build 78; include in the next consolidated Native/Server-compatible release.
+Status: SHIPPED — Server 2d967e48 (deployed 2026-10-02) + Native Build 79 (VALID); pending Founder physical acceptance (see BUILD 79). Supplement Skip and peptide un-skip remain deferred product decisions.
 
 Peptides:
 - peptide occurrences must support canonical Skip even though Complete remains specialized/dose-aware;
