@@ -333,7 +333,11 @@ describe("execution-backed peptide Support skip contract", () => {
     });
     const past = peptideService();
     expect(await past.service.getPriorityDetail("reminder_peptide_weekly", "user", { occurrenceDate: "2026-09-09" }))
-      .toMatchObject({ skippable: false, skipCommand: null });
+      .toMatchObject({ skippable: false, skipCommand: null, notificationAction: { skipCommand: null } });
+    // A future occurrence: the notification may skip on its own day; the
+    // detail button (today-only) may not.
+    expect(await past.service.getPriorityDetail("reminder_peptide_weekly", "user", { occurrenceDate: "2026-09-23" }))
+      .toMatchObject({ skippable: false, skipCommand: null, notificationAction: { skipCommand: { commandType: "priority.skip.v1" } } });
     const completed = peptideService({ reminder: peptideReminder({
       completionHistory: [{ occurrenceDate: TODAY, completedAt: `${TODAY}T17:30:00.000Z`, effectiveDose: "0.5 mg" }],
     }) });

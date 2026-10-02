@@ -459,7 +459,8 @@ describe("Execution-backed Daily Focus skip capability", () => {
       executionItems: [execution(), supplementExecution],
     });
     const creatine = priority(items, "Creatine");
-    if (creatine) expect(creatine.notificationAction.skipCommand).toBeNull();
+    expect(creatine).toBeDefined();
+    expect(creatine.notificationAction.skipCommand).toBeNull();
     expect(priority(items).notificationAction.skipCommand).not.toBeNull();
   });
 });

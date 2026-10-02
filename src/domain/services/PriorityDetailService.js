@@ -188,7 +188,9 @@ export function createPriorityDetailService({ repositories, now = () => new Date
               priorityId: projection.priorityId,
               occurrenceDate: projection.localDate,
               timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
-              skippable: skipSupported,
+              // A notification skip is only meaningful on or before its
+              // own day; a past occurrence belongs to Morning Check-In.
+              skippable: skipSupported && projection.localDate >= today,
             }
           ), projection), protocol.category);
           if (!skipSupported) return supportDetail;
@@ -246,7 +248,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           occurrenceDate,
           completed,
           skipEntry,
-        }), reminder, occurrenceDate, open, null, isPrioritySkipSupportedReminder(reminder)), { reminder, occurrenceDate, today, open });
+        }), reminder, occurrenceDate, open, null, occurrenceDate >= today && isPrioritySkipSupportedReminder(reminder)), { reminder, occurrenceDate, today, open });
       }
 
       return createFallbackPriorityDetail(priorityId, goals, occurrenceDate);
@@ -304,8 +306,9 @@ function withDoseAdjustable(detail, category) {
 // stays Completed and untouched.
 function withPausedOccurrence(detail, projection) {
   if (!detail) return null;
+  // Completed and Skipped are terminal and win over a later pause.
   const paused = projection?.operationalState === ExecutionPriorityOperationalState.PAUSED &&
-    projection.occurrenceCompleted !== true;
+    projection.occurrenceCompleted !== true && detail.status !== "Skipped";
   if (!paused) return detail;
   const executionContract = detail.executionContract
     ? Object.freeze({ ...detail.executionContract, expectedVersion: null })
