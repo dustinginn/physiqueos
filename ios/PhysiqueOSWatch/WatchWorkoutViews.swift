@@ -42,8 +42,17 @@ struct WatchWorkoutRootView: View {
     }
 
     private func execution(_ projection: WatchWorkoutProjection) -> some View {
-        TabView {
-            WatchWorkoutExecutionView(store: store, projection: projection)
+#if DEBUG
+        if store.debugSurface == "metrics" {
+            return AnyView(WatchWorkoutMetricsView(store: store, projection: projection))
+        }
+#endif
+        return AnyView(TabView {
+            WatchWorkoutExecutionView(
+                store: store,
+                projection: projection,
+                forceReducedLuminance: store.debugSurface == "always-on"
+            )
             WatchWorkoutMetricsView(store: store, projection: projection)
         }
         .tabViewStyle(.verticalPage)
@@ -51,7 +60,7 @@ struct WatchWorkoutRootView: View {
             DragGesture(minimumDistance: 36).onEnded { value in
                 if value.translation.width < -42 { store.setControlsVisible(true) }
             }
-        )
+        ))
     }
 
     private var unavailable: some View {
@@ -110,12 +119,13 @@ struct WatchWorkoutStartView: View {
 struct WatchWorkoutExecutionView: View {
     @Bindable var store: WatchWorkoutStore
     let projection: WatchWorkoutProjection
+    var forceReducedLuminance = false
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: isLuminanceReduced ? 15 : 1)) { context in
+        TimelineView(.periodic(from: .now, by: (isLuminanceReduced || forceReducedLuminance) ? 15 : 1)) { context in
             ScrollView {
-                VStack(spacing: 6) {
+                VStack(spacing: 2) {
                     progress
                     if projection.phase == .paused { status("PAUSED", color: WatchPhysiqueOSTheme.warning) }
                     if store.connectionState != .reachable { status("OFFLINE · HEALTH CONTINUES", color: WatchPhysiqueOSTheme.warning) }
@@ -160,7 +170,7 @@ struct WatchWorkoutExecutionView: View {
                         .foregroundStyle(WatchPhysiqueOSTheme.muted)
                 }
                 .padding(.horizontal, 7)
-                .padding(.vertical, 5)
+                .padding(.vertical, 4)
                 .background(row.isCompletionTarget ? WatchPhysiqueOSTheme.secondarySurface : WatchPhysiqueOSTheme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 9))
             }
@@ -179,7 +189,7 @@ struct WatchWorkoutExecutionView: View {
             Text(value).font(.system(size: 24, weight: .black, design: .rounded)).minimumScaleFactor(0.6)
             Text(label).font(.system(size: 8, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.muted)
         }
-        .frame(maxWidth: .infinity, minHeight: 42)
+        .frame(maxWidth: .infinity, minHeight: 38)
         .background(WatchPhysiqueOSTheme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
@@ -199,22 +209,42 @@ struct WatchWorkoutExecutionView: View {
             VStack(spacing: 0) {
                 Text(rest.mode == .countdown ? "REST COUNTDOWN" : "REST STOPWATCH")
                     .font(.system(size: 8, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.muted)
-                Text(clock(seconds)).font(.system(size: 34, weight: .black, design: .rounded)).monospacedDigit()
+                Text(clock(seconds)).font(.system(size: 30, weight: .black, design: .rounded)).monospacedDigit()
             }
         }
     }
 
     @ViewBuilder
     private var primaryAction: some View {
-        if projection.completedSets == projection.totalSets, projection.totalSets > 0 {
-            Button("Finish Workout") { store.requestFinish() }
-                .buttonStyle(.borderedProminent).tint(WatchPhysiqueOSTheme.purple)
-                .disabled(store.isMutationPending || store.connectionState != .reachable)
+        if projection.phase == .finishing {
+            HStack(spacing: 6) {
+                ProgressView().tint(WatchPhysiqueOSTheme.purple)
+                Text("Finishing safely…").font(.caption).foregroundStyle(WatchPhysiqueOSTheme.muted)
+            }
+        } else if projection.completedSets == projection.totalSets, projection.totalSets > 0 {
+            executionButton("Finish Workout") { store.requestFinish() }
         } else {
-            Button("Complete Set") { store.completeSet() }
-                .buttonStyle(.borderedProminent).tint(WatchPhysiqueOSTheme.purple)
-                .disabled(!projection.canCompleteSet || store.isMutationPending || store.connectionState != .reachable)
+            executionButton("Complete Set", enabled: projection.canCompleteSet) { store.completeSet() }
         }
+    }
+
+    private func executionButton(
+        _ title: String,
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 16, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(WatchPhysiqueOSTheme.purple)
+                .foregroundStyle(WatchPhysiqueOSTheme.background)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled || store.isMutationPending || store.connectionState != .reachable)
+        .opacity((enabled && !store.isMutationPending && store.connectionState == .reachable) ? 1 : 0.45)
     }
 
     @ViewBuilder
@@ -226,6 +256,15 @@ struct WatchWorkoutExecutionView: View {
         case .finishPending: Text("Finish pending…")
         case .rejected(let reason): Text("Not recorded · \(reason)")
         case nil: EmptyView()
+        }
+        if let finish = projection.finish {
+            if finish.healthSaved && finish.serverPending {
+                Text("Health saved · PhysiqueOS pending")
+            } else if finish.serverCommitted && !finish.healthSaved {
+                Text("PhysiqueOS saved · Health pending")
+            } else if finish.healthFailed {
+                Text("Health save needs retry")
+            }
         }
     }
 
@@ -280,14 +319,9 @@ struct WatchWorkoutControlsView: View {
     @Bindable var store: WatchWorkoutStore
 
     var body: some View {
+        ScrollView {
         VStack(spacing: 8) {
             Text("WORKOUT CONTROLS").font(.system(size: 9, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.muted)
-            Button(store.projection?.phase == .paused ? "Resume" : "Pause") { store.pauseOrResume() }
-                .buttonStyle(.borderedProminent).tint(WatchPhysiqueOSTheme.purple)
-                .disabled(store.isMutationPending || store.connectionState != .reachable)
-            Button("Finish Workout", role: .destructive) { store.requestFinish() }
-                .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.destructive)
-                .disabled(store.isMutationPending || store.connectionState != .reachable)
             if store.projection?.finishEligibility == .confirmable {
                 let remaining = max(0, (store.projection?.totalSets ?? 0) - (store.projection?.completedSets ?? 0))
                 Text(remaining == 0
@@ -299,11 +333,27 @@ struct WatchWorkoutControlsView: View {
                     Button("Finish", role: .destructive) { store.confirmFinish() }
                 }
                 .disabled(store.isMutationPending)
+            } else {
+                Button(store.projection?.phase == .paused ? "Resume" : "Pause") { store.pauseOrResume() }
+                    .buttonStyle(.borderedProminent).tint(WatchPhysiqueOSTheme.purple)
+                    .disabled(store.isMutationPending || store.connectionState != .reachable)
+                Button("Finish Workout", role: .destructive) { store.requestFinish() }
+                    .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.destructive)
+                    .disabled(store.isMutationPending || store.connectionState != .reachable)
+                if store.notice == .healthStartFailed {
+                    Button("Retry Health Start") { store.retryHealthStart() }
+                        .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.warning)
+                }
+                if store.projection?.finish?.healthFailed == true {
+                    Button("Retry Health Save") { store.retryHealthFinish() }
+                        .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.warning)
+                }
             }
             Button("Back") { store.setControlsVisible(false) }
                 .buttonStyle(.plain).foregroundStyle(WatchPhysiqueOSTheme.muted)
         }
         .padding(.horizontal, 8)
+        }
         .gesture(DragGesture(minimumDistance: 36).onEnded { value in
             if value.translation.width > 42 { store.setControlsVisible(false) }
         })
@@ -320,13 +370,41 @@ struct WatchWorkoutSummaryView: View {
                 Image(systemName: "checkmark.circle.fill").font(.title).foregroundStyle(WatchPhysiqueOSTheme.success)
                 Text("WORKOUT SAVED").font(.headline)
                 Text("\(projection.completedSets) completed sets").font(.caption).foregroundStyle(WatchPhysiqueOSTheme.muted)
-                if let calories = store.health.activeCalories { Text("\(Int(calories.rounded())) active cal") }
-                if let heartRate = store.health.averageHeartRateBPM { Text("\(Int(heartRate.rounded())) avg BPM") }
-                if store.health.lifecycle != .saved {
-                    Text("Health saved / PhysiqueOS pending")
+                LazyVGrid(
+                    columns: [.init(.flexible()), .init(.flexible()), .init(.flexible())],
+                    spacing: 5
+                ) {
+                    if let duration = projection.summary?.activeDurationSeconds {
+                        summaryMetric("\(Int(duration) / 60)m", "ACTIVE")
+                    }
+                    if let volume = projection.summary?.volume {
+                        summaryMetric("\(Int(volume.rounded()).formatted())", "LB VOLUME")
+                    }
+                    if let calories = store.health.activeCalories {
+                        summaryMetric("\(Int(calories.rounded()))", "ACTIVE CAL")
+                    }
+                    if let heartRate = store.health.averageHeartRateBPM {
+                        summaryMetric("\(Int(heartRate.rounded()))", "AVG BPM")
+                    }
+                    if let prs = projection.summary?.authoritativePRCount {
+                        summaryMetric("\(prs)", "PR\(prs == 1 ? "" : "S")")
+                    }
+                }
+                if projection.finish?.correlationPending == true {
+                    Text("Correlation pending")
                         .font(.caption2).foregroundStyle(WatchPhysiqueOSTheme.warning).multilineTextAlignment(.center)
                 }
             }
         }
+    }
+
+    private func summaryMetric(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 0) {
+            Text(value).font(.system(size: 15, weight: .bold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.65)
+            Text(label).font(.system(size: 8, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.muted)
+        }
+        .frame(maxWidth: .infinity, minHeight: 39)
+        .background(WatchPhysiqueOSTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
     }
 }

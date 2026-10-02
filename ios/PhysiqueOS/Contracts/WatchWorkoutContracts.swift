@@ -35,6 +35,8 @@ struct WatchWorkoutCommand: Codable, Equatable, Sendable {
         case requestFinish
         case cancelFinish
         case confirmFinish
+        case reportHealthSaved
+        case reportHealthSaveFailed
         case unknown
         static let fallback: Self = .unknown
     }
@@ -47,6 +49,9 @@ struct WatchWorkoutCommand: Codable, Equatable, Sendable {
     var expectedRevision: Int
     var exerciseId: String?
     var setId: String?
+    /// Stable saga identity. The confirm command's mutation id becomes this
+    /// value; later HealthKit reports carry it across revision refreshes.
+    var finishOperationId: String? = nil
     var issuedAt: Date
 
     var isBoundedAndSupported: Bool {
@@ -57,6 +62,7 @@ struct WatchWorkoutCommand: Codable, Equatable, Sendable {
             && expectedRevision >= 0
             && exerciseId.map { !$0.isEmpty && $0.count <= WatchWorkoutContract.maximumIdentifierLength } ?? true
             && setId.map { !$0.isEmpty && $0.count <= WatchWorkoutContract.maximumIdentifierLength } ?? true
+            && finishOperationId.map { !$0.isEmpty && $0.count <= WatchWorkoutContract.maximumIdentifierLength } ?? true
     }
 }
 
@@ -153,6 +159,24 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
     var stalenessReason: StalenessReason?
     var lastAcknowledgedMutationId: String?
     var metrics: WatchWorkoutMetrics?
+    var finish: WatchWorkoutFinishStatus? = nil
+    var summary: WatchWorkoutSummary? = nil
+}
+
+struct WatchWorkoutFinishStatus: Codable, Equatable, Sendable {
+    var operationId: String
+    var healthSaved: Bool
+    var healthFailed: Bool
+    var serverCommitted: Bool
+    var serverPending: Bool
+    var correlationPending: Bool
+}
+
+struct WatchWorkoutSummary: Codable, Equatable, Sendable {
+    var activeDurationSeconds: Double?
+    var completedSets: Int
+    var volume: Double?
+    var authoritativePRCount: Int?
 }
 
 /// Small deterministic delivery gate shared by transport tests and the

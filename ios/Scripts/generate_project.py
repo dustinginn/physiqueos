@@ -459,6 +459,7 @@ HOME_WIDGET_BLOCK = 0x17FF
 # phone transport, and watch unit-test target fully generator-owned.
 watch_phase1a_phone_files = [
     ("Networking", "WatchWorkoutConnectivityBridge.swift"),
+    ("Networking", "WatchWorkoutFinishCoordinator.swift"),
 ]
 watch_phase1a_phone_test_files = [
     ("PhysiqueOSTests", "WatchWorkoutTransportTests.swift"),
@@ -468,6 +469,7 @@ watch_app_files = [
     ("PhysiqueOSWatch", "WatchWorkoutStore.swift"),
     ("PhysiqueOSWatch", "WatchWorkoutHealthController.swift"),
     ("PhysiqueOSWatch", "WatchWorkoutViews.swift"),
+    ("PhysiqueOSWatch", "WatchWorkoutPreviewFixtures.swift"),
 ]
 watch_shared_files = [
     ("Contracts", "WatchWorkoutContracts.swift"),

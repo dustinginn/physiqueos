@@ -272,6 +272,70 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertNotNil(authority.draft(id: "session-1")?.finishedAt)
     }
 
+    func testWatchFinishUsesOneOperationAndRequiresBothDurableLegs() throws {
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
+        XCTAssertEqual(authority.requestFinishConfirmation(sessionId: "session-1"), .applied(revision: 1))
+        XCTAssertEqual(
+            authority.confirmFinish(sessionId: "session-1", finishOperationId: "finish-one"),
+            .applied(revision: 2)
+        )
+        var draft = try XCTUnwrap(authority.draft(id: "session-1"))
+        XCTAssertEqual(draft.watchFinishOperationId, "finish-one")
+        XCTAssertEqual(draft.watchHealthSaveState, .pending)
+        XCTAssertEqual(draft.watchServerCommitState, .pending)
+        XCTAssertFalse(WatchWorkoutFinishCoordinator.isTerminalReady(draft))
+
+        XCTAssertEqual(
+            authority.recordWatchHealthSave(
+                sessionId: "session-1", finishOperationId: "wrong", succeeded: true,
+                context: .intent(mutationId: "health-wrong", expectedRevision: 2)
+            ),
+            .rejected(.sessionNotMutable)
+        )
+        XCTAssertEqual(
+            authority.recordWatchHealthSave(
+                sessionId: "session-1", finishOperationId: "finish-one", succeeded: true,
+                context: .intent(mutationId: "health-one", expectedRevision: 2)
+            ),
+            .applied(revision: 3)
+        )
+        draft = try XCTUnwrap(authority.draft(id: "session-1"))
+        XCTAssertFalse(WatchWorkoutFinishCoordinator.isTerminalReady(draft), "Health-first must retain the structured session")
+
+        XCTAssertEqual(
+            authority.recordWatchServerCommit(
+                sessionId: "session-1", finishOperationId: "finish-one",
+                succeeded: true, authoritativePRCount: 2
+            ),
+            .applied(revision: 4)
+        )
+        draft = try XCTUnwrap(authority.draft(id: "session-1"))
+        XCTAssertTrue(WatchWorkoutFinishCoordinator.isTerminalReady(draft))
+        XCTAssertEqual(draft.watchAuthoritativePRCount, 2)
+    }
+
+    func testWatchHealthSaveReportIsRevisionGuardedAndIdempotent() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        _ = authority.requestFinishConfirmation(sessionId: "session-1")
+        _ = authority.confirmFinish(sessionId: "session-1", finishOperationId: "finish-one")
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        let stale = WatchWorkoutCommand(
+            schemaVersion: 1, commandId: "health-stale", mutationId: "health-stale",
+            kind: .reportHealthSaved, sessionId: "session-1", expectedRevision: 1,
+            exerciseId: nil, setId: nil, finishOperationId: "finish-one", issuedAt: clock.now
+        )
+        XCTAssertEqual(router.route(stale).status, .stale)
+        XCTAssertEqual(authority.draft(id: "session-1")?.watchHealthSaveState, .pending)
+
+        var accepted = stale
+        accepted.commandId = "health-current"
+        accepted.mutationId = "health-current"
+        accepted.expectedRevision = 2
+        XCTAssertEqual(router.route(accepted).status, .applied)
+        XCTAssertEqual(router.route(accepted).status, .unchanged)
+        XCTAssertEqual(authority.draft(id: "session-1")?.watchHealthSaveState, .succeeded)
+    }
+
     func testWatchMetricsTotalRequiresActiveAndBasalEnergy() {
         XCTAssertNil(WatchWorkoutMetrics(elapsedActiveSeconds: 60, currentHeartRateBPM: 120, activeCalories: 50, basalCalories: nil).totalCalories)
         XCTAssertEqual(WatchWorkoutMetrics(elapsedActiveSeconds: 60, currentHeartRateBPM: 120, activeCalories: 50, basalCalories: 12).totalCalories, 62)

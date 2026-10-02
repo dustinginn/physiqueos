@@ -18,11 +18,14 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     private(set) var connectionState: ConnectionState = .activating
     private(set) var notice: Notice?
     private(set) var controlsVisible = false
+    private(set) var debugSurface: String?
     private(set) var gate = WatchWorkoutCommandDeliveryGate()
     let health = WatchWorkoutHealthController()
 
     private let session: WCSession?
     private var installed = false
+    private var pendingHealthReport: (operationId: String, succeeded: Bool)?
+    private var countdownHapticTask: Task<Void, Never>?
 
     override convenience init() {
         self.init(session: WCSession.isSupported() ? .default : nil)
@@ -42,11 +45,29 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     func install() {
         guard !installed else { return }
         installed = true
+#if DEBUG
+        if let fixtureName = ProcessInfo.processInfo.argumentValue(after: "-watchFixture"),
+           let fixture = WatchWorkoutPreviewFixtures.make(fixtureName) {
+            projection = fixture.projection
+            connectionState = fixture.connectionState
+            notice = fixture.notice
+            controlsVisible = fixtureName == "controls"
+            debugSurface = fixtureName
+            health.installDebugMetrics(
+                heartRate: fixture.heartRate,
+                activeCalories: fixture.activeCalories,
+                basalCalories: fixture.basalCalories,
+                averageHeartRate: fixture.averageHeartRate
+            )
+            return
+        }
+#endif
         session?.delegate = self
         session?.activate()
         if let data = session?.receivedApplicationContext[WatchWorkoutContract.applicationContextProjectionKey] as? Data,
            let incoming = try? WatchWorkoutWireCodec.decode(WatchWorkoutProjection.self, from: data) {
             apply(incoming)
+            resumeSavedHealthReportIfNeeded()
         }
         Task { await recoverHealthKitIfNeeded() }
     }
@@ -80,8 +101,28 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         issue(.confirmFinish)
     }
 
+    func retryHealthStart() {
+        guard let projection, projection.phase == .active || projection.phase == .paused else { return }
+        Task {
+            do {
+                try await health.start(structuredSessionId: projection.sessionId)
+                if projection.phase == .paused { health.pause() }
+                notice = nil
+            } catch { notice = .healthStartFailed }
+        }
+    }
+
+    func retryHealthFinish() {
+        guard let operationId = projection?.finish?.operationId else { return }
+        Task { await finishHealthKit(operationId: operationId) }
+    }
+
     func retryPending() {
         guard let pending = gate.pending else {
+            if pendingHealthReport != nil {
+                issuePendingHealthReport()
+                return
+            }
             refresh()
             return
         }
@@ -91,7 +132,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     private func issue(
         _ kind: WatchWorkoutCommand.Kind,
         exerciseId: String? = nil,
-        setId: String? = nil
+        setId: String? = nil,
+        finishOperationId: String? = nil
     ) {
         guard let session, session.activationState == .activated, session.isReachable else {
             connectionState = .phoneUnavailable
@@ -108,6 +150,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             expectedRevision: projection?.revision ?? 0,
             exerciseId: exerciseId,
             setId: setId,
+            finishOperationId: finishOperationId,
             issuedAt: Date()
         )
         guard gate.begin(command) else { return }
@@ -136,7 +179,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         guard let acknowledgement = try? WatchWorkoutWireCodec.decode(
             WatchWorkoutAcknowledgement.self, from: data
         ) else { return }
-        let kind = gate.pending?.kind
+        let command = gate.pending
+        let kind = command?.kind
         let matched = gate.acknowledge(acknowledgement)
         if let incoming = acknowledgement.projection { apply(incoming) }
         guard matched else { return }
@@ -146,11 +190,26 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             notice = nil
             if acknowledgement.status == .applied {
                 WKInterfaceDevice.current().play(.success)
+                if kind == .completeSet,
+                   acknowledgement.projection?.completedSets == acknowledgement.projection?.totalSets {
+                    WKInterfaceDevice.current().play(.notification)
+                } else if kind == .pause || kind == .resume {
+                    WKInterfaceDevice.current().play(.click)
+                }
             }
             synchronizeHealthKit(after: acknowledgement, originalKind: kind)
+            if kind == .reportHealthSaved || kind == .reportHealthSaveFailed {
+                if kind == .reportHealthSaved, let sessionId = acknowledgement.projection?.sessionId {
+                    health.markSavedCorrelationReported(sessionId)
+                }
+                pendingHealthReport = nil
+            }
         case .stale:
             notice = .staleRefreshed
             WKInterfaceDevice.current().play(.retry)
+            if kind == .reportHealthSaved || kind == .reportHealthSaveFailed {
+                issuePendingHealthReport()
+            }
         case .rejected:
             notice = .rejected(acknowledgement.reason?.rawValue ?? "rejected")
             WKInterfaceDevice.current().play(.failure)
@@ -172,7 +231,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
                 case .pause: health.pause()
                 case .resume: health.resume()
                 case .confirmFinish:
-                    _ = try await health.finish()
+                    let operationId = projection.finish?.operationId
+                        ?? acknowledgement.mutationId
+                    await finishHealthKit(operationId: operationId)
                 default: break
                 }
             } catch {
@@ -180,6 +241,29 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
                 else if originalKind == .confirmFinish { notice = .finishPending }
             }
         }
+    }
+
+    private func finishHealthKit(operationId: String) async {
+        do {
+            _ = try await health.finish()
+            reportHealthSave(operationId: operationId, succeeded: true)
+        } catch {
+            notice = .finishPending
+            reportHealthSave(operationId: operationId, succeeded: false)
+        }
+    }
+
+    private func reportHealthSave(operationId: String, succeeded: Bool) {
+        pendingHealthReport = (operationId, succeeded)
+        issuePendingHealthReport()
+    }
+
+    private func issuePendingHealthReport() {
+        guard gate.pending == nil, let report = pendingHealthReport else { return }
+        issue(
+            report.succeeded ? .reportHealthSaved : .reportHealthSaveFailed,
+            finishOperationId: report.operationId
+        )
     }
 
     private func apply(_ incoming: WatchWorkoutProjection) {
@@ -190,6 +274,44 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         }
         projection = incoming
         connectionState = session?.isReachable == true ? .reachable : .phoneUnavailable
+        scheduleCountdownHaptics(for: incoming)
+    }
+
+    private func scheduleCountdownHaptics(for projection: WatchWorkoutProjection) {
+        countdownHapticTask?.cancel()
+        guard projection.phase == .active,
+              let rest = projection.rest,
+              rest.mode == .countdown,
+              let endsAt = rest.endsAt
+        else { return }
+        countdownHapticTask = Task { @MainActor [weak self] in
+            for threshold in [10.0, 5.0, 0.0] {
+                guard let self, !Task.isCancelled,
+                      self.projection?.rest?.id == rest.id,
+                      self.projection?.phase == .active
+                else { return }
+                let delay = endsAt.timeIntervalSinceNow - threshold
+                if delay > 0 {
+                    do { try await Task.sleep(for: .seconds(delay)) }
+                    catch { return }
+                }
+                guard !Task.isCancelled,
+                      self.projection?.rest?.id == rest.id,
+                      self.projection?.phase == .active
+                else { return }
+                WKInterfaceDevice.current().play(threshold == 0 ? .notification : .directionUp)
+            }
+        }
+    }
+
+    private func resumeSavedHealthReportIfNeeded() {
+        guard pendingHealthReport == nil,
+              let projection,
+              let operationId = projection.finish?.operationId,
+              health.savedCorrelationPendingReport == projection.sessionId
+        else { return }
+        pendingHealthReport = (operationId, true)
+        issuePendingHealthReport()
     }
 
     private func recoverHealthKitIfNeeded() async {
@@ -225,6 +347,16 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         guard let data = applicationContext[WatchWorkoutContract.applicationContextProjectionKey] as? Data,
               let incoming = try? WatchWorkoutWireCodec.decode(WatchWorkoutProjection.self, from: data)
         else { return }
-        Task { @MainActor [weak self] in self?.apply(incoming) }
+        Task { @MainActor [weak self] in
+            self?.apply(incoming)
+            self?.resumeSavedHealthReportIfNeeded()
+        }
+    }
+}
+
+private extension ProcessInfo {
+    func argumentValue(after flag: String) -> String? {
+        guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1]
     }
 }

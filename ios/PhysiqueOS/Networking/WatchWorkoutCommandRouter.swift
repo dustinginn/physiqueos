@@ -85,7 +85,21 @@ final class WatchWorkoutCommandRouter {
         case .cancelFinish:
             outcome = authority.cancelFinishConfirmation(sessionId: command.sessionId, context: context)
         case .confirmFinish:
-            outcome = authority.confirmFinish(sessionId: command.sessionId, context: context)
+            outcome = authority.confirmFinish(
+                sessionId: command.sessionId,
+                finishOperationId: command.mutationId,
+                context: context
+            )
+        case .reportHealthSaved, .reportHealthSaveFailed:
+            guard let finishOperationId = command.finishOperationId else {
+                return acknowledgement(command, .rejected, .invalidCommand, command.expectedRevision)
+            }
+            outcome = authority.recordWatchHealthSave(
+                sessionId: command.sessionId,
+                finishOperationId: finishOperationId,
+                succeeded: command.kind == .reportHealthSaved,
+                context: context
+            )
         case .unknown:
             return acknowledgement(command, .rejected, .unsupportedContract, command.expectedRevision)
         }

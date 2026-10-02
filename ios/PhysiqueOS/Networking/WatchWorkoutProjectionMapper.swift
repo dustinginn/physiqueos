@@ -15,10 +15,10 @@ extension WatchWorkoutProjection {
         guard let live = TrainingSessionLiveProjection.make(from: draft, now: now) else { return nil }
         let phase: Phase
         if prepared { phase = .prepared }
+        else if draft.step == .complete { phase = .committed }
         else if draft.submissionState != nil || draft.finishedAt != nil { phase = .finishing }
         else if draft.finishConfirmationRequestedAt != nil { phase = .finishing }
         else if draft.pausedAt != nil { phase = .paused }
-        else if draft.step == .complete { phase = .committed }
         else { phase = .active }
         let canComplete = phase == .active && live.currentSet != nil
         let finishEligibility: FinishEligibility
@@ -68,7 +68,55 @@ extension WatchWorkoutProjection {
             elapsedWorkoutSeconds: prepared ? nil : authority.activeElapsedSeconds(sessionId: draft.id, at: now),
             stalenessReason: stalenessReason,
             lastAcknowledgedMutationId: draft.appliedMutationIds?.last,
-            metrics: nil
+            metrics: nil,
+            finish: Self.finishStatus(draft),
+            summary: Self.summary(draft, authority: authority, now: now)
+        )
+    }
+
+    private static func finishStatus(_ draft: TrainingLoggerDraft) -> WatchWorkoutFinishStatus? {
+        guard let operationId = draft.watchFinishOperationId else { return nil }
+        let healthSaved = draft.watchHealthSaveState == .succeeded
+        let serverCommitted = draft.watchServerCommitState == .succeeded
+        return .init(
+            operationId: operationId,
+            healthSaved: healthSaved,
+            healthFailed: draft.watchHealthSaveState == .failed,
+            serverCommitted: serverCommitted,
+            serverPending: !serverCommitted,
+            correlationPending: !(healthSaved && serverCommitted)
+        )
+    }
+
+    @MainActor
+    private static func summary(
+        _ draft: TrainingLoggerDraft,
+        authority: TrainingSessionAuthority,
+        now: Date
+    ) -> WatchWorkoutSummary? {
+        guard draft.finishedAt != nil || draft.step == .complete else { return nil }
+        let performed = TrainingPerformedSessionProjection.make(from: draft)
+        let volume = performed.exercises.reduce(0.0) { exerciseTotal, exercise in
+            exerciseTotal + exercise.sets.reduce(0.0) { setTotal, set in
+                let write = set.writeRepresentation(defaultLoadType: exercise.defaultLoadType)
+                guard let reps = set.reps, reps.isFinite, reps > 0,
+                      let load = write.load, load.isFinite, load > 0
+                else { return setTotal }
+                return setTotal + reps * load
+            }
+        }
+        let activeDuration: Double? = {
+            if let started = draft.startedAt.flatMap(TrainingSessionClock.date(from:)),
+               let finished = draft.finishedAt.flatMap(TrainingSessionClock.date(from:)) {
+                return max(0, finished.timeIntervalSince(started) - (draft.accumulatedPausedSeconds ?? 0))
+            }
+            return authority.activeElapsedSeconds(sessionId: draft.id, at: now)
+        }()
+        return .init(
+            activeDurationSeconds: activeDuration,
+            completedSets: draft.completedSetCount,
+            volume: volume > 0 ? volume : nil,
+            authoritativePRCount: draft.watchAuthoritativePRCount
         )
     }
 

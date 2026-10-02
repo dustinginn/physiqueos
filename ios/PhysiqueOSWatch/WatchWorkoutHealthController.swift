@@ -29,6 +29,11 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
     private var workoutSession: HKWorkoutSession?
     private var builder: HKLiveWorkoutBuilder?
     private let correlationKey = "physiqueos.watchWorkout.activeCorrelation.v1"
+    private let savedCorrelationKey = "physiqueos.watchWorkout.savedCorrelationPendingReport.v1"
+
+    var savedCorrelationPendingReport: String? {
+        UserDefaults.standard.string(forKey: savedCorrelationKey)
+    }
 
     func start(structuredSessionId: String) async throws {
         if correlationId == structuredSessionId, [.starting, .running, .paused].contains(lifecycle) { return }
@@ -85,11 +90,34 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         let workout = try await builder.finishWorkout()
         rawDurationSeconds = workout?.duration ?? builder.elapsedTime
         lifecycle = .saved
+        if let correlationId {
+            UserDefaults.standard.set(correlationId, forKey: savedCorrelationKey)
+        }
         self.workoutSession = nil
         self.builder = nil
         UserDefaults.standard.removeObject(forKey: correlationKey)
         return workout
     }
+
+    func markSavedCorrelationReported(_ structuredSessionId: String) {
+        guard savedCorrelationPendingReport == structuredSessionId else { return }
+        UserDefaults.standard.removeObject(forKey: savedCorrelationKey)
+    }
+
+#if DEBUG
+    func installDebugMetrics(
+        heartRate: Double?,
+        activeCalories: Double?,
+        basalCalories: Double?,
+        averageHeartRate: Double?
+    ) {
+        currentHeartRateBPM = heartRate
+        self.activeCalories = activeCalories
+        self.basalCalories = basalCalories
+        averageHeartRateBPM = averageHeartRate
+        lifecycle = .running
+    }
+#endif
 
     func recover(structuredSessionId: String?) async throws {
         guard workoutSession == nil,

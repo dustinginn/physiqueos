@@ -417,17 +417,19 @@
 		000000000000000000001634 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 000000000000000000001633 /* WidgetKit.framework */; };
 		000000000000000000001636 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 000000000000000000001635 /* SwiftUI.framework */; };
 		00000000000000000000163F /* PhysiqueOSLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 000000000000000000001632 /* PhysiqueOSLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		000000000000000000001907 /* WatchWorkoutConnectivityBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001900 /* WatchWorkoutConnectivityBridge.swift */; };
-		000000000000000000001908 /* WatchWorkoutTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001901 /* WatchWorkoutTransportTests.swift */; };
-		000000000000000000001909 /* PhysiqueOSWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001902 /* PhysiqueOSWatchApp.swift */; };
-		00000000000000000000190A /* WatchWorkoutStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001903 /* WatchWorkoutStore.swift */; };
-		00000000000000000000190B /* WatchWorkoutHealthController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001904 /* WatchWorkoutHealthController.swift */; };
-		00000000000000000000190C /* WatchWorkoutViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001905 /* WatchWorkoutViews.swift */; };
-		00000000000000000000190D /* WatchWorkoutContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001506 /* WatchWorkoutContracts.swift */; };
-		00000000000000000000190E /* WatchWorkoutReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001906 /* WatchWorkoutReducerTests.swift */; };
-		000000000000000000001915 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
-		000000000000000000001916 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B4 /* WatchConnectivity.framework */; };
-		00000000000000000000191F /* PhysiqueOSWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 000000000000000000001913 /* PhysiqueOSWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		000000000000000000001909 /* WatchWorkoutConnectivityBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001900 /* WatchWorkoutConnectivityBridge.swift */; };
+		00000000000000000000190A /* WatchWorkoutFinishCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001901 /* WatchWorkoutFinishCoordinator.swift */; };
+		00000000000000000000190B /* WatchWorkoutTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001902 /* WatchWorkoutTransportTests.swift */; };
+		00000000000000000000190C /* PhysiqueOSWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001903 /* PhysiqueOSWatchApp.swift */; };
+		00000000000000000000190D /* WatchWorkoutStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001904 /* WatchWorkoutStore.swift */; };
+		00000000000000000000190E /* WatchWorkoutHealthController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001905 /* WatchWorkoutHealthController.swift */; };
+		00000000000000000000190F /* WatchWorkoutViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001906 /* WatchWorkoutViews.swift */; };
+		000000000000000000001910 /* WatchWorkoutPreviewFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001907 /* WatchWorkoutPreviewFixtures.swift */; };
+		000000000000000000001911 /* WatchWorkoutContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001506 /* WatchWorkoutContracts.swift */; };
+		000000000000000000001912 /* WatchWorkoutReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001908 /* WatchWorkoutReducerTests.swift */; };
+		000000000000000000001919 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
+		00000000000000000000191A /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B4 /* WatchConnectivity.framework */; };
+		000000000000000000001923 /* PhysiqueOSWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 000000000000000000001917 /* PhysiqueOSWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -452,18 +454,18 @@
 			remoteGlobalIDString = 000000000000000000001637;
 			remoteInfo = PhysiqueOSLiveActivity;
 		};
-		000000000000000000001921 /* PBXContainerItemProxy */ = {
+		000000000000000000001925 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 000000000000000000001282 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 000000000000000000001917;
+			remoteGlobalIDString = 00000000000000000000191B;
 			remoteInfo = PhysiqueOSWatch;
 		};
-		00000000000000000000192A /* PBXContainerItemProxy */ = {
+		00000000000000000000192E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 000000000000000000001282 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 000000000000000000001917;
+			remoteGlobalIDString = 00000000000000000000191B;
 			remoteInfo = PhysiqueOSWatch;
 		};
 /* End PBXContainerItemProxy section */
@@ -480,13 +482,13 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000191E /* Embed Watch Content */ = {
+		000000000000000000001922 /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
-				00000000000000000000191F /* PhysiqueOSWatch.app in Embed Watch Content */,
+				000000000000000000001923 /* PhysiqueOSWatch.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -905,16 +907,18 @@
 		000000000000000000001635 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		000000000000000000001632 /* PhysiqueOSLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PhysiqueOSLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		000000000000000000001900 /* WatchWorkoutConnectivityBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutConnectivityBridge.swift"; sourceTree = "<group>"; };
-		000000000000000000001901 /* WatchWorkoutTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutTransportTests.swift"; sourceTree = "<group>"; };
-		000000000000000000001902 /* PhysiqueOSWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSWatchApp.swift"; sourceTree = "<group>"; };
-		000000000000000000001903 /* WatchWorkoutStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutStore.swift"; sourceTree = "<group>"; };
-		000000000000000000001904 /* WatchWorkoutHealthController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutHealthController.swift"; sourceTree = "<group>"; };
-		000000000000000000001905 /* WatchWorkoutViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutViews.swift"; sourceTree = "<group>"; };
-		000000000000000000001906 /* WatchWorkoutReducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutReducerTests.swift"; sourceTree = "<group>"; };
-		00000000000000000000190F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
-		000000000000000000001910 /* PhysiqueOSWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "PhysiqueOSWatch.entitlements"; sourceTree = "<group>"; };
-		000000000000000000001913 /* PhysiqueOSWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOSWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		000000000000000000001914 /* PhysiqueOSWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001901 /* WatchWorkoutFinishCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutFinishCoordinator.swift"; sourceTree = "<group>"; };
+		000000000000000000001902 /* WatchWorkoutTransportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutTransportTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001903 /* PhysiqueOSWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSWatchApp.swift"; sourceTree = "<group>"; };
+		000000000000000000001904 /* WatchWorkoutStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutStore.swift"; sourceTree = "<group>"; };
+		000000000000000000001905 /* WatchWorkoutHealthController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutHealthController.swift"; sourceTree = "<group>"; };
+		000000000000000000001906 /* WatchWorkoutViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutViews.swift"; sourceTree = "<group>"; };
+		000000000000000000001907 /* WatchWorkoutPreviewFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutPreviewFixtures.swift"; sourceTree = "<group>"; };
+		000000000000000000001908 /* WatchWorkoutReducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutReducerTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001913 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		000000000000000000001914 /* PhysiqueOSWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "PhysiqueOSWatch.entitlements"; sourceTree = "<group>"; };
+		000000000000000000001917 /* PhysiqueOSWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOSWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001918 /* PhysiqueOSWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -950,16 +954,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000191C /* Frameworks */ = {
+		000000000000000000001920 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001915 /* HealthKit.framework in Frameworks */,
-				000000000000000000001916 /* WatchConnectivity.framework in Frameworks */,
+				000000000000000000001919 /* HealthKit.framework in Frameworks */,
+				00000000000000000000191A /* WatchConnectivity.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001927 /* Frameworks */ = {
+		00000000000000000000192B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = ();
@@ -1065,6 +1069,7 @@
 		00000000000000000000126E /* Networking */ = {
 			isa = PBXGroup;
 			children = (
+				000000000000000000001901 /* WatchWorkoutFinishCoordinator.swift */,
 				000000000000000000001900 /* WatchWorkoutConnectivityBridge.swift */,
 				000000000000000000001059 /* HomeAPI.swift */,
 				00000000000000000000105B /* PriorityAPI.swift */,
@@ -1457,7 +1462,7 @@
 		00000000000000000000126B /* PhysiqueOSTests */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001901 /* WatchWorkoutTransportTests.swift */,
+				000000000000000000001902 /* WatchWorkoutTransportTests.swift */,
 				00000000000000000000120C /* AppTabTests.swift */,
 				00000000000000000000120E /* HomeReadModelTests.swift */,
 				000000000000000000001210 /* PriorityReadModelTests.swift */,
@@ -1544,8 +1549,8 @@
 		000000000000000000001269 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001913 /* PhysiqueOSWatch.app */,
-				000000000000000000001914 /* PhysiqueOSWatchTests.xctest */,
+				000000000000000000001917 /* PhysiqueOSWatch.app */,
+				000000000000000000001918 /* PhysiqueOSWatchTests.xctest */,
 				000000000000000000001280 /* PhysiqueOS.app */,
 				000000000000000000001281 /* PhysiqueOSTests.xctest */,
 				00000000000000000000129A /* PhysiqueOSUITests.xctest */,
@@ -1557,8 +1562,8 @@
 		000000000000000000001268 /* Main */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001911 /* PhysiqueOSWatch */,
-				000000000000000000001912 /* PhysiqueOSWatchTests */,
+				000000000000000000001915 /* PhysiqueOSWatch */,
+				000000000000000000001916 /* PhysiqueOSWatchTests */,
 				00000000000000000000126A /* PhysiqueOS */,
 				00000000000000000000126B /* PhysiqueOSTests */,
 				00000000000000000000129B /* PhysiqueOSUITests */,
@@ -1594,23 +1599,24 @@
 			path = PhysiqueOSLiveActivity;
 			sourceTree = "<group>";
 		};
-		000000000000000000001911 /* PhysiqueOSWatch */ = {
+		000000000000000000001915 /* PhysiqueOSWatch */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001902 /* PhysiqueOSWatchApp.swift */,
-				000000000000000000001903 /* WatchWorkoutStore.swift */,
-				000000000000000000001904 /* WatchWorkoutHealthController.swift */,
-				000000000000000000001905 /* WatchWorkoutViews.swift */,
-				00000000000000000000190F /* Info.plist */,
-				000000000000000000001910 /* PhysiqueOSWatch.entitlements */,
+				000000000000000000001903 /* PhysiqueOSWatchApp.swift */,
+				000000000000000000001904 /* WatchWorkoutStore.swift */,
+				000000000000000000001905 /* WatchWorkoutHealthController.swift */,
+				000000000000000000001906 /* WatchWorkoutViews.swift */,
+				000000000000000000001907 /* WatchWorkoutPreviewFixtures.swift */,
+				000000000000000000001913 /* Info.plist */,
+				000000000000000000001914 /* PhysiqueOSWatch.entitlements */,
 			);
 			path = PhysiqueOSWatch;
 			sourceTree = "<group>";
 		};
-		000000000000000000001912 /* PhysiqueOSWatchTests */ = {
+		000000000000000000001916 /* PhysiqueOSWatchTests */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001906 /* WatchWorkoutReducerTests.swift */,
+				000000000000000000001908 /* WatchWorkoutReducerTests.swift */,
 			);
 			path = PhysiqueOSWatchTests;
 			sourceTree = "<group>";
@@ -1626,13 +1632,13 @@
 				00000000000000000000128B /* Frameworks */,
 				00000000000000000000128C /* Resources */,
 				00000000000000000000163E /* Embed Foundation Extensions */,
-				00000000000000000000191E /* Embed Watch Content */,
+				000000000000000000001922 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				000000000000000000001640 /* PBXTargetDependency */,
-				000000000000000000001920 /* PBXTargetDependency */,
+				000000000000000000001924 /* PBXTargetDependency */,
 			);
 			name = PhysiqueOS;
 			productName = PhysiqueOS;
@@ -1692,34 +1698,34 @@
 			productReference = 000000000000000000001632 /* PhysiqueOSLiveActivity.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
-		000000000000000000001917 /* PhysiqueOSWatch */ = {
+		00000000000000000000191B /* PhysiqueOSWatch */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001918 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */;
+			buildConfigurationList = 00000000000000000000191C /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */;
 			buildPhases = (
-				00000000000000000000191B /* Sources */,
-				00000000000000000000191C /* Frameworks */,
-				00000000000000000000191D /* Resources */,
+				00000000000000000000191F /* Sources */,
+				000000000000000000001920 /* Frameworks */,
+				000000000000000000001921 /* Resources */,
 			);
 			buildRules = ();
 			dependencies = ();
 			name = PhysiqueOSWatch;
 			productName = PhysiqueOSWatch;
-			productReference = 000000000000000000001913 /* PhysiqueOSWatch.app */;
+			productReference = 000000000000000000001917 /* PhysiqueOSWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
-		000000000000000000001922 /* PhysiqueOSWatchTests */ = {
+		000000000000000000001926 /* PhysiqueOSWatchTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 000000000000000000001923 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */;
+			buildConfigurationList = 000000000000000000001927 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */;
 			buildPhases = (
-				000000000000000000001926 /* Sources */,
-				000000000000000000001927 /* Frameworks */,
-				000000000000000000001928 /* Resources */,
+				00000000000000000000192A /* Sources */,
+				00000000000000000000192B /* Frameworks */,
+				00000000000000000000192C /* Resources */,
 			);
 			buildRules = ();
-			dependencies = (000000000000000000001929 /* PBXTargetDependency */,);
+			dependencies = (00000000000000000000192D /* PBXTargetDependency */,);
 			name = PhysiqueOSWatchTests;
 			productName = PhysiqueOSWatchTests;
-			productReference = 000000000000000000001914 /* PhysiqueOSWatchTests.xctest */;
+			productReference = 000000000000000000001918 /* PhysiqueOSWatchTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -1746,12 +1752,12 @@
 					000000000000000000001637 = {
 						CreatedOnToolsVersion = 27.0;
 					};
-					000000000000000000001917 = {
+					00000000000000000000191B = {
 						CreatedOnToolsVersion = 27.0;
 					};
-					000000000000000000001922 = {
+					000000000000000000001926 = {
 						CreatedOnToolsVersion = 27.0;
-						TestTargetID = 000000000000000000001917;
+						TestTargetID = 00000000000000000000191B;
 					};
 				};
 			};
@@ -1772,8 +1778,8 @@
 				00000000000000000000128D /* PhysiqueOSTests */,
 				00000000000000000000129C /* PhysiqueOSUITests */,
 				000000000000000000001637 /* PhysiqueOSLiveActivity */,
-				000000000000000000001917 /* PhysiqueOSWatch */,
-				000000000000000000001922 /* PhysiqueOSWatchTests */,
+				00000000000000000000191B /* PhysiqueOSWatch */,
+				000000000000000000001926 /* PhysiqueOSWatchTests */,
 			);
 		};
 /* End PBXProject section */
@@ -1827,13 +1833,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000191D /* Resources */ = {
+		000000000000000000001921 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001928 /* Resources */ = {
+		00000000000000000000192C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = ();
@@ -1847,7 +1853,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				000000000000000000001002 /* PhysiqueOSApp.swift in Sources */,
-				000000000000000000001907 /* WatchWorkoutConnectivityBridge.swift in Sources */,
+				000000000000000000001909 /* WatchWorkoutConnectivityBridge.swift in Sources */,
+				00000000000000000000190A /* WatchWorkoutFinishCoordinator.swift in Sources */,
 				000000000000000000001004 /* AppEnvironment.swift in Sources */,
 				000000000000000000001006 /* AppTab.swift in Sources */,
 				000000000000000000001008 /* AppDestination.swift in Sources */,
@@ -2158,7 +2165,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				00000000000000000000120D /* AppTabTests.swift in Sources */,
-				000000000000000000001908 /* WatchWorkoutTransportTests.swift in Sources */,
+				00000000000000000000190B /* WatchWorkoutTransportTests.swift in Sources */,
 				00000000000000000000120F /* HomeReadModelTests.swift in Sources */,
 				000000000000000000001211 /* PriorityReadModelTests.swift in Sources */,
 				000000000000000000001213 /* GoalsReadModelTests.swift in Sources */,
@@ -2257,23 +2264,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		00000000000000000000191B /* Sources */ = {
+		00000000000000000000191F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001909 /* PhysiqueOSWatchApp.swift in Sources */,
-				00000000000000000000190A /* WatchWorkoutStore.swift in Sources */,
-				00000000000000000000190B /* WatchWorkoutHealthController.swift in Sources */,
-				00000000000000000000190C /* WatchWorkoutViews.swift in Sources */,
-				00000000000000000000190D /* WatchWorkoutContracts.swift in Sources */,
+				00000000000000000000190C /* PhysiqueOSWatchApp.swift in Sources */,
+				00000000000000000000190D /* WatchWorkoutStore.swift in Sources */,
+				00000000000000000000190E /* WatchWorkoutHealthController.swift in Sources */,
+				00000000000000000000190F /* WatchWorkoutViews.swift in Sources */,
+				000000000000000000001910 /* WatchWorkoutPreviewFixtures.swift in Sources */,
+				000000000000000000001911 /* WatchWorkoutContracts.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		000000000000000000001926 /* Sources */ = {
+		00000000000000000000192A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				00000000000000000000190E /* WatchWorkoutReducerTests.swift in Sources */,
+				000000000000000000001912 /* WatchWorkoutReducerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2295,15 +2303,15 @@
 			target = 000000000000000000001637 /* PhysiqueOSLiveActivity */;
 			targetProxy = 000000000000000000001641 /* PBXContainerItemProxy */;
 		};
-		000000000000000000001920 /* PBXTargetDependency */ = {
+		000000000000000000001924 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 000000000000000000001917 /* PhysiqueOSWatch */;
-			targetProxy = 000000000000000000001921 /* PBXContainerItemProxy */;
+			target = 00000000000000000000191B /* PhysiqueOSWatch */;
+			targetProxy = 000000000000000000001925 /* PBXContainerItemProxy */;
 		};
-		000000000000000000001929 /* PBXTargetDependency */ = {
+		00000000000000000000192D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 000000000000000000001917 /* PhysiqueOSWatch */;
-			targetProxy = 00000000000000000000192A /* PBXContainerItemProxy */;
+			target = 00000000000000000000191B /* PhysiqueOSWatch */;
+			targetProxy = 00000000000000000000192E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2598,7 +2606,7 @@
 			};
 			name = Release;
 		};
-		000000000000000000001919 /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
+		00000000000000000000191D /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 80;
@@ -2621,7 +2629,7 @@
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
 			}; name = Debug; };
-		00000000000000000000191A /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
+		00000000000000000000191E /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 80;
@@ -2644,7 +2652,7 @@
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
 			}; name = Release; };
-		000000000000000000001924 /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
+		000000000000000000001928 /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 80;
@@ -2659,7 +2667,7 @@
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhysiqueOSWatch.app/PhysiqueOSWatch";
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
 			}; name = Debug; };
-		000000000000000000001925 /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
+		000000000000000000001929 /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 80;
@@ -2722,15 +2730,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001918 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */ = {
+		00000000000000000000191C /* Build configuration list for PBXNativeTarget "PhysiqueOSWatch" */ = {
 			isa = XCConfigurationList;
-			buildConfigurations = (000000000000000000001919 /* Debug */, 00000000000000000000191A /* Release */,);
+			buildConfigurations = (00000000000000000000191D /* Debug */, 00000000000000000000191E /* Release */,);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		000000000000000000001923 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */ = {
+		000000000000000000001927 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */ = {
 			isa = XCConfigurationList;
-			buildConfigurations = (000000000000000000001924 /* Debug */, 000000000000000000001925 /* Release */,);
+			buildConfigurations = (000000000000000000001928 /* Debug */, 000000000000000000001929 /* Release */,);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};

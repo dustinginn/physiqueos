@@ -171,6 +171,14 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// Persisted two-step finish gate shared by phone/Watch commands. Finish
     /// is never inferred from progress, including after the final set.
     var finishConfirmationRequestedAt: String? = nil
+    /// One stable operation joins the Watch HealthKit save and the phone's
+    /// structured Server commit. Optional fields keep every pre-Watch draft
+    /// backward-decodable. Neither component being durable is enough to
+    /// remove the local session; terminal completion requires both.
+    var watchFinishOperationId: String? = nil
+    var watchHealthSaveState: WatchWorkoutFinishComponentState? = nil
+    var watchServerCommitState: WatchWorkoutFinishComponentState? = nil
+    var watchAuthoritativePRCount: Int? = nil
     /// Session-level rest override. `nil` defers to the rest preference
     /// provider (exercise, then global), and finally to Off.
     var restConfiguration: TrainingRestConfiguration? = nil
@@ -274,6 +282,12 @@ extension TrainingLoggerDraft {
 enum TrainingLoggerSubmissionState: String, Codable, Equatable {
     case acceptedProcessing
     case resultUnknown
+}
+
+enum WatchWorkoutFinishComponentState: String, Codable, Equatable, Sendable {
+    case pending
+    case succeeded
+    case failed
 }
 
 struct TrainingLoggerSupportingEvidence: Codable, Equatable, Identifiable {

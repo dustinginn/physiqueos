@@ -314,14 +314,51 @@ final class TrainingSessionAuthority {
     @discardableResult
     func confirmFinish(
         sessionId: String,
+        finishOperationId: String? = nil,
         context: TrainingSessionMutationContext = .ui
     ) -> TrainingSessionMutationOutcome {
         mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
             guard draft.finishConfirmationRequestedAt != nil
             else { throw TrainingSessionMutationRejection.sessionNotMutable }
             if draft.finishedAt == nil { draft.finishedAt = TrainingSessionClock.string(from: self.now()) }
+            if draft.watchFinishOperationId == nil, let finishOperationId {
+                draft.watchFinishOperationId = finishOperationId
+                draft.watchHealthSaveState = .pending
+                draft.watchServerCommitState = .pending
+            }
             draft.finishConfirmationRequestedAt = nil
             draft.rest = nil
+        }
+    }
+
+    @discardableResult
+    func recordWatchHealthSave(
+        sessionId: String,
+        finishOperationId: String,
+        succeeded: Bool,
+        context: TrainingSessionMutationContext
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
+            guard draft.watchFinishOperationId == finishOperationId else {
+                throw TrainingSessionMutationRejection.sessionNotMutable
+            }
+            draft.watchHealthSaveState = succeeded ? .succeeded : .failed
+        }
+    }
+
+    @discardableResult
+    func recordWatchServerCommit(
+        sessionId: String,
+        finishOperationId: String,
+        succeeded: Bool,
+        authoritativePRCount: Int? = nil
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: .system, scope: .lifecycle) { draft in
+            guard draft.watchFinishOperationId == finishOperationId else {
+                throw TrainingSessionMutationRejection.sessionNotMutable
+            }
+            draft.watchServerCommitState = succeeded ? .succeeded : .failed
+            if succeeded { draft.watchAuthoritativePRCount = authoritativePRCount }
         }
     }
 
