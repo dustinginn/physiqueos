@@ -26,6 +26,7 @@ describe("Phase 4 canonical domain schema", () => {
       healthKitSleepHistoricalEvidenceSamples: "canonical_training_records",
       healthKitSleepHistoricalEvidenceDays: "canonical_training_records",
       healthKitSleepValidationSamples: "canonical_training_records",
+      dexaHealthKitWritebackReceipts: "canonical_training_records",
     });
     expect(PHASE4_DOMAIN_TABLES.confidenceActivationArtifacts)
       .toBe("canonical_confidence_records");

@@ -493,6 +493,10 @@ export function createEvidenceReviewService({ repositories, now = () => new Date
       });
     },
     async discard(id, { confirmedBy } = {}) {
+      const review = await repositories.evidenceReviews.getReviewById(id);
+      if (!review || !["pending", "commit_failed"].includes(review.status)) {
+        throw reviewError("EVIDENCE_REVIEW_DISCARD_NOT_ALLOWED", "Only an uncommitted Evidence Review can be discarded.");
+      }
       const timestamp = now().toISOString();
       return repositories.evidenceReviews.updateReview(id, {
         status: "discarded", confirmation: { confirmedAt: timestamp, confirmedBy },

@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 import {
+  DEXA_HEALTHKIT_WRITEBACK_RECEIPT_COLLECTION,
+  normalizeDexaHealthKitWritebackReceipt,
+} from "../../domain/services/DexaHealthKitWritebackService.js";
+import {
   bindTrainingSupportingEvidencePackage,
   reconcileConfirmedEvidencePackage,
 } from "../../domain/services/CanonicalEvidenceService.js";
@@ -183,6 +187,7 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "ingestHealthKitSleep",
   "ingestHealthKitSleepHistoricalValidation",
   "ingestHealthKitSleepHistoricalEvidence",
+  "recordDexaHealthKitWritebackReceipt",
   "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport", "saveNutritionStrategy",
   "resolveWorkoutReconciliation",
   "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
@@ -364,6 +369,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     ingestHealthKitSleep: createHealthKitSleepIngestPort({ records, now }),
     ingestHealthKitSleepHistoricalValidation: createHealthKitSleepHistoricalValidationPort({ records, now }),
     ingestHealthKitSleepHistoricalEvidence: createHealthKitSleepHistoricalEvidenceImportPort({ records, now }),
+    recordDexaHealthKitWritebackReceipt,
     commitTrainingSession,
     editDexaReview,
     requestEvidenceReviewConfirmation,
@@ -379,6 +385,42 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     changePeptideLifecycle: createPeptideLifecyclePort({ now, loadCandidate, persistCandidateCollections }),
     saveCoachingUpdates,
   });
+
+  async function recordDexaHealthKitWritebackReceipt(context) {
+    const receipt = normalizeDexaHealthKitWritebackReceipt(context.payload, {
+      ownerUserId: context.ownerUserId,
+      reportedAt: now(),
+    });
+    const existing = await records.get({
+      ownerUserId: context.ownerUserId,
+      collection: DEXA_HEALTHKIT_WRITEBACK_RECEIPT_COLLECTION,
+      recordId: receipt.id,
+    });
+    const persisted = existing
+      ? await records.put({
+        ownerUserId: context.ownerUserId,
+        collection: DEXA_HEALTHKIT_WRITEBACK_RECEIPT_COLLECTION,
+        recordId: receipt.id,
+        expectedVersion: existing.version,
+        sourceIdentity: receipt.intentIdentity,
+        payload: receipt,
+      })
+      : (await records.putIfAbsent({
+        ownerUserId: context.ownerUserId,
+        collection: DEXA_HEALTHKIT_WRITEBACK_RECEIPT_COLLECTION,
+        recordId: receipt.id,
+        sourceIdentity: receipt.intentIdentity,
+        payload: receipt,
+      })).record;
+    return {
+      result: {
+        receiptId: receipt.id,
+        intentIdentity: receipt.intentIdentity,
+        outcome: receipt.outcome,
+        version: persisted.version,
+      },
+    };
+  }
 
   function guardedGenericEvidenceReviewMutation(mutation) {
     return async (context) => {
@@ -577,6 +619,13 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         } else {
           reconciliation = reconcileHealthKitWorkoutObservation({ observation, canonicalObjects });
         }
+      } else if (isPhysiqueOSOwnedBodyCompositionObservation(observation)) {
+        reconciliation = {
+          state: HealthKitReconciliationState.SOURCE_ONLY,
+          reason: "physiqueos_owned_writeback",
+          canonicalizationPermitted: false,
+          canonicalizationPermanentBar: true,
+        };
       } else {
         reconciliation = { state: HealthKitReconciliationState.SOURCE_ONLY };
       }
@@ -3491,6 +3540,15 @@ function healthKitDailySnapshotDomain(observationType) {
   if (observationType === HealthKitObservationType.ACTIVITY_SUMMARY) return HealthKitCanonicalDomain.ACTIVITY;
   if (observationType === HealthKitObservationType.NUTRITION_DAILY_TOTAL) return HealthKitCanonicalDomain.NUTRITION;
   return null;
+}
+
+function isPhysiqueOSOwnedBodyCompositionObservation(observation) {
+  if (observation?.observationType !== HealthKitObservationType.QUANTITY_SAMPLE) return false;
+  if (String(observation.source?.bundleIdentifier ?? "").toLowerCase() !== "com.physiqueos.native.dev") return false;
+  const sampleType = String(observation.measurement?.sampleType ?? "")
+    .replace(/^HKQuantityTypeIdentifier/, "")
+    .toLowerCase();
+  return sampleType === "bodyfatpercentage" || sampleType === "leanbodymass";
 }
 
 function healthKitObservationIdentityCollisionProblem(observation, storedObservations) {

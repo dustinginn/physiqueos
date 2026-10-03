@@ -72,6 +72,7 @@ function fixture(overrides = {}) {
       }),
       getDEXA: call({ report: {} }),
     },
+    dexaHealthKitWriteback: { getWriteback: call({ schemaVersion: "dexa-hk-writeback-v1", intents: [] }) },
     healthKitCanary: {
       getActivityValidation: call({ boundedRange: {}, items: [] }),
       getSeptember23ActivityRepairPreflight: call({
@@ -709,6 +710,7 @@ describe("Native production contract boundary", () => {
       "healthkit.sleep.historical-validation.ingest.v1",
       "healthkit.sleep.historical-evidence.ingest.v1",
       "healthkit.sleep.ingest.v1",
+      "dexa.healthkit-writeback.receipt.v1",
       "dexa-review.measurements.v1", "evidence-review.commit.v1", "evidence-review.dispose.v1",
       "workout-reconciliation.resolve.v1",
       "operating-plan.recurring-support.save.v1", "operating-plan.nutrition-strategy.save.v1",

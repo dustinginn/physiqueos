@@ -39,6 +39,7 @@ const NATIVE_WRITE_COMMANDS = new Set([
   Phase3Command.INGEST_HEALTHKIT_SLEEP,
   Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION,
   Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE,
+  Phase3Command.RECORD_DEXA_HEALTHKIT_WRITEBACK_RECEIPT,
   Phase3Command.EDIT_DEXA_REVIEW,
   Phase3Command.COMMIT_EVIDENCE_REVIEW,
   Phase3Command.DISPOSE_EVIDENCE_REVIEW,
@@ -203,6 +204,10 @@ export function createNativeProductionContractService({
           break;
         }
         case "dexa": data = await readers.progress.getDEXA({ context, currentDate }); break;
+        case "dexa-healthkit-writeback": data = await readers.dexaHealthKitWriteback.getWriteback({
+          mode: input.mode ?? "permanent",
+          validationAction: input.validationAction ?? null,
+        }); break;
         case "photos": data = await readers.photos.getNativePhotosTimeline({
           context,
           currentDate,

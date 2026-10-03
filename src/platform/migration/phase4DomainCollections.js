@@ -50,6 +50,7 @@ export const PHASE4_CANONICAL_DOMAIN_TABLES = Object.freeze({
 export const PHASE4_APPLICATION_RECORD_TABLES = Object.freeze({
   healthKitObservations: "canonical_training_records",
   healthKitConfiguration: "canonical_training_records",
+  dexaHealthKitWritebackReceipts: "canonical_training_records",
   healthKitCanonicalDays: "canonical_training_records",
   healthKitCanonicalWorkouts: "canonical_training_records",
   healthKitWorkoutLinks: "canonical_training_records",

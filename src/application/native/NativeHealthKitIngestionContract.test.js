@@ -107,6 +107,25 @@ describe("Native HealthKit V1 ingestion contract", () => {
     expect(sourceWorkout).not.toHaveProperty("evidence_type");
   });
 
+  it("permanently quarantines PhysiqueOS-owned body-composition samples from feedback canonicalization", async () => {
+    const records = recordStore();
+    const ports = createCanonicalPersistenceCommandPorts({ records });
+    await ports.ingestHealthKitObservations(context("delivery-own-dexa", {
+      batchId: "healthkit-own-dexa-batch",
+      observations: [quantitySample({
+        sampleType: "HKQuantityTypeIdentifierBodyFatPercentage",
+        sourceBundle: "com.physiqueos.native.dev",
+      })],
+    }));
+    expect(records.snapshot().healthKitObservations[0].reconciliation).toEqual({
+      state: "source_only",
+      reason: "physiqueos_owned_writeback",
+      canonicalizationPermitted: false,
+      canonicalizationPermanentBar: true,
+    });
+    expect(records.snapshot().canonicalEvidenceObjects).toEqual([]);
+  });
+
   it("keeps strength detail authoritative and persists only a server-owned match candidate", async () => {
     const original = detailedSession();
     const records = recordStore([original]);
@@ -428,6 +447,21 @@ function workout({
       activeCalories,
       averageHeartRate: 122,
     },
+  };
+}
+
+function quantitySample({ sampleType, sourceBundle }) {
+  return {
+    observationType: "quantity_sample",
+    externalId: "physiqueos-dexa-sample-001",
+    source: { bundleIdentifier: sourceBundle, productType: "iPhone17,1" },
+    occurrence: {
+      localDate: "2026-10-09",
+      timeZone: "America/Los_Angeles",
+      startedAt: "2026-10-09T12:00:00-07:00",
+      endedAt: "2026-10-09T12:00:00-07:00",
+    },
+    quantitySample: { sampleType, value: 0.081, unit: "%" },
   };
 }
 
