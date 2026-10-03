@@ -1,44 +1,53 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T20:15:00Z",
+  "generated_at_utc": "2026-10-03T21:27:00Z",
   "task": {
     "id": "20261003-build85-watch-physical-acceptance-corrections",
     "title": "Build 85 Watch physical-acceptance corrections",
     "agent": "codex",
-    "status": "root_cause_checkpoint_production_unchanged"
+    "status": "reviewed_candidates_policy_authorization_gate"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "prompt_commit": "999498283bb3fc7b7a268d3d2c0c934fe89479f1",
     "production_server_sha": "b47663b32372a78010dbc8e4aa41303012d98dc7",
     "production_deployment": "b9449c52-5444-4dae-9f44-fd0261b1a9d3",
-    "native_sha": "bcd92c74602695766c270fe6af052de45afece4b",
-    "native_build": 84,
-    "testflight_delivery": "a4b7b504-e0ba-4cb5-9909-3e01cc8156d5"
+    "server_candidate_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "installed_native_sha": "bcd92c74602695766c270fe6af052de45afece4b",
+    "installed_native_build": 84,
+    "installed_testflight_delivery": "a4b7b504-e0ba-4cb5-9909-3e01cc8156d5",
+    "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "native_candidate_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "native_build": 85,
+    "testflight_delivery": null
   },
   "result": {
-    "summary": "Read-only production and source audit proves the inactive-display warning is a direct isReachable presentation bug, while today's untouched 95% Pending Review arose because trusted Watch correlation is dormant in Native and absent/unconfigured in the production Server path. PR celebration functionally passes; only larger local confetti is requested.",
+    "summary": "Exact Build 85 Native and Server candidates are pushed, tested and independently approved. The prospective trusted-Watch policy dry run passed twice with stable facts and independent review. Production is unchanged and the workflow is stopped for Founder authorization.",
     "production_mutated": false,
-    "implementation_started": false,
+    "implementation_complete": true,
+    "native_review_approved": true,
+    "server_review_approved": true,
+    "policy_plan_review_approved": true,
     "pending_review_untouched": true,
-    "training_saves": 1,
-    "healthkit_strength_workouts": 1,
-    "candidate_links": 1,
-    "held_claims": 0,
-    "pending_reviews": 1,
-    "exact_correlation_present": false
+    "policy_effective_at": "2026-10-05T07:00:00.000Z",
+    "policy_planned_record_digest": "fc028029635cb7ba1de6301206f5f8a8",
+    "policy_current_digest": null,
+    "policy_current_version": null,
+    "policy_dry_runs": 2,
+    "predicted_policy_mutations": 2
   },
   "root_causes": [
-    "Build 84 treats every WCSession isReachable=false transition as phoneUnavailable and renders OFFLINE without an actionable failure or staleness threshold.",
-    "HealthKitBatchBuilder constructs the trusted workout normalizer in its explicit disabled state, so the Watch metadata never becomes a physiqueOSSessionId.",
-    "Production Server b47663b does not contain the trusted exact-correlation implementation; the implementation-bearing composition also defaults its trusted source allowlist empty.",
-    "The generic matcher therefore correctly created a 95% logger_session_window candidate and Pending Review; enabling heuristic auto-confirm is not an acceptable workaround."
+    "Build 84 false-offline presentation is corrected without weakening fail-closed structured commands.",
+    "Native now emits prospective exact correlation only from durable phone/Watch authority after the Server-owned effective boundary.",
+    "Server handles both ingestion orderings, revalidates exact proof, preserves Founder terminal choices and never routes trusted correlation through the heuristic review path.",
+    "Today's historical review has no durable exact session ID and therefore remains untouched for an explicit Founder choice."
   ],
   "decisions_required": [
-    "After implementation, tests and fresh independent review, Founder authorization will be required before any Server deployment, production trusted-source allowlist/config activation, or mutation of today's Pending Review."
+    "Authorize exact Server SHA 3c0f4aefddbb9a6886f6ad012443978303d47024 for guarded production deployment.",
+    "After exact runtime verification, authorize the reviewed prospective policy plan: effective 2026-10-05T07:00:00.000Z, desired digest fc028029635cb7ba1de6301206f5f8a8, exactly one policy row plus one audit row."
   ],
-  "recommended_next_step": "Create isolated Build 85 Native/Server worktrees from the exact Build 84 authorities, implement the proven narrow corrections, test them, prepare the exact guarded activation/repair dry runs, obtain fresh independent review, then publish and stop at the Founder authorization gate.",
-  "full_report_path": "agent-handoffs/reports/20261003T201500Z-build85-watch-physical-acceptance-corrections.md",
+  "recommended_next_step": "After explicit Founder authorization, deploy exact Server 3c0f4aef, verify web/worker/live/ready, re-dry-run and apply only the exact prospective policy if facts and future boundary still match, then complete Native Build 85 archive and guarded TestFlight upload to VALID.",
+  "full_report_path": "agent-handoffs/reports/20261003T212700Z-build85-watch-candidates-policy-authorization-gate.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
