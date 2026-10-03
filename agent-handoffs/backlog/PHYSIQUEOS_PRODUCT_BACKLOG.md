@@ -403,3 +403,50 @@ Execution gate:
 - DO NOT implement, deploy, enable policy, create a Native build, write/delete HealthKit samples, or backfill until Founder explicitly resumes this backlog item.
 - When resumed, use the audit's Phase B-E plan and reverify current Native/Server authorities first.
 - Target readiness remains the Founder DEXA on Friday 2026-10-09.
+
+
+## Build 83 Cardio classification — LOCKED Founder decision 2026-10-02
+
+Continuation authority:
+- Build 83 continuity checkpoint: agent-handoffs/reports/20261003T033236Z-build83-first-real-workout-corrections-checkpoint3.md
+- checkpoint main commit: b2e1779aa8b639ca8508c817204b96df4b4ba511
+- pushed Native candidate: abb131d9e1a4cd9eeb6c1a5caca1e1ad9e1b9c4e
+
+Founder locked classification:
+- Stair Stepper / HealthKit type 44: canonical Cardio and prospectively strategically eligible under the accepted Cardio framework.
+- Cooldown / HealthKit type 80: canonical workout/history record labeled Cooldown, but NOT Cardio anywhere.
+
+Cooldown must NOT:
+- count as a Cardio session;
+- contribute Cardio session totals;
+- contribute Cardio minutes/totals;
+- set hasCardio or equivalent flags;
+- satisfy Cardio targets;
+- appear as Cardio in Home, Active Goal, Training reporting or indicators;
+- enter Cardio strategic evidence;
+- affect V3 Confidence, Narrative, recommendations, Briefings or Cardio strategy.
+
+Cooldown MAY:
+- appear as Cooldown in Log;
+- appear as Cooldown in Training Day/history;
+- appear as Cooldown in Activity/history where canonical workout history is presented.
+
+Architecture requirement:
+canonical workout/history inclusion is independent from workout-family reporting classification and strategic evidence eligibility.
+
+No production policy change is authorized merely to implement this distinction. If the current policy/model cannot represent it safely and backward-compatibly, stop for Founder review.
+
+Build 82 compatibility is mandatory for Server read responses until Build 83 adoption. Do not introduce an enum/value that causes Build 82 Training Day/Log decoding failure.
+
+WITHDRAWN SERVER CANDIDATE:
+- 22925625 is explicitly withdrawn and MUST NOT be deployed or used for D3 repair.
+- A new exact Server SHA implementing the locked Cooldown non-Cardio rule must pass tests and fresh independent review before Founder deploy authorization.
+
+D3 remains authorized in principle only after the new Server candidate is reviewed/deployed:
+- bounded repair of exactly the Oct 2 Stair Stepper and Cooldown source_only observations;
+- dry-run first;
+- Stair Stepper repaired as Cardio;
+- Cooldown repaired as canonical non-Cardio;
+- no Activity calorie/exercise-minute inflation;
+- no other records affected;
+- no historical strategic artifact rewrite.
