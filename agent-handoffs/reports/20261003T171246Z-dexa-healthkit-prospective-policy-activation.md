@@ -6,7 +6,7 @@
 - Founder authority: direct chat authorization naming the exact record, payload, digest, Server SHA, preflight gates, and create-only semantics
 - Prior review authority: `agent-handoffs/reports/20261003T162145Z-dexa-healthkit-physical-validation-closeout.md`
 - Generated (UTC): `2026-10-03T17:12:46Z`
-- Initial MAIN publication commit: `PENDING_PUBLICATION_FOLLOW_UP`
+- Initial MAIN publication commit: `b967a9680d902c62d62486b17dea55cab0427b16`
 
 ## Result
 

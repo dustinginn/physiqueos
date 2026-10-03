@@ -15,7 +15,8 @@
     "native_sha": "bcd92c74602695766c270fe6af052de45afece4b",
     "native_build": 84,
     "policy_digest": "15f04b12710a124475e2e02f70a5255cbe4a0c5f47b6655d701c3053b214bb98",
-    "preflight_facts_digest": "284474e2dd6bf535d83d2865bb3b6a2c80a17db0b5ff1851d0f7ff91f5c45fc9"
+    "preflight_facts_digest": "284474e2dd6bf535d83d2865bb3b6a2c80a17db0b5ff1851d0f7ff91f5c45fc9",
+    "initial_main_report_commit": "b967a9680d902c62d62486b17dea55cab0427b16"
   },
   "result": {
     "summary": "The exact create-only DEXA HealthKit prospective policy is active at version 1, effective from canonical scan date 2026-10-09 for Body Fat Percentage and fat-free Lean Body Mass only. Parent and independent read-only audits prove zero current intents/diagnostics, all historical DEXAs excluded, Sep. 12 receipts still absent, and every protected non-policy collection unchanged.",
