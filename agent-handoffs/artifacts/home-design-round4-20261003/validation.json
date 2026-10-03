@@ -1,0 +1,76 @@
+{
+  "measurements": {
+    "t1l": {
+      "width": 402,
+      "height": 1179.875
+    },
+    "t1d": {
+      "width": 402,
+      "height": 1177.875
+    },
+    "t2l": {
+      "width": 402,
+      "height": 1097.75
+    },
+    "t2d": {
+      "width": 402,
+      "height": 1097.75
+    },
+    "t3d": {
+      "width": 402,
+      "height": 1080.203125
+    },
+    "t3l": {
+      "width": 402,
+      "height": 1080.203125
+    }
+  },
+  "validation": {
+    "t1l": {
+      "requiredFields": 52,
+      "mismatches": 0,
+      "confidenceGeometry": [
+        "79"
+      ],
+      "confidenceGeometryValid": true
+    },
+    "t1d": {
+      "requiredFields": 52,
+      "mismatches": 0,
+      "confidenceGeometry": [
+        "79"
+      ],
+      "confidenceGeometryValid": true
+    },
+    "t2l": {
+      "requiredFields": 52,
+      "mismatches": 0,
+      "confidenceGeometry": [],
+      "confidenceGeometryValid": true
+    },
+    "t2d": {
+      "requiredFields": 52,
+      "mismatches": 0,
+      "confidenceGeometry": [],
+      "confidenceGeometryValid": true
+    },
+    "t3d": {
+      "requiredFields": 52,
+      "mismatches": 0,
+      "confidenceGeometry": [
+        "79",
+        "79"
+      ],
+      "confidenceGeometryValid": true
+    },
+    "t3l": {
+      "requiredFields": 52,
+      "mismatches": 0,
+      "confidenceGeometry": [
+        "79",
+        "79"
+      ],
+      "confidenceGeometryValid": true
+    }
+  }
+}

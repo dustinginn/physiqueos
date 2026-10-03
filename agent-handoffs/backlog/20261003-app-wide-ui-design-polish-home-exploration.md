@@ -44,3 +44,16 @@ Round 3 preserves the Founder-preferred dark/light foundations in a three-concep
 - `agent-handoffs/artifacts/home-design-round3-20261003/STRUCTURAL-DIFFERENCE.md`
 
 No Round 3 concept, hierarchy, ordering, palette, component treatment or light-mode direction is accepted. Founder review and explicit direction-setting remain the next gate.
+
+## Round 4 — three-track refinement
+
+Status: **Home Round 4 — three-track refinement ready for Founder review**
+
+Round 4 advances the three Founder-selected tracks independently: a locked structured light/dark pair, an editorial light/dark pair with a cross-phase Guardrail rail, and an immersive dark/mineral-light pair with corrected 79% geometry, Phase 2 progress ownership and persistent Guardrail treatment.
+
+- `agent-handoffs/artifacts/home-design-round4-20261003/README.md`
+- `agent-handoffs/artifacts/home-design-round4-20261003/comparison-board.html`
+- `agent-handoffs/artifacts/home-design-round4-20261003/TYPOGRAPHY-ACCESSIBILITY.md`
+- `agent-handoffs/artifacts/home-design-round4-20261003/IMPLEMENTATION-NOTES.md`
+
+No track, palette, hierarchy, component treatment, light-mode implementation or Log translation is accepted. Founder review and explicit direction-setting remain the next gate.
