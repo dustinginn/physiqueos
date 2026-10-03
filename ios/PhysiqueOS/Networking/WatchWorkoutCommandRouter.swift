@@ -8,17 +8,20 @@ final class WatchWorkoutCommandRouter {
     private let authority: TrainingSessionAuthority
     private let isPhoneReachable: () -> Bool
     private let serverWaitingForNetwork: () -> Bool
+    private let canCommitFinish: (TrainingLoggerDraft) -> Bool
     private let now: () -> Date
 
     init(
         authority: TrainingSessionAuthority,
         isPhoneReachable: @escaping () -> Bool,
         serverWaitingForNetwork: @escaping () -> Bool = { false },
+        canCommitFinish: @escaping (TrainingLoggerDraft) -> Bool = { _ in true },
         now: @escaping () -> Date = Date.init
     ) {
         self.authority = authority
         self.isPhoneReachable = isPhoneReachable
         self.serverWaitingForNetwork = serverWaitingForNetwork
+        self.canCommitFinish = canCommitFinish
         self.now = now
     }
 
@@ -132,6 +135,11 @@ final class WatchWorkoutCommandRouter {
         case .cancelFinish:
             outcome = authority.cancelFinishConfirmation(sessionId: command.sessionId, context: context)
         case .confirmFinish:
+            // A Watch-confirmed finish freezes the session, so it must pass
+            // the same local commit validation as a phone Finish.
+            guard current.watchFinishOperationId != nil || canCommitFinish(current) else {
+                return acknowledgement(command, .rejected, .sessionNotMutable, current.currentRevision)
+            }
             outcome = authority.confirmFinish(
                 sessionId: command.sessionId,
                 finishOperationId: command.mutationId,

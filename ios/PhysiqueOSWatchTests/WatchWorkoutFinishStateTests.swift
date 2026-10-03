@@ -277,4 +277,124 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         XCTAssertEqual(WatchExecutionLayout.topInset(safeAreaTop: 56), 39)
         XCTAssertEqual(WatchExecutionLayout.topInset(safeAreaTop: 40), 28)
     }
+
+    // MARK: Command deferral (fresh re-review N1) via the test command sink
+
+    @MainActor
+    private func sinkStore(_ suite: String) -> (WatchWorkoutStore, CommandLog) {
+        let (store, _) = makeStore(suite)
+        let log = CommandLog()
+        store.commandSinkForTesting = { log.commands.append($0) }
+        return (store, log)
+    }
+
+    final class CommandLog { var commands: [WatchWorkoutCommand] = [] }
+
+    @MainActor
+    private func acknowledge(
+        _ store: WatchWorkoutStore, _ command: WatchWorkoutCommand,
+        status: WatchWorkoutAcknowledgement.Status = .applied, projection: WatchWorkoutProjection
+    ) throws {
+        let ack = WatchWorkoutAcknowledgement(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: command.commandId,
+            mutationId: command.mutationId, status: status, reason: nil,
+            acknowledgedRevision: projection.revision, projection: projection
+        )
+        store.receiveAcknowledgement(try WatchWorkoutWireCodec.encode(ack))
+    }
+
+    @MainActor
+    func testFinishTappedWhileCompleteSetIsInFlightIsSentAfterItsReply() throws {
+        let (store, log) = sinkStore("defer.finish")
+        var active = try fixture("final-set")
+        store.apply(active)
+        store.completeSet()
+        XCTAssertEqual(log.commands.map(\.kind), [.completeSet])
+        // The context already shows every set done, so Finish is tappable.
+        active.completedSets = active.totalSets
+        store.requestFinish()
+        XCTAssertEqual(store.presentedPhase, .finishConfirmation)
+        XCTAssertEqual(log.commands.count, 1, "Deferred while Complete Set is in flight.")
+
+        active.revision += 1
+        try acknowledge(store, log.commands[0], projection: active)
+
+        XCTAssertEqual(store.presentedPhase, .finishConfirmation, "The reply to another command never drops the Finish tap.")
+        XCTAssertEqual(log.commands.map(\.kind), [.completeSet, .requestFinish])
+    }
+
+    @MainActor
+    func testNotYetTappedWhileAnotherCommandIsInFlightIsNotReRaised() throws {
+        let (store, log) = sinkStore("defer.notyet")
+        var requested = try fixture("normal")
+        requested.phase = .finishConfirmation
+        requested.rest = nil
+        store.apply(requested)
+        store.refresh()
+        store.cancelFinish()
+        XCTAssertEqual(store.presentedPhase, .active)
+        try acknowledge(store, log.commands[0], status: .unchanged, projection: requested)
+        XCTAssertEqual(store.presentedPhase, .active, "A deferred Not Yet is not re-opened by the refresh reply.")
+        XCTAssertEqual(log.commands.map(\.kind), [.refreshProjection, .cancelFinish])
+    }
+
+    @MainActor
+    func testAStaleFinishRequestAsksAgainAndKeepsTheConfirmationUp() throws {
+        let (store, log) = sinkStore("defer.stale")
+        var active = try fixture("final-workout")
+        store.apply(active)
+        store.requestFinish()
+        active.revision += 1
+        try acknowledge(store, log.commands[0], status: .stale, projection: active)
+        XCTAssertEqual(store.presentedPhase, .finishConfirmation)
+        XCTAssertEqual(log.commands.map(\.kind), [.requestFinish, .requestFinish], "Re-asked on the refreshed revision.")
+    }
+
+    @MainActor
+    func testPhoneSideNotYetClosesTheConfirmation() throws {
+        let (store, log) = sinkStore("phone.notyet")
+        var requested = try fixture("normal")
+        requested.phase = .finishConfirmation
+        store.apply(requested)
+        XCTAssertEqual(store.presentedPhase, .finishConfirmation)
+        var active = requested
+        active.phase = .active
+        active.revision += 1
+        store.apply(active)
+        XCTAssertEqual(store.presentedPhase, .active)
+        XCTAssertTrue(log.commands.isEmpty)
+    }
+
+    @MainActor
+    func testDoneSendsNoCommitAndDoesNotTouchHealthKit() throws {
+        let (store, log) = sinkStore("done.nocommit")
+        var summary = try fixture("summary")
+        summary.finishedAt = now.addingTimeInterval(-60)
+        store.apply(summary)
+        store.dismissSummary()
+        XCTAssertTrue(log.commands.allSatisfy { $0.kind == .refreshProjection }, "Only a read-only refresh.")
+        XCTAssertNotEqual(store.health.lifecycle, .cancelled)
+    }
+
+    func testAKnownFinishIsSavedEvenIfTheDraftWasLaterDiscarded() {
+        let discarded = WatchWorkoutProjection.terminal(
+            sessionId: "current", revision: 0, phase: .unavailable,
+            recentlyEnded: [.init(sessionId: "s1", outcome: .discardedAfterFinish, finishOperationId: "op-1", finishedAt: now)]
+        )
+        XCTAssertEqual(
+            WatchHealthSessionResolution.resolve(healthSessionId: "s1", incoming: discarded, knownFinish: nil),
+            .save(operationId: "op-1", endAt: now)
+        )
+        let cancelled = WatchWorkoutProjection.terminal(
+            sessionId: "current", revision: 0, phase: .unavailable,
+            recentlyEnded: [.init(sessionId: "s1", outcome: .cancelled, finishOperationId: nil, finishedAt: nil)]
+        )
+        XCTAssertEqual(
+            WatchHealthSessionResolution.resolve(
+                healthSessionId: "s1", incoming: cancelled, knownFinish: .init(operationId: "op-known", finishedAt: now)
+            ),
+            .save(operationId: "op-known", endAt: now),
+            "A known confirmed finish beats a later cancelled record."
+        )
+    }
 }

@@ -12,6 +12,11 @@ struct TrainingSessionTerminalRecord: Codable, Equatable, Sendable {
         case committed
         /// Canonical Cancel or a saved-draft discard: nothing was committed.
         case cancelled
+        /// A saved draft discarded after its finish was confirmed (the
+        /// escape hatch from a finish that cannot commit). The structured
+        /// session is gone, but the confirmed finish keeps its operation so
+        /// the Watch saves its HealthKit workout instead of discarding it.
+        case discardedAfterFinish
     }
 
     var sessionId: String

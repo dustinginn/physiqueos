@@ -254,6 +254,7 @@ final class TrainingSessionAuthority {
     ) -> TrainingSessionMutationOutcome {
         return mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
             guard draft.mode == .live, draft.leftAt == nil, draft.submissionState == nil,
+                  draft.finishedAt == nil,
                   draft.step == .workout || draft.isAddingExercises
             else { throw TrainingSessionMutationRejection.sessionNotMutable }
             guard draft.pausedAt == nil else { return }
@@ -403,6 +404,9 @@ final class TrainingSessionAuthority {
             if draft.finishedAt != nil, draft.watchFinishOperationId != nil { return }
             guard draft.finishConfirmationRequestedAt != nil
             else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            // Sets may have been unchecked since the request: a confirmed
+            // finish must be committable.
+            guard draft.completedSetCount > 0 else { throw TrainingSessionMutationRejection.noCompletedSets }
             Self.stampFinish(&draft, finishedAt: TrainingSessionClock.string(from: self.now()), operationId: finishOperationId)
         }
     }
@@ -525,9 +529,10 @@ final class TrainingSessionAuthority {
         // landed, and a cancelled record would make the Watch discard the
         // HealthKit workout of a saved session. (Discarding a saved draft
         // stays possible as the explicit escape hatch.)
-        if reason == .cancelled, let current = draft(id: sessionId),
-           current.watchFinishOperationId != nil || submittingSessionIds.contains(sessionId) {
-            return .rejected(.sessionNotMutable)
+        if let current = draft(id: sessionId), reason != .committed {
+            // Nothing ends a session while its commit is in flight.
+            if submittingSessionIds.contains(sessionId) { return .rejected(.sessionNotMutable) }
+            if reason == .cancelled, current.watchFinishOperationId != nil { return .rejected(.sessionNotMutable) }
         }
         return endSession(sessionId: sessionId, reason: reason, retainingPresentation: false)
     }
@@ -610,12 +615,16 @@ final class TrainingSessionAuthority {
         }
         presentation.completionPresentationPending = true
         presentation.completionRecordedAt = TrainingSessionClock.string(from: now())
+        let keepsFinish = reason == .committed
+            || (reason == .discarded && existing.watchFinishOperationId != nil)
+        let outcome: TrainingSessionTerminalRecord.Outcome = reason == .committed ? .committed
+            : keepsFinish ? .discardedAfterFinish : .cancelled
         appendTerminalRecord(.init(
             sessionId: sessionId,
-            outcome: reason == .committed ? .committed : .cancelled,
-            finishOperationId: reason == .committed ? existing.watchFinishOperationId : nil,
-            finishedAt: reason == .committed ? existing.finishedAt : nil,
-            healthSaveState: reason == .committed ? existing.watchHealthSaveState : nil,
+            outcome: outcome,
+            finishOperationId: keepsFinish ? existing.watchFinishOperationId : nil,
+            finishedAt: keepsFinish ? existing.finishedAt : nil,
+            healthSaveState: keepsFinish ? existing.watchHealthSaveState : nil,
             cancelMutationId: reason == .committed ? nil : cancelMutationId,
             recordedAt: presentation.completionRecordedAt ?? TrainingSessionClock.string(from: now())
         ))

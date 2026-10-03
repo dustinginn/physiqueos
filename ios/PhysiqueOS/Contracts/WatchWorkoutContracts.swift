@@ -239,6 +239,9 @@ struct WatchWorkoutEndedSession: Codable, Equatable, Sendable {
         case committed
         /// Canonical Cancel: discard the HealthKit workout.
         case cancelled
+        /// A confirmed finish whose structured draft was later discarded on
+        /// the phone: the HealthKit workout is still saved, never discarded.
+        case discardedAfterFinish
         /// Unknown future outcome: never discard on it.
         case unknown
         static let fallback: Self = .unknown

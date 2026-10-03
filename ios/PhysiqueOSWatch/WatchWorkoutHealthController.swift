@@ -40,13 +40,21 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
     }
 
     /// The structured session whose HealthKit workout can still be saved
-    /// or discarded here: exactly the states `finish()` accepts (running or
-    /// paused). Starting, ending, saved or failed workouts are not offered,
-    /// so resolution can never loop on a workout that cannot be finished.
+    /// or discarded here: exactly the states `finish()` accepts. That
+    /// includes a workout the system already ended and one whose save
+    /// failed (both stay savable by Retry). A save in flight is excluded;
+    /// the store attempts automatic saves at most once, so a failing save
+    /// can never loop.
     var activeCorrelationId: String? {
-        guard workoutSession != nil, lifecycle == .running || lifecycle == .paused else { return nil }
+        guard workoutSession != nil, !finishInFlight, Self.savableStates.contains(lifecycle) else { return nil }
         return correlationId
     }
+
+    static let savableStates: Set<Lifecycle> = [.running, .paused, .ending, .failed]
+    private var finishInFlight = false
+    /// `endCollection` already succeeded for the current builder, so a
+    /// retried save goes straight to `finishWorkout`.
+    private var collectionEnded = false
 
     /// The last structured session whose workout this controller saved.
     private(set) var lastSavedCorrelationId: String?
@@ -84,6 +92,7 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         builder.delegate = self
         workoutSession = session
         self.builder = builder
+        collectionEnded = false
         correlationId = structuredSessionId
         UserDefaults.standard.set(structuredSessionId, forKey: correlationKey)
         lifecycle = .starting
@@ -114,15 +123,20 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
     /// callers check `hasSaved(structuredSessionId:)`.
     @discardableResult
     func finish(structuredSessionId: String? = nil, endAt: Date? = nil) async throws -> HKWorkout? {
-        guard let workoutSession, let builder,
-              lifecycle == .running || lifecycle == .paused,
+        guard let workoutSession, let builder, !finishInFlight,
+              Self.savableStates.contains(lifecycle),
               structuredSessionId == nil || structuredSessionId == correlationId
         else { throw ControllerError.notRunning }
+        finishInFlight = true
+        defer { finishInFlight = false }
         lifecycle = .ending
         let endedAt = Self.endDate(finishedAt: endAt, workoutStart: builder.startDate, now: Date())
-        workoutSession.end()
+        if workoutSession.state != .ended { workoutSession.end() }
         do {
-            try await builder.endCollection(at: endedAt)
+            if !collectionEnded {
+                try await builder.endCollection(at: endedAt)
+                collectionEnded = true
+            }
             let workout = try await builder.finishWorkout()
             rawDurationSeconds = workout?.duration ?? builder.elapsedTime
             lifecycle = .saved
@@ -132,9 +146,12 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
             }
             self.workoutSession = nil
             self.builder = nil
+            collectionEnded = false
             UserDefaults.standard.removeObject(forKey: correlationKey)
             return workout
         } catch {
+            // Keep the session and builder: Retry Health Save (or End &
+            // Save) can finish the same workout later.
             lifecycle = .failed
             lastErrorDescription = error.localizedDescription
             throw error
@@ -169,6 +186,7 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         }
         workoutSession = nil
         builder = nil
+        collectionEnded = false
         correlationId = nil
         currentHeartRateBPM = nil
         activeCalories = nil
@@ -235,6 +253,7 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         builder.delegate = self
         workoutSession = recovered
         self.builder = builder
+        collectionEnded = false
         correlationId = stored
         lifecycle = recovered.state == .paused ? .paused : .running
     }

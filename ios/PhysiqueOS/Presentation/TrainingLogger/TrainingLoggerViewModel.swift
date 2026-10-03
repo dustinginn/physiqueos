@@ -131,11 +131,16 @@ final class TrainingLoggerViewModel {
         }
     }
 
-    isolated deinit {
-        authorityObservation?.cancel()
-    }
-
     private func noteAuthorityChange(_ change: TrainingSessionChange) {
+        // A finish committed elsewhere that came back ambiguous (accepted /
+        // result unknown) while this screen is open gets the same honest
+        // recovery (and Still saving / Retry) as this screen's own commit.
+        if change.sessionId == selectedDraftId, completedDraft == nil,
+           let current = sessionAuthority.draft(id: change.sessionId),
+           current.submissionState != nil, durabilityRecoveryTasks[current.id] == nil,
+           !sessionAuthority.isSubmitting(sessionId: current.id), authority == .founderProduction {
+            scheduleDurabilityRecovery(for: current)
+        }
         guard change.kind == .ended(.committed), completedDraft == nil,
               selectedDraftId == change.sessionId,
               let pending = sessionAuthority.pendingCompletion(id: change.sessionId)
@@ -258,16 +263,21 @@ final class TrainingLoggerViewModel {
     func discardSavedDraft(draftId: String) {
         guard canWrite else { return }
         guard savedDrafts.contains(where: { $0.id == draftId }) else { return }
+        // Refused while a commit for it is in flight; files are removed only
+        // once the authority actually ended it.
+        guard sessionAuthority.endSession(sessionId: draftId, reason: .discarded).isAccepted else {
+            validationMessage = "This workout is being saved and can't be discarded right now."
+            return
+        }
         attachmentStore.removeAll(draftId: draftId)
-        sessionAuthority.endSession(sessionId: draftId, reason: .discarded)
         if draft?.id == draftId { draft = nil }
     }
 
     func cancelWorkout() {
         guard canWrite, !isFinishConfirmed else { return }
         if let draftId = draft?.id {
+            guard sessionAuthority.endSession(sessionId: draftId, reason: .cancelled).isAccepted else { return }
             attachmentStore.removeAll(draftId: draftId)
-            sessionAuthority.endSession(sessionId: draftId, reason: .cancelled)
         }
         draft = nil
         completedPerformanceRecords = []

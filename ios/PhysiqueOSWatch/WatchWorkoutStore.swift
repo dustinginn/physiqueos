@@ -47,20 +47,21 @@ enum WatchHealthSessionResolution: Equatable {
             default: return .keep
             }
         }
+        // Once a finish was confirmed for this workout it is saved, never
+        // discarded, whatever later happened to the structured session.
+        if let knownFinish {
+            return .save(operationId: knownFinish.operationId, endAt: knownFinish.finishedAt)
+        }
         if let ended = incoming.recentlyEnded.first(where: { $0.sessionId == healthSessionId }) {
             switch ended.outcome {
-            case .committed:
-                if let operationId = ended.finishOperationId ?? knownFinish?.operationId {
-                    return .save(operationId: operationId, endAt: ended.finishedAt ?? knownFinish?.finishedAt)
+            case .committed, .discardedAfterFinish:
+                if let operationId = ended.finishOperationId {
+                    return .save(operationId: operationId, endAt: ended.finishedAt)
                 }
                 return .keep
             case .cancelled: return .discard
             case .unknown: return .keep
             }
-        }
-        // Once a finish was confirmed for this workout, never discard it.
-        if let knownFinish {
-            return .save(operationId: knownFinish.operationId, endAt: knownFinish.finishedAt)
         }
         // No record either way (Save & Leave, another session became
         // current, a lost ledger): keep recording. Only an explicit Cancel
@@ -123,6 +124,11 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 
     private let session: WCSession?
     private let defaults: UserDefaults
+    /// Test seam: when set, commands are handed here (as if the phone were
+    /// reachable) instead of WatchConnectivity; replies arrive through
+    /// `receiveAcknowledgement`.
+    var commandSinkForTesting: ((WatchWorkoutCommand) -> Void)?
+    private var resumedReportSessionIds: Set<String> = []
     private let now: () -> Date
     private var installed = false
     private var pendingHealthReport: (sessionId: String, operationId: String, succeeded: Bool)?
@@ -173,11 +179,21 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         case .prepared: return .prepared
         case .active: return localFinishConfirmation ? .finishConfirmation : .active
         case .paused: return localFinishConfirmation ? .finishConfirmation : .paused
-        case .finishConfirmation: return .finishConfirmation
+        case .finishConfirmation:
+            // Not Yet answers at once, even while it waits for the phone.
+            if !localFinishConfirmation, isCancelFinishOutstanding {
+                return projection.pausedAt != nil ? .paused : .active
+            }
+            return .finishConfirmation
         case .finishing: return .finishing
         case .committed: return .committed
         case .unavailable, .cancelled: return .none
         }
+    }
+
+    private var isCancelFinishOutstanding: Bool {
+        gate.pending?.kind == .cancelFinish || deferredKind == .cancelFinish
+            || queuedAfterAcknowledgement == .cancelFinish
     }
 
     /// Rest is shown only while sets are being executed. A Finish intent
@@ -311,6 +327,11 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             if !issue(.requestFinish), gate.pending != nil { deferredKind = .requestFinish }
         case .finishConfirmation:
             localFinishConfirmation = true
+            stopCountdownHaptics()
+            if queuedAfterAcknowledgement == .cancelFinish { queuedAfterAcknowledgement = nil }
+            if deferredKind == .cancelFinish { deferredKind = nil }
+            // A Not Yet already on its way: ask again once it lands.
+            if gate.pending?.kind == .cancelFinish { deferredKind = .requestFinish }
         default:
             return
         }
@@ -419,9 +440,11 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         finishOperationId: String? = nil,
         sessionId: String? = nil
     ) -> Bool {
-        guard let session, session.activationState == .activated, session.isReachable else {
-            connectionState = .phoneUnavailable
-            return false
+        if commandSinkForTesting == nil {
+            guard let session, session.activationState == .activated, session.isReachable else {
+                connectionState = .phoneUnavailable
+                return false
+            }
         }
         let identity = UUID().uuidString
         let targetSessionId = sessionId ?? projection?.sessionId ?? "current"
@@ -446,6 +469,12 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 
     private func send(_ command: WatchWorkoutCommand) {
         retryTask?.cancel()
+        if let sink = commandSinkForTesting {
+            sendAttempts += 1
+            connectionState = .reachable
+            sink(command)
+            return
+        }
         guard let session, session.isReachable,
               let data = try? WatchWorkoutWireCodec.encode(command)
         else {
@@ -511,7 +540,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
                     completeHealthReport(acknowledgement)
                 case .rejected:
                     // The phone can never accept it (unknown session or a
-                    // different operation): stop, never loop.
+                    // different operation): stop, and do not re-arm it from
+                    // the saved-report marker on every later context.
+                    if let report = pendingHealthReport { health.markSavedCorrelationReported(report.sessionId) }
                     pendingHealthReport = nil
                 case .stale:
                     healthReportStaleRetries += 1
@@ -739,7 +770,11 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             if incoming.phase == .cancelled, incoming.sessionId != "current" {
                 terminalSessionIds.insert(incoming.sessionId)
             }
-            for ended in incoming.recentlyEnded { terminalSessionIds.insert(ended.sessionId) }
+            // A committed session may still owe its Workout Saved summary;
+            // only cancelled ones are closed for good.
+            for ended in incoming.recentlyEnded where ended.outcome == .cancelled {
+                terminalSessionIds.insert(ended.sessionId)
+            }
             authoritativeTerminalReceived = true
             projection = nil
             page = .workout
@@ -769,6 +804,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
            incoming.revision < current.revision {
             return
         }
+        let previousPhase = projection?.sessionId == incoming.sessionId ? projection?.phase : nil
         if projection?.sessionId != incoming.sessionId {
             localFinishConfirmation = false
             finishingObservedAt = nil
@@ -780,19 +816,26 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         case .finishConfirmation:
             // The phone (or this Watch, earlier) asked to finish: confirm
             // here, unless Not Yet is already on its way to the phone.
-            if queuedAfterAcknowledgement != .cancelFinish { localFinishConfirmation = true }
+            if queuedAfterAcknowledgement != .cancelFinish, deferredKind != .cancelFinish,
+               gate.pending?.kind != .cancelFinish {
+                localFinishConfirmation = true
+            }
             stopCountdownHaptics()
         case .finishing, .committed:
             localFinishConfirmation = false
             if finishingObservedAt == nil { finishingObservedAt = now() }
             stopCountdownHaptics()
         case .active, .paused:
-            // Not Yet from either device ends a requested confirmation; a
-            // local tap still waiting on its request keeps it up.
-            if gate.pending?.kind != .requestFinish, queuedAfterAcknowledgement == nil {
+            // Only the phone leaving a requested confirmation (Not Yet from
+            // either device) closes it. A projection that was already active
+            // (another command's reply, a stale request's refresh) never
+            // drops a Finish tap still being asked for.
+            let finishIntentPending = gate.pending?.kind == .requestFinish
+                || deferredKind == .requestFinish || queuedAfterAcknowledgement != nil
+            if previousPhase == .finishConfirmation, !finishIntentPending {
                 localFinishConfirmation = false
             }
-            scheduleCountdownHaptics(for: incoming)
+            if !localFinishConfirmation { scheduleCountdownHaptics(for: incoming) }
         default:
             stopCountdownHaptics()
         }
@@ -896,9 +939,11 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     private func resumeSavedHealthReportIfNeeded() {
         guard pendingHealthReport == nil,
               let savedSessionId = health.savedCorrelationPendingReport,
+              !resumedReportSessionIds.contains(savedSessionId),
               let operationId = finishKnowledge[savedSessionId]?.operationId
                 ?? (projection?.sessionId == savedSessionId ? projection?.finish?.operationId : nil)
         else { return }
+        resumedReportSessionIds.insert(savedSessionId)
         pendingHealthReport = (savedSessionId, operationId, true)
         issuePendingHealthReport()
     }

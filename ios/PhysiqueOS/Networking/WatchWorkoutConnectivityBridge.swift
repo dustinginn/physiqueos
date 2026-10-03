@@ -80,7 +80,11 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
             // Receipt of an interactive message proves the paired phone
             // authority is reachable for this mutation.
             isPhoneReachable: { true },
-            serverWaitingForNetwork: { CommandConnectivityStatus.shared.isWaitingForNetwork }
+            serverWaitingForNetwork: { CommandConnectivityStatus.shared.isWaitingForNetwork },
+            canCommitFinish: { [environment] draft in
+                environment.nativeAuthority != .founderProduction
+                    || environment.trainingWriteAPI.localValidationError(for: draft) == nil
+            }
         )
     }
 

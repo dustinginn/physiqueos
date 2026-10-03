@@ -91,12 +91,18 @@ extension WatchWorkoutProjection {
             .filter { $0.sessionId != sessionId }
         let half = WatchWorkoutContract.maximumRecentlyEndedSessions / 2
         let committed = records.filter { $0.outcome == .committed }.prefix(half)
-        let cancelled = records.filter { $0.outcome == .cancelled }.prefix(half)
-        return (Array(committed) + Array(cancelled))
+        let ended = records.filter { $0.outcome != .committed }.prefix(half)
+        return (Array(committed) + Array(ended))
             .map { record in
                 .init(
                     sessionId: record.sessionId,
-                    outcome: record.outcome == .committed ? .committed : .cancelled,
+                    outcome: {
+                        switch record.outcome {
+                        case .committed: return .committed
+                        case .cancelled: return .cancelled
+                        case .discardedAfterFinish: return .discardedAfterFinish
+                        }
+                    }(),
                     finishOperationId: record.finishOperationId,
                     finishedAt: record.finishedAt.flatMap(TrainingSessionClock.date(from:))
                 )

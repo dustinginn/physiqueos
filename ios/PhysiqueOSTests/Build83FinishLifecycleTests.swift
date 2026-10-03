@@ -79,6 +79,8 @@ final class Build83FinishLifecycleTests: XCTestCase {
             releaseWaiters()
         }
 
+        func markDurable(_ id: String) { durableIds.insert(id) }
+
         private func releaseWaiters() {
             let pending = waiters
             waiters = []
@@ -689,6 +691,88 @@ final class Build83FinishLifecycleTests: XCTestCase {
         let ended = router.unavailableProjection().recentlyEnded
         XCTAssertTrue(ended.contains { $0.sessionId == "session-1" && $0.outcome == .committed && $0.finishOperationId == "op-kept" })
         XCTAssertLessThanOrEqual(ended.count, WatchWorkoutContract.maximumRecentlyEndedSessions)
+    }
+
+    // MARK: Fresh re-review fixes (N3, N5, N6)
+
+    func testDiscardingAConfirmedFinishIsRefusedWhileCommittingAndOtherwiseKeepsTheFinish() async throws {
+        let clock = Clock(t0)
+        let store = Store([thirteenSetSession(done: true)])
+        let authority = makeAuthority(store, clock: clock)
+        let router = router(authority, clock)
+        let writeAPI = WriteAPI(gated: true)
+        let coordinator = coordinator(authority, writeAPI)
+        _ = router.route(command(.requestFinish, authority, id: "request"))
+        _ = router.route(command(.confirmFinish, authority, id: "op-1"))
+        coordinator.reconcile()
+        await waitUntil("committing") { await writeAPI.inFlight == 1 }
+        XCTAssertEqual(authority.endSession(sessionId: "session-1", reason: .discarded), .rejected(.sessionNotMutable),
+                       "Nothing ends a session while its commit is in flight.")
+        await writeAPI.release()
+        await waitUntil("ended") { authority.drafts.isEmpty }
+
+        // A frozen finish that cannot commit can be discarded (escape hatch);
+        // the Watch is told the finish existed, so it saves HealthKit.
+        var stuck = thirteenSetSession(done: true)
+        stuck.id = "session-2"
+        stuck.finishedAt = "2026-10-02T23:58:45Z"
+        stuck.watchFinishOperationId = "op-2"
+        stuck.watchServerCommitState = .failed
+        stuck.watchHealthSaveState = .pending
+        try store.persist(stuck)
+        authority.reloadFromStore()
+        XCTAssertTrue(authority.endSession(sessionId: "session-2", reason: .discarded).isAccepted)
+        let record = try XCTUnwrap(authority.terminalRecord(sessionId: "session-2"))
+        XCTAssertEqual(record.outcome, .discardedAfterFinish)
+        XCTAssertEqual(record.finishOperationId, "op-2")
+        let ended = router.unavailableProjection().recentlyEnded.first { $0.sessionId == "session-2" }
+        XCTAssertEqual(ended?.outcome, .discardedAfterFinish)
+        XCTAssertFalse(authority.isCancelled(sessionId: "session-2"))
+    }
+
+    func testWatchConfirmIsRefusedWhenSetsWereUncheckedOrTheFinishCannotCommit() throws {
+        let clock = Clock(t0)
+        let authority = makeAuthority(Store([thirteenSetSession()]), clock: clock)
+        let router = router(authority, clock)
+        _ = router.route(command(.completeSet, authority, id: "c1", exerciseId: "a", setId: "a1"))
+        _ = router.route(command(.requestFinish, authority, id: "request"))
+        // The phone unchecks the only completed set before the Watch confirms.
+        authority.setCompletion(sessionId: "session-1", exerciseId: "a", setId: "a1", completed: false)
+        let confirm = router.route(command(.confirmFinish, authority, id: "op"))
+        XCTAssertEqual(confirm.status, .rejected)
+        XCTAssertNil(authority.draft(id: "session-1")?.watchFinishOperationId, "Never frozen uncommittable.")
+
+        let validating = WatchWorkoutCommandRouter(
+            authority: authority, isPhoneReachable: { true }, canCommitFinish: { _ in false }, now: { clock.now }
+        )
+        _ = validating.route(command(.completeSet, authority, id: "c2", exerciseId: "a", setId: "a1"))
+        let invalid = validating.route(command(.confirmFinish, authority, id: "op-invalid"))
+        XCTAssertEqual(invalid.status, .rejected)
+        XCTAssertNil(authority.draft(id: "session-1")?.watchFinishOperationId)
+    }
+
+    func testAnOpenLoggerRecoversAFinishThatCameBackAmbiguousElsewhere() async throws {
+        let clock = Clock(t0)
+        let authority = makeAuthority(Store([thirteenSetSession(done: true)]), clock: clock)
+        let router = router(authority, clock)
+        let writeAPI = WriteAPI(outcomes: [.processing, .processing, .processing])
+        let coordinator = coordinator(authority, writeAPI)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction,
+            durabilityRecoveryDelay: .milliseconds(20), now: { clock.now }
+        )
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        _ = router.route(command(.requestFinish, authority, id: "request"))
+        _ = router.route(command(.confirmFinish, authority, id: "op-1"))
+        coordinator.reconcile()
+        await waitUntil("coordinator done, ambiguous") {
+            !coordinator.isCommitting(sessionId: "session-1") && authority.draft(id: "session-1")?.submissionState != nil
+        }
+        XCTAssertTrue(viewModel.isAwaitingDurability)
+        XCTAssertTrue(viewModel.isStillSaving(at: clock.now.addingTimeInterval(25)), "Still saving / Retry is offered.")
+        await writeAPI.markDurable("session-1")
+        await waitUntil("recovered") { viewModel.draft?.step == .complete }
     }
 
     // MARK: 13-set performed fixture
