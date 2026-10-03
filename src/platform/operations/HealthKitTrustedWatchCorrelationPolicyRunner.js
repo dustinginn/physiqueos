@@ -25,24 +25,24 @@ export async function runHealthKitTrustedWatchCorrelationPolicy({
   if (!ownerUserId) throw Object.assign(new Error("Owner authority is required."), { code: "OWNER_REQUIRED" });
   const get = (recordId) => records.get({ ownerUserId, collection: COLLECTION, recordId });
   const current = await get(HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID);
-  const facts = Object.freeze({
+  const currentFacts = {
     policyDigest: digest(current),
     policyVersion: current?.version ?? null,
-  });
+  };
   const bundleIdentifiers = authorization.trustedSourceBundleIdentifiers;
   const activityTypes = authorization.traditionalStrengthTrainingActivityTypes;
   const effectiveAt = authorization.effectiveAt;
   const tolerance = authorization.clockToleranceSeconds;
   if (JSON.stringify(bundleIdentifiers) !== JSON.stringify(["com.physiqueos.native.dev"])) {
-    return Object.freeze({ outcome: "refused", reason: "trusted_source_bundle_must_match_audited_production_fact", facts });
+    return Object.freeze({ outcome: "refused", reason: "trusted_source_bundle_must_match_audited_production_fact", facts: currentFacts });
   }
   if (JSON.stringify(activityTypes) !== JSON.stringify(["50"])) {
-    return Object.freeze({ outcome: "refused", reason: "activity_types_must_be_exact_traditional_strength", facts });
+    return Object.freeze({ outcome: "refused", reason: "activity_types_must_be_exact_traditional_strength", facts: currentFacts });
   }
-  if (tolerance !== 120) return Object.freeze({ outcome: "refused", reason: "clock_tolerance_must_be_120_seconds", facts });
+  if (tolerance !== 120) return Object.freeze({ outcome: "refused", reason: "clock_tolerance_must_be_120_seconds", facts: currentFacts });
   const parsedEffectiveAt = new Date(effectiveAt);
   if (!effectiveAt || Number.isNaN(parsedEffectiveAt.getTime()) || parsedEffectiveAt.toISOString() !== effectiveAt) {
-    return Object.freeze({ outcome: "refused", reason: "effective_at_invalid", facts });
+    return Object.freeze({ outcome: "refused", reason: "effective_at_invalid", facts: currentFacts });
   }
   const desired = {
     id: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
@@ -56,6 +56,8 @@ export async function runHealthKitTrustedWatchCorrelationPolicy({
     effectiveAt,
     authorizationReference: String(authorization.authorizationReference ?? "") || null,
   };
+  const plannedRecordDigest = digest(stripVolatile(desired));
+  const facts = Object.freeze({ ...currentFacts, plannedRecordDigest });
   const resolution = resolveHealthKitTrustedWatchWorkoutCorrelationPolicy(desired);
   if (!resolution.enabled) return Object.freeze({ outcome: "refused", reason: resolution.invalidReason, facts });
   const alreadyApplied = current && digest(stripVolatile(current)) === digest(stripVolatile(desired));
@@ -66,7 +68,7 @@ export async function runHealthKitTrustedWatchCorrelationPolicy({
     return Object.freeze({
       outcome: alreadyApplied ? "already_applied" : "dry_run",
       recordId: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
-      plannedRecordDigest: digest(stripVolatile(desired)),
+      plannedRecordDigest,
       plannedResolution: resolution,
       predictedMutations: alreadyApplied ? [] : Object.freeze([
         Object.freeze({ collection: COLLECTION, recordId: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID, operation: current ? "update" : "create" }),
@@ -84,13 +86,27 @@ export async function runHealthKitTrustedWatchCorrelationPolicy({
   }
   if (alreadyApplied) return Object.freeze({ outcome: "already_applied", facts, resolution });
   const appliedAt = now().toISOString();
-  const written = await records.put({
-    ownerUserId,
-    collection: COLLECTION,
-    recordId: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
-    expectedVersion: current ? current.version : null,
-    payload: { ...desired, updatedAt: appliedAt },
-  });
+  const payload = { ...desired, updatedAt: appliedAt };
+  let written;
+  if (current) {
+    written = await records.put({
+      ownerUserId, collection: COLLECTION,
+      recordId: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+      expectedVersion: current.version, payload,
+    });
+  } else {
+    const created = await records.putIfAbsent({
+      ownerUserId, collection: COLLECTION,
+      recordId: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+      payload,
+    });
+    if (!created.created) {
+      throw Object.assign(new Error("Trusted Watch correlation policy changed during activation."), {
+        code: "TRUSTED_WATCH_CORRELATION_POLICY_CONCURRENT_INSERT",
+      });
+    }
+    written = created.record;
+  }
   const auditId = `${HEALTHKIT_TRUSTED_WATCH_CORRELATION_AUDIT_PREFIX}${createHash("sha256")
     .update(`${ownerUserId}\u0000${effectiveAt}\u0000${appliedAt}`).digest("hex").slice(0, 32)}`;
   const audit = await records.putIfAbsent({

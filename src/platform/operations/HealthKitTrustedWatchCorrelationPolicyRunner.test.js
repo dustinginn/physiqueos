@@ -74,6 +74,15 @@ describe("guarded trusted Watch correlation policy", () => {
       now: () => NOW,
     });
     expect(past).toMatchObject({ outcome: "refused", reason: "effective_at_must_be_future" });
+
+    const changedPlan = await runHealthKitTrustedWatchCorrelationPolicy({
+      records: createInMemoryCanonicalRecordStore({ healthKitConfiguration: [] }),
+      authorization: { ...authorization, effectiveAt: "2026-10-05T07:00:00.000Z" },
+      apply: true,
+      expected: dry.facts,
+      now: () => NOW,
+    });
+    expect(changedPlan).toMatchObject({ outcome: "refused", reason: "production_drifted_since_dry_run" });
   });
 
   it("builds a SHA-gated single-file production payload and keeps apply gated", async () => {

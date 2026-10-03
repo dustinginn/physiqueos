@@ -518,6 +518,56 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     const existingById = new Map(existingObservations.map((record) => [record.id, record]));
     const canonicalDayById = new Map(existingCanonicalDays.map((record) => [record.id, record]));
     const receivedAt = () => context.metadata.clientOccurredAt ?? now().toISOString();
+    const confirmTrustedExactCorrelation = async ({ persistedWorkout, exactCorrelation }) => {
+      const assessment = Object.freeze({
+        outcome: HealthKitStrengthMatchOutcome.CONFIDENT,
+        matcherVersion: "healthkit-strength-matcher-v5",
+        candidates: Object.freeze([Object.freeze({
+          loggerSessionCanonicalId: exactCorrelation.canonicalTrainingSessionId,
+          confidence: 100,
+          basis: "trusted_physiqueos_session_id",
+          reasons: Object.freeze(["trusted_physiqueos_session_id"]),
+        })]),
+      });
+      const baseLink = createHealthKitWorkoutLinkCandidate({
+        canonicalWorkout: persistedWorkout,
+        assessment,
+        ownerUserId: context.ownerUserId,
+        now: now(),
+      });
+      const exactLink = Object.freeze({
+        ...baseLink,
+        associationAuthority: "trusted_physiqueos_session_id_v1",
+        createdBy: { kind: "trusted_watch_correlation", ref: "trusted_physiqueos_session_id_v1" },
+        statusHistory: [{
+          status: HealthKitWorkoutLinkStatus.CANDIDATE,
+          at: baseLink.createdAt,
+          by: { kind: "trusted_watch_correlation", ref: "trusted_physiqueos_session_id_v1" },
+        }],
+      });
+      const insertedLink = await records.putIfAbsent({
+        ownerUserId: context.ownerUserId,
+        collection: HEALTHKIT_WORKOUT_LINK_COLLECTION,
+        recordId: exactLink.id,
+        sourceIdentity: exactLink.id,
+        payload: exactLink,
+      });
+      const confirmed = await confirmHealthKitWorkoutRelationship({
+        records,
+        ownerUserId: context.ownerUserId,
+        linkId: insertedLink.record.id,
+        by: { kind: "trusted_watch_correlation", ref: "trusted_physiqueos_session_id_v1" },
+        now: now(),
+      });
+      const linked = confirmed.link;
+      const atIndex = workoutLinks.findIndex((item) => item.id === linked.id);
+      if (atIndex === -1) workoutLinks.push(linked); else workoutLinks.splice(atIndex, 1, linked);
+      workoutLinkClaims = await records.list({
+        ownerUserId: context.ownerUserId,
+        collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
+      });
+      return linked;
+    };
     const results = [];
     for (const observation of batch.observations) {
       const existing = existingById.get(observation.id);
@@ -843,53 +893,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         };
         const exactCorrelation = exactCorrelations.get(observation.id);
         if (exactCorrelation && ["create", "update"].includes(decision.action)) {
-          const assessment = Object.freeze({
-            outcome: HealthKitStrengthMatchOutcome.CONFIDENT,
-            matcherVersion: "healthkit-strength-matcher-v5",
-            candidates: Object.freeze([Object.freeze({
-              loggerSessionCanonicalId: exactCorrelation.canonicalTrainingSessionId,
-              confidence: 100,
-              basis: "trusted_physiqueos_session_id",
-              reasons: Object.freeze(["trusted_physiqueos_session_id"]),
-            })]),
-          });
-          const baseLink = createHealthKitWorkoutLinkCandidate({
-            canonicalWorkout: persistedWorkout,
-            assessment,
-            ownerUserId: context.ownerUserId,
-            now: now(),
-          });
-          const exactLink = Object.freeze({
-            ...baseLink,
-            associationAuthority: "trusted_physiqueos_session_id_v1",
-            createdBy: { kind: "trusted_watch_correlation", ref: "trusted_physiqueos_session_id_v1" },
-            statusHistory: [{
-              status: HealthKitWorkoutLinkStatus.CANDIDATE,
-              at: baseLink.createdAt,
-              by: { kind: "trusted_watch_correlation", ref: "trusted_physiqueos_session_id_v1" },
-            }],
-          });
-          const insertedLink = await records.putIfAbsent({
-            ownerUserId: context.ownerUserId,
-            collection: HEALTHKIT_WORKOUT_LINK_COLLECTION,
-            recordId: exactLink.id,
-            sourceIdentity: exactLink.id,
-            payload: exactLink,
-          });
-          const confirmed = await confirmHealthKitWorkoutRelationship({
-            records,
-            ownerUserId: context.ownerUserId,
-            linkId: insertedLink.record.id,
-            by: { kind: "trusted_watch_correlation", ref: "trusted_physiqueos_session_id_v1" },
-            now: now(),
-          });
-          const linked = confirmed.link;
-          const atIndex = workoutLinks.findIndex((item) => item.id === linked.id);
-          if (atIndex === -1) workoutLinks.push(linked); else workoutLinks.splice(atIndex, 1, linked);
-          workoutLinkClaims = await records.list({
-            ownerUserId: context.ownerUserId,
-            collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
-          });
+          const linked = await confirmTrustedExactCorrelation({ persistedWorkout, exactCorrelation });
           reconciliation = {
             ...reconciliation,
             canonicalTrainingSessionId: exactCorrelation.canonicalTrainingSessionId,
@@ -906,10 +910,41 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           });
         }
       }
+      let exactAssociationPersisted = false;
+      const replayExactCorrelation = exactCorrelations.get(observation.id);
+      if (observation.observationType === HealthKitObservationType.WORKOUT && replayExactCorrelation &&
+        stored.reconciliation?.associationAuthority !== "trusted_physiqueos_session_id_v1") {
+        const workoutRecordId = stored.reconciliation?.canonicalId ?? getHealthKitCanonicalWorkoutRecordId(observation);
+        const persistedWorkout = canonicalWorkoutById.get(workoutRecordId) ?? await records.get({
+          ownerUserId: context.ownerUserId,
+          collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
+          recordId: workoutRecordId,
+        });
+        if (persistedWorkout) {
+          const linked = await confirmTrustedExactCorrelation({
+            persistedWorkout, exactCorrelation: replayExactCorrelation,
+          });
+          reconciliation = {
+            ...stored.reconciliation,
+            canonicalTrainingSessionId: replayExactCorrelation.canonicalTrainingSessionId,
+            workoutLinkId: linked.id,
+            associationAuthority: replayExactCorrelation.associationAuthority,
+          };
+          stored = await records.put({
+            ownerUserId: context.ownerUserId,
+            collection: "healthKitObservations",
+            recordId: stored.id,
+            expectedVersion: stored.version,
+            sourceIdentity: stored.id,
+            payload: { ...stored, reconciliation },
+          });
+          exactAssociationPersisted = true;
+        }
+      }
       const reconciliationChanged = existing &&
         observation.observationType === HealthKitObservationType.WORKOUT &&
         comparableRecord(existing.reconciliation) !== comparableRecord(reconciliation);
-      if (reconciliationChanged) {
+      if (reconciliationChanged && !exactAssociationPersisted) {
         stored = await records.put({
             ownerUserId: context.ownerUserId,
             collection: "healthKitObservations",
@@ -958,6 +993,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         workoutLinks,
         canonicalObjects,
         canonicalObjectStorageMetadata,
+        sourceObservationsById: existingById,
+        trustedWatchCorrelationPolicy,
+        confirmTrustedExactCorrelation,
         workoutLinkClaims,
       });
     }
@@ -991,7 +1029,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     };
   }
 
-  async function reassessWorkoutRelationships({ context, workoutPolicy, canonicalWorkoutById, workoutLinks, canonicalObjects, canonicalObjectStorageMetadata, workoutLinkClaims }) {
+  async function reassessWorkoutRelationships({
+    context, workoutPolicy, canonicalWorkoutById, workoutLinks, canonicalObjects,
+    canonicalObjectStorageMetadata, sourceObservationsById, trustedWatchCorrelationPolicy,
+    confirmTrustedExactCorrelation, workoutLinkClaims,
+  }) {
     const summary = {
       assessed: 0,
       updated: 0,
@@ -1021,6 +1063,49 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     };
     for (const workout of inWindow) {
       summary.assessed += 1;
+      const sourceObservation = sourceObservationsById.get(workout.current?.sourceObservationId);
+      const exactCorrelation = sourceObservation?.measurement?.physiqueOSSessionId
+        ? reconcileHealthKitWorkoutObservation({
+          observation: sourceObservation,
+          canonicalObjects,
+          trustedWatchCorrelationPolicy,
+          claimedPhysiqueOSSessionIds: workoutLinks
+            .filter((link) => link.status === HealthKitWorkoutLinkStatus.CONFIRMED &&
+              link.canonicalWorkoutId !== workout.id)
+            .map((link) => link.loggerSessionCanonicalId),
+        })
+        : null;
+      if (exactCorrelation?.associationAuthority === "trusted_physiqueos_session_id_v1") {
+        const linked = await confirmTrustedExactCorrelation({
+          observation: sourceObservation,
+          persistedWorkout: workout,
+          exactCorrelation,
+        });
+        if (sourceObservation.reconciliation?.associationAuthority !== exactCorrelation.associationAuthority) {
+          const reconciliation = {
+            ...sourceObservation.reconciliation,
+            canonicalTrainingSessionId: exactCorrelation.canonicalTrainingSessionId,
+            workoutLinkId: linked.id,
+            associationAuthority: exactCorrelation.associationAuthority,
+          };
+          const savedObservation = await records.put({
+            ownerUserId: context.ownerUserId,
+            collection: "healthKitObservations",
+            recordId: sourceObservation.id,
+            expectedVersion: sourceObservation.version,
+            sourceIdentity: sourceObservation.id,
+            payload: { ...sourceObservation, reconciliation },
+          });
+          sourceObservationsById.set(savedObservation.id, savedObservation);
+        }
+        summary.automaticallyConfirmed += 1;
+        continue;
+      } else if (exactCorrelation?.reason === "trusted_session_not_found") {
+        // The Watch workout arrived before its independently committed Logger
+        // session. Preserve the exact identity and wait for a later ingestion
+        // pass; never open a heuristic Founder review for this ordering race.
+        continue;
+      }
       // One physical workout can appear as two canonical records (a re-created
       // HealthKit workout, or two sources). Only the earliest may hold a link.
       const duplicates = findPossibleDuplicateCanonicalWorkouts(workout, inWindow);

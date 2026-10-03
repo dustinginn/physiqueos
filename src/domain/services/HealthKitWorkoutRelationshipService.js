@@ -11,9 +11,16 @@ import {
   getHealthKitWorkoutLinkRecordId,
   unlinkHealthKitWorkoutLink,
 } from "./HealthKitWorkoutLinkService.js";
-import { isActiveDetailedStrengthSession } from "./HealthKitObservationService.js";
+import {
+  isActiveDetailedStrengthSession,
+  reconcileHealthKitWorkoutObservation,
+} from "./HealthKitObservationService.js";
 import { isTrustedNativeLiveLoggerSession } from "./HealthKitWorkoutLinkService.js";
 import { createHealthKitQuarantinedEligibility } from "./HealthKitEvidenceEligibilityPolicy.js";
+import {
+  HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+  resolveHealthKitTrustedWatchWorkoutCorrelationPolicy,
+} from "./HealthKitTrustedWatchWorkoutCorrelationPolicy.js";
 
 // The guarded write path for HealthKit workout <-> Workout Logger relationships.
 // Every confirmation, unlink and relink MUST come through here (the future
@@ -59,12 +66,17 @@ export async function confirmHealthKitWorkoutRelationship({ records, ownerUserId
   const link = await records.get({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION, recordId: linkId });
   if (!link) throw new HealthKitWorkoutLinkError("LINK_NOT_FOUND", "The workout link does not exist.");
 
-  const [links, workouts, evidence, claims, metadata] = await Promise.all([
+  const [links, workouts, evidence, claims, metadata, sourceObservations, trustedPolicyRecord] = await Promise.all([
     records.list({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION }),
     records.list({ ownerUserId, collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION }),
     records.list({ ownerUserId, collection: "canonicalEvidenceObjects" }),
     records.list({ ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION }),
     records.listStorageMetadata({ ownerUserId, collection: "canonicalEvidenceObjects" }),
+    records.list({ ownerUserId, collection: "healthKitObservations" }),
+    records.get({
+      ownerUserId, collection: "healthKitConfiguration",
+      recordId: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+    }),
   ]);
   assertHealthKitWorkoutRelationshipConfirmationAllowed({
     ownerUserId,
@@ -73,6 +85,8 @@ export async function confirmHealthKitWorkoutRelationship({ records, ownerUserId
     workouts,
     evidence,
     claims,
+    sourceObservations,
+    trustedWatchCorrelationPolicy: resolveHealthKitTrustedWatchWorkoutCorrelationPolicy(trustedPolicyRecord),
     loggerSessionServerCommitTimestamps: new Map(metadata.map((row) => [row.recordId, row.createdAt])),
   });
   if (link.status === HealthKitWorkoutLinkStatus.CONFIRMED) return Object.freeze({ outcome: "already_confirmed", link });
@@ -126,6 +140,8 @@ export function assertHealthKitWorkoutRelationshipConfirmationAllowed({
   workouts = [],
   evidence = [],
   claims = [],
+  sourceObservations = [],
+  trustedWatchCorrelationPolicy = null,
   loggerSessionServerCommitTimestamps = new Map(),
 } = {}) {
   if (!validLinkRecord(link, ownerUserId)) {
@@ -140,9 +156,21 @@ export function assertHealthKitWorkoutRelationshipConfirmationAllowed({
   const workout = workouts.find((candidate) => candidate.id === link.canonicalWorkoutId);
   if (link.associationAuthority === "trusted_physiqueos_session_id_v1") {
     const exactSessionId = String(link.loggerSessionCanonicalId).split("training_logger_draft_").at(-1);
+    const sourceObservation = sourceObservations.find((candidate) =>
+      candidate.id === workout?.current?.sourceObservationId);
+    const exactProof = reconcileHealthKitWorkoutObservation({
+      observation: sourceObservation,
+      canonicalObjects: evidence,
+      trustedWatchCorrelationPolicy,
+      claimedPhysiqueOSSessionIds: links
+        .filter((candidate) => candidate.id !== link.id && candidate.status === HealthKitWorkoutLinkStatus.CONFIRMED)
+        .map((candidate) => candidate.loggerSessionCanonicalId),
+    });
     if (!workout || workout.current?.family !== "strength" || workout.current?.canonicalType !== "traditional_strength_training" ||
       link.matchBasis !== "trusted_physiqueos_session_id" || link.confidence !== 100 ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(exactSessionId)) {
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(exactSessionId) ||
+      exactProof.associationAuthority !== "trusted_physiqueos_session_id_v1" ||
+      exactProof.canonicalTrainingSessionId !== link.loggerSessionCanonicalId) {
       throw new HealthKitWorkoutLinkError(
         "LINK_TRUSTED_CORRELATION_INVALID",
         "The trusted Watch workout relationship is not canonical.",

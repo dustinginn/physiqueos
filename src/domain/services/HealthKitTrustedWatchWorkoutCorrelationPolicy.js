@@ -3,6 +3,7 @@ export const HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_SCHEMA_VERSION = "health
 export const HEALTHKIT_TRUSTED_WATCH_CORRELATION_CONTRACT_VERSION = "healthkit-trusted-watch-workout-correlation-v1";
 
 const EXACT_TRADITIONAL_STRENGTH_TYPES = Object.freeze(["50"]);
+export const HEALTHKIT_TRUSTED_WATCH_SOURCE_BUNDLE = "com.physiqueos.native.dev";
 
 export function resolveHealthKitTrustedWatchWorkoutCorrelationPolicy(record) {
   const disabled = (source, invalidReason = null) => Object.freeze({
@@ -24,8 +25,8 @@ export function resolveHealthKitTrustedWatchWorkoutCorrelationPolicy(record) {
     if (record.prospectiveOnly !== true || record.historicalBackfill !== false) {
       return disabled("invalid_configuration_fail_closed", "prospective_boundary_invalid");
     }
-    if (!Array.isArray(record.trustedSourceBundleIdentifiers) || record.trustedSourceBundleIdentifiers.length !== 1 ||
-      record.trustedSourceBundleIdentifiers.some((value) => typeof value !== "string" || !value.trim() || value !== value.trim())) {
+    if (JSON.stringify(record.trustedSourceBundleIdentifiers) !==
+      JSON.stringify([HEALTHKIT_TRUSTED_WATCH_SOURCE_BUNDLE])) {
       return disabled("invalid_configuration_fail_closed", "trusted_source_bundle_invalid");
     }
     if (JSON.stringify(record.traditionalStrengthTrainingActivityTypes) !== JSON.stringify(EXACT_TRADITIONAL_STRENGTH_TYPES)) {

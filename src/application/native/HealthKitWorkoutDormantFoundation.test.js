@@ -929,6 +929,76 @@ describe("trusted PhysiqueOS Watch correlation", () => {
     expect(records.snapshot().canonicalEvidenceObjects).toEqual(beforeEvidence);
   });
 
+  it("waits without heuristic review when HealthKit wins the race, then confirms on the next ingestion pass", async () => {
+    const records = store({ trustedWatchPolicy: true, evidence: [] });
+    await ingest(records, [workout({
+      externalId: "trusted-health-first",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+    })], "health-first");
+    expect(records.snapshot().healthKitCanonicalWorkouts).toHaveLength(1);
+    expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(0);
+    expect(records.snapshot().evidenceReviews ?? []).toEqual([]);
+
+    await records.putIfAbsent({
+      ownerUserId: OWNER,
+      collection: "canonicalEvidenceObjects",
+      recordId: canonicalId,
+      sourceIdentity: canonicalId,
+      payload: liveLogger(canonicalId, "10:00", "11:00", 3600),
+    });
+    await ingest(records, [activity({ sourceRevision: 2 })], "activity-after-logger");
+    const after = records.snapshot();
+    expect(after.healthKitWorkoutLinks).toHaveLength(1);
+    expect(after.healthKitWorkoutLinks[0]).toMatchObject({
+      status: "confirmed",
+      loggerSessionCanonicalId: canonicalId,
+      associationAuthority: "trusted_physiqueos_session_id_v1",
+    });
+    expect(after.healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
+    expect(after.evidenceReviews ?? []).toEqual([]);
+    expect(after.canonicalEvidenceObjects).toHaveLength(1);
+  });
+
+  it("revalidates exact source semantics before returning idempotent trusted confirmation", async () => {
+    const records = store({ trustedWatchPolicy: true, evidence: [liveLogger(canonicalId, "10:00", "11:00", 3600)] });
+    await ingest(records, [workout({
+      externalId: "trusted-proof-drift",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+    })], "trusted-proof");
+    const snapshot = records.snapshot();
+    const observation = snapshot.healthKitObservations[0];
+    const link = snapshot.healthKitWorkoutLinks[0];
+    await records.put({
+      ownerUserId: OWNER,
+      collection: "healthKitObservations",
+      recordId: observation.id,
+      sourceIdentity: observation.id,
+      expectedVersion: observation.version,
+      payload: {
+        ...observation,
+        occurrence: {
+          ...observation.occurrence,
+          startedAt: `${DAY}T13:00:00-07:00`,
+          endedAt: `${DAY}T14:00:00-07:00`,
+        },
+        measurement: { ...observation.measurement, isIndoorWorkout: false },
+      },
+    });
+    await expect(confirmHealthKitWorkoutRelationship({
+      records,
+      ownerUserId: OWNER,
+      linkId: link.id,
+      by: { kind: "trusted_watch_correlation", ref: "trusted_physiqueos_session_id_v1" },
+      now: "2026-09-23T20:01:00.000Z",
+    })).rejects.toMatchObject({ code: "LINK_TRUSTED_CORRELATION_INVALID" });
+    expect(records.snapshot().healthKitWorkoutLinks[0].status).toBe("confirmed");
+    expect(records.snapshot().healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
+  });
+
   it("keeps foreign or invalid exact metadata out of trusted authority and rejects a second exact claim", async () => {
     const foreign = store({ trustedWatchPolicy: true, evidence: [liveLogger(canonicalId, "10:00", "11:00", 3600)] });
     await ingest(foreign, [workout({

@@ -193,6 +193,25 @@ describe("Native manifest Sleep capability", () => {
     });
     expect((await manifestService({ healthKitSleep: malformed }).manifest({ request }))
       .healthKitTrustedWatchWorkoutCorrelation.enabled).toBe(false);
+
+    const foreign = createHealthKitSleepCapabilityReadService({
+      records: createInMemoryCanonicalRecordStore({
+        healthKitConfiguration: [{
+          id: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+          schemaVersion: "healthkit-trusted-watch-workout-correlation-policy-v1",
+          status: "enabled",
+          prospectiveOnly: true,
+          historicalBackfill: false,
+          trustedSourceBundleIdentifiers: ["com.foreign.application"],
+          traditionalStrengthTrainingActivityTypes: ["50"],
+          clockToleranceSeconds: 120,
+          effectiveAt: "2026-10-04T07:00:00.000Z",
+        }],
+      }),
+      ownerUserId: OWNER,
+    });
+    expect((await manifestService({ healthKitSleep: foreign }).manifest({ request }))
+      .healthKitTrustedWatchWorkoutCorrelation.enabled).toBe(false);
   });
 });
 
