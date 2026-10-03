@@ -158,7 +158,13 @@ Trigger:
 - Founder begins planning actual beta onboarding, or DO cost/performance symptoms recur.
 
 7. Apple Watch companion
-Status: PHASE 1A CANCEL PARITY BUILD 82 PHYSICALLY INSTALLED + LAUNCHED on `codex/apple-watch-workout-v1-phase1a-overnight` at `a173f27b4a9ab208021a1f3cd7febc7402cf3b42`; not uploaded. Physical checkpoint: `agent-handoffs/reports/20261002T173031Z-watch-v1-cancel-workout-parity-physical-checkpoint.md`.
+Status: BUILD 84 REAL WORKOUT GENERALLY PASSED / BUILD 85 FOCUSED CORRECTIONS AUDITED (2026-10-03). Early root-cause checkpoint: `agent-handoffs/reports/20261003T201500Z-build85-watch-physical-acceptance-corrections.md`.
+Current physical-acceptance facts:
+- real Watch execution, set completion, phone editing, pause/resume, Finish confirmation, recovery, HealthKit save, Saved summary/Done, metrics, Daily Totals, Crown paging and green progress substantially passed;
+- performance-record celebration functionally passed for session-volume and reps-at-load records; Build 85 larger-confetti polish is pending while the one-time/Reduce Motion lifecycle remains locked;
+- inactive/Always-On display falsely shows `OFFLINE · HEALTH ON` because Build 84 maps immediate `WCSession.isReachable=false` directly to phone-unavailable presentation. No evidence establishes a lost structured session; Build 85 must distinguish passive unreachability from confirmed/stale authority failure while keeping mutations fail-closed;
+- the real PhysiqueOS-created Strength workout incorrectly entered generic 95% Pending Review. Read-only production audit proves exactly one Logger save, one HealthKit strength workout, one canonical workout, one candidate link, zero claims and no exact-correlation identity. The Founder-left review remains untouched;
+- trusted correlation is still dormant: Native batch normalization is default-disabled, production Server lacks the exact-correlation implementation, and the implementation-bearing Server composition defaults the source allowlist empty. Do not enable generic heuristic auto-confirm. A reviewed Server/config candidate and bounded one-record repair dry run require separate Founder authorization before mutation.
 Locked V1:
 - phone is the sole structured `TrainingSessionAuthority` and planning surface; Watch starts one phone-prepared Ready-for-Watch plan only while the paired phone is reachable;
 - after start, a disconnected Watch HealthKit workout may continue, but every structured mutation fails closed until phone authority returns;
@@ -186,12 +192,12 @@ Phase 1A implemented:
 - phone Cancel now publishes an authoritative terminal projection that clears Watch execution, metrics, controls, pending/rest/pause state and prevents delayed same-session resurrection across reconnect/relaunch;
 - generator-owned PhysiqueOS Watch AppIcon is compiled into the signed archive and the physical Watch returns the installed 216x216 icon as non-placeholder;
 - fresh paired Build 82 archive, strict signature/profile/entitlement inspection, physical iPhone+Watch install, launch and idle reachability proof are complete.
-Phase 1A remaining physical/release gates:
-- Founder prepares a short phone workout, marks it Ready for Watch, taps Start on Watch, and grants the requested Health authorization on-device;
-- one physical Start/Complete/Pause/Resume/Finish acceptance, including disconnect/reconnect and relaunch recovery;
-- physical Cancel acceptance while active, while paused without Resume, and from phone with immediate Watch terminal teardown;
-- battery/Always-On observation and exact HealthKit-to-structured correlation proof on the saved workout;
-- independent post-acceptance review before enabling the production trusted Watch bundle allowlist or uploading a Watch TestFlight build.
+Phase 1A / Build 85 remaining gates:
+- implement and independently review the false-offline state correction, exact trusted correlation pipeline/config and larger confetti against Build 84;
+- prepare exact source allowlist (`com.physiqueos.native.dev`) and today's single-record repair dry run, then stop for Founder authorization before Server deploy/config/repair;
+- rerun focused + regression suites, archive and guarded TestFlight workflow only under the applicable release gate;
+- physical reconnect/stale-authority acceptance after Build 85 and exact HealthKit-to-structured association proof after authorized activation;
+- physical Cancel acceptance while active, while paused without Resume, and from phone remains a separate unfinished matrix item unless already recorded by a later acceptance report.
 
 OPERATIONAL / ENVIRONMENT
 

@@ -2,17 +2,17 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: DEXA -> Apple Health permanent prospective policy activation
+- Task: Build 85 Watch physical-acceptance corrections
 - Agent: Codex
-- Status: active, zero current intents, independently verified
-- Generated (UTC): 2026-10-03T17:12:46Z
+- Status: root cause proven; production unchanged; implementation not started
+- Generated (UTC): 2026-10-03T20:15:00Z
 
-The exact create-only policy record is active at version 1, created `2026-10-03T17:09:54.334Z`, effective from canonical scan date `2026-10-09`, prospective-only with no backfill, and limited to Body Fat Percentage plus fat-free Lean Body Mass.
+The bounded read-only production audit proves today's real workout has exactly one Logger save, one PhysiqueOS HealthKit strength workout, one canonical workout, one 95% candidate link/review and zero claims. The Founder-left review remains pending and untouched.
 
-Fresh preflight, parent post-readback, and independent post-activation audits prove: current permanent intents `0`; diagnostics `0`; all three existing DEXAs excluded; Sep. 12 receipts still deleted/materialized absent; no Weight/feedback path; and every protected Weight, Evidence, Confidence, Briefing, Sleep, Training and Cardio digest unchanged.
+The inactive-display warning is a direct `isReachable` presentation defect. Trusted exact Watch correlation did not fail its predicate; it never entered the production path because Native normalization is still default-disabled and the production Server lacks/unconfigures that exact path. Generic heuristic auto-confirm remains off and must not be used as a workaround.
 
-Build 84 and the Sep. 12 validation controls were not touched. Do not invoke the validation controls again. Next gate is the real Oct. 9 prospective DEXA acceptance.
+Next: isolate Build 85 from exact Build 84, implement/test the narrow Native and Server corrections plus larger confetti, obtain fresh independent review, and publish the exact deployment/config/one-record repair authority request. Stop for Founder authorization before any Server deployment or production mutation.
 
-Detailed report: `agent-handoffs/reports/20261003T171246Z-dexa-healthkit-prospective-policy-activation.md`
+Detailed report: `agent-handoffs/reports/20261003T201500Z-build85-watch-physical-acceptance-corrections.md`
 
 Protocol: `agent-handoffs/README.md`
