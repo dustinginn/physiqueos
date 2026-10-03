@@ -126,6 +126,10 @@ def icloud_root() -> pathlib.Path:
     return expand(os.environ.get("PHYSIQUEOS_ICLOUD_ROOT", str(DEFAULT_ICLOUD)))
 
 
+def cache_home() -> pathlib.Path:
+    return expand(os.environ.get("PHYSIQUEOS_RECOVERY_CACHE_HOME", str(DEFAULT_HOME)))
+
+
 def generation_id(now: Optional[dt.datetime] = None) -> str:
     stamp = (now or utc_now()).strftime("%Y%m%d-%H%M%SZ")
     return f"PhysiqueOS-Recovery-{stamp}"
@@ -400,7 +404,7 @@ def build_aggregator(config: dict[str, Any], temp_root: pathlib.Path,
                 # avoids every live checkout. The legacy DB is independently bounded
                 # by the 100 MiB generation ceiling.
                 cache_key = sha256_bytes(canonical_bytes(candidates))[:24]
-                cache_dir = runtime_home() / "cache" / "git"
+                cache_dir = cache_home() / "cache" / "git"
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 source_bundle = cache_dir / f"{dbid}-{cache_key}.bundle"
                 if source_bundle.exists():
