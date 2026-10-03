@@ -1,50 +1,60 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T16:21:45Z",
+  "generated_at_utc": "2026-10-03T16:27:19Z",
   "task": {
-    "id": "20261003T162000Z-dexa-healthkit-physical-validation-closeout",
-    "title": "DEXA to Apple Health physical-validation closeout",
+    "id": "20261003T163500Z-sleep-v3-oct3-morning-canary-audit",
+    "title": "Sleep v3 Oct 3 morning canary read-only audit",
     "agent": "codex",
-    "status": "waiting_for_founder_activation_authorization"
+    "status": "pass_with_display_note"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_sha": "1757bf25fb9783e590cbd4634debf9b6810cebfa",
+    "prompt_sha": "1611eb8f7f5f18641a3f813cba6ec47fd0eae5c0",
+    "reporting_base_sha": "776dc6af3802709640b4f9335031fd940ed4eb90",
     "production_server_sha": "b47663b32372a78010dbc8e4aa41303012d98dc7",
     "production_deployment": "b9449c52-5444-4dae-9f44-fd0261b1a9d3",
     "native_sha": "bcd92c74602695766c270fe6af052de45afece4b",
     "native_build": 84,
     "native_delivery_id": "a4b7b504-e0ba-4cb5-9909-3e01cc8156d5",
-    "native_processing_state": "VALID",
-    "initial_main_report_commit": "080a142eac19e4905f3083672091c85b91494de1"
+    "native_processing_state": "VALID"
   },
   "result": {
-    "summary": "Founder physical Sep. 12 write/verify/delete validation passed. Production read-only closeout found the exact two final deleted/absent receipts, unchanged Sep. 12 canonical semantics, zero feedback loop or DEXA Weight, and zero current/candidate permanent intents. Permanent policy remains absent/disabled pending direct authorization.",
+    "summary": "PASS WITH DISPLAY NOTE: exact Oct 3 sleep-canon-v3 revision 2 is internally correct and equals fresh v3; independent minute rounding explains displayed stages totaling 7h37 versus the 7h36 headline; 9h25 Time in Bed is the distinct Oura in-bed envelope; longest continuous asleep is exactly 4,560 seconds; provenance, quarantine and isolation invariants pass.",
     "success": true,
-    "physical_validation_pass": true,
-    "production_mutated_by_closeout": false,
-    "policy_enabled": false,
-    "historical_backfill": false,
-    "candidate_intent_count": 0
+    "verdict": "PASS_WITH_DISPLAY_NOTE",
+    "canonical_revision": 2,
+    "provisional_until_local": "2026-10-03T18:00:00-07:00",
+    "production_mutated": false,
+    "historical_mutated": false,
+    "strategic_leak_count": 0,
+    "patch_proposed": false
   },
   "validation": {
     "production_audit": {
       "status": "passed",
-      "bundle_sha256": "11144cbe6cd021b1a07628b3abea9d38500ada114121a14831eef4bd4dbcba64",
-      "summary": "Exact runtime, repeatable-read transaction_read_only=on, owner scope, rollback, final deleted receipt pair, zero own-source body observations/evidence, and zero candidate intents all passed. A later manual Morning Check-In transaction was provenance-separated from DEXA validation."
+      "bundle_sha256": "27c9e39a7974d2fa5042b113cc4f49fc595e718f39506584b1255ef641b1a5f6",
+      "summary": "Exact runtime/build/owner gates, REPEATABLE READ READ ONLY, transaction_read_only=on, 21 SELECTs, zero blocked statements, zero record-store mutations and explicit rollback passed. Stored Oct 3 content equals fresh v3 exactly."
     },
-    "review": {
-      "status": "approved",
-      "summary": "Fresh independent exact-SHA activation-path review passed; targeted Server tests passed 5 files / 141 tests. Create-only putIfAbsent was selected, with stop-on-existing semantics."
+    "arithmetic": {
+      "status": "passed",
+      "summary": "Deep 5,370s + Core 15,060s + REM 6,930s = Asleep 27,360s exactly; Awake 4,110s completes the gap-free 31,470s main window. Independent minute rounding is non-additive by one displayed minute."
+    },
+    "continuity": {
+      "status": "passed",
+      "summary": "Independent timeline derivation and served read model both return 4,560s; Core-Deep-Core-Deep remains contiguous, Awake breaks both sides, and timeline gaps/source-boundary artifacts are zero."
+    },
+    "isolation": {
+      "status": "passed",
+      "summary": "Historical 87-day/8,601-sample/2,878-validation counts and digests exactly match the v3 activation fence; all historical days remain v2; strategic scan total is zero; current day remains validation-only quarantined."
     }
   },
   "decisions_required": [
-    "Founder direct authorization for the exact create-only dexa_healthkit_writeback_policy record published in the review request."
+    "Separate preserved gate: Founder direct authorization is still required before the already-published DEXA prospective writeback policy may be enabled."
   ],
   "blockers": [],
-  "recommended_next_step": "If authorized, rerun the exact immediate read-only drift fence, then create the absent policy record once and verify exact readback plus zero post-write intents. Do not backfill or repeat Sep. 12 validation.",
-  "full_report_path": "agent-handoffs/reports/20261003T162145Z-dexa-healthkit-physical-validation-closeout.md",
-  "authorization_request_path": "agent-handoffs/inbox/review-requests/20261003T162145Z-founder-authorization-dexa-healthkit-prospective-activation.md",
+  "recommended_next_step": "After 6:00 PM PDT, manually confirm the updating badge clears, record the then-current revision and values with one bounded read-only check, confirm Oura provenance/quarantine/fresh-v3 equality, and watch for any unexplained later revision. Do not recalculate, backfill or force finalization.",
+  "preserved_separate_gate": "DEXA prospective writeback activation remains disabled and requires its separately published direct Founder authorization.",
+  "full_report_path": "agent-handoffs/reports/20261003T162719Z-sleep-v3-oct3-morning-canary-audit.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

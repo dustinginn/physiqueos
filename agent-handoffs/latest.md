@@ -2,17 +2,19 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: DEXA -> Apple Health physical-validation closeout (`20261003T162000Z-dexa-healthkit-physical-validation-closeout`)
+- Task: Sleep v3 Oct 3 morning canary read-only audit (`20261003T163500Z-sleep-v3-oct3-morning-canary-audit`)
 - Agent: Codex
-- Status: physical validation PASS; prospective activation candidate approved; waiting for Founder authorization
-- Generated (UTC): 2026-10-03T16:21:45Z
+- Status: **PASS WITH DISPLAY NOTE**; morning canonical is exact and still provisional until 6:00 PM PDT
+- Generated (UTC): `2026-10-03T16:27:19Z`
 
-Founder-confirmed Sep. 12 Body Fat Percentage `8.1%` and fat-free Lean Body Mass `160.5 lb` were written, visibly verified with PhysiqueOS as source, and then precisely deleted. The production closeout confirmed the two receipts are final `deleted` / `absent`, Sep. 12 canonical revision/fingerprint are unchanged, no Weight or feedback loop exists, and historical/current permanent intents remain zero.
+The exact Oct 3 `sleep-canon-v3` canonical row (revision 2) equals a fresh v3 computation. Deep/Core/REM exact seconds sum to the exact 7h36 headline; their independently rounded display rows sum to 7h37 as expected. Time in Bed is a separate 9h25 Oura in-bed envelope extending 26m before and 14m30s after the staged sleep extent. Longest continuous asleep is exactly 4,560 seconds (1h16), with adjacent asleep-stage transitions preserved and Awake breaking both sides.
 
-The exact prospective create-only policy candidate is effective from canonical scan date `2026-10-09`, supports only Body Fat Percentage and fat-free Lean Body Mass, and forbids backfill. Its production dry run is zero. **It has not been enabled.**
+Source is Oura via Apple Health with one coherent selected generation and no Watch/Oura double counting. Historical Sleep digests remain exact, strategic leakage is zero, and production mutation is zero. No patch is proposed.
 
-Next gate: Founder direct authorization for `agent-handoffs/inbox/review-requests/20261003T162145Z-founder-authorization-dexa-healthkit-prospective-activation.md`.
+Next gate: manually recheck after 6:00 PM PDT, record the then-current final revision/values, and investigate only an unexplained later revision. Strategic Sleep remains quarantined and the broader natural canary remains HOLD.
 
-Detailed report: `agent-handoffs/reports/20261003T162145Z-dexa-healthkit-physical-validation-closeout.md`
+The independent DEXA prospective activation request remains separate and still requires direct Founder authorization.
+
+Detailed report: `agent-handoffs/reports/20261003T162719Z-sleep-v3-oct3-morning-canary-audit.md`
 
 Protocol: `agent-handoffs/README.md`
