@@ -1,0 +1,78 @@
+{
+  "archive_builds": [
+    {
+      "build": "84",
+      "path": "~/Library/Developer/Xcode/Archives/2026-10-03/PhysiqueOS-Build84-bcd92c74.xcarchive",
+      "role": "current-valid",
+      "version": "1.0"
+    },
+    {
+      "build": "83",
+      "path": "~/Library/Developer/Xcode/Archives/2026-10-02/PhysiqueOS-Build83.xcarchive",
+      "role": "previous-rollback",
+      "version": "1.0"
+    }
+  ],
+  "git_common_dirs": [
+    "~/Developer/PhysiqueOS/server/.git",
+    "~/Documents/GitHub/physiqueos/.git",
+    "~/Documents/GitHub/physiqueos-fresh-20260910/.git",
+    "~/.claude/jobs/704e1bcb/tmp/agent-handoffs-publish/.git",
+    "/private/tmp/physiqueos-sleep-audit-20261003-1611eb8f/repo.git"
+  ],
+  "origin_url": "git@github.com:dustinginn/PhysiqueOS.git",
+  "retention": {
+    "daily": 14,
+    "monthly": 12,
+    "release_checkpoint": 12,
+    "weekly": 8
+  },
+  "safe_release_sources": [
+    "~/.physiqueos-release/bin/physiqueos-asc-upload",
+    "~/.physiqueos-release/bin/physiqueos-handoff-publish",
+    "~/.physiqueos-release/bin/physiqueos-inbox",
+    "~/.physiqueos-release/lib/physiqueos_handoff_lib.py"
+  ],
+  "untracked_allowlist": [
+    {
+      "extensions": [".md"],
+      "max_bytes": 65536,
+      "path": "~/Developer/PhysiqueOS/native-production-read-foundation/agent-handoffs/reports/20261001T050828Z-healthkit-sleep-v2-historical-evidence-prospective-prep.md"
+    },
+    {
+      "extensions": [".md"],
+      "max_bytes": 65536,
+      "path": "~/Developer/PhysiqueOS/native-production-read-foundation/agent-handoffs/reports/20261001T053235Z-healthkit-sleep-v2-server-deployed-founder-import-gate.md"
+    },
+    {
+      "extensions": [".mjs"],
+      "max_bytes": 65536,
+      "path_glob": "~/.claude/jobs/a4bc60c7/tmp/srvD/scripts/operations/sleep*.mjs"
+    },
+    {
+      "extensions": [".js"],
+      "max_bytes": 131072,
+      "path_glob": "~/GitHub/physiqueos-sandbox-weight-manual/src/app/api/v1/native/sandbox/weight/manual/*.js"
+    },
+    {
+      "extensions": [".js"],
+      "max_bytes": 131072,
+      "path": "~/GitHub/physiqueos-sandbox-weight-manual/src/application/evidence/NativeSandboxManualWeightService.js"
+    },
+    {
+      "extensions": [".js"],
+      "max_bytes": 131072,
+      "path_glob": "~/GitHub/physiqueos-sandbox-weight-manual/src/platform/sandbox/NativeSandbox*Weight*.test.js"
+    },
+    {
+      "extensions": [".js"],
+      "max_bytes": 131072,
+      "path": "~/GitHub/physiqueos-sandbox-weight-manual/src/platform/sandbox/NativeSandboxWorkerComposition.test.js"
+    },
+    {
+      "extensions": [".js"],
+      "max_bytes": 131072,
+      "path": "~/GitHub/physiqueos-sandbox-weight-manual/src/platform/sandbox/nativeSandboxWeightValidation.js"
+    }
+  ]
+}
