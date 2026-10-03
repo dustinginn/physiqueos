@@ -1,61 +1,49 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T15:36:12Z",
+  "generated_at_utc": "2026-10-03T16:21:45Z",
   "task": {
-    "id": "20261003T061500Z-dexa-healthkit-writeback-overnight-implementation",
-    "title": "DEXA to Apple Health writeback overnight implementation",
+    "id": "20261003T162000Z-dexa-healthkit-physical-validation-closeout",
+    "title": "DEXA to Apple Health physical-validation closeout",
     "agent": "codex",
-    "status": "waiting_for_founder_installation"
+    "status": "waiting_for_founder_activation_authorization"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_sha": "9ce8027900d41ee9d706ca9ce79fb24794197798",
+    "prompt_sha": "1757bf25fb9783e590cbd4634debf9b6810cebfa",
     "production_server_sha": "b47663b32372a78010dbc8e4aa41303012d98dc7",
     "production_deployment": "b9449c52-5444-4dae-9f44-fd0261b1a9d3",
-    "server_base_sha": "89fe0a0340adee22d15b92a1f074a0bbd348ac77",
-    "server_candidate_sha": "b47663b32372a78010dbc8e4aa41303012d98dc7",
-    "native_base_sha": "3e61dd215e8474c52bd54230d2d9dfb2f3a93534",
-    "native_candidate_sha": "bcd92c74602695766c270fe6af052de45afece4b",
+    "native_sha": "bcd92c74602695766c270fe6af052de45afece4b",
     "native_build": 84,
     "native_delivery_id": "a4b7b504-e0ba-4cb5-9909-3e01cc8156d5",
-    "native_processing_state": "VALID",
-    "reporting_base_sha": "66ac9859cfcd3eb8def8cb2d0904aad634c2d511"
+    "native_processing_state": "VALID"
   },
   "result": {
-    "summary": "Exact reviewed Server is live and healthy; exact reviewed Build 84 is VALID in App Store Connect. Physical Sep. 12 validation remains unexecuted and permanent writeback remains disabled while awaiting Founder installation confirmation.",
+    "summary": "Founder physical Sep. 12 write/verify/delete validation passed. Production read-only closeout found the exact two final deleted/absent receipts, unchanged Sep. 12 canonical semantics, zero feedback loop or DEXA Weight, and zero current/candidate permanent intents. Permanent policy remains absent/disabled pending direct authorization.",
     "success": true,
-    "production_mutated": true,
-    "deployed": true,
-    "healthkit_written": false,
-    "healthkit_deleted": false,
-    "testflight_uploaded": true,
-    "testflight_valid": true,
-    "native_archive_created": true
+    "physical_validation_pass": true,
+    "production_mutated_by_closeout": false,
+    "policy_enabled": false,
+    "historical_backfill": false,
+    "candidate_intent_count": 0
   },
   "validation": {
-    "tests": {
+    "production_audit": {
       "status": "passed",
-      "summary": "Prior Server/Native gates remain authoritative. Postdeploy web/worker exact SHA, ACTIVE 9/9, live/ready, schema 000014, runtime stamps, read-only dormant-policy/zero-intent audit, and post-upload Build 84 VALID status all passed."
+      "bundle_sha256": "11144cbe6cd021b1a07628b3abea9d38500ada114121a14831eef4bd4dbcba64",
+      "summary": "Exact runtime, repeatable-read transaction_read_only=on, owner scope, rollback, final deleted receipt pair, zero own-source body observations/evidence, and zero candidate intents all passed. A later manual Morning Check-In transaction was provenance-separated from DEXA validation."
     },
     "review": {
       "status": "approved",
-      "summary": "Fresh independent Server and Native exact-SHA reviews approved b47663b32372a78010dbc8e4aa41303012d98dc7 and bcd92c74602695766c270fe6af052de45afece4b with no blocking findings."
-    },
-    "archive": {
-      "status": "uploaded_valid",
-      "build": 84,
-      "path": "~/Library/Developer/Xcode/Archives/2026-10-03/PhysiqueOS-Build84-bcd92c74.xcarchive",
-      "binary_sha256": "10c34dd17b64f9fbc0ae0aac3d012909a14a86984613b729026b41c6731d04ec"
+      "summary": "Fresh independent exact-SHA activation-path review passed; targeted Server tests passed 5 files / 141 tests. Create-only putIfAbsent was selected, with stop-on-existing semantics."
     }
   },
   "decisions_required": [
-    "Founder installs Build 84 remotely from TestFlight and confirms installation.",
-    "Only after installation confirmation, separately initiate the bounded Sep. 12 write/verify/delete validation.",
-    "Permanent writeback remains disabled until physical validation succeeds and a separate activation decision is made."
+    "Founder direct authorization for the exact create-only dexa_healthkit_writeback_policy record published in the review request."
   ],
   "blockers": [],
-  "recommended_next_step": "Stop and wait for Founder confirmation that Build 84 is installed. Do not execute Sep. 12 validation or enable permanent writeback before that confirmation.",
-  "full_report_path": "agent-handoffs/reports/20261003T153612Z-dexa-healthkit-server-deployed-build84-valid.md",
+  "recommended_next_step": "If authorized, rerun the exact immediate read-only drift fence, then create the absent policy record once and verify exact readback plus zero post-write intents. Do not backfill or repeat Sep. 12 validation.",
+  "full_report_path": "agent-handoffs/reports/20261003T162145Z-dexa-healthkit-physical-validation-closeout.md",
+  "authorization_request_path": "agent-handoffs/inbox/review-requests/20261003T162145Z-founder-authorization-dexa-healthkit-prospective-activation.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
