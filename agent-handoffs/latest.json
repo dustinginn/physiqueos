@@ -15,7 +15,8 @@
     "native_sha": "bcd92c74602695766c270fe6af052de45afece4b",
     "native_build": 84,
     "native_delivery_id": "a4b7b504-e0ba-4cb5-9909-3e01cc8156d5",
-    "native_processing_state": "VALID"
+    "native_processing_state": "VALID",
+    "initial_main_report_commit": "080a142eac19e4905f3083672091c85b91494de1"
   },
   "result": {
     "summary": "Founder physical Sep. 12 write/verify/delete validation passed. Production read-only closeout found the exact two final deleted/absent receipts, unchanged Sep. 12 canonical semantics, zero feedback loop or DEXA Weight, and zero current/candidate permanent intents. Permanent policy remains absent/disabled pending direct authorization.",
