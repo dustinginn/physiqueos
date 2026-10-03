@@ -256,6 +256,16 @@ class PolicyTests(TempCase):
             with mock.patch.object(recovery, "query_icloud_upload", return_value={"state": "REMOTE_ICLOUD_SYNC_UNKNOWN"}):
                 with self.assertRaises(recovery.GateFailure): recovery.install_scheduler()
 
+    def test_bounded_upload_wait_passes_and_notifies_failure_path(self):
+        observations = [{"state": "REMOTE_ICLOUD_SYNC_UNKNOWN"}, {"state": "ICLOUD_UPLOAD_REPORTED_COMPLETE"}]
+        with mock.patch.object(recovery, "query_icloud_upload", side_effect=observations):
+            result = recovery.wait_for_upload_report(self.temp, attempts=2, interval_seconds=0)
+        self.assertEqual(result["state"], "ICLOUD_UPLOAD_REPORTED_COMPLETE")
+        with mock.patch.object(recovery, "query_icloud_upload", return_value={"state": "ICLOUD_UPLOAD_ERROR"}):
+            with self.assertRaises(recovery.GateFailure) as caught:
+                recovery.wait_for_upload_report(self.temp, attempts=2, interval_seconds=0)
+        self.assertEqual(caught.exception.outcome, "FAIL_SCANNER_ERROR")
+
 
 if __name__ == "__main__":
     unittest.main()

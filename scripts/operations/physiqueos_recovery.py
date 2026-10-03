@@ -1346,6 +1346,20 @@ def next_schedule(now: Optional[dt.datetime] = None) -> str:
     return candidate.isoformat()
 
 
+def wait_for_upload_report(path: pathlib.Path, *, attempts: int = 20, interval_seconds: float = 15.0) -> dict[str, Any]:
+    observation: dict[str, Any] = {"state": "REMOTE_ICLOUD_SYNC_UNKNOWN"}
+    for attempt in range(max(1, attempts)):
+        observation = query_icloud_upload(path)
+        if observation.get("state") == "ICLOUD_UPLOAD_REPORTED_COMPLETE":
+            return observation
+        if attempt + 1 < attempts and interval_seconds > 0:
+            time.sleep(interval_seconds)
+    state = observation.get("state", "REMOTE_ICLOUD_SYNC_UNKNOWN")
+    if state == "ICLOUD_UPLOAD_ERROR":
+        raise GateFailure("FAIL_SCANNER_ERROR", "iCloud upload reported an error after bounded wait")
+    raise GateFailure("FAIL_UNKNOWN_FILE", "iCloud upload completion unavailable after bounded wait")
+
+
 def install_scheduler() -> dict[str, Any]:
     state = read_state()
     if state.get("local_validation") != "PASS" or state.get("icloud_local_copy") != "LOCAL_ICLOUD_CONTAINER_COMPLETE":
@@ -1437,7 +1451,11 @@ def scheduled_run(config: dict[str, Any], reason: str = "daily") -> dict[str, An
         source = build_generation(config, reason)
         local_restore = restore_smoke_test(source)
         cloud = publish_icloud(source)
-        cloud_restore = restore_smoke_test(pathlib.Path(cloud["destination"]))
+        final_cloud_path = pathlib.Path(cloud["destination"])
+        cloud["upload"] = wait_for_upload_report(final_cloud_path)
+        update_state({"icloud_upload_reported": "ICLOUD_UPLOAD_REPORTED_COMPLETE",
+                      "icloud_upload_metadata": cloud["upload"]})
+        cloud_restore = restore_smoke_test(final_cloud_path)
         plan = retention_plan(icloud_root() / "generations", config,
                               first_run=len(complete_generations(icloud_root() / "generations")) <= 1,
                               upload_state=cloud["upload"].get("state", "REMOTE_ICLOUD_SYNC_UNKNOWN"))
