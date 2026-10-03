@@ -39,7 +39,9 @@ final class HealthKitWorkoutIndoorOutdoorFidelityTests: XCTestCase {
     /// value, shared by Indoor Walk and Outdoor Walk.
     private static func workoutAddition(
         activityType: String = "52",
-        isIndoorWorkout: Bool?
+        isIndoorWorkout: Bool?,
+        sourceBundleIdentifier: String = "com.apple.Health",
+        externalUUID: String? = nil
     ) -> HealthKitQueryAddition {
         let start = Self.now
         let end = start.addingTimeInterval(1800)
@@ -48,7 +50,7 @@ final class HealthKitWorkoutIndoorOutdoorFidelityTests: XCTestCase {
             healthKitUUID: UUID(uuidString: "60000000-0000-0000-0000-000000000001")!,
             objectTypeIdentifier: HealthKitSynchronizationStream.workouts.objectTypeIdentifier,
             source: HealthKitQuerySource(
-                bundleIdentifier: "com.apple.Health", sourceName: "Apple Watch", sourceRevision: "11",
+                bundleIdentifier: sourceBundleIdentifier, sourceName: "Apple Watch", sourceRevision: "11",
                 productType: "Watch7,5", privacySafeDeviceProvenance: nil
             ),
             occurrence: HealthKitQueryOccurrence(
@@ -69,7 +71,7 @@ final class HealthKitWorkoutIndoorOutdoorFidelityTests: XCTestCase {
                 telemetryTypeIdentifiers: [],
                 isIndoorWorkout: isIndoorWorkout
             )),
-            allowlistedMetadata: [:]
+            allowlistedMetadata: externalUUID.map { ["HKExternalUUID": $0] } ?? [:]
         )
     }
 
@@ -80,8 +82,11 @@ final class HealthKitWorkoutIndoorOutdoorFidelityTests: XCTestCase {
         )
     }
 
-    private static func wireWorkout(for addition: HealthKitQueryAddition) throws -> [String: Any] {
-        let batch = try HealthKitBatchBuilder().build(
+    private static func wireWorkout(
+        for addition: HealthKitQueryAddition,
+        builder: HealthKitBatchBuilder = HealthKitBatchBuilder()
+    ) throws -> [String: Any] {
+        let batch = try builder.build(
             scope: Self.scope(), previousCursor: nil,
             queryResult: .init(additions: [addition], deletions: [], proposedAnchorData: Data("a".utf8), completedAt: Self.now),
             createdAt: Self.now
@@ -125,6 +130,34 @@ final class HealthKitWorkoutIndoorOutdoorFidelityTests: XCTestCase {
         let addition = Self.workoutAddition(activityType: "50", isIndoorWorkout: nil)
         guard case let .workout(workout) = addition.payload else { return XCTFail("Expected workout payload") }
         XCTAssertNil(workout.isIndoorWorkout)
+    }
+
+    func testBatchBuilderEmitsExactSessionOnlyFromItsServerGatedContext() throws {
+        let sessionID = UUID(uuidString: "a18d53bb-674a-4d3f-8b23-561bf102da11")!
+        let addition = Self.workoutAddition(
+            activityType: "50",
+            isIndoorWorkout: true,
+            sourceBundleIdentifier: "com.physiqueos.native.dev",
+            externalUUID: sessionID.uuidString
+        )
+        let enabled = HealthKitBatchBuilder { scope in
+            HealthKitTrustedWorkoutCorrelationContext(
+                trustedSourceBundleIdentifiers: ["com.physiqueos.native.dev"],
+                traditionalStrengthTrainingActivityTypes: ["50"],
+                ownerKey: scope.ownerIdentity,
+                sessions: [.init(
+                    sessionId: sessionID,
+                    ownerKey: scope.ownerIdentity,
+                    startedAt: Self.now.addingTimeInterval(-30),
+                    endedAt: Self.now.addingTimeInterval(1_830)
+                )],
+                clockToleranceSeconds: 120
+            )
+        }
+        XCTAssertEqual(try Self.wireWorkout(for: addition, builder: enabled)["physiqueOSSessionId"] as? String,
+                       sessionID.uuidString.lowercased())
+        XCTAssertNil(try Self.wireWorkout(for: addition)["physiqueOSSessionId"],
+                     "Absent Server capability keeps correlation metadata off.")
     }
 
     // MARK: - Normalizer passthrough (`NormalizedHealthKitObservation`)

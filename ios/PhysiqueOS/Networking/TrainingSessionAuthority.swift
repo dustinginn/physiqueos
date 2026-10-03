@@ -623,6 +623,7 @@ final class TrainingSessionAuthority {
             sessionId: sessionId,
             outcome: outcome,
             finishOperationId: keepsFinish ? existing.watchFinishOperationId : nil,
+            startedAt: keepsFinish ? (existing.watchStartedAt ?? existing.startedAt) : nil,
             finishedAt: keepsFinish ? existing.finishedAt : nil,
             healthSaveState: keepsFinish ? existing.watchHealthSaveState : nil,
             cancelMutationId: reason == .committed ? nil : cancelMutationId,

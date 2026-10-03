@@ -355,7 +355,7 @@ struct WatchWorkoutExecutionView: View {
     static let pageIndicatorClearance: CGFloat = 9
 
     private var statusText: (text: String, color: Color)? {
-        if store.connectionState != .reachable { return ("OFFLINE · HEALTH ON", WatchPhysiqueOSTheme.warning) }
+        if store.shouldShowAuthorityWarning(at: Date()) { return ("IPHONE UNAVAILABLE · HEALTH ON", WatchPhysiqueOSTheme.warning) }
         if projection.phase == .paused { return ("PAUSED", WatchPhysiqueOSTheme.warning) }
         switch store.notice {
         case .setPending: return ("SET PENDING…", WatchPhysiqueOSTheme.muted)
@@ -795,13 +795,14 @@ enum WatchDailyTotalsPresentation {
         connection: WatchWorkoutStore.ConnectionState,
         at date: Date
     ) -> String {
+        let confirmedUnavailable = connection == .phoneUnavailable || connection == .reconnecting
         guard let totals else {
-            return connection == .reachable ? "Waiting for iPhone" : "iPhone unavailable"
+            return confirmedUnavailable ? "iPhone unavailable" : "Waiting for iPhone"
         }
         guard totals.localDate == localDateKey(date) else { return "Today not loaded yet" }
         let time = (totals.refreshedAt ?? totals.writtenAt).formatted(date: .omitted, time: .shortened)
         if totals.refreshedAt == nil { return "Not loaded yet" }
-        if totals.isOffline || connection != .reachable { return "Offline · as of \(time)" }
+        if totals.isOffline || confirmedUnavailable { return "Offline · as of \(time)" }
         if let refreshed = totals.refreshedAt, date.timeIntervalSince(refreshed) > staleAfter { return "As of \(time)" }
         return "Updated \(time)"
     }

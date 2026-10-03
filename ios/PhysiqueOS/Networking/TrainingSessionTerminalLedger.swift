@@ -22,6 +22,9 @@ struct TrainingSessionTerminalRecord: Codable, Equatable, Sendable {
     var sessionId: String
     var outcome: Outcome
     var finishOperationId: String?
+    /// Original Watch-owned structured workout start, retained so a delayed
+    /// HealthKit workout can be correlated after the editable draft is gone.
+    var startedAt: String? = nil
     var finishedAt: String?
     var healthSaveState: WatchWorkoutFinishComponentState?
     /// The Cancel mutation id, so a lost Watch Cancel acknowledgement replays

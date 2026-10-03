@@ -346,6 +346,9 @@ struct ProductionContractManifest: Decodable, Sendable, Equatable {
     /// Source-controlled, bounded Recovery/Sleep Evidence import. Raw and
     /// fail-closed so an older or drifted Server leaves the lane inert.
     let healthKitSleepHistoricalEvidence: ProductionJSONValue?
+    /// Prospective, owner-scoped trusted Watch correlation policy. Raw and
+    /// fail-closed so older Servers leave correlation metadata suppressed.
+    let healthKitTrustedWatchWorkoutCorrelation: ProductionJSONValue?
 }
 
 indirect enum ProductionJSONValue: Codable, Sendable, Equatable {

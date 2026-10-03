@@ -153,6 +153,8 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     private let sleepActivation: HealthKitSleepActivationGate?
     private let sleepCapabilitySource: (any HealthKitSleepCapabilitySource)?
     private let sleepManifestSender: HealthKitSleepWindowManifestSender?
+    private let trustedWorkoutCorrelationGate: HealthKitTrustedWorkoutCorrelationGate?
+    private let trustedWorkoutCorrelationCapabilitySource: (any HealthKitTrustedWorkoutCorrelationCapabilitySource)?
 
     private(set) var lastBootstrapOutcome: HealthKitAutomaticBootstrapOutcome?
     /// The Founder's owner identity almost never changes within one signed-in
@@ -186,11 +188,15 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         now: @escaping @Sendable () -> Date = Date.init,
         sleepActivation: HealthKitSleepActivationGate? = nil,
         sleepCapabilitySource: (any HealthKitSleepCapabilitySource)? = nil,
-        sleepManifestSender: HealthKitSleepWindowManifestSender? = nil
+        sleepManifestSender: HealthKitSleepWindowManifestSender? = nil,
+        trustedWorkoutCorrelationGate: HealthKitTrustedWorkoutCorrelationGate? = nil,
+        trustedWorkoutCorrelationCapabilitySource: (any HealthKitTrustedWorkoutCorrelationCapabilitySource)? = nil
     ) {
         self.sleepActivation = sleepActivation
         self.sleepCapabilitySource = sleepCapabilitySource
         self.sleepManifestSender = sleepManifestSender
+        self.trustedWorkoutCorrelationGate = trustedWorkoutCorrelationGate
+        self.trustedWorkoutCorrelationCapabilitySource = trustedWorkoutCorrelationCapabilitySource
         self.ownerIdentityCache = ownerIdentityCache
         self.authorization = authorization
         self.synchronizer = synchronizer
@@ -486,6 +492,22 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             outcome.skippedReason = "device_identity_unavailable"
             lastBootstrapOutcome = outcome
             return outcome
+        }
+        // Refresh the prospective trust policy before querying Workouts. An
+        // absent or malformed block resolves OFF. A transient failed read
+        // keeps the last Server-resolved state, which the Server independently
+        // enforces again on every ingest.
+        if let gate = trustedWorkoutCorrelationGate,
+           let source = trustedWorkoutCorrelationCapabilitySource {
+            let now = self.now
+            switch await boundedStep({
+                let block = try await source.healthKitTrustedWorkoutCorrelationCapabilityBlock()
+                gate.update(HealthKitTrustedWorkoutCorrelationCapability.resolve(manifestBlock: block, at: now()))
+            }) {
+            case .succeeded: break
+            case .failed, .timedOut:
+                outcome.streamErrors[.workouts, default: []].append("trusted_watch_correlation_capability_refresh_failed")
+            }
         }
         let historicalScopes = Dictionary(uniqueKeysWithValues: Self.streams.map { stream in
             (stream, HealthKitCursorScope(

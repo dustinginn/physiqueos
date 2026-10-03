@@ -21,6 +21,49 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
     // MARK: Finish confirmation (today's exact sequence)
 
     @MainActor
+    func testPassiveAlwaysOnReachabilityDoesNotPresentFalseOffline() throws {
+        let (store, _) = makeStore("reachability.passive")
+        store.apply(try fixture("normal"))
+        XCTAssertEqual(store.connectionState, .passive)
+        XCTAssertFalse(store.shouldShowAuthorityWarning(at: now))
+
+        store.setDisplayActive(false)
+        XCTAssertFalse(
+            store.shouldShowAuthorityWarning(at: now.addingTimeInterval(10 * 60)),
+            "A dimmed Always-On display is not evidence that phone authority was lost."
+        )
+    }
+
+    @MainActor
+    func testStalePassiveAuthorityWarnsOnlyWhenTheDisplayIsActive() throws {
+        let (store, _) = makeStore("reachability.stale")
+        store.apply(try fixture("normal"))
+        let stale = now.addingTimeInterval(WatchWorkoutStore.authoritativeProjectionStaleAfter + 1)
+        store.setDisplayActive(false)
+        XCTAssertFalse(store.shouldShowAuthorityWarning(at: stale))
+        store.setDisplayActive(true)
+        XCTAssertTrue(store.shouldShowAuthorityWarning(at: stale))
+    }
+
+    @MainActor
+    func testUnavailableCommandFailsClosedAndReconnectSucceeds() throws {
+        let (store, _) = makeStore("reachability.command")
+        store.apply(try fixture("normal"))
+        store.completeSet()
+        XCTAssertEqual(store.connectionState, .phoneUnavailable)
+        XCTAssertFalse(store.isMutationPending, "No unreachable structured mutation may be queued as if it was delivered.")
+        XCTAssertTrue(store.shouldShowAuthorityWarning(at: now))
+
+        var delivered: WatchWorkoutCommand?
+        store.commandSinkForTesting = { delivered = $0 }
+        store.completeSet()
+        XCTAssertEqual(store.connectionState, .reachable)
+        XCTAssertNotNil(delivered)
+        XCTAssertTrue(store.isMutationPending)
+        XCTAssertFalse(store.shouldShowAuthorityWarning(at: now))
+    }
+
+    @MainActor
     func testFinalSetFinishShowsConfirmationAtOnceAndHidesRestWithoutThePhone() throws {
         let (store, _) = makeStore("finish.confirm")
         var final = try fixture("final-workout")
@@ -240,6 +283,8 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         XCTAssertTrue(WatchDailyTotalsPresentation.freshness(totals(date: today, refreshedAgo: 3_600), connection: .reachable, at: now).hasPrefix("As of"))
         XCTAssertTrue(WatchDailyTotalsPresentation.freshness(totals(date: today, offline: true), connection: .reachable, at: now).hasPrefix("Offline"))
         XCTAssertTrue(WatchDailyTotalsPresentation.freshness(totals(date: today), connection: .phoneUnavailable, at: now).hasPrefix("Offline"))
+        XCTAssertTrue(WatchDailyTotalsPresentation.freshness(totals(date: today), connection: .passive, at: now).hasPrefix("Updated"))
+        XCTAssertEqual(WatchDailyTotalsPresentation.freshness(nil, connection: .passive, at: now), "Waiting for iPhone")
         XCTAssertEqual(WatchDailyTotalsPresentation.freshness(nil, connection: .reachable, at: now), "Waiting for iPhone")
     }
 

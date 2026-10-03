@@ -1327,6 +1327,15 @@ final class TrainingLoggerTests: XCTestCase {
         )
     }
 
+    func testBuild85ConfettiIsNoticeablyLargerButStillBrief() {
+        XCTAssertEqual(PerformanceRecordConfettiStyle.particleCount, 36)
+        XCTAssertGreaterThan(PerformanceRecordConfettiStyle.particleCount, 20)
+        XCTAssertGreaterThanOrEqual(PerformanceRecordConfettiStyle.minimumParticleSize, 7)
+        XCTAssertGreaterThanOrEqual(PerformanceRecordConfettiStyle.maximumParticleSize, 10)
+        XCTAssertGreaterThan(PerformanceRecordConfettiStyle.horizontalBaseSpread, 55)
+        XCTAssertLessThanOrEqual(PerformanceRecordConfettiStyle.duration, 1)
+    }
+
     private struct StubSucceedingTrainingWriteAPI: TrainingWriteAPI {
         func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
             TrainingCommitResult(status: "durable", reviewId: "review-1", reviewRevision: 1, sessionId: draft.id, intendedDate: draft.workoutDate, exerciseIds: draft.exercises.map(\.id))
@@ -1789,7 +1798,7 @@ final class TrainingLoggerTests: XCTestCase {
         let usesNonExemptEncryption = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool)
         XCTAssertFalse(usesNonExemptEncryption)
         XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String, "1.0")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "83")
+        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, "85")
         XCTAssertEqual(Bundle.main.bundleIdentifier, "com.physiqueos.native.dev")
     }
 }

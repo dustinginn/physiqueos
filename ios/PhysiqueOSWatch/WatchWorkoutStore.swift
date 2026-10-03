@@ -75,7 +75,10 @@ enum WatchHealthSessionResolution: Equatable {
 @Observable
 final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     enum ConnectionState: Equatable {
-        case activating, reachable, phoneUnavailable, reconnecting
+        /// Activated WCSession whose immediate `sendMessage` lane is not
+        /// currently reachable. This is the normal Always-On/inactive-display
+        /// state and is not, by itself, evidence that phone authority is gone.
+        case activating, passive, reachable, phoneUnavailable, reconnecting
     }
 
     enum Notice: Equatable {
@@ -103,6 +106,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     /// Interactive commands retry with backoff while the phone does not
     /// answer, and surface "Waiting for iPhone" after this long.
     static let waitingForPhoneAfter: TimeInterval = 30
+    /// Passive reachability becomes actionable only when the Watch is active
+    /// and its last authoritative phone projection is genuinely old.
+    static let authoritativeProjectionStaleAfter: TimeInterval = 5 * 60
     static let replyWatchdog: TimeInterval = 12
     static let retryBackoff: [TimeInterval] = [2, 4, 8]
     /// Mirrors the phone terminal ledger. A count cap could evict the exact
@@ -120,6 +126,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     private(set) var debugSurface: String?
     private(set) var gate = WatchWorkoutCommandDeliveryGate()
     private(set) var pendingIssuedAt: Date?
+    private(set) var lastAuthoritativeContactAt: Date?
+    private(set) var displayIsActive = true
     /// When the Watch first saw the confirmed finish of the shown session.
     private(set) var finishingObservedAt: Date?
     private(set) var dailyTotals: WatchDailyTotals?
@@ -214,6 +222,27 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     func isWaitingForPhone(at date: Date) -> Bool {
         guard let pendingIssuedAt, gate.pending != nil else { return false }
         return connectionState != .reachable || date.timeIntervalSince(pendingIssuedAt) >= Self.waitingForPhoneAfter
+    }
+
+    /// Presentation truth is deliberately stricter than `isReachable ==
+    /// false`. watchOS routinely drops immediate-message reachability while
+    /// the display is dimmed even though application-context delivery and the
+    /// structured session remain healthy.
+    func shouldShowAuthorityWarning(at date: Date) -> Bool {
+        if isWaitingForPhone(at: date) { return true }
+        switch connectionState {
+        case .phoneUnavailable, .reconnecting:
+            return true
+        case .passive:
+            guard displayIsActive, let lastAuthoritativeContactAt else { return false }
+            return date.timeIntervalSince(lastAuthoritativeContactAt) >= Self.authoritativeProjectionStaleAfter
+        case .activating, .reachable:
+            return false
+        }
+    }
+
+    func setDisplayActive(_ active: Bool) {
+        displayIsActive = active
     }
 
     /// Why a confirmed finish is still in progress after `waitingForPhoneAfter`.
@@ -535,6 +564,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             pendingIssuedAt = nil
             sendAttempts = 0
             connectionState = .reachable
+            lastAuthoritativeContactAt = now()
             // Settle a Health report BEFORE applying state, so a terminal or
             // re-applied projection can never re-send an answered report.
             if isReport {
@@ -819,8 +849,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             finishingObservedAt = nil
         }
         projection = incoming
+        lastAuthoritativeContactAt = now()
         authoritativeTerminalReceived = false
-        connectionState = session?.isReachable == true ? .reachable : .phoneUnavailable
+        connectionState = session?.isReachable == true ? .reachable : .passive
         switch incoming.phase {
         case .finishConfirmation:
             // The phone (or this Watch, earlier) asked to finish: confirm
@@ -999,16 +1030,17 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         error: (any Error)?
     ) {
         let reachable = activationState == .activated && session.isReachable
+        let activated = activationState == .activated && error == nil
         Task { @MainActor [weak self] in
-            self?.connectionState = reachable ? .reachable : .phoneUnavailable
-            self?.refresh()
+            self?.connectionState = reachable ? .reachable : activated ? .passive : .phoneUnavailable
+            if reachable { self?.refresh() }
         }
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         let reachable = session.isReachable
         Task { @MainActor [weak self] in
-            self?.connectionState = reachable ? .reachable : .phoneUnavailable
+            self?.connectionState = reachable ? .reachable : .passive
             if reachable { self?.retryPending() }
         }
     }

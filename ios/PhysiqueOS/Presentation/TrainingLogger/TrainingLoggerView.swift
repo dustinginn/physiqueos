@@ -2,6 +2,21 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum PerformanceRecordConfettiStyle {
+    static let particleCount = 36
+    static let minimumParticleSize: CGFloat = 7
+    static let particleSizeVariants = 4
+    static let horizontalBaseSpread: CGFloat = 75
+    static let horizontalSpreadVariants = 85
+    static let verticalBaseSpread: CGFloat = 50
+    static let verticalSpreadVariants = 70
+    static let verticalDrop: CGFloat = 95
+    static let duration: TimeInterval = 0.95
+    static var maximumParticleSize: CGFloat {
+        minimumParticleSize + CGFloat(particleSizeVariants - 1)
+    }
+}
+
 struct TrainingLoggerView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -1212,21 +1227,27 @@ struct TrainingLoggerView: View {
     }
 
     /// A short, self-contained confetti pop (under one second), then gone.
+    /// Build 85 increases only the local particle size/count/spread; the
+    /// one-time and Reduce Motion gates remain owned by the card above.
     private struct ConfettiBurst: View {
         private struct Piece: Identifiable {
             let id: Int
             let dx: CGFloat, dy: CGFloat, spin: Double, color: Color, size: CGFloat
         }
         @State private var launched = false
-        private let pieces: [Piece] = (0..<20).map { index in
+        private let pieces: [Piece] = (0..<PerformanceRecordConfettiStyle.particleCount).map { index in
             let colors: [Color] = [PhysiqueOSTheme.chartSuccess, PhysiqueOSTheme.accent, PhysiqueOSTheme.chartEvidence, PhysiqueOSTheme.chartEffort]
-            let angle = Double(index) / 20 * 2 * .pi
+            let angle = Double(index) / Double(PerformanceRecordConfettiStyle.particleCount) * 2 * .pi
             return Piece(id: index,
-                         dx: CGFloat(cos(angle)) * CGFloat(55 + (index * 37) % 65),
-                         dy: CGFloat(sin(angle)) * CGFloat(35 + (index * 53) % 50) + 70,
+                         dx: CGFloat(cos(angle)) * (PerformanceRecordConfettiStyle.horizontalBaseSpread
+                            + CGFloat((index * 37) % PerformanceRecordConfettiStyle.horizontalSpreadVariants)),
+                         dy: CGFloat(sin(angle)) * (PerformanceRecordConfettiStyle.verticalBaseSpread
+                            + CGFloat((index * 53) % PerformanceRecordConfettiStyle.verticalSpreadVariants))
+                            + PerformanceRecordConfettiStyle.verticalDrop,
                          spin: Double((index * 97) % 360),
                          color: colors[index % colors.count],
-                         size: CGFloat(4 + index % 3))
+                         size: PerformanceRecordConfettiStyle.minimumParticleSize
+                            + CGFloat(index % PerformanceRecordConfettiStyle.particleSizeVariants))
         }
 
         var body: some View {
@@ -1242,7 +1263,7 @@ struct TrainingLoggerView: View {
             }
             .frame(maxWidth: .infinity)
             .onAppear {
-                withAnimation(.easeOut(duration: 0.9)) { launched = true }
+                withAnimation(.easeOut(duration: PerformanceRecordConfettiStyle.duration)) { launched = true }
             }
         }
     }

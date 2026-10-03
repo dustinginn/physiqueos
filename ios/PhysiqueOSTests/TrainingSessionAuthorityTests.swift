@@ -598,6 +598,54 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         ))
     }
 
+    func testTrustedWatchCapabilityAndCommittedLedgerSurviveRelaunchFailClosed() throws {
+        let effective = t0.addingTimeInterval(-60)
+        let block: ProductionJSONValue = .object([
+            "contractVersion": .string(HealthKitTrustedWorkoutCorrelationContract.contractVersion),
+            "enabled": .bool(true),
+            "prospectiveOnly": .bool(true),
+            "trustedSourceBundleIdentifiers": .array([.string("com.physiqueos.native.dev")]),
+            "traditionalStrengthTrainingActivityTypes": .array([.string("50")]),
+            "clockToleranceSeconds": .number(120),
+            "effectiveAt": .string(ISO8601DateFormatter().string(from: effective))
+        ])
+        let capability = HealthKitTrustedWorkoutCorrelationCapability.resolve(manifestBlock: block, at: t0)
+        XCTAssertTrue(capability.enabled)
+
+        let capabilityStore = MemoryTrustedWorkoutCapabilityStore()
+        let gate = HealthKitTrustedWorkoutCorrelationGate(store: capabilityStore)
+        gate.update(capability)
+        let sessionID = UUID()
+        let ledger = MemoryTrainingSessionTerminalLedgerStore([.init(
+            sessionId: sessionID.uuidString,
+            outcome: .committed,
+            finishOperationId: "finish-1",
+            startedAt: TrainingSessionClock.string(from: t0),
+            finishedAt: TrainingSessionClock.string(from: t0.addingTimeInterval(3_600)),
+            healthSaveState: .succeeded,
+            cancelMutationId: nil,
+            recordedAt: TrainingSessionClock.string(from: t0.addingTimeInterval(3_601)),
+            acknowledgedAt: nil
+        )])
+        let registryNow = t0.addingTimeInterval(3_700)
+        let registry = HealthKitTrustedWorkoutCorrelationRegistry(
+            gate: gate,
+            drafts: MemoryTrainingLoggerDraftStore(),
+            terminalLedger: ledger,
+            now: { registryNow }
+        )
+        let context = registry.context(ownerKey: "founder")
+        XCTAssertEqual(context.sessions.map(\.sessionId), [sessionID])
+        XCTAssertEqual(context.trustedSourceBundleIdentifiers, ["com.physiqueos.native.dev"])
+
+        let malformed = HealthKitTrustedWorkoutCorrelationCapability.resolve(
+            manifestBlock: .object(["enabled": .bool(true)]), at: t0
+        )
+        XCTAssertFalse(malformed.enabled)
+        gate.update(malformed)
+        XCTAssertTrue(registry.context(ownerKey: "founder").sessions.isEmpty)
+    }
+
     func testCompleteSetStampsCompletedAtAdvancesRevisionAndPersistsBeforePublishing() {
         let store = RecordingStore([liveSession()])
         let (authority, _) = makeAuthority(store)
@@ -1363,6 +1411,12 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(viewModel.draft?.exercises[0].sets[0].isCompleted, true, "Completion is visible synchronously.")
         XCTAssertLessThan(elapsed, 2, "201 local mutations took \(elapsed)s")
     }
+}
+
+private final class MemoryTrustedWorkoutCapabilityStore: HealthKitTrustedWorkoutCorrelationCapabilityStore, @unchecked Sendable {
+    private var capability: HealthKitTrustedWorkoutCorrelationCapability?
+    func load() -> HealthKitTrustedWorkoutCorrelationCapability? { capability }
+    func save(_ capability: HealthKitTrustedWorkoutCorrelationCapability) { self.capability = capability }
 }
 
 // MARK: - Build 78: pending Workout Complete presentation

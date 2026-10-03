@@ -54,9 +54,14 @@ struct HealthKitObservationNormalizer: Sendable {
 struct HealthKitBatchBuilder: Sendable {
     let maximumPartitionSize: Int
     private let encoder: JSONEncoder
+    private let trustedWorkoutCorrelationContext: @Sendable (HealthKitCursorScope) -> HealthKitTrustedWorkoutCorrelationContext
 
-    init(maximumPartitionSize: Int = HealthKitServerIngestionContract.maximumObservationsPerBatch) {
+    init(
+        maximumPartitionSize: Int = HealthKitServerIngestionContract.maximumObservationsPerBatch,
+        trustedWorkoutCorrelationContext: @escaping @Sendable (HealthKitCursorScope) -> HealthKitTrustedWorkoutCorrelationContext = { _ in .disabled }
+    ) {
         self.maximumPartitionSize = maximumPartitionSize
+        self.trustedWorkoutCorrelationContext = trustedWorkoutCorrelationContext
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
@@ -70,7 +75,9 @@ struct HealthKitBatchBuilder: Sendable {
         createdAt: Date,
         ingestionPurpose: HealthKitIngestionPurpose = .operational
     ) throws -> HealthKitStagedBatch {
-        let normalizer = HealthKitObservationNormalizer()
+        let normalizer = HealthKitObservationNormalizer(
+            trustedWorkoutCorrelations: trustedWorkoutCorrelationContext(scope)
+        )
         let namespace = Self.externalIDNamespace(for: scope.predicateVersion)
         let additions = queryResult.additions
             .map { normalizer.normalize($0, externalIDNamespace: namespace) }

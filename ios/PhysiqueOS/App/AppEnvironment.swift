@@ -676,6 +676,7 @@ final class AppEnvironment {
             sleepActivation: .production
         ),
         healthKitSleepActivation: HealthKitSleepActivationGate = .production,
+        healthKitTrustedWorkoutCorrelationGate: HealthKitTrustedWorkoutCorrelationGate = .production,
         healthKitObserverClient: any HealthKitObserverClient = SystemHealthKitObserverClient(),
         healthKitSynchronizationStore: any HealthKitSynchronizationStore = FileHealthKitSynchronizationStore(),
         healthKitObservationUploader: (any HealthKitObservationUploader)? = nil,
@@ -752,12 +753,25 @@ final class AppEnvironment {
         // (second line of defense behind the query client's predicate); the
         // canary engine below is deliberately constructed without it, so the
         // Founder's explicit exact-day Workout canary is unchanged.
+        let trustedWorkoutTerminalLedger = UserDefaultsTrainingSessionTerminalLedgerStore(
+            key: "physiqueos.\(NativeAPIEnvironment.founderProduction.rawValue).trainingSession.terminalLedger.v1"
+        )
+        let trustedWorkoutCorrelationRegistry = HealthKitTrustedWorkoutCorrelationRegistry(
+            gate: healthKitTrustedWorkoutCorrelationGate,
+            drafts: founderProductionTrainingLoggerDraftStore,
+            terminalLedger: trustedWorkoutTerminalLedger
+        )
         self.healthKitSynchronizationEngine = HealthKitSynchronizationEngine(
             queryClient: healthKitQueryClient,
             observerClient: healthKitObserverClient,
             store: healthKitSynchronizationStore,
             uploader: uploader,
             featureGate: healthKitFeatureGate,
+            batchBuilder: HealthKitBatchBuilder(
+                trustedWorkoutCorrelationContext: { scope in
+                    trustedWorkoutCorrelationRegistry.context(ownerKey: scope.ownerIdentity)
+                }
+            ),
             workoutActivationFloor: .current,
             sleepActivation: healthKitSleepActivation,
             backgroundTaskScheduler: UIKitBackgroundTaskScheduler()
@@ -795,7 +809,9 @@ final class AppEnvironment {
             synchronizationStore: healthKitSynchronizationStore,
             sleepActivation: healthKitSleepActivation,
             sleepCapabilitySource: productionNativeAPI,
-            sleepManifestSender: sleepManifestSender
+            sleepManifestSender: sleepManifestSender,
+            trustedWorkoutCorrelationGate: healthKitTrustedWorkoutCorrelationGate,
+            trustedWorkoutCorrelationCapabilitySource: productionNativeAPI
         )
         let canaryGate = HealthKitFeatureGate.founderActivityValidation
         let canaryAuthorization = HealthKitAuthorizationCoordinator(
