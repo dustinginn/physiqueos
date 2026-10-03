@@ -60,3 +60,27 @@ After green review/tests, produce Build 83 from Build 82, deterministic generato
 Founder acceptance after Build 83 should verify: Finish confirmation, Watch/phone Finish save HK workout, bounded finish timing/recovery, rest stops, Done dismisses summary, fixed execution screen/no scrollbar/green progress, metrics order/colors, Daily Totals, Stair Stepper/Cooldown appearance as appropriate, and no Activity inflation.
 
 Update durable backlog. Follow mandatory GH-main protocol before every stop and publish exact final report commit SHA.
+
+
+LOCKED WATCH CONTROLS GESTURE — FOUNDER CORRECTION
+
+Founder reiterates the originally intended interaction:
+
+From the primary Watch workout execution screen, SWIPE RIGHT to access workout controls.
+
+The controls surface contains:
+- Pause / Resume;
+- Finish Workout;
+- Cancel Workout.
+
+Do NOT require swipe left for these controls.
+
+Requirements:
+- swipe-right gesture/navigation must be deliberate and reliable;
+- vertical Crown/page navigation remains reserved for Execution -> Workout Metrics -> Daily Totals;
+- the new fixed/non-scrollable execution layout must not interfere with swipe-right controls;
+- Finish confirmation semantics from this controls surface must use the same unified finish state machine as primary final-set Finish;
+- Cancel remains available active and paused;
+- Pause/Resume unchanged semantically;
+- update Watch interaction tests and shipping renders to reflect swipe-right controls;
+- audit current navigation implementation so the visual/page direction matches the Founder's physical gesture expectation, not merely an internal TabView index label.
