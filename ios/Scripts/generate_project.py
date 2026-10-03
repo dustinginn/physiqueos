@@ -483,6 +483,26 @@ WATCH_ASSETS = ("PhysiqueOSWatch", "Assets.xcassets")
 WATCH_FRAMEWORKS = ["HealthKit.framework", "WatchConnectivity.framework"]
 WATCH_APP_BLOCK = 0x18FF
 
+# Build 83 (first real Watch workout corrections). One more pinned block after
+# the Watch block, so every existing object id (and the committed schemes'
+# blueprint ids) stays byte-identical. Includes the watchOS UI test target that
+# proves the physical swipe-right controls gesture.
+build83_app_files = [
+    ("Networking", "TrainingSessionTerminalLedger.swift"),
+    ("Networking", "NetworkDiagnosticsExport.swift"),
+    ("Presentation/You", "NetworkDiagnosticsSection.swift"),
+]
+build83_test_files = [
+    ("PhysiqueOSTests", "Build83FinishLifecycleTests.swift"),
+]
+build83_watch_test_files = [
+    ("PhysiqueOSWatchTests", "WatchWorkoutFinishStateTests.swift"),
+]
+watch_ui_test_files = [
+    ("PhysiqueOSWatchUITests", "WatchWorkoutNavigationUITests.swift"),
+]
+BUILD83_BLOCK = 0x19FF
+
 # Daily-driver local-day authority. Allocated after every established object
 # (including the N1 tests) so adding it renumbers nothing.
 dd_app_files = [
@@ -593,13 +613,14 @@ BUNDLE_ID_UI_TEST = "com.physiqueos.native.dev.UITests"
 BUNDLE_ID_LIVE_ACTIVITY = "com.physiqueos.native.dev.WorkoutActivity"
 BUNDLE_ID_WATCH = "com.physiqueos.native.dev.watchkitapp"
 BUNDLE_ID_WATCH_TEST = "com.physiqueos.native.dev.watchkitapp.Tests"
+BUNDLE_ID_WATCH_UI_TEST = "com.physiqueos.native.dev.watchkitapp.UITests"
 DEPLOYMENT_TARGET = "18.0"
 WATCH_DEPLOYMENT_TARGET = "11.0"
 
 # One authoritative TestFlight build number. Increment this value, run this
 # generator, then build/archive. Never edit CURRENT_PROJECT_VERSION in the
 # generated project by hand.
-APP_BUILD_NUMBER = 82
+APP_BUILD_NUMBER = 83
 
 # The Founder's existing, paid Apple Developer Program team ("DUSTIN JOSEPH
 # GINN" in Xcode's Signing & Capabilities UI). Recovered from a real Xcode
@@ -640,7 +661,7 @@ for group, fname in test_files:
 # Groups (every distinct directory that needs a PBXGroup)
 group_names = sorted(set(
     ["App", "Contracts", "Networking", "SharedUI", "Resources", "Presentation", "Supporting"]
-    + [g for g, _ in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files]
+    + [g for g, _ in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files + build83_app_files]
     + [g for g, _ in resource_files]
     + [g for g, _ in reference_only_files + late_reference_only_files]
 ), key=lambda g: (g.count("/"), g))
@@ -820,6 +841,25 @@ for name in (
     "watchTestResourcesPhase", "watchTestDependency", "watchTestContainerProxy"
 ):
     I(name)
+assert _counter[0] < BUILD83_BLOCK, "Build 83 ID block would collide with the Watch block"
+_counter[0] = BUILD83_BLOCK
+for group, fname in build83_app_files + build83_test_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:{group}/{fname}")
+for group, fname in build83_watch_test_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:watchtest:{group}/{fname}")
+for group, fname in watch_ui_test_files:
+    I(f"fileref:{group}/{fname}")
+    I(f"buildfile:watchuitest:{group}/{fname}")
+I("group:PhysiqueOSWatchUITests")
+I("fileref:PhysiqueOSWatchUITests.xctest")
+for name in (
+    "watchUITestTarget", "watchUITestConfigList", "watchUITestDebug", "watchUITestRelease",
+    "watchUITestSourcesPhase", "watchUITestFrameworksPhase", "watchUITestResourcesPhase",
+    "watchUITestDependency", "watchUITestContainerProxy"
+):
+    I(name)
 _counter[0] = _resume_counter
 
 # ---------------- PBXBuildFile ----------------
@@ -845,10 +885,10 @@ for group, fname in late_app_files:
 for group, fname in late_test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
-for group, fname in n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files:
+for group, fname in n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files + build83_app_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
-for group, fname in [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files:
+for group, fname in [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files + build83_test_files:
     bf, fr = I(f"buildfile:{group}/{fname}"), I(f"fileref:{group}/{fname}")
     buildfile_lines.append(f"\t\t{bf} /* {fname} in Sources */ = {{isa = PBXBuildFile; fileRef = {fr} /* {fname} */; }};")
 for framework in system_frameworks:
@@ -873,7 +913,7 @@ container_proxy = f"""\t\t{I('testContainerProxy')} /* PBXContainerItemProxy */ 
 
 # ---------------- PBXFileReference ----------------
 fileref_lines = []
-for group, fname in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files + resource_files + late_resource_files + recovery_sleep_resource_files + reference_only_files + late_reference_only_files + test_files + late_test_files + [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files + ui_test_files + recovery_sleep_ui_test_files:
+for group, fname in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + [SLEEP_EVIDENCE_TEST] + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files + build83_app_files + resource_files + late_resource_files + recovery_sleep_resource_files + reference_only_files + late_reference_only_files + test_files + late_test_files + [f for f in n1_test_files if f != SLEEP_EVIDENCE_TEST] + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files + build83_test_files + ui_test_files + recovery_sleep_ui_test_files:
     fr = I(f"fileref:{group}/{fname}")
     fileref_lines.append(f"\t\t{fr} /* {fname} */ = {{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};")
 for framework in system_frameworks:
@@ -916,7 +956,7 @@ frameworks_phases = f"""\t\t{I('appFrameworksPhase')} /* Frameworks */ = {{
 
 # ---------------- PBXGroup ----------------
 all_members = (
-    [(g, f) for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files]
+    [(g, f) for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files + build83_app_files]
     + [(g, f) for g, f in resource_files]
     + [(g, f) for g, f in late_resource_files + recovery_sleep_resource_files]
     + [(g, f) for g, f in reference_only_files + late_reference_only_files]
@@ -970,7 +1010,7 @@ for g in group_names:
 \t\t\tsourceTree = "<group>";
 \t\t}};""")
 
-test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files)
+test_refs = "\n".join(f"\t\t\t\t{I(f'fileref:{grp}/{fname}')} /* {fname} */," for grp, fname in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files + build83_test_files)
 group_lines.append(f"""\t\t{I('group:PhysiqueOSTests')} /* PhysiqueOSTests */ = {{
 \t\t\tisa = PBXGroup;
 \t\t\tchildren = (
@@ -1013,12 +1053,12 @@ group_lines.append(f"""\t\t{I('group:main')} /* Main */ = {{
 \t\t}};""")
 
 # ---------------- PBXNativeTarget ----------------
-app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files)
+app_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files + build83_app_files)
 app_resource_build_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Resources */,"
     for g, f in resource_files + late_resource_files + recovery_sleep_resource_files
 )
-test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files)
+test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files + build83_test_files)
 ui_test_source_build_ids = "\n".join(f"\t\t\t\t{I(f'buildfile:{g}/{f}')} /* {f} in Sources */," for g, f in ui_test_files + recovery_sleep_ui_test_files)
 
 sources_phases = f"""\t\t{I('appSourcesPhase')} /* Sources */ = {{
@@ -1664,9 +1704,25 @@ for group, fname in watch_phase1a_phone_files:
 for group, fname in watch_phase1a_phone_test_files:
     _append_group_child("group:PhysiqueOSTests", f"\t\t\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */,\n")
 group_lines.append(_group_block("PhysiqueOSWatch", watch_app_files, [WATCH_PLIST, WATCH_ENTITLEMENTS, WATCH_ASSETS]))
-group_lines.append(_group_block("PhysiqueOSWatchTests", watch_test_files))
+group_lines.append(_group_block("PhysiqueOSWatchTests", watch_test_files + build83_watch_test_files))
 _append_group_child("group:main", f"\t\t\t\t{I('group:PhysiqueOSWatch')} /* PhysiqueOSWatch */,\n\t\t\t\t{I('group:PhysiqueOSWatchTests')} /* PhysiqueOSWatchTests */,\n")
 _append_group_child("group:products", f"\t\t\t\t{_watch_app_ref} /* PhysiqueOSWatch.app */,\n\t\t\t\t{_watch_test_ref} /* PhysiqueOSWatchTests.xctest */,\n")
+
+# ---------------- Build 83 Watch test additions + Watch UI test target ----------------
+_watch_ui_test_ref = I("fileref:PhysiqueOSWatchUITests.xctest")
+for group, fname in build83_watch_test_files + watch_ui_test_files:
+    fileref_lines.append(
+        f"\t\t{I(f'fileref:{group}/{fname}')} /* {fname} */ = "
+        f"{{isa = PBXFileReference; lastKnownFileType = {file_type_for(fname)}; path = \"{fname}\"; sourceTree = \"<group>\"; }};"
+    )
+fileref_lines.append(f"\t\t{_watch_ui_test_ref} /* PhysiqueOSWatchUITests.xctest */ = {{isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; }};")
+for group, fname in build83_watch_test_files:
+    buildfile_lines.append(_bf_sources(f"buildfile:watchtest:{group}/{fname}", group, fname))
+for group, fname in watch_ui_test_files:
+    buildfile_lines.append(_bf_sources(f"buildfile:watchuitest:{group}/{fname}", group, fname))
+group_lines.append(_group_block("PhysiqueOSWatchUITests", watch_ui_test_files))
+_append_group_child("group:main", f"\t\t\t\t{I('group:PhysiqueOSWatchUITests')} /* PhysiqueOSWatchUITests */,\n")
+_append_group_child("group:products", f"\t\t\t\t{_watch_ui_test_ref} /* PhysiqueOSWatchUITests.xctest */,\n")
 
 _phone_source_anchor = f"\t\t\t\t{I(f'buildfile:{app_files[0][0]}/{app_files[0][1]}')} /* {app_files[0][1]} in Sources */,\n"
 assert sources_phases.count(_phone_source_anchor) == 1
@@ -1688,7 +1744,10 @@ _watch_source_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:watch:{g}/{f}')} /* {f} in Sources */," for g, f in watch_app_files + watch_shared_files
 )
 _watch_test_source_ids = "\n".join(
-    f"\t\t\t\t{I(f'buildfile:watchtest:{g}/{f}')} /* {f} in Sources */," for g, f in watch_test_files
+    f"\t\t\t\t{I(f'buildfile:watchtest:{g}/{f}')} /* {f} in Sources */," for g, f in watch_test_files + build83_watch_test_files
+)
+_watch_ui_test_source_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:watchuitest:{g}/{f}')} /* {f} in Sources */," for g, f in watch_ui_test_files
 )
 sources_phases += f"""
 \t\t{I('watchSourcesPhase')} /* Sources */ = {{
@@ -1704,6 +1763,14 @@ sources_phases += f"""
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = (
 {_watch_test_source_ids}
+\t\t\t);
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};
+\t\t{I('watchUITestSourcesPhase')} /* Sources */ = {{
+\t\t\tisa = PBXSourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = (
+{_watch_ui_test_source_ids}
 \t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};"""
@@ -1725,6 +1792,12 @@ frameworks_phases += f"""
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = ();
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};
+\t\t{I('watchUITestFrameworksPhase')} /* Frameworks */ = {{
+\t\t\tisa = PBXFrameworksBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = ();
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};"""
 resources_phases += f"""
 \t\t{I('watchResourcesPhase')} /* Resources */ = {{
@@ -1736,6 +1809,12 @@ resources_phases += f"""
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};
 \t\t{I('watchTestResourcesPhase')} /* Resources */ = {{
+\t\t\tisa = PBXResourcesBuildPhase;
+\t\t\tbuildActionMask = 2147483647;
+\t\t\tfiles = ();
+\t\t\trunOnlyForDeploymentPostprocessing = 0;
+\t\t}};
+\t\t{I('watchUITestResourcesPhase')} /* Resources */ = {{
 \t\t\tisa = PBXResourcesBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = ();
@@ -1764,6 +1843,13 @@ container_proxy += f"""
 \t\t\tremoteInfo = PhysiqueOSWatch;
 \t\t}};
 \t\t{I('watchTestContainerProxy')} /* PBXContainerItemProxy */ = {{
+\t\t\tisa = PBXContainerItemProxy;
+\t\t\tcontainerPortal = {I('project')} /* Project object */;
+\t\t\tproxyType = 1;
+\t\t\tremoteGlobalIDString = {I('watchTarget')};
+\t\t\tremoteInfo = PhysiqueOSWatch;
+\t\t}};
+\t\t{I('watchUITestContainerProxy')} /* PBXContainerItemProxy */ = {{
 \t\t\tisa = PBXContainerItemProxy;
 \t\t\tcontainerPortal = {I('project')} /* Project object */;
 \t\t\tproxyType = 1;
@@ -1823,6 +1909,21 @@ native_targets += f"""
 \t\t\tproductName = PhysiqueOSWatchTests;
 \t\t\tproductReference = {_watch_test_ref} /* PhysiqueOSWatchTests.xctest */;
 \t\t\tproductType = "com.apple.product-type.bundle.unit-test";
+\t\t}};
+\t\t{I('watchUITestTarget')} /* PhysiqueOSWatchUITests */ = {{
+\t\t\tisa = PBXNativeTarget;
+\t\t\tbuildConfigurationList = {I('watchUITestConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchUITests" */;
+\t\t\tbuildPhases = (
+\t\t\t\t{I('watchUITestSourcesPhase')} /* Sources */,
+\t\t\t\t{I('watchUITestFrameworksPhase')} /* Frameworks */,
+\t\t\t\t{I('watchUITestResourcesPhase')} /* Resources */,
+\t\t\t);
+\t\t\tbuildRules = ();
+\t\t\tdependencies = ({I('watchUITestDependency')} /* PBXTargetDependency */,);
+\t\t\tname = PhysiqueOSWatchUITests;
+\t\t\tproductName = PhysiqueOSWatchUITests;
+\t\t\tproductReference = {_watch_ui_test_ref} /* PhysiqueOSWatchUITests.xctest */;
+\t\t\tproductType = "com.apple.product-type.bundle.ui-testing";
 \t\t}};"""
 
 target_dependency += f"""
@@ -1835,6 +1936,11 @@ target_dependency += f"""
 \t\t\tisa = PBXTargetDependency;
 \t\t\ttarget = {I('watchTarget')} /* PhysiqueOSWatch */;
 \t\t\ttargetProxy = {I('watchTestContainerProxy')} /* PBXContainerItemProxy */;
+\t\t}};
+\t\t{I('watchUITestDependency')} /* PBXTargetDependency */ = {{
+\t\t\tisa = PBXTargetDependency;
+\t\t\ttarget = {I('watchTarget')} /* PhysiqueOSWatch */;
+\t\t\ttargetProxy = {I('watchUITestContainerProxy')} /* PBXContainerItemProxy */;
 \t\t}};"""
 
 _ext_attr = f"""\t\t\t\t\t{I('extTarget')} = {{
@@ -1849,10 +1955,14 @@ project_obj = project_obj.replace(_ext_attr, _ext_attr + f"""\t\t\t\t\t{I('watch
 \t\t\t\t\t\tCreatedOnToolsVersion = 27.0;
 \t\t\t\t\t\tTestTargetID = {I('watchTarget')};
 \t\t\t\t\t}};
+\t\t\t\t\t{I('watchUITestTarget')} = {{
+\t\t\t\t\t\tCreatedOnToolsVersion = 27.0;
+\t\t\t\t\t\tTestTargetID = {I('watchTarget')};
+\t\t\t\t\t}};
 """, 1)
 _ext_target_entry = f"\t\t\t\t{I('extTarget')} /* PhysiqueOSLiveActivity */,\n"
 assert project_obj.count(_ext_target_entry) == 1
-project_obj = project_obj.replace(_ext_target_entry, _ext_target_entry + f"\t\t\t\t{I('watchTarget')} /* PhysiqueOSWatch */,\n\t\t\t\t{I('watchTestTarget')} /* PhysiqueOSWatchTests */,\n", 1)
+project_obj = project_obj.replace(_ext_target_entry, _ext_target_entry + f"\t\t\t\t{I('watchTarget')} /* PhysiqueOSWatch */,\n\t\t\t\t{I('watchTestTarget')} /* PhysiqueOSWatchTests */,\n\t\t\t\t{I('watchUITestTarget')} /* PhysiqueOSWatchUITests */,\n", 1)
 
 watch_common = f"""
 \t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -1893,6 +2003,24 @@ watch_test_common = f"""
 \t\t\t\tWATCHOS_DEPLOYMENT_TARGET = {WATCH_DEPLOYMENT_TARGET};"""
 watch_debug = f"""\t\t{I('watchDebug')} /* Debug */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_common}\n\t\t\t}}; name = Debug; }};"""
 watch_release = f"""\t\t{I('watchRelease')} /* Release */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_common}\n\t\t\t}}; name = Release; }};"""
+# UI test bundle version stays 1 (like the phone UI tests): only shipped
+# products carry APP_BUILD_NUMBER, which the release verifier counts.
+watch_ui_test_common = f"""
+\t\t\t\tCODE_SIGN_STYLE = Automatic;
+\t\t\t\tCURRENT_PROJECT_VERSION = 1;
+\t\t\t\tDEVELOPMENT_TEAM = {DEVELOPMENT_TEAM};
+\t\t\t\tGENERATE_INFOPLIST_FILE = YES;
+\t\t\t\tMARKETING_VERSION = 1.0;
+\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = {BUNDLE_ID_WATCH_UI_TEST};
+\t\t\t\tPRODUCT_NAME = "$(TARGET_NAME)";
+\t\t\t\tSDKROOT = watchos;
+\t\t\t\tSUPPORTED_PLATFORMS = "watchos watchsimulator";
+\t\t\t\tSWIFT_EMIT_LOC_STRINGS = NO;
+\t\t\t\tTARGETED_DEVICE_FAMILY = 4;
+\t\t\t\tTEST_TARGET_NAME = PhysiqueOSWatch;
+\t\t\t\tWATCHOS_DEPLOYMENT_TARGET = {WATCH_DEPLOYMENT_TARGET};"""
+watch_ui_test_debug = f"""\t\t{I('watchUITestDebug')} /* Debug */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_ui_test_common}\n\t\t\t}}; name = Debug; }};"""
+watch_ui_test_release = f"""\t\t{I('watchUITestRelease')} /* Release */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_ui_test_common}\n\t\t\t}}; name = Release; }};"""
 watch_test_debug = f"""\t\t{I('watchTestDebug')} /* Debug */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_test_common}\n\t\t\t}}; name = Debug; }};"""
 watch_test_release = f"""\t\t{I('watchTestRelease')} /* Release */ = {{ isa = XCBuildConfiguration; buildSettings = {{{watch_test_common}\n\t\t\t}}; name = Release; }};"""
 config_lists += f"""
@@ -1905,6 +2033,12 @@ config_lists += f"""
 \t\t{I('watchTestConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */ = {{
 \t\t\tisa = XCConfigurationList;
 \t\t\tbuildConfigurations = ({I('watchTestDebug')} /* Debug */, {I('watchTestRelease')} /* Release */,);
+\t\t\tdefaultConfigurationIsVisible = 0;
+\t\t\tdefaultConfigurationName = Release;
+\t\t}};
+\t\t{I('watchUITestConfigList')} /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchUITests" */ = {{
+\t\t\tisa = XCConfigurationList;
+\t\t\tbuildConfigurations = ({I('watchUITestDebug')} /* Debug */, {I('watchUITestRelease')} /* Release */,);
 \t\t\tdefaultConfigurationIsVisible = 0;
 \t\t\tdefaultConfigurationName = Release;
 \t\t}};"""
@@ -1976,6 +2110,8 @@ pbxproj = f"""// !$*UTF8*$!
 {watch_release}
 {watch_test_debug}
 {watch_test_release}
+{watch_ui_test_debug}
+{watch_ui_test_release}
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1993,7 +2129,7 @@ with open(f"{ROOT}/PhysiqueOS.xcodeproj/project.pbxproj", "w") as f:
 print("wrote project.pbxproj,", len(pbxproj), "bytes")
 print("appTarget id:", I('appTarget'))
 print("testTarget id:", I('testTarget'))
-print("app files:", len(app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files), "resources:", len(resource_files + late_resource_files + recovery_sleep_resource_files),
+print("app files:", len(app_files + late_app_files + n1_app_files + sleep_evidence_app_files + dd_app_files + peptide_app_files + recovery_sleep_app_files + sleep_polish_app_files + session_authority_app_files + live_activity_app_files + build78_app_files + home_widget_app_files + build83_app_files), "resources:", len(resource_files + late_resource_files + recovery_sleep_resource_files),
       "reference-only:", len(reference_only_files + late_reference_only_files),
-      "test files:", len(test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files))
+      "test files:", len(test_files + late_test_files + n1_test_files + peptide_test_files + recovery_sleep_test_files + sleep_polish_test_files + session_authority_test_files + live_activity_test_files + build78_test_files + home_widget_test_files + build83_test_files))
 print("development team:", DEVELOPMENT_TEAM)

@@ -4,12 +4,20 @@ import Foundation
 /// imports neither WatchConnectivity nor HealthKit so both app targets can
 /// compile/test the exact same deterministic contract.
 enum WatchWorkoutContract {
-    static let schemaVersion = 2
+    /// v3 (Build 83): explicit `finishConfirmation` phase, `finishedAt`,
+    /// recently ended sessions and Daily Totals. A v2 Watch ignores v3
+    /// projections (and a v3 phone refuses v2 commands), so a mismatched pair
+    /// fails closed instead of misreading a new phase as terminal.
+    static let schemaVersion = 3
     static let maximumIdentifierLength = 96
     static let maximumRows = 2
+    static let maximumRecentlyEndedSessions = 3
     // Keep the transport slot stable across schema revisions so the newest
     // authoritative payload replaces an older cached projection in place.
     static let applicationContextProjectionKey = "physiqueos.watchWorkout.projection.v1"
+    /// Separate slot for the compact Daily Totals snapshot. Application
+    /// context is replaced as a whole, so the phone always publishes both.
+    static let applicationContextDailyTotalsKey = "physiqueos.watchWorkout.dailyTotals.v1"
 }
 
 protocol WatchWorkoutSafeStringEnum: RawRepresentable, Codable where RawValue == String {
@@ -99,7 +107,10 @@ struct WatchWorkoutAcknowledgement: Codable, Equatable, Sendable {
 
 struct WatchWorkoutProjection: Codable, Equatable, Sendable {
     enum Phase: String, WatchWorkoutSafeStringEnum, Sendable {
-        case unavailable, prepared, active, paused, finishing, committed, cancelled
+        /// `finishConfirmation`: Finish was requested and waits for the
+        /// explicit Finish / Not Yet answer. Nothing is finishing yet.
+        /// `finishing`: Finish was confirmed (one `finish.operationId`).
+        case unavailable, prepared, active, paused, finishConfirmation, finishing, committed, cancelled
         static let fallback: Self = .unavailable
     }
 
@@ -164,16 +175,30 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
     var metrics: WatchWorkoutMetrics?
     var finish: WatchWorkoutFinishStatus? = nil
     var summary: WatchWorkoutSummary? = nil
+    /// The confirmed Finish instant (phone authority). The Watch ends its
+    /// HealthKit workout at this instant so both records share one window.
+    var finishedAt: Date? = nil
+    /// Sessions the phone ended recently (newest first, bounded). Lets the
+    /// Watch resolve a still-running HealthKit workout for a session that is
+    /// no longer current: save it when the session was committed, discard it
+    /// only when it was cancelled.
+    var recentlyEnded: [WatchWorkoutEndedSession] = []
 
     var isTerminalAuthorityState: Bool {
         phase == .cancelled || phase == .unavailable
+    }
+
+    /// The Watch's HealthKit workout must be ended and saved in these phases.
+    var requiresHealthSave: Bool {
+        (phase == .finishing || phase == .committed) && finish?.operationId != nil
     }
 
     static func terminal(
         sessionId: String,
         revision: Int,
         phase: Phase,
-        stalenessReason: StalenessReason? = nil
+        stalenessReason: StalenessReason? = nil,
+        recentlyEnded: [WatchWorkoutEndedSession] = []
     ) -> Self {
         precondition(phase == .cancelled || phase == .unavailable)
         return .init(
@@ -197,9 +222,46 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
             lastAcknowledgedMutationId: nil,
             metrics: nil,
             finish: nil,
-            summary: nil
+            summary: nil,
+            finishedAt: nil,
+            recentlyEnded: recentlyEnded
         )
     }
+}
+
+/// How the phone authority ended a session that is no longer current.
+struct WatchWorkoutEndedSession: Codable, Equatable, Sendable {
+    enum Outcome: String, WatchWorkoutSafeStringEnum, Sendable {
+        /// Structured session durable on the Server: save, never discard.
+        case committed
+        /// Canonical Cancel: discard the HealthKit workout.
+        case cancelled
+        /// Unknown future outcome: never discard on it.
+        case unknown
+        static let fallback: Self = .unknown
+    }
+    var sessionId: String
+    var outcome: Outcome
+    var finishOperationId: String?
+    var finishedAt: Date?
+}
+
+/// Compact, display-only daily totals for the Watch's third Crown page. The
+/// phone derives it from the same canonical snapshot Home and the Home
+/// Widget render; the Watch never computes daily totals itself.
+struct WatchDailyTotals: Codable, Equatable, Sendable {
+    static let schemaVersion = 1
+
+    var schemaVersion: Int
+    /// Local calendar day the values belong to ("yyyy-MM-dd").
+    var localDate: String
+    var activeCalories: Double?
+    var nutritionCalories: Double?
+    var isActivityPartialDay: Bool
+    /// Last fully successful canonical read; nil when never refreshed.
+    var refreshedAt: Date?
+    var isOffline: Bool
+    var writtenAt: Date
 }
 
 struct WatchWorkoutFinishStatus: Codable, Equatable, Sendable {
@@ -209,6 +271,10 @@ struct WatchWorkoutFinishStatus: Codable, Equatable, Sendable {
     var serverCommitted: Bool
     var serverPending: Bool
     var correlationPending: Bool
+    /// A Watch HealthKit workout belongs to this finish (Watch-started).
+    var healthExpected: Bool = true
+    /// The phone's command transport is waiting for a network path.
+    var serverWaitingForNetwork: Bool = false
 }
 
 struct WatchWorkoutSummary: Codable, Equatable, Sendable {

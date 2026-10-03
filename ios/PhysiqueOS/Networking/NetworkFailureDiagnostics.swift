@@ -51,7 +51,7 @@ enum NetworkFailureDiagnostics {
         )
         var events = recentEvents(defaults: defaults)
         events.insert(event, at: 0)
-        if let data = try? JSONEncoder().encode(Array(events.prefix(64))) {
+        if let data = try? JSONEncoder().encode(Array(events.prefix(256))) {
             defaults.set(data, forKey: eventKey)
         }
     }

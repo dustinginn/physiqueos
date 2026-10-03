@@ -239,11 +239,14 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         idempotencyKey: String,
         expectedExerciseIds: [String]
     ) async throws -> DurableTrainingOutcome {
-        // Keep the interactive ambiguity budget bounded. The initial request
-        // gets the ordinary <=3s target; one short same-key replay plus
-        // canonical readback distinguishes a lost acknowledgement from work
-        // that is genuinely still processing. We do not turn a server-side
-        // continuation into a minute-long blocking spinner.
+        // Keep the interactive ambiguity budget bounded but realistic. Build
+        // 82 production measured the bounded canonical commit at ~6.1 s
+        // (6.75 s total) for a 13-set workout, so the old 3 s / 1 s budgets
+        // turned every ordinary Finish into "ambiguous -> readback ->
+        // recovery". The initial request now gets 15 s and the one same-key
+        // replay 8 s (the connectivity wait itself is bounded separately by
+        // the command transport); canonical readback still distinguishes a
+        // lost acknowledgement from work genuinely still processing.
         let maximumAttempts = 2
         var acceptanceEstablished = false
         for attempt in 0..<maximumAttempts {
@@ -251,7 +254,7 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
                 let outcome: ProductionCommandOutcome<TrainingCommitResult> = try await api.submitCommand(
                     ProductionCommandType.commitTrainingSession,
                     idempotencyKey: idempotencyKey,
-                    timeoutInterval: attempt == 0 ? 3 : 1,
+                    timeoutInterval: Self.commitAttemptTimeouts[min(attempt, Self.commitAttemptTimeouts.count - 1)],
                     payload: payload
                 )
                 let durable = outcome.confirmation?.state == "confirmed" || outcome.confirmation?.trainingSessionDurable == true
@@ -352,6 +355,9 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
             expected.0 == actual.0 && expected.1 == actual.1 && expected.2 == actual.2
         }
     }
+
+    /// Per-attempt idle budgets for the Training commit (seconds).
+    static let commitAttemptTimeouts: [TimeInterval] = [15, 8]
 
     private struct DurableTrainingOutcome {
         var commandOutcome: ProductionCommandOutcome<TrainingCommitResult>?

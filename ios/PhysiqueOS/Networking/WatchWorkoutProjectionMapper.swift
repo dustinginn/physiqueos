@@ -10,19 +10,14 @@ extension WatchWorkoutProjection {
         authority: TrainingSessionAuthority,
         now: Date,
         prepared: Bool = false,
-        stalenessReason: StalenessReason? = nil
+        stalenessReason: StalenessReason? = nil,
+        serverWaitingForNetwork: Bool = false
     ) -> Self? {
         guard let live = TrainingSessionLiveProjection.make(from: draft, now: now) else { return nil }
-        let phase: Phase
-        if prepared { phase = .prepared }
-        else if draft.step == .complete { phase = .committed }
-        else if draft.submissionState != nil || draft.finishedAt != nil { phase = .finishing }
-        else if draft.finishConfirmationRequestedAt != nil { phase = .finishing }
-        else if draft.pausedAt != nil { phase = .paused }
-        else { phase = .active }
+        let phase = Self.phase(of: draft, prepared: prepared)
         let canComplete = phase == .active && live.currentSet != nil
         let finishEligibility: FinishEligibility
-        if draft.finishConfirmationRequestedAt != nil { finishEligibility = .confirmable }
+        if phase == .finishConfirmation { finishEligibility = .confirmable }
         else if phase == .active || phase == .paused { finishEligibility = .confirmationRequired }
         else { finishEligibility = .unavailable }
         return .init(
@@ -49,7 +44,10 @@ extension WatchWorkoutProjection {
                     isCompletionTarget: canComplete && row.isCompletionTarget
                 )
             },
-            rest: live.rest.map {
+            // Rest belongs to set execution only: hidden (and silent) the
+            // moment Finish is requested, confirmed, or committed. The draft
+            // keeps the interval, so Not Yet restores it from its anchor.
+            rest: (phase == .active || phase == .paused) ? live.rest.map {
                 .init(
                     id: $0.id,
                     mode: $0.mode == .countdown ? .countdown : .stopwatch,
@@ -58,7 +56,7 @@ extension WatchWorkoutProjection {
                     frozenElapsedSeconds: $0.frozenElapsedSeconds,
                     frozenRemainingSeconds: $0.frozenRemainingSeconds
                 )
-            },
+            } : nil,
             canCompleteSet: canComplete,
             finishEligibility: finishEligibility,
             isFinalPlannedSetTransition: live.isWorkoutComplete,
@@ -69,22 +67,53 @@ extension WatchWorkoutProjection {
             stalenessReason: stalenessReason,
             lastAcknowledgedMutationId: draft.appliedMutationIds?.last,
             metrics: nil,
-            finish: Self.finishStatus(draft),
-            summary: Self.summary(draft, authority: authority, now: now)
+            finish: Self.finishStatus(draft, serverWaitingForNetwork: serverWaitingForNetwork),
+            summary: Self.summary(draft, authority: authority, now: now),
+            finishedAt: draft.finishedAt.flatMap(TrainingSessionClock.date(from:)),
+            recentlyEnded: Self.recentlyEnded(authority: authority, excluding: draft.id)
         )
     }
 
-    private static func finishStatus(_ draft: TrainingLoggerDraft) -> WatchWorkoutFinishStatus? {
+    /// One phase per lifecycle point. `finishConfirmation` (requested, not
+    /// confirmed) is never presented as finishing.
+    static func phase(of draft: TrainingLoggerDraft, prepared: Bool = false) -> Phase {
+        if prepared { return .prepared }
+        if draft.step == .complete { return .committed }
+        if draft.submissionState != nil || draft.finishedAt != nil { return .finishing }
+        if draft.finishConfirmationRequestedAt != nil { return .finishConfirmation }
+        if draft.pausedAt != nil { return .paused }
+        return .active
+    }
+
+    @MainActor
+    static func recentlyEnded(authority: TrainingSessionAuthority, excluding sessionId: String? = nil) -> [WatchWorkoutEndedSession] {
+        authority.recentlyEndedSessions(limit: WatchWorkoutContract.maximumRecentlyEndedSessions + 1)
+            .filter { $0.sessionId != sessionId }
+            .prefix(WatchWorkoutContract.maximumRecentlyEndedSessions)
+            .map { record in
+                .init(
+                    sessionId: record.sessionId,
+                    outcome: record.outcome == .committed ? .committed : .cancelled,
+                    finishOperationId: record.finishOperationId,
+                    finishedAt: record.finishedAt.flatMap(TrainingSessionClock.date(from:))
+                )
+            }
+    }
+
+    private static func finishStatus(_ draft: TrainingLoggerDraft, serverWaitingForNetwork: Bool) -> WatchWorkoutFinishStatus? {
         guard let operationId = draft.watchFinishOperationId else { return nil }
+        let healthExpected = draft.watchHealthSaveState != nil
         let healthSaved = draft.watchHealthSaveState == .succeeded
-        let serverCommitted = draft.watchServerCommitState == .succeeded
+        let serverCommitted = draft.watchServerCommitState == .succeeded || draft.step == .complete
         return .init(
             operationId: operationId,
             healthSaved: healthSaved,
             healthFailed: draft.watchHealthSaveState == .failed,
             serverCommitted: serverCommitted,
             serverPending: !serverCommitted,
-            correlationPending: !(healthSaved && serverCommitted)
+            correlationPending: healthExpected && !(healthSaved && serverCommitted),
+            healthExpected: healthExpected,
+            serverWaitingForNetwork: !serverCommitted && serverWaitingForNetwork
         )
     }
 

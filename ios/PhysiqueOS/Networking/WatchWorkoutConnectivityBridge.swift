@@ -18,6 +18,11 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
     private let healthStore = HKHealthStore()
     private var mirroredWorkoutSession: HKWorkoutSession?
     private var observation: TrainingSessionObservation?
+    /// Latest values of both application-context slots. `updateApplicationContext`
+    /// replaces the whole dictionary, so every publish carries both.
+    private var latestProjectionData: Data?
+    private var latestDailyTotalsData: Data?
+    private var connectivityObservation: UUID?
 
     init(environment: AppEnvironment, session: WCSession? = WCSession.isSupported() ? .default : nil) {
         self.environment = environment
@@ -35,7 +40,19 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
         }
         session?.delegate = self
         session?.activate()
+        // "Waiting for network" on a pending finish reaches the Watch too.
+        connectivityObservation = CommandConnectivityStatus.shared.observe { [weak self] in
+            self?.publishCurrentProjection()
+        }
         attachToSelectedAuthority()
+    }
+
+    /// Daily Totals from the same canonical snapshot Home and the Home
+    /// Widget render. Published on every snapshot write; no network traffic
+    /// of its own and no per-second updates.
+    func publishDailyTotals(_ totals: WatchDailyTotals?) {
+        latestDailyTotalsData = totals.flatMap { try? WatchWorkoutWireCodec.encode($0) }
+        publishContext()
     }
 
     func attachToSelectedAuthority() {
@@ -68,7 +85,8 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
             authority: environment.trainingSessionAuthority(for: environment.nativeAuthority),
             // Receipt of an interactive message proves the paired phone
             // authority is reachable for this mutation.
-            isPhoneReachable: { true }
+            isPhoneReachable: { true },
+            serverWaitingForNetwork: { CommandConnectivityStatus.shared.isWaitingForNetwork }
         )
     }
 
@@ -78,11 +96,18 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
     }
 
     private func publish(_ projection: WatchWorkoutProjection) {
-        guard let session, session.activationState == .activated,
-              let data = try? WatchWorkoutWireCodec.encode(projection) else { return }
-        try? session.updateApplicationContext([
-            WatchWorkoutContract.applicationContextProjectionKey: data
-        ])
+        guard let data = try? WatchWorkoutWireCodec.encode(projection) else { return }
+        latestProjectionData = data
+        publishContext()
+    }
+
+    private func publishContext() {
+        guard let session, session.activationState == .activated else { return }
+        var context: [String: Any] = [:]
+        if let latestProjectionData { context[WatchWorkoutContract.applicationContextProjectionKey] = latestProjectionData }
+        if let latestDailyTotalsData { context[WatchWorkoutContract.applicationContextDailyTotalsKey] = latestDailyTotalsData }
+        guard !context.isEmpty else { return }
+        try? session.updateApplicationContext(context)
     }
 
     private func route(_ data: Data) -> Data? {
@@ -132,5 +157,23 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
 
     nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: any Error) {
         Task { @MainActor [weak self] in self?.mirroredWorkoutSession = nil }
+    }
+}
+
+extension WatchDailyTotals {
+    /// The Watch's Daily Totals are the canonical Home snapshot's values,
+    /// unchanged: today's Activity active calories and Nutrition calories.
+    init?(snapshot: HomeWidgetSnapshot?) {
+        guard let snapshot, let writtenAt = HomeWidgetSnapshotClock.date(from: snapshot.writtenAt) else { return nil }
+        self.init(
+            schemaVersion: Self.schemaVersion,
+            localDate: snapshot.localDate,
+            activeCalories: snapshot.activity?.activeCalories,
+            nutritionCalories: snapshot.nutrition?.calories,
+            isActivityPartialDay: snapshot.activity?.isPartialDay ?? false,
+            refreshedAt: snapshot.lastSuccessfulReadAt.flatMap(HomeWidgetSnapshotClock.date),
+            isOffline: snapshot.refreshState != .success,
+            writtenAt: writtenAt
+        )
     }
 }

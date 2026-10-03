@@ -284,7 +284,10 @@ final class AppEnvironment {
         let created = TrainingSessionAuthority(
             store: environment == .founderProduction ? founderProductionTrainingLoggerDraftStore : sandboxTrainingLoggerDraftStore,
             environment: environment,
-            restPreferences: trainingRestPreferences
+            restPreferences: trainingRestPreferences,
+            terminalLedger: UserDefaultsTrainingSessionTerminalLedgerStore(
+                key: "physiqueos.\(environment.rawValue).trainingSession.terminalLedger.v1"
+            )
         )
         trainingSessionAuthorities[environment] = created
         return created

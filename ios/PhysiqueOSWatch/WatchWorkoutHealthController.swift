@@ -39,6 +39,30 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         UserDefaults.standard.string(forKey: savedCorrelationKey)
     }
 
+    /// The structured session whose HealthKit workout is currently live
+    /// (starting, running, paused, or ending) on this Watch.
+    var activeCorrelationId: String? {
+        guard workoutSession != nil, [.starting, .running, .paused, .ending].contains(lifecycle) else { return nil }
+        return correlationId
+    }
+
+    /// The last structured session whose workout this controller saved.
+    private(set) var lastSavedCorrelationId: String?
+
+    func hasSaved(structuredSessionId: String) -> Bool {
+        lastSavedCorrelationId == structuredSessionId || savedCorrelationPendingReport == structuredSessionId
+    }
+
+    /// The HealthKit end instant for a confirmed finish: the phone's
+    /// `finishedAt` (so both records share one window), clamped to the
+    /// workout's start and to now.
+    nonisolated static func endDate(finishedAt: Date?, workoutStart: Date?, now: Date) -> Date {
+        guard let finishedAt else { return now }
+        var end = min(finishedAt, now)
+        if let workoutStart { end = max(end, workoutStart) }
+        return end
+    }
+
     func start(structuredSessionId: String) async throws {
         if correlationId == structuredSessionId, [.starting, .running, .paused].contains(lifecycle) { return }
         guard workoutSession == nil else { throw ControllerError.anotherSessionActive }
@@ -82,25 +106,37 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         lifecycle = .running
     }
 
+    /// Ends and saves the workout for `structuredSessionId` (exactly that
+    /// session) at the confirmed finish instant. Single flight: a second
+    /// call while one is ending, or after it saved, throws `notRunning`;
+    /// callers check `hasSaved(structuredSessionId:)`.
     @discardableResult
-    func finish() async throws -> HKWorkout? {
+    func finish(structuredSessionId: String? = nil, endAt: Date? = nil) async throws -> HKWorkout? {
         guard let workoutSession, let builder,
-              lifecycle == .running || lifecycle == .paused || lifecycle == .ending
+              lifecycle == .running || lifecycle == .paused,
+              structuredSessionId == nil || structuredSessionId == correlationId
         else { throw ControllerError.notRunning }
         lifecycle = .ending
-        let endedAt = Date()
+        let endedAt = Self.endDate(finishedAt: endAt, workoutStart: builder.startDate, now: Date())
         workoutSession.end()
-        try await builder.endCollection(at: endedAt)
-        let workout = try await builder.finishWorkout()
-        rawDurationSeconds = workout?.duration ?? builder.elapsedTime
-        lifecycle = .saved
-        if let correlationId {
-            UserDefaults.standard.set(correlationId, forKey: savedCorrelationKey)
+        do {
+            try await builder.endCollection(at: endedAt)
+            let workout = try await builder.finishWorkout()
+            rawDurationSeconds = workout?.duration ?? builder.elapsedTime
+            lifecycle = .saved
+            if let correlationId {
+                lastSavedCorrelationId = correlationId
+                UserDefaults.standard.set(correlationId, forKey: savedCorrelationKey)
+            }
+            self.workoutSession = nil
+            self.builder = nil
+            UserDefaults.standard.removeObject(forKey: correlationKey)
+            return workout
+        } catch {
+            lifecycle = .failed
+            lastErrorDescription = error.localizedDescription
+            throw error
         }
-        self.workoutSession = nil
-        self.builder = nil
-        UserDefaults.standard.removeObject(forKey: correlationKey)
-        return workout
     }
 
     /// Canonical Cancel policy: end the active workout session and discard
@@ -123,6 +159,7 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
             correlationId = stored
         }
 
+        let cancelledCorrelationId = correlationId
         lifecycle = .ending
         workoutSession?.end()
         switch Self.cancellationDisposition {
@@ -138,8 +175,27 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         rawDurationSeconds = nil
         lastErrorDescription = nil
         UserDefaults.standard.removeObject(forKey: correlationKey)
-        UserDefaults.standard.removeObject(forKey: savedCorrelationKey)
+        // A different session's saved workout still owes its report.
+        if cancelledCorrelationId != nil, savedCorrelationPendingReport == cancelledCorrelationId {
+            UserDefaults.standard.removeObject(forKey: savedCorrelationKey)
+        }
         lifecycle = .cancelled
+    }
+
+    /// The correlation persisted for a running (possibly not yet
+    /// recovered) workout.
+    var storedCorrelationId: String? {
+        UserDefaults.standard.string(forKey: correlationKey)
+    }
+
+    /// Clears on-screen metrics when no workout session is live.
+    func resetPresentationMetrics() {
+        guard workoutSession == nil else { return }
+        currentHeartRateBPM = nil
+        activeCalories = nil
+        basalCalories = nil
+        averageHeartRateBPM = nil
+        rawDurationSeconds = nil
     }
 
     func markSavedCorrelationReported(_ structuredSessionId: String) {

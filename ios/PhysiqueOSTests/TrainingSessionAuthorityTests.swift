@@ -328,8 +328,15 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertNotNil(authority.draft(id: "session-1")?.finishedAt)
     }
 
-    func testWatchFinishUsesOneOperationAndRequiresBothDurableLegs() throws {
-        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
+    /// A Watch-started session (one Watch HealthKit workout).
+    private func watchStartedSession() -> TrainingLoggerDraft {
+        var draft = liveSession()
+        draft.watchStartedAt = draft.startedAt
+        return draft
+    }
+
+    func testWatchFinishUsesOneOperationAndStructuredCommitAloneIsTerminal() throws {
+        let (authority, _) = makeAuthority(RecordingStore([watchStartedSession()]))
         XCTAssertEqual(authority.requestFinishConfirmation(sessionId: "session-1"), .applied(revision: 1))
         XCTAssertEqual(
             authority.confirmFinish(sessionId: "session-1", finishOperationId: "finish-one"),
@@ -356,7 +363,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
             .applied(revision: 3)
         )
         draft = try XCTUnwrap(authority.draft(id: "session-1"))
-        XCTAssertFalse(WatchWorkoutFinishCoordinator.isTerminalReady(draft), "Health-first must retain the structured session")
+        XCTAssertFalse(WatchWorkoutFinishCoordinator.isTerminalReady(draft), "Health alone is never structured durability")
 
         XCTAssertEqual(
             authority.recordWatchServerCommit(
@@ -370,8 +377,11 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(draft.watchAuthoritativePRCount, 2)
     }
 
-    func testWatchFinishServerFirstRetainsSessionUntilHealthSave() throws {
-        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
+    /// Build 83: HealthKit never blocks structured durability. A durable
+    /// Server commit is terminal while the Health leg is still pending; the
+    /// Health report is recorded afterwards on the same operation.
+    func testWatchFinishServerFirstIsTerminalWithoutWaitingForHealth() throws {
+        let (authority, _) = makeAuthority(RecordingStore([watchStartedSession()]))
         _ = authority.requestFinishConfirmation(sessionId: "session-1")
         _ = authority.confirmFinish(sessionId: "session-1", finishOperationId: "finish-server-first")
         XCTAssertEqual(
@@ -381,7 +391,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
             .applied(revision: 3)
         )
         var draft = try XCTUnwrap(authority.draft(id: "session-1"))
-        XCTAssertFalse(WatchWorkoutFinishCoordinator.isTerminalReady(draft))
+        XCTAssertTrue(WatchWorkoutFinishCoordinator.isTerminalReady(draft))
         XCTAssertEqual(draft.watchHealthSaveState, .pending)
 
         XCTAssertEqual(
@@ -396,7 +406,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
     }
 
     func testWatchHealthSaveReportIsRevisionGuardedAndIdempotent() throws {
-        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        let (authority, clock) = makeAuthority(RecordingStore([watchStartedSession()]))
         _ = authority.requestFinishConfirmation(sessionId: "session-1")
         _ = authority.confirmFinish(sessionId: "session-1", finishOperationId: "finish-one")
         let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
@@ -1358,10 +1368,14 @@ extension TrainingSessionAuthorityTests {
                                              setId: pending.exercises[0].sets[0].id),
                        .rejected(.sessionEnded), "A Live Activity intent cannot touch a committed workout.")
 
-        let changeBefore = authority.lastChange
         XCTAssertTrue(authority.acknowledgeCompletion(sessionId: "session-1"))
+        // Build 83 (P8): Return to Log publishes so the paired Watch leaves
+        // its summary at once; it is not a session mutation.
+        XCTAssertEqual(authority.lastChange?.kind, .completionAcknowledged)
+        let changeAfterAcknowledge = authority.lastChange
         XCTAssertFalse(authority.acknowledgeCompletion(sessionId: "session-1"), "Idempotent.")
-        XCTAssertEqual(authority.lastChange, changeBefore, "Acknowledging publishes no session change.")
+        XCTAssertEqual(authority.lastChange, changeAfterAcknowledge, "A repeated acknowledge publishes nothing.")
+        XCTAssertNotNil(authority.terminalRecord(sessionId: "session-1")?.acknowledgedAt)
         XCTAssertTrue(store.drafts.isEmpty)
 
         // A store that cannot write the presentation still ends the session.

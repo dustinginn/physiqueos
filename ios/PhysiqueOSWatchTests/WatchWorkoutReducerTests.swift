@@ -65,7 +65,7 @@ final class WatchWorkoutReducerTests: XCTestCase {
         let store = WatchWorkoutStore(session: nil)
         let active = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("normal")?.projection)
         store.apply(active)
-        store.setControlsVisible(true)
+        store.showControls()
 
         store.requestCancelWorkout()
         XCTAssertTrue(store.cancelConfirmationVisible)
@@ -73,7 +73,7 @@ final class WatchWorkoutReducerTests: XCTestCase {
 
         XCTAssertFalse(store.cancelConfirmationVisible)
         XCTAssertEqual(store.projection?.sessionId, active.sessionId)
-        XCTAssertTrue(store.controlsVisible)
+        XCTAssertEqual(store.page, .controls)
     }
 
     @MainActor
@@ -81,7 +81,7 @@ final class WatchWorkoutReducerTests: XCTestCase {
         let store = WatchWorkoutStore(session: nil)
         let active = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("paused")?.projection)
         store.apply(active)
-        store.setControlsVisible(true)
+        store.showControls()
         store.requestCancelWorkout()
         store.health.installDebugMetrics(
             heartRate: 68, activeCalories: 21, basalCalories: 9, averageHeartRate: 70
@@ -95,7 +95,7 @@ final class WatchWorkoutReducerTests: XCTestCase {
         await Task.yield()
 
         XCTAssertNil(store.projection)
-        XCTAssertFalse(store.controlsVisible)
+        XCTAssertEqual(store.page, .workout)
         XCTAssertFalse(store.cancelConfirmationVisible)
         XCTAssertNil(store.notice)
         XCTAssertNil(store.health.currentHeartRateBPM)

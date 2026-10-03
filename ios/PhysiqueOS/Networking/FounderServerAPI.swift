@@ -1289,6 +1289,36 @@ actor ProductionNativeAPI {
         timeoutInterval: TimeInterval = 15,
         payload: Payload
     ) async throws -> ProductionCommandOutcome<Result> {
+        // Build 83 diagnostics: one sanitized event per command call (type,
+        // key fingerprint, duration, outcome) so a stall is attributable to
+        // the exact command without storing its key or payload.
+        let started = Date()
+        do {
+            let outcome: ProductionCommandOutcome<Result> = try await performSubmitCommand(
+                commandType, idempotencyKey: idempotencyKey, expectedVersion: expectedVersion,
+                timeoutInterval: timeoutInterval, payload: payload
+            )
+            CommandNetworkDiagnostics.recordCommand(
+                commandType: commandType, idempotencyKey: idempotencyKey, succeeded: true,
+                durationMs: Date().timeIntervalSince(started) * 1_000
+            )
+            return outcome
+        } catch {
+            CommandNetworkDiagnostics.recordCommand(
+                commandType: commandType, idempotencyKey: idempotencyKey, succeeded: false,
+                durationMs: Date().timeIntervalSince(started) * 1_000, error: error
+            )
+            throw error
+        }
+    }
+
+    private func performSubmitCommand<Payload: Encodable, Result: Decodable>(
+        _ commandType: String,
+        idempotencyKey: String,
+        expectedVersion: String?,
+        timeoutInterval: TimeInterval,
+        payload: Payload
+    ) async throws -> ProductionCommandOutcome<Result> {
         let metadata = ProductionCommandRequestMetadata(
             commandId: UUIDv7.generateString(),
             idempotencyKey: idempotencyKey,

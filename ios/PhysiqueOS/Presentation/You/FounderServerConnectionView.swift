@@ -443,6 +443,8 @@ private struct ProductionFounderConnectionView: View {
                     .disabled(isWorking)
                     .frame(maxWidth: .infinity, alignment: .center)
                 }
+
+                NetworkDiagnosticsSection()
             }
             .padding(.horizontal, 16)
             .padding(.top, 14)

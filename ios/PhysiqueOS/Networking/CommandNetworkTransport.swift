@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Network
 
@@ -146,25 +147,86 @@ enum CommandNetworkDiagnostics {
         /// on a non-2xx status is itself evidence the response did not
         /// come from the application route handler.
         var responseBodyByteCount: Int? = nil
+        /// Build 83: what this event records. `nil` (older events) and
+        /// "attempt" are one finished request; the others are transport
+        /// lifecycle facts: "waitingForConnectivity",
+        /// "stuckWaitCancelled", "connectivityBudgetExceeded",
+        /// "sessionRecreated", and "command" (one command call's outcome).
+        var kind: String? = nil
+        var errorDomain: String? = nil
+        var errorCode: Int? = nil
+        /// Which recreated command `URLSession` handled the attempt.
+        var sessionGeneration: Int? = nil
+        /// "command" events only: the command type (never a payload) and a
+        /// short, non-reversible fingerprint of the idempotency key.
+        var commandType: String? = nil
+        var idempotencyFingerprint: String? = nil
+        var durationMs: Double? = nil
     }
 
     private static let eventKey = "physiqueos.command-network.diagnostic-events.v1"
+    /// Failures and waits only, so a burst of successful HealthKit ingests
+    /// can never roll the evidence of a stall out of the ring.
+    private static let failureEventKey = "physiqueos.command-network.failure-events.v1"
+    static let eventLimit = 256
+    static let failureEventLimit = 128
 
     static func recentEvents(defaults: UserDefaults = .standard) -> [Event] {
         guard let data = defaults.data(forKey: eventKey) else { return [] }
         return (try? JSONDecoder().decode([Event].self, from: data)) ?? []
     }
 
+    static func recentFailureEvents(defaults: UserDefaults = .standard) -> [Event] {
+        guard let data = defaults.data(forKey: failureEventKey) else { return [] }
+        return (try? JSONDecoder().decode([Event].self, from: data)) ?? []
+    }
+
+    private static let lock = NSLock()
+
     static func record(_ event: Event, defaults: UserDefaults = .standard) {
+        lock.lock(); defer { lock.unlock() }
         var events = recentEvents(defaults: defaults)
         events.insert(event, at: 0)
-        if let data = try? JSONEncoder().encode(Array(events.prefix(64))) {
+        if let data = try? JSONEncoder().encode(Array(events.prefix(eventLimit))) {
             defaults.set(data, forKey: eventKey)
+        }
+        guard !event.succeeded else { return }
+        var failures = recentFailureEvents(defaults: defaults)
+        failures.insert(event, at: 0)
+        if let data = try? JSONEncoder().encode(Array(failures.prefix(failureEventLimit))) {
+            defaults.set(data, forKey: failureEventKey)
         }
     }
 
     static func clear(defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: eventKey)
+        defaults.removeObject(forKey: failureEventKey)
+    }
+
+    /// Short, non-reversible identity for correlating an idempotency key
+    /// across attempts (and with a Server log fingerprint) without storing it.
+    static func fingerprint(_ value: String) -> String {
+        SHA256.hash(data: Data(value.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// One command call's outcome (all of its transport attempts together).
+    static func recordCommand(
+        commandType: String, idempotencyKey: String, succeeded: Bool,
+        durationMs: Double, error: Error? = nil, httpStatusCode: Int? = nil,
+        capturedAt: Date = Date(), defaults: UserDefaults = .standard
+    ) {
+        var event = Event(capturedAt: capturedAt, path: "/api/v1/native/commands", succeeded: succeeded)
+        event.kind = "command"
+        event.commandType = commandType
+        event.idempotencyFingerprint = fingerprint(idempotencyKey)
+        event.durationMs = durationMs
+        event.httpStatusCode = httpStatusCode
+        if let error {
+            let nsError = error as NSError
+            event.errorDomain = nsError.domain
+            event.errorCode = nsError.code
+        }
+        record(event, defaults: defaults)
     }
 
     /// Builds the `Event` from already-extracted plain values, independent
@@ -243,17 +305,138 @@ extension CommandNetworkDiagnostics.TransactionTimings {
 /// Collects the one `URLSessionTaskMetrics` Foundation delivers per task,
 /// on whatever queue Foundation calls it back on -- success or failure, this
 /// callback still fires as long as the task actually started.
-private final class MetricsCollectingDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+///
+/// Build 83: also bounds the connectivity wait. A live Build 82 workout
+/// proved a command session can sit "waiting for connectivity" for its full
+/// 60 s resource timeout, attempt after attempt, while reads on the shared
+/// session reached the same host in milliseconds. When a task starts
+/// waiting this delegate (1) reports "Waiting for network", (2) cancels it at
+/// once if the system path is already satisfied (this session is stuck, not
+/// the network; nothing was sent, so an immediate retry on a fresh session
+/// is safe), and otherwise (3) cancels it if it is still waiting with zero
+/// bytes sent after the interactive connectivity budget.
+final class MetricsCollectingDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    enum WaitOutcome: Equatable, Sendable {
+        case none
+        /// Waiting while the system path was satisfied: cancelled at once.
+        case stuckPathSatisfied
+        /// Still waiting, nothing sent, after the connectivity budget.
+        case budgetExceeded
+    }
+
     private let lock = NSLock()
     private var collected: URLSessionTaskMetrics?
+    private var outcome: WaitOutcome = .none
+    private var waited = false
+    private let connectivityBudget: TimeInterval
+    private let pathProvider: any NetworkPathProviding
+    private let onWaiting: @Sendable (NetworkPathSnapshot) -> Void
+
+    init(
+        connectivityBudget: TimeInterval = CommandNetworkDiagnosticsTransport.interactiveConnectivityBudget,
+        pathProvider: any NetworkPathProviding = NetworkPathObserver.shared,
+        onWaiting: @escaping @Sendable (NetworkPathSnapshot) -> Void = { _ in }
+    ) {
+        self.connectivityBudget = connectivityBudget
+        self.pathProvider = pathProvider
+        self.onWaiting = onWaiting
+    }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
         lock.lock(); collected = metrics; lock.unlock()
     }
 
+    func urlSession(_ session: URLSession, taskIsWaitingForConnectivity task: URLSessionTask) {
+        let snapshot = pathProvider.currentSnapshot()
+        lock.lock(); waited = true; lock.unlock()
+        onWaiting(snapshot)
+        handleWaiting(snapshot: snapshot, cancel: { [weak task] in task?.cancel() }, isStillWaiting: { [weak task] in
+            guard let task else { return false }
+            return task.state == .running && task.countOfBytesSent == 0 && task.countOfBytesReceived == 0
+        })
+    }
+
+    /// Decision logic, testable without a real waiting task.
+    func handleWaiting(
+        snapshot: NetworkPathSnapshot,
+        cancel: @escaping @Sendable () -> Void,
+        isStillWaiting: @escaping @Sendable () -> Bool,
+        schedule: (TimeInterval, @escaping @Sendable () -> Void) -> Void = { delay, work in
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + delay, execute: work)
+        }
+    ) {
+        if snapshot.status == "satisfied" {
+            setOutcome(.stuckPathSatisfied)
+            cancel()
+            return
+        }
+        schedule(connectivityBudget) { [weak self] in
+            guard let self, isStillWaiting() else { return }
+            self.setOutcome(.budgetExceeded)
+            cancel()
+        }
+    }
+
+    private func setOutcome(_ value: WaitOutcome) {
+        lock.lock(); if outcome == .none { outcome = value }; lock.unlock()
+    }
+
     var metrics: URLSessionTaskMetrics? {
         lock.lock(); defer { lock.unlock() }
         return collected
+    }
+
+    var waitOutcome: WaitOutcome {
+        lock.lock(); defer { lock.unlock() }
+        return outcome
+    }
+
+    var didWaitForConnectivity: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return waited
+    }
+}
+
+/// The command transport's own `URLSession`, replaceable. After a transport
+/// failure (or a stuck connectivity wait) the session is recreated so the
+/// next attempt gets a fresh connection pool and path evaluation instead of
+/// inheriting a wedged one; in-flight tasks on the old session finish.
+final class CommandURLSessionPool: @unchecked Sendable {
+    private let lock = NSLock()
+    private var session: URLSession
+    private var currentGeneration = 0
+    private let makeSession: @Sendable () -> URLSession
+
+    init(makeSession: @escaping @Sendable () -> URLSession) {
+        self.makeSession = makeSession
+        self.session = makeSession()
+    }
+
+    /// A fixed session (tests): `recreate` is a no-op.
+    convenience init(fixed session: URLSession) {
+        self.init(makeSession: { session })
+    }
+
+    func current() -> (session: URLSession, generation: Int) {
+        lock.lock(); defer { lock.unlock() }
+        return (session, currentGeneration)
+    }
+
+    /// Replaces the session unless another caller already did after
+    /// `generation`. Returns the new generation when a session was replaced.
+    @discardableResult
+    func recreate(after generation: Int) -> Int? {
+        lock.lock()
+        guard generation == currentGeneration else { lock.unlock(); return nil }
+        let replacement = makeSession()
+        guard replacement !== session else { lock.unlock(); return nil }
+        let old = session
+        session = replacement
+        currentGeneration += 1
+        let next = currentGeneration
+        lock.unlock()
+        old.finishTasksAndInvalidate()
+        return next
     }
 }
 
@@ -267,21 +450,48 @@ private final class MetricsCollectingDelegate: NSObject, URLSessionTaskDelegate,
 /// `CommandNetworkDiagnostics` for every attempt via the metrics-collecting
 /// delegate, regardless of outcome.
 struct CommandNetworkDiagnosticsTransport: FounderHTTPTransport {
-    let session: URLSession
+    /// How long an interactive command may wait for a network path before
+    /// it fails so the caller can show "Waiting for network" and retry with
+    /// the same idempotency key. Was effectively 60 s in Build 82.
+    static let interactiveConnectivityBudget: TimeInterval = 12
+
+    let pool: CommandURLSessionPool
     let pathProvider: any NetworkPathProviding
     let now: @Sendable () -> Date
     let recordEvent: @Sendable (CommandNetworkDiagnostics.Event) -> Void
+    let connectivityBudget: TimeInterval
+    let reportWaiting: @Sendable (Bool) -> Void
+
+    var session: URLSession { pool.current().session }
 
     init(
         session: URLSession,
         pathProvider: any NetworkPathProviding = NetworkPathObserver.shared,
         now: @escaping @Sendable () -> Date = Date.init,
-        recordEvent: @escaping @Sendable (CommandNetworkDiagnostics.Event) -> Void = { CommandNetworkDiagnostics.record($0) }
+        recordEvent: @escaping @Sendable (CommandNetworkDiagnostics.Event) -> Void = { CommandNetworkDiagnostics.record($0) },
+        connectivityBudget: TimeInterval = Self.interactiveConnectivityBudget,
+        reportWaiting: @escaping @Sendable (Bool) -> Void = { CommandConnectivityStatus.report(waiting: $0) }
     ) {
-        self.session = session
+        self.init(
+            pool: CommandURLSessionPool(fixed: session), pathProvider: pathProvider, now: now,
+            recordEvent: recordEvent, connectivityBudget: connectivityBudget, reportWaiting: reportWaiting
+        )
+    }
+
+    init(
+        pool: CommandURLSessionPool,
+        pathProvider: any NetworkPathProviding = NetworkPathObserver.shared,
+        now: @escaping @Sendable () -> Date = Date.init,
+        recordEvent: @escaping @Sendable (CommandNetworkDiagnostics.Event) -> Void = { CommandNetworkDiagnostics.record($0) },
+        connectivityBudget: TimeInterval = Self.interactiveConnectivityBudget,
+        reportWaiting: @escaping @Sendable (Bool) -> Void = { CommandConnectivityStatus.report(waiting: $0) }
+    ) {
+        self.pool = pool
         self.pathProvider = pathProvider
         self.now = now
         self.recordEvent = recordEvent
+        self.connectivityBudget = connectivityBudget
+        self.reportWaiting = reportWaiting
     }
 
     /// The dedicated session real command submissions use in production:
@@ -292,41 +502,111 @@ struct CommandNetworkDiagnosticsTransport: FounderHTTPTransport {
     /// transfer cannot run unbounded. Per-request idle timeouts
     /// (`URLRequest.timeoutInterval`, set by `FounderServerAPI.perform`) are
     /// unchanged.
+    /// `waitsForConnectivity` still rides out a brief gap, but the wait is
+    /// bounded per task by `interactiveConnectivityBudget` (see
+    /// `MetricsCollectingDelegate`); the 60 s resource ceiling remains only
+    /// for genuinely large uploads that are actually transferring.
     static func production() -> CommandNetworkDiagnosticsTransport {
-        let configuration = URLSessionConfiguration.default
-        configuration.waitsForConnectivity = true
-        configuration.timeoutIntervalForResource = 60
-        return CommandNetworkDiagnosticsTransport(session: URLSession(configuration: configuration))
+        CommandNetworkDiagnosticsTransport(pool: CommandURLSessionPool {
+            let configuration = URLSessionConfiguration.default
+            configuration.waitsForConnectivity = true
+            configuration.timeoutIntervalForResource = 60
+            return URLSession(configuration: configuration)
+        })
     }
 
     func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let delegate = MetricsCollectingDelegate()
+        try await attempt(request, allowStuckRetry: true)
+    }
+
+    private func attempt(_ request: URLRequest, allowStuckRetry: Bool) async throws -> (Data, HTTPURLResponse) {
         let path = request.url?.path ?? ""
+        let (session, generation) = pool.current()
+        let recordEvent = recordEvent
+        let now = now
+        let reportWaiting = reportWaiting
+        let delegate = MetricsCollectingDelegate(connectivityBudget: connectivityBudget, pathProvider: pathProvider) { snapshot in
+            reportWaiting(true)
+            var event = CommandNetworkDiagnostics.makeEvent(
+                capturedAt: now(), path: path, succeeded: false, pathSnapshot: snapshot, transaction: nil
+            )
+            event.kind = "waitingForConnectivity"
+            event.sessionGeneration = generation
+            recordEvent(event)
+        }
         do {
             let (data, response) = try await session.data(for: request, delegate: delegate)
             let httpResponse = response as? HTTPURLResponse
+            reportWaiting(false)
             record(
-                path: path, succeeded: true, delegate: delegate,
+                path: path, succeeded: true, delegate: delegate, generation: generation,
                 httpStatusCode: httpResponse?.statusCode, responseBodyByteCount: data.count
             )
             guard let httpResponse else { throw FounderServerError.invalidResponse }
             return (data, httpResponse)
         } catch {
-            record(path: path, succeeded: false, delegate: delegate, httpStatusCode: nil, responseBodyByteCount: nil)
+            let waitOutcome = delegate.waitOutcome
+            record(
+                path: path, succeeded: false, delegate: delegate, generation: generation,
+                httpStatusCode: nil, responseBodyByteCount: nil, error: error,
+                kind: waitOutcome == .stuckPathSatisfied ? "stuckWaitCancelled"
+                    : waitOutcome == .budgetExceeded ? "connectivityBudgetExceeded" : "attempt"
+            )
+            if waitOutcome != .none || Self.isTransportFailure(error) {
+                if let next = pool.recreate(after: generation) {
+                    var event = CommandNetworkDiagnostics.makeEvent(
+                        capturedAt: now(), path: path, succeeded: false,
+                        pathSnapshot: pathProvider.currentSnapshot(), transaction: nil
+                    )
+                    event.kind = "sessionRecreated"
+                    event.sessionGeneration = next
+                    recordEvent(event)
+                }
+            }
+            // Nothing was sent while waiting on a satisfied path: retry once,
+            // at once, on the fresh session (same request, same idempotency
+            // key). A caller's own cancellation is never retried.
+            if waitOutcome == .stuckPathSatisfied, allowStuckRetry, !Task.isCancelled {
+                return try await attempt(request, allowStuckRetry: false)
+            }
+            // Only a wait that ran out its budget leaves "Waiting for
+            // network" showing (until the next command gets through).
+            if waitOutcome != .budgetExceeded { reportWaiting(false) }
             throw error
         }
     }
 
+    /// Failures that say the connection or its path is bad (not the Server's
+    /// answer, and not the caller's own cancellation).
+    static func isTransportFailure(_ error: Error) -> Bool {
+        guard let urlError = error as? URLError else { return false }
+        switch urlError.code {
+        case .timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost,
+             .cannotFindHost, .dnsLookupFailed, .secureConnectionFailed, .resourceUnavailable,
+             .internationalRoamingOff, .dataNotAllowed, .callIsActive:
+            return true
+        default:
+            return false
+        }
+    }
+
     private func record(
-        path: String, succeeded: Bool, delegate: MetricsCollectingDelegate,
-        httpStatusCode: Int?, responseBodyByteCount: Int?
+        path: String, succeeded: Bool, delegate: MetricsCollectingDelegate, generation: Int,
+        httpStatusCode: Int?, responseBodyByteCount: Int?, error: Error? = nil, kind: String = "attempt"
     ) {
-        let event = CommandNetworkDiagnostics.makeEvent(
+        var event = CommandNetworkDiagnostics.makeEvent(
             capturedAt: now(), path: path, succeeded: succeeded,
             pathSnapshot: pathProvider.currentSnapshot(),
             transaction: CommandNetworkDiagnostics.TransactionTimings(metrics: delegate.metrics),
             httpStatusCode: httpStatusCode, responseBodyByteCount: responseBodyByteCount
         )
+        event.kind = kind
+        event.sessionGeneration = generation
+        if let error {
+            let nsError = error as NSError
+            event.errorDomain = nsError.domain
+            event.errorCode = nsError.code
+        }
         recordEvent(event)
     }
 }

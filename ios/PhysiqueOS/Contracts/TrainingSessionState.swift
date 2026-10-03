@@ -299,6 +299,12 @@ struct TrainingSessionChange: Equatable, Sendable {
         /// unchanged; observers re-read `isSubmitting`).
         case submission
         case ended(TrainingSessionEndReason)
+        /// A durable completion's late bookkeeping changed (the Watch Health
+        /// leg reported after the structured commit). No editable session.
+        case completionUpdated
+        /// `Return to Log`: the pending completion presentation is gone, so
+        /// paired surfaces must leave the summary now, not on next refresh.
+        case completionAcknowledged
     }
 
     var sessionId: String
@@ -402,6 +408,9 @@ enum TrainingSessionInvariants {
             && draft.submissionState == nil
             && draft.leftAt == nil
             && draft.pausedAt == nil
+            // A confirmed finish is frozen for the Watch and Live Activity:
+            // its commit payload (and so its idempotency key) cannot change.
+            && draft.watchFinishOperationId == nil
     }
 
     /// Equality ignoring the bookkeeping the authority itself advances.

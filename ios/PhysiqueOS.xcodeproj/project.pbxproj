@@ -374,6 +374,9 @@
 		000000000000000000001801 /* HomeWidgetNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001800 /* HomeWidgetNavigation.swift */; };
 		000000000000000000001803 /* HomeWidgetSnapshotCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001802 /* HomeWidgetSnapshotCoordinator.swift */; };
 		000000000000000000001805 /* HomeWidgetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001804 /* HomeWidgetBridge.swift */; };
+		000000000000000000001A01 /* TrainingSessionTerminalLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A00 /* TrainingSessionTerminalLedger.swift */; };
+		000000000000000000001A03 /* NetworkDiagnosticsExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A02 /* NetworkDiagnosticsExport.swift */; };
+		000000000000000000001A05 /* NetworkDiagnosticsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A04 /* NetworkDiagnosticsSection.swift */; };
 		0000000000000000000012D5 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D4 /* HealthKitSynchronizationTests.swift */; };
 		0000000000000000000012D7 /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D6 /* HealthKitSleepIngestionTests.swift */; };
 		0000000000000000000012D9 /* HealthKitSleepHistoricalValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D8 /* HealthKitSleepHistoricalValidationTests.swift */; };
@@ -395,6 +398,7 @@
 		000000000000000000001613 /* TrainingRestPreferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001612 /* TrainingRestPreferenceTests.swift */; };
 		000000000000000000001705 /* CompletionFeedbackAndNotificationCapabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001704 /* CompletionFeedbackAndNotificationCapabilityTests.swift */; };
 		000000000000000000001807 /* HomeWidgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001806 /* HomeWidgetTests.swift */; };
+		000000000000000000001A07 /* Build83FinishLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A06 /* Build83FinishLifecycleTests.swift */; };
 		0000000000000000000012B3 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
 		0000000000000000000012B5 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B4 /* WatchConnectivity.framework */; };
 		000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001614 /* WorkoutActivityAttributes.swift */; };
@@ -431,6 +435,8 @@
 		00000000000000000000191C /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B4 /* WatchConnectivity.framework */; };
 		000000000000000000001925 /* PhysiqueOSWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 000000000000000000001919 /* PhysiqueOSWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		000000000000000000001916 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001915 /* Assets.xcassets */; };
+		000000000000000000001A09 /* WatchWorkoutFinishStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A08 /* WatchWorkoutFinishStateTests.swift */; };
+		000000000000000000001A0B /* WatchWorkoutNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A0A /* WatchWorkoutNavigationUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -463,6 +469,13 @@
 			remoteInfo = PhysiqueOSWatch;
 		};
 		000000000000000000001930 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000001282 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 00000000000000000000191D;
+			remoteInfo = PhysiqueOSWatch;
+		};
+		000000000000000000001A16 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 000000000000000000001282 /* Project object */;
 			proxyType = 1;
@@ -794,6 +807,9 @@
 		000000000000000000001800 /* HomeWidgetNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeWidgetNavigation.swift"; sourceTree = "<group>"; };
 		000000000000000000001802 /* HomeWidgetSnapshotCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeWidgetSnapshotCoordinator.swift"; sourceTree = "<group>"; };
 		000000000000000000001804 /* HomeWidgetBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeWidgetBridge.swift"; sourceTree = "<group>"; };
+		000000000000000000001A00 /* TrainingSessionTerminalLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionTerminalLedger.swift"; sourceTree = "<group>"; };
+		000000000000000000001A02 /* NetworkDiagnosticsExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkDiagnosticsExport.swift"; sourceTree = "<group>"; };
+		000000000000000000001A04 /* NetworkDiagnosticsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkDiagnosticsSection.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E7 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
@@ -884,6 +900,7 @@
 		000000000000000000001612 /* TrainingRestPreferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingRestPreferenceTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001704 /* CompletionFeedbackAndNotificationCapabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CompletionFeedbackAndNotificationCapabilityTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001806 /* HomeWidgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeWidgetTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001A06 /* Build83FinishLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Build83FinishLifecycleTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001296 /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		000000000000000000001298 /* GoalsAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepAcceptanceUITests.swift"; sourceTree = "<group>"; };
@@ -921,6 +938,9 @@
 		000000000000000000001915 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
 		000000000000000000001919 /* PhysiqueOSWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOSWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		00000000000000000000191A /* PhysiqueOSWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000001A08 /* WatchWorkoutFinishStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutFinishStateTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001A0A /* WatchWorkoutNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WatchWorkoutNavigationUITests.swift"; sourceTree = "<group>"; };
+		000000000000000000001A0D /* PhysiqueOSWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhysiqueOSWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -966,6 +986,12 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		00000000000000000000192D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		000000000000000000001A13 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = ();
@@ -1154,6 +1180,8 @@
 				000000000000000000001606 /* WorkoutLiveActivityBridge.swift */,
 				000000000000000000001802 /* HomeWidgetSnapshotCoordinator.swift */,
 				000000000000000000001804 /* HomeWidgetBridge.swift */,
+				000000000000000000001A00 /* TrainingSessionTerminalLedger.swift */,
+				000000000000000000001A02 /* NetworkDiagnosticsExport.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -1448,6 +1476,7 @@
 				0000000000000000000012D0 /* HealthKitSleepCanaryView.swift */,
 				0000000000000000000012D2 /* HealthKitSleepValidationSection.swift */,
 				0000000000000000000013A2 /* HealthKitSleepHistoricalEvidenceSection.swift */,
+				000000000000000000001A04 /* NetworkDiagnosticsSection.swift */,
 			);
 			path = You;
 			sourceTree = "<group>";
@@ -1534,6 +1563,7 @@
 				000000000000000000001612 /* TrainingRestPreferenceTests.swift */,
 				000000000000000000001704 /* CompletionFeedbackAndNotificationCapabilityTests.swift */,
 				000000000000000000001806 /* HomeWidgetTests.swift */,
+				000000000000000000001A06 /* Build83FinishLifecycleTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1551,6 +1581,7 @@
 		000000000000000000001269 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				000000000000000000001A0D /* PhysiqueOSWatchUITests.xctest */,
 				000000000000000000001919 /* PhysiqueOSWatch.app */,
 				00000000000000000000191A /* PhysiqueOSWatchTests.xctest */,
 				000000000000000000001280 /* PhysiqueOS.app */,
@@ -1564,6 +1595,7 @@
 		000000000000000000001268 /* Main */ = {
 			isa = PBXGroup;
 			children = (
+				000000000000000000001A0C /* PhysiqueOSWatchUITests */,
 				000000000000000000001917 /* PhysiqueOSWatch */,
 				000000000000000000001918 /* PhysiqueOSWatchTests */,
 				00000000000000000000126A /* PhysiqueOS */,
@@ -1620,8 +1652,17 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000001908 /* WatchWorkoutReducerTests.swift */,
+				000000000000000000001A08 /* WatchWorkoutFinishStateTests.swift */,
 			);
 			path = PhysiqueOSWatchTests;
+			sourceTree = "<group>";
+		};
+		000000000000000000001A0C /* PhysiqueOSWatchUITests */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000001A0A /* WatchWorkoutNavigationUITests.swift */,
+			);
+			path = PhysiqueOSWatchUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1731,6 +1772,21 @@
 			productReference = 00000000000000000000191A /* PhysiqueOSWatchTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		000000000000000000001A0E /* PhysiqueOSWatchUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000000001A0F /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchUITests" */;
+			buildPhases = (
+				000000000000000000001A12 /* Sources */,
+				000000000000000000001A13 /* Frameworks */,
+				000000000000000000001A14 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = (000000000000000000001A15 /* PBXTargetDependency */,);
+			name = PhysiqueOSWatchUITests;
+			productName = PhysiqueOSWatchUITests;
+			productReference = 000000000000000000001A0D /* PhysiqueOSWatchUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1762,6 +1818,10 @@
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = 00000000000000000000191D;
 					};
+					000000000000000000001A0E = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 00000000000000000000191D;
+					};
 				};
 			};
 			buildConfigurationList = 000000000000000000001283 /* Build configuration list for PBXProject "PhysiqueOS" */;
@@ -1783,6 +1843,7 @@
 				000000000000000000001637 /* PhysiqueOSLiveActivity */,
 				00000000000000000000191D /* PhysiqueOSWatch */,
 				000000000000000000001928 /* PhysiqueOSWatchTests */,
+				000000000000000000001A0E /* PhysiqueOSWatchUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -1845,6 +1906,12 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		00000000000000000000192E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		000000000000000000001A14 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = ();
@@ -2155,6 +2222,9 @@
 				000000000000000000001801 /* HomeWidgetNavigation.swift in Sources */,
 				000000000000000000001803 /* HomeWidgetSnapshotCoordinator.swift in Sources */,
 				000000000000000000001805 /* HomeWidgetBridge.swift in Sources */,
+				000000000000000000001A01 /* TrainingSessionTerminalLedger.swift in Sources */,
+				000000000000000000001A03 /* NetworkDiagnosticsExport.swift in Sources */,
+				000000000000000000001A05 /* NetworkDiagnosticsSection.swift in Sources */,
 				000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */,
 				000000000000000000001618 /* CompleteWorkoutSetIntent.swift in Sources */,
 				00000000000000000000161B /* WorkoutLiveActivityViews.swift in Sources */,
@@ -2239,6 +2309,7 @@
 				000000000000000000001613 /* TrainingRestPreferenceTests.swift in Sources */,
 				000000000000000000001705 /* CompletionFeedbackAndNotificationCapabilityTests.swift in Sources */,
 				000000000000000000001807 /* HomeWidgetTests.swift in Sources */,
+				000000000000000000001A07 /* Build83FinishLifecycleTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2287,6 +2358,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				000000000000000000001912 /* WatchWorkoutReducerTests.swift in Sources */,
+				000000000000000000001A09 /* WatchWorkoutFinishStateTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		000000000000000000001A12 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				000000000000000000001A0B /* WatchWorkoutNavigationUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2317,6 +2397,11 @@
 			isa = PBXTargetDependency;
 			target = 00000000000000000000191D /* PhysiqueOSWatch */;
 			targetProxy = 000000000000000000001930 /* PBXContainerItemProxy */;
+		};
+		000000000000000000001A15 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 00000000000000000000191D /* PhysiqueOSWatch */;
+			targetProxy = 000000000000000000001A16 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2444,7 +2529,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 83;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOS/Supporting/Info.plist";
@@ -2472,7 +2557,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 83;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOS/Supporting/Info.plist";
@@ -2565,7 +2650,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSLiveActivity/PhysiqueOSLiveActivity.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 83;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSLiveActivity/Info.plist";
@@ -2591,7 +2676,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSLiveActivity/PhysiqueOSLiveActivity.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 83;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSLiveActivity/Info.plist";
@@ -2615,7 +2700,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 83;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSWatch/Info.plist";
@@ -2639,7 +2724,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 83;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSWatch/Info.plist";
@@ -2662,7 +2747,7 @@
 		00000000000000000000192A /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 83;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -2677,7 +2762,7 @@
 		00000000000000000000192B /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 82;
+				CURRENT_PROJECT_VERSION = 83;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -2687,6 +2772,36 @@
 				SUPPORTED_PLATFORMS = "watchos watchsimulator";
 				TARGETED_DEVICE_FAMILY = 4;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PhysiqueOSWatch.app/PhysiqueOSWatch";
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			}; name = Release; };
+		000000000000000000001A10 /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GMTRM6G9;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.physiqueos.native.dev.watchkitapp.UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = PhysiqueOSWatch;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+			}; name = Debug; };
+		000000000000000000001A11 /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GMTRM6G9;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.physiqueos.native.dev.watchkitapp.UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = PhysiqueOSWatch;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
 			}; name = Release; };
 /* End XCBuildConfiguration section */
@@ -2746,6 +2861,12 @@
 		000000000000000000001929 /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (00000000000000000000192A /* Debug */, 00000000000000000000192B /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		000000000000000000001A0F /* Build configuration list for PBXNativeTarget "PhysiqueOSWatchUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (000000000000000000001A10 /* Debug */, 000000000000000000001A11 /* Release */,);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};

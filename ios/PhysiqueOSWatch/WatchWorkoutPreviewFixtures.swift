@@ -13,6 +13,29 @@ enum WatchWorkoutPreviewFixtures {
         var activeCalories: Double? = 184
         var basalCalories: Double? = 46
         var averageHeartRate: Double? = 121
+        var page: WatchWorkoutStore.Page = .workout
+        var localFinishConfirmation = false
+        var dailyTotals: WatchDailyTotals? = WatchWorkoutPreviewFixtures.totals()
+        var finishingObservedAt: Date?
+        var pendingCommand: WatchWorkoutCommand?
+        var pendingIssuedAt: Date?
+    }
+
+    static func totals(
+        offline: Bool = false,
+        refreshedMinutesAgo: Double = 2,
+        localDate: String = WatchDailyTotalsPresentation.localDateKey(Date())
+    ) -> WatchDailyTotals {
+        .init(
+            schemaVersion: WatchDailyTotals.schemaVersion,
+            localDate: localDate,
+            activeCalories: 912.6,
+            nutritionCalories: 2_463.3,
+            isActivityPartialDay: true,
+            refreshedAt: Date().addingTimeInterval(-refreshedMinutesAgo * 60),
+            isOffline: offline,
+            writtenAt: Date().addingTimeInterval(-refreshedMinutesAgo * 60)
+        )
     }
 
     static func make(_ name: String) -> Fixture? {
@@ -24,8 +47,38 @@ enum WatchWorkoutPreviewFixtures {
             fixture.projection.rows = []
             fixture.projection.canCompleteSet = false
             fixture.projection.elapsedWorkoutSeconds = nil
-        case "normal", "metrics", "controls", "always-on":
-            if name == "controls" { fixture.projection.finishEligibility = .confirmable }
+        case "normal", "metrics", "always-on", "daily-totals", "geometry":
+            break
+        case "daily-totals-stale":
+            fixture.dailyTotals = totals(offline: true, refreshedMinutesAgo: 47)
+        case "daily-totals-missing":
+            fixture.dailyTotals = totals(localDate: "2000-01-01")
+        case "controls":
+            fixture.page = .controls
+        case "controls-paused":
+            fixture.page = .controls
+            fixture.projection.phase = .paused
+            fixture.projection.canCompleteSet = false
+            fixture.projection.pausedAt = Date().addingTimeInterval(-35)
+        case "controls-finish-confirmation":
+            fixture.page = .controls
+            fixture.projection.phase = .finishConfirmation
+            fixture.projection.finishEligibility = .confirmable
+            fixture.projection.canCompleteSet = false
+            fixture.projection.rest = nil
+            fixture.localFinishConfirmation = true
+        case "finish-confirmation":
+            fixture.projection.completedSets = fixture.projection.totalSets
+            fixture.projection.phase = .finishConfirmation
+            fixture.projection.finishEligibility = .confirmable
+            fixture.projection.canCompleteSet = false
+            fixture.projection.rest = nil
+            fixture.localFinishConfirmation = true
+        case "finish-confirmation-waiting":
+            fixture.projection.completedSets = fixture.projection.totalSets
+            fixture.projection.canCompleteSet = false
+            fixture.localFinishConfirmation = true
+            fixture.connectionState = .phoneUnavailable
         case "final-set":
             fixture.projection.completedSets = 4
             fixture.projection.rows = [
@@ -72,13 +125,17 @@ enum WatchWorkoutPreviewFixtures {
             fixture.projection.rows = [
                 row(role: "current", name: "Face Pull", set: 1, count: 1, load: "45", reps: "15", target: true)
             ]
-        case "finishing":
+        case "finishing", "finishing-waiting":
             fixture.projection.phase = .finishing
             fixture.projection.canCompleteSet = false
+            fixture.projection.rest = nil
+            fixture.projection.finishedAt = Date().addingTimeInterval(-40)
             fixture.projection.finish = .init(
                 operationId: "finish-preview", healthSaved: true, healthFailed: false,
-                serverCommitted: false, serverPending: true, correlationPending: true
+                serverCommitted: false, serverPending: true, correlationPending: true,
+                serverWaitingForNetwork: name == "finishing-waiting"
             )
+            fixture.finishingObservedAt = Date().addingTimeInterval(name == "finishing-waiting" ? -45 : -3)
         case "summary":
             fixture.projection.phase = .committed
             fixture.projection.completedSets = fixture.projection.totalSets
@@ -93,6 +150,7 @@ enum WatchWorkoutPreviewFixtures {
                 activeDurationSeconds: 3_245, completedSets: 6,
                 volume: 8_760, authoritativePRCount: 2
             )
+            fixture.projection.finishedAt = Date().addingTimeInterval(-60)
         default:
             return nil
         }

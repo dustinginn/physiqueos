@@ -77,18 +77,19 @@ final class CommandNetworkDiagnosticsTests: XCTestCase {
     }
 
     @MainActor
-    func testRecordAndReadBackNewestFirstAndCapAt64() {
+    func testRecordAndReadBackNewestFirstAndCapAt256() {
         let defaults = freshDefaults("CommandNetworkDiagnosticsTests.order")
-        for index in 0..<70 {
+        for index in 0..<270 {
             CommandNetworkDiagnostics.record(
                 .init(capturedAt: Date(timeIntervalSince1970: Double(index)), path: "/api/v1/native/commands", succeeded: true),
                 defaults: defaults
             )
         }
         let events = CommandNetworkDiagnostics.recentEvents(defaults: defaults)
-        XCTAssertEqual(events.count, 64)
-        // Newest-first: the last one recorded (index 69) is first.
-        XCTAssertEqual(events.first?.capturedAt, Date(timeIntervalSince1970: 69))
+        XCTAssertEqual(events.count, CommandNetworkDiagnostics.eventLimit)
+        XCTAssertEqual(CommandNetworkDiagnostics.eventLimit, 256)
+        // Newest-first: the last one recorded (index 269) is first.
+        XCTAssertEqual(events.first?.capturedAt, Date(timeIntervalSince1970: 269))
     }
 
     @MainActor

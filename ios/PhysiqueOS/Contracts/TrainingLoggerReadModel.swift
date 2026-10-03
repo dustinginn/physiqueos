@@ -168,13 +168,19 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// Explicit phone-created eligibility for the paired Watch. This is a
     /// planning marker, not an independently executable Watch plan.
     var readyForWatchAt: String? = nil
+    /// When the paired Watch started this plan. A Watch-started session owns
+    /// a Watch HealthKit workout, so its Finish expects a Health leg.
+    var watchStartedAt: String? = nil
     /// Persisted two-step finish gate shared by phone/Watch commands. Finish
     /// is never inferred from progress, including after the final set.
     var finishConfirmationRequestedAt: String? = nil
-    /// One stable operation joins the Watch HealthKit save and the phone's
-    /// structured Server commit. Optional fields keep every pre-Watch draft
-    /// backward-decodable. Neither component being durable is enough to
-    /// remove the local session; terminal completion requires both.
+    /// One stable finish operation per session (Build 83: minted by the
+    /// first confirmed Finish from either the phone or the Watch, then
+    /// reused by every later Finish). It joins the structured Server commit
+    /// and, for a Watch-started session, the Watch HealthKit save. Optional
+    /// fields keep every pre-Watch draft backward-decodable. The structured
+    /// commit alone ends the session; the Health leg continues independently
+    /// and is recorded on the completion afterwards.
     var watchFinishOperationId: String? = nil
     var watchHealthSaveState: WatchWorkoutFinishComponentState? = nil
     var watchServerCommitState: WatchWorkoutFinishComponentState? = nil

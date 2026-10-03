@@ -47,7 +47,13 @@ struct PhysiqueOSApp: App {
         if !isUnitTestHost { homeWidget.install() }
         _homeWidget = State(initialValue: homeWidget)
         let watchWorkoutConnectivity = PhoneWatchWorkoutConnectivityBridge(environment: environment)
-        if !isUnitTestHost { watchWorkoutConnectivity.install() }
+        if !isUnitTestHost {
+            // Daily Totals on the Watch are the canonical Home snapshot.
+            homeWidget.coordinator.onSnapshotWritten = { [weak watchWorkoutConnectivity] snapshot in
+                watchWorkoutConnectivity?.publishDailyTotals(WatchDailyTotals(snapshot: snapshot))
+            }
+            watchWorkoutConnectivity.install()
+        }
         _watchWorkoutConnectivity = State(initialValue: watchWorkoutConnectivity)
         // HealthKit background delivery relaunches a terminated app WITHOUT
         // ever activating a scene, so the scenePhase-driven bootstrap below

@@ -172,7 +172,11 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
         let label = labels.isEmpty ? "Workout" : labels.joined(separator: " · ")
 
         var restCue: Rest?
-        if (phase == .inProgress || phase == .paused), let rest = draft.rest, let started = rest.startedAtDate {
+        // Rest is hidden (and its haptics silent) from the moment Finish is
+        // requested or confirmed; Not Yet restores it from its anchor.
+        if (phase == .inProgress || phase == .paused),
+           draft.finishConfirmationRequestedAt == nil, draft.finishedAt == nil,
+           let rest = draft.rest, let started = rest.startedAtDate {
             restCue = Rest(
                 id: rest.id, mode: rest.mode, startedAt: started, endsAt: rest.endsAtDate,
                 durationSeconds: rest.durationSeconds, sourceExerciseId: rest.sourceExerciseId,
@@ -277,6 +281,8 @@ struct TrainingSessionLiveProjection: Codable, Hashable, Sendable {
     static func phase(of draft: TrainingLoggerDraft) -> Phase {
         if draft.step == .complete { return .complete }
         if draft.submissionState != nil { return .finishing }
+        // A confirmed Finish (phone or Watch) never offers Complete Set again.
+        if draft.finishedAt != nil, draft.watchFinishOperationId != nil { return .finishing }
         if draft.pausedAt != nil { return .paused }
         if draft.leftAt != nil { return .planning }
         if draft.step == .workout || draft.isAddingExercises { return .inProgress }

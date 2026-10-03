@@ -70,7 +70,8 @@ struct TrainingLoggerView: View {
                     catalogWriteAPI: environment.trainingExerciseCatalogWriteAPI,
                     sessionAuthority: environment.trainingSessionAuthority(for: environment.nativeAuthority),
                     attachmentStore: environment.trainingLoggerAttachmentStore,
-                    authority: environment.nativeAuthority
+                    authority: environment.nativeAuthority,
+                    backgroundScheduler: UIKitBackgroundTaskScheduler()
                 )
                 viewModelAuthority = environment.nativeAuthority
             }
@@ -1039,12 +1040,15 @@ struct TrainingLoggerView: View {
                     .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
+            FinishProgressStatus(viewModel: viewModel)
             PrimaryActionButton(title: viewModel.isAwaitingDurability ? "Finishing workout…" : viewModel.isSubmitting ? "Saving…" : "Finish Workout") {
-                Task { await viewModel.submit() }
+                viewModel.finish()
             }
                 .disabled(viewModel.isSubmitting || viewModel.isAwaitingDurability)
                 .accessibilityIdentifier("trainingLogger.completeLocal")
-            secondaryButton("Back to Workout Review") { viewModel.go(to: .summary) }
+            if !viewModel.isSubmitting, !viewModel.isAwaitingDurability {
+                secondaryButton("Back to Workout Review") { viewModel.go(to: .summary) }
+            }
         }
     }
 
@@ -1069,6 +1073,38 @@ struct TrainingLoggerView: View {
             PrimaryActionButton(title: "Return to Log") {
                 viewModel.acknowledgeCompletion()
                 dismiss()
+            }
+        }
+    }
+
+    /// Honest, bounded Finish progress: after `stillSavingThreshold` the
+    /// screen says the workout is safe on this iPhone, whether the network is
+    /// the reason, and offers a same-key Retry. Never a destructive Cancel.
+    private struct FinishProgressStatus: View {
+        let viewModel: TrainingLoggerViewModel
+        @State private var connectivity = CommandConnectivityStatus.shared
+
+        var body: some View {
+            SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
+                if viewModel.isStillSaving(at: context.date) {
+                    CardContainer {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label(
+                                connectivity.isWaitingForNetwork ? "Waiting for network" : "Still saving",
+                                systemImage: connectivity.isWaitingForNetwork ? "wifi.exclamationmark" : "hourglass"
+                            )
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            Text("Your workout is safe on this iPhone. Retry sends the same workout again; it can never be saved twice.")
+                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            Button("Retry") { viewModel.retryFinish() }
+                                .buttonStyle(.bordered)
+                                .tint(PhysiqueOSTheme.accent)
+                                .accessibilityIdentifier("trainingLogger.retryFinish")
+                        }
+                    }
+                }
             }
         }
     }

@@ -77,6 +77,16 @@ final class TrainingLoggerViewModel {
     private var durabilityRecoveryTasks: [String: Task<Void, Never>] = [:]
     private let durabilityRecoveryMaxAttempts: Int
     private let durabilityRecoveryDelay: Duration
+    /// When the current Finish wait began (a commit attempt, a joined
+    /// finish, or durability recovery). After `stillSavingThreshold` the
+    /// screen says so honestly and offers a same-key Retry; there is never a
+    /// destructive Cancel for a confirmed Finish.
+    private(set) var finishWaitStartedAt: Date?
+    static let stillSavingThreshold: TimeInterval = 20
+    private var submitTask: Task<Void, Never>?
+    private var submitToken = UUID()
+    private var authorityObservation: TrainingSessionObservation?
+    private let backgroundScheduler: (any BackgroundTaskScheduling)?
 
     /// Interprets attached supporting-evidence screenshots as soon as they
     /// are attached, so the wait `submit()` would otherwise hit at Finish is
@@ -96,6 +106,7 @@ final class TrainingLoggerViewModel {
         authority: NativeAPIEnvironment = .sandbox,
         durabilityRecoveryMaxAttempts: Int = 30,
         durabilityRecoveryDelay: Duration = .seconds(2),
+        backgroundScheduler: (any BackgroundTaskScheduling)? = nil,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.api = api
@@ -111,7 +122,21 @@ final class TrainingLoggerViewModel {
         self.authority = authority
         self.durabilityRecoveryMaxAttempts = durabilityRecoveryMaxAttempts
         self.durabilityRecoveryDelay = durabilityRecoveryDelay
+        self.backgroundScheduler = backgroundScheduler
         self.now = now
+        // A finish committed by another owner (a Watch Finish, or recovery)
+        // lands this screen on Workout Complete instead of an empty Logger.
+        authorityObservation = self.sessionAuthority.observeChanges { [weak self] change in
+            self?.noteAuthorityChange(change)
+        }
+    }
+
+    private func noteAuthorityChange(_ change: TrainingSessionChange) {
+        guard change.kind == .ended(.committed), completedDraft == nil,
+              selectedDraftId == change.sessionId,
+              let pending = sessionAuthority.pendingCompletion(id: change.sessionId)
+        else { return }
+        presentRecoveredCompletion(pending)
     }
 
     func load() async {
@@ -135,9 +160,12 @@ final class TrainingLoggerViewModel {
                         // draft from the explicit submitted-command lifecycle
                         // becomes a pending presentation; an older residue
                         // must not replay as a surprise after an upgrade.
+                        // A confirmed finish (one operation stamped) is the
+                        // explicit lifecycle too, even when no reply arrived.
                         guard sessionAuthority.endCommittedSession(
                             sessionId: candidate.id,
                             retainingPresentation: candidate.submissionState != nil
+                                || candidate.watchFinishOperationId != nil
                         ).isAccepted else { continue }
                         // Exact deterministic identity/fingerprint proof
                         // clears only this residue. Same-date/category sibling
@@ -350,14 +378,54 @@ final class TrainingLoggerViewModel {
         return ended
     }
 
+    /// The Finish button. Owns the attempt so `retryFinish` can replace it.
+    func finish() {
+        guard submitTask == nil else { return }
+        startSubmitTask(after: nil)
+    }
+
+    /// Same-key Retry for a Finish that is taking too long. The abandoned
+    /// attempt's request may still land; the Server can only replay its
+    /// original receipt, because the retry carries the same persisted
+    /// idempotency identity. Never discards anything.
+    func retryFinish() {
+        if let draft, draft.submissionState != nil {
+            retryDurabilityRecovery(for: draft)
+            return
+        }
+        let previous = submitTask
+        previous?.cancel()
+        startSubmitTask(after: previous)
+    }
+
+    private func startSubmitTask(after previous: Task<Void, Never>?) {
+        let token = UUID()
+        submitToken = token
+        submitTask = Task { [weak self] in
+            await previous?.value
+            await self?.submit()
+            if self?.submitToken == token { self?.submitTask = nil }
+        }
+    }
+
+    var isStillSaving: Bool { isStillSaving(at: now()) }
+
+    func isStillSaving(at date: Date) -> Bool {
+        guard let started = finishWaitStartedAt, isSubmitting || isAwaitingDurability else { return false }
+        return date.timeIntervalSince(started) >= Self.stillSavingThreshold
+    }
+
     func submit() async {
         guard canWrite, completedDraft == nil, let sessionId = draft?.id, !isSubmitting else { return }
         if draft?.mode == .live {
-            // Stamps `finishedAt` only the first time; always ends rest. A
-            // refused stamp stops here: committing without the persisted
-            // window would change the idempotency signature on retry.
+            // Stamps `finishedAt` and the session's one finish operation
+            // only the first time (reusing a Watch-confirmed one); always
+            // ends rest. A refused stamp stops here: committing without the
+            // persisted window would change the idempotency signature on
+            // retry. For a Watch-started workout the stamped operation is
+            // what makes the Watch end and save its HealthKit workout.
             if draft?.finishedAt == nil { validationMessage = nil }
-            let stamped = sessionAuthority.markFinishing(
+            let stamped = sessionAuthority.confirmPhoneFinish(
                 sessionId: sessionId, finishedAt: ISO8601DateFormatter().string(from: now())
             )
             noteRejection(stamped)
@@ -366,22 +434,57 @@ final class TrainingLoggerViewModel {
                 return
             }
         }
-        guard let submittedDraft = draft else { return }
+        guard draft != nil else { return }
         guard authority == .founderProduction else {
             completeLocalCapture()
             return
         }
-        guard sessionAuthority.beginSubmission(sessionId: sessionId) else {
-            validationMessage = "This workout is already being finished."
-            return
-        }
         isSubmitting = true
+        finishWaitStartedAt = now()
         validationMessage = nil
         refreshWarning = nil
         defer {
             isSubmitting = false
-            sessionAuthority.endSubmission(sessionId: sessionId)
+            if draft?.submissionState == nil { finishWaitStartedAt = nil }
         }
+        if !sessionAuthority.beginSubmission(sessionId: sessionId) {
+            // Another owner (the Watch finish, recovery, another screen) is
+            // committing this exact finish: join it rather than refusing.
+            guard await joinInFlightSubmission(sessionId: sessionId),
+                  sessionAuthority.beginSubmission(sessionId: sessionId)
+            else { return }
+        }
+        defer { sessionAuthority.endSubmission(sessionId: sessionId) }
+        guard let submittedDraft = draft else { return }
+        if let scheduler = backgroundScheduler {
+            // Finish is usually tapped right before the phone is locked.
+            _ = try? await withBackgroundExecutionAssertion(
+                named: "training-finish-submit", scheduler: scheduler
+            ) { await commitSubmission(submittedDraft) }
+        } else {
+            await commitSubmission(submittedDraft)
+        }
+    }
+
+    /// Waits while another owner commits `sessionId`. Returns `true` when
+    /// that owner stopped without proving durability and this Finish should
+    /// commit itself (same key); `false` when it finished (or was cancelled).
+    private func joinInFlightSubmission(sessionId: String) async -> Bool {
+        while !Task.isCancelled {
+            if sessionAuthority.draft(id: sessionId) == nil {
+                if completedDraft == nil, let pending = sessionAuthority.pendingCompletion(id: sessionId) {
+                    presentRecoveredCompletion(pending)
+                }
+                return false
+            }
+            if !sessionAuthority.isSubmitting(sessionId: sessionId) { return true }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        return false
+    }
+
+    private func commitSubmission(_ submittedDraft: TrainingLoggerDraft) async {
+        let sessionId = submittedDraft.id
         let committed: TrainingCommitResult
         do {
             let result = try await writeAPI.commit(submittedDraft)
@@ -397,9 +500,13 @@ final class TrainingLoggerViewModel {
                 return
             }
         } catch {
+            // Retry replaced this attempt; it reports nothing.
+            if Task.isCancelled { return }
             // The mutation itself did not reach canonical success — this is
             // the only branch allowed to report the submission as failed,
-            // and the only one that leaves the draft in place.
+            // and the only one that leaves the draft in place. The confirmed
+            // finish keeps its operation, so Retry (or background recovery)
+            // reuses the same idempotency identity.
             validationMessage = (error as? LocalizedError)?.errorDescription ?? "This workout could not be saved."
             return
         }
@@ -433,12 +540,20 @@ final class TrainingLoggerViewModel {
 
     var isAwaitingDurability: Bool { draft?.submissionState != nil }
 
-    private func scheduleDurabilityRecovery(for candidate: TrainingLoggerDraft) {
+    private func scheduleDurabilityRecovery(for candidate: TrainingLoggerDraft, commitImmediately: Bool = false) {
         guard durabilityRecoveryTasks[candidate.id] == nil else { return }
         let maxAttempts = durabilityRecoveryMaxAttempts
         let recoveryDelay = durabilityRecoveryDelay
+        if finishWaitStartedAt == nil { finishWaitStartedAt = now() }
+        let token = UUID()
+        durabilityRecoveryTokens[candidate.id] = token
         durabilityRecoveryTasks[candidate.id] = Task { [weak self, writeAPI] in
-            defer { self?.durabilityRecoveryTasks[candidate.id] = nil }
+            defer {
+                if self?.durabilityRecoveryTokens[candidate.id] == token {
+                    self?.durabilityRecoveryTasks[candidate.id] = nil
+                    self?.durabilityRecoveryTokens[candidate.id] = nil
+                }
+            }
             for attempt in 0..<maxAttempts {
                 guard !Task.isCancelled else { return }
                 if await writeAPI.isDraftAlreadyDurable(candidate) {
@@ -448,7 +563,7 @@ final class TrainingLoggerViewModel {
                 // Reuse the exact persisted idempotency identity to resolve
                 // an ambiguous acknowledgement. This can only replay the
                 // original command; it cannot create a sibling session.
-                if attempt > 0, let result = try? await writeAPI.commit(candidate), result.isDurable {
+                if attempt > 0 || commitImmediately, let result = try? await writeAPI.commit(candidate), result.isDurable {
                     self?.resolveDurableDraft(candidate, commitResult: result)
                     return
                 }
@@ -456,6 +571,18 @@ final class TrainingLoggerViewModel {
                 catch { return }
             }
         }
+    }
+
+    private var durabilityRecoveryTokens: [String: UUID] = [:]
+
+    /// Retry from "Still saving": restart recovery now, committing at once
+    /// with the same persisted idempotency identity.
+    private func retryDurabilityRecovery(for candidate: TrainingLoggerDraft) {
+        durabilityRecoveryTasks[candidate.id]?.cancel()
+        durabilityRecoveryTasks[candidate.id] = nil
+        durabilityRecoveryTokens[candidate.id] = nil
+        finishWaitStartedAt = now()
+        scheduleDurabilityRecovery(for: candidate, commitImmediately: true)
     }
 
     private func resolveDurableDraft(
@@ -475,6 +602,7 @@ final class TrainingLoggerViewModel {
             selectedDraftId = completed.id
             completedPerformanceRecords = []
             processingMessage = nil
+            finishWaitStartedAt = nil
             loadCompletedPerformanceRecords(for: candidate, commitResult: commitResult)
         }
         guard ended else { return }

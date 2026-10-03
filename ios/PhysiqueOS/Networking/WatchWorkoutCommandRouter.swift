@@ -7,22 +7,26 @@ import Foundation
 final class WatchWorkoutCommandRouter {
     private let authority: TrainingSessionAuthority
     private let isPhoneReachable: () -> Bool
+    private let serverWaitingForNetwork: () -> Bool
     private let now: () -> Date
 
     init(
         authority: TrainingSessionAuthority,
         isPhoneReachable: @escaping () -> Bool,
+        serverWaitingForNetwork: @escaping () -> Bool = { false },
         now: @escaping () -> Date = Date.init
     ) {
         self.authority = authority
         self.isPhoneReachable = isPhoneReachable
+        self.serverWaitingForNetwork = serverWaitingForNetwork
         self.now = now
     }
 
     func currentProjection(stalenessReason: WatchWorkoutProjection.StalenessReason? = nil) -> WatchWorkoutProjection? {
         let date = now()
+        let waiting = serverWaitingForNetwork()
         if let active = authority.liveActivitySubject(at: date) {
-            return .make(draft: active, authority: authority, now: date, stalenessReason: stalenessReason)
+            return .make(draft: active, authority: authority, now: date, stalenessReason: stalenessReason, serverWaitingForNetwork: waiting)
         }
         if let prepared = authority.preparedWorkout() {
             return .make(draft: prepared, authority: authority, now: date, prepared: true, stalenessReason: stalenessReason)
@@ -33,17 +37,36 @@ final class WatchWorkoutCommandRouter {
         return nil
     }
 
+    /// No current session. Carries how recent sessions ended, so a Watch
+    /// still holding a HealthKit workout for one of them saves it when it
+    /// was committed instead of discarding it.
     func unavailableProjection() -> WatchWorkoutProjection {
         .terminal(
             sessionId: "current",
             revision: 0,
             phase: .unavailable,
-            stalenessReason: .authorityUnavailable
+            stalenessReason: .authorityUnavailable,
+            recentlyEnded: WatchWorkoutProjection.recentlyEnded(authority: authority)
         )
     }
 
     func cancelledProjection(sessionId: String, revision: Int) -> WatchWorkoutProjection {
-        .terminal(sessionId: sessionId, revision: revision, phase: .cancelled)
+        .terminal(
+            sessionId: sessionId, revision: revision, phase: .cancelled,
+            recentlyEnded: WatchWorkoutProjection.recentlyEnded(authority: authority)
+        )
+    }
+
+    /// The projection a refresh naming `sessionId` receives. A cancelled
+    /// session the Watch still shows gets its explicit terminal first (the
+    /// Watch then refreshes "current"); everything else gets the current
+    /// state, which lists committed sessions in `recentlyEnded`.
+    func refreshProjection(for sessionId: String) -> WatchWorkoutProjection {
+        if sessionId != "current", authority.draft(id: sessionId) == nil,
+           authority.isCancelled(sessionId: sessionId) {
+            return cancelledProjection(sessionId: sessionId, revision: authority.lastChange?.revision ?? 0)
+        }
+        return currentProjection() ?? unavailableProjection()
     }
 
     func route(_ command: WatchWorkoutCommand) -> WatchWorkoutAcknowledgement {
@@ -59,33 +82,13 @@ final class WatchWorkoutCommandRouter {
         }
         if command.kind == .refreshProjection {
             let revision = authority.draft(id: command.sessionId)?.currentRevision
-            if authority.isCancelled(sessionId: command.sessionId) {
-                return acknowledgement(
-                    command, .unchanged, nil, revision ?? command.expectedRevision,
-                    projection: cancelledProjection(
-                        sessionId: command.sessionId,
-                        revision: revision ?? command.expectedRevision
-                    )
-                )
-            }
             return acknowledgement(
-                command, .unchanged, nil, revision,
-                projection: currentProjection() ?? unavailableProjection()
+                command, .unchanged, nil, revision ?? command.expectedRevision,
+                projection: refreshProjection(for: command.sessionId)
             )
         }
         guard let current = authority.draft(id: command.sessionId) else {
-            let replayedCancel = command.kind == .cancelWorkout
-                && authority.isCancelled(sessionId: command.sessionId, mutationId: command.mutationId)
-            return acknowledgement(
-                command,
-                replayedCancel ? .unchanged : .rejected,
-                replayedCancel ? nil : .sessionUnavailable,
-                command.expectedRevision,
-                projection: cancelledProjection(
-                    sessionId: command.sessionId,
-                    revision: command.expectedRevision
-                )
-            )
+            return routeEndedSession(command)
         }
         if current.appliedMutationIds?.contains(command.mutationId) == true {
             return acknowledgement(command, .unchanged, nil, current.currentRevision)
@@ -173,6 +176,56 @@ final class WatchWorkoutCommandRouter {
                 authority.draft(id: command.sessionId)?.currentRevision
             )
         }
+    }
+
+    /// A command for a session that is no longer editable. A committed
+    /// session never answers with a cancelled terminal (that would make the
+    /// Watch discard a workout that was saved): a late Health report is
+    /// recorded on the completion, a late Finish is already satisfied, and
+    /// anything else is refused with the current state.
+    private func routeEndedSession(_ command: WatchWorkoutCommand) -> WatchWorkoutAcknowledgement {
+        if authority.isCommitted(sessionId: command.sessionId) {
+            let projection = currentProjection() ?? unavailableProjection()
+            switch command.kind {
+            case .reportHealthSaved, .reportHealthSaveFailed:
+                guard let finishOperationId = command.finishOperationId else {
+                    return acknowledgement(command, .rejected, .invalidCommand, command.expectedRevision, projection: projection)
+                }
+                let outcome = authority.recordHealthSaveAfterCommit(
+                    sessionId: command.sessionId,
+                    finishOperationId: finishOperationId,
+                    succeeded: command.kind == .reportHealthSaved
+                )
+                let refreshed = currentProjection() ?? unavailableProjection()
+                switch outcome {
+                case .applied(let revision):
+                    return acknowledgement(command, .applied, nil, revision, projection: refreshed)
+                case .unchanged(let revision), .duplicate(let revision):
+                    return acknowledgement(command, .unchanged, nil, revision, projection: refreshed)
+                case .rejected:
+                    return acknowledgement(command, .rejected, .sessionNotMutable, command.expectedRevision, projection: refreshed)
+                }
+            case .requestFinish, .confirmFinish:
+                return acknowledgement(command, .unchanged, nil, command.expectedRevision, projection: projection)
+            default:
+                return acknowledgement(command, .rejected, .sessionNotMutable, command.expectedRevision, projection: projection)
+            }
+        }
+        if authority.isCancelled(sessionId: command.sessionId) {
+            let replayedCancel = command.kind == .cancelWorkout
+                && authority.isCancelled(sessionId: command.sessionId, mutationId: command.mutationId)
+            return acknowledgement(
+                command,
+                replayedCancel ? .unchanged : .rejected,
+                replayedCancel ? nil : .sessionUnavailable,
+                command.expectedRevision,
+                projection: cancelledProjection(sessionId: command.sessionId, revision: command.expectedRevision)
+            )
+        }
+        return acknowledgement(
+            command, .rejected, .sessionUnavailable, command.expectedRevision,
+            projection: unavailableProjection()
+        )
     }
 
     private func acknowledgement(

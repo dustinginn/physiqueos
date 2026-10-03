@@ -131,6 +131,10 @@ final class HomeWidgetSnapshotCoordinator {
     private let timeZone: () -> TimeZone
     private let reload: () -> Void
     private let isProtectedDataAvailable: () -> Bool
+    /// Every written (or cleared) canonical snapshot, for the paired Watch's
+    /// Daily Totals page: the Watch shows exactly what Home and the Home
+    /// Widget show, never its own calculation.
+    var onSnapshotWritten: ((HomeWidgetSnapshot?) -> Void)?
     private var isRefreshing = false
     private var refreshPending = false
     private var reloadPending = false
@@ -242,6 +246,7 @@ final class HomeWidgetSnapshotCoordinator {
                 if activityFailed { snapshot.activity = previous.activity }
             }
             try store.write(snapshot)
+            onSnapshotWritten?(snapshot)
             reload()
         } catch {
             guard environment.nativeAuthority == authority, sessionGeneration == generation else { return }
@@ -257,7 +262,7 @@ final class HomeWidgetSnapshotCoordinator {
                 previous.writtenAt = HomeWidgetSnapshotClock.string(from: instant)
                 previous.refreshState = .offline
                 previous.workout = HomeWidgetSnapshotProjection.workoutProjection(activeWorkout)
-                try? store.write(previous)
+                if (try? store.write(previous)) != nil { onSnapshotWritten?(previous) }
             } else {
                 let day = DailyDriverLocalDay.resolve(at: instant, in: zone)
                 let empty = HomeWidgetSnapshot(
@@ -274,7 +279,7 @@ final class HomeWidgetSnapshotCoordinator {
                     weight: nil,
                     workout: HomeWidgetSnapshotProjection.workoutProjection(activeWorkout)
                 )
-                try? store.write(empty)
+                if (try? store.write(empty)) != nil { onSnapshotWritten?(empty) }
             }
             reload()
         }
@@ -302,6 +307,7 @@ final class HomeWidgetSnapshotCoordinator {
 
     func clear() {
         try? store?.clear()
+        onSnapshotWritten?(nil)
         reload()
     }
 

@@ -29,10 +29,12 @@ final class TrainingSessionAuthority {
     /// Sessions ended in this process. A late whole-draft write can never
     /// bring one back.
     @ObservationIgnored private var endedSessionIds: Set<String> = []
-    /// In-process command tombstones make a lost Watch Cancel acknowledgement
-    /// replay idempotent after the draft itself has been removed. A cold phone
-    /// launch still fails closed with an explicit terminal projection.
-    @ObservationIgnored private var cancelledMutationIdsBySession: [String: String] = [:]
+    /// Persisted, bounded record of how recent sessions ended (committed with
+    /// its finish operation, or cancelled with its Cancel mutation id). It
+    /// outlives the draft and a relaunch, so a late Watch command or a still
+    /// running Watch HealthKit workout is answered with the real outcome.
+    @ObservationIgnored private let terminalLedgerStore: TrainingSessionTerminalLedgerStore
+    private(set) var terminalRecords: [TrainingSessionTerminalRecord]
 
     /// Every saved (editable) draft for this authority, newest first (store
     /// order). Pending completion presentations are held separately.
@@ -53,12 +55,15 @@ final class TrainingSessionAuthority {
         store: TrainingLoggerDraftStore,
         environment: NativeAPIEnvironment,
         restPreferences: TrainingRestPreferenceProviding = UnsetTrainingRestPreferences(),
+        terminalLedger: TrainingSessionTerminalLedgerStore = MemoryTrainingSessionTerminalLedgerStore(),
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.store = store
         self.environment = environment
         self.restPreferences = restPreferences
         self.now = now
+        self.terminalLedgerStore = terminalLedger
+        self.terminalRecords = TrainingSessionTerminalLedger.pruned(terminalLedger.loadRecords(), now: now())
         let stored = store.loadAll()
         self.drafts = Self.sorted(stored.filter { !$0.isPendingCompletionPresentation })
         self.pendingCompletions = stored.filter(\.isPendingCompletionPresentation)
@@ -136,14 +141,77 @@ final class TrainingSessionAuthority {
     }
 
     /// `Return to Log`: the only point that clears a pending presentation.
-    /// Idempotent; touches no editable session and publishes no session
-    /// change (the Live Activity already ended with the commit).
+    /// Idempotent; touches no editable session. It publishes
+    /// `.completionAcknowledged` so the paired Watch leaves its summary at
+    /// once (the Live Activity already ended with the commit).
     @discardableResult
     func acknowledgeCompletion(sessionId: String) -> Bool {
-        guard canWrite, pendingCompletions.contains(where: { $0.id == sessionId }) else { return false }
+        guard canWrite, let presentation = pendingCompletions.first(where: { $0.id == sessionId }) else { return false }
         store.discard(id: sessionId)
         pendingCompletions.removeAll { $0.id == sessionId }
+        updateTerminalRecord(sessionId: sessionId) {
+            $0.acknowledgedAt = TrainingSessionClock.string(from: self.now())
+        }
+        lastChange = .init(sessionId: sessionId, revision: presentation.currentRevision, kind: .completionAcknowledged)
         return true
+    }
+
+    // MARK: - Terminal ledger
+
+    func terminalRecord(sessionId: String) -> TrainingSessionTerminalRecord? {
+        terminalRecords.first { $0.sessionId == sessionId }
+    }
+
+    /// Recently ended sessions for the paired Watch (newest first).
+    func recentlyEndedSessions(limit: Int) -> [TrainingSessionTerminalRecord] {
+        Array(TrainingSessionTerminalLedger.pruned(terminalRecords, now: now()).prefix(limit))
+    }
+
+    private func appendTerminalRecord(_ record: TrainingSessionTerminalRecord) {
+        var records = terminalRecords.filter { $0.sessionId != record.sessionId }
+        records.insert(record, at: 0)
+        terminalRecords = TrainingSessionTerminalLedger.pruned(records, now: now())
+        terminalLedgerStore.saveRecords(terminalRecords)
+    }
+
+    private func updateTerminalRecord(sessionId: String, _ transform: (inout TrainingSessionTerminalRecord) -> Void) {
+        guard let index = terminalRecords.firstIndex(where: { $0.sessionId == sessionId }) else { return }
+        var record = terminalRecords[index]
+        transform(&record)
+        guard record != terminalRecords[index] else { return }
+        terminalRecords[index] = record
+        terminalLedgerStore.saveRecords(terminalRecords)
+    }
+
+    /// The Watch Health leg reported after the structured commit already
+    /// ended the session. Recorded on the pending presentation (when still
+    /// shown) and on the ledger. Idempotent; a different operation id is
+    /// refused, so a stale report can never touch another finish.
+    @discardableResult
+    func recordHealthSaveAfterCommit(
+        sessionId: String,
+        finishOperationId: String,
+        succeeded: Bool
+    ) -> TrainingSessionMutationOutcome {
+        guard canWrite else { return .rejected(.writesNotAuthorized) }
+        guard let record = terminalRecord(sessionId: sessionId), record.outcome == .committed,
+              record.finishOperationId == finishOperationId
+        else { return .rejected(.sessionNotMutable) }
+        let state: WatchWorkoutFinishComponentState = succeeded ? .succeeded : .failed
+        // A saved workout is never downgraded by a late failure report.
+        if record.healthSaveState == .succeeded || record.healthSaveState == state {
+            return .unchanged(revision: pendingCompletions.first { $0.id == sessionId }?.currentRevision ?? 0)
+        }
+        updateTerminalRecord(sessionId: sessionId) { $0.healthSaveState = state }
+        var revision = 0
+        if let index = pendingCompletions.firstIndex(where: { $0.id == sessionId }) {
+            var presentation = pendingCompletions[index]
+            presentation.watchHealthSaveState = state
+            revision = presentation.currentRevision
+            if (try? store.persist(presentation)) != nil { pendingCompletions[index] = presentation }
+        }
+        lastChange = .init(sessionId: sessionId, revision: revision, kind: .completionUpdated)
+        return .applied(revision: revision)
     }
 
     private func isCurrentPendingCompletion(_ draft: TrainingLoggerDraft, now date: Date? = nil) -> Bool {
@@ -286,6 +354,7 @@ final class TrainingSessionAuthority {
                   !draft.exercises.isEmpty, draft.mode == .live
             else { throw TrainingSessionMutationRejection.sessionNotMutable }
             draft.startedAt = TrainingSessionClock.string(from: self.now())
+            draft.watchStartedAt = draft.startedAt
             draft.readyForWatchAt = nil
             draft.leftAt = nil
         }
@@ -299,9 +368,13 @@ final class TrainingSessionAuthority {
         mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
             guard draft.mode == .live, draft.startedAt != nil, draft.submissionState == nil
             else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            // Already confirmed (from either device): nothing left to ask.
+            guard draft.finishedAt == nil else { return }
             if draft.finishConfirmationRequestedAt == nil {
                 draft.finishConfirmationRequestedAt = TrainingSessionClock.string(from: self.now())
             }
+            // Rest stays recorded (Not Yet restores it from its absolute
+            // anchor); every surface hides it while confirmation is open.
         }
     }
 
@@ -310,8 +383,10 @@ final class TrainingSessionAuthority {
         sessionId: String,
         context: TrainingSessionMutationContext = .ui
     ) -> TrainingSessionMutationOutcome {
-        mutate(sessionId: sessionId, context: context, scope: .lifecycle) {
-            $0.finishConfirmationRequestedAt = nil
+        mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
+            // A confirmed Finish cannot be taken back by Not Yet.
+            guard draft.finishedAt == nil else { return }
+            draft.finishConfirmationRequestedAt = nil
         }
     }
 
@@ -322,17 +397,45 @@ final class TrainingSessionAuthority {
         context: TrainingSessionMutationContext = .ui
     ) -> TrainingSessionMutationOutcome {
         mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
+            // Joining a Finish already confirmed elsewhere (the phone, or a
+            // lost acknowledgement) reuses its one operation: no change.
+            if draft.finishedAt != nil, draft.watchFinishOperationId != nil { return }
             guard draft.finishConfirmationRequestedAt != nil
             else { throw TrainingSessionMutationRejection.sessionNotMutable }
-            if draft.finishedAt == nil { draft.finishedAt = TrainingSessionClock.string(from: self.now()) }
-            if draft.watchFinishOperationId == nil, let finishOperationId {
-                draft.watchFinishOperationId = finishOperationId
-                draft.watchHealthSaveState = .pending
-                draft.watchServerCommitState = .pending
-            }
-            draft.finishConfirmationRequestedAt = nil
-            draft.rest = nil
+            Self.stampFinish(&draft, finishedAt: TrainingSessionClock.string(from: self.now()), operationId: finishOperationId)
         }
+    }
+
+    /// Phone Finish (Final Confirmation). The Logger's own confirmation
+    /// screen is the explicit confirmation, so no Watch request is needed.
+    /// Mints the session's one finish operation unless the Watch (or an
+    /// earlier attempt) already did, so a phone Finish of a Watch-started
+    /// workout drives the Watch to end and save its HealthKit workout, and a
+    /// phone Finish during a Watch finish joins that same operation.
+    @discardableResult
+    func confirmPhoneFinish(
+        sessionId: String,
+        finishedAt: String,
+        finishOperationId: String = UUID().uuidString
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { draft in
+            guard draft.mode == .live else { return }
+            Self.stampFinish(&draft, finishedAt: finishedAt, operationId: finishOperationId)
+        }
+    }
+
+    /// One finish per session: `finishedAt` and the operation are stamped
+    /// once and never moved (the idempotency signature includes
+    /// `finishedAt`); rest ends; the confirmation gate closes.
+    private static func stampFinish(_ draft: inout TrainingLoggerDraft, finishedAt: String, operationId: String?) {
+        if draft.finishedAt == nil { draft.finishedAt = finishedAt }
+        if draft.watchFinishOperationId == nil, let operationId {
+            draft.watchFinishOperationId = operationId
+            draft.watchServerCommitState = .pending
+            draft.watchHealthSaveState = draft.watchStartedAt != nil ? .pending : nil
+        }
+        draft.finishConfirmationRequestedAt = nil
+        draft.rest = nil
     }
 
     @discardableResult
@@ -427,7 +530,8 @@ final class TrainingSessionAuthority {
     ) -> TrainingSessionMutationOutcome {
         guard canWrite else { return .rejected(.writesNotAuthorized) }
         guard let current = draft(id: sessionId) else {
-            if cancelledMutationIdsBySession[sessionId] == context.mutationId {
+            if let record = terminalRecord(sessionId: sessionId), record.outcome == .cancelled,
+               record.cancelMutationId != nil, record.cancelMutationId == context.mutationId {
                 return .duplicate(revision: lastChange?.revision ?? 0)
             }
             return .rejected(endedSessionIds.contains(sessionId) ? .sessionEnded : .sessionNotFound)
@@ -446,20 +550,20 @@ final class TrainingSessionAuthority {
               !submittingSessionIds.contains(sessionId)
         else { return .rejected(.sessionNotMutable) }
 
-        if let mutationId = context.mutationId {
-            cancelledMutationIdsBySession[sessionId] = mutationId
-        }
-        let outcome = endSession(sessionId: sessionId, reason: .cancelled)
-        if case .rejected = outcome { cancelledMutationIdsBySession[sessionId] = nil }
-        return outcome
+        return endSession(sessionId: sessionId, reason: .cancelled, retainingPresentation: false, cancelMutationId: context.mutationId)
     }
 
+    /// The session ended without a commit (Cancel or discard), per the
+    /// persisted ledger; with `mutationId`, only that exact Cancel.
     func isCancelled(sessionId: String, mutationId: String? = nil) -> Bool {
-        guard lastChange?.sessionId == sessionId,
-              lastChange?.kind == .ended(.cancelled)
-        else { return false }
+        guard let record = terminalRecord(sessionId: sessionId), record.outcome == .cancelled else { return false }
         guard let mutationId else { return true }
-        return cancelledMutationIdsBySession[sessionId] == mutationId
+        return record.cancelMutationId == mutationId
+    }
+
+    /// The session is durable on the Server (pending presentation or ledger).
+    func isCommitted(sessionId: String) -> Bool {
+        pendingCompletions.contains { $0.id == sessionId } || terminalRecord(sessionId: sessionId)?.outcome == .committed
     }
 
     /// A durable commit. Ends the session exactly like
@@ -476,7 +580,8 @@ final class TrainingSessionAuthority {
     private func endSession(
         sessionId: String,
         reason: TrainingSessionEndReason,
-        retainingPresentation: Bool
+        retainingPresentation: Bool,
+        cancelMutationId: String? = nil
     ) -> TrainingSessionMutationOutcome {
         guard canWrite else { return .rejected(.writesNotAuthorized) }
         guard let existing = draft(id: sessionId) else {
@@ -486,8 +591,21 @@ final class TrainingSessionAuthority {
         presentation.step = .complete
         presentation.submissionState = nil
         presentation.rest = nil
+        presentation.finishConfirmationRequestedAt = nil
+        if reason == .committed, presentation.watchFinishOperationId != nil {
+            presentation.watchServerCommitState = .succeeded
+        }
         presentation.completionPresentationPending = true
         presentation.completionRecordedAt = TrainingSessionClock.string(from: now())
+        appendTerminalRecord(.init(
+            sessionId: sessionId,
+            outcome: reason == .committed ? .committed : .cancelled,
+            finishOperationId: reason == .committed ? existing.watchFinishOperationId : nil,
+            finishedAt: reason == .committed ? existing.finishedAt : nil,
+            healthSaveState: reason == .committed ? existing.watchHealthSaveState : nil,
+            cancelMutationId: reason == .committed ? nil : cancelMutationId,
+            recordedAt: presentation.completionRecordedAt ?? TrainingSessionClock.string(from: now())
+        ))
         if retainingPresentation, reason == .committed, (try? store.persist(presentation)) != nil {
             // Only the just-completed session is owed: a newer completion
             // supersedes any older unacknowledged one, which therefore can

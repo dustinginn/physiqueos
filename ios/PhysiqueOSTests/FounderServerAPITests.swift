@@ -4899,8 +4899,8 @@ final class FounderServerAPITests: XCTestCase {
         let requests = await transport.requests
         XCTAssertEqual(requests.count, 4)
         XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), requests[3].value(forHTTPHeaderField: "Idempotency-Key"))
-        XCTAssertEqual(requests[1].timeoutInterval, 3)
-        XCTAssertEqual(requests[3].timeoutInterval, 1)
+        XCTAssertEqual(requests[1].timeoutInterval, 15)
+        XCTAssertEqual(requests[3].timeoutInterval, 8)
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(requests[1].httpBody)) as? [String: Any])
         XCTAssertEqual(json["commandType"] as? String, "training-session.commit.v1")
         let payload = try XCTUnwrap(json["payload"] as? [String: Any])
@@ -5016,7 +5016,7 @@ final class FounderServerAPITests: XCTestCase {
         let requests = await transport.requests
         XCTAssertEqual(requests.count, 3)
         XCTAssertNil(requests[2].value(forHTTPHeaderField: "Idempotency-Key"))
-        XCTAssertEqual(requests[1].timeoutInterval, 3)
+        XCTAssertEqual(requests[1].timeoutInterval, 15)
         XCTAssertEqual(requests[2].url?.path, "/api/v1/native/read/training-session")
     }
 
@@ -5059,8 +5059,8 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(requests.count, 6)
         XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"),
                        requests[3].value(forHTTPHeaderField: "Idempotency-Key"))
-        XCTAssertEqual(requests[1].timeoutInterval, 3)
-        XCTAssertEqual(requests[3].timeoutInterval, 1)
+        XCTAssertEqual(requests[1].timeoutInterval, 15)
+        XCTAssertEqual(requests[3].timeoutInterval, 8)
         XCTAssertEqual(requests.filter { $0.url?.path == "/api/v1/native/read/training-session" }.count, 3)
     }
 
