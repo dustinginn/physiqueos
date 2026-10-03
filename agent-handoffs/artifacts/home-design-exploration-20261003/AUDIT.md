@@ -1,6 +1,6 @@
 # PhysiqueOS Home design audit
 
-Date: 2026-10-03  
+Date: 2026-10-03
 Scope: Design exploration only; no shipping Native or Server implementation change.
 
 ## Authority inspected
