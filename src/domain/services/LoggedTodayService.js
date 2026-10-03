@@ -117,9 +117,10 @@ export function composeLoggedTodaySummary({
 
 // Logged Today's Training row summarizes the day's training compactly, one
 // line per modality: the Logger session(s) (Strength) and today's canonical
-// Cardio workouts grouped by type ("2 Outdoor Walks · 32 min"). Cardio lines
+// standalone canonical workouts grouped by type ("2 Outdoor Walks · 32 min").
+// These lines include Cardio plus explicit OTHER history such as Cooldown and
 // come from the same canonical projection Training Day uses; nothing here
-// invents a Logger session for Cardio. `summary` stays one string (every
+// invents a Logger session. `summary` stays one string (every
 // line, comma-joined) for clients that render a single line; `lines` carries
 // the same content line by line.
 function composeTrainingRow(sessions, healthKitStrengthPresentationBySession = new Map(), cardioWorkouts = []) {
@@ -195,9 +196,15 @@ function composeCardioLines(cardioWorkouts = []) {
       const name = workouts.length === 1 ? label : pluralTrainingLabel(label, workouts.length);
       const single = workouts.length === 1 ? workouts[0] : null;
       const recordId = single ? String(single._canonicalId ?? single.canonicalId ?? single.id) : null;
+      const family = String(workouts[0]?.provenance?.healthkit_family ?? "");
+      // Preserve the legacy/default Cardio shape for older projected records
+      // that predate the explicit family stamp. Only an explicit OTHER family
+      // may narrow the row to non-Cardio.
+      const isOtherHistory = family === "other";
+      const idFamily = isOtherHistory ? "workout" : "cardio";
       return {
-        id: `training:cardio:${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-        kind: "cardio",
+        id: `training:${idFamily}:${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+        kind: isOtherHistory ? "other" : "cardio",
         summary: duration ? `${name} · ${duration}` : name,
         href: "/progress/training",
         recordId,

@@ -1670,7 +1670,7 @@ export function createTrainingLibraryReports({
   const activitySessions = activitySlug
     ? scopedSessions.filter(
         (session) =>
-          !isResistanceTrainingSession(session) &&
+          isCardioTrainingSession(session) &&
           slugify(session.metadata?.activity_type) === slugify(activitySlug)
       )
     : [];
@@ -2430,7 +2430,7 @@ function sumTrainingActiveCalories(trainingSessions = [], confirmedHealthKitWork
 function getTrainingUnderstanding({ activityDays = [], trainingSessions = [] } = {}) {
   const latestActivityDay = activityDays.at(-1);
   const resistanceCount = trainingSessions.filter(isResistanceTrainingSession).length;
-  const cardioCount = Math.max(trainingSessions.length - resistanceCount, 0);
+  const cardioCount = trainingSessions.filter(isCardioTrainingSession).length;
   const activeCalories =
     latestActivityDay?.derived_metrics?.workout_active_calories ??
     sumTrainingActiveCalories(trainingSessions);
@@ -2605,9 +2605,7 @@ function finiteNumberOrNull(value) {
 }
 
 function getTrainingBreakdowns(trainingSessions = []) {
-  const cardioSessions = trainingSessions.filter(
-    (session) => !isResistanceTrainingSession(session)
-  );
+  const cardioSessions = trainingSessions.filter(isCardioTrainingSession);
   const resistanceSessions = trainingSessions.filter(isResistanceTrainingSession);
 
   return {
@@ -2934,6 +2932,17 @@ function isResistanceTrainingSession(session = {}) {
     /strength|resistance|lifting|weights?/i.test(activityType) ||
     (session.exercises ?? []).length > 0
   );
+}
+
+// Preserve the historical reporting rule that any non-resistance Training
+// evidence is Cardio, except when a canonical HealthKit workout explicitly
+// declares a different reporting family. Cooldown is stamped `other`, so it
+// remains visible in general history without entering Cardio counts, totals,
+// targets, library breakdowns or indicators.
+function isCardioTrainingSession(session = {}) {
+  if (isResistanceTrainingSession(session)) return false;
+  const healthKitFamily = session.provenance?.healthkit_family;
+  return healthKitFamily === undefined || healthKitFamily === null || healthKitFamily === "cardio";
 }
 
 function pluralize(count, noun) {

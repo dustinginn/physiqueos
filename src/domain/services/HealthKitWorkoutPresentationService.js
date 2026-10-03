@@ -215,6 +215,15 @@ export function isPresentableCanonicalCardioWorkout(workout) {
   return isPresentableCanonicalWorkoutOfFamily(workout, HealthKitWorkoutFamily.CARDIO);
 }
 
+// Canonical standalone workout-history rows include Cardio plus exact
+// non-Cardio history such as Cooldown. Keeping this gate separate from the
+// Cardio-specific helper prevents a history row from acquiring Cardio
+// semantics merely because the same read surface presents both.
+export function isPresentableCanonicalWorkoutHistory(workout) {
+  return [HealthKitWorkoutFamily.CARDIO, HealthKitWorkoutFamily.OTHER]
+    .some((family) => isPresentableCanonicalWorkoutOfFamily(workout, family));
+}
+
 // Same structural-integrity check `isPresentableCanonicalWorkout` has always
 // used for a Strength presentation candidate, generalized to any family so
 // Part E's whole-day-accounting eligibility (see
@@ -269,6 +278,9 @@ function isPresentableCanonicalWorkoutOfFamily(workout, family) {
  *    structurally has no Logger session and no confirm/deny step at all (see
  *    `HealthKitWorkoutLinkService.js`'s cardio-coexistence branch) --
  *    canonicalization IS Cardio's inclusion decision.
+ *  - Other history: exact canonical non-Cardio workout types (currently only
+ *    Cooldown). They are descriptive Activity workout history only and never
+ *    become Cardio sessions, minutes, totals, flags, targets or strategy.
  * One canonical workout identity contributes at most once, defensively
  * deduped by id even though today's shape cannot produce a duplicate.
  */
@@ -298,12 +310,14 @@ export function projectWholeDayEligibleHealthKitWorkouts({
   }
 
   for (const workout of canonicalWorkouts) {
-    if (!isPresentableCanonicalWorkoutOfFamily(workout, HealthKitWorkoutFamily.CARDIO)) continue;
+    if (!isPresentableCanonicalWorkoutHistory(workout)) continue;
     if (seen.has(workout.id)) continue;
     seen.add(workout.id);
     output.push(buildEligibleWholeDayWorkout({
       workout,
-      basis: "canonicalized_cardio",
+      basis: workout.current.family === HealthKitWorkoutFamily.CARDIO
+        ? "canonicalized_cardio"
+        : "canonicalized_workout_history",
       loggerSessionCanonicalId: null,
     }));
   }

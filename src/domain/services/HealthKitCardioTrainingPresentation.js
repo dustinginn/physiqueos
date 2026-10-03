@@ -4,7 +4,7 @@ import {
 } from "./HealthKitWorkoutService.js";
 import { isActiveCanonicalTrainingSession } from "./CanonicalReadModel.js";
 import { getLocalDateKey, resolveLocalTimeZone } from "../utils/localDate.js";
-import { isPresentableCanonicalCardioWorkout } from "./HealthKitWorkoutPresentationService.js";
+import { isPresentableCanonicalWorkoutHistory } from "./HealthKitWorkoutPresentationService.js";
 import {
   HealthKitCardioCoexistenceState,
   assessHealthKitCardioCoexistence,
@@ -28,7 +28,9 @@ import {
 //  - create or imply a Training Logger session, a Strength link, a claim, or an
 //    auto-confirm (the adapted record has no exercises and no relationship);
 //  - change strategic eligibility (the canonical workout stays quarantined; this
-//    module never reads or writes that decision);
+//    module never reads or writes that decision). It presents canonical Cardio
+//    plus explicit OTHER history such as Cooldown. Cooldown never enters the
+//    Cardio family; being shown here is history inclusion only;
 //  - infer Indoor/Outdoor (the label comes ONLY from the stored canonicalType,
 //    which is location-specific only when Apple's explicit signal was retained;
 //    a generic `walking` stays a generic "Walking");
@@ -44,6 +46,14 @@ const CARDIO_LABELS = Object.freeze({
   cycling: "Cycling",
   indoor_cycling: "Indoor Cycle",
   outdoor_cycling: "Outdoor Cycle",
+  // Apple Fitness's own name for HKWorkoutActivityType.stairClimbing, and the
+  // label existing screenshot-derived Stair Stepper evidence already carries,
+  // so Training Day's existing classifier files it under Cardio.
+  stair_climbing: "Stair Stepper",
+  // Generic label. Training Day's existing classifier files it as kind
+  // "other" (a value every installed Native build decodes), so it is shown as
+  // an ordinary workout row and never counted toward the day's Cardio header.
+  cooldown: "Cooldown",
 });
 const METERS_PER_MILE = 1609.344;
 const COEXISTS_WITH_EVIDENCE = "matches_existing_evidence_workout";
@@ -66,11 +76,11 @@ export function healthKitCardioActivityLabel(canonicalType) {
 export function projectHealthKitCardioWorkoutAsTrainingRecord(workout) {
   const current = workout?.current;
   if (!workout?.id || !isHealthKitCanonicalWorkoutIdentity(workout.id) || !current) return null;
-  if (current.family !== HealthKitWorkoutFamily.CARDIO) return null;
+  if (![HealthKitWorkoutFamily.CARDIO, HealthKitWorkoutFamily.OTHER].includes(current.family)) return null;
   if (workout.retiredAt || workout.quality?.status === "superseded") return null;
   // Same structural-integrity gate Activity's whole-day accounting uses, so a
   // workout is presented in Training Day exactly when Activity counts it.
-  if (!isPresentableCanonicalCardioWorkout(workout)) return null;
+  if (!isPresentableCanonicalWorkoutHistory(workout)) return null;
   const localDate = workout.localDate ?? current.localDate ?? null;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(localDate ?? ""))) return null;
 
@@ -128,6 +138,9 @@ export function projectHealthKitCardioWorkoutAsTrainingRecord(workout) {
 }
 
 function shouldSuppressAsDuplicate(workout, activeEvidenceObjects, presentEvidenceIdentities) {
+  // Cooldown is non-Cardio and has no Cardio coexistence semantics. It remains
+  // a canonical history row; only Cardio workouts use this duplicate matcher.
+  if (workout?.current?.family !== HealthKitWorkoutFamily.CARDIO) return false;
   // 1. Stored decision: the canonicalizer recorded this workout as the same workout as a
   //    present evidence workout. Only suppress when that evidence is really ACTIVE on the
   //    page, so a retired/superseded screenshot workout can never make the row vanish.

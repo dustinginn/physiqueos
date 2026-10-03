@@ -314,8 +314,8 @@ describe("Reporting and Library semantics are explicit", () => {
   });
 });
 
-describe("PostgreSQL store: bounded Cardio read", () => {
-  it("reads only the owner's Cardio-family canonical workouts", async () => {
+describe("PostgreSQL store: bounded standalone workout-history read", () => {
+  it("reads only the owner's Cardio/OTHER canonical workout-history rows", async () => {
     const query = vi.fn(async () => ({ rows: [] }));
     const store = createPostgresTrainingNavigationReadStore({ pool: { query, totalCount: 1, idleCount: 1, waitingCount: 0 }, ownerUserId: "owner-one" });
     await store.run("training.landing", () => store.listHealthKitCanonicalCardioWorkouts());
@@ -323,7 +323,7 @@ describe("PostgreSQL store: bounded Cardio read", () => {
     const [sql, values] = query.mock.calls[0];
     expect(values).toEqual(["owner-one"]);
     expect(sql).toContain("collection_name='healthKitCanonicalWorkouts'");
-    expect(sql).toContain("payload#>>'{current,family}'='cardio'");
+    expect(sql).toContain("payload#>>'{current,family}' IN ('cardio','other')");
     expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/i);
   });
 });

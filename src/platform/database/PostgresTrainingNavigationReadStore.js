@@ -96,12 +96,13 @@ export function createPostgresTrainingNavigationReadStore({
        ORDER BY record_id`,
       [ownerUserId, date]
     ),
-    // Bounded, owner-scoped: only Cardio-family canonical workouts (aggregate
-    // Training history presentation; Strength telemetry is never a Training row).
+    // Bounded, owner-scoped: standalone canonical workout-history rows. This
+    // includes Cardio plus OTHER history such as Cooldown; Strength telemetry
+    // is never an independent Training row.
     listHealthKitCanonicalCardioWorkouts: () => queryRecords(
       `SELECT payload,version FROM physiqueos.canonical_training_records
        WHERE owner_user_id=$1 AND collection_name='healthKitCanonicalWorkouts'
-         AND payload#>>'{current,family}'='cardio'
+         AND payload#>>'{current,family}' IN ('cardio','other')
        ORDER BY record_id`,
       [ownerUserId]
     ),
@@ -146,7 +147,7 @@ export function createRepositoryTrainingNavigationReadStore({ repositories } = {
     listHealthKitCanonicalWorkoutsForDate: async (date) => ((await repositories.healthKitCanonicalWorkouts?.list?.()) ?? [])
       .filter((workout) => (workout?.localDate ?? workout?.current?.localDate) === date),
     listHealthKitCanonicalCardioWorkouts: async () => ((await repositories.healthKitCanonicalWorkouts?.list?.()) ?? [])
-      .filter((workout) => workout?.current?.family === "cardio"),
+      .filter((workout) => ["cardio", "other"].includes(workout?.current?.family)),
     getHealthKitCanonicalWorkout: async (recordId) => ((await repositories.healthKitCanonicalWorkouts?.list?.()) ?? [])
       .find((workout) => workout?.id === recordId) ?? null,
     listHealthKitWorkoutLinks: async () => repositories.healthKitWorkoutLinks?.list?.() ?? [],

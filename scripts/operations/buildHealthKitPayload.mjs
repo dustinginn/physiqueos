@@ -40,6 +40,12 @@
 //   (deferred-workout-reconcile) reconciles exactly ONE already-stored observation that ingestion
 //   deferred solely for family_not_in_activation_scope, against the CURRENT Workout policy. No
 //   date range, no bulk list — --observation-id is the exact identity, and only that one.
+//   node scripts/operations/buildHealthKitPayload.mjs --kind unsupported-workout-repair --sha <40-hex> \
+//     --mode dry-run|apply [--observation-ids <id>,<id>] [--authorization-ref <text>] [--expected <json file>] --out <file>
+//   (unsupported-workout-repair) one-time repair of EXACTLY the two 2026-10-02 Founder workouts
+//   (Stair Stepper 44, Cooldown 80) stored as source_only / unsupported_workout_type. The scope is
+//   fixed in code; apply additionally requires both --observation-ids, and --sha must be the
+//   deployed runtime SHA (the entry refuses RUNTIME_SHA_MISMATCH).
 import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
@@ -54,7 +60,7 @@ export async function buildHealthKitPayload({
   authorizationReference = "", expected = "", includeValues = true, marker, desired = "", simulateComplete = false,
   openEnded = false, families = "", linkAutoConfirm = null,
   expectedCurrentFamilies = "", expectedCurrentPolicyDigest = "", acknowledgeNarrowing = false,
-  observationId = "",
+  observationId = "", observationIds = "",
   sleepMode = "validation_only", timeZone = "America/Los_Angeles", historicalDays = 30, auditKind = "dormancy",
   maxDays = 7,
 } = {}) {
@@ -224,6 +230,31 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
+  if (kind === "unsupported-workout-repair") {
+    if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
+    const ids = String(observationIds ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+    if (String(observationIds ?? "").trim() && (ids.length !== 2 || new Set(ids).size !== 2)) {
+      throw new Error("--observation-ids must name exactly two distinct observation ids (Stair Stepper and Cooldown).");
+    }
+    if (mode === "apply" && ids.length !== 2) {
+      throw new Error("apply mode requires --observation-ids naming both observation ids.");
+    }
+    if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
+      throw new Error("apply mode requires --authorization-ref and --expected.");
+    }
+    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_${mode === "apply" ? "APPLY" : "DRYRUN"}_SUCCESS_${suffix}`;
+    const result = await build({
+      entryPoints: [path.join(root, "scripts/operations/healthKitUnsupportedWorkoutTypeRepair.entry.mjs")],
+      bundle: true, write: false, format: "esm", platform: "node", target: "node22", legalComments: "none", minify: true,
+      external: ["pg"],
+      define: {
+        __EXPECTED_GIT_SHA__: JSON.stringify(sha), __MODE__: JSON.stringify(mode), __OBSERVATION_IDS__: JSON.stringify(ids.join(",")),
+        __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference)), __EXPECTED_JSON__: JSON.stringify(String(expected)),
+        __MARKER__: JSON.stringify(successMarker),
+      },
+    });
+    return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
+  }
   if (kind === "sleep-canon-v3") {
     if (!DATE.test(effective)) throw new Error("--effective must be the YYYY-MM-DD prospective Sleep D0.");
     if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
@@ -298,7 +329,7 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
-  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, deferred-workout-reconcile, training-audit, sleep-policy, sleep-audit, or sleep-canon-v3.");
+  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, deferred-workout-reconcile, unsupported-workout-repair, training-audit, sleep-policy, sleep-audit, or sleep-canon-v3.");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -316,6 +347,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     includeValues: !args["no-values"], openEnded: Boolean(args["open-ended"]), families: args.families ?? "", linkAutoConfirm,
     expectedCurrentFamilies: args["expected-current-families"] ?? "", expectedCurrentPolicyDigest: args["expected-current-policy-digest"] ?? "",
     acknowledgeNarrowing: Boolean(args["acknowledge-narrowing"]), observationId: args["observation-id"] ?? "",
+    observationIds: args["observation-ids"] ?? "",
     sleepMode: args["sleep-mode"] ?? "validation_only", timeZone: args["time-zone"] ?? "America/Los_Angeles",
     historicalDays: args["historical-days"] ?? 30, auditKind: args["audit-kind"] ?? "dormancy",
     maxDays: args["max-days"] ?? 7,

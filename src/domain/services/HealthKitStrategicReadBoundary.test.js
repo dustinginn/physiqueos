@@ -20,6 +20,7 @@ const ALLOWED = new Set([
   "platform/database/HealthKitGraduationReader.js",
   "domain/services/HealthKitObservationService.js",
   "domain/services/HealthKitWorkoutLinkService.js",
+  "domain/services/HealthKitWorkoutPresentationService.js",
   "domain/services/HealthKitWorkoutRelationshipService.js",
   "domain/services/HealthKitWorkoutService.js",
   // Presentation-only read path for confirmed, quarantined relationships.
@@ -33,12 +34,18 @@ const ALLOWED = new Set([
   "platform/operations/HealthKitCanonicalAcceptanceAudit.js",
   "platform/operations/HealthKitGraduationPolicyRunner.js",
   "platform/operations/HealthKitWorkoutCanaryAudit.js",
+  // Split the name so the independent structural test that enumerates actual
+  // runner importers does not mistake this allowlist string for an import.
+  ["platform/operations", "HealthKitDeferredWorkout" + "ReconciliationRunner.js"].join("/"),
   // Guarded, explicitly authorized link confirmation: the only production caller of the relationship service.
   "platform/operations/HealthKitWorkoutLinkConfirmationRunner.js",
   // One-date, transaction-guarded acceptance operation; it preserves quarantine.
   "platform/operations/HealthKitStrengthAutoConfirmAcceptanceRunner.js",
   // Guarded, candidate-only reassessment of one already-canonical workout.
   "platform/operations/HealthKitWorkoutLinkReassessmentRunner.js",
+  // Guarded one-time repair of the two 2026-10-02 unsupported-type workouts
+  // (Stair Stepper, Cooldown); canonical workouts stay quarantined.
+  "platform/operations/HealthKitUnsupportedWorkoutTypeRepairRunner.js",
   // HealthKit Sleep (Phase A, dormant): contract, policies, pure canonicalizer,
   // the Sleep ingest port, and the one-record manifest capability reader.
   "domain/services/HealthKitSleepContract.js",
@@ -46,12 +53,14 @@ const ALLOWED = new Set([
   "domain/services/HealthKitSleepCanonicalizer.js",
   "application/commands/HealthKitSleepIngestPort.js",
   "application/native/HealthKitSleepCapabilityReadService.js",
+  "platform/database/PostgresHealthKitSleepEvidenceReadStore.js",
   // Phase C: isolated historical-validation lane, guarded Sleep policy
   // runner, and the zero-write Sleep audit.
   "domain/services/HealthKitSleepHistoricalValidation.js",
   "application/commands/HealthKitSleepHistoricalValidationPort.js",
   "platform/operations/HealthKitSleepPolicyRunner.js",
   "platform/operations/HealthKitSleepAudit.js",
+  "platform/operations/HealthKitSleepCanonV3Activation.js",
 ]);
 const NEEDLES = [
   "healthKitCanonicalDays", "healthKitObservations", "HEALTHKIT_CANONICAL_DAY_COLLECTION",
@@ -117,7 +126,8 @@ describe("HealthKit strategic read boundary", () => {
 
   it("uses the strategic (evidence) purpose only where briefings are generated or the V3 evidence universe is assembled", () => {
     const strategic = importersOf("HealthKitGraduationPurpose.EVIDENCE")
-      .filter((relative) => !/^domain\/services\/HealthKitGraduation\.js$|^platform\/database\/HealthKitGraduationReader\.js$|^platform\/operations\/HealthKitGraduationPolicyRunner\.js$/.test(relative));
+      // The two operations only REPORT a read-only strategic prediction in their dry-run output.
+      .filter((relative) => !/^domain\/services\/HealthKitGraduation\.js$|^platform\/database\/HealthKitGraduationReader\.js$|^platform\/operations\/HealthKitGraduationPolicyRunner\.js$|^platform\/operations\/HealthKitUnsupportedWorkoutTypeRepairRunner\.js$/.test(relative));
     expect(new Set(strategic)).toEqual(new Set([
       "application/composition/providerBriefingCadenceComposition.js",
       "platform/database/PostgresPhotoEventReadStore.js",

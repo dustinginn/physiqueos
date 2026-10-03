@@ -60,6 +60,12 @@ vi.mock("../../platform/database/PostgresBriefingCadenceExecution", () => ({
 
 import { createProviderBriefingCadenceRunner } from "./providerBriefingCadenceComposition.js";
 import {
+  oct2CanonicalWorkout,
+  oct2CooldownInput,
+  oct2StairStepperInput,
+  oct2WalkInput,
+} from "../../fixtures/healthKitOct2StairStepperCooldownFixture.js";
+import {
   HEALTHKIT_GRADUATION_POLICY_RECORD_ID as POLICY_ID,
   HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION as SCHEMA,
 } from "../../domain/services/HealthKitGraduation.js";
@@ -79,11 +85,12 @@ const day = (domain, coverage = "complete_day") => ({
   provenance: { sourceObservationIds: ["healthkit_observation_x"] },
 });
 
-async function run({ policyRecord = null, days = [] } = {}) {
+async function run({ policyRecord = null, days = [], workouts = [] } = {}) {
   const runtime = { user: { id: OWNER, timeZone: "America/Los_Angeles" }, canonicalEvidenceObjects: [] };
   const pool = { query: vi.fn(async (text, values = []) => {
     if (/record_id=\$3/.test(text)) return { rows: policyRecord ? [{ payload: policyRecord, version: 1 }] : [] };
     if (values[1] === "healthKitCanonicalDays") return { rows: days.map((payload) => ({ payload, version: 1 })) };
+    if (values[1] === "healthKitCanonicalWorkouts") return { rows: workouts.map((payload) => ({ payload, version: 1 })) };
     return { rows: [] };
   }) };
   const authorityStore = { read: async () => ({ state: {
@@ -125,6 +132,28 @@ describe("provider briefing cadence: graduated HealthKit evidence", () => {
   it("never lets a partial day reach generation", async () => {
     const { seen } = await run({ policyRecord: policy(on), days: [day("activity", "partial_day"), day("nutrition", "partial_day")] });
     expect(seen).toEqual([]);
+  });
+
+  it("gives every cadence briefing generator (Weekly, Midweek and Monthly share one snapshot) a graduated Stair Stepper but never a Cooldown", async () => {
+    const workouts = [
+      oct2CanonicalWorkout(oct2WalkInput()),
+      oct2CanonicalWorkout(oct2StairStepperInput()),
+      oct2CanonicalWorkout(oct2CooldownInput()),
+    ];
+    const cardioOn = { enabled: true, domains: ["cardio_training"], startLocalDate: "2026-09-25", endLocalDate: null };
+    const { seen, runtime } = await run({ policyRecord: policy(cardioOn), workouts });
+    expect(seen.map((object) => object.payload.metadata.activity_type).sort()).toEqual(["Outdoor Walk", "Stair Stepper"]);
+    expect(seen.every((object) => object.payload.evidenceEligibility.state === "eligible")).toBe(true);
+    expect(JSON.stringify(seen)).not.toMatch(/cooldown/i);
+    expect(captured.weekly.repositories).toBe(captured.repositories);
+    expect(captured.midweek.repositories).toBe(captured.repositories);
+    expect(captured.monthly.repositories).toBe(captured.repositories);
+    // Confidence publication keeps the raw runtime (no HealthKit workout at all).
+    expect(runtime.canonicalEvidenceObjects).toEqual([]);
+    expect(await captured.weekly.confidenceStoreResolver()).toBe(runtime);
+    // Same snapshot without the Cooldown: byte-identical generator evidence.
+    const { seen: withoutCooldown } = await run({ policyRecord: policy(cardioOn), workouts: workouts.slice(0, 2) });
+    expect(seen).toEqual(withoutCooldown);
   });
 
   it("keeps the generation snapshot read-only", async () => {
