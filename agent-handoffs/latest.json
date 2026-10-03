@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T02:45:58Z",
+  "generated_at_utc": "2026-10-03T03:02:13Z",
   "task": {
     "id": "build83-first-real-workout-comprehensive-correction-20261003",
-    "title": "Build 83 first-real-workout corrections - IN-FLIGHT STATUS SNAPSHOT (observer, not lane completion)",
+    "title": "Build 83 first-real-workout corrections - Founder authorization recorded; lane needs DIRECT exact-SHA authorization (observer status 2)",
     "agent": "claude",
     "status": "in_progress"
   },
@@ -14,12 +14,12 @@
     "native_build": 82,
     "native_sha": "e2cbcd0cf40dca64a4c8490bf0ebd4077b2eb69c",
     "testflight_delivery_id": "f3d09d99-9b8e-4344-85e7-5d2ddcc04519",
-    "build83_native_candidate_local": "c2b171fe (WIP, unpushed) + uncommitted",
-    "build83_server_candidate_local": "f91d76c0 (unpushed, not deployed)",
+    "build83_native_candidate_local": "152c813e (unpushed)",
+    "build83_server_candidate_local": "f91d76c0 reviewed; D1/D2 candidate in preparation on claude/build83-server-cardio-d1d2-20261003 (new SHA pending)",
     "sleep_canonical_algorithm": "sleep-canon-v3 (ordinary, effective 2026-10-02)"
   },
   "result": {
-    "summary": "Build 83 lane (bg 788283ca) still running. Lane checkpoint 1 (unpublished, classifier-blocked) summarized: audits 14-16 proven (Stair Stepper/Cooldown stored source_only by design -> product-policy D1-D3; 945 kcal/109 min LEGITIMATE no change; Add Set no defect, closed). Finish lifecycle/one finishOperationId/transport/diagnostics/Watch UI incl. swipe-right controls + Daily Totals implemented locally. Server f91d76c0 independently reviewed (APPROVE WITH NITS, fixed) but NOT deployed: auto-mode classifier refused production deploy. Native NOT green: Watch tests 13/13 pass 02:22Z; full iOS 1963 tests with 24 failing cases (22 TrainingLoggerTests) at 02:24Z, lane still testing. No archive/upload yet. Founder authorization sentence + cardio D1-D3 decision needed.",
+    "summary": "Founder APPROVED: Server deploy (guarded), D1 Stair Stepper(44)->strategic Cardio, D2 Cooldown(80) canonical but strategically ineligible (canonical inclusion != strategic eligibility), D3 bounded Oct 2 repair of exactly 2 observations after D1/D2 deployed (dry-run + post-verification). Relayed authorization was correctly NOT accepted by the Build 83 lane: Founder must post it directly in the lane (claude attach 788283ca) naming the NEW Server SHA that includes D1/D2 (fresh review pending). Native 152c813e: full iOS 1963 tests, only known baseline Peptide failure (must be proven pre-existing, no waiver); Watch 20/20 unit + 7/7 UI (swipe-right proven); fresh re-review running. No deploy/mutation/upload yet.",
     "success": null,
     "production_mutated": false,
     "deployed": false,
@@ -33,14 +33,15 @@
     }
   },
   "open_gates": [
-    "Founder authorization: deploy Server f91d76c0 + continue Build 83 to TestFlight (lane classifier block)",
-    "Founder decision: cardio D1 (Stair Stepper->Cardio), D2 (Cooldown non-strategic display), D3 (Oct 2 repair)",
-    "Native suites green + fresh independent Native review closure",
+    "Lane: D1/D2 Server candidate + fresh independent review -> report exact new SHA",
+    "Founder: post authorization DIRECTLY in lane naming the exact new SHA",
+    "Guarded deploy, then bounded D3 dry-run/repair/verification",
+    "Native: resolve/prove baseline Peptide failure, close re-review",
     "Build 83 archive, guarded TestFlight upload, VALID"
   ],
-  "full_report_path": "agent-handoffs/reports/20261003T024558Z-build83-in-flight-status-snapshot.md",
+  "full_report_path": "agent-handoffs/reports/20261003T030213Z-build83-founder-authorization-relay-status.md",
   "parent_report_path": "agent-handoffs/inbox/prompts/20261003T003500Z-build83-first-real-workout-comprehensive-correction.md",
-  "previous_latest_report_path": "agent-handoffs/reports/20261003T002055Z-build82-live-workout-finish-stall-audit.md",
+  "previous_latest_report_path": "agent-handoffs/reports/20261003T024558Z-build83-in-flight-status-snapshot.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
