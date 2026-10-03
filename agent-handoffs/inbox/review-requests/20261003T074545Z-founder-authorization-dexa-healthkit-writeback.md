@@ -1,5 +1,7 @@
 # Founder authorization request: DEXA -> Apple Health rollout gates
 
+**Status:** AUTHORIZED AND COMPLETED on 2026-10-03. Server `b47663b3...` is live as deployment `b9449c52...`; Build 84 delivery `a4b7b504...` is `VALID`. See `agent-handoffs/reports/20261003T153612Z-dexa-healthkit-server-deployed-build84-valid.md`. The process is now stopped for Founder remote-installation confirmation; physical validation and permanent activation remain unexecuted.
+
 Implementation report: `agent-handoffs/reports/20261003T074545Z-dexa-healthkit-writeback-overnight-implementation.md`
 
 The approved architecture is implemented, hard-tested, independently reviewed, and archived. No production deployment, TestFlight upload, Apple Health mutation, historical backfill, or permanent policy enablement has occurred.
