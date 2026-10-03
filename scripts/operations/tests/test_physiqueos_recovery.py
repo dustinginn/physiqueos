@@ -59,6 +59,7 @@ class CanonicalTests(TempCase):
         scanner = recovery.SecretScanner()
         scanner.scan_data("code.js", b"const secret = resolveCredentialFromKeychain();")
         scanner.scan_data("safe.test.js", b"postgresql://testuser:testpassword@localhost/test")
+        scanner.scan_data("container.test.js", b"postgresql://fixtureuser:secret@db/test")
         self.assertEqual(scanner.outcome(), "PASS")
         scanner.scan_data("unsafe.js", b"postgresql://realuser:realpassword@db.example.com/prod")
         self.assertEqual(scanner.outcome(), "FAIL_SECRET")

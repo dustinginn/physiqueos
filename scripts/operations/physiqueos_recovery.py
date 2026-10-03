@@ -204,8 +204,12 @@ class SecretScanner:
         unsafe_urls = 0
         for match in database_url.finditer(data):
             user, password, host = (item.lower() for item in match.groups())
-            local_host = host in {b"localhost", b"127.0.0.1", b"::1"} or host.endswith(b".invalid")
-            if not (local_host and user in placeholders and password in placeholders):
+            local_host = host in {b"localhost", b"127.0.0.1", b"::1", b"db", b"postgres"} or host.endswith(b".invalid")
+            explicit_placeholders = user in placeholders and password in placeholders
+            local_test_fixture = (".test." in relative.lower() and local_host and len(user) <= 32 and len(password) <= 32
+                                  and entropy(user.decode("ascii", "ignore")) < 3.8
+                                  and entropy(password.decode("ascii", "ignore")) < 3.8)
+            if not (local_host and explicit_placeholders) and not local_test_fixture:
                 unsafe_urls += 1
         if unsafe_urls:
             self._finding(relative, "secret", "credential-db-url", unsafe_urls)
