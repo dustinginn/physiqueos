@@ -84,8 +84,8 @@ final class HealthKitCapabilityTests: XCTestCase {
             try categoryIdentifier(.sleepAnalysis),
         ])
         XCTAssertEqual(write, [
-            try identifier(.bodyMass),
             try identifier(.bodyFatPercentage),
+            try identifier(.leanBodyMass),
         ])
     }
 
@@ -95,10 +95,10 @@ final class HealthKitCapabilityTests: XCTestCase {
         XCTAssertEqual(HealthKitServerIngestionContract.queryCursorAuthority, "device")
     }
 
-    func testUnsupportedDEXAMappingsRemainExcluded() throws {
+    func testDEXAWriteSetExcludesWeightAndContainsOnlyApprovedMappings() throws {
         let write = Set(HealthKitTypeRegistry.physiqueOSV1.allWriteTypes.map(\.identifier))
-        XCTAssertFalse(write.contains(try identifier(.leanBodyMass)))
-        XCTAssertEqual(write, [try identifier(.bodyMass), try identifier(.bodyFatPercentage)])
+        XCTAssertFalse(write.contains(try identifier(.bodyMass)))
+        XCTAssertEqual(write, [try identifier(.leanBodyMass), try identifier(.bodyFatPercentage)])
     }
 
     func testAuthorizationConstructionSeparatesInitialReadsFromFutureWrites() {

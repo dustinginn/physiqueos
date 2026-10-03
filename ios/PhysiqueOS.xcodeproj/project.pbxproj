@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		000000000000000000001A20 /* DEXAHealthKitWriteback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A21 /* DEXAHealthKitWriteback.swift */; };
+		000000000000000000001A22 /* DEXAHealthKitWritebackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A23 /* DEXAHealthKitWritebackTests.swift */; };
 		000000000000000000001002 /* PhysiqueOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001001 /* PhysiqueOSApp.swift */; };
 		000000000000000000001004 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001003 /* AppEnvironment.swift */; };
 		000000000000000000001006 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001005 /* AppTab.swift */; };
@@ -510,6 +512,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		000000000000000000001A21 /* DEXAHealthKitWriteback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHealthKitWriteback.swift"; sourceTree = "<group>"; };
+		000000000000000000001A23 /* DEXAHealthKitWritebackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHealthKitWritebackTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001001 /* PhysiqueOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSApp.swift"; sourceTree = "<group>"; };
 		000000000000000000001003 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppEnvironment.swift"; sourceTree = "<group>"; };
 		000000000000000000001005 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTab.swift"; sourceTree = "<group>"; };
@@ -1097,6 +1101,7 @@
 		00000000000000000000126E /* Networking */ = {
 			isa = PBXGroup;
 			children = (
+				000000000000000000001A21 /* DEXAHealthKitWriteback.swift */,
 				000000000000000000001901 /* WatchWorkoutFinishCoordinator.swift */,
 				000000000000000000001900 /* WatchWorkoutConnectivityBridge.swift */,
 				000000000000000000001059 /* HomeAPI.swift */,
@@ -1493,6 +1498,7 @@
 		00000000000000000000126B /* PhysiqueOSTests */ = {
 			isa = PBXGroup;
 			children = (
+				000000000000000000001A23 /* DEXAHealthKitWritebackTests.swift */,
 				000000000000000000001902 /* WatchWorkoutTransportTests.swift */,
 				00000000000000000000120C /* AppTabTests.swift */,
 				00000000000000000000120E /* HomeReadModelTests.swift */,
@@ -1924,6 +1930,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				000000000000000000001A20 /* DEXAHealthKitWriteback.swift in Sources */,
 				000000000000000000001002 /* PhysiqueOSApp.swift in Sources */,
 				000000000000000000001909 /* WatchWorkoutConnectivityBridge.swift in Sources */,
 				00000000000000000000190A /* WatchWorkoutFinishCoordinator.swift in Sources */,
@@ -2239,6 +2246,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				000000000000000000001A22 /* DEXAHealthKitWritebackTests.swift in Sources */,
 				00000000000000000000120D /* AppTabTests.swift in Sources */,
 				00000000000000000000190B /* WatchWorkoutTransportTests.swift in Sources */,
 				00000000000000000000120F /* HomeReadModelTests.swift in Sources */,
@@ -2529,7 +2537,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOS/Supporting/Info.plist";
@@ -2557,7 +2565,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOS/Supporting/PhysiqueOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOS/Supporting/Info.plist";
@@ -2650,7 +2658,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSLiveActivity/PhysiqueOSLiveActivity.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSLiveActivity/Info.plist";
@@ -2676,7 +2684,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSLiveActivity/PhysiqueOSLiveActivity.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSLiveActivity/Info.plist";
@@ -2700,7 +2708,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSWatch/Info.plist";
@@ -2724,7 +2732,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "PhysiqueOSWatch/PhysiqueOSWatch.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PhysiqueOSWatch/Info.plist";
@@ -2747,7 +2755,7 @@
 		00000000000000000000192A /* Debug */ = { isa = XCBuildConfiguration; buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
@@ -2762,7 +2770,7 @@
 		00000000000000000000192B /* Release */ = { isa = XCBuildConfiguration; buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 83;
+				CURRENT_PROJECT_VERSION = 84;
 				DEVELOPMENT_TEAM = 33GMTRM6G9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;

@@ -148,6 +148,7 @@ struct PhysiqueOSApp: App {
                     guard phase == .active, environment.nativeAuthority == .founderProduction else { return }
                     Task {
                         await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap()
+                        await environment.dexaHealthKitWritebackCoordinator.reconcilePermanent()
                         await homeWidget.refreshCanonicalSnapshot()
                     }
                 }

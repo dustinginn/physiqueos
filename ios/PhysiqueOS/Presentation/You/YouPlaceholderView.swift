@@ -12,6 +12,8 @@ import SwiftUI
 /// Status card remain out of this slice's scope.
 struct YouPlaceholderView: View {
     let onNavigate: (AppDestination) -> Void
+    @Environment(AppEnvironment.self) private var environment
+    @State private var validationAction: DEXAValidationAction?
 
     var body: some View {
         ScrollView {
@@ -38,6 +40,10 @@ struct YouPlaceholderView: View {
                 }
                 .buttonStyle(.plain)
 
+                if environment.nativeAuthority == .founderProduction {
+                    dexaHealthSettings
+                }
+
                 Text("Founder profile and settings arrive in a later slice.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
@@ -48,5 +54,83 @@ struct YouPlaceholderView: View {
         }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
+        .confirmationDialog(
+            validationAction?.title ?? "DEXA validation",
+            isPresented: Binding(
+                get: { validationAction != nil },
+                set: { if !$0 { validationAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let validationAction {
+                Button(validationAction.buttonTitle, role: validationAction == .delete ? .destructive : nil) {
+                    let action = validationAction.rawValue
+                    self.validationAction = nil
+                    Task { await environment.dexaHealthKitWritebackCoordinator.runPhysicalValidation(action: action) }
+                }
+            }
+            Button("Cancel", role: .cancel) { validationAction = nil }
+        } message: {
+            Text(validationAction?.message ?? "")
+        }
+    }
+
+    private var dexaHealthSettings: some View {
+        let coordinator = environment.dexaHealthKitWritebackCoordinator
+        return CardContainer {
+            VStack(alignment: .leading, spacing: 14) {
+                Toggle(isOn: Binding(
+                    get: { coordinator.isEnabled },
+                    set: { enabled in
+                        if enabled { Task { await coordinator.enable() } }
+                        else { coordinator.disable() }
+                    }
+                )) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("DEXA → Apple Health")
+                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        Text("Body Fat % and calculated fat-free Lean Body Mass only. No DEXA Weight.")
+                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    }
+                }
+                .tint(PhysiqueOSTheme.accent)
+
+                Text(coordinator.state.label)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+
+                if coordinator.isEnabled {
+                    Button("Retry writeback") { Task { await coordinator.reconcilePermanent() } }
+                        .buttonStyle(.bordered)
+
+                    Divider().overlay(PhysiqueOSTheme.divider)
+                    Text("Founder physical validation · Sep 12")
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text("Writes exactly the guarded canonical scan, verifies both PhysiqueOS-owned samples, then supports exact deletion. Run only during the physical validation session.")
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    HStack {
+                        Button("Write validation samples") { validationAction = .write }
+                            .buttonStyle(.borderedProminent)
+                        Button("Delete validation samples", role: .destructive) { validationAction = .delete }
+                            .buttonStyle(.bordered)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private enum DEXAValidationAction: String {
+    case write, delete
+    var title: String { self == .write ? "Write Sep 12 validation samples?" : "Delete Sep 12 validation samples?" }
+    var buttonTitle: String { self == .write ? "Write and verify" : "Delete exactly these samples" }
+    var message: String {
+        self == .write
+            ? "This is a deliberate physical test. PhysiqueOS will write only the real canonical Sep 12 Body Fat % and calculated fat-free Lean Body Mass."
+            : "PhysiqueOS will delete only its two owned Sep 12 validation samples after verifying their exact identities."
     }
 }

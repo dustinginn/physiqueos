@@ -110,6 +110,9 @@ struct DEXAHistoryView: View {
                     Task { await viewModel?.selectScope(pillID: pillID) }
                 }
                 latestScanCard(report.latestScan)
+                if environment.nativeAuthority == .founderProduction {
+                    dexaWritebackStatus
+                }
                 summaryGrid(report.summary)
                 if let delta = report.delta { deltaRow(delta) }
                 coreTrendsCard(report)
@@ -117,6 +120,29 @@ struct DEXAHistoryView: View {
                 regionalCard(title: "Regional Tissue Lean Mass", series: report.regionalLeanTrends, namespace: "regionalLean", isExpanded: $isRegionalLeanExpanded)
                 regionalCard(title: "Regional Tissue Fat Mass", series: report.regionalFatTrends, namespace: "regionalFat", isExpanded: $isRegionalFatExpanded)
                 historyCard(report.history)
+            }
+        }
+    }
+
+    private var dexaWritebackStatus: some View {
+        let coordinator = environment.dexaHealthKitWritebackCoordinator
+        return CardContainer {
+            HStack(spacing: 10) {
+                Image(systemName: coordinator.state == .current ? "checkmark.icloud.fill" : "heart.text.square")
+                    .foregroundStyle(coordinator.state == .current ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textSecondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("DEXA → Apple Health")
+                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(coordinator.state.label)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+                Spacer()
+                if coordinator.isEnabled && coordinator.state != .reconciling {
+                    Button("Retry") { Task { await coordinator.reconcilePermanent() } }
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                }
             }
         }
     }

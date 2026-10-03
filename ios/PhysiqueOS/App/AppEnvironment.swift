@@ -340,6 +340,10 @@ final class AppEnvironment {
     /// (`.founderActivityValidation`) and cursor namespace never overlap
     /// with the automatic path's.
     let healthKitFounderCanaryCoordinator: HealthKitFounderCanaryCoordinator
+    /// Explicitly opted-in DEXA export. Its preference defaults false, the
+    /// Server permanent policy defaults disabled, and it never participates
+    /// in the automatic HealthKit read/sleep synchronization path.
+    let dexaHealthKitWritebackCoordinator: DEXAHealthKitWritebackCoordinator
 
     var weightEvidenceAPI: WeightEvidenceAPI {
         switch nativeAuthority {
@@ -708,7 +712,16 @@ final class AppEnvironment {
         self.homeWidgetRefreshRelay = homeWidgetRefreshRelay
         self.founderPhotoMediaStore = founderPhotoMediaStore ?? FounderPhotoMediaStore(api: founderServerAPI)
         self.founderProductionPhotoMediaStore = FounderProductionPhotoMediaStore(api: productionNativeAPI)
-        self.productionIdempotencyKeyStore = ProductionIdempotencyKeyStore()
+        let productionIdempotencyKeyStore = ProductionIdempotencyKeyStore()
+        self.productionIdempotencyKeyStore = productionIdempotencyKeyStore
+        self.dexaHealthKitWritebackCoordinator = DEXAHealthKitWritebackCoordinator(
+            server: ProductionDEXAHealthKitWritebackServer(
+                api: productionNativeAPI,
+                idempotencyStore: productionIdempotencyKeyStore
+            ),
+            samples: SystemDEXAHealthKitSampleStore(),
+            preferences: UserDefaultsDEXAHealthKitWritebackPreferenceStore()
+        )
         self.stagedPhotoIntakeStore = stagedPhotoIntakeStore ?? FileStagedPhotoIntakeStore()
         self.healthKitFeatureGate = healthKitFeatureGate
         self.healthKitAuthorizationCoordinator = HealthKitAuthorizationCoordinator(

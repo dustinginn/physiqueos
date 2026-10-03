@@ -49,8 +49,8 @@ struct HealthKitTypeRegistry {
             .sleep: [requiredCategory(.sleepAnalysis)],
         ],
         writeTypesByDomain: [
-            .weight: [requiredQuantity(.bodyMass)],
-            .bodyComposition: [requiredQuantity(.bodyFatPercentage)],
+            .weight: [],
+            .bodyComposition: [requiredQuantity(.bodyFatPercentage), requiredQuantity(.leanBodyMass)],
         ]
     )
 

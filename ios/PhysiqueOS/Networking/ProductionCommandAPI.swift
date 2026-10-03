@@ -33,6 +33,7 @@ enum ProductionCommandType {
     static let changeSupplementLifecycle = "operating-plan.supplement-lifecycle.change.v1"
     static let saveCoachingUpdates = "operating-plan.coaching-updates.save.v1"
     static let changePeptideLifecycle = "operating-plan.peptide-lifecycle.change.v1"
+    static let recordDexaHealthKitWritebackReceipt = "dexa.healthkit-writeback.receipt.v1"
 }
 
 // MARK: - Peptide lifecycle (pause / resume)
