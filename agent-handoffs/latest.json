@@ -1,49 +1,44 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T05:55:04Z",
+  "generated_at_utc": "2026-10-03T06:06:47Z",
   "task": {
-    "id": "build83-first-real-workout-comprehensive-correction-20261003",
-    "title": "Build 83 Server, D3 and Native TestFlight final",
+    "id": "20261003T061500Z-dexa-healthkit-writeback-overnight-implementation",
+    "title": "DEXA to Apple Health writeback overnight implementation",
     "agent": "codex",
-    "status": "complete"
+    "status": "in_progress"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "takeover_prompt_sha": "5afbfd77cb50921425c86575373dd5fa0812698d",
-    "continuity_checkpoint_sha": "b2e1779aa8b639ca8508c817204b96df4b4ba511",
+    "prompt_sha": "9ce8027900d41ee9d706ca9ce79fb24794197798",
     "production_server_sha": "89fe0a0340adee22d15b92a1f074a0bbd348ac77",
     "production_deployment": "28678d4a-e3cc-4b2b-a479-1851ab7093bf",
-    "server_candidate_sha": "89fe0a0340adee22d15b92a1f074a0bbd348ac77",
-    "native_candidate_sha": "3e61dd215e8474c52bd54230d2d9dfb2f3a93534",
-    "withdrawn_server_sha": "22925625ba377e67943ac5d63dd2c9613c897936",
+    "server_base_sha": "89fe0a0340adee22d15b92a1f074a0bbd348ac77",
+    "native_base_sha": "3e61dd215e8474c52bd54230d2d9dfb2f3a93534",
     "native_build": 83,
-    "final_sha": "3e61dd215e8474c52bd54230d2d9dfb2f3a93534",
-    "base_sha": "d0ff65965233fa44e108387f01b649a2bdb476df"
+    "reporting_base_sha": "9ce8027900d41ee9d706ca9ce79fb24794197798"
   },
   "result": {
-    "summary": "Exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 is ACTIVE, the exact two-record/six-write D3 repair is independently verified, and Native SHA 3e61dd215e8474c52bd54230d2d9dfb2f3a93534 shipped as Build 83. App Store Connect delivery 507b409f-a29f-48a0-93b4-49ab46b5ad6d is VALID. Stair Stepper is canonical eligible Cardio; Cooldown is canonical history but non-Cardio and history-only.",
-    "success": true,
-    "production_mutated": true,
-    "deployed": true,
-    "d3_run": true,
-    "testflight_uploaded": true,
-    "testflight_delivery_id": "507b409f-a29f-48a0-93b4-49ab46b5ad6d",
-    "testflight_state": "VALID"
+    "summary": "Exact authorities verified and isolated Server/Native implementation lanes established. Build 83 remains untouched; no production, HealthKit, archive, or TestFlight mutation has occurred.",
+    "success": null,
+    "production_mutated": false,
+    "deployed": false,
+    "healthkit_written": false,
+    "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "passed",
-      "summary": "Server sets passed 321/321, 88/88 and post-deploy 24/24. D3 replay/integrity checks passed. Native finish 36/36, Watch 27/27, affected finish-state 20/20 and fresh Watch UI 7/7 passed. Training class reproduced the known 10/16 order state leak; the exact remaining six passed 6/6 with individual fresh erases. Generator deterministic; signed archive and guarded upload gates passed."
+      "status": "pending",
+      "summary": "No implementation tests run yet."
     },
     "review": {
-      "status": "approved",
-      "summary": "Fresh independent review approved deployed Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77, deployment 28678d4a-e3cc-4b2b-a479-1851ab7093bf and the exact D3 result with no blocking findings. Exact Native SHA 3e61dd215e8474c52bd54230d2d9dfb2f3a93534 is also independently approved with no findings."
+      "status": "pending",
+      "summary": "Fresh independent Server and Native reviews are required after implementation."
     }
   },
   "decisions_required": [],
   "blockers": [],
-  "recommended_next_step": "Founder installs Build 83 from TestFlight and completes the physical first-real-workout acceptance checklist in the final report. DEXA HealthKit remains READY/HOLD; Sleep v3 remains unchanged.",
-  "full_report_path": "agent-handoffs/reports/20261003T055504Z-build83-server-d3-native-testflight-final.md",
+  "recommended_next_step": "Continue implementation in isolated lanes, then test and obtain independent reviews. Stop at exact-SHA deploy or Build 84 upload authorization gates.",
+  "full_report_path": "agent-handoffs/reports/20261003T060647Z-dexa-healthkit-writeback-overnight-checkpoint1.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
