@@ -1,44 +1,51 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T03:50:16Z",
+  "generated_at_utc": "2026-10-03T04:37:45Z",
   "task": {
     "id": "build83-first-real-workout-comprehensive-correction-20261003",
-    "title": "Build 83 Codex takeover - early continuity checkpoint",
+    "title": "Build 83 corrected Server candidate - pre-deployment authorization checkpoint",
     "agent": "codex",
-    "status": "partial"
+    "status": "blocked_on_founder_authorization"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
+    "takeover_prompt_sha": "5afbfd77cb50921425c86575373dd5fa0812698d",
+    "continuity_checkpoint_sha": "b2e1779aa8b639ca8508c817204b96df4b4ba511",
     "production_server_sha": "d0ff65965233fa44e108387f01b649a2bdb476df",
     "production_deployment": "64533990-3f04-43bc-b710-a2d28dc1850e",
-    "native_build": 82,
-    "native_sha": "e2cbcd0cf40dca64a4c8490bf0ebd4077b2eb69c",
+    "server_candidate_sha": "89fe0a0340adee22d15b92a1f074a0bbd348ac77",
+    "native_candidate_sha": "3e61dd215e8474c52bd54230d2d9dfb2f3a93534",
+    "withdrawn_server_sha": "22925625ba377e67943ac5d63dd2c9613c897936",
+    "native_build": 83,
     "final_sha": null,
-    "base_sha": "e2cbcd0cf40dca64a4c8490bf0ebd4077b2eb69c"
+    "base_sha": "d0ff65965233fa44e108387f01b649a2bdb476df"
   },
   "result": {
-    "summary": "IN PROGRESS. Codex verified the takeover and Claude checkpoint authorities, confirmed pushed Native abb131d9, preserved all Native and Server worktrees, and found the replacement Cooldown branch clean at withdrawn 22925625 with no later correction commit. Reviewed Server candidate A remains f91d76c0. No production action, code change, deployment, D3 repair, archive or upload occurred.",
+    "summary": "Corrected exact Server and Native candidates are committed, pushed, tested and independently approved. Cooldown is canonical history but non-Cardio everywhere; Stair Stepper is canonical strategically eligible Cardio. Withdrawn 22925625 is not an ancestor and must never deploy. Stopped before Server deployment and D3 pending direct Founder authorization of exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77.",
     "success": false,
     "production_mutated": false,
     "deployed": false,
+    "d3_run": false,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "not_run",
-      "summary": "No tests run during takeover inventory. Claude results remain documented in checkpoint b2e1779a; Codex exact-candidate gates are next."
+      "status": "passed",
+      "summary": "Server changed-test set 13 files/321 tests passed; independent reviewer passed 88 focused D1-D3 tests. Native finish lifecycle 36/36, Watch 27/27, and final affected Watch finish-state 20/20 passed."
     },
     "review": {
-      "status": "pending",
-      "summary": "Fresh Codex Native and Server independent reviews have not yet run."
+      "status": "approved",
+      "summary": "Fresh independent reviews approved exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 and exact Native SHA 3e61dd215e8474c52bd54230d2d9dfb2f3a93534 with no findings."
     }
   },
   "decisions_required": [
-    "After a corrected Server candidate is pushed, tested and independently approved, Founder must directly authorize that exact SHA before deployment and D3."
+    "Founder must directly authorize exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 before deployment and the bounded Oct. 2 D3 repair."
   ],
-  "blockers": [],
-  "recommended_next_step": "Run remaining Native gates and independent review; produce a corrected Server candidate from f91d76c0 with Stair Stepper Cardio and Cooldown non-Cardio semantics; test, independently review, push, checkpoint exact SHA and stop before deployment.",
-  "full_report_path": "agent-handoffs/reports/20261003T035016Z-build83-codex-takeover-checkpoint.md",
+  "blockers": [
+    "Direct Founder authorization of exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 has not yet been given."
+  ],
+  "recommended_next_step": "STOP. Await direct Founder authorization of exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77; only then deploy that SHA, verify runtime identity, and run the bounded D3 dry-run/apply sequence.",
+  "full_report_path": "agent-handoffs/reports/20261003T043745Z-build83-server-candidate-predeployment-authorization.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
