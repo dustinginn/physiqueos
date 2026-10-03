@@ -2274,7 +2274,8 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     // consistency while downstream work remains represented by its durable
     // work items.
     const canonicalCommitStartedAt = performance.now();
-    const commit = await commitCanonicalEvidencePackage(context, packageAndObject);
+    const canonicalCommitTimings = {};
+    const commit = await commitCanonicalEvidencePackage(context, packageAndObject, { timings: canonicalCommitTimings });
     const canonicalCommitDurationMs = roundedDuration(canonicalCommitStartedAt);
     const canonicalId = `training|authoritative|training_logger_draft_${context.payload.sessionId}`;
     const durableReadbackStartedAt = performance.now();
@@ -2295,11 +2296,13 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     // collision) is deferred and never blocks the session. A store failure while
     // writing the events fails the whole command atomically, so the client's
     // idempotent retry re-derives them; a partial event batch is never left.
+    const performanceEventsStartedAt = performance.now();
     const performanceReconciliation = await reconcileCommittedSessionPerformanceEvents(context, {
       canonicalId,
       evidencePackage: packageAndObject,
       supportingReviewId: supportingReview?.id ?? null,
     });
+    const performanceEventsDurationMs = roundedDuration(performanceEventsStartedAt);
     const performanceRecords = sessionPerformanceRecordsResult(performanceReconciliation, canonicalId);
 
     // A legacy caller may still supply an already-interpreted supporting
@@ -2307,6 +2310,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     // source after the exact canonical package commits; modern Native uses
     // the independent target-bound intake path and does not enter here.
     let reviewRevision = supportingReview?.version ?? null;
+    const supportingReviewStartedAt = performance.now();
     if (supportingReview) {
       const updated = await records.put({
         ownerUserId: context.ownerUserId,
@@ -2337,6 +2341,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       });
       reviewRevision = updated.version;
     }
+    const supportingReviewDurationMs = roundedDuration(supportingReviewStartedAt);
     return {
       status: "committed",
       result: {
@@ -2348,10 +2353,20 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         canonicalId,
         trainingSessionDurable: true,
         durationMs: roundedDuration(startedAt),
+        // The first three keys keep their original meaning. The canonical*
+        // keys split boundedCanonicalCommitMs into its load, domain and
+        // persist sub-stages; performanceEventsMs and supportingReviewMs time
+        // the two steps after the durable readback that were previously only
+        // visible inside durationMs. Durations only, in milliseconds.
         stageDurations: {
           validationAndPackageMs: packageDurationMs,
           boundedCanonicalCommitMs: canonicalCommitDurationMs,
           durableReadbackMs: durableReadbackDurationMs,
+          canonicalLoadMs: canonicalCommitTimings.canonicalLoadMs ?? 0,
+          canonicalDomainMs: canonicalCommitTimings.canonicalDomainMs ?? 0,
+          canonicalPersistMs: canonicalCommitTimings.canonicalPersistMs ?? 0,
+          performanceEventsMs: performanceEventsDurationMs,
+          supportingReviewMs: supportingReviewDurationMs,
         },
         exerciseIds: record.payload?.exercises?.map((item) => item.canonicalExerciseId).filter(Boolean) ?? [],
         continuationWorkItemIds: commit.briefingReconciliation?.workItemIds ?? [],
@@ -3049,7 +3064,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     const before = new Map();
     for (const collection of writeCollections) {
       const values = await records.list({ ownerUserId: context.ownerUserId, collection });
-      before.set(collection, structuredClone(values));
+      // Same reasoning as loadCandidate: `values` is fresh and never shared,
+      // the candidate gets the only copy the domain step can mutate.
+      before.set(collection, values);
       candidate[collection] = structuredClone(values);
     }
     if (lowerLevelEnabled) {
@@ -3110,7 +3127,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     }
   }
 
-  async function commitCanonicalEvidencePackage(context, evidencePackage) {
+  // `timings`, when supplied, receives the load / domain / persist sub-stage
+  // durations (ms) of this bounded commit; it never changes the commit.
+  async function commitCanonicalEvidencePackage(context, evidencePackage, { timings = null } = {}) {
     refuseQuarantinedHealthKitEvidence(evidencePackage?.evidence_objects);
     const collections = [
       "user", "goals", "protocols", "protocolVersions", "dailyBriefings",
@@ -3118,7 +3137,10 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       "piEnergyConfidenceWorkItems", "piTrainingConfidenceWorkItems",
       "briefingReconciliationWorkItems",
     ];
+    const loadStartedAt = performance.now();
     const { candidate, before } = await loadCandidate(collections, context.ownerUserId);
+    if (timings) timings.canonicalLoadMs = roundedDuration(loadStartedAt);
+    const domainStartedAt = performance.now();
     let commit;
     try {
       commit = await createPILowerLevelCanonicalEvidenceCommitService({
@@ -3127,6 +3149,8 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       }).commitConfirmedEvidencePackage(evidencePackage, context.ownerUserId);
     } catch (error) {
       throw canonicalValidationProblem(error);
+    } finally {
+      if (timings) timings.canonicalDomainMs = roundedDuration(domainStartedAt);
     }
     if (["baseline_conflict", "persistence_failure", "committed_publication_failure"].includes(commit.outcome)) {
       throw new ApplicationProblem({
@@ -3138,6 +3162,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         detail: `Canonical evidence outcome: ${commit.outcome}.`,
       });
     }
+    const persistStartedAt = performance.now();
     await persistCandidateCollections({
       before,
       candidate,
@@ -3148,6 +3173,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       ],
       ownerUserId: context.ownerUserId,
     });
+    if (timings) timings.canonicalPersistMs = roundedDuration(persistStartedAt);
     const objectIds = new Set((evidencePackage.evidence_objects ?? []).map((item) => item.id));
     const packageId = evidencePackage.package_id;
     const canonicalEvidenceObjects = (candidate.canonicalEvidenceObjects ?? []).filter((item) =>
@@ -3162,7 +3188,15 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     const before = new Map();
     await Promise.all(collections.map(async (collection) => {
       const values = await records.list({ ownerUserId, collection, sourceOrder });
-      before.set(collection, structuredClone(values));
+      // `before` holds the listed records themselves; only the candidate needs
+      // its own deep copy. Safe because `values` is a fresh array of fresh
+      // records on every list() (Postgres: rows parsed per query, mapped to
+      // new objects; in-memory store: structuredClone per record), it is not
+      // retained anywhere else (the candidate below is a separate clone and
+      // the domain step only ever receives the candidate), records.put() never
+      // mutates a previously listed record (both stores write a new object),
+      // and `before` is only read, by persistCandidateCollections.
+      before.set(collection, values);
       if (collection === "user") candidate.user = structuredClone(values[0] ?? null);
       else candidate[collection] = structuredClone(values);
     }));
@@ -3513,8 +3547,14 @@ function healthKitObservationIdentityCollisionProblem(observation, storedObserva
   });
 }
 
-function comparableRecord(record) {
-  const { version: _version, ...value } = structuredClone(record ?? {});
+// The record without its top-level storage version, as JSON. The rest
+// destructure copies own enumerable properties in the same [[OwnPropertyKeys]]
+// order JSON.stringify and structuredClone use, without mutating the record,
+// so for JSON data (plain objects, arrays, strings, numbers, booleans, null,
+// undefined, Dates) this is byte-identical to the former
+// JSON.stringify(structuredClone(record)) form, minus the deep copy.
+export function comparableRecord(record) {
+  const { version: _version, ...value } = record ?? {};
   return JSON.stringify(value);
 }
 

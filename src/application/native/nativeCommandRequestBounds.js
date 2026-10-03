@@ -52,7 +52,29 @@ export const HEALTHKIT_INGEST_MAXIMUM_REQUEST_BYTES = 5 * 1024 * 1024;
  */
 export const HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES = 1.5 * 1024 * 1024;
 
+/**
+ * Maximum HTTP body for training-session.commit.v1 (the Logger workout commit).
+ *
+ * Under the historical 4 KiB default a structured workout of roughly 25-30 sets
+ * was refused with 413 (a 13-set Native workout is about 2-3 KB). Unlike the
+ * HealthKit contracts, the Server declares no count or length maxima for this
+ * payload: Phase3CommandService only requires a non-empty `exercises` array,
+ * and createNativeTrainingPackage requires at least one set per exercise,
+ * finite reps/duration/load, an enumerated loadType/unit, and supersets of at
+ * least two occurrences of the same session. A contract-maximum derivation is
+ * therefore impossible, so this reviewed constant is instead checked against
+ * computeTrainingSessionCommitReviewedMaximumRequestBytes(): a pessimistic
+ * encoding of TRAINING_SESSION_COMMIT_REVIEWED_MAXIMUM, a 24-exercise,
+ * 120-set workout (about twice the largest realistic session) with every
+ * optional field present (about 54 KB). NativeCommandRequestBounds.test.js
+ * fails if this constant is below that derivation or more than 25% above it.
+ * Realistic Native workouts encode at about 140 bytes per set: 40 sets is
+ * about 6 KB (refused under 4 KiB), 80 sets about 12 KB.
+ */
+export const TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES = 64 * 1024;
+
 const COMMAND_MAXIMUM_REQUEST_BYTES = Object.freeze({
+  [Phase3Command.COMMIT_TRAINING_SESSION]: TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES,
   [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS]: HEALTHKIT_INGEST_MAXIMUM_REQUEST_BYTES,
   [Phase3Command.INGEST_HEALTHKIT_SLEEP]: HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES,
   // Samples-only subset of the Sleep request, so the same reviewed bound covers it.
@@ -219,4 +241,97 @@ export function computeHealthKitSleepIngestMaximumRequestBytes() {
     deletions: Array.from({ length: HEALTHKIT_SLEEP_MAX_DELETIONS_PER_BATCH }, () => deletion),
     windowManifest: section(SLEEP_MANIFEST_WIRE_FIELDS),
   });
+}
+
+/**
+ * The reviewed realistic-maximum Logger workout the training-session.commit.v1
+ * bound is derived from. These are review limits for the HTTP bound, not
+ * validation rules: the Server does not reject a workout that exceeds them,
+ * only a body larger than TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES.
+ *
+ *   exercises / sets             a very long session, about twice a realistic
+ *                                maximum (10-12 exercises, 50-60 sets)
+ *   supersetGroups / members     every exercise paired into a superset
+ *   identifierLength             Native UUID().uuidString session, occurrence
+ *                                and set ids
+ *   numericLiteralLength         the longest shortest-round-trip Double literal
+ *                                Swift's JSONEncoder emits (-1.2345678901234567e-300)
+ *   exerciseNameLength,          Founder-typed text, sized at three UTF-8 bytes
+ *   variantTextLength            per UTF-16 unit (non-ASCII; Swift's encoder
+ *                                does not \u-escape it)
+ */
+export const TRAINING_SESSION_COMMIT_REVIEWED_MAXIMUM = Object.freeze({
+  exercises: 24,
+  sets: 120,
+  supersetGroups: 12,
+  membersPerSuperset: 2,
+  identifierLength: 36,
+  supersetIdLength: 64,
+  canonicalExerciseIdLength: 96,
+  exerciseNameLength: 96,
+  muscleGroupIdLength: 48,
+  variantTextLength: 48,
+  reviewIdLength: 128,
+  timestampLength: 32,
+  numericLiteralLength: 24,
+});
+
+/**
+ * Encoded size of TRAINING_SESSION_COMMIT_REVIEWED_MAXIMUM, deliberately
+ * pessimistic: every exercise carries BOTH a canonical id and a provisional
+ * exercise (Native sends one or the other), an execution variant, and every
+ * set carries reps, duration and load at the longest numeric literal with the
+ * longest loadType/unit, plus the same 4 KiB command envelope allowance the
+ * HealthKit derivations use.
+ */
+export function computeTrainingSessionCommitReviewedMaximumRequestBytes(
+  maximum = TRAINING_SESSION_COMMIT_REVIEWED_MAXIMUM,
+) {
+  const ascii = (count) => "a".repeat(count);
+  const wide = (count) => "€".repeat(count); // U+20AC: three UTF-8 bytes
+  const numeric = -1.2345678901234567e-300;
+  if (JSON.stringify(numeric).length < maximum.numericLiteralLength) {
+    throw new Error("The pessimistic numeric literal is shorter than the reviewed length.");
+  }
+  const set = {
+    setId: ascii(maximum.identifierLength),
+    reps: numeric,
+    durationSeconds: numeric,
+    load: numeric,
+    loadType: "external_load",
+    unit: "bodyweight",
+  };
+  const exerciseWithSets = (setCount) => ({
+    canonicalExerciseId: ascii(maximum.canonicalExerciseIdLength),
+    provisionalExercise: {
+      name: wide(maximum.exerciseNameLength),
+      primaryMuscleGroupId: ascii(maximum.muscleGroupIdLength),
+    },
+    occurrenceId: ascii(maximum.identifierLength),
+    executionVariant: {
+      key: ascii(maximum.variantTextLength),
+      label: wide(maximum.variantTextLength),
+      rawLabel: wide(maximum.variantTextLength),
+    },
+    sets: Array.from({ length: setCount }, () => set),
+  });
+  // Every exercise has at least one set; the remainder goes to the first.
+  const baseSets = Math.floor(maximum.sets / maximum.exercises);
+  const exercises = Array.from({ length: maximum.exercises }, (_, index) =>
+    exerciseWithSets(baseSets + (index === 0 ? maximum.sets - baseSets * maximum.exercises : 0)));
+  const payload = {
+    sessionId: ascii(maximum.identifierLength),
+    localDate: "2026-10-02",
+    mode: "retrospective",
+    startedAt: ascii(maximum.timestampLength),
+    finishedAt: ascii(maximum.timestampLength),
+    exercises,
+    supersets: Array.from({ length: maximum.supersetGroups }, () => ({
+      id: ascii(maximum.supersetIdLength),
+      memberExerciseIds: Array.from({ length: maximum.membersPerSuperset }, () => ascii(maximum.identifierLength)),
+    })),
+    supportingEvidenceReviewId: ascii(maximum.reviewIdLength),
+    supportingEvidenceReviewVersion: Number.MAX_SAFE_INTEGER,
+  };
+  return WORST_CASE_ENVELOPE_BYTES + new TextEncoder().encode(JSON.stringify({ payload })).length;
 }

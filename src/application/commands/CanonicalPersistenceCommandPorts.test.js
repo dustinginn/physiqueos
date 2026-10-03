@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInMemoryCanonicalRecordStore } from "../../platform/database/Phase4CanonicalRecordStore.js";
-import { createCanonicalPersistenceCommandPorts } from "./CanonicalPersistenceCommandPorts.js";
+import { comparableRecord, createCanonicalPersistenceCommandPorts } from "./CanonicalPersistenceCommandPorts.js";
 import { createPhase3CommandService, Phase3Command } from "./Phase3CommandService.js";
 import { createInMemoryFoundationTransactionStore } from "../../platform/commands/InMemoryFoundationTransactionStore.js";
 
@@ -128,8 +128,20 @@ describe("Phase 4 canonical command persistence ports", () => {
       validationAndPackageMs: expect.any(Number),
       boundedCanonicalCommitMs: expect.any(Number),
       durableReadbackMs: expect.any(Number),
+      canonicalLoadMs: expect.any(Number),
+      canonicalDomainMs: expect.any(Number),
+      canonicalPersistMs: expect.any(Number),
+      performanceEventsMs: expect.any(Number),
+      supportingReviewMs: expect.any(Number),
     });
     expect(Object.values(training.result.stageDurations).every((value) => value >= 0)).toBe(true);
+    // The canonical sub-stages are inside the bounded canonical commit, and
+    // every stage is inside the command's total (rounding slack: 0.01 ms each).
+    const stages = training.result.stageDurations;
+    expect(stages.canonicalLoadMs + stages.canonicalDomainMs + stages.canonicalPersistMs)
+      .toBeLessThanOrEqual(stages.boundedCanonicalCommitMs + 0.03);
+    expect(stages.validationAndPackageMs + stages.boundedCanonicalCommitMs + stages.durableReadbackMs +
+      stages.performanceEventsMs + stages.supportingReviewMs).toBeLessThanOrEqual(training.result.durationMs + 0.05);
     const snapshot = records.snapshot();
     expect(snapshot.canonicalEvidenceObjects.map((item) => item.evidence_type).sort()).toEqual(["activity_day", "nutrition", "training"]);
     expect(snapshot.evidenceReviews.filter((item) => item.source === "training_logger")).toEqual([]);
@@ -861,6 +873,137 @@ describe("Phase 4 canonical command persistence ports", () => {
     });
   });
 });
+
+describe("bounded Training commit persistence", () => {
+  const legacyComparableRecord = (record) => {
+    const { version: _version, ...value } = structuredClone(record ?? {});
+    return JSON.stringify(value);
+  };
+
+  it("compares records byte-identically to the former deep-copy form without copying or mutating", () => {
+    const reordered = { a: 1, b: 2, c: 3 };
+    delete reordered.b;
+    reordered.b = 4;
+    const cases = [
+      null, undefined, {}, { version: 3 },
+      { id: "x", version: 2, payload: { version: 9, sets: [{ reps: 8, load: 102.05828620000001 }, null] } },
+      JSON.parse('{"__proto__":{"polluted":true},"id":"proto","version":1}'),
+      { 10: "a", 9: "b", z: "c", "-1": "d", "1.5": "e", 4294967295: "f", 4294967294: "g" },
+      { createdAt: new Date("2026-10-02T17:31:09.000Z"), invalid: new Date(Number.NaN) },
+      { missing: undefined, holes: [undefined, , 3], negativeZero: -0, nan: Number.NaN, infinite: Infinity },
+      { text: "lone \ud800 surrogate   \u0000 \"quoted\" é \u{1F3CB}" },
+      reordered,
+      { nested: { version: 1 }, version: undefined },
+      [1, 2, 3], "text", 42, true,
+    ];
+    for (const record of cases) expect(comparableRecord(record)).toBe(legacyComparableRecord(record));
+    const frozen = Object.freeze({ version: 7, z: 1, a: Object.freeze({ y: 2, b: 3 }) });
+    expect(comparableRecord(frozen)).toBe('{"z":1,"a":{"y":2,"b":3}}');
+    expect(frozen.version).toBe(7);
+  });
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("persists exactly the records an 80-set commit changes, and an identical re-commit or command replay writes nothing", async () => {
+    // The canonical commit stamps updatedAt from the wall clock; pin Date only
+    // so an identical re-commit derives a byte-identical candidate.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-11T12:00:00.000Z"));
+    const store = fixture();
+    const puts = [];
+    const records = { ...store, put: async (input) => {
+      puts.push(`${input.collection}:${input.recordId}`);
+      return store.put(input);
+    } };
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    // Unrelated canonical records the Training commit must leave untouched.
+    await ports.upsertNutritionDay(commandContext({
+      localDate: "2026-08-11", dailyTotals: { calories: 2400, protein_g: 190 }, meals: [],
+    }, null, "nutrition-before-training"));
+    await ports.upsertActivityDay(commandContext({
+      localDate: "2026-08-11", dailyActivity: { move_calories: 720, exercise_minutes: 60 },
+      sourceIdentity: "activity-before-training", source: { application: "Apple Fitness", modality: "screenshot" },
+    }, null, "activity-before-training"));
+    const before = store.snapshot();
+    puts.length = 0;
+
+    const payload = eightySetTrainingPayload();
+    const first = await ports.commitTrainingSession(commandContext(payload, null, "training-80-sets"));
+    expect(first.result).toMatchObject({ status: "durable", trainingSessionDurable: true });
+    const after = store.snapshot();
+    const session = after.canonicalEvidenceObjects.find((item) => item.canonicalId === first.result.canonicalId);
+    expect(session.payload.exercises.flatMap((exercise) => exercise.sets)).toHaveLength(80);
+    // Every write is a record that changed, every changed record was written once.
+    expect(new Set(puts).size).toBe(puts.length);
+    expect([...puts].sort()).toEqual(changedRecordKeys(before, after));
+    expect(puts.length).toBeGreaterThan(0);
+    for (const item of before.canonicalEvidenceObjects) {
+      expect(after.canonicalEvidenceObjects.find((candidate) => candidate.canonicalId === item.canonicalId)).toEqual(item);
+    }
+
+    // An identical re-commit (a lost acknowledgement retried below the
+    // receipt layer) re-derives the same candidate and writes nothing.
+    puts.length = 0;
+    const again = await ports.commitTrainingSession(commandContext(payload, null, "training-80-sets-again"));
+    expect(again.result).toMatchObject({ status: "durable", canonicalId: first.result.canonicalId });
+    expect(puts).toEqual([]);
+    expect(store.snapshot()).toEqual(after);
+
+    // A replay through the idempotent command service returns the receipt and
+    // never reaches the port at all.
+    const service = createPhase3CommandService({ transactionRunner: createInMemoryFoundationTransactionStore(), ports });
+    const input = {
+      commandType: Phase3Command.COMMIT_TRAINING_SESSION,
+      principal,
+      metadata: { idempotencyKey: "training-80-sets-idempotency-key", payloadVersion: "1" },
+      payload: { ...payload, sessionId: "native-session-eighty-replay" },
+    };
+    const committed = await service.execute(input);
+    expect(committed.outcome).toBe("committed");
+    const replayBefore = store.snapshot();
+    puts.length = 0;
+    const replayed = await service.execute(input);
+    expect(replayed.outcome).toBe("replayed");
+    expect(replayed.receipt.result.canonicalId).toBe(committed.receipt.result.canonicalId);
+    expect(puts).toEqual([]);
+    expect(store.snapshot()).toEqual(replayBefore);
+  });
+});
+
+function eightySetTrainingPayload() {
+  // Sixteen distinct canonical exercises: the canonical package merges repeated
+  // occurrences of one exercise, so distinct ids keep all 80 sets distinct.
+  const exercises = [
+    "bench_press", "chest_press_machine", "incline_bench_press", "incline_dumbbell_press",
+    "chest_fly_machine", "pull_up", "iso_lateral_high_row", "seated_cable_row",
+    "shoulder_press_machine", "lateral_raise_machine", "lateral_raise", "cable_machine_front_raise",
+    "spider_curl", "ez_bar_curl", "cable_pushdown", "leg_press",
+  ];
+  return {
+    sessionId: "native-session-eighty", localDate: "2026-08-11", mode: "live",
+    startedAt: "2026-08-11T15:58:41Z", finishedAt: "2026-08-11T17:31:09Z",
+    exercises: exercises.map((canonicalExerciseId, index) => ({
+      canonicalExerciseId,
+      occurrenceId: `occurrence-${index + 1}`,
+      sets: Array.from({ length: 5 }, (_, setIndex) => ({
+        setId: `occurrence-${index + 1}-set-${setIndex + 1}`,
+        reps: 12 - setIndex,
+        load: canonicalExerciseId === "pull_up" ? null : 100 + 5 * setIndex,
+        loadType: canonicalExerciseId === "pull_up" ? "bodyweight" : "external_load",
+        unit: canonicalExerciseId === "pull_up" ? "bodyweight" : "lb",
+      })),
+    })),
+    supersets: [{ id: "superset-1", memberExerciseIds: ["occurrence-1", "occurrence-2"] }],
+  };
+}
+
+function changedRecordKeys(before, after) {
+  const identity = (record, index) => String(record?.id ?? record?.canonicalId ?? record?.package_id ?? record?.review_id ?? `@index:${index}`);
+  const keyed = (snapshot) => new Map(Object.entries(snapshot).flatMap(([collection, values]) =>
+    values.map((record, index) => [`${collection}:${identity(record, index)}`, JSON.stringify(record)])));
+  const prior = keyed(before);
+  return [...keyed(after)].filter(([key, value]) => prior.get(key) !== value).map(([key]) => key).sort();
+}
 
 function fixture() {
   return createInMemoryCanonicalRecordStore({

@@ -33,7 +33,11 @@ import {
   HEALTHKIT_OBSERVATION_WIRE_FIELDS,
   NATIVE_COMMAND_DEFAULT_MAXIMUM_REQUEST_BYTES,
   NATIVE_COMMAND_MAXIMUM_REQUEST_CEILING_BYTES,
+  HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES,
+  TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES,
+  TRAINING_SESSION_COMMIT_REVIEWED_MAXIMUM,
   computeHealthKitIngestMaximumRequestBytes,
+  computeTrainingSessionCommitReviewedMaximumRequestBytes,
   nativeCommandRequestMaximumBytes,
   resolveNativeCommandMaximumRequestBytes,
 } from "./nativeCommandRequestBounds.js";
@@ -421,6 +425,101 @@ describe("unrelated Native commands and malformed input", () => {
   });
 });
 
+describe("training-session.commit.v1 request bound", () => {
+  const TRAINING = "training-session.commit.v1";
+
+  it("accepts realistic 40-set and 80-set Native workouts that the old 4 KiB default refused", async () => {
+    runtimeCommand.mockResolvedValue({ outcome: "committed" });
+    for (const [exercises, setsPerExercise] of [[8, 5], [16, 5]]) {
+      const envelope = nativeTrainingEnvelope({ exercises, setsPerExercise });
+      const body = encodeCommand(envelope);
+      expect(envelope.payload.exercises.flatMap((exercise) => exercise.sets)).toHaveLength(exercises * setsPerExercise);
+      expect(bytes(body)).toBeGreaterThan(NATIVE_COMMAND_DEFAULT_MAXIMUM_REQUEST_BYTES);
+      expect(bytes(body)).toBeLessThan(TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES / 4);
+      // The pre-change behavior: the generic default refuses it.
+      await expect(readBoundedJsonRequest(jsonRequest(body))).rejects.toMatchObject({ status: 413 });
+
+      const response = await post(body);
+      expect(response.status).toBe(200);
+      expect(runtimeCommand).toHaveBeenLastCalledWith(expect.objectContaining({
+        commandType: TRAINING,
+        payload: envelope.payload,
+      }));
+    }
+    expect(runtimeCommand).toHaveBeenCalledTimes(2);
+  });
+
+  it("accepts a training body exactly at the bound and refuses one byte more before command handling", async () => {
+    runtimeCommand.mockResolvedValue({ outcome: "committed" });
+    const atLimit = padToBytes(nativeTrainingEnvelope({ exercises: 2, setsPerExercise: 3 }), TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES);
+    expect(bytes(atLimit)).toBe(TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES);
+    expect((await post(atLimit)).status).toBe(200);
+    expect(runtimeCommand).toHaveBeenCalledTimes(1);
+
+    const over = padToBytes(nativeTrainingEnvelope({ exercises: 2, setsPerExercise: 3 }), TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES + 1);
+    const rejected = await post(over);
+    expect(rejected.status).toBe(413);
+    expect((await rejected.json()).code).toBe("REQUEST_TOO_LARGE");
+    expect(runtimeCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the reviewed bound synchronized with its pessimistic realistic-maximum derivation", () => {
+    const derived = computeTrainingSessionCommitReviewedMaximumRequestBytes();
+    // Too small would refuse the reviewed maximum workout; too large is silent loosening.
+    expect(TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES).toBe(64 * 1024);
+    expect(TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES).toBeGreaterThanOrEqual(derived);
+    expect(TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES).toBeLessThanOrEqual(Math.ceil(derived * 1.25));
+    expect(TRAINING_SESSION_COMMIT_REVIEWED_MAXIMUM.sets).toBeGreaterThanOrEqual(2 * 60);
+    // The reviewed maximum dwarfs a realistic 80-set Native workout.
+    expect(derived).toBeGreaterThan(3 * bytes(encodeCommand(nativeTrainingEnvelope({ exercises: 16, setsPerExercise: 5 }))));
+    expect(resolveNativeCommandMaximumRequestBytes(TRAINING)).toBe(TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES);
+    expect(nativeCommandRequestMaximumBytes({ commandType: TRAINING })).toBe(TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES);
+  });
+
+  it("leaves the ceiling and every other command's bound unchanged", () => {
+    expect(NATIVE_COMMAND_MAXIMUM_REQUEST_CEILING_BYTES).toBe(HEALTHKIT_INGEST_MAXIMUM_REQUEST_BYTES);
+    expect(NATIVE_COMMAND_MAXIMUM_REQUEST_CEILING_BYTES).toBe(5 * 1024 * 1024);
+    const overridden = new Map([
+      [TRAINING, TRAINING_SESSION_COMMIT_MAXIMUM_REQUEST_BYTES],
+      [Phase3Command.INGEST_HEALTHKIT_OBSERVATIONS, HEALTHKIT_INGEST_MAXIMUM_REQUEST_BYTES],
+      [Phase3Command.INGEST_HEALTHKIT_SLEEP, HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES],
+      [Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_VALIDATION, HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES],
+      [Phase3Command.INGEST_HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE, HEALTHKIT_SLEEP_INGEST_MAXIMUM_REQUEST_BYTES],
+    ]);
+    for (const commandType of Object.values(Phase3Command)) {
+      expect(resolveNativeCommandMaximumRequestBytes(commandType))
+        .toBe(overridden.get(commandType) ?? NATIVE_COMMAND_DEFAULT_MAXIMUM_REQUEST_BYTES);
+    }
+  });
+
+  it("does not let another command borrow the training allowance", async () => {
+    const trainingSized = encodeCommand(nativeTrainingEnvelope({ exercises: 8, setsPerExercise: 5 }));
+    for (const commandType of ["weight.submit.v1", "training-session.create.v1", "training-session.commit.v2"]) {
+      const response = await post(trainingSized.replace(`"commandType":"${TRAINING}"`, `"commandType":"${commandType}"`));
+      expect(response.status).toBe(413);
+    }
+    expect(runtimeCommand).not.toHaveBeenCalled();
+  });
+
+  it("forwards the request id and the client-declared Content-Length to the runtime", async () => {
+    runtimeCommand.mockResolvedValue({ outcome: "committed" });
+    const body = encodeCommand(nativeTrainingEnvelope({ exercises: 8, setsPerExercise: 5 }));
+    const response = await post(body, { "content-length": String(bytes(body)) });
+    expect(response.status).toBe(200);
+    const requestId = response.headers.get("x-request-id");
+    expect(requestId).toMatch(/^[A-Za-z0-9._:-]{8,128}$/);
+    expect(runtimeCommand).toHaveBeenCalledWith(expect.objectContaining({
+      requestId,
+      declaredBodySize: String(bytes(body)),
+      metadata: expect.objectContaining({ correlationId: requestId }),
+    }));
+
+    runtimeCommand.mockClear();
+    await post(body);
+    expect(runtimeCommand).toHaveBeenCalledWith(expect.objectContaining({ declaredBodySize: null }));
+  });
+});
+
 describe("idempotency and identity are unchanged", () => {
   it("still accepts any parseable clientOccurredAt for the server receipt time", async () => {
     const envelope = healthKitEnvelope([summary()]);
@@ -696,6 +795,53 @@ function maximalObservation(index) {
       coverage: padded("complete_day"),
       sourceRevision: numeric("1"),
       dailyActivity,
+    },
+  };
+}
+
+// The exact wire shape Native's TrainingWriteAPI encodes (Swift JSONEncoder,
+// nil optionals omitted): uppercase UUID session/occurrence/set ids, full
+// precision Doubles for converted loads, one provisional exercise, one
+// execution variant, and supersets pairing neighbouring exercises.
+function nativeTrainingEnvelope({ exercises = 8, setsPerExercise = 5 } = {}) {
+  const uuid = (seed) => {
+    const hex = createHash("sha256").update(String(seed)).digest("hex").toUpperCase();
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+  };
+  const catalog = ["barbell_bench_press", "incline_dumbbell_press", "cable_fly", "lat_pulldown", "seated_cable_row", "pull_up", "barbell_back_squat", "romanian_deadlift"];
+  const loads = [185, 102.05828620000001, 62.5, 140, 22.679618, null, 225, 155.5];
+  const payloadExercises = Array.from({ length: exercises }, (_, index) => {
+    const bodyweight = loads[index % loads.length] == null;
+    return {
+      ...(index === exercises - 1
+        ? { provisionalExercise: { name: "Single-Arm Landmine Press (Kneeling)", primaryMuscleGroupId: "shoulders" } }
+        : { canonicalExerciseId: catalog[index % catalog.length] }),
+      occurrenceId: uuid(`occurrence-${index}`),
+      ...(index === 1 ? { executionVariant: { key: "paused", label: "Paused", rawLabel: "paused" } } : {}),
+      sets: Array.from({ length: setsPerExercise }, (_, setIndex) => ({
+        setId: uuid(`set-${index}-${setIndex}`),
+        reps: 12 - setIndex,
+        load: bodyweight ? 0 : loads[index % loads.length],
+        loadType: bodyweight ? "bodyweight" : "external_load",
+        unit: bodyweight ? "bodyweight" : index % 2 ? "kg" : "lb",
+      })),
+    };
+  });
+  const supersets = [];
+  for (let index = 2; index + 1 < exercises; index += 4) {
+    supersets.push({ id: uuid(`superset-${index}`), memberExerciseIds: [payloadExercises[index].occurrenceId, payloadExercises[index + 1].occurrenceId] });
+  }
+  return {
+    commandType: "training-session.commit.v1",
+    metadata: { commandId: createUuidV7(), idempotencyKey: uuid("idempotency"), payloadVersion: "1" },
+    payload: {
+      sessionId: uuid("session"),
+      localDate: "2026-10-02",
+      mode: "live",
+      startedAt: "2026-10-02T15:58:41Z",
+      finishedAt: "2026-10-02T17:31:09Z",
+      exercises: payloadExercises,
+      supersets,
     },
   };
 }

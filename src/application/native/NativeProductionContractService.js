@@ -254,9 +254,24 @@ export function createNativeProductionContractService({
       return envelope(resource, data);
     },
 
-    async command({ request, commandType, metadata, payload }) {
+    async command({ request, commandType, metadata, payload, requestId = null, declaredBodySize = null }) {
       const commandStartedAt = performanceClock();
       const principal = await authorize(request, "founder:write");
+      // The first Server-side proof that an authorized command arrived, logged
+      // before any validation, read or canonical work. Joined to the later
+      // receipt_committed / durable_acknowledgement lines by requestId. Only
+      // fingerprints and sizes: never a raw identifier, key, token or payload.
+      const correlationRequestId = requestId ?? metadata?.correlationId ?? null;
+      logger?.info?.("native.command.received", {
+        requestId: correlationRequestId,
+        commandType: NATIVE_WRITE_COMMANDS.has(commandType) ? commandType : "unrecognized",
+        commandIdFingerprint: optionalIdentityFingerprint(metadata?.commandId),
+        idempotencyFingerprint: optionalIdentityFingerprint(metadata?.idempotencyKey),
+        deviceFingerprint: optionalIdentityFingerprint(principal.deviceId),
+        sessionFingerprint: optionalIdentityFingerprint(principal.sessionId),
+        declaredBodySize: normalizeDeclaredBodySize(declaredBodySize),
+        authDurationMs: elapsed(performanceClock, commandStartedAt),
+      });
       if (typeof executeCommand !== "function") throw unavailableResource();
       if (!NATIVE_WRITE_COMMANDS.has(commandType)) {
         throw new ApplicationProblem({
@@ -305,6 +320,7 @@ export function createNativeProductionContractService({
       }
       const result = await executeCommand({ commandType, principal, metadata, payload });
       logger?.info?.("native.command.receipt_committed", {
+        requestId: correlationRequestId,
         commandType,
         durationMs: elapsed(performanceClock, commandStartedAt),
         commandState: result?.outcome ?? "committed",
@@ -321,6 +337,7 @@ export function createNativeProductionContractService({
           canonicalId: result.receipt.result.canonicalId ?? null,
         });
         logger?.info?.("native.command.durable_acknowledgement", {
+          requestId: correlationRequestId,
           commandType,
           durationMs: elapsed(performanceClock, commandStartedAt),
           confirmationDurationMs: 0,
@@ -342,6 +359,7 @@ export function createNativeProductionContractService({
           commandId: result.receipt?.commandId ?? metadata.commandId,
         });
         logger?.info?.("native.command.durable_acknowledgement", {
+          requestId: correlationRequestId,
           commandType,
           durationMs: elapsed(performanceClock, commandStartedAt),
           confirmationDurationMs: elapsed(performanceClock, durableStartedAt),
@@ -481,6 +499,21 @@ function projectLegacyPresentationItem(item, allowedIcons) {
 
 function safeIdentityFingerprint(value) {
   return createHash("sha256").update(String(value ?? "")).digest("hex").slice(0, 16);
+}
+
+// An absent identity logs null rather than the fingerprint of an empty string.
+function optionalIdentityFingerprint(value) {
+  return value == null || String(value) === "" ? null : safeIdentityFingerprint(value);
+}
+
+// The client-declared Content-Length, as a non-negative safe integer, or null
+// when the header is absent or not a plain decimal byte count.
+function normalizeDeclaredBodySize(value) {
+  if (typeof value === "number") return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const text = String(value ?? "").trim();
+  if (!/^\d{1,15}$/.test(text)) return null;
+  const size = Number(text);
+  return Number.isSafeInteger(size) ? size : null;
 }
 
 function elapsed(clock, startedAt) {

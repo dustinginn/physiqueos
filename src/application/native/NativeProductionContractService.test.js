@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createNativeProductionContractService } from "./NativeProductionContractService.js";
 import { nativeProductionContractManifest } from "./nativeProductionContractManifest.js";
+import { createStructuredLogger } from "../../platform/observability/structuredLogger.js";
 import { createRealBuild45ExecutionItems, createRealBuild45Goals, createRealBuild45PendingReview } from "../../domain/services/RealBuild45PhotoReviewFixture.js";
 import { planPhotoSessionReviewRepair } from "../../domain/services/PhotoSessionReviewRepair.js";
 import { BUILD45_PROGRESS_PHOTOS_REVIEW_REPAIR_AUTHORIZATION } from "../../platform/operations/build45ProgressPhotosReviewRepairAuthorization.js";
@@ -105,6 +106,8 @@ function fixture(overrides = {}) {
     evidenceIntake,
     openMedia,
     now: () => new Date("2026-09-09T12:00:00.000Z"),
+    logger: overrides.logger ?? null,
+    ...(overrides.performanceClock ? { performanceClock: overrides.performanceClock } : {}),
   });
   return { confirmEvidenceReview, evidenceIntake, executeCommand, openMedia, readers, service };
 }
@@ -760,5 +763,160 @@ describe("Native daily-driver local day (travel)", () => {
     expect(current.readers.training.getDay).toHaveBeenLastCalledWith({ date: "2026-09-23", timeZone: null });
     await current.service.read({ request: request(), resource: "training-day", input: { date: "2026-09-23", timeZone: "America/Chicago" } });
     expect(current.readers.training.getDay).toHaveBeenLastCalledWith({ date: "2026-09-23", timeZone: "America/Chicago" });
+  });
+});
+
+describe("Native command request-start observability", () => {
+  const RAW = Object.freeze({
+    commandId: "0199a5b2-7c3d-7e4f-8a1b-2c3d4e5f6a7b",
+    idempotencyKey: "RAW-IDEMPOTENCY-KEY-9F8E7D6C5B4A",
+    sessionId: "raw-logger-session-5E4D3C2B",
+    exerciseId: "raw_exercise_identity_bench",
+  });
+  const trainingResult = Object.freeze({
+    outcome: "committed",
+    receipt: { commandId: RAW.commandId, result: {
+      status: "durable", canonicalId: `training|authoritative|training_logger_draft_${RAW.sessionId}`,
+      trainingSessionDurable: true,
+      stageDurations: {
+        validationAndPackageMs: 1, boundedCanonicalCommitMs: 2, durableReadbackMs: 0.2,
+        canonicalLoadMs: 0.5, canonicalDomainMs: 0.7, canonicalPersistMs: 0.8,
+        performanceEventsMs: 0.3, supportingReviewMs: 0,
+      },
+    } },
+  });
+  const trainingCommand = (overrides = {}) => ({
+    request: request(),
+    requestId: "01999999-aaaa-7bbb-8ccc-dddddddddddd",
+    declaredBodySize: "2345",
+    commandType: "training-session.commit.v1",
+    metadata: { commandId: RAW.commandId, idempotencyKey: RAW.idempotencyKey, correlationId: "01999999-aaaa-7bbb-8ccc-dddddddddddd" },
+    payload: { sessionId: RAW.sessionId, localDate: "2026-09-09", exercises: [{ canonicalExerciseId: RAW.exerciseId, sets: [{ reps: 8, load: 185 }] }] },
+    ...overrides,
+  });
+  const events = (logger) => logger.info.mock.calls.map(([event]) => event);
+  const fields = (logger, name) => logger.info.mock.calls.find(([event]) => event === name)?.[1];
+
+  it("logs native.command.received after authorization and before the command executes", async () => {
+    const order = [];
+    const logger = { info: vi.fn((event) => order.push(event)), warn: vi.fn(), error: vi.fn() };
+    let clock = 100;
+    const current = fixture({
+      logger,
+      performanceClock: () => clock,
+      authenticate: vi.fn(async () => { order.push("authorize"); clock += 12.5; return principal; }),
+    });
+    current.executeCommand.mockImplementation(async () => { order.push("executeCommand"); return trainingResult; });
+    await current.service.command(trainingCommand());
+    expect(order).toEqual([
+      "authorize",
+      "native.command.received",
+      "executeCommand",
+      "native.command.receipt_committed",
+      "native.command.durable_acknowledgement",
+    ]);
+    const received = fields(logger, "native.command.received");
+    expect(received).toEqual({
+      requestId: "01999999-aaaa-7bbb-8ccc-dddddddddddd",
+      commandType: "training-session.commit.v1",
+      commandIdFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+      idempotencyFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+      deviceFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+      sessionFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+      declaredBodySize: 2345,
+      authDurationMs: 12.5,
+    });
+    // The three lines join on requestId and on the existing idempotency fingerprint.
+    for (const name of ["native.command.receipt_committed", "native.command.durable_acknowledgement"]) {
+      expect(fields(logger, name)).toMatchObject({
+        requestId: received.requestId,
+        idempotencyFingerprint: received.idempotencyFingerprint,
+      });
+    }
+    expect(fields(logger, "native.command.durable_acknowledgement").stages)
+      .toEqual(trainingResult.receipt.result.stageDurations);
+  });
+
+  it("never logs raw identifiers, keys, tokens or payload contents", async () => {
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const current = fixture({ logger });
+    current.executeCommand.mockResolvedValue(trainingResult);
+    await current.service.command(trainingCommand());
+    const logged = JSON.stringify(logger.info.mock.calls);
+    expect(events(logger)).toContain("native.command.received");
+    for (const raw of [
+      RAW.commandId, RAW.idempotencyKey, RAW.sessionId, RAW.exerciseId,
+      principal.deviceId, principal.sessionId, "x".repeat(43), "Bearer",
+    ]) {
+      expect(logged).not.toContain(raw);
+    }
+  });
+
+  it("logs nothing when authentication, scope or ownership fails", async () => {
+    const denials = [
+      vi.fn(async () => { throw Object.assign(new Error("expired"), { status: 401, code: "ACCESS_TOKEN_EXPIRED" }); }),
+      vi.fn(async () => ({ ...principal, scopes: ["founder:read"] })),
+      vi.fn(async () => ({ ...principal, userId: "someone-else" })),
+    ];
+    for (const authenticate of denials) {
+      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const current = fixture({ logger, authenticate });
+      await expect(current.service.command(trainingCommand())).rejects.toBeTruthy();
+      expect(logger.info).not.toHaveBeenCalled();
+      expect(current.executeCommand).not.toHaveBeenCalled();
+    }
+  });
+
+  it("names an unknown command type 'unrecognized' and never echoes it", async () => {
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const current = fixture({ logger });
+    await expect(current.service.command(trainingCommand({ commandType: "client-chosen.secret-ish.v9" })))
+      .rejects.toMatchObject({ status: 400, code: "NATIVE_COMMAND_UNAVAILABLE" });
+    expect(events(logger)).toEqual(["native.command.received"]);
+    expect(fields(logger, "native.command.received").commandType).toBe("unrecognized");
+    expect(JSON.stringify(logger.info.mock.calls)).not.toContain("client-chosen");
+    expect(current.executeCommand).not.toHaveBeenCalled();
+  });
+
+  it("logs a null declared size and identity when absent or not a byte count", async () => {
+    for (const [declaredBodySize, expected] of [
+      [undefined, null], [null, null], ["", null], ["abc", null], ["-1", null], ["1e3", null], ["12.5", null],
+      [" 4096 ", 4096], ["0", 0], [65536, 65536], [-5, null], [Number.NaN, null],
+    ]) {
+      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const current = fixture({ logger });
+      await current.service.command({
+        request: request(), commandType: "weight.submit.v1", declaredBodySize,
+        metadata: { idempotencyKey: "weight-observability-1" }, payload: { localDate: "2026-09-09", value: 180 },
+      });
+      const received = fields(logger, "native.command.received");
+      expect(received.declaredBodySize).toBe(expected);
+      expect(received.commandIdFingerprint).toBeNull();
+      expect(received.requestId).toBeNull();
+    }
+  });
+
+  it("keeps every new field readable through the production structured logger", async () => {
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), log: vi.fn() };
+    const logger = createStructuredLogger({ sink, clock: () => new Date("2026-10-02T12:00:00Z"), buildIdentity: { buildId: "synthetic" } });
+    const current = fixture({ logger });
+    current.executeCommand.mockResolvedValue(trainingResult);
+    await current.service.command(trainingCommand());
+    const records = sink.info.mock.calls.map(([line]) => JSON.parse(line));
+    expect(records.map((record) => record.event)).toEqual([
+      "native.command.received", "native.command.receipt_committed", "native.command.durable_acknowledgement",
+    ]);
+    const received = records[0];
+    for (const field of [
+      "requestId", "commandType", "commandIdFingerprint", "idempotencyFingerprint",
+      "deviceFingerprint", "sessionFingerprint", "declaredBodySize", "authDurationMs",
+    ]) {
+      expect(received).toHaveProperty(field);
+      expect(received[field]).not.toBe("[REDACTED]");
+    }
+    expect(received.declaredBodySize).toBe(2345);
+    for (const record of records) expect(record.requestId).toBe("01999999-aaaa-7bbb-8ccc-dddddddddddd");
+    expect(records[2].stages).toEqual(trainingResult.receipt.result.stageDurations);
+    expect(JSON.stringify(records)).not.toContain("[REDACTED]");
   });
 });

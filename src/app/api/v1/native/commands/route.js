@@ -17,6 +17,10 @@ export async function POST(request) {
     });
     return (await getProductionNativeContractRuntime()).command({
       request,
+      requestId,
+      // Client-declared size only (logged after authorization, never trusted
+      // for bounds); the body above was already read under its own bound.
+      declaredBodySize: request.headers.get("content-length"),
       commandType: body.commandType,
       metadata: {
         ...(body.metadata ?? {}),
