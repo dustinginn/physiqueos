@@ -246,7 +246,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         displayIsActive = active
         guard active, session?.activationState == .activated, session?.isReachable == true else { return }
         connectionState = .reachable
-        refresh()
+        retryPending()
     }
 
     /// Explicit recovery from a stale authority warning. The interactive
@@ -259,7 +259,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             return
         }
         connectionState = .reachable
-        refresh()
+        retryPending()
     }
 
     /// Why a confirmed finish is still in progress after `waitingForPhoneAfter`.
@@ -848,7 +848,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             deferredKind = nil
             stopCountdownHaptics()
             connectionState = session?.isReachable == true ? .reachable : .passive
-            if incoming.phase == .cancelled { refresh() }
+            if incoming.phase == .cancelled, session?.isReachable == true { refresh() }
             return
         }
         guard !terminalSessionIds.contains(incoming.sessionId) else { return }

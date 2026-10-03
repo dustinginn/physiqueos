@@ -61,6 +61,13 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         store.apply(.terminal(sessionId: "current", revision: 1, phase: .unavailable))
         XCTAssertEqual(store.connectionState, .passive)
         XCTAssertFalse(store.shouldShowAuthorityWarning(at: now))
+
+        store.apply(.terminal(sessionId: "cancelled", revision: 2, phase: .cancelled))
+        XCTAssertEqual(
+            store.connectionState, .passive,
+            "A fresh cancelled projection must not manufacture OFFLINE by issuing an unreachable refresh."
+        )
+        XCTAssertFalse(store.shouldShowAuthorityWarning(at: now))
     }
 
     @MainActor
@@ -88,6 +95,21 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         XCTAssertNotNil(delivered)
         XCTAssertTrue(store.isMutationPending)
         XCTAssertFalse(store.shouldShowAuthorityWarning(at: now))
+    }
+
+    @MainActor
+    func testRetryPendingResendsTheExactMutationInsteadOfStartingARefresh() throws {
+        let (store, _) = makeStore("reachability.retry-pending")
+        store.apply(try fixture("normal"))
+        var delivered: [WatchWorkoutCommand] = []
+        store.commandSinkForTesting = { delivered.append($0) }
+        store.completeSet()
+        store.retryPending()
+
+        XCTAssertEqual(delivered.count, 2)
+        XCTAssertEqual(delivered[0].kind, .completeSet)
+        XCTAssertEqual(delivered[1].commandId, delivered[0].commandId)
+        XCTAssertEqual(delivered[1].mutationId, delivered[0].mutationId)
     }
 
     @MainActor
