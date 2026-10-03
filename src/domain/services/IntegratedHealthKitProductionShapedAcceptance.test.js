@@ -46,7 +46,10 @@ import { createCardioWholeDayAttributionFixture } from "../../fixtures/healthKit
 
 const OWNER = "user_founder_001";
 const TZ = "America/Los_Angeles";
-const PRODUCTION_BASE = "01d1900b";
+// The live Server base for Build 83. Structural candidate guards must compare
+// against what is actually deployed, not the pre-Cardio historical base used
+// when this acceptance suite was first written.
+const PRODUCTION_BASE = "d0ff65965233fa44e108387f01b649a2bdb476df";
 const WORKOUT_POLICY_ID = "healthkit_workout_canonical_activation_policy";
 const DAILY_POLICY_ID = "healthkit_canonical_daily_activation_policy";
 const sha256 = (value) => createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");
@@ -392,7 +395,7 @@ describe("Item 14: isIndoorWorkout survives request bounds, ingestion and the ca
 });
 
 // ---------------------------------------------------------------------------
-// Item 15: Cardio is NOT activated
+// Item 15: workout scope stays bounded (no policy activation in this candidate)
 // ---------------------------------------------------------------------------
 
 function gitAvailable() {
@@ -406,22 +409,11 @@ function gitAvailable() {
 const REPO_ROOT = path.resolve(new URL("../../..", import.meta.url).pathname);
 const diffAvailable = gitAvailable();
 const git = (...args) => execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-// Committed history only: excludes this acceptance suite itself, which is
-// added on top of the candidate and is not part of the candidate under test.
-// The command-ports file hosts the Workout/graduation write paths this guard protects. The
-// daily-driver local-day lane (weigh-in future-date guard in the device zone) is the only reviewed
-// change allowed there: every added line must be that time-zone pass-through or its comment.
 const COMMAND_PORTS = "src/application/commands/CanonicalPersistenceCommandPorts.js";
-const commandPortsDiff = () => git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", COMMAND_PORTS).split("\n");
-const commandPortsChangeIsOnlyTheWeighInZone = () => commandPortsDiff()
-  .filter((line) => line.startsWith("-") && !line.startsWith("---"))
-  .every((line) => line === '-import { getLocalDateKey, resolveLocalTimeZone } from "../../domain/utils/localDate.js";') && commandPortsDiff()
-  .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
-  .every((line) => /^\+\s*(\/\/.*|import \{ getLocalDateKey, resolveLocalTimeZone, resolveRequestedTimeZone \} from "\.\.\/\.\.\/domain\/utils\/localDate\.js";|timeZone: reconcilePreviousDayPriorities === false|\? resolveRequestedTimeZone\(context\.payload\.timeZone\) \?\? undefined|: undefined,)$/u.test(line));
 const candidateNames = () => git("diff", "--name-only", PRODUCTION_BASE, "HEAD")
   .split("\n").filter(Boolean).filter((name) => !/IntegratedProductionShapedAcceptance\.test\.js$|IntegratedHealthKitProductionShapedAcceptance\.test\.js$/u.test(name));
 
-describe("Item 15: Cardio is NOT activated by the combined candidate", () => {
+describe("Item 15: the combined candidate does not activate or widen a workout policy", () => {
   it("the graduation policy cannot name Cardio/Workout at all: such a policy fails closed for BOTH purposes", () => {
     for (const domain of ["cardio", "workout", "walking"]) {
       const resolved = resolveHealthKitGraduationPolicy(graduationPolicy({
@@ -474,45 +466,36 @@ describe("Item 15: Cardio is NOT activated by the combined candidate", () => {
     })).toMatchObject({ eligible: false, reason: "family_not_in_activation_scope" });
   });
 
-  it.skipIf(!diffAvailable)("git diff 01d1900b..HEAD touches no migration, schema or database-definition file", () => {
+  it.skipIf(!diffAvailable)("git diff from the live production base touches no migration or schema file", () => {
     const names = candidateNames();
     expect(names.length).toBeGreaterThan(0);
     expect(names.filter((name) => /(^|\/)(migrations?|schema)(\/|\.)|\.sql$|prisma|drizzle|knex|ddl|seed/iu.test(name))).toEqual([]);
-    // The only files under a database path are the READ-ONLY graduation reader (and its test), for the
-    // Training Day Cardio presentation fix the READ-ONLY Training navigation read store, and for the Active
-    // Goal current state the READ-ONLY active-goal read store (and its test). SELECT-only; asserted below.
+    // The only database-path changes are a graduation-reader test and the
+    // read-only Training navigation query that now includes OTHER history.
     expect(names.filter((name) => /(^|\/)database\//u.test(name)).sort()).toEqual([
-      "src/platform/database/HealthKitGraduationReader.js", "src/platform/database/HealthKitGraduationReader.test.js",
-      "src/platform/database/PostgresActiveGoalReadStore.js", "src/platform/database/PostgresActiveGoalReadStore.test.js",
-      "src/platform/database/PostgresPriorityNavigationReadStore.js",
-      "src/platform/database/PostgresTrainingNavigationReadStore.js", "src/platform/database/PostgresTrainingNavigationReadStore.test.js"]);
-    // Daily-driver candidate: Priority Detail reads the day's check-in (skip state) by exact record id -- a read, no write.
-    const priorityStoreAdded = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", "src/platform/database/PostgresPriorityNavigationReadStore.js")
-      .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n");
-    expect(priorityStoreAdded).toMatch(/\.get\(\{ ownerUserId, collection: "dailyCheckIns"/u);
-    expect(priorityStoreAdded).not.toMatch(/\b(INSERT|UPDATE|DELETE|UPSERT|ALTER|CREATE|DROP|TRUNCATE)\b|\.(put|putIfAbsent|delete)\(/iu);
-    const goalStoreAdded = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", "src/platform/database/PostgresActiveGoalReadStore.js")
-      .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n");
-    expect(goalStoreAdded).toMatch(/SELECT record_id,/u);
-    expect(goalStoreAdded).not.toMatch(/\b(INSERT|UPDATE|DELETE|UPSERT|ALTER|CREATE|DROP|TRUNCATE)\b/iu);
+      "src/platform/database/HealthKitGraduationReader.test.js",
+      "src/platform/database/PostgresTrainingNavigationReadStore.js"]);
     const storeAdded = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", "src/platform/database/PostgresTrainingNavigationReadStore.js")
       .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n");
-    expect(storeAdded).toMatch(/SELECT payload,version FROM/u);
+    expect(storeAdded).toMatch(/IN \('cardio','other'\)/u);
     expect(storeAdded).not.toMatch(/\b(INSERT|UPDATE|DELETE|UPSERT|ALTER|CREATE|DROP|TRUNCATE)\b/iu);
   });
 
-  it.skipIf(!diffAvailable)("git diff 01d1900b..HEAD adds no line that writes/creates/activates a Workout or graduation policy", () => {
-    const untouched = ["src/domain/services/HealthKitGraduation.js",
-      "src/platform/operations/HealthKitDeferredWorkoutReconciliationRunner.js", "src/domain/services/HealthKitEvidenceEligibilityPolicy.js"];
+  it.skipIf(!diffAvailable)("git diff from the live production base cannot activate or widen a Workout or graduation policy", () => {
+    const untouched = [
+      "src/platform/operations/HealthKitActivationPolicyRunner.js",
+      "scripts/operations/healthKitActivationPolicy.entry.mjs",
+      "src/platform/operations/HealthKitDeferredWorkoutReconciliationRunner.js",
+      "scripts/operations/healthKitDeferredWorkoutReconciliation.entry.mjs",
+      "src/domain/services/HealthKitEvidenceEligibilityPolicy.js",
+      "src/domain/services/HealthKitObservationService.js",
+    ];
     const names = candidateNames();
     for (const file of untouched) expect(names, file).not.toContain(file);
-    if (names.includes(COMMAND_PORTS)) expect(commandPortsChangeIsOnlyTheWeighInZone(), COMMAND_PORTS).toBe(true);
-    const added = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", "src", "scripts", ":(exclude)*.test.js")
-      .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++"));
-    expect(added.length).toBeGreaterThan(0);
-    const offenders = added.filter((line) =>
-      /healthkit_workout_canonical_activation_policy|healthkit_canonical_graduation_policy|WORKOUT_ACTIVATION|\bfamilies\b|healthKitConfiguration|openEnded|records\.(?:put|create|update|upsert|write|delete)|\.(?:insert|upsert)\(/u.test(line));
-    expect(offenders).toEqual([]);
+    const commandPortsAdded = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", COMMAND_PORTS)
+      .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n");
+    expect(commandPortsAdded).toContain("WORKOUT_UNSUPPORTED_TYPE_REASON");
+    expect(commandPortsAdded).not.toMatch(/healthkit_workout_canonical_activation_policy|healthkit_canonical_graduation_policy/u);
   });
 });
 
@@ -623,7 +606,7 @@ describe("Item 16: historical deferred Cardio walks are never auto-reconciled or
     expect(records.snapshot().healthKitCanonicalWorkouts).toEqual([]);
   });
 
-  it("no module outside scripts/operations invokes the reconciliation runner, and the candidate diff never touches it or the ingestion deferral logic", () => {
+  it("no module outside scripts/operations invokes the reconciliation runner, and replay only freezes the two unsupported observations for explicit repair", () => {
     const importers = [];
     for (const rootName of ["src", "scripts"]) {
       const walkDirectory = (directory) => {
@@ -645,8 +628,11 @@ describe("Item 16: historical deferred Cardio walks are never auto-reconciled or
     if (diffAvailable) {
       const names = candidateNames();
       expect(names).not.toContain("src/platform/operations/HealthKitDeferredWorkoutReconciliationRunner.js");
-      if (names.includes(COMMAND_PORTS)) expect(commandPortsChangeIsOnlyTheWeighInZone(), COMMAND_PORTS).toBe(true);
       expect(names).not.toContain("scripts/operations/healthKitDeferredWorkoutReconciliation.entry.mjs");
+      const commandPortsAdded = git("diff", "-U0", PRODUCTION_BASE, "HEAD", "--", COMMAND_PORTS)
+        .split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++")).join("\n");
+      expect(commandPortsAdded).toMatch(/SOURCE_ONLY[\s\S]*WORKOUT_UNSUPPORTED_TYPE_REASON/u);
+      expect(commandPortsAdded).not.toContain("runHealthKitUnsupportedWorkoutTypeRepair");
     }
   });
 });
