@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "home-ui-round2-immutable-fixture-v1",
+  "authority": {
+    "round2PromptCommit": "031df6f138c2f2332d63879302a1573e19f5d225",
+    "nativeBuild84Commit": "bcd92c74602695766c270fe6af052de45afece4b",
+    "visualAnchors": [
+      "screens/anchor-a-light.jpg",
+      "screens/anchor-b-dark.jpg"
+    ],
+    "note": "One immutable presentation fixture for every Round 2 concept. The Round 1 confidence-caption error is corrected to the Native ConfidenceRing semantic: 79% confidence."
+  },
+  "header": {
+    "greeting": "Good afternoon,",
+    "name": "Dustin"
+  },
+  "hero": {
+    "sectionLabel": "Trajectory",
+    "goalLabel": "Build Lean Mass",
+    "headline": "Lean Mass Build",
+    "primaryTimeline": "On track",
+    "supportLine": "Execution is aligned with the current plan.",
+    "confidence": {
+      "value": 79,
+      "presentationLabel": "Confidence",
+      "spokenValue": "79% confidence"
+    },
+    "targetLabel": "Target",
+    "targetValue": "Oct 31",
+    "remainingLabel": "Remaining",
+    "remainingValue": "4 weeks"
+  },
+  "nextBestAction": {
+    "title": "Log Morning Weight"
+  },
+  "briefing": {
+    "sectionLabel": "Latest Briefing",
+    "title": "Midweek Briefing",
+    "date": "Sep 23",
+    "preview": "Keep executing consistently. Keep the current setup in place.",
+    "round2Presentation": "Action-only on Home; preview remains canonical data but is progressively disclosed in Briefing detail."
+  },
+  "goal": {
+    "sectionLabel": "Primary Goal",
+    "title": "Build Lean Mass",
+    "dateRange": "Jul 18 – Oct 31",
+    "progressLabel": "Progress",
+    "progressValue": "58%",
+    "destinationLabel": "Destination",
+    "destinationValue": "+10 lb lean",
+    "phases": [
+      {
+        "label": "Phase 1",
+        "title": "Establish Maintenance",
+        "status": "Complete",
+        "timing": "Completed Aug 14"
+      },
+      {
+        "label": "Phase 2",
+        "title": "Lean Mass Build",
+        "status": "Active",
+        "timing": "Aug 15 – Oct 31 · about 4 weeks remaining",
+        "progress": "+5.8 of 10 lb"
+      }
+    ],
+    "guardrail": {
+      "label": "Guardrail",
+      "title": "Keep body fat at 8–9%",
+      "observation": "Latest DEXA: 8.1% · within range"
+    }
+  },
+  "priorities": {
+    "sectionLabel": "Today’s Priorities",
+    "openCount": "3 open",
+    "items": [
+      {
+        "title": "Morning Weigh-In",
+        "detail": "Before food or fluids",
+        "state": "Open"
+      },
+      {
+        "title": "Foam Rolling",
+        "detail": "7:15 PM",
+        "state": "Open"
+      },
+      {
+        "title": "Tesamorelin",
+        "detail": "10:29 PM · 0.5 mg",
+        "state": "Open"
+      }
+    ]
+  },
+  "navigation": ["Home", "Goals", "Log", "Evidence", "You"]
+}

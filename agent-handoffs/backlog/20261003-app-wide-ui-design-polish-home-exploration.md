@@ -20,3 +20,15 @@ Scope boundary remains:
 - no palette, typography or component migration approved.
 
 Next gate: Founder visual review and direction-setting.
+
+## Round 2 — hybrid, light appearance and experimental directions
+
+Status: **Home Round 2 exploration ready for Founder review**
+
+Round 2 synthesizes the two Founder-selected Round 1 anchors, adds a true iOS light-appearance feasibility audit, and introduces three materially more experimental Home directions. The review set is available at:
+
+- `agent-handoffs/artifacts/home-design-round2-20261003/README.md`
+- `agent-handoffs/artifacts/home-design-round2-20261003/comparison-board.html`
+- `agent-handoffs/artifacts/home-design-round2-20261003/AUDIT.md`
+
+No Round 2 direction, ordering change, palette, component treatment or light-mode implementation is accepted. The next gate remains Founder visual review and explicit direction-setting.
