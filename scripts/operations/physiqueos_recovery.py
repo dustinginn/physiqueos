@@ -373,8 +373,19 @@ def build_aggregator(config: dict[str, Any], temp_root: pathlib.Path,
             continue
         dbid = database_id(index, common)
         try:
-            git(["fetch", "--no-tags", str(common), f"+refs/heads/*:refs/source/{dbid}/heads/*"],
-                git_dir=aggregator, timeout=120)
+            # Do not fetch every legacy ref: File Provider can block while upload-pack
+            # walks otherwise GitHub-durable history. Fresh origin already supplies
+            # reachable objects, so import only tips absent from that object store.
+            local_heads = ref_lines(common, "refs/heads/")
+            for source_ref, sha in local_heads:
+                present = git(["cat-file", "-e", f"{sha}^{{commit}}"], git_dir=aggregator, check=False).returncode == 0
+                suffix = source_ref.removeprefix("refs/heads/")
+                destination_ref = f"refs/source/{dbid}/heads/{suffix}"
+                if present:
+                    git(["update-ref", destination_ref, sha], git_dir=aggregator)
+                else:
+                    git(["fetch", "--no-tags", str(common), f"+{source_ref}:{destination_ref}"],
+                        git_dir=aggregator, timeout=90)
             stash_exists = git(["show-ref", "--verify", "--quiet", "refs/stash"], git_dir=common, check=False).returncode == 0
             if stash_exists:
                 git(["fetch", "--no-tags", str(common), f"+refs/stash:refs/source/{dbid}/stash"],
