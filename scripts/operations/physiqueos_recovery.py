@@ -373,19 +373,37 @@ def build_aggregator(config: dict[str, Any], temp_root: pathlib.Path,
             continue
         dbid = database_id(index, common)
         try:
-            # Do not fetch every legacy ref: File Provider can block while upload-pack
-            # walks otherwise GitHub-durable history. Fresh origin already supplies
-            # reachable objects, so import only tips absent from that object store.
             local_heads = ref_lines(common, "refs/heads/")
+            candidates: list[tuple[str, str]] = []
             for source_ref, sha in local_heads:
                 present = git(["cat-file", "-e", f"{sha}^{{commit}}"], git_dir=aggregator, check=False).returncode == 0
-                suffix = source_ref.removeprefix("refs/heads/")
-                destination_ref = f"refs/source/{dbid}/heads/{suffix}"
-                if present:
-                    git(["update-ref", destination_ref, sha], git_dir=aggregator)
-                else:
-                    git(["fetch", "--no-tags", str(common), f"+{source_ref}:{destination_ref}"],
+                if present and is_reachable(aggregator, sha, authorities):
+                    continue
+                candidates.append((source_ref, sha))
+            if "/Documents/" in str(common) and candidates:
+                # File Provider can deadlock upload-pack even though its object DB is
+                # readable. A direct, bounded bundle of only fresh-origin-absent tips
+                # avoids every live checkout. The legacy DB is independently bounded
+                # by the 100 MiB generation ceiling.
+                source_bundle = temp_root / f"{dbid}-source.bundle"
+                git(["bundle", "create", str(source_bundle), *[ref for ref, _ in candidates]],
+                    git_dir=common, timeout=180)
+                for source_ref, sha in candidates:
+                    suffix = source_ref.removeprefix("refs/heads/")
+                    destination_ref = f"refs/source/{dbid}/heads/{suffix}"
+                    git(["fetch", "--no-tags", str(source_bundle), f"+{source_ref}:{destination_ref}"],
                         git_dir=aggregator, timeout=90)
+            else:
+                # Do not fetch every local ref: fresh origin already supplies all
+                # reachable objects, so import only tips absent from its authority.
+                for source_ref, sha in candidates:
+                    suffix = source_ref.removeprefix("refs/heads/")
+                    destination_ref = f"refs/source/{dbid}/heads/{suffix}"
+                    if git(["cat-file", "-e", f"{sha}^{{commit}}"], git_dir=aggregator, check=False).returncode == 0:
+                        git(["update-ref", destination_ref, sha], git_dir=aggregator)
+                    else:
+                        git(["fetch", "--no-tags", str(common), f"+{source_ref}:{destination_ref}"],
+                            git_dir=aggregator, timeout=90)
             stash_exists = git(["show-ref", "--verify", "--quiet", "refs/stash"], git_dir=common, check=False).returncode == 0
             if stash_exists:
                 git(["fetch", "--no-tags", str(common), f"+refs/stash:refs/source/{dbid}/stash"],
