@@ -517,7 +517,11 @@ def capture_dirty_worktrees(git_inventory: dict[str, Any], config: dict[str, Any
             worktree = pathlib.Path(raw_path)
             if not worktree.is_dir():
                 continue
-            status = git(["status", "--porcelain=v2", "-z"], cwd=worktree, timeout=8, check=False)
+            try:
+                status = git(["status", "--porcelain=v2", "-z"], cwd=worktree, timeout=8, check=False)
+            except RuntimeError:
+                unknown.append({"path": display_path(worktree), "state": "UNKNOWN_FILE_PROVIDER_OR_TIMEOUT"})
+                continue
             if status.returncode != 0:
                 unknown.append({"path": display_path(worktree), "state": "UNKNOWN_FILE_PROVIDER_OR_TIMEOUT"})
                 continue
@@ -770,7 +774,7 @@ def write_checksums(root: pathlib.Path) -> dict[str, Any]:
 
 def scan_generation(root: pathlib.Path) -> dict[str, Any]:
     scanner = SecretScanner()
-    scan_map: dict[str, str] = {}
+    scan_map: dict[str, list[str]] = {}
     inventory_path = root / "local-state" / "inventory.json"
     if inventory_path.is_file():
         inventory = read_json(inventory_path)
@@ -778,14 +782,25 @@ def scan_generation(root: pathlib.Path) -> dict[str, Any]:
             for group in ("tracked", "index", "untracked"):
                 for item in worktree.get(group, []):
                     if "object" in item:
-                        scan_map[item["object"]] = item["path"]
+                        scan_map.setdefault(item["object"], []).append(item["path"])
+    for object_path, logical_paths in scan_map.items():
+        path = root / object_path
+        if not path.is_file():
+            scanner._finding(object_path, "scanner-error", "missing-content-object")
+            continue
+        data = path.read_bytes()
+        for logical in sorted(set(logical_paths)):
+            scanner.scan_data(logical, data,
+                              approved_binary=pathlib.PurePosixPath(logical).suffix.lower() in SecretScanner.BINARY_SUFFIXES)
     for path in root.rglob("*"):
         if not path.is_file() or path.name == "COMPLETE":
             continue
         relative = safe_rel(path, root)
-        logical = scan_map.get(relative, relative)
+        if relative in scan_map:
+            continue
+        logical = relative
         approved_binary = pathlib.PurePosixPath(logical).suffix.lower() in SecretScanner.BINARY_SUFFIXES
-        if relative.startswith("local-state/objects/") and relative not in scan_map:
+        if relative.startswith("local-state/objects/"):
             scanner._finding(relative, "unknown", "unreferenced-content-object")
             continue
         scanner.scan_file(path, logical, approved_binary=approved_binary)
@@ -949,6 +964,11 @@ def restore_smoke_test(generation: pathlib.Path, *, keep_scratch: bool = False) 
                 actual = git(["rev-parse", ref], cwd=clone).stdout.decode().strip()
                 if actual != sha:
                     raise GateFailure("FAIL_SCANNER_ERROR", "restored local ref SHA mismatch")
+            git_dir = clone / ".git"
+            restored_authorities = [ref for ref, _ in ref_lines(git_dir, "refs/remotes/origin/")]
+            restored_authorities.extend(ref for ref, _ in ref_lines(git_dir, "refs/tags/"))
+            restored_recovery_refs = [ref for ref, _ in ref_lines(git_dir, "refs/recovery/")]
+            scan_unpushed_blobs(git_dir, restored_recovery_refs, restored_authorities)
 
         dirty_inventory = read_json(generation / "local-state" / "inventory.json")
         for index, entry in enumerate(item for item in dirty_inventory["worktrees"] if item["state"] == "DIRTY"):

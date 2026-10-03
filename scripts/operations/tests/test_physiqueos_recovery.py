@@ -169,6 +169,16 @@ class VerificationTests(TempCase):
         self.assertEqual(recovery.classify_icloud_metadata(2, 1, 0, 0, 1), "REMOTE_ICLOUD_SYNC_UNKNOWN")
         self.assertEqual(recovery.classify_icloud_metadata(2, 1, 0, 1, 0), "ICLOUD_UPLOAD_ERROR")
 
+    def test_content_object_scanned_under_every_logical_path(self):
+        root = self.temp / "generation"; (root / "local-state" / "objects" / "aa").mkdir(parents=True)
+        data = b"safe text\n"; digest = recovery.sha256_bytes(data)
+        object_path = root / "local-state" / "objects" / digest[:2] / digest
+        object_path.parent.mkdir(parents=True, exist_ok=True); object_path.write_bytes(data)
+        inventory = {"worktrees": [{"tracked": [{"path": "safe.txt", "object": object_path.relative_to(root).as_posix()}],
+                                     "index": [], "untracked": []}]}
+        recovery.write_json(root / "local-state" / "inventory.json", inventory)
+        self.assertEqual(recovery.scan_generation(root)["outcome"], "PASS")
+
 
 class PolicyTests(TempCase):
     def config(self):
