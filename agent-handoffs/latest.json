@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T00:20:55Z",
+  "generated_at_utc": "2026-10-03T02:45:58Z",
   "task": {
-    "id": "build82-live-workout-finish-stall-audit-20261002",
-    "title": "LIVE INCIDENT: Build 82 workout finish stall (Watch + iPhone) read-only audit",
+    "id": "build83-first-real-workout-comprehensive-correction-20261003",
+    "title": "Build 83 first-real-workout corrections - IN-FLIGHT STATUS SNAPSHOT (observer, not lane completion)",
     "agent": "claude",
-    "status": "completed"
+    "status": "in_progress"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -14,40 +14,38 @@
     "native_build": 82,
     "native_sha": "e2cbcd0cf40dca64a4c8490bf0ebd4077b2eb69c",
     "testflight_delivery_id": "f3d09d99-9b8e-4344-85e7-5d2ddcc04519",
+    "build83_native_candidate_local": "c2b171fe (WIP, unpushed) + uncommitted",
+    "build83_server_candidate_local": "f91d76c0 (unpushed, not deployed)",
     "sleep_canonical_algorithm": "sleep-canon-v3 (ordinary, effective 2026-10-02)"
   },
   "result": {
-    "summary": "Audit complete (read-only). Workout SAFE exactly once: training-session.commit.v1 durable 2026-10-03T00:07:54Z, 3 exercises 4+4+5=13 sets, 1 receipt/1 canonical object/1 package, no review/accepted_processing; unchanged at S3 00:18:57Z. Watch Finish never confirmed: requestFinish-only state is mapped to .finishing (\"Finishing safely...\") while the real confirm lives only on the swipe-left controls page; no finishOperationId -> no HealthKit finish/save (Apple Health workout unsaveable in Build 82). Phone Finish was a separate operation (no shared finishOperationId; shared idempotency key/canonical id prevents duplicates); its command URLSession (waitsForConnectivity, 60 s resource timeout) failed every attempt for ~9 min while reads worked, then committed in 6.75 s (server bounded commit 6.1 s > client 3 s/1 s budget). Rest stopwatch: requestFinish keeps rest; Watch renders rest in .finishing. Founder action: tap Return to Log on iPhone Workout Complete (force-quit/reopen first if still Saving); leave Watch alone. Patch plan P1-P8 + tests K1-K12 awaiting authorization.",
-    "success": true,
+    "summary": "Build 83 lane (bg 788283ca) still running. Lane checkpoint 1 (unpublished, classifier-blocked) summarized: audits 14-16 proven (Stair Stepper/Cooldown stored source_only by design -> product-policy D1-D3; 945 kcal/109 min LEGITIMATE no change; Add Set no defect, closed). Finish lifecycle/one finishOperationId/transport/diagnostics/Watch UI incl. swipe-right controls + Daily Totals implemented locally. Server f91d76c0 independently reviewed (APPROVE WITH NITS, fixed) but NOT deployed: auto-mode classifier refused production deploy. Native NOT green: Watch tests 13/13 pass 02:22Z; full iOS 1963 tests with 24 failing cases (22 TrainingLoggerTests) at 02:24Z, lane still testing. No archive/upload yet. Founder authorization sentence + cardio D1-D3 decision needed.",
+    "success": null,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
     "healthkit_written": false
   },
   "validation": {
-    "production_readonly": {
+    "observer": {
       "status": "completed",
-      "summary": "3 REPEATABLE READ READ ONLY snapshots S1-S3 (transaction_read_only=on, 52 SELECTs each, ROLLBACK, marker x1) + web run logs to 00:13Z"
-    },
-    "static_audit": {
-      "status": "completed",
-      "summary": "Native e2cbcd0c Watch/phone finish saga + Server d0ff6596 command path; no builds/tests run"
+      "summary": "read-only observation of lane worktree/branches/scratch logs + prod control-plane apps get; lane not interrupted"
     }
   },
   "open_gates": [
-    "Founder authorization for patch plan P1-P8 (Native Build 83 + log-only Server P6)",
-    "follow-up: 0 trainingPerformanceEvents derived for this commit",
-    "consolidated post-workout Watch UI patch (separate)"
+    "Founder authorization: deploy Server f91d76c0 + continue Build 83 to TestFlight (lane classifier block)",
+    "Founder decision: cardio D1 (Stair Stepper->Cardio), D2 (Cooldown non-strategic display), D3 (Oct 2 repair)",
+    "Native suites green + fresh independent Native review closure",
+    "Build 83 archive, guarded TestFlight upload, VALID"
   ],
-  "full_report_path": "agent-handoffs/reports/20261003T002055Z-build82-live-workout-finish-stall-audit.md",
-  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T235500Z-build82-live-workout-finish-stall-audit.md",
-  "previous_latest_report_path": "agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md",
+  "full_report_path": "agent-handoffs/reports/20261003T024558Z-build83-in-flight-status-snapshot.md",
+  "parent_report_path": "agent-handoffs/inbox/prompts/20261003T003500Z-build83-first-real-workout-comprehensive-correction.md",
+  "previous_latest_report_path": "agent-handoffs/reports/20261003T002055Z-build82-live-workout-finish-stall-audit.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_chatgpt_retrieval": true
-  },
-  "checkpoint_report_path": "agent-handoffs/reports/20261003T000935Z-build82-live-workout-finish-stall-audit-checkpoint1.md"
+  }
 }
