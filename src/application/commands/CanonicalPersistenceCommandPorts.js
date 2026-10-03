@@ -518,6 +518,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     const existingById = new Map(existingObservations.map((record) => [record.id, record]));
     const canonicalDayById = new Map(existingCanonicalDays.map((record) => [record.id, record]));
     const receivedAt = () => context.metadata.clientOccurredAt ?? now().toISOString();
+    let trustedExactConfirmedCount = 0;
     const confirmTrustedExactCorrelation = async ({ persistedWorkout, exactCorrelation }) => {
       const assessment = Object.freeze({
         outcome: HealthKitStrengthMatchOutcome.CONFIDENT,
@@ -575,6 +576,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         now: now(),
       });
       const linked = confirmed.link;
+      if (confirmed.outcome === "confirmed") trustedExactConfirmedCount += 1;
       const atIndex = workoutLinks.findIndex((item) => item.id === linked.id);
       if (atIndex === -1) workoutLinks.push(linked); else workoutLinks.splice(atIndex, 1, linked);
       workoutLinkClaims = await records.list({
@@ -1018,6 +1020,10 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         workoutLinkClaims,
       });
     }
+    workoutRelationships = {
+      ...workoutRelationships,
+      automaticallyConfirmed: (workoutRelationships.automaticallyConfirmed ?? 0) + trustedExactConfirmedCount,
+    };
     const canonicalizedBy = (domain) => results.filter((item) =>
       item.reconciliation?.state === DAILY_SNAPSHOT_STATES[domain].canonicalized
     ).length;
@@ -1118,7 +1124,6 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           });
           sourceObservationsById.set(savedObservation.id, savedObservation);
         }
-        if (exactResult.outcome === "confirmed") summary.automaticallyConfirmed += 1;
         continue;
       } else if (exactCorrelation?.reason === "trusted_session_not_found") {
         // The Watch workout arrived before its independently committed Logger

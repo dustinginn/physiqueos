@@ -918,13 +918,15 @@ describe("trusted PhysiqueOS Watch correlation", () => {
     expect(after.healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
     expect(after.evidenceReviews ?? []).toEqual([]);
     expect(after.canonicalEvidenceObjects).toEqual(beforeEvidence);
+    expect(result.result.workoutRelationships.automaticallyConfirmed).toBe(1);
 
-    await ingest(records, [workout({
+    const replay = await ingest(records, [workout({
       externalId: "trusted-watch-one",
       sourceBundleIdentifier: "com.physiqueos.native.dev",
       isIndoorWorkout: true,
       physiqueOSSessionId: sessionId,
     })], "trusted-replay");
+    expect(replay.result.workoutRelationships.automaticallyConfirmed).toBe(0);
     expect(records.snapshot().healthKitCanonicalWorkouts).toHaveLength(1);
     expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(1);
     expect(records.snapshot().canonicalEvidenceObjects).toEqual(beforeEvidence);
