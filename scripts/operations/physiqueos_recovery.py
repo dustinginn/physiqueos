@@ -1146,17 +1146,19 @@ def publish_icloud(source: pathlib.Path) -> dict[str, Any]:
     if copied["manifest_sha256"] != verification["manifest_sha256"]:
         raise GateFailure("FAIL_SCANNER_ERROR", "iCloud incoming manifest digest mismatch")
     os.rename(incoming, final)
+    upload = query_icloud_upload(final)
+    upload_state = upload.get("state", "REMOTE_ICLOUD_SYNC_UNKNOWN")
     latest = {
         "schema_version": SCHEMA_VERSION, "generation_id": source.name, "path": f"generations/{source.name}",
         "manifest_sha256": verification["manifest_sha256"], "local_container_completed_at": iso_utc(),
         "local_container_state": "LOCAL_ICLOUD_CONTAINER_COMPLETE",
+        "upload_reported_state": upload_state,
+        "upload_metadata_checked_at": iso_utc(),
         "independent_remote_confirmation": "REMOTE_ICLOUD_SYNC_UNKNOWN",
     }
     latest_incoming = root / f".incoming-LATEST-{uuid.uuid4().hex}.json"
     write_json(latest_incoming, latest)
     os.replace(latest_incoming, root / "LATEST.json")
-    upload = query_icloud_upload(final)
-    upload_state = upload.get("state", "REMOTE_ICLOUD_SYNC_UNKNOWN")
     update_state({"latest_generation": source.name, "latest_icloud_path": str(final),
                   "icloud_local_copy": "LOCAL_ICLOUD_CONTAINER_COMPLETE",
                   "icloud_upload_reported": upload_state,
@@ -1164,6 +1166,35 @@ def publish_icloud(source: pathlib.Path) -> dict[str, Any]:
     return {"generation_id": source.name, "destination": str(final),
             "local_state": "LOCAL_ICLOUD_CONTAINER_COMPLETE", "upload": upload,
             "independent_remote_confirmation": "REMOTE_ICLOUD_SYNC_UNKNOWN", **copied}
+
+
+def refresh_icloud_status() -> dict[str, Any]:
+    root = icloud_root()
+    latest_path = root / "LATEST.json"
+    if not latest_path.is_file():
+        raise GateFailure("FAIL_UNKNOWN_FILE", "iCloud LATEST.json unavailable")
+    latest = read_json(latest_path)
+    relative = pathlib.PurePosixPath(str(latest.get("path", "")))
+    if not relative.parts or relative.is_absolute() or ".." in relative.parts:
+        raise GateFailure("FAIL_SCANNER_ERROR", "unsafe iCloud LATEST path")
+    generation = root.joinpath(*relative.parts).resolve()
+    try:
+        generation.relative_to(root.resolve())
+    except ValueError as exc:
+        raise GateFailure("FAIL_SCANNER_ERROR", "iCloud LATEST path escaped destination") from exc
+    verification = verify_generation(generation)
+    if verification["manifest_sha256"] != latest.get("manifest_sha256"):
+        raise GateFailure("FAIL_SCANNER_ERROR", "iCloud LATEST manifest mismatch")
+    upload = query_icloud_upload(generation)
+    state = upload.get("state", "REMOTE_ICLOUD_SYNC_UNKNOWN")
+    latest["upload_reported_state"] = state
+    latest["upload_metadata_checked_at"] = iso_utc()
+    temporary = root / f".incoming-LATEST-refresh-{uuid.uuid4().hex}.json"
+    write_json(temporary, latest)
+    os.replace(temporary, latest_path)
+    update_state({"icloud_upload_reported": state, "icloud_upload_metadata": upload})
+    return {"generation_id": latest["generation_id"], "upload": upload,
+            "independent_remote_confirmation": latest.get("independent_remote_confirmation", "REMOTE_ICLOUD_SYNC_UNKNOWN")}
 
 
 def tree_checksums(root: pathlib.Path) -> list[dict[str, Any]]:
@@ -1188,19 +1219,24 @@ def copy_archive_tier(config: dict[str, Any]) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     for item, definition in zip(selected, config["archive_builds"]):
         source = expand(definition["path"])
-        name = f"PhysiqueOS-{item['version']}-Build{item['build']}-{item['role']}.xcarchive"
+        name = f"PhysiqueOS-{item['version']}-Build{item['build']}-{item['role']}-Archive"
         final = archive_root / name
         if final.exists():
             results.append({"build": item["build"], "state": "ALREADY_PRESENT", "path": str(final)})
             continue
         incoming = archive_root / f".incoming-{name}-{uuid.uuid4().hex}"
-        copy_tree_exact(source, incoming)
+        incoming.mkdir()
+        copied_archive = incoming / "Archive.xcarchive"
+        copy_tree_exact(source, copied_archive)
         source_sums = tree_checksums(source)
-        destination_sums = tree_checksums(incoming)
+        destination_sums = tree_checksums(copied_archive)
         if source_sums != destination_sums:
             raise GateFailure("FAIL_SCANNER_ERROR", f"archive checksum mismatch for Build {item['build']}")
-        write_json(incoming / "PHYSIQUEOS-ARCHIVE-CHECKSUMS.json",
+        write_json(incoming / "ARCHIVE-CHECKSUMS.json",
                    {"schema_version": SCHEMA_VERSION, "build": item["build"], "files": destination_sums})
+        write_json(incoming / "MANIFEST.json",
+                   {"schema_version": SCHEMA_VERSION, "build": item["build"], "version": item["version"],
+                    "role": item["role"], "source_identity": item, "private_keys_exported": False})
         os.rename(incoming, final)
         upload = query_icloud_upload(final)
         results.append({"build": item["build"], "state": "LOCAL_ICLOUD_CONTAINER_COMPLETE",
@@ -1454,10 +1490,15 @@ def status_document() -> dict[str, Any]:
             age_hours = round((utc_now() - value).total_seconds() / 3600, 2)
         except ValueError:
             pass
+    live_upload: Optional[dict[str, Any]] = None
+    latest_icloud_path = state.get("latest_icloud_path")
+    if latest_icloud_path and pathlib.Path(latest_icloud_path).is_dir():
+        live_upload = query_icloud_upload(pathlib.Path(latest_icloud_path))
     return {"latest_generation": state.get("latest_generation"), "reason": state.get("reason"),
             "source_time": source_time, "age_hours": age_hours, "local_validation": state.get("local_validation", "UNKNOWN"),
             "icloud_local_copy": state.get("icloud_local_copy", "UNKNOWN"),
-            "icloud_upload_reported": state.get("icloud_upload_reported", "UNKNOWN"),
+            "icloud_upload_reported": (live_upload or {}).get("state", state.get("icloud_upload_reported", "UNKNOWN")),
+            "icloud_upload_metadata": live_upload or state.get("icloud_upload_metadata"),
             "independent_remote_confirmation": state.get("remote_confirmation", "REMOTE_ICLOUD_SYNC_UNKNOWN"),
             "last_failure": state.get("last_failure"), "next_scheduled_run": next_schedule(),
             "archive_tier": state.get("archive_tier", "NOT_COPIED"), "scheduler": state.get("scheduler", "NOT_INSTALLED"),
@@ -1475,6 +1516,7 @@ def parser() -> argparse.ArgumentParser:
     restore = sub.add_parser("restore-smoke-test"); restore.add_argument("--source", type=pathlib.Path, required=True); restore.add_argument("--keep-scratch", action="store_true")
     sub.add_parser("status")
     publish = sub.add_parser("publish-icloud"); publish.add_argument("--source", type=pathlib.Path, required=True)
+    sub.add_parser("refresh-icloud-status")
     sub.add_parser("copy-archives")
     retention = sub.add_parser("retention-plan"); retention.add_argument("--first-run", action="store_true")
     sub.add_parser("install-scheduler")
@@ -1494,6 +1536,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         elif args.mode == "restore-smoke-test": result = restore_smoke_test(args.source, keep_scratch=args.keep_scratch)
         elif args.mode == "status": result = status_document()
         elif args.mode == "publish-icloud": result = publish_icloud(args.source)
+        elif args.mode == "refresh-icloud-status": result = refresh_icloud_status()
         elif args.mode == "copy-archives": result = copy_archive_tier(config)
         elif args.mode == "retention-plan":
             result = retention_plan(icloud_root() / "generations", config, first_run=args.first_run,

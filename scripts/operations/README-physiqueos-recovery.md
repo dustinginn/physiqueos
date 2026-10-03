@@ -20,6 +20,7 @@ scripts/operations/physiqueos-recovery create --reason manual
 scripts/operations/physiqueos-recovery verify --source '<local-generation-path>'
 scripts/operations/physiqueos-recovery restore-smoke-test --source '<local-generation-path>'
 scripts/operations/physiqueos-recovery publish-icloud --source '<local-generation-path>'
+scripts/operations/physiqueos-recovery refresh-icloud-status
 scripts/operations/physiqueos-recovery restore-smoke-test --source '<iCloud-generation-path>'
 scripts/operations/physiqueos-recovery copy-archives
 scripts/operations/physiqueos-recovery install-scheduler

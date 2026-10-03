@@ -169,6 +169,13 @@ class VerificationTests(TempCase):
         self.assertEqual(recovery.classify_icloud_metadata(2, 1, 0, 0, 1), "REMOTE_ICLOUD_SYNC_UNKNOWN")
         self.assertEqual(recovery.classify_icloud_metadata(2, 1, 0, 1, 0), "ICLOUD_UPLOAD_ERROR")
 
+    def test_status_prefers_live_icloud_metadata(self):
+        home = self.temp / "home"; cloud_generation = self.temp / "cloud"; cloud_generation.mkdir()
+        with mock.patch.dict(os.environ, {"PHYSIQUEOS_RECOVERY_HOME": str(home)}, clear=False):
+            recovery.update_state({"latest_icloud_path": str(cloud_generation), "icloud_upload_reported": "ICLOUD_UPLOAD_ERROR"})
+            with mock.patch.object(recovery, "query_icloud_upload", return_value={"state": "REMOTE_ICLOUD_SYNC_UNKNOWN"}):
+                self.assertEqual(recovery.status_document()["icloud_upload_reported"], "REMOTE_ICLOUD_SYNC_UNKNOWN")
+
     def test_content_object_scanned_under_every_logical_path(self):
         root = self.temp / "generation"; (root / "local-state" / "objects" / "aa").mkdir(parents=True)
         data = b"safe text\n"; digest = recovery.sha256_bytes(data)
