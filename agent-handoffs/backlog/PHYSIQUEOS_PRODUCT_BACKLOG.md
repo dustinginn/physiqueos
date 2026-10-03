@@ -465,7 +465,7 @@ Completion result:
 - physical TestFlight acceptance remains observational and is listed in the final report.
 
 
-## Mac disaster-recovery / iCloud backup V1 — FIRST SMALL GENERATION UPLOADED + RESTORE VERIFIED / SCHEDULER REVIEW GATED (2026-10-03)
+## Mac disaster-recovery / iCloud backup V1 — SMALL TIER IMPLEMENTED / ARCHIVE COPY + INDEPENDENT REMOTE PROOF PENDING (2026-10-03)
 
 Audit authority:
 - `agent-handoffs/reports/20261003T174554Z-mac-icloud-backup-disaster-recovery-audit-plan.md`
@@ -473,6 +473,7 @@ Audit authority:
 - implementation prompt authority `b84428fe54121f5a0d5198157fe972d99586a59a`
 - local Phase 7 implementation authority `54b4ba82ed089a98e2c5950fecbe9b9a7a7e4dc8`
 - iCloud status/archive-integrity implementation authority `6a3e6199` (full SHA in post-copy checkpoint)
+- final scheduler-gate implementation authority `f367ea94` (full SHA in final report)
 
 Goal:
 Create a safe, automated backup path for non-reproducible PhysiqueOS development state on the Founder Mac, with iCloud Drive as a likely off-device destination.
@@ -552,6 +553,9 @@ Status / hard gate:
 - Fourteen File Provider/legacy checkouts are recorded `UNKNOWN_FILE_PROVIDER_OR_TIMEOUT`; their common-database refs are captured, but dirty-state coverage is not claimed.
 - The mandatory pre-write checkpoint was published and verified on `origin/main` at `b181dd54c98ba27aab6717eef2996d0ce3039d8c` before the first iCloud write.
 - The dedicated destination now exists. Generation `PhysiqueOS-Recovery-20261003-191629Z` was copied through `.incoming`, destination-rehashed, renamed, and made current through atomic `LATEST.json`. Scratch restore from the final iCloud destination copy passes.
-- Foundation metadata now reports all 97 final files uploaded, none uploading and no errors: `ICLOUD_UPLOAD_REPORTED_COMPLETE`. This is not independent remote proof; `REMOTE_ICLOUD_SYNC_UNKNOWN` remains correct until distinct-session/device retrieval and checksum verification.
-- Scheduler/hooks remain uninstalled until a fresh clean-snapshot implementation review completes. Retention is implemented but generation #1 deletion is disabled.
+- Foundation metadata produced a clean 97/97 `ICLOUD_UPLOAD_REPORTED_COMPLETE` observation during status refresh and again at scheduler installation, but later queries returned metadata unavailable. Historical upload-reported completion is recorded; current live state and independent remote state are conservatively `REMOTE_ICLOUD_SYNC_UNKNOWN`.
+- A clean exported `origin/main` snapshot review passed 19 tests before enablement; after the fresh-metadata gate was hardened, the suite passed 20 tests. The 03:30 local launchd agent is installed, loaded and idle with last exit `0`; its RunAtLoad catch-up correctly skipped because the generation was under 24 hours old.
+- Explicit hooks are installed for post-major-main-checkpoint and post-TestFlight-VALID use, with recursion prevention verified against the recovery report.
+- Retention is implemented but generation #1 deletion is disabled. Current upload metadata unknown additionally disables all retention deletion.
 - Build 84 and Build 83 identity/archive selection is verified, but their separate iCloud copy is still pending and remains subject to the standing 15 GiB disk-safety floor.
+- Current data-volume free space remains about 13 GiB, so the Build 84/83 archive tier was not copied. No unrelated data was deleted to manufacture headroom.
