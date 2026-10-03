@@ -462,3 +462,52 @@ Completion result:
 - Cooldown is canonical Cooldown history, reporting family `other`, strategic role `history_only`, and contributes nothing to Cardio reporting, targets, indicators or strategy;
 - duplicate workouts `0`; Activity canonical-day count/digest and live calories/exercise minutes unchanged; no historical strategic artifact rewritten;
 - physical TestFlight acceptance remains observational and is listed in the final report.
+
+
+## Mac disaster-recovery / iCloud backup strategy — BACKLOG (2026-10-02)
+
+Goal:
+Create a safe, automated backup path for non-reproducible PhysiqueOS development state on the Founder Mac, with iCloud Drive as a likely off-device destination.
+
+Founder preference:
+- simple iCloud Drive folder;
+- at least once daily;
+- also after major patches/releases/checkpoints where useful;
+- coders may produce/update the backup artifact automatically once the design is accepted.
+
+Architecture constraints:
+- DO NOT place active Git worktrees, Xcode projects-in-use, DerivedData, simulator device data, node_modules, caches or other high-churn development trees directly under iCloud synchronization.
+- Prefer a staged, immutable/versioned backup bundle or snapshot copied atomically into a dedicated iCloud Drive/PhysiqueOS Backups folder.
+- Never copy secrets, keychain contents, PATs, App Store Connect credentials, DigitalOcean credentials/database URLs, signing private keys or other sensitive credential material into the backup bundle.
+- Preserve references/inventory for credential-dependent tooling without exporting credentials themselves.
+- Do not rely on iCloud as the only source-control backup. GitHub remains source authority for pushed source/handoffs.
+
+Audit/design should identify the truly non-reproducible local state, including:
+- repo/worktree/branch/SHA inventory;
+- dirty/uncommitted changes;
+- unpushed commits/branches;
+- safe git bundle/patch representation where appropriate;
+- agent handoff/config/operational files not already durable on GitHub;
+- release/archive inventory and whether signed archives need a separate backup policy;
+- local scripts/tools that are not tracked but are necessary to recover;
+- simulator/Founder test fixtures only if genuinely irreplaceable;
+- Xcode project generator/source authority;
+- sanitized deployment/config metadata;
+- restoration procedure onto a replacement Mac.
+
+Design requirements:
+- daily backup cadence;
+- post-major-patch/release trigger;
+- atomic write (stage locally, validate, then move/copy into iCloud destination);
+- checksums/manifests;
+- retention/rotation policy;
+- size ceiling;
+- disk-floor awareness;
+- verify iCloud destination is actually available before deleting/rotating anything;
+- never delete the only copy of local state merely because a backup was attempted;
+- restore drill/test;
+- human-readable latest manifest;
+- optional notification only on failure or meaningful backup problem.
+
+Status:
+BACKLOG ONLY. Audit/design before implementation. Do not configure iCloud or copy Founder files until explicitly authorized.
