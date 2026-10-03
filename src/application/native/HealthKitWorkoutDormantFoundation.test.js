@@ -961,6 +961,40 @@ describe("trusted PhysiqueOS Watch correlation", () => {
     expect(after.canonicalEvidenceObjects).toHaveLength(1);
   });
 
+  it("confirms without a version conflict when the HealthKit-first workout itself replays after Logger commit", async () => {
+    const records = store({ trustedWatchPolicy: true, evidence: [] });
+    const observedWorkout = workout({
+      externalId: "trusted-health-first-replay",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+    });
+    await ingest(records, [observedWorkout], "health-first-replay-initial");
+    expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(0);
+    expect(records.snapshot().evidenceReviews ?? []).toEqual([]);
+
+    await records.putIfAbsent({
+      ownerUserId: OWNER,
+      collection: "canonicalEvidenceObjects",
+      recordId: canonicalId,
+      sourceIdentity: canonicalId,
+      payload: liveLogger(canonicalId, "10:00", "11:00", 3600),
+    });
+    await ingest(records, [observedWorkout], "health-first-replay-after-logger");
+
+    const after = records.snapshot();
+    expect(after.healthKitCanonicalWorkouts).toHaveLength(1);
+    expect(after.healthKitWorkoutLinks).toHaveLength(1);
+    expect(after.healthKitWorkoutLinks[0]).toMatchObject({
+      status: "confirmed",
+      loggerSessionCanonicalId: canonicalId,
+      associationAuthority: "trusted_physiqueos_session_id_v1",
+    });
+    expect(after.healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
+    expect(after.evidenceReviews ?? []).toEqual([]);
+    expect(after.canonicalEvidenceObjects).toHaveLength(1);
+  });
+
   it("revalidates exact source semantics before returning idempotent trusted confirmation", async () => {
     const records = store({ trustedWatchPolicy: true, evidence: [liveLogger(canonicalId, "10:00", "11:00", 3600)] });
     await ingest(records, [workout({

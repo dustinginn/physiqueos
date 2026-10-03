@@ -954,7 +954,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
             payload: { ...existing, reconciliation },
           });
       }
-      if (ownsCreation) existingById.set(stored.id, stored);
+      existingById.set(stored.id, stored);
       results.push({
         sourceObservationId: stored.id,
         ingestionPurpose: stored.ingestionPurpose,
