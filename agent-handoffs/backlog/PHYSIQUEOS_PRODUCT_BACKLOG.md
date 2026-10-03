@@ -1,6 +1,6 @@
 PhysiqueOS product backlog — durable authority
 
-Last updated: 2026-10-02
+Last updated: 2026-10-03
 Owner: Founder
 Purpose: durable cross-chat authority for outstanding product work, accepted deferrals, natural acceptance gates, and next-build integration items.
 
@@ -465,7 +465,11 @@ Completion result:
 - physical TestFlight acceptance remains observational and is listed in the final report.
 
 
-## Mac disaster-recovery / iCloud backup strategy — BACKLOG (2026-10-02)
+## Mac disaster-recovery / iCloud backup strategy — AUDITED / DESIGN COMPLETE / IMPLEMENTATION NOT STARTED (2026-10-03)
+
+Audit authority:
+- `agent-handoffs/reports/20261003T174554Z-mac-icloud-backup-disaster-recovery-audit-plan.md`
+- prompt authority `5b7ece032abc2a10fd83da6c6c36ad578f1c1e1b`
 
 Goal:
 Create a safe, automated backup path for non-reproducible PhysiqueOS development state on the Founder Mac, with iCloud Drive as a likely off-device destination.
@@ -483,7 +487,27 @@ Architecture constraints:
 - Preserve references/inventory for credential-dependent tooling without exporting credentials themselves.
 - Do not rely on iCloud as the only source-control backup. GitHub remains source authority for pushed source/handoffs.
 
-Audit/design should identify the truly non-reproducible local state, including:
+Audit findings:
+- iCloud Drive is locally available, but the dedicated `PhysiqueOS Backups` folder does not exist and no remote upload was attempted or claimed.
+- Current and legacy shared Git object databases have 22 local branch tips not reachable from any freshly fetched GitHub head/tag (12 tips / 14 commits current; 10 legacy).
+- Five worktrees have verified dirty/untracked state. Thirteen older checkouts under `~/Documents` remain `UNKNOWN-REVIEW` because read-only status scans stalled in the File Provider-backed estate.
+- `iCloud Drive/Documents` points to `~/Documents`, where an older PhysiqueOS repo/worktree estate already lives. Do not move it in this project; capture/review first, then handle any later migration as a separate controlled operation.
+- No Time Machine destination or local snapshot is configured.
+- Seven signed Xcode archives (Builds 79-84) total about 673 MiB. One usable Apple Development identity and seven profiles are present, but private keys/keychain/profiles remain excluded from the recovery bundle.
+- The guarded release tool is local-only and small; safe tool source, schema-validated receipts and sanitized state are backup candidates, while release configs, ASC key material and auth containers are never-copy.
+- Small daily recovery state is expected to be about 5-25 MiB with a 100 MiB fail-closed review ceiling. Builds/caches/simulators/agent session stores remain excluded.
+
+Accepted design pending Founder choices:
+- stage outside iCloud under a generation-specific incomplete path;
+- import fresh GitHub refs and all local refs into a temporary bare aggregator, then create one local-only Git bundle with GitHub prerequisites;
+- capture staged/unstaged state with binary patches plus exact content-addressed file bytes; capture untracked files only through an explicit allowlist;
+- fail closed on deterministic filename/content/structured/Git-object scans and report categories/paths only, never secret values;
+- SHA-256 every file, verify the bundle, and perform a fresh-clone scratch restore before any iCloud promotion;
+- copy into iCloud under an incomplete name, destination-rehash, locally rename, then track local completion, File Provider upload-reported completion and independently downloaded remote confirmation as distinct states;
+- never rotate on local copy success or unknown remote status; keep immutable daily/weekly/monthly/release generations;
+- restore onto a new Mac by cloning GitHub first, importing local-only refs/dirty state, recreating worktrees outside iCloud, restoring safe tools, and reauthenticating all credential-dependent systems.
+
+Audit/design covered the truly non-reproducible local state, including:
 - repo/worktree/branch/SHA inventory;
 - dirty/uncommitted changes;
 - unpushed commits/branches;
@@ -496,7 +520,7 @@ Audit/design should identify the truly non-reproducible local state, including:
 - sanitized deployment/config metadata;
 - restoration procedure onto a replacement Mac.
 
-Design requirements:
+Design requirements established:
 - daily backup cadence;
 - post-major-patch/release trigger;
 - atomic write (stage locally, validate, then move/copy into iCloud destination);
@@ -510,5 +534,16 @@ Design requirements:
 - human-readable latest manifest;
 - optional notification only on failure or meaningful backup problem.
 
-Status:
-BACKLOG ONLY. Audit/design before implementation. Do not configure iCloud or copy Founder files until explicitly authorized.
+Founder decisions pending before implementation:
+1. destination — recommend exactly `iCloud Drive/PhysiqueOS Backups`;
+2. cadence — recommend 03:30 local daily with next-wake catch-up plus post-major-main-checkpoint and post-TestFlight-VALID runs;
+3. retention — recommend 14 daily, 8 weekly, 12 monthly and 12 release/checkpoint generations;
+4. signed archives — recommend a separate post-release tier beginning with current Build 84 + rollback Build 83, plus named milestones;
+5. untracked policy — recommend strict explicit path/type/size allowlist; unknown paths block promotion;
+6. second destination — recommend an encrypted independent destination or Time Machine later, without delaying iCloud V1.
+
+Status / hard gate:
+- Phase 1 audit/design is complete.
+- **IMPLEMENTATION NOT STARTED.** No backup script, local staging bundle, iCloud folder/write, scheduler, release hook, retention deletion, key export or repository move exists from this task.
+- Next only after Founder decisions: Phase 2 local `audit`/`dry-run`; Phase 3 secret scan/checksum/restore drill; Phase 4 explicit destination approval and first copy; Phase 5 independent iCloud retrieval/checksum; Phase 6 scheduler/release hook.
+- No iCloud write before explicit Founder approval of the exact destination.
