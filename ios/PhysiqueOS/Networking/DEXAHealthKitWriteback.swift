@@ -1,5 +1,6 @@
 import Foundation
 import HealthKit
+import CryptoKit
 
 enum DEXAHealthKitMeasurementKind: String, Codable, Sendable {
     case bodyFatPercentage
@@ -199,7 +200,7 @@ final class SystemDEXAHealthKitSampleStore: DEXAHealthKitSampleStore {
 
     @MainActor func save(_ intent: DEXAHealthKitIntent) async throws {
         guard intent.desiredState == "present", let value = intent.value,
-              let dateText = intent.sampleInstant, let date = ISO8601DateFormatter().date(from: dateText)
+              let dateText = intent.sampleInstant, let date = Self.parseSampleInstant(dateText)
         else { throw DEXAHealthKitWritebackError.invalidIntent }
         let healthValue = intent.measurementKind == .bodyFatPercentage ? value / 100 : value
         let metadata: [String: Any] = [
@@ -247,6 +248,13 @@ final class SystemDEXAHealthKitSampleStore: DEXAHealthKitSampleStore {
     private func healthUnit(for kind: DEXAHealthKitMeasurementKind) -> HKUnit {
         kind == .bodyFatPercentage ? .percent() : .pound()
     }
+
+    static func parseSampleInstant(_ text: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: text) { return date }
+        return ISO8601DateFormatter().date(from: text)
+    }
 }
 
 enum DEXAHealthKitWritebackError: Error, Equatable {
@@ -258,6 +266,31 @@ enum DEXAHealthKitWritebackError: Error, Equatable {
     case saveNotAccepted
     case deleteNotAccepted
     case ownedSampleChanged
+}
+
+enum DEXAHealthKitIdentity {
+    static func intentIdentity(logicalScanKey: String, kind: DEXAHealthKitMeasurementKind) -> String {
+        "dexa_hk_intent_\(digest("dexa-hk-intent-v1|\(logicalScanKey)|\(kind.rawValue)"))"
+    }
+
+    static func syncIdentity(logicalScanKey: String, kind: DEXAHealthKitMeasurementKind) -> (identifier: String, externalUUID: String) {
+        let hex = String(digest("dexa-hk-v1|\(logicalScanKey)|\(kind.rawValue)").prefix(32))
+        let uuid = "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20))"
+        return ("physiqueos.dexa.v1.\(hex)", uuid)
+    }
+
+    static func localDate(of instant: Date, timeZone: String) -> String? {
+        guard let zone = TimeZone(identifier: timeZone) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let components = calendar.dateComponents([.year, .month, .day], from: instant)
+        guard let year = components.year, let month = components.month, let day = components.day else { return nil }
+        return String(format: "%04d-%02d-%02d", year, month, day)
+    }
+
+    private static func digest(_ text: String) -> String {
+        SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
 }
 
 enum DEXAHealthKitWritebackState: Equatable, Sendable {
@@ -274,7 +307,7 @@ enum DEXAHealthKitWritebackState: Equatable, Sendable {
         case .off: "Off"
         case .ready: "Ready"
         case .reconciling: "Updating Apple Health…"
-        case .current: "Apple Health is current"
+        case .current: "Saved"
         case .permissionNeeded: "Apple Health permission needed"
         case .pending: "Pending retry"
         case .failed: "Needs attention"
@@ -321,7 +354,6 @@ final class DEXAHealthKitWritebackCoordinator {
     @MainActor func enable() async {
         do {
             _ = try await samples.requestAuthorization()
-            guard allTypesAuthorized else { state = .permissionNeeded; return }
             preferences.isEnabled = true
             state = .ready
             await reconcilePermanent()
@@ -342,6 +374,7 @@ final class DEXAHealthKitWritebackCoordinator {
 
     @MainActor func runPhysicalValidation(action: String) async {
         guard preferences.isEnabled, ["write", "delete"].contains(action) else { return }
+        guard allTypesAuthorized else { state = .permissionNeeded; return }
         await reconcile(mode: "validation", validationAction: action)
     }
 
@@ -366,13 +399,16 @@ final class DEXAHealthKitWritebackCoordinator {
             }
             var sawPermission = false
             var sawFailure = false
+            var sawDeferred = false
             for intent in projection.intents {
                 let result = await reconcile(intent)
                 sawPermission = sawPermission || result == "permission_needed"
-                sawFailure = sawFailure || ["failed", "deferred"].contains(result)
+                sawFailure = sawFailure || result == "failed"
+                sawDeferred = sawDeferred || result == "deferred"
             }
             if sawPermission { state = .permissionNeeded }
-            else if sawFailure { state = .pending }
+            else if sawFailure { state = .failed("Apple Health writeback failed.") }
+            else if sawDeferred { state = .pending }
             else { state = .current; lastCompletedAt = Date() }
         } catch {
             state = .pending
@@ -402,21 +438,36 @@ final class DEXAHealthKitWritebackCoordinator {
         guard let validationAction, mode == "validation", ["write", "delete"].contains(validationAction),
               projection.validation.supported,
               projection.validation.requiresExplicitAction,
+              !projection.policy.enabled,
               !projection.validation.permanentPolicyEnabled,
               projection.validation.scanDate == "2026-09-12",
               projection.validation.expectedRevision == 1,
               projection.validation.permanentEffectiveFromScanDate == "2026-10-09",
               projection.intents.count == 2,
-              Set(projection.intents.map(\.measurementKind)) == allowedKinds
+              Set(projection.intents.map(\.measurementKind)) == allowedKinds,
+              Set(projection.intents.map(\.logicalScanKey)).count == 1
         else { return false }
         let expectedState = validationAction == "write" ? "present" : "withdrawn"
-        return projection.intents.allSatisfy { intent in
+        let identitiesAreBounded = projection.intents.allSatisfy { intent in
             intent.mode == "validation" &&
             intent.occurrenceDate == "2026-09-12" &&
             intent.canonicalRevision == 1 &&
             intent.syncVersion == 1 &&
             intent.timePrecision == "date" &&
             intent.desiredState == expectedState
+        }
+        guard identitiesAreBounded else { return false }
+        if validationAction == "delete" {
+            return projection.intents.allSatisfy { $0.value == nil && $0.unit == nil }
+        }
+        return projection.intents.allSatisfy { intent in
+            switch intent.measurementKind {
+            case .bodyFatPercentage:
+                intent.value == 8.1 && intent.unit == "percent"
+            case .leanBodyMassFatFree:
+                intent.value == 160.5 && intent.unit == "lb" &&
+                intent.derivation == "fat_free_mass_total_minus_fat"
+            }
         }
     }
 
@@ -425,7 +476,7 @@ final class DEXAHealthKitWritebackCoordinator {
               intent.canonicalRevision >= 1,
               intent.syncVersion == intent.canonicalRevision,
               ["present", "withdrawn"].contains(intent.desiredState),
-              intent.syncIdentifier.hasPrefix("physiqueos.dexa.v1."),
+              identityIsSafe(intent),
               intent.measurementKind != .leanBodyMassFatFree || intent.derivation == "fat_free_mass_total_minus_fat"
         else { return await report(intent, outcome: "failed", errorCode: "intent_invalid") }
         guard samples.authorizationStatus(for: intent.measurementKind) == .sharingAuthorized else {
@@ -435,7 +486,14 @@ final class DEXAHealthKitWritebackCoordinator {
             let existing = try await samples.ownedSamples(for: intent)
             guard existing.count <= 1 else { throw DEXAHealthKitWritebackError.ambiguousOwnedSamples }
             if intent.desiredState == "withdrawn" {
-                if let sample = existing.first { try await samples.delete(sample, for: intent) }
+                if let sample = existing.first {
+                    if intent.mode == "validation" {
+                        guard sample.syncVersion == intent.syncVersion else {
+                            throw DEXAHealthKitWritebackError.newerSampleExists
+                        }
+                    }
+                    try await samples.delete(sample, for: intent)
+                }
                 guard try await samples.ownedSamples(for: intent).isEmpty else {
                     throw DEXAHealthKitWritebackError.verificationFailed
                 }
@@ -492,5 +550,29 @@ final class DEXAHealthKitWritebackCoordinator {
 
     private func approximatelyEqual(_ left: Double, _ right: Double, kind: DEXAHealthKitMeasurementKind) -> Bool {
         abs(left - right) <= (kind == .bodyFatPercentage ? 0.000_01 : 0.01)
+    }
+
+    private func identityIsSafe(_ intent: DEXAHealthKitIntent) -> Bool {
+        guard let canonicalId = intent.canonicalId,
+              canonicalId == intent.logicalScanKey,
+              let occurrenceDate = intent.occurrenceDate,
+              ["exact", "appointment_time", "date"].contains(intent.timePrecision),
+              let instantText = intent.sampleInstant,
+              let instant = SystemDEXAHealthKitSampleStore.parseSampleInstant(instantText),
+              DEXAHealthKitIdentity.localDate(of: instant, timeZone: intent.timeZone) == occurrenceDate,
+              intent.intentIdentity == DEXAHealthKitIdentity.intentIdentity(
+                logicalScanKey: intent.logicalScanKey, kind: intent.measurementKind
+              )
+        else { return false }
+        let logicalParts = intent.logicalScanKey.split(separator: "|", omittingEmptySubsequences: false)
+        guard logicalParts.count == 3,
+              logicalParts[0] == "dexa_scan",
+              !logicalParts[1].isEmpty,
+              logicalParts[2] == Substring(occurrenceDate)
+        else { return false }
+        let sync = DEXAHealthKitIdentity.syncIdentity(
+            logicalScanKey: intent.logicalScanKey, kind: intent.measurementKind
+        )
+        return intent.syncIdentifier == sync.identifier && intent.externalUUID == sync.externalUUID
     }
 }

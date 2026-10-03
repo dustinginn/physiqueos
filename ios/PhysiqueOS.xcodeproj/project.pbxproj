@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		000000000000000000001A20 /* DEXAHealthKitWriteback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A21 /* DEXAHealthKitWriteback.swift */; };
-		000000000000000000001A22 /* DEXAHealthKitWritebackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A23 /* DEXAHealthKitWritebackTests.swift */; };
 		000000000000000000001002 /* PhysiqueOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001001 /* PhysiqueOSApp.swift */; };
 		000000000000000000001004 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001003 /* AppEnvironment.swift */; };
 		000000000000000000001006 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001005 /* AppTab.swift */; };
@@ -379,6 +377,7 @@
 		000000000000000000001A01 /* TrainingSessionTerminalLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A00 /* TrainingSessionTerminalLedger.swift */; };
 		000000000000000000001A03 /* NetworkDiagnosticsExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A02 /* NetworkDiagnosticsExport.swift */; };
 		000000000000000000001A05 /* NetworkDiagnosticsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A04 /* NetworkDiagnosticsSection.swift */; };
+		000000000000000000001B01 /* DEXAHealthKitWriteback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001B00 /* DEXAHealthKitWriteback.swift */; };
 		0000000000000000000012D5 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D4 /* HealthKitSynchronizationTests.swift */; };
 		0000000000000000000012D7 /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D6 /* HealthKitSleepIngestionTests.swift */; };
 		0000000000000000000012D9 /* HealthKitSleepHistoricalValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D8 /* HealthKitSleepHistoricalValidationTests.swift */; };
@@ -401,6 +400,7 @@
 		000000000000000000001705 /* CompletionFeedbackAndNotificationCapabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001704 /* CompletionFeedbackAndNotificationCapabilityTests.swift */; };
 		000000000000000000001807 /* HomeWidgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001806 /* HomeWidgetTests.swift */; };
 		000000000000000000001A07 /* Build83FinishLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A06 /* Build83FinishLifecycleTests.swift */; };
+		000000000000000000001B03 /* DEXAHealthKitWritebackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001B02 /* DEXAHealthKitWritebackTests.swift */; };
 		0000000000000000000012B3 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B2 /* HealthKit.framework */; };
 		0000000000000000000012B5 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B4 /* WatchConnectivity.framework */; };
 		000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001614 /* WorkoutActivityAttributes.swift */; };
@@ -512,8 +512,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		000000000000000000001A21 /* DEXAHealthKitWriteback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHealthKitWriteback.swift"; sourceTree = "<group>"; };
-		000000000000000000001A23 /* DEXAHealthKitWritebackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHealthKitWritebackTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001001 /* PhysiqueOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PhysiqueOSApp.swift"; sourceTree = "<group>"; };
 		000000000000000000001003 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppEnvironment.swift"; sourceTree = "<group>"; };
 		000000000000000000001005 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppTab.swift"; sourceTree = "<group>"; };
@@ -814,6 +812,7 @@
 		000000000000000000001A00 /* TrainingSessionTerminalLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingSessionTerminalLedger.swift"; sourceTree = "<group>"; };
 		000000000000000000001A02 /* NetworkDiagnosticsExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkDiagnosticsExport.swift"; sourceTree = "<group>"; };
 		000000000000000000001A04 /* NetworkDiagnosticsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkDiagnosticsSection.swift"; sourceTree = "<group>"; };
+		000000000000000000001B00 /* DEXAHealthKitWriteback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHealthKitWriteback.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E7 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
@@ -905,6 +904,7 @@
 		000000000000000000001704 /* CompletionFeedbackAndNotificationCapabilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CompletionFeedbackAndNotificationCapabilityTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001806 /* HomeWidgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeWidgetTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001A06 /* Build83FinishLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Build83FinishLifecycleTests.swift"; sourceTree = "<group>"; };
+		000000000000000000001B02 /* DEXAHealthKitWritebackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHealthKitWritebackTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001296 /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		000000000000000000001298 /* GoalsAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepAcceptanceUITests.swift"; sourceTree = "<group>"; };
@@ -1101,7 +1101,6 @@
 		00000000000000000000126E /* Networking */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001A21 /* DEXAHealthKitWriteback.swift */,
 				000000000000000000001901 /* WatchWorkoutFinishCoordinator.swift */,
 				000000000000000000001900 /* WatchWorkoutConnectivityBridge.swift */,
 				000000000000000000001059 /* HomeAPI.swift */,
@@ -1187,6 +1186,7 @@
 				000000000000000000001804 /* HomeWidgetBridge.swift */,
 				000000000000000000001A00 /* TrainingSessionTerminalLedger.swift */,
 				000000000000000000001A02 /* NetworkDiagnosticsExport.swift */,
+				000000000000000000001B00 /* DEXAHealthKitWriteback.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -1498,7 +1498,6 @@
 		00000000000000000000126B /* PhysiqueOSTests */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000001A23 /* DEXAHealthKitWritebackTests.swift */,
 				000000000000000000001902 /* WatchWorkoutTransportTests.swift */,
 				00000000000000000000120C /* AppTabTests.swift */,
 				00000000000000000000120E /* HomeReadModelTests.swift */,
@@ -1570,6 +1569,7 @@
 				000000000000000000001704 /* CompletionFeedbackAndNotificationCapabilityTests.swift */,
 				000000000000000000001806 /* HomeWidgetTests.swift */,
 				000000000000000000001A06 /* Build83FinishLifecycleTests.swift */,
+				000000000000000000001B02 /* DEXAHealthKitWritebackTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1930,7 +1930,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001A20 /* DEXAHealthKitWriteback.swift in Sources */,
 				000000000000000000001002 /* PhysiqueOSApp.swift in Sources */,
 				000000000000000000001909 /* WatchWorkoutConnectivityBridge.swift in Sources */,
 				00000000000000000000190A /* WatchWorkoutFinishCoordinator.swift in Sources */,
@@ -2232,6 +2231,7 @@
 				000000000000000000001A01 /* TrainingSessionTerminalLedger.swift in Sources */,
 				000000000000000000001A03 /* NetworkDiagnosticsExport.swift in Sources */,
 				000000000000000000001A05 /* NetworkDiagnosticsSection.swift in Sources */,
+				000000000000000000001B01 /* DEXAHealthKitWriteback.swift in Sources */,
 				000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */,
 				000000000000000000001618 /* CompleteWorkoutSetIntent.swift in Sources */,
 				00000000000000000000161B /* WorkoutLiveActivityViews.swift in Sources */,
@@ -2246,7 +2246,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001A22 /* DEXAHealthKitWritebackTests.swift in Sources */,
 				00000000000000000000120D /* AppTabTests.swift in Sources */,
 				00000000000000000000190B /* WatchWorkoutTransportTests.swift in Sources */,
 				00000000000000000000120F /* HomeReadModelTests.swift in Sources */,
@@ -2318,6 +2317,7 @@
 				000000000000000000001705 /* CompletionFeedbackAndNotificationCapabilityTests.swift in Sources */,
 				000000000000000000001807 /* HomeWidgetTests.swift in Sources */,
 				000000000000000000001A07 /* Build83FinishLifecycleTests.swift in Sources */,
+				000000000000000000001B03 /* DEXAHealthKitWritebackTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

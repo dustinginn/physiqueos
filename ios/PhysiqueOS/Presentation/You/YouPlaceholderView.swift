@@ -14,6 +14,7 @@ struct YouPlaceholderView: View {
     let onNavigate: (AppDestination) -> Void
     @Environment(AppEnvironment.self) private var environment
     @State private var validationAction: DEXAValidationAction?
+    @State private var showDexaOptInExplanation = false
 
     var body: some View {
         ScrollView {
@@ -54,6 +55,14 @@ struct YouPlaceholderView: View {
         }
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.background)
+        .alert("Save DEXA results to Apple Health?", isPresented: $showDexaOptInExplanation) {
+            Button("Continue") {
+                Task { await environment.dexaHealthKitWritebackCoordinator.enable() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("PhysiqueOS saves Body Fat Percentage and calculated fat-free Lean Body Mass. Weight and other DEXA results stay in PhysiqueOS. Apple will show the write-only Health authorization next.")
+        }
         .confirmationDialog(
             validationAction?.title ?? "DEXA validation",
             isPresented: Binding(
@@ -82,7 +91,7 @@ struct YouPlaceholderView: View {
                 Toggle(isOn: Binding(
                     get: { coordinator.isEnabled },
                     set: { enabled in
-                        if enabled { Task { await coordinator.enable() } }
+                        if enabled { showDexaOptInExplanation = true }
                         else { coordinator.disable() }
                     }
                 )) {
