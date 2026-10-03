@@ -298,6 +298,7 @@ enum DEXAHealthKitWritebackState: Equatable, Sendable {
     case ready
     case reconciling
     case current
+    case deleted
     case permissionNeeded
     case pending
     case failed(String)
@@ -308,6 +309,7 @@ enum DEXAHealthKitWritebackState: Equatable, Sendable {
         case .ready: "Ready"
         case .reconciling: "Updating Apple Health…"
         case .current: "Saved"
+        case .deleted: "Deleted"
         case .permissionNeeded: "Apple Health permission needed"
         case .pending: "Pending retry"
         case .failed: "Needs attention"
@@ -409,7 +411,10 @@ final class DEXAHealthKitWritebackCoordinator {
             if sawPermission { state = .permissionNeeded }
             else if sawFailure { state = .failed("Apple Health writeback failed.") }
             else if sawDeferred { state = .pending }
-            else { state = .current; lastCompletedAt = Date() }
+            else {
+                state = mode == "validation" && validationAction == "delete" ? .deleted : .current
+                lastCompletedAt = Date()
+            }
         } catch {
             state = .pending
         }

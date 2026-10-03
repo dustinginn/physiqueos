@@ -128,8 +128,9 @@ struct DEXAHistoryView: View {
         let coordinator = environment.dexaHealthKitWritebackCoordinator
         return CardContainer {
             HStack(spacing: 10) {
-                Image(systemName: coordinator.state == .current ? "checkmark.icloud.fill" : "heart.text.square")
-                    .foregroundStyle(coordinator.state == .current ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textSecondary)
+                let completed = coordinator.state == .current || coordinator.state == .deleted
+                Image(systemName: completed ? "checkmark.icloud.fill" : "heart.text.square")
+                    .foregroundStyle(completed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textSecondary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("DEXA → Apple Health")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)

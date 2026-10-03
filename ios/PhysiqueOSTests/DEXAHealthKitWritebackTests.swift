@@ -276,6 +276,8 @@ final class DEXAHealthKitWritebackTests: XCTestCase {
         XCTAssertTrue(samples.stored.values.allSatisfy(\.isEmpty))
         let deleteOutcomes = await deleteServer.receiptOutcomes()
         XCTAssertEqual(deleteOutcomes, ["deleted", "deleted"])
+        XCTAssertEqual(deleter.state, .deleted)
+        XCTAssertEqual(deleter.state.label, "Deleted")
     }
 
     func testPhysicalValidationRejectsAnyScanOutsideTheGuardedSeptember12Identity() async {
