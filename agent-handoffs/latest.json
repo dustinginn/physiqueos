@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T04:37:45Z",
+  "generated_at_utc": "2026-10-03T05:10:50Z",
   "task": {
     "id": "build83-first-real-workout-comprehensive-correction-20261003",
-    "title": "Build 83 corrected Server candidate - pre-deployment authorization checkpoint",
+    "title": "Build 83 Server deployed and D3 independently verified",
     "agent": "codex",
-    "status": "blocked_on_founder_authorization"
+    "status": "in_progress_native_release"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "takeover_prompt_sha": "5afbfd77cb50921425c86575373dd5fa0812698d",
     "continuity_checkpoint_sha": "b2e1779aa8b639ca8508c817204b96df4b4ba511",
-    "production_server_sha": "d0ff65965233fa44e108387f01b649a2bdb476df",
-    "production_deployment": "64533990-3f04-43bc-b710-a2d28dc1850e",
+    "production_server_sha": "89fe0a0340adee22d15b92a1f074a0bbd348ac77",
+    "production_deployment": "28678d4a-e3cc-4b2b-a479-1851ab7093bf",
     "server_candidate_sha": "89fe0a0340adee22d15b92a1f074a0bbd348ac77",
     "native_candidate_sha": "3e61dd215e8474c52bd54230d2d9dfb2f3a93534",
     "withdrawn_server_sha": "22925625ba377e67943ac5d63dd2c9613c897936",
@@ -21,31 +21,27 @@
     "base_sha": "d0ff65965233fa44e108387f01b649a2bdb476df"
   },
   "result": {
-    "summary": "Corrected exact Server and Native candidates are committed, pushed, tested and independently approved. Cooldown is canonical history but non-Cardio everywhere; Stair Stepper is canonical strategically eligible Cardio. Withdrawn 22925625 is not an ancestor and must never deploy. Stopped before Server deployment and D3 pending direct Founder authorization of exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77.",
-    "success": false,
-    "production_mutated": false,
-    "deployed": false,
-    "d3_run": false,
+    "summary": "Exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 is ACTIVE on web and worker. The fail-closed D3 dry run matched exactly the two reviewed Oct. 2 observations, the six-write apply completed, and fresh independent read-only verification approved the result. Stair Stepper is canonical eligible Cardio; Cooldown is canonical history but non-Cardio and history-only. Native Build 83 release work continues from exact reviewed SHA 3e61dd215e8474c52bd54230d2d9dfb2f3a93534.",
+    "success": true,
+    "production_mutated": true,
+    "deployed": true,
+    "d3_run": true,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server changed-test set 13 files/321 tests passed; independent reviewer passed 88 focused D1-D3 tests. Native finish lifecycle 36/36, Watch 27/27, and final affected Watch finish-state 20/20 passed."
+      "summary": "Server candidate changed-test set 321/321 and independent focused D1-D3 set 88/88 passed; post-deploy exact-SHA focused tests passed 24/24. D3 replay, workout integrity, Activity integrity and historical strategic artifact checks passed. Native finish lifecycle 36/36, Watch 27/27, and final affected Watch finish-state 20/20 passed."
     },
     "review": {
       "status": "approved",
-      "summary": "Fresh independent reviews approved exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 and exact Native SHA 3e61dd215e8474c52bd54230d2d9dfb2f3a93534 with no findings."
+      "summary": "Fresh independent review approved deployed Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77, deployment 28678d4a-e3cc-4b2b-a479-1851ab7093bf and the exact D3 result with no blocking findings. Exact Native SHA 3e61dd215e8474c52bd54230d2d9dfb2f3a93534 is also independently approved with no findings."
     }
   },
-  "decisions_required": [
-    "Founder must directly authorize exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 before deployment and the bounded Oct. 2 D3 repair."
-  ],
-  "blockers": [
-    "Direct Founder authorization of exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 has not yet been given."
-  ],
-  "recommended_next_step": "STOP. Await direct Founder authorization of exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77; only then deploy that SHA, verify runtime identity, and run the bounded D3 dry-run/apply sequence.",
-  "full_report_path": "agent-handoffs/reports/20261003T043745Z-build83-server-candidate-predeployment-authorization.md",
+  "decisions_required": [],
+  "blockers": [],
+  "recommended_next_step": "Continue the exact reviewed Native candidate through remaining UI, deterministic generation, signed archive and guarded TestFlight-first gates; wait for VALID and publish the final Build 83 authority checkpoint.",
+  "full_report_path": "agent-handoffs/reports/20261003T051050Z-build83-server-deployed-d3-verified-checkpoint.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
