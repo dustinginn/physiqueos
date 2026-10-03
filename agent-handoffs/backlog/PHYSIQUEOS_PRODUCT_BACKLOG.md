@@ -158,13 +158,13 @@ Trigger:
 - Founder begins planning actual beta onboarding, or DO cost/performance symptoms recur.
 
 7. Apple Watch companion
-Status: BUILD 84 REAL WORKOUT GENERALLY PASSED / BUILD 85 CANDIDATES + PROSPECTIVE POLICY INDEPENDENTLY APPROVED / FOUNDER DEPLOYMENT-ACTIVATION GATE (2026-10-03). Authority checkpoint: `agent-handoffs/reports/20261003T212700Z-build85-watch-candidates-policy-authorization-gate.md`.
+Status: BUILD 84 REAL WORKOUT GENERALLY PASSED / BUILD 85 SERVER + PROSPECTIVE POLICY ACTIVE AND INDEPENDENTLY VERIFIED / NATIVE TESTFLIGHT RELEASE IN PROGRESS (2026-10-03). Authority checkpoint: `agent-handoffs/reports/20261003T223000Z-build85-server-policy-activated.md`.
 Current physical-acceptance facts:
 - real Watch execution, set completion, phone editing, pause/resume, Finish confirmation, recovery, HealthKit save, Saved summary/Done, metrics, Daily Totals, Crown paging and green progress substantially passed;
 - performance-record celebration physical acceptance PASS for session-volume and reps-at-load records; exact reviewed Build 85 candidate includes larger local confetti while preserving the one-time/Reduce Motion lifecycle;
 - inactive/Always-On false `OFFLINE · HEALTH ON` root cause is corrected in exact reviewed Native `b8ee8690b194cb90086b62816b9a2c8c400dc026`; immediate reachability is passive, stale/failed authority stays visible, and structured mutations remain fail-closed;
-- the real PhysiqueOS-created Strength workout incorrectly entered generic 95% Pending Review. Read-only production audit proves exactly one Logger save, one HealthKit strength workout, one canonical workout, one candidate link, zero claims and no exact-correlation identity. The Founder-left review remains untouched;
-- trusted correlation remains dormant in production pending authorization. Exact reviewed Server `3c0f4aefddbb9a6886f6ad012443978303d47024` and Native `b8ee8690b194cb90086b62816b9a2c8c400dc026` implement the prospective path. The policy plan is independently approved for exact source `com.physiqueos.native.dev`, type 50 and effective `2026-10-05T07:00:00.000Z`; two production READ ONLY dry runs returned planned digest `fc028029635cb7ba1de6301206f5f8a8` and exactly two predicted rows. Today’s review has no durable exact ID and cannot be retroactively trusted; it remains untouched for Founder action.
+- the real PhysiqueOS-created Strength workout incorrectly entered generic 95% Pending Review. The Founder manually confirmed it with the correct Logger session; that explicit pre-activation reconciliation remains unchanged and is not retroactively converted into trusted correlation;
+- exact Server `3c0f4aefddbb9a6886f6ad012443978303d47024` is production deployment `e9ffc644-ba32-48d0-afc7-ec3d809d8c77`, ACTIVE 9/9 with healthy live/ready and exact web/worker source. The create-only prospective trusted-Watch policy is version 1 and active for exact source `com.physiqueos.native.dev`, type 50, indoor required, 120-second tolerance and effective `2026-10-05T07:00:00.000Z`; no backfill. It created exactly one policy row plus audit `healthkit_trusted_watch_correlation_audit_6dbb503923b0247b369bbd5e91b39e5c`. Independent verification passed with no workout/review/strategic/Sleep/DEXA mutation or duplicates.
 Locked V1:
 - phone is the sole structured `TrainingSessionAuthority` and planning surface; Watch starts one phone-prepared Ready-for-Watch plan only while the paired phone is reachable;
 - after start, a disconnected Watch HealthKit workout may continue, but every structured mutation fails closed until phone authority returns;
@@ -193,9 +193,7 @@ Phase 1A implemented:
 - generator-owned PhysiqueOS Watch AppIcon is compiled into the signed archive and the physical Watch returns the installed 216x216 icon as non-placeholder;
 - fresh paired Build 82 archive, strict signature/profile/entitlement inspection, physical iPhone+Watch install, launch and idle reachability proof are complete.
 Phase 1A / Build 85 remaining gates:
-- Founder authorizes exact Server `3c0f4aefddbb9a6886f6ad012443978303d47024`; deploy, verify exact web/worker runtime plus live/ready, then re-dry-run and apply only the reviewed prospective two-row policy plan if facts and future boundary remain exact;
-- do not auto-repair today’s Pending Review: no stored exact session identity exists, so only an explicit Founder reconciliation choice is safe;
-- archive exact Native `b8ee8690b194cb90086b62816b9a2c8c400dc026`, rerun final signing/profile/entitlement gates and use guarded TestFlight-first workflow to VALID after Server/policy authorization;
+- archive exact Native `b8ee8690b194cb90086b62816b9a2c8c400dc026`, rerun final signing/profile/entitlement gates and use the guarded TestFlight-first workflow to VALID;
 - physical reconnect/stale-authority acceptance after Build 85 and exact HealthKit-to-structured association proof after authorized activation;
 - physical Cancel acceptance while active, while paused without Resume, and from phone remains a separate unfinished matrix item unless already recorded by a later acceptance report.
 
