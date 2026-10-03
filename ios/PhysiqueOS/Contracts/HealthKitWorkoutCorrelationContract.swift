@@ -13,6 +13,9 @@ struct HealthKitTrustedWorkoutCorrelationContext: Sendable {
 
     var trustedSourceBundleIdentifiers: Set<String>
     var traditionalStrengthTrainingActivityTypes: Set<String>
+    /// Server-owned prospective boundary. A delayed historical workout must
+    /// never acquire exact authority after activation.
+    var effectiveAt: Date?
     var ownerKey: String
     var sessions: [SessionEnvelope]
     var clockToleranceSeconds: TimeInterval
@@ -20,6 +23,7 @@ struct HealthKitTrustedWorkoutCorrelationContext: Sendable {
     static let disabled = Self(
         trustedSourceBundleIdentifiers: [],
         traditionalStrengthTrainingActivityTypes: [],
+        effectiveAt: nil,
         ownerKey: "",
         sessions: [],
         clockToleranceSeconds: 0
@@ -47,7 +51,9 @@ enum HealthKitTrustedWorkoutCorrelation {
               let externalUUID,
               let sessionUUID = UUID(uuidString: externalUUID),
               let startedAt,
-              let endedAt, endedAt >= startedAt
+              let endedAt, endedAt >= startedAt,
+              let effectiveAt = context.effectiveAt,
+              startedAt >= effectiveAt
         else { return nil }
         let matches = context.sessions.filter { envelope in
             guard let envelopeEnd = envelope.endedAt else { return false }
@@ -186,7 +192,10 @@ extension ProductionNativeAPI: HealthKitTrustedWorkoutCorrelationCapabilitySourc
 /// Rebuilds the exact allowlist from durable phone authority at staging time.
 /// The terminal ledger carries committed sessions across app kill and delayed
 /// HealthKit delivery; active drafts are included only after a durable commit
-/// presentation exists.
+/// presentation exists. A confirmed Watch finish is included before the
+/// independent Server commit completes because its HealthKit observer may
+/// run first; its UUID, Watch start, finish operation and frozen end are
+/// already durable phone authority at that point.
 final class HealthKitTrustedWorkoutCorrelationRegistry: @unchecked Sendable {
     private let gate: HealthKitTrustedWorkoutCorrelationGate
     private let drafts: TrainingLoggerDraftStore
@@ -210,10 +219,12 @@ final class HealthKitTrustedWorkoutCorrelationRegistry: @unchecked Sendable {
               let effectiveAt = capability.effectiveAt, effectiveAt <= now()
         else { return .disabled }
         var byID: [UUID: HealthKitTrustedWorkoutCorrelationContext.SessionEnvelope] = [:]
-        for draft in drafts.loadAll() where draft.completionPresentationPending == true {
+        for draft in drafts.loadAll()
+        where draft.watchStartedAt != nil && draft.watchFinishOperationId != nil && draft.finishedAt != nil {
             guard let id = UUID(uuidString: draft.id),
                   let start = (draft.watchStartedAt ?? draft.startedAt).flatMap(TrainingSessionClock.date(from:)),
-                  let end = draft.finishedAt.flatMap(TrainingSessionClock.date(from:))
+                  let end = draft.finishedAt.flatMap(TrainingSessionClock.date(from:)),
+                  start >= effectiveAt
             else { continue }
             byID[id] = .init(sessionId: id, ownerKey: ownerKey, startedAt: start, endedAt: end)
         }
@@ -221,13 +232,15 @@ final class HealthKitTrustedWorkoutCorrelationRegistry: @unchecked Sendable {
             where record.outcome == .committed {
             guard let id = UUID(uuidString: record.sessionId),
                   let start = record.startedAt.flatMap(TrainingSessionClock.date(from:)),
-                  let end = record.finishedAt.flatMap(TrainingSessionClock.date(from:))
+                  let end = record.finishedAt.flatMap(TrainingSessionClock.date(from:)),
+                  start >= effectiveAt
             else { continue }
             byID[id] = .init(sessionId: id, ownerKey: ownerKey, startedAt: start, endedAt: end)
         }
         return .init(
             trustedSourceBundleIdentifiers: capability.trustedSourceBundleIdentifiers,
             traditionalStrengthTrainingActivityTypes: capability.traditionalStrengthTrainingActivityTypes,
+            effectiveAt: effectiveAt,
             ownerKey: ownerKey,
             sessions: byID.values.sorted { $0.sessionId.uuidString < $1.sessionId.uuidString },
             clockToleranceSeconds: capability.clockToleranceSeconds

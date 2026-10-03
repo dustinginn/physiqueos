@@ -445,7 +445,13 @@ struct WatchWorkoutExecutionView: View {
 
     @ViewBuilder
     private func primaryAction(_ layout: WatchExecutionLayout) -> some View {
-        if projection.completedSets == projection.totalSets, projection.totalSets > 0 {
+        if store.shouldShowAuthorityWarning(at: Date()) {
+            WatchEdgeCapsuleButton(
+                title: "Retry iPhone", layout: layout, enabled: true,
+                tint: WatchPhysiqueOSTheme.warning
+            ) { store.retryAuthorityConnection() }
+                .accessibilityIdentifier("watch.execution.retryPhone")
+        } else if projection.completedSets == projection.totalSets, projection.totalSets > 0 {
             WatchEdgeCapsuleButton(title: "Finish Workout", layout: layout, enabled: store.connectionState == .reachable) {
                 store.requestFinish()
             }
@@ -844,6 +850,13 @@ struct WatchWorkoutControlsView: View {
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(WatchPhysiqueOSTheme.muted)
                 .accessibilityIdentifier("watch.controls.title")
+            if store.shouldShowAuthorityWarning(at: Date()) {
+                controlButton(
+                    "Retry iPhone", icon: "arrow.clockwise", tint: WatchPhysiqueOSTheme.warning,
+                    prominent: true, enabled: true, layout
+                ) { store.retryAuthorityConnection() }
+                    .accessibilityIdentifier("watch.controls.retryPhone")
+            }
             if phase == .active || phase == .paused {
                 controlButton(phase == .paused ? "Resume" : "Pause",
                               icon: phase == .paused ? "play.fill" : "pause.fill",

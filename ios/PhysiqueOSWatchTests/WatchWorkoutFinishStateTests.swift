@@ -46,6 +46,33 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
     }
 
     @MainActor
+    func testCachedProjectionDoesNotMasqueradeAsFreshPhoneContact() throws {
+        let (store, _) = makeStore("reachability.cached")
+        store.apply(try fixture("normal"), recordsAuthoritativeContact: false)
+        XCTAssertEqual(store.connectionState, .passive)
+        XCTAssertTrue(store.shouldShowAuthorityWarning(at: now))
+        store.setDisplayActive(false)
+        XCTAssertFalse(store.shouldShowAuthorityWarning(at: now.addingTimeInterval(60 * 60)))
+    }
+
+    @MainActor
+    func testFreshTerminalContextIsPassiveRatherThanFalseOffline() throws {
+        let (store, _) = makeStore("reachability.terminal")
+        store.apply(.terminal(sessionId: "current", revision: 1, phase: .unavailable))
+        XCTAssertEqual(store.connectionState, .passive)
+        XCTAssertFalse(store.shouldShowAuthorityWarning(at: now))
+    }
+
+    @MainActor
+    func testExplicitAuthorityRetryFailsClosedWhenInteractiveLaneIsUnavailable() throws {
+        let (store, _) = makeStore("reachability.retry")
+        store.apply(try fixture("normal"))
+        store.retryAuthorityConnection()
+        XCTAssertEqual(store.connectionState, .phoneUnavailable)
+        XCTAssertFalse(store.isMutationPending)
+    }
+
+    @MainActor
     func testUnavailableCommandFailsClosedAndReconnectSucceeds() throws {
         let (store, _) = makeStore("reachability.command")
         store.apply(try fixture("normal"))

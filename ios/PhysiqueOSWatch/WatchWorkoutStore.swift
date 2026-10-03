@@ -234,7 +234,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         case .phoneUnavailable, .reconnecting:
             return true
         case .passive:
-            guard displayIsActive, let lastAuthoritativeContactAt else { return false }
+            guard displayIsActive else { return false }
+            guard let lastAuthoritativeContactAt else { return true }
             return date.timeIntervalSince(lastAuthoritativeContactAt) >= Self.authoritativeProjectionStaleAfter
         case .activating, .reachable:
             return false
@@ -243,6 +244,22 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 
     func setDisplayActive(_ active: Bool) {
         displayIsActive = active
+        guard active, session?.activationState == .activated, session?.isReachable == true else { return }
+        connectionState = .reachable
+        refresh()
+    }
+
+    /// Explicit recovery from a stale authority warning. The interactive
+    /// command lane remains fail-closed: no workout mutation is queued when
+    /// the phone is still unreachable.
+    func retryAuthorityConnection() {
+        session?.activate()
+        guard session?.activationState == .activated, session?.isReachable == true else {
+            connectionState = .phoneUnavailable
+            return
+        }
+        connectionState = .reachable
+        refresh()
     }
 
     /// Why a confirmed finish is still in progress after `waitingForPhoneAfter`.
@@ -288,7 +305,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         session?.delegate = self
         session?.activate()
         if let context = session?.receivedApplicationContext {
-            receiveApplicationContext(context)
+            receiveApplicationContext(context, recordsAuthoritativeContact: false)
         }
         Task { await recoverHealthKitIfNeeded() }
     }
@@ -785,8 +802,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 
     // MARK: - Authoritative state
 
-    func apply(_ incoming: WatchWorkoutProjection) {
+    func apply(_ incoming: WatchWorkoutProjection, recordsAuthoritativeContact: Bool = true) {
         guard incoming.schemaVersion == WatchWorkoutContract.schemaVersion else { return }
+        if recordsAuthoritativeContact { lastAuthoritativeContactAt = now() }
         if incoming.requiresHealthSave, let operationId = incoming.finish?.operationId {
             rememberFinish(sessionId: incoming.sessionId, operationId: operationId, finishedAt: incoming.finishedAt)
         }
@@ -829,7 +847,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             }
             deferredKind = nil
             stopCountdownHaptics()
-            connectionState = session?.isReachable == true ? .reachable : .phoneUnavailable
+            connectionState = session?.isReachable == true ? .reachable : .passive
             if incoming.phase == .cancelled { refresh() }
             return
         }
@@ -849,7 +867,6 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             finishingObservedAt = nil
         }
         projection = incoming
-        lastAuthoritativeContactAt = now()
         authoritativeTerminalReceived = false
         connectionState = session?.isReachable == true ? .reachable : .passive
         switch incoming.phase {
@@ -886,7 +903,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         dailyTotals = totals
     }
 
-    private func receiveApplicationContext(_ context: [String: Any]) {
+    private func receiveApplicationContext(
+        _ context: [String: Any],
+        recordsAuthoritativeContact: Bool = true
+    ) {
         // The phone always publishes both slots: an absent totals slot means
         // the canonical snapshot was cleared (sign-out, authority switch).
         if let data = context[WatchWorkoutContract.applicationContextDailyTotalsKey] as? Data,
@@ -897,7 +917,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         }
         if let data = context[WatchWorkoutContract.applicationContextProjectionKey] as? Data,
            let incoming = try? WatchWorkoutWireCodec.decode(WatchWorkoutProjection.self, from: data) {
-            apply(incoming)
+            apply(incoming, recordsAuthoritativeContact: recordsAuthoritativeContact)
             resumeSavedHealthReportIfNeeded()
         }
     }

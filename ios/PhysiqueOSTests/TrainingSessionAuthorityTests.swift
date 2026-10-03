@@ -576,6 +576,7 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         let context = HealthKitTrustedWorkoutCorrelationContext(
             trustedSourceBundleIdentifiers: ["com.physiqueos.watch"],
             traditionalStrengthTrainingActivityTypes: ["50"],
+            effectiveAt: t0.addingTimeInterval(-60),
             ownerKey: "founder",
             sessions: [.init(sessionId: sessionId, ownerKey: "founder", startedAt: t0, endedAt: t0.addingTimeInterval(3_600))],
             clockToleranceSeconds: 30
@@ -596,6 +597,13 @@ final class TrainingSessionAuthorityTests: XCTestCase {
             activityType: "50", isIndoorWorkout: true,
             startedAt: t0.addingTimeInterval(-60), endedAt: t0.addingTimeInterval(3_590), context: context
         ))
+        var preActivation = context
+        preActivation.effectiveAt = t0.addingTimeInterval(10)
+        XCTAssertNil(HealthKitTrustedWorkoutCorrelation.extract(
+            externalUUID: sessionId.uuidString, sourceBundleIdentifier: "com.physiqueos.watch",
+            activityType: "50", isIndoorWorkout: true,
+            startedAt: t0.addingTimeInterval(5), endedAt: t0.addingTimeInterval(3_590), context: preActivation
+        ), "A delayed historical workout never gains prospective exact authority.")
     }
 
     func testTrustedWatchCapabilityAndCommittedLedgerSurviveRelaunchFailClosed() throws {
@@ -644,6 +652,46 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertFalse(malformed.enabled)
         gate.update(malformed)
         XCTAssertTrue(registry.context(ownerKey: "founder").sessions.isEmpty)
+    }
+
+    func testTrustedWatchRegistryBridgesHealthFirstFinishButExcludesPreActivationDrafts() throws {
+        let effective = t0.addingTimeInterval(-60)
+        let capability = HealthKitTrustedWorkoutCorrelationCapability.resolve(manifestBlock: .object([
+            "contractVersion": .string(HealthKitTrustedWorkoutCorrelationContract.contractVersion),
+            "enabled": .bool(true), "prospectiveOnly": .bool(true),
+            "trustedSourceBundleIdentifiers": .array([.string("com.physiqueos.native.dev")]),
+            "traditionalStrengthTrainingActivityTypes": .array([.string("50")]),
+            "clockToleranceSeconds": .number(120),
+            "effectiveAt": .string(ISO8601DateFormatter().string(from: effective))
+        ]), at: t0)
+        let capabilityStore = MemoryTrustedWorkoutCapabilityStore()
+        let gate = HealthKitTrustedWorkoutCorrelationGate(store: capabilityStore)
+        gate.update(capability)
+
+        let currentID = UUID()
+        var healthFirst = liveSession(id: currentID.uuidString, startedAt: TrainingSessionClock.string(from: t0))
+        healthFirst.watchStartedAt = healthFirst.startedAt
+        healthFirst.finishedAt = TrainingSessionClock.string(from: t0.addingTimeInterval(3_600))
+        healthFirst.watchFinishOperationId = "finish-current"
+        healthFirst.watchHealthSaveState = .succeeded
+        XCTAssertNil(healthFirst.completionPresentationPending, "The Server commit has not completed yet.")
+
+        let historicalID = UUID()
+        var historical = liveSession(id: historicalID.uuidString, startedAt: TrainingSessionClock.string(from: effective.addingTimeInterval(-1)))
+        historical.watchStartedAt = historical.startedAt
+        historical.finishedAt = TrainingSessionClock.string(from: t0.addingTimeInterval(1_800))
+        historical.watchFinishOperationId = "finish-historical"
+
+        let registryNow = t0.addingTimeInterval(3_700)
+        let registry = HealthKitTrustedWorkoutCorrelationRegistry(
+            gate: gate,
+            drafts: MemoryTrainingLoggerDraftStore(drafts: [healthFirst, historical]),
+            terminalLedger: MemoryTrainingSessionTerminalLedgerStore(),
+            now: { registryNow }
+        )
+        let context = registry.context(ownerKey: "founder")
+        XCTAssertEqual(context.sessions.map(\.sessionId), [currentID])
+        XCTAssertEqual(context.effectiveAt, effective)
     }
 
     func testCompleteSetStampsCompletedAtAdvancesRevisionAndPersistsBeforePublishing() {

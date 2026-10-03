@@ -144,6 +144,7 @@ final class HealthKitWorkoutIndoorOutdoorFidelityTests: XCTestCase {
             HealthKitTrustedWorkoutCorrelationContext(
                 trustedSourceBundleIdentifiers: ["com.physiqueos.native.dev"],
                 traditionalStrengthTrainingActivityTypes: ["50"],
+                effectiveAt: Self.now.addingTimeInterval(-60),
                 ownerKey: scope.ownerIdentity,
                 sessions: [.init(
                     sessionId: sessionID,
