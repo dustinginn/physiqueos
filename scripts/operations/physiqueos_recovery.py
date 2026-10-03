@@ -1402,8 +1402,11 @@ def install_scheduler() -> dict[str, Any]:
     temporary.write_bytes(plistlib.dumps(plist, fmt=plistlib.FMT_XML, sort_keys=True))
     os.replace(temporary, plist_path)
     result = run(["/bin/launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist_path)], check=False, timeout=30)
-    if result.returncode != 0 and b"already" not in result.stderr.lower():
-        raise GateFailure("FAIL_SCANNER_ERROR", "launchd bootstrap failed")
+    if result.returncode != 0:
+        loaded = run(["/bin/launchctl", "print", f"gui/{os.getuid()}/com.physiqueos.recovery"],
+                     check=False, timeout=30)
+        if loaded.returncode != 0:
+            raise GateFailure("FAIL_SCANNER_ERROR", "launchd bootstrap failed")
     hooks = home / "hooks"
     hooks.mkdir(exist_ok=True)
     checkpoint = hooks / "after-major-main-checkpoint"

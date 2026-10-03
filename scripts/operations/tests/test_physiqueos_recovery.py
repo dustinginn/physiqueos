@@ -248,6 +248,19 @@ class PolicyTests(TempCase):
             self.assertEqual(plist["StartCalendarInterval"], {"Hour": 3, "Minute": 30})
             self.assertTrue(plist["RunAtLoad"])
 
+    def test_scheduler_reinstall_accepts_verified_loaded_job(self):
+        recovery_home = self.temp / "home-loaded"; launch_agents = self.temp / "LaunchAgents-loaded"
+        cloud = self.temp / "cloud-loaded"; cloud.mkdir()
+        env = {"PHYSIQUEOS_RECOVERY_HOME": str(recovery_home), "PHYSIQUEOS_LAUNCH_AGENTS": str(launch_agents)}
+        with mock.patch.dict(os.environ, env, clear=False):
+            recovery.update_state({"local_validation": "PASS", "icloud_local_copy": "LOCAL_ICLOUD_CONTAINER_COMPLETE",
+                                   "latest_icloud_path": str(cloud)})
+            failed_bootstrap = mock.Mock(returncode=5, stderr=b"failure")
+            loaded = mock.Mock(returncode=0, stderr=b"")
+            with mock.patch.object(recovery, "run", side_effect=[failed_bootstrap, loaded]), mock.patch.object(
+                    recovery, "query_icloud_upload", return_value={"state": "ICLOUD_UPLOAD_REPORTED_COMPLETE"}):
+                self.assertEqual(recovery.install_scheduler()["scheduler"], "INSTALLED")
+
     def test_scheduler_install_blocks_on_fresh_upload_unknown(self):
         recovery_home = self.temp / "home-unknown"; cloud = self.temp / "cloud-unknown"; cloud.mkdir()
         with mock.patch.dict(os.environ, {"PHYSIQUEOS_RECOVERY_HOME": str(recovery_home)}, clear=False):
