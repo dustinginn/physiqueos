@@ -55,6 +55,14 @@ class CanonicalTests(TempCase):
         serialized = json.dumps(scanner.findings)
         self.assertNotIn(secret, serialized)
 
+    def test_code_expression_and_synthetic_local_database_are_not_secrets(self):
+        scanner = recovery.SecretScanner()
+        scanner.scan_data("code.js", b"const secret = resolveCredentialFromKeychain();")
+        scanner.scan_data("safe.test.js", b"postgresql://testuser:testpassword@localhost/test")
+        self.assertEqual(scanner.outcome(), "PASS")
+        scanner.scan_data("unsafe.js", b"postgresql://realuser:realpassword@db.example.com/prod")
+        self.assertEqual(scanner.outcome(), "FAIL_SECRET")
+
     def test_unknown_binary_and_approved_binary(self):
         scanner = recovery.SecretScanner(); scanner.scan_data("mystery.bin", b"\x00abc")
         self.assertEqual(scanner.outcome(), "FAIL_UNKNOWN_FILE")

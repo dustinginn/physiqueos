@@ -155,8 +155,8 @@ class SecretScanner:
         ("aws-access-key", re.compile(rb"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")),
         ("authorization-header", re.compile(rb"(?im)^\s*authorization\s*:\s*(?:bearer|basic)\s+\S+")),
         ("jwt", re.compile(rb"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")),
-        ("secret-assignment", re.compile(rb"(?im)\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*['\"]?[^\s'\";,]{8,}")),
-        ("credential-db-url", re.compile(rb"(?i)\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?)://[^\s/:]+:[^\s/@]+@")),
+        ("secret-literal-assignment", re.compile(rb"(?im)\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*(['\"])[^'\"\r\n]{8,}\1")),
+        ("secret-env-assignment", re.compile(rb"(?im)^\s*(?:PASSWORD|PASSWD|SECRET|API_KEY|ACCESS_TOKEN|CLIENT_SECRET)\s*=\s*[^\s#]{8,}")),
         ("service-account", re.compile(rb"(?i)\"type\"\s*:\s*\"service_account\"|\"private_key_id\"\s*:")),
     ]
 
@@ -198,6 +198,17 @@ class SecretScanner:
             count = len(pattern.findall(data))
             if count:
                 self._finding(relative, "secret", rule, count)
+        database_url = re.compile(rb"(?i)\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?)://([^\s/:]+):([^\s/@]+)@([^\s/:]+)")
+        placeholders = {b"user", b"password", b"pass", b"test", b"testuser", b"testpassword", b"postgres",
+                        b"local", b"sandbox", b"example", b"placeholder", b"not-a-secret"}
+        unsafe_urls = 0
+        for match in database_url.finditer(data):
+            user, password, host = (item.lower() for item in match.groups())
+            local_host = host in {b"localhost", b"127.0.0.1", b"::1"} or host.endswith(b".invalid")
+            if not (local_host and user in placeholders and password in placeholders):
+                unsafe_urls += 1
+        if unsafe_urls:
+            self._finding(relative, "secret", "credential-db-url", unsafe_urls)
         text = data.decode("utf-8", errors="ignore")
         candidate_pattern = re.compile(r"(?i)(?:token|secret|password|api[_-]?key)\s*[:=]\s*['\"]?([A-Za-z0-9_+/.=-]{24,})")
         for match in candidate_pattern.finditer(text):
