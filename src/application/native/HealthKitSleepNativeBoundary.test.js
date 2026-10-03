@@ -21,6 +21,7 @@ import {
   resolveNativeCommandMaximumRequestBytes,
 } from "./nativeCommandRequestBounds.js";
 import { HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID } from "../../domain/services/HealthKitSleepPolicies.js";
+import { HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID } from "../../domain/services/HealthKitTrustedWatchWorkoutCorrelationPolicy.js";
 import { createPairedCalibrationFixtures } from "../../fixtures/confidenceNarrativeV3CalibrationFixtures.js";
 import { createCanonicalEvidenceObservationsV3 } from "../../domain/intelligence/ProductionConfidenceNarrativeV3Adapter.js";
 import { activationPolicy, uuid, wire } from "../../testSupport/healthKitSleepSynthetic.js";
@@ -147,6 +148,51 @@ describe("Native manifest Sleep capability", () => {
     const { healthKitSleepIngestion: _served, healthKitSleepHistoricalEvidence: _servedHistorical, ...rest } = served;
     const { healthKitSleepIngestion: _static, healthKitSleepHistoricalEvidence: _staticHistorical, ...staticRest } = nativeProductionContractManifest;
     expect(rest).toEqual(staticRest);
+  });
+
+  it("serves trusted Watch correlation only from its exact prospective policy", async () => {
+    const request = new Request("https://physiqueos.example/api/v1/native/contracts");
+    expect(nativeProductionContractManifest.healthKitTrustedWatchWorkoutCorrelation.enabled).toBe(false);
+
+    const enabled = createHealthKitSleepCapabilityReadService({
+      records: createInMemoryCanonicalRecordStore({
+        healthKitConfiguration: [{
+          id: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+          schemaVersion: "healthkit-trusted-watch-workout-correlation-policy-v1",
+          status: "enabled",
+          prospectiveOnly: true,
+          historicalBackfill: false,
+          trustedSourceBundleIdentifiers: ["com.physiqueos.native.dev"],
+          traditionalStrengthTrainingActivityTypes: ["50"],
+          clockToleranceSeconds: 120,
+          effectiveAt: "2026-10-04T07:00:00.000Z",
+        }],
+      }),
+      ownerUserId: OWNER,
+    });
+    expect((await manifestService({ healthKitSleep: enabled }).manifest({ request }))
+      .healthKitTrustedWatchWorkoutCorrelation).toEqual({
+        contractVersion: "healthkit-trusted-watch-workout-correlation-v1",
+        enabled: true,
+        prospectiveOnly: true,
+        trustedSourceBundleIdentifiers: ["com.physiqueos.native.dev"],
+        traditionalStrengthTrainingActivityTypes: ["50"],
+        clockToleranceSeconds: 120,
+        effectiveAt: "2026-10-04T07:00:00.000Z",
+      });
+
+    const malformed = createHealthKitSleepCapabilityReadService({
+      records: createInMemoryCanonicalRecordStore({
+        healthKitConfiguration: [{
+          id: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+          status: "enabled",
+          trustedSourceBundleIdentifiers: ["com.physiqueos.native.dev", "com.guessed.watch"],
+        }],
+      }),
+      ownerUserId: OWNER,
+    });
+    expect((await manifestService({ healthKitSleep: malformed }).manifest({ request }))
+      .healthKitTrustedWatchWorkoutCorrelation.enabled).toBe(false);
   });
 });
 

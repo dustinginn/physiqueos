@@ -24,6 +24,7 @@ import {
   STAGED_SERVER_DERIVATIVE_GENERATION,
   stagedOriginalMaximumBytes,
 } from "../../domain/services/StagedEvidenceArtifactManifest.js";
+import { describeHealthKitTrustedWatchWorkoutCorrelationCapability } from "../../domain/services/HealthKitTrustedWatchWorkoutCorrelationPolicy.js";
 
 export const NativeProductionResource = Object.freeze({
   PROFILE: "profile",
@@ -241,6 +242,7 @@ export const nativeProductionContractManifest = Object.freeze({
   healthKitSleepIngestion: healthKitSleepIngestionContract(null),
   healthKitSleepHistoricalValidation: healthKitSleepHistoricalValidationContract(null),
   healthKitSleepHistoricalEvidence: healthKitSleepHistoricalEvidenceContract(null),
+  healthKitTrustedWatchWorkoutCorrelation: describeHealthKitTrustedWatchWorkoutCorrelationCapability(null),
   reads,
   writes,
 });
@@ -300,12 +302,13 @@ function healthKitSleepHistoricalEvidenceContract(capability) {
  * The served manifest: the static contract with the per-owner Sleep
  * capabilities resolved. Null capabilities keep both lanes disabled.
  */
-export function withHealthKitSleepCapability(manifest, capability, validationPolicy = null, historicalEvidenceCapability = null) {
+export function withHealthKitSleepCapability(manifest, capability, validationPolicy = null, historicalEvidenceCapability = null, trustedWatchWorkoutCorrelationCapability = null) {
   return Object.freeze({
     ...manifest,
     healthKitSleepIngestion: healthKitSleepIngestionContract(capability),
     healthKitSleepHistoricalValidation: healthKitSleepHistoricalValidationContract(validationPolicy),
     healthKitSleepHistoricalEvidence: healthKitSleepHistoricalEvidenceContract(historicalEvidenceCapability),
+    healthKitTrustedWatchWorkoutCorrelation: describeHealthKitTrustedWatchWorkoutCorrelationCapability(trustedWatchWorkoutCorrelationCapability),
   });
 }
 

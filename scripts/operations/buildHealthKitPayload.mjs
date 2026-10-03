@@ -46,6 +46,11 @@
 //   (Stair Stepper 44, Cooldown 80) stored as source_only / unsupported_workout_type. The scope is
 //   fixed in code; apply additionally requires both --observation-ids, and --sha must be the
 //   deployed runtime SHA (the entry refuses RUNTIME_SHA_MISMATCH).
+//   node scripts/operations/buildHealthKitPayload.mjs --kind trusted-watch-policy --sha <40-hex> \
+//     --effective <ISO-8601 instant> --mode dry-run|apply [--authorization-ref <text>] \
+//     [--expected <json file>] --out <file>
+//   (trusted-watch-policy) prospectively enables exact correlation only for the audited PhysiqueOS
+//   bundle + indoor Traditional Strength Training (type 50), with a fixed 120-second clock fence.
 import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
@@ -136,6 +141,29 @@ export async function buildHealthKitPayload({
         __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference)), __EXPECTED_JSON__: JSON.stringify(String(expected)),
         __INCLUDE_VALUES__: JSON.stringify(Boolean(includeValues)), __SIMULATE_COMPLETE__: JSON.stringify(Boolean(simulateComplete)),
         __MARKER__: JSON.stringify(successMarker),
+      },
+    });
+    return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
+  }
+  if (kind === "trusted-watch-policy") {
+    if (!["dry-run", "apply"].includes(mode)) throw new Error("--mode must be dry-run or apply.");
+    const parsedEffective = new Date(effective);
+    if (!effective || Number.isNaN(parsedEffective.getTime()) || parsedEffective.toISOString() !== effective) {
+      throw new Error("--effective must be an exact ISO-8601 instant.");
+    }
+    if (mode === "apply" && (!String(authorizationReference).trim() || !String(expected).trim())) {
+      throw new Error("apply mode requires --authorization-ref and --expected.");
+    }
+    const successMarker = marker ?? `PHYSIQUEOS_HEALTHKIT_TRUSTED_WATCH_POLICY_${mode === "apply" ? "APPLY" : "DRYRUN"}_SUCCESS_${suffix}`;
+    const result = await build({
+      entryPoints: [path.join(root, "scripts/operations/healthKitTrustedWatchCorrelationPolicy.entry.mjs")],
+      bundle: true, write: false, format: "esm", platform: "node", target: "node22", legalComments: "none", minify: true,
+      external: ["pg"],
+      define: {
+        __EXPECTED_GIT_SHA__: JSON.stringify(sha), __MODE__: JSON.stringify(mode),
+        __EFFECTIVE_AT__: JSON.stringify(effective),
+        __AUTHORIZATION_REFERENCE__: JSON.stringify(String(authorizationReference)),
+        __EXPECTED_JSON__: JSON.stringify(String(expected)), __MARKER__: JSON.stringify(successMarker),
       },
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
@@ -329,7 +357,7 @@ export async function buildHealthKitPayload({
     });
     return { code: `// PHYSIQUEOS_AUDIT_SUCCESS_MARKER: ${successMarker}\n${result.outputFiles[0].text}`, marker: successMarker };
   }
-  throw new Error("--kind must be policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, deferred-workout-reconcile, unsupported-workout-repair, training-audit, sleep-policy, sleep-audit, or sleep-canon-v3.");
+  throw new Error("--kind must be policy, trusted-watch-policy, graduation, audit, workout-audit, link-confirm, strength-auto-confirm, link-reassess, deferred-workout-reconcile, unsupported-workout-repair, training-audit, sleep-policy, sleep-audit, or sleep-canon-v3.");
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

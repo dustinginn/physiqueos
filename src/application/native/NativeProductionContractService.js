@@ -100,6 +100,7 @@ export function createNativeProductionContractService({
       let sleepCapability = null;
       let validationCapability = null;
       let historicalEvidenceCapability = null;
+      let trustedWatchWorkoutCorrelationCapability = null;
       try {
         sleepCapability = await readers.healthKitSleep?.getCapability?.() ?? null;
       } catch {
@@ -115,7 +116,18 @@ export function createNativeProductionContractService({
       } catch {
         historicalEvidenceCapability = null;
       }
-      return withHealthKitSleepCapability(nativeProductionContractManifest, sleepCapability, validationCapability, historicalEvidenceCapability);
+      try {
+        trustedWatchWorkoutCorrelationCapability = await readers.healthKitSleep?.getTrustedWatchWorkoutCorrelationCapability?.() ?? null;
+      } catch {
+        trustedWatchWorkoutCorrelationCapability = null;
+      }
+      return withHealthKitSleepCapability(
+        nativeProductionContractManifest,
+        sleepCapability,
+        validationCapability,
+        historicalEvidenceCapability,
+        trustedWatchWorkoutCorrelationCapability
+      );
     },
 
     async read({ request, resource, input = {} }) {

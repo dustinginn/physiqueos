@@ -17,6 +17,7 @@ import { getHealthKitWorkoutReconciliationId } from "../../domain/services/Healt
 const OWNER = "user_founder_001";
 const WORKOUT_POLICY_ID = "healthkit_workout_canonical_activation_policy";
 const DAILY_POLICY_ID = "healthkit_canonical_daily_activation_policy";
+const TRUSTED_WATCH_POLICY_ID = "healthkit_trusted_watch_workout_correlation_policy";
 const DAY = "2026-09-23";
 const HK_UUID = "9f3c2a10-1111-4222-8333-444455556666";
 const SENTINELS = [
@@ -884,6 +885,79 @@ describe("daily Activity is never double counted", () => {
   });
 });
 
+describe("trusted PhysiqueOS Watch correlation", () => {
+  const sessionId = "a18d53bb-674a-4d3f-8b23-561bf102da11";
+  const canonicalId = `training|authoritative|training_logger_draft_${sessionId}`;
+
+  it("creates one canonical telemetry workout and exact confirmed association without a heuristic review", async () => {
+    const records = store({ trustedWatchPolicy: true, evidence: [liveLogger(canonicalId, "10:00", "11:00", 3600)] });
+    const beforeEvidence = structuredClone(records.snapshot().canonicalEvidenceObjects);
+    const result = await ingest(records, [workout({
+      externalId: "trusted-watch-one",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+    })], "trusted-one");
+    const after = records.snapshot();
+
+    expect(result.result.observations[0].reconciliation).toMatchObject({
+      state: "workout_canonicalized",
+      canonicalTrainingSessionId: canonicalId,
+      associationAuthority: "trusted_physiqueos_session_id_v1",
+    });
+    expect(after.healthKitCanonicalWorkouts).toHaveLength(1);
+    expect(after.healthKitWorkoutLinks).toHaveLength(1);
+    expect(after.healthKitWorkoutLinks[0]).toMatchObject({
+      status: "confirmed",
+      loggerSessionCanonicalId: canonicalId,
+      matchBasis: "trusted_physiqueos_session_id",
+      confidence: 100,
+      associationAuthority: "trusted_physiqueos_session_id_v1",
+    });
+    expect(after.healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
+    expect(after.evidenceReviews ?? []).toEqual([]);
+    expect(after.canonicalEvidenceObjects).toEqual(beforeEvidence);
+
+    await ingest(records, [workout({
+      externalId: "trusted-watch-one",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+    })], "trusted-replay");
+    expect(records.snapshot().healthKitCanonicalWorkouts).toHaveLength(1);
+    expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(1);
+    expect(records.snapshot().canonicalEvidenceObjects).toEqual(beforeEvidence);
+  });
+
+  it("keeps foreign or invalid exact metadata out of trusted authority and rejects a second exact claim", async () => {
+    const foreign = store({ trustedWatchPolicy: true, evidence: [liveLogger(canonicalId, "10:00", "11:00", 3600)] });
+    await ingest(foreign, [workout({
+      sourceBundleIdentifier: "com.apple.Workout",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+    })], "foreign");
+    expect(foreign.snapshot().healthKitWorkoutLinks[0]).toMatchObject({ status: "candidate" });
+    expect(foreign.snapshot().evidenceReviews[0]).toMatchObject({ status: "pending" });
+
+    const records = store({ trustedWatchPolicy: true, evidence: [liveLogger(canonicalId, "10:00", "11:00", 3600)] });
+    await ingest(records, [workout({
+      externalId: "trusted-first",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+    })], "first");
+    const second = await ingest(records, [workout({
+      externalId: "trusted-second",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+    })], "second");
+    expect(second.result.observations[0].reconciliation.associationAuthority).toBeUndefined();
+    expect(records.snapshot().healthKitWorkoutLinks.filter((link) => link.status === "confirmed")).toHaveLength(1);
+    expect(records.snapshot().healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
+  });
+});
+
 describe("strategic quarantine", () => {
   it("keeps Apple workouts and links out of V3, Evidence, and every strategic reader", async () => {
     const records = store({ evidence: [logger("session-a", "10:01", "10:59")] });
@@ -941,7 +1015,7 @@ function policy(overrides = {}) {
   };
 }
 
-function store({ workoutPolicy = true, workoutPolicyOverrides = {}, dailyPolicy = false, evidence = [] } = {}) {
+function store({ workoutPolicy = true, workoutPolicyOverrides = {}, dailyPolicy = false, trustedWatchPolicy = false, evidence = [] } = {}) {
   const configuration = [];
   if (workoutPolicy) configuration.push(policy(workoutPolicyOverrides));
   if (dailyPolicy) {
@@ -949,6 +1023,20 @@ function store({ workoutPolicy = true, workoutPolicyOverrides = {}, dailyPolicy 
       id: DAILY_POLICY_ID, schemaVersion: "healthkit-canonical-activation-policy-v1", status: "enabled",
       domains: ["activity", "nutrition"], effectiveLocalDate: DAY, endLocalDate: DAY,
       strategicEvidenceEligibility: "quarantined", historicalBackfill: false, version: 1,
+    });
+  }
+  if (trustedWatchPolicy) {
+    configuration.push({
+      id: TRUSTED_WATCH_POLICY_ID,
+      schemaVersion: "healthkit-trusted-watch-workout-correlation-policy-v1",
+      status: "enabled",
+      prospectiveOnly: true,
+      historicalBackfill: false,
+      trustedSourceBundleIdentifiers: ["com.physiqueos.native.dev"],
+      traditionalStrengthTrainingActivityTypes: ["50"],
+      clockToleranceSeconds: 120,
+      effectiveAt: `${DAY}T00:00:00.000Z`,
+      version: 1,
     });
   }
   return createInMemoryCanonicalRecordStore({
@@ -968,13 +1056,19 @@ function store({ workoutPolicy = true, workoutPolicyOverrides = {}, dailyPolicy 
 function workout({
   activityType = "50", externalId = HK_UUID, startedAt = `${DAY}T10:00:00-07:00`, endedAt = `${DAY}T11:00:00-07:00`,
   clientLocalDate = DAY, durationSeconds = 3600, activeCalories = 400, averageHeartRate = 122, sourceRevision,
+  sourceBundleIdentifier = "com.apple.health.watch", isIndoorWorkout, physiqueOSSessionId,
 } = {}) {
   return {
     observationType: "workout",
     externalId,
-    source: { bundleIdentifier: "com.apple.health.watch", sourceName: "Apple Watch", productType: "Watch7,5" },
+    source: { bundleIdentifier: sourceBundleIdentifier, sourceName: "Apple Watch", productType: "Watch7,5" },
     occurrence: { localDate: clientLocalDate, timeZone: "America/Los_Angeles", startedAt, endedAt },
-    workout: { activityType, durationSeconds, activeCalories, averageHeartRate, ...(sourceRevision ? { sourceRevision } : {}) },
+    workout: {
+      activityType, durationSeconds, activeCalories, averageHeartRate,
+      ...(typeof isIndoorWorkout === "boolean" ? { isIndoorWorkout } : {}),
+      ...(physiqueOSSessionId ? { physiqueOSSessionId } : {}),
+      ...(sourceRevision ? { sourceRevision } : {}),
+    },
   };
 }
 

@@ -138,6 +138,18 @@ export function assertHealthKitWorkoutRelationshipConfirmationAllowed({
   }
   assertHealthKitWorkoutLinkAllowed(link, { existingLinks: links, canonicalWorkouts: workouts });
   const workout = workouts.find((candidate) => candidate.id === link.canonicalWorkoutId);
+  if (link.associationAuthority === "trusted_physiqueos_session_id_v1") {
+    const exactSessionId = String(link.loggerSessionCanonicalId).split("training_logger_draft_").at(-1);
+    if (!workout || workout.current?.family !== "strength" || workout.current?.canonicalType !== "traditional_strength_training" ||
+      link.matchBasis !== "trusted_physiqueos_session_id" || link.confidence !== 100 ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(exactSessionId)) {
+      throw new HealthKitWorkoutLinkError(
+        "LINK_TRUSTED_CORRELATION_INVALID",
+        "The trusted Watch workout relationship is not canonical.",
+      );
+    }
+    return Object.freeze({ session, workout, assessment: null });
+  }
   const assessment = assessHealthKitStrengthLinkCandidates({
     canonicalWorkout: workout,
     canonicalObjects: evidence,

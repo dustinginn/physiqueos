@@ -8,6 +8,10 @@ import {
   resolveHealthKitSleepValidationPolicy,
 } from "../../domain/services/HealthKitSleepHistoricalValidation.js";
 import { HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT } from "../commands/HealthKitSleepHistoricalEvidenceImportPort.js";
+import {
+  HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+  resolveHealthKitTrustedWatchWorkoutCorrelationPolicy,
+} from "../../domain/services/HealthKitTrustedWatchWorkoutCorrelationPolicy.js";
 
 /**
  * Resolves the owner's Sleep activation policy for the Native manifest. One
@@ -36,6 +40,13 @@ export function createHealthKitSleepCapabilityReadService({ records, ownerUserId
     },
     async getHistoricalEvidenceCapability() {
       return Object.freeze({ enabled: true, ...HEALTHKIT_SLEEP_HISTORICAL_EVIDENCE_IMPORT });
+    },
+    async getTrustedWatchWorkoutCorrelationCapability() {
+      return resolveHealthKitTrustedWatchWorkoutCorrelationPolicy(await records.get({
+        ownerUserId,
+        collection: HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION,
+        recordId: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+      }));
     },
   });
 }

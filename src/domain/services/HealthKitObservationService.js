@@ -414,6 +414,8 @@ export function isCompatibleHealthKitReplay(existing, incoming) {
 export function reconcileHealthKitWorkoutObservation({
   observation,
   canonicalObjects = [],
+  trustedWatchCorrelationPolicy = null,
+  claimedPhysiqueOSSessionIds = [],
 } = {}) {
   if (observation?.observationType !== HealthKitObservationType.WORKOUT) {
     return Object.freeze({ state: HealthKitReconciliationState.SOURCE_ONLY });
@@ -423,6 +425,56 @@ export function reconcileHealthKitWorkoutObservation({
       state: HealthKitReconciliationState.WORKOUT_CANONICALIZATION_DEFERRED,
       reason: "canonical_workout_evidence_eligibility_boundary_not_yet_separate",
       canonicalCandidate: createCanonicalWorkoutCandidate(observation),
+    });
+  }
+
+  const exactSessionId = observation.measurement.physiqueOSSessionId;
+  const sourceIsTrusted = trustedWatchCorrelationPolicy?.enabled === true &&
+    trustedWatchCorrelationPolicy.trustedSourceBundleIdentifiers.includes(observation.source.bundleIdentifier);
+  if (exactSessionId && sourceIsTrusted) {
+    const expectedCanonicalId = `training|authoritative|training_logger_draft_${exactSessionId}`;
+    const fail = (reason) => Object.freeze({
+      state: HealthKitReconciliationState.TRAINING_MATCH_AMBIGUOUS,
+      reason,
+      candidates: Object.freeze([]),
+      confirmationRequired: false,
+    });
+    if (observation.measurement.activityType !== "50" || observation.measurement.isIndoorWorkout !== true) {
+      return fail("trusted_session_workout_semantics_mismatch");
+    }
+    if (Date.parse(observation.occurrence.startedAt) < Date.parse(trustedWatchCorrelationPolicy.effectiveAt)) {
+      return fail("trusted_session_before_prospective_activation");
+    }
+    if (claimedPhysiqueOSSessionIds.includes(expectedCanonicalId)) return fail("trusted_session_already_claimed");
+    const exactSessions = canonicalObjects.filter((record) => {
+      const payload = record.payload ?? record;
+      return (record.canonicalId ?? payload.id) === expectedCanonicalId &&
+        isActiveDetailedStrengthSession(record) &&
+        payload?.metadata?.logger_origin === "training_logger" && payload?.metadata?.logger_mode === "live";
+    });
+    if (exactSessions.length !== 1) {
+      return fail(exactSessions.length === 0 ? "trusted_session_not_found" : "trusted_session_identity_conflict");
+    }
+    const payload = exactSessions[0].payload ?? exactSessions[0];
+    const sessionStart = Date.parse(payload?.metadata?.start_time);
+    const sessionEnd = Date.parse(payload?.metadata?.end_time);
+    const workoutStart = Date.parse(observation.occurrence.startedAt);
+    const workoutEnd = Date.parse(observation.occurrence.endedAt);
+    const tolerance = trustedWatchCorrelationPolicy.clockToleranceSeconds * 1000;
+    if (![sessionStart, sessionEnd, workoutStart, workoutEnd].every(Number.isFinite) ||
+      workoutEnd < workoutStart || workoutStart < sessionStart - tolerance || workoutEnd > sessionEnd + tolerance) {
+      return fail("trusted_session_time_envelope_mismatch");
+    }
+    return Object.freeze({
+      state: HealthKitReconciliationState.TRAINING_SESSION_LINKED,
+      canonicalTrainingSessionId: expectedCanonicalId,
+      candidates: Object.freeze([{
+        canonicalId: expectedCanonicalId,
+        outcome: "duplicate",
+        confidence: 100,
+        reasons: Object.freeze(["trusted_physiqueos_session_id"]),
+      }]),
+      associationAuthority: "trusted_physiqueos_session_id_v1",
     });
   }
 
@@ -636,6 +688,9 @@ function normalizeMeasurement(value, observationType, index) {
       // `false` (explicitly outdoor) is preserved: `compact` only drops
       // null/undefined/"", never `false`.
       isIndoorWorkout: typeof workout.isIndoorWorkout === "boolean" ? workout.isIndoorWorkout : null,
+      physiqueOSSessionId: workout.physiqueOSSessionId == null
+        ? null
+        : uuidText(workout.physiqueOSSessionId, `observations[${index}].workout.physiqueOSSessionId`),
       // A first revision is the same observation whether stated or not.
       sourceRevision: workout.sourceRevision == null
         ? null
@@ -678,6 +733,7 @@ export function createCanonicalWorkoutCandidate(observation) {
       distance: measurement.distance,
       distance_unit: measurement.distanceUnit,
       average_heart_rate: measurement.averageHeartRate,
+      physiqueos_session_id: measurement.physiqueOSSessionId,
       source_workout_id: observation.externalId,
     }),
     exercises: [],
@@ -686,6 +742,14 @@ export function createCanonicalWorkoutCandidate(observation) {
       source_observation_ids: [observation.id],
     },
   });
+}
+
+function uuidText(value, field) {
+  const text = requiredText(value, field).toLowerCase();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(text)) {
+    throw invalid(field, `${field} must be a UUID.`);
+  }
+  return text;
 }
 
 export function isActiveDetailedStrengthSession(record) {
