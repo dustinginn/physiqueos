@@ -1406,12 +1406,19 @@ def dry_run(config: dict[str, Any]) -> dict[str, Any]:
     original = os.environ.get("PHYSIQUEOS_RECOVERY_HOME")
     temporary = pathlib.Path(tempfile.mkdtemp(prefix="physiqueos-recovery-dry-run-", dir="/private/tmp"))
     os.environ["PHYSIQUEOS_RECOVERY_HOME"] = str(temporary)
+    stage = "create"
     try:
         generation = build_generation(config, "dry-run")
+        stage = "verify"
         verification = verify_generation(generation)
+        stage = "restore-smoke-test"
         restore = restore_smoke_test(generation)
         return {"result": "PASS", "generation": generation.name, "verification": verification,
                 "restore": restore, "iCloud_writes": 0}
+    except GateFailure:
+        raise
+    except Exception as exc:
+        raise GateFailure("FAIL_SCANNER_ERROR", f"dry-run stage failed safely: {stage}") from exc
     finally:
         if original is None:
             os.environ.pop("PHYSIQUEOS_RECOVERY_HOME", None)
