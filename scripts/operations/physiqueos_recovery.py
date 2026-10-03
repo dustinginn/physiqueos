@@ -1034,10 +1034,15 @@ def restore_smoke_test(generation: pathlib.Path, *, keep_scratch: bool = False) 
         tools = generation / "tool-inventory" / "safe-tools"
         for path in tools.glob("*") if tools.is_dir() else []:
             data = path.read_bytes()
-            if data.startswith(b"#!") and b"python" in data.splitlines()[0].lower():
-                run(["/usr/bin/python3", "-m", "py_compile", str(path)], timeout=30)
+            first_line = data.splitlines()[0].lower() if data.splitlines() else b""
+            if path.suffix == ".py" or (data.startswith(b"#!") and b"python" in first_line):
+                try:
+                    compile(data, str(path), "exec")
+                except SyntaxError as exc:
+                    raise GateFailure("FAIL_SCANNER_ERROR", f"safe Python tool syntax failed: {path.name}") from exc
             else:
-                run(["/bin/sh", "-n", str(path)], timeout=30)
+                interpreter = "/bin/bash" if b"bash" in first_line else "/bin/zsh" if b"zsh" in first_line else "/bin/sh"
+                run([interpreter, "-n", str(path)], timeout=30)
 
         stage = "xcode-project-regeneration"
         generator = clone / "ios" / "Scripts" / "generate_project.py"
