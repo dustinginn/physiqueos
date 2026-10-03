@@ -2,23 +2,21 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: DEXA → Apple Health writeback audit + implementation plan (`dexa-healthkit-writeback-audit-plan-20261002`)
+- Task: LIVE INCIDENT — Build 82 workout finish stall, Watch + iPhone (`build82-live-workout-finish-stall-audit-20261002`)
 - Agent: Claude
-- Status: completed (audit and plan only); Founder decisions pending; implementation not started
-- Generated (UTC): 2026-10-02T23:54:05Z
-- Authority: Server d0ff6596 (deployment 64533990); Native Build 82 e2cbcd0c (TestFlight f3d09d99); all unchanged
+- Status: **checkpoint 1, audit continuing**: live production captured read-only; Founder recovery action not yet issued
+- Generated (UTC): 2026-10-03T00:09:35Z
+- Authority: Server d0ff6596 (deployment 64533990, reverified); Native Build 82 e2cbcd0c (TestFlight f3d09d99)
 
 Summary:
-- Nothing is written to HealthKit today. Daily Weight is manual-only in PhysiqueOS.
-- Writeback will key on the active canonical DEXA record created after `canonical_commit`.
-- Recommended V1: automatic and prospective-only (scan date ≥ 2026-10-09). A Native reconciler writes Body Fat %, plus Lean Body Mass as fat-free mass (total − fat) if approved.
-- No Weight, RMR or BMI is written.
-- Exactly-once writes and correction-replace use HealthKit's sync identifier and sync version.
-- PhysiqueOS's own samples are never re-ingested.
-- The Founder must decide 7 items before Phase B. The DEXA is Fri Oct 9.
+- **The workout is safe.** `training-session.commit.v1` committed durably exactly once at 2026-10-03T00:07:54Z. It holds 3 exercises with 4 + 4 + 5 = 13 sets. There is one receipt, one canonical object and one package, with no review or accepted_processing.
+- For about 9 minutes after Final Confirmation, no Training command reached Server. Native polled `training.navigation.session` (404 ×14) during that time. Server work then took 6.75 s.
+- The blocked leg is Native, before the network. No HealthKit workout was ingested for this session.
+- Do not tap Finish, Retry, Save & Leave or Cancel yet. Native root cause, stopwatch, patch and test plan follow in the final report.
+- Production writes: 0.
 
-Detailed report: `agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md`
-Decision request: `agent-handoffs/inbox/review-requests/20261002T235405Z-founder-decisions-dexa-healthkit-writeback.md`
-Previous latest: `agent-handoffs/reports/20261002T220000Z-healthkit-sleep-canon-v3-prospective-activation.md`
+Detailed report: `agent-handoffs/reports/20261003T000935Z-build82-live-workout-finish-stall-audit-checkpoint1.md`
+Task: `agent-handoffs/inbox/prompts/20261002T235500Z-build82-live-workout-finish-stall-audit.md`
+Previous latest: `agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md`
 
 Protocol: `agent-handoffs/README.md`

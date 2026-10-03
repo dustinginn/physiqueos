@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-02T23:54:05Z",
+  "generated_at_utc": "2026-10-03T00:09:35Z",
   "task": {
-    "id": "dexa-healthkit-writeback-audit-plan-20261002",
-    "title": "DEXA -> Apple Health writeback audit + implementation plan",
+    "id": "build82-live-workout-finish-stall-audit-20261002",
+    "title": "LIVE INCIDENT: Build 82 workout finish stall (Watch + iPhone) read-only audit",
     "agent": "claude",
-    "status": "completed"
+    "status": "in_progress_checkpoint"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -17,28 +17,29 @@
     "sleep_canonical_algorithm": "sleep-canon-v3 (ordinary, effective 2026-10-02)"
   },
   "result": {
-    "summary": "Audit + plan only. No body measurements are written to Apple Health today; PhysiqueOS Weight is manual-only, so DEXA writeback cannot contaminate PhysiqueOS Weight. Accepted point = active canonical DEXA after canonical_commit. Recommended V1: automatic prospective-only (scan date >= 2026-10-09) Native reconciler writing Body Fat % (+ Lean Body Mass as fat-free mass total-fat), sync-identifier exact-once/replace, own samples never re-ingested; do NOT write Weight/RMR/BMI. Founder decisions pending (7). Implementation not started.",
-    "success": true,
+    "summary": "CHECKPOINT 1: live production captured read-only. Workout is SAFE: training-session.commit.v1 committed durably exactly once at 2026-10-03T00:07:54Z (3 exercises, 4+4+5=13 sets; 1 receipt, 1 canonical evidence object, 1 package, no review/accepted_processing). No Training command reached Server for ~9 min after Final Confirmation (end_time 23:58:45Z) while Native polled training.navigation.session (404 x14); Server work 6.75 s. Blocked leg is Native pre-network. No HealthKit workout ingested for the session. Founder recovery action NOT yet issued; do not tap Finish/Retry/Save & Leave/Cancel. Native root cause, stopwatch, patch/test plan pending in final report.",
+    "success": null,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
     "healthkit_written": false
   },
   "validation": {
-    "static_audit": {
+    "production_readonly": {
       "status": "completed",
-      "summary": "Native e2cbcd0c + Server src (identical to d0ff6596 for DEXA/weight) + iOS 27.0 SDK headers; no builds/tests/production reads"
+      "summary": "2 REPEATABLE READ READ ONLY snapshots (transaction_read_only=on, 52 SELECTs each, ROLLBACK, marker x1) + web run-log tail; control-plane read via physiqueos-final-cutover-config"
     }
   },
   "open_gates": [
-    "Founder decisions \u00a7P 1-7 (review request 20261002T235405Z)",
-    "Phase B implementation (Server dormant + Native Build 83 on e2cbcd0c)",
-    "disk >= 20 GiB before Phase C Native testing (16 GiB at audit)",
-    "Oct 9 real-scan acceptance"
+    "Native e2cbcd0c finish-saga trace (9-min pre-network stall, 404 session polling)",
+    "second-Finish idempotency proof",
+    "single Founder recovery action",
+    "stopwatch terminal bug",
+    "patch + deterministic test plan"
   ],
-  "full_report_path": "agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md",
-  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T233000Z-dexa-healthkit-writeback-audit-plan.md",
-  "previous_latest_report_path": "agent-handoffs/reports/20261002T220000Z-healthkit-sleep-canon-v3-prospective-activation.md",
+  "full_report_path": "agent-handoffs/reports/20261003T000935Z-build82-live-workout-finish-stall-audit-checkpoint1.md",
+  "parent_report_path": "agent-handoffs/inbox/prompts/20261002T235500Z-build82-live-workout-finish-stall-audit.md",
+  "previous_latest_report_path": "agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
