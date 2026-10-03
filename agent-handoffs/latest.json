@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T03:02:13Z",
+  "generated_at_utc": "2026-10-03T03:08:12Z",
   "task": {
     "id": "build83-first-real-workout-comprehensive-correction-20261003",
     "title": "Build 83 first-real-workout corrections - Founder authorization recorded; lane needs DIRECT exact-SHA authorization (observer status 2)",
@@ -19,7 +19,7 @@
     "sleep_canonical_algorithm": "sleep-canon-v3 (ordinary, effective 2026-10-02)"
   },
   "result": {
-    "summary": "Founder APPROVED: Server deploy (guarded), D1 Stair Stepper(44)->strategic Cardio, D2 Cooldown(80) canonical but strategically ineligible (canonical inclusion != strategic eligibility), D3 bounded Oct 2 repair of exactly 2 observations after D1/D2 deployed (dry-run + post-verification). Relayed authorization was correctly NOT accepted by the Build 83 lane: Founder must post it directly in the lane (claude attach 788283ca) naming the NEW Server SHA that includes D1/D2 (fresh review pending). Native 152c813e: full iOS 1963 tests, only known baseline Peptide failure (must be proven pre-existing, no waiver); Watch 20/20 unit + 7/7 UI (swipe-right proven); fresh re-review running. No deploy/mutation/upload yet.",
+    "summary": "Founder APPROVED: Server deploy (guarded), D1 Stair Stepper(44)->strategic Cardio, D2 Cooldown(80) canonical but strategically ineligible (canonical inclusion != strategic eligibility), D3 bounded Oct 2 repair of exactly 2 observations after D1/D2 deployed (dry-run + post-verification). Relayed authorization was correctly NOT accepted by the Build 83 lane: Founder must post it directly in the lane (now reachable by Remote Control: session 79959d1b) naming the NEW Server SHA that includes D1/D2 (fresh review pending). Native 152c813e: full iOS 1963 tests, only known baseline Peptide failure (must be proven pre-existing, no waiver); Watch 20/20 unit + 7/7 UI (swipe-right proven); fresh re-review running. No deploy/mutation/upload yet.",
     "success": null,
     "production_mutated": false,
     "deployed": false,
@@ -48,5 +48,13 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_chatgpt_retrieval": true
+  },
+  "lane": {
+    "session_name": "PhysiqueOS Build 83 First Real Workout Corrections",
+    "active_bg_id": "79959d1b",
+    "remote_control": true,
+    "remote_session_url": "https://claude.ai/code/session_01JeoLqTfypDVtXm2hX9nEav",
+    "superseded_bg_id_do_not_resume": "788283ca",
+    "note": "Restarted at Founder request solely to enable Remote Control; same conversation history; interrupted UI tests/review being re-run by the lane."
   }
 }
