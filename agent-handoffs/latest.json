@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T00:09:35Z",
+  "generated_at_utc": "2026-10-03T00:20:55Z",
   "task": {
     "id": "build82-live-workout-finish-stall-audit-20261002",
     "title": "LIVE INCIDENT: Build 82 workout finish stall (Watch + iPhone) read-only audit",
     "agent": "claude",
-    "status": "in_progress_checkpoint"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -17,8 +17,8 @@
     "sleep_canonical_algorithm": "sleep-canon-v3 (ordinary, effective 2026-10-02)"
   },
   "result": {
-    "summary": "CHECKPOINT 1: live production captured read-only. Workout is SAFE: training-session.commit.v1 committed durably exactly once at 2026-10-03T00:07:54Z (3 exercises, 4+4+5=13 sets; 1 receipt, 1 canonical evidence object, 1 package, no review/accepted_processing). No Training command reached Server for ~9 min after Final Confirmation (end_time 23:58:45Z) while Native polled training.navigation.session (404 x14); Server work 6.75 s. Blocked leg is Native pre-network. No HealthKit workout ingested for the session. Founder recovery action NOT yet issued; do not tap Finish/Retry/Save & Leave/Cancel. Native root cause, stopwatch, patch/test plan pending in final report.",
-    "success": null,
+    "summary": "Audit complete (read-only). Workout SAFE exactly once: training-session.commit.v1 durable 2026-10-03T00:07:54Z, 3 exercises 4+4+5=13 sets, 1 receipt/1 canonical object/1 package, no review/accepted_processing; unchanged at S3 00:18:57Z. Watch Finish never confirmed: requestFinish-only state is mapped to .finishing (\"Finishing safely...\") while the real confirm lives only on the swipe-left controls page; no finishOperationId -> no HealthKit finish/save (Apple Health workout unsaveable in Build 82). Phone Finish was a separate operation (no shared finishOperationId; shared idempotency key/canonical id prevents duplicates); its command URLSession (waitsForConnectivity, 60 s resource timeout) failed every attempt for ~9 min while reads worked, then committed in 6.75 s (server bounded commit 6.1 s > client 3 s/1 s budget). Rest stopwatch: requestFinish keeps rest; Watch renders rest in .finishing. Founder action: tap Return to Log on iPhone Workout Complete (force-quit/reopen first if still Saving); leave Watch alone. Patch plan P1-P8 + tests K1-K12 awaiting authorization.",
+    "success": true,
     "production_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
@@ -27,17 +27,19 @@
   "validation": {
     "production_readonly": {
       "status": "completed",
-      "summary": "2 REPEATABLE READ READ ONLY snapshots (transaction_read_only=on, 52 SELECTs each, ROLLBACK, marker x1) + web run-log tail; control-plane read via physiqueos-final-cutover-config"
+      "summary": "3 REPEATABLE READ READ ONLY snapshots S1-S3 (transaction_read_only=on, 52 SELECTs each, ROLLBACK, marker x1) + web run logs to 00:13Z"
+    },
+    "static_audit": {
+      "status": "completed",
+      "summary": "Native e2cbcd0c Watch/phone finish saga + Server d0ff6596 command path; no builds/tests run"
     }
   },
   "open_gates": [
-    "Native e2cbcd0c finish-saga trace (9-min pre-network stall, 404 session polling)",
-    "second-Finish idempotency proof",
-    "single Founder recovery action",
-    "stopwatch terminal bug",
-    "patch + deterministic test plan"
+    "Founder authorization for patch plan P1-P8 (Native Build 83 + log-only Server P6)",
+    "follow-up: 0 trainingPerformanceEvents derived for this commit",
+    "consolidated post-workout Watch UI patch (separate)"
   ],
-  "full_report_path": "agent-handoffs/reports/20261003T000935Z-build82-live-workout-finish-stall-audit-checkpoint1.md",
+  "full_report_path": "agent-handoffs/reports/20261003T002055Z-build82-live-workout-finish-stall-audit.md",
   "parent_report_path": "agent-handoffs/inbox/prompts/20261002T235500Z-build82-live-workout-finish-stall-audit.md",
   "previous_latest_report_path": "agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md",
   "safety": {
@@ -46,5 +48,6 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_chatgpt_retrieval": true
-  }
+  },
+  "checkpoint_report_path": "agent-handoffs/reports/20261003T000935Z-build82-live-workout-finish-stall-audit-checkpoint1.md"
 }
