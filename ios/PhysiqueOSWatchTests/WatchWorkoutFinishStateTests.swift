@@ -157,7 +157,7 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
     }
 
     @MainActor
-    func testFinishKnowledgeEvictsTheOldestNotAnArbitrarySession() throws {
+    func testFinishKnowledgeKeepsEveryFinishForFortyEightHoursAndThenExpiresIt() throws {
         let suite = "finish.knowledge.order"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
@@ -170,9 +170,13 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
             finishing.finish?.operationId = "op-\(index)"
             store.apply(finishing)
         }
-        XCTAssertEqual(store.finishKnowledge.count, 12)
-        XCTAssertNil(store.finishKnowledge["session-12"], "The oldest is evicted.")
+        XCTAssertEqual(store.finishKnowledge.count, 13)
+        XCTAssertEqual(store.finishKnowledge["session-12"]?.operationId, "op-0",
+                       "A thirteenth recent finish cannot crowd out the running workout's recovery key.")
         XCTAssertEqual(store.finishKnowledge["session-00"]?.operationId, "op-12", "The newest is always kept.")
+
+        clock.now = now.addingTimeInterval((49 * 60 * 60) + (13 * 60))
+        XCTAssertTrue(store.finishKnowledge.isEmpty, "Expired recovery knowledge does not grow without bound.")
     }
 
     func testHealthKitEndsAtTheAuthoritativeFinishInstant() {

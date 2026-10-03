@@ -105,6 +105,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     static let waitingForPhoneAfter: TimeInterval = 30
     static let replyWatchdog: TimeInterval = 12
     static let retryBackoff: [TimeInterval] = [2, 4, 8]
+    /// Mirrors the phone terminal ledger. A count cap could evict the exact
+    /// still-running HealthKit workout before cold-launch recovery sees it.
+    static let finishKnowledgeRetention: TimeInterval = 48 * 60 * 60
 
     private(set) var projection: WatchWorkoutProjection?
     private(set) var connectionState: ConnectionState = .activating
@@ -881,13 +884,23 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     private(set) var finishKnowledge: [String: FinishKnowledge] {
         get {
             guard let data = defaults.data(forKey: Self.finishKnowledgeKey) else { return [:] }
-            return (try? WatchWorkoutWireCodec.decode([String: FinishKnowledge].self, from: data)) ?? [:]
+            let decoded = (try? WatchWorkoutWireCodec.decode([String: FinishKnowledge].self, from: data)) ?? [:]
+            let reference = now()
+            return decoded.filter { _, knowledge in
+                let age = reference.timeIntervalSince(knowledge.recordedAt)
+                return age >= -5 * 60 && age <= Self.finishKnowledgeRetention
+            }
         }
         set {
-            // Keep the 12 most recent; the oldest knowledge is evicted first.
-            let newest = newValue.sorted { $0.value.recordedAt > $1.value.recordedAt }.prefix(12)
-            let bounded = Dictionary(uniqueKeysWithValues: newest.map { ($0.key, $0.value) })
-            if let data = try? WatchWorkoutWireCodec.encode(bounded) {
+            // Keep every finish in the bounded recovery window. Human workout
+            // volume makes this compact, while retaining all records preserves
+            // the same 48-hour guarantee as the phone's terminal ledger.
+            let reference = now()
+            let retained = newValue.filter { _, knowledge in
+                let age = reference.timeIntervalSince(knowledge.recordedAt)
+                return age >= -5 * 60 && age <= Self.finishKnowledgeRetention
+            }
+            if let data = try? WatchWorkoutWireCodec.encode(retained) {
                 defaults.set(data, forKey: Self.finishKnowledgeKey)
             }
         }
