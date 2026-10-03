@@ -465,11 +465,13 @@ Completion result:
 - physical TestFlight acceptance remains observational and is listed in the final report.
 
 
-## Mac disaster-recovery / iCloud backup strategy — AUDITED / DESIGN COMPLETE / IMPLEMENTATION NOT STARTED (2026-10-03)
+## Mac disaster-recovery / iCloud backup V1 — LOCAL IMPLEMENTATION VALIDATED / FIRST ICLOUD COPY GATED (2026-10-03)
 
 Audit authority:
 - `agent-handoffs/reports/20261003T174554Z-mac-icloud-backup-disaster-recovery-audit-plan.md`
 - prompt authority `5b7ece032abc2a10fd83da6c6c36ad578f1c1e1b`
+- implementation prompt authority `b84428fe54121f5a0d5198157fe972d99586a59a`
+- local Phase 7 implementation authority `54b4ba82ed089a98e2c5950fecbe9b9a7a7e4dc8`
 
 Goal:
 Create a safe, automated backup path for non-reproducible PhysiqueOS development state on the Founder Mac, with iCloud Drive as a likely off-device destination.
@@ -534,16 +536,19 @@ Design requirements established:
 - human-readable latest manifest;
 - optional notification only on failure or meaningful backup problem.
 
-Founder decisions pending before implementation:
+Founder-approved V1 decisions:
 1. destination — recommend exactly `iCloud Drive/PhysiqueOS Backups`;
 2. cadence — recommend 03:30 local daily with next-wake catch-up plus post-major-main-checkpoint and post-TestFlight-VALID runs;
 3. retention — recommend 14 daily, 8 weekly, 12 monthly and 12 release/checkpoint generations;
 4. signed archives — recommend a separate post-release tier beginning with current Build 84 + rollback Build 83, plus named milestones;
 5. untracked policy — recommend strict explicit path/type/size allowlist; unknown paths block promotion;
-6. second destination — recommend an encrypted independent destination or Time Machine later, without delaying iCloud V1.
+6. Time Machine and a second destination are intentionally outside V1 and do not block it.
 
 Status / hard gate:
-- Phase 1 audit/design is complete.
-- **IMPLEMENTATION NOT STARTED.** No backup script, local staging bundle, iCloud folder/write, scheduler, release hook, retention deletion, key export or repository move exists from this task.
-- Next only after Founder decisions: Phase 2 local `audit`/`dry-run`; Phase 3 secret scan/checksum/restore drill; Phase 4 explicit destination approval and first copy; Phase 5 independent iCloud retrieval/checksum; Phase 6 scheduler/release hook.
-- No iCloud write before explicit Founder approval of the exact destination.
+- Phase 1 audit/design is complete and the approved local V1 tool is implemented on the pushed feature branch.
+- Live `audit`, deterministic tests, full `dry-run`, local `create`, checksum verification and fresh-GitHub scratch restore all pass. The first local immutable generation is `PhysiqueOS-Recovery-20261003-191629Z`, 5,260,954 bytes, manifest SHA-256 `7b712856eb9437ffce9d0e9d63d12abb80f177fe7a1d2bb78f49eb9d1e96413d`.
+- The generation contains 22 local-only recovery refs, five exact dirty-worktree reconstructions, four guarded tool sources, 37 schema-validated release receipts, and sanitized inventory. The secret scanner reports `PASS`; credentials, keychains/private keys, auth sessions, raw production/health exports, build trees, dependencies and caches remain excluded.
+- Fourteen File Provider/legacy checkouts are recorded `UNKNOWN_FILE_PROVIDER_OR_TIMEOUT`; their common-database refs are captured, but dirty-state coverage is not claimed.
+- **No iCloud write has occurred at this checkpoint.** The dedicated destination remains absent pending the mandatory pre-write GH-main checkpoint publication and verification.
+- Scheduler/hooks remain uninstalled until the copied generation passes restore from the iCloud destination and Foundation metadata reports upload complete. Retention is implemented but generation #1 deletion is disabled.
+- Build 84 and Build 83 identity/archive selection is verified, but their separate iCloud copy is still pending and remains subject to the standing 15 GiB disk-safety floor.
