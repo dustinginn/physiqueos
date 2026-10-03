@@ -828,10 +828,14 @@ def build_generation(config: dict[str, Any], reason: str) -> pathlib.Path:
     building.mkdir(parents=True)
     temp_git = home / "staging" / f".git-{uuid.uuid4().hex}"
     temp_git.mkdir(parents=True)
+    stage = "git-aggregation"
     try:
         git_inventory = build_aggregator(config, temp_git, make_bundle=building / "git" / "local-only.bundle")
+        stage = "dirty-state-capture"
         dirty = capture_dirty_worktrees(git_inventory, config, building / "local-state")
+        stage = "safe-artifact-inventory"
         safe_tools = copy_safe_artifacts(config, building)
+        stage = "archive-inventory"
         archives = archive_inventory(config)
         write_json(building / "release-inventory" / "archive-selection.json", archives)
         (building / "README-RESTORE.md").write_text(RESTORE_README, encoding="utf-8")
@@ -857,6 +861,7 @@ def build_generation(config: dict[str, Any], reason: str) -> pathlib.Path:
                            "raw production/health exports", "DerivedData", "simulators", "node_modules", "caches"],
         }
         write_json(building / "MANIFEST.json", manifest)
+        stage = "pre-promotion-secret-scan"
         initial_scan = scan_generation(building)
         size = generation_size(building)
         if size > SMALL_GENERATION_CEILING:
@@ -866,12 +871,14 @@ def build_generation(config: dict[str, Any], reason: str) -> pathlib.Path:
         manifest["secret_scan"] = initial_scan
         manifest["size_bytes_before_checksums"] = size
         write_json(building / "MANIFEST.json", manifest)
+        stage = "checksums"
         checksums = write_checksums(building)
         complete = {"schema_version": SCHEMA_VERSION, "generation_id": gen_id, "completed_at": iso_utc(),
                     "manifest_sha256": sha256_file(building / "MANIFEST.json"),
                     "checksums_sha256": sha256_file(building / "checksums" / "SHA256SUMS.json"),
                     "file_count": len(checksums["files"])}
         write_json(building / "COMPLETE", complete)
+        stage = "local-verification"
         verify_generation(building)
         os.rename(building, final)
         update_state({"latest_generation": gen_id, "latest_local_path": str(final), "source_time": manifest["source_time"],
@@ -879,11 +886,16 @@ def build_generation(config: dict[str, Any], reason: str) -> pathlib.Path:
                       "icloud_upload_reported": "UNKNOWN", "remote_confirmation": "REMOTE_ICLOUD_SYNC_UNKNOWN",
                       "last_failure": None})
         return final
-    except Exception:
+    except GateFailure:
         if building.exists():
             failed = home / "staging" / f"FAILED-{building.name.lstrip('.')}"
             os.rename(building, failed)
         raise
+    except Exception as exc:
+        if building.exists():
+            failed = home / "staging" / f"FAILED-{building.name.lstrip('.')}"
+            os.rename(building, failed)
+        raise GateFailure("FAIL_SCANNER_ERROR", f"generation stage failed safely: {stage}") from exc
     finally:
         shutil.rmtree(temp_git, ignore_errors=True)
 
