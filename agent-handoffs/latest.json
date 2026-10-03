@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T22:30:00Z",
+  "generated_at_utc": "2026-10-03T22:55:00Z",
   "task": {
     "id": "20261003-build85-founder-authorized-release",
-    "title": "Build 85 Server deployment and trusted-Watch activation",
+    "title": "Build 85 Watch corrections release",
     "agent": "codex",
-    "status": "server_policy_verified_native_release_next"
+    "status": "complete_testflight_valid_physical_acceptance_next"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -14,10 +14,10 @@
     "production_deployment": "e9ffc644-ba32-48d0-afc7-ec3d809d8c77",
     "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
     "native_build": 85,
-    "testflight_delivery": null
+    "testflight_delivery": "a8c393e7-7d2c-41f0-9ba0-d37f43e53dc1"
   },
   "result": {
-    "summary": "Exact Build 85 Server is ACTIVE and healthy. The exact prospective trusted-Watch policy and one audit row were created and independently verified; historical workout/review/strategic/Sleep/DEXA state and today's Founder reconciliation remain unchanged. Native archive and TestFlight VALID are next.",
+    "summary": "Exact Build 85 Server is ACTIVE and healthy; the prospective trusted-Watch policy and audit are active and independently verified; exact Native Build 85 is uploaded and Apple reports build/import VALID. The pre-activation Founder-confirmed match, DEXA and Sleep remain unchanged.",
     "production_mutated": true,
     "server_deployed": true,
     "server_review_approved": true,
@@ -33,10 +33,16 @@
     "sleep_mutations": 0,
     "dexa_mutations": 0,
     "native_review_approved": true,
-    "testflight_valid": false
+    "ios_tests_executed": 288,
+    "ios_test_failures": 0,
+    "watch_tests_executed": 27,
+    "watch_test_failures": 0,
+    "testflight_valid": true,
+    "testflight_import_valid": true,
+    "testflight_on_app_store_connect": true
   },
-  "recommended_next_step": "Archive exact Native b8ee8690, verify signing/profile/entitlements and required regressions, upload through the guarded TestFlight-first path, wait for VALID, then publish the final GH-main report.",
-  "full_report_path": "agent-handoffs/reports/20261003T223000Z-build85-server-policy-activated.md",
+  "recommended_next_step": "Install Build 85 remotely and physically accept inactive/Always-On connectivity presentation; after the future policy boundary, verify a new eligible PhysiqueOS-created indoor strength workout exact-correlates without generic Pending Review.",
+  "full_report_path": "agent-handoffs/reports/20261003T225500Z-build85-server-policy-native-testflight-final.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

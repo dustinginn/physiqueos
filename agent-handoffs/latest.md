@@ -4,15 +4,17 @@ Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
 - Task: Build 85 Watch physical-acceptance corrections
 - Agent: Codex
-- Status: exact Native/Server candidates and prospective policy plan independently approved; production unchanged; stopped for Founder authorization
-- Generated (UTC): 2026-10-03T21:27:00Z
+- Status: complete — exact Server deployed, prospective trusted-Watch policy active, Native Build 85 uploaded and Apple VALID
+- Generated (UTC): 2026-10-03T22:55:00Z
 
-Exact Native Build 85 candidate `b8ee8690b194cb90086b62816b9a2c8c400dc026` and Server candidate `3c0f4aefddbb9a6886f6ad012443978303d47024` are pushed, tested and independently approved.
+Production Server authority is exact `3c0f4aefddbb9a6886f6ad012443978303d47024`, deployment `e9ffc644-ba32-48d0-afc7-ec3d809d8c77`, ACTIVE 9/9. Web and worker match the SHA; live/ready are HTTP 200.
 
-The prospective production policy dry run passed twice with zero writes and independently reproduced facts: exact source `com.physiqueos.native.dev`, type 50, effective `2026-10-05T07:00:00.000Z`, planned digest `fc028029635cb7ba1de6301206f5f8a8`, and exactly one policy row plus one audit row predicted. Today’s Founder-left 95% review remains untouched; it cannot be retroactively trusted because its observation has no durable exact session ID.
+The create-only prospective trusted-Watch policy is version 1, effective `2026-10-05T07:00:00.000Z`, and independently verified. It created exactly the policy row and audit `healthkit_trusted_watch_correlation_audit_6dbb503923b0247b369bbd5e91b39e5c`; no historical workout, strategic, Sleep or DEXA state changed. The Founder-manually-confirmed pre-activation 95% workout match remains untouched.
 
-Next: Founder must authorize exact Server `3c0f4aef...` deployment and the exact prospective two-row policy activation. After verified deploy/activation, complete Native archive/signing gates, guarded TestFlight-first upload and wait for VALID.
+Exact Native `b8ee8690b194cb90086b62816b9a2c8c400dc026` is App Store Connect Build 85 delivery `a8c393e7-7d2c-41f0-9ba0-d37f43e53dc1`, independently reconfirmed build/import `VALID` and present on App Store Connect.
 
-Detailed report: `agent-handoffs/reports/20261003T212700Z-build85-watch-candidates-policy-authorization-gate.md`
+Next: Founder installs Build 85 remotely and physically accepts inactive/Always-On connectivity presentation. After the future policy boundary, a new PhysiqueOS-created indoor strength workout should exact-correlate automatically without generic Pending Review.
+
+Detailed report: `agent-handoffs/reports/20261003T225500Z-build85-server-policy-native-testflight-final.md`
 
 Protocol: `agent-handoffs/README.md`
