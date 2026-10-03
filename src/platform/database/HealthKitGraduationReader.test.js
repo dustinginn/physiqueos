@@ -6,6 +6,12 @@ import {
   HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION,
   HealthKitGraduationPurpose as Purpose,
 } from "../../domain/services/HealthKitGraduation.js";
+import {
+  oct2CanonicalWorkout,
+  oct2CooldownInput,
+  oct2StairStepperInput,
+  oct2WalkInput,
+} from "../../fixtures/healthKitOct2StairStepperCooldownFixture.js";
 
 const OWNER = "user_founder_001";
 const DATE = "2026-09-21";
@@ -41,6 +47,39 @@ function tracked(collections) {
 }
 
 const ordinary = () => [{ canonicalId: "activity_day|2026-09-20", payload: { evidence_type: "activity_day", observed_at: "2026-09-20", daily_activity: { move_calories: 1 } }, quality: { status: "active" } }];
+
+describe("HealthKit graduation reader: Cardio workouts (strategic role gate)", () => {
+  const cardio = (evidenceEligibility) => policy({
+    projection: { enabled: false },
+    evidenceEligibility,
+  });
+  const workouts = () => [
+    oct2CanonicalWorkout(oct2WalkInput()),
+    oct2CanonicalWorkout(oct2StairStepperInput()),
+    oct2CanonicalWorkout(oct2CooldownInput()),
+  ];
+
+  it("hands strategic readers a graduated Stair Stepper but never a canonical Cooldown", async () => {
+    const { records } = tracked({
+      healthKitConfiguration: [cardio({ enabled: true, domains: ["cardio_training"], startLocalDate: "2026-09-25", endLocalDate: null })],
+      healthKitCanonicalWorkouts: workouts(),
+    });
+    const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+    const objects = await reader.overlayCardioWorkouts(ordinary(), { purpose: Purpose.EVIDENCE });
+    const graduated = objects.filter((object) => object.healthKitProjection);
+    expect(graduated.map((object) => object.payload.metadata.activity_type).sort()).toEqual(["Outdoor Walk", "Stair Stepper"]);
+    expect(JSON.stringify(objects)).not.toMatch(/cooldown/i);
+    // The ordinary Activity evidence passes through untouched.
+    expect(objects[0]).toEqual(ordinary()[0]);
+  });
+
+  it("returns the ordinary evidence untouched when cardio_training is out of scope", async () => {
+    const { records } = tracked({ healthKitConfiguration: [cardio({ enabled: false })], healthKitCanonicalWorkouts: workouts() });
+    const reader = createHealthKitGraduationReader({ records, ownerUserId: OWNER });
+    const objects = ordinary();
+    expect(await reader.overlayCardioWorkouts(objects, { purpose: Purpose.EVIDENCE })).toBe(objects);
+  });
+});
 
 describe("HealthKit graduation reader", () => {
   it("returns the same array and never loads canonical days when the policy is absent", async () => {

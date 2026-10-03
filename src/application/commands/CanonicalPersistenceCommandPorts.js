@@ -537,12 +537,18 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           observation, effectiveLocalDate, family: classification.family, activationPolicy: workoutPolicyRecord,
         });
         if (existing && (WORKOUT_TERMINAL_STATES.has(existing.reconciliation?.state) ||
-          existing.reconciliation?.reason === WORKOUT_FAMILY_OUT_OF_SCOPE_REASON)) {
+          existing.reconciliation?.reason === WORKOUT_FAMILY_OUT_OF_SCOPE_REASON ||
+          (existing.reconciliation?.state === HealthKitReconciliationState.SOURCE_ONLY &&
+            existing.reconciliation?.reason === WORKOUT_UNSUPPORTED_TYPE_REASON))) {
           // A canonicalized (or superseded) workout is never reconsidered on
-          // replay, and a workout a family scope kept raw keeps saying so.
+          // replay, and a workout a family scope kept raw keeps saying so. So
+          // does a workout stored as an unsupported type: a later classifier
+          // change (Stair Stepper 44, Cooldown 80) never canonicalizes it on a
+          // replay -- only the bounded, explicitly authorized repair does -- and
+          // a replay never rewrites it to an unrelated "deferred" reason.
           reconciliation = structuredClone(existing.reconciliation);
         } else if (!existing && workoutAssessment.eligible && classification.family === HealthKitWorkoutFamily.UNSUPPORTED) {
-          reconciliation = { state: HealthKitReconciliationState.SOURCE_ONLY, reason: "unsupported_workout_type" };
+          reconciliation = { state: HealthKitReconciliationState.SOURCE_ONLY, reason: WORKOUT_UNSUPPORTED_TYPE_REASON };
         } else if (!existing && workoutAssessment.reason === WORKOUT_FAMILY_OUT_OF_SCOPE_REASON) {
           // Stored with its real reason so an audit can count what a family
           // scope kept raw. Like every raw workout stored under a policy, it is
@@ -3432,6 +3438,9 @@ const WORKOUT_TERMINAL_STATES = new Set([
 // runner can refuse against the exact same reason string ingestion stores,
 // without duplicating this literal and risking drift if it ever changes.
 export const WORKOUT_FAMILY_OUT_OF_SCOPE_REASON = "family_not_in_activation_scope";
+// Same rationale: the bounded unsupported-type repair selects against the exact
+// reason string ingestion stores for a type the classifier did not support.
+export const WORKOUT_UNSUPPORTED_TYPE_REASON = "unsupported_workout_type";
 
 // A HealthKit workout is immutable: the same UUID re-delivered with different
 // content is not a different workout but drifted associated statistics (heart

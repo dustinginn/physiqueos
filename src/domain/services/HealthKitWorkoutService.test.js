@@ -31,7 +31,9 @@ describe("HealthKit workout type classification", () => {
   });
 
   it("never guesses: any other type, numeric or named, stays unsupported", () => {
-    for (const type of ["16", "44", "24", "35", "46", "3000", "Elliptical", "Stair Climbing", "Swimming", "Yoga", "", null, undefined]) {
+    // 44 (Stair Stepper) and 80 (Cooldown) are now deliberately supported (Founder
+    // decisions D1/D2); Apple's separate "Stairs" (68) is still never guessed.
+    for (const type of ["16", "68", "24", "35", "46", "3000", "Elliptical", "Stairs", "Stair Climber Machine", "Swimming", "Yoga", "", null, undefined]) {
       expect(classifyHealthKitWorkoutType(type).family, String(type)).toBe(HealthKitWorkoutFamily.UNSUPPORTED);
     }
   });
@@ -85,7 +87,7 @@ describe("indoor/outdoor cardio specialization (explicit signal only)", () => {
   });
 
   it("never lets an unsupported/unrecognized activity type silently become a known specific type just because an indoor/outdoor signal was supplied", () => {
-    for (const type of ["16", "44", "3000", "Elliptical", "Swimming", "Yoga"]) {
+    for (const type of ["16", "68", "3000", "Elliptical", "Swimming", "Yoga"]) {
       const withIndoorTrue = classifyHealthKitWorkoutType(type, { isIndoorWorkout: true });
       const withIndoorFalse = classifyHealthKitWorkoutType(type, { isIndoorWorkout: false });
       expect(withIndoorTrue, String(type)).toMatchObject({ family: HealthKitWorkoutFamily.UNSUPPORTED, canonicalType: null });

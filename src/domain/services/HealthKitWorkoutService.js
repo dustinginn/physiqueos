@@ -28,14 +28,127 @@ export const HealthKitWorkoutFamily = Object.freeze({
 // same types. Anything else stays a raw source observation, never guessed.
 //   strength: traditionalStrengthTraining (50), functionalStrengthTraining (20)
 //   cardio:   walking (52), running (37), cycling (13), the types PhysiqueOS
-//             already models as cardio today (Apple Fitness walks, Voice run/walk/cycling)
+//             already models as cardio today (Apple Fitness walks, Voice run/walk/cycling),
+//             stairClimbing (44, Apple's "Stair Stepper"), and cooldown (80).
+//
+// `family` decides canonicalization, the Workout activation policy's family
+// scope, and presentation (Log / Training Day / Activity). It does NOT decide
+// strategic use: that is `HealthKitWorkoutStrategicRole` below, a separate,
+// explicit per-type decision. Cooldown is canonical Cardio-family HISTORY
+// (it is shown wherever the day's workouts are shown) but is never strategic.
 const NUMERIC_TYPES = Object.freeze({
   50: { family: HealthKitWorkoutFamily.STRENGTH, canonicalType: "traditional_strength_training" },
   20: { family: HealthKitWorkoutFamily.STRENGTH, canonicalType: "functional_strength_training" },
   52: { family: HealthKitWorkoutFamily.CARDIO, canonicalType: "walking" },
   37: { family: HealthKitWorkoutFamily.CARDIO, canonicalType: "running" },
   13: { family: HealthKitWorkoutFamily.CARDIO, canonicalType: "cycling" },
+  44: { family: HealthKitWorkoutFamily.CARDIO, canonicalType: "stair_climbing" },
+  80: { family: HealthKitWorkoutFamily.CARDIO, canonicalType: "cooldown" },
 });
+
+// Strategic role of a canonical workout, decided per canonical TYPE and kept
+// deliberately separate from canonicalization:
+//
+//   canonical workout (history: Log, Training Day, Activity, Training history)
+//     -> (separate) strategic role, decided ONLY here
+//     -> (separate) graduation-policy scope, decided by the Server-owned policy
+//
+// GRADUATION_CANDIDATE  may become strategic Evidence, but only through its
+//                       family's own explicit graduation scope (Cardio:
+//                       `cardio_training`). Canonicalization alone never
+//                       makes anything strategic.
+// HISTORY_ONLY          canonical history/presentation only. It is never
+//                       strategic under any policy: graduation, V3,
+//                       Confidence, Narrative, recommendations and briefings
+//                       never see it.
+// LOGGER_TELEMETRY      Apple telemetry for a Workout Logger session; the
+//                       Logger owns training content (Strength).
+//
+// The table is an ALLOWLIST: a canonical type that is not named here (a
+// future type, a malformed record) resolves to HISTORY_ONLY, never to a
+// strategic role. Widening a type is a reviewed edit to this table.
+export const HealthKitWorkoutStrategicRole = Object.freeze({
+  GRADUATION_CANDIDATE: "graduation_candidate",
+  HISTORY_ONLY: "history_only",
+  LOGGER_TELEMETRY: "logger_telemetry",
+});
+
+const STRATEGIC_ROLE_BY_FAMILY_AND_TYPE = Object.freeze({
+  [HealthKitWorkoutFamily.STRENGTH]: Object.freeze({
+    traditional_strength_training: HealthKitWorkoutStrategicRole.LOGGER_TELEMETRY,
+    functional_strength_training: HealthKitWorkoutStrategicRole.LOGGER_TELEMETRY,
+  }),
+  [HealthKitWorkoutFamily.CARDIO]: Object.freeze({
+    walking: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    indoor_walking: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    outdoor_walking: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    running: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    indoor_running: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    outdoor_running: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    cycling: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    indoor_cycling: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    outdoor_cycling: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    stair_climbing: HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE,
+    cooldown: HealthKitWorkoutStrategicRole.HISTORY_ONLY,
+  }),
+});
+
+// The graduation-policy domain a GRADUATION_CANDIDATE family may graduate
+// under. Strength has none: it is never independently strategic.
+const GRADUATION_DOMAIN_BY_FAMILY = Object.freeze({
+  [HealthKitWorkoutFamily.CARDIO]: "cardio_training",
+});
+
+/**
+ * The strategic role of one canonical workout TYPE. Pure; fail-closed: any
+ * family/type pair the table does not name is HISTORY_ONLY.
+ */
+export function resolveHealthKitWorkoutTypeStrategicRole({ family, canonicalType } = {}) {
+  const byType = Object.hasOwn(STRATEGIC_ROLE_BY_FAMILY_AND_TYPE, String(family))
+    ? STRATEGIC_ROLE_BY_FAMILY_AND_TYPE[family]
+    : null;
+  const type = String(canonicalType ?? "");
+  return byType && Object.hasOwn(byType, type) ? byType[type] : HealthKitWorkoutStrategicRole.HISTORY_ONLY;
+}
+
+/**
+ * The ONE strategic-eligibility decision for a stored canonical workout,
+ * independent of whether it is canonical/presented. Every strategic reader
+ * (today: the graduation overlay that feeds V3, Confidence, Narrative,
+ * recommendations and briefings) must ask this, never `family` alone.
+ *
+ * The role is derived from the record's own family + canonicalType through the
+ * allowlist above. A role STAMPED on the record (`current.strategicRole`,
+ * written at canonicalization) can only narrow that decision, never widen it:
+ * a stamped HISTORY_ONLY keeps even a walk out, and a stamped
+ * GRADUATION_CANDIDATE cannot promote a type the allowlist does not name.
+ * Records canonicalized before the stamp existed (walk/run/cycle) carry no
+ * stamp and resolve from the allowlist alone.
+ *
+ * `eligible: true` only means "may graduate": the caller must still apply the
+ * Server-owned graduation scope for `graduationDomain` and date.
+ */
+export function assessHealthKitWorkoutStrategicEligibility(workout) {
+  const current = workout?.current;
+  const ineligible = (reason, role = null) => Object.freeze({ eligible: false, role, graduationDomain: null, reason });
+  if (!current || typeof current !== "object") return ineligible("not_a_canonical_workout");
+  const typeRole = resolveHealthKitWorkoutTypeStrategicRole(current);
+  const stamped = current.strategicRole;
+  if (stamped !== undefined && !Object.values(HealthKitWorkoutStrategicRole).includes(stamped)) {
+    return ineligible("stamped_strategic_role_unrecognized", HealthKitWorkoutStrategicRole.HISTORY_ONLY);
+  }
+  if (typeRole !== HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE) {
+    return ineligible(typeRole === HealthKitWorkoutStrategicRole.LOGGER_TELEMETRY
+      ? "logger_telemetry_never_independently_strategic"
+      : "history_only_workout_type", typeRole);
+  }
+  if (stamped !== undefined && stamped !== HealthKitWorkoutStrategicRole.GRADUATION_CANDIDATE) {
+    return ineligible("stamped_strategic_role_narrows_type", stamped);
+  }
+  const graduationDomain = GRADUATION_DOMAIN_BY_FAMILY[current.family] ?? null;
+  if (!graduationDomain) return ineligible("family_has_no_graduation_domain", typeRole);
+  return Object.freeze({ eligible: true, role: typeRole, graduationDomain, reason: "graduation_candidate_workout_type" });
+}
 
 // Apple uses the SAME raw HKWorkoutActivityType value for the indoor and
 // outdoor variant of a given cardio activity (e.g. "52" is walking whether
@@ -44,6 +157,10 @@ const NUMERIC_TYPES = Object.freeze({
 // have a location-specific variant. This table is the one place that variant
 // naming lives, so it stays consistent with this codebase's existing
 // snake_case canonicalType convention (see `traditional_strength_training`).
+// Stair Stepper (`stair_climbing`) and Cooldown (`cooldown`) deliberately have
+// no location variant: a stair stepper is a machine and Apple's indoor flag
+// adds nothing a Founder-facing label needs, so the explicit signal (when
+// present) is retained on the observation but never changes these types.
 const CARDIO_LOCATION_VARIANTS = Object.freeze({
   walking: Object.freeze({ indoor: "indoor_walking", outdoor: "outdoor_walking" }),
   running: Object.freeze({ indoor: "indoor_running", outdoor: "outdoor_running" }),
@@ -99,9 +216,13 @@ function classifyHealthKitWorkoutFamilyAndType(activityType) {
       basis: "display_name",
     });
   }
+  // Exact display names only for the two Apple types added later, so no other
+  // stair/step-like name (Apple's separate "Stairs", 68) is ever guessed in.
   const cardio = /\b(walk|walking)\b/.test(lower) ? "walking"
     : /\b(run|running|jog|jogging)\b/.test(lower) ? "running"
-      : /\b(cycl|cycling|bike|biking)/.test(lower) ? "cycling" : null;
+      : /\b(cycl|cycling|bike|biking)/.test(lower) ? "cycling"
+        : /^(stair ?climbing|stair ?stepper)$/.test(lower) ? "stair_climbing"
+          : /^cool ?down$/.test(lower) ? "cooldown" : null;
   if (cardio) {
     return Object.freeze({ family: HealthKitWorkoutFamily.CARDIO, canonicalType: cardio, appleActivityType: text, basis: "display_name" });
   }
@@ -301,6 +422,10 @@ function snapshotOf(observation, classification) {
     sourceRevision: m.sourceRevision ?? 1,
     family: classification.family,
     canonicalType: classification.canonicalType,
+    // Explicit, per-type strategic role (see HealthKitWorkoutStrategicRole).
+    // Descriptive classification, not source telemetry: it is deliberately not
+    // part of the semantic fingerprint.
+    strategicRole: resolveHealthKitWorkoutTypeStrategicRole(classification),
     appleActivityType: classification.appleActivityType,
     localDate,
     localDateBasis: derived ? "workout_start_in_workout_time_zone" : "client_local_date_unverified",

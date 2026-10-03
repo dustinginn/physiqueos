@@ -8,7 +8,7 @@ import { selectActiveCanonicalActivityDays } from "./CanonicalActivityDayReadMod
 import { selectActiveCanonicalNutritionDays } from "./CanonicalNutritionDayService.js";
 import { assessHealthKitCoexistence, HealthKitCanonicalDomain } from "./HealthKitCanonicalDayService.js";
 import { HEALTHKIT_CANONICAL_DAY_COLLECTION } from "./HealthKitEvidenceEligibilityPolicy.js";
-import { HealthKitWorkoutFamily } from "./HealthKitWorkoutService.js";
+import { HealthKitWorkoutFamily, assessHealthKitWorkoutStrategicEligibility } from "./HealthKitWorkoutService.js";
 import { projectPresentedHealthKitCardioTrainingRecords } from "./HealthKitCardioTrainingPresentation.js";
 import { resolveLocalTimeZone } from "../utils/localDate.js";
 
@@ -362,7 +362,10 @@ function graduateNutritionDay({ objects, day, purpose }) {
  * Phase 1 Cardio strategic graduation: canonical HealthKit Cardio workouts
  * (family "cardio" only -- never Strength, which keeps its own separate
  * reconciliation semantics and stays quarantined here regardless of this
- * scope) into ordinary Training evidence, under the SAME graduation-policy
+ * scope -- and only Cardio TYPES whose strategic role is
+ * GRADUATION_CANDIDATE: walk/run/cycle variants and Stair Stepper, never a
+ * HISTORY_ONLY type such as Cooldown) into ordinary Training evidence, under
+ * the SAME graduation-policy
  * architecture as Activity/Nutrition above (fail-closed scope resolution, a
  * read-time-only overlay, no stored-record flag).
  *
@@ -410,8 +413,15 @@ export function overlayGraduatedHealthKitCardioWorkouts({
   if (!scope.enabled || !scope.domains.includes("cardio_training") || canonicalWorkouts.length === 0) {
     return Object.freeze({ objects: canonicalObjects, applied: Object.freeze([]) });
   }
+  // Strategic eligibility is a separate, explicit per-type decision
+  // (`assessHealthKitWorkoutStrategicEligibility`), never `family` alone: a
+  // canonical Cardio-family workout of a HISTORY_ONLY type (Cooldown) is shown
+  // in Log / Training Day / Activity history but never graduates, under either
+  // purpose, whatever this scope says.
   const eligible = canonicalWorkouts.filter((workout) => {
     if (workout?.current?.family !== HealthKitWorkoutFamily.CARDIO) return false;
+    const strategic = assessHealthKitWorkoutStrategicEligibility(workout);
+    if (!strategic.eligible || strategic.graduationDomain !== "cardio_training") return false;
     const localDate = workout.localDate ?? workout.current?.localDate ?? null;
     return isHealthKitGraduationInScope(scope, { domain: "cardio_training", localDate });
   });

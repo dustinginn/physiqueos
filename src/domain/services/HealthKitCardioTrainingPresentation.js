@@ -28,7 +28,10 @@ import {
 //  - create or imply a Training Logger session, a Strength link, a claim, or an
 //    auto-confirm (the adapted record has no exercises and no relationship);
 //  - change strategic eligibility (the canonical workout stays quarantined; this
-//    module never reads or writes that decision);
+//    module never reads or writes that decision). It presents every canonical
+//    Cardio-family workout, including a HISTORY_ONLY type such as Cooldown:
+//    being shown here is history inclusion, never strategic eligibility, which
+//    only `assessHealthKitWorkoutStrategicEligibility` decides;
 //  - infer Indoor/Outdoor (the label comes ONLY from the stored canonicalType,
 //    which is location-specific only when Apple's explicit signal was retained;
 //    a generic `walking` stays a generic "Walking");
@@ -44,6 +47,14 @@ const CARDIO_LABELS = Object.freeze({
   cycling: "Cycling",
   indoor_cycling: "Indoor Cycle",
   outdoor_cycling: "Outdoor Cycle",
+  // Apple Fitness's own name for HKWorkoutActivityType.stairClimbing, and the
+  // label existing screenshot-derived Stair Stepper evidence already carries,
+  // so Training Day's existing classifier files it under Cardio.
+  stair_climbing: "Stair Stepper",
+  // Generic label. Training Day's existing classifier files it as kind
+  // "other" (a value every installed Native build decodes), so it is shown as
+  // an ordinary workout row and never counted toward the day's Cardio header.
+  cooldown: "Cooldown",
 });
 const METERS_PER_MILE = 1609.344;
 const COEXISTS_WITH_EVIDENCE = "matches_existing_evidence_workout";
