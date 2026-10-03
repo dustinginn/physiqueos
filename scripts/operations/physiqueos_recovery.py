@@ -384,9 +384,18 @@ def build_aggregator(config: dict[str, Any], temp_root: pathlib.Path,
                 # readable. A direct, bounded bundle of only fresh-origin-absent tips
                 # avoids every live checkout. The legacy DB is independently bounded
                 # by the 100 MiB generation ceiling.
-                source_bundle = temp_root / f"{dbid}-source.bundle"
-                git(["bundle", "create", str(source_bundle), *[ref for ref, _ in candidates]],
-                    git_dir=common, timeout=180)
+                cache_key = sha256_bytes(canonical_bytes(candidates))[:24]
+                cache_dir = runtime_home() / "cache" / "git"
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                source_bundle = cache_dir / f"{dbid}-{cache_key}.bundle"
+                if source_bundle.exists():
+                    git(["bundle", "verify", str(source_bundle)], git_dir=common, timeout=120)
+                else:
+                    temporary_bundle = temp_root / f"{dbid}-{cache_key}.building.bundle"
+                    git(["bundle", "create", str(temporary_bundle), *[ref for ref, _ in candidates]],
+                        git_dir=common, timeout=600)
+                    git(["bundle", "verify", str(temporary_bundle)], git_dir=common, timeout=120)
+                    os.replace(temporary_bundle, source_bundle)
                 git(["fetch", "--no-tags", str(source_bundle),
                      f"+refs/heads/*:refs/source/{dbid}/heads/*"], git_dir=aggregator, timeout=120)
             else:
