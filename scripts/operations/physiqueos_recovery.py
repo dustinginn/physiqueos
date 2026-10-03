@@ -1350,8 +1350,12 @@ def install_scheduler() -> dict[str, Any]:
     state = read_state()
     if state.get("local_validation") != "PASS" or state.get("icloud_local_copy") != "LOCAL_ICLOUD_CONTAINER_COMPLETE":
         raise GateFailure("FAIL_UNKNOWN_FILE", "scheduler gate: no validated iCloud generation")
-    if state.get("icloud_upload_reported") != "ICLOUD_UPLOAD_REPORTED_COMPLETE":
-        raise GateFailure("FAIL_UNKNOWN_FILE", "scheduler gate: upload is not reported complete")
+    latest_icloud_path = state.get("latest_icloud_path")
+    if not latest_icloud_path or not pathlib.Path(latest_icloud_path).is_dir():
+        raise GateFailure("FAIL_UNKNOWN_FILE", "scheduler gate: final iCloud generation unavailable")
+    live_upload = query_icloud_upload(pathlib.Path(latest_icloud_path))
+    if live_upload.get("state") != "ICLOUD_UPLOAD_REPORTED_COMPLETE":
+        raise GateFailure("FAIL_UNKNOWN_FILE", "scheduler gate: fresh upload metadata is not complete")
     home = runtime_home()
     bin_dir = home / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
@@ -1395,7 +1399,8 @@ def install_scheduler() -> dict[str, Any]:
     checkpoint.chmod(0o755); release.chmod(0o755)
     update_state({"scheduler": {"state": "INSTALLED", "plist": str(plist_path), "installed_at": iso_utc(),
                                 "next_run": next_schedule()},
-                  "hooks": {"checkpoint": str(checkpoint), "release": str(release)}})
+                  "hooks": {"checkpoint": str(checkpoint), "release": str(release)},
+                  "icloud_upload_reported": "ICLOUD_UPLOAD_REPORTED_COMPLETE", "icloud_upload_metadata": live_upload})
     return {"scheduler": "INSTALLED", "plist": str(plist_path), "hooks": [str(checkpoint), str(release)],
             "installed_files": installed}
 

@@ -234,18 +234,27 @@ class PolicyTests(TempCase):
             if pathlib.Path("/usr/bin/osascript").exists(): self.assertTrue(command.called)
 
     def test_scheduler_install_gate_and_plist(self):
-        recovery_home = self.temp / "home"; launch_agents = self.temp / "LaunchAgents"
+        recovery_home = self.temp / "home"; launch_agents = self.temp / "LaunchAgents"; cloud = self.temp / "cloud"; cloud.mkdir()
         env = {"PHYSIQUEOS_RECOVERY_HOME": str(recovery_home), "PHYSIQUEOS_LAUNCH_AGENTS": str(launch_agents)}
         with mock.patch.dict(os.environ, env, clear=False):
             recovery.update_state({"local_validation": "PASS", "icloud_local_copy": "LOCAL_ICLOUD_CONTAINER_COMPLETE",
-                                   "icloud_upload_reported": "ICLOUD_UPLOAD_REPORTED_COMPLETE"})
-            with mock.patch.object(recovery, "run") as command:
+                                   "icloud_upload_reported": "ICLOUD_UPLOAD_REPORTED_COMPLETE", "latest_icloud_path": str(cloud)})
+            with mock.patch.object(recovery, "run") as command, mock.patch.object(
+                    recovery, "query_icloud_upload", return_value={"state": "ICLOUD_UPLOAD_REPORTED_COMPLETE"}):
                 command.return_value.returncode = 0; command.return_value.stderr = b""
                 result = recovery.install_scheduler()
             self.assertEqual(result["scheduler"], "INSTALLED")
             plist = __import__("plistlib").loads((launch_agents / "com.physiqueos.recovery.plist").read_bytes())
             self.assertEqual(plist["StartCalendarInterval"], {"Hour": 3, "Minute": 30})
             self.assertTrue(plist["RunAtLoad"])
+
+    def test_scheduler_install_blocks_on_fresh_upload_unknown(self):
+        recovery_home = self.temp / "home-unknown"; cloud = self.temp / "cloud-unknown"; cloud.mkdir()
+        with mock.patch.dict(os.environ, {"PHYSIQUEOS_RECOVERY_HOME": str(recovery_home)}, clear=False):
+            recovery.update_state({"local_validation": "PASS", "icloud_local_copy": "LOCAL_ICLOUD_CONTAINER_COMPLETE",
+                                   "icloud_upload_reported": "ICLOUD_UPLOAD_REPORTED_COMPLETE", "latest_icloud_path": str(cloud)})
+            with mock.patch.object(recovery, "query_icloud_upload", return_value={"state": "REMOTE_ICLOUD_SYNC_UNKNOWN"}):
+                with self.assertRaises(recovery.GateFailure): recovery.install_scheduler()
 
 
 if __name__ == "__main__":
