@@ -315,13 +315,12 @@ def parse_worktrees(common_dir: pathlib.Path) -> list[dict[str, Any]]:
 
 
 def is_reachable(aggregator: pathlib.Path, sha: str, authorities: list[str]) -> bool:
-    for authority in authorities:
-        result = git(["merge-base", "--is-ancestor", sha, authority], git_dir=aggregator, check=False)
-        if result.returncode == 0:
-            return True
-        if result.returncode not in (0, 1):
-            raise RuntimeError("git reachability check failed")
-    return False
+    del authorities  # authority namespaces are fixed below and freshly fetched.
+    result = git(["for-each-ref", "--contains", sha, "--format=%(refname)",
+                  "refs/remotes/origin/", "refs/tags/"], git_dir=aggregator, check=False)
+    if result.returncode != 0:
+        raise RuntimeError("git reachability check failed")
+    return bool(result.stdout.strip())
 
 
 def scan_unpushed_blobs(aggregator: pathlib.Path, recovery_refs: list[str], authorities: list[str]) -> dict[str, Any]:
@@ -388,11 +387,8 @@ def build_aggregator(config: dict[str, Any], temp_root: pathlib.Path,
                 source_bundle = temp_root / f"{dbid}-source.bundle"
                 git(["bundle", "create", str(source_bundle), *[ref for ref, _ in candidates]],
                     git_dir=common, timeout=180)
-                for source_ref, sha in candidates:
-                    suffix = source_ref.removeprefix("refs/heads/")
-                    destination_ref = f"refs/source/{dbid}/heads/{suffix}"
-                    git(["fetch", "--no-tags", str(source_bundle), f"+{source_ref}:{destination_ref}"],
-                        git_dir=aggregator, timeout=90)
+                git(["fetch", "--no-tags", str(source_bundle),
+                     f"+refs/heads/*:refs/source/{dbid}/heads/*"], git_dir=aggregator, timeout=120)
             else:
                 # Do not fetch every local ref: fresh origin already supplies all
                 # reachable objects, so import only tips absent from its authority.
