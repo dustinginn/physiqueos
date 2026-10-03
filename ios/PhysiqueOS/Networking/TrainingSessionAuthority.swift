@@ -163,8 +163,8 @@ final class TrainingSessionAuthority {
     }
 
     /// Recently ended sessions for the paired Watch (newest first).
-    func recentlyEndedSessions(limit: Int) -> [TrainingSessionTerminalRecord] {
-        Array(TrainingSessionTerminalLedger.pruned(terminalRecords, now: now()).prefix(limit))
+    func recentlyEndedSessions() -> [TrainingSessionTerminalRecord] {
+        TrainingSessionTerminalLedger.pruned(terminalRecords, now: now())
     }
 
     private func appendTerminalRecord(_ record: TrainingSessionTerminalRecord) {

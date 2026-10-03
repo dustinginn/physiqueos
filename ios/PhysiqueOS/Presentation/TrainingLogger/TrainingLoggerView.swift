@@ -14,6 +14,7 @@ struct TrainingLoggerView: View {
     @State private var provisionalName = ""
     @State private var provisionalAreaId = ""
     @State private var showingCancelWorkoutConfirmation = false
+    @State private var showingDiscardFailedFinishConfirmation = false
     @State private var isNumericKeyboardVisible = false
     @State private var focusedNumericFieldID: String?
     @State private var numericEditBuffers: [String: String] = [:]
@@ -102,6 +103,17 @@ struct TrainingLoggerView: View {
         .fileImporter(isPresented: $isSupportingFilePickerPresented, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
             attachAndInterpretFiles(urls)
+        }
+        .alert(
+            "Discard this saved workout?",
+            isPresented: $showingDiscardFailedFinishConfirmation
+        ) {
+            Button("Discard Saved Workout", role: .destructive) {
+                viewModel?.discardFailedConfirmedFinish()
+            }
+            Button("Keep Workout", role: .cancel) {}
+        } message: {
+            Text("This removes the structured workout from this iPhone. Because Finish was already confirmed, a paired Watch will still end and save its HealthKit workout.")
         }
     }
 
@@ -1056,6 +1068,15 @@ struct TrainingLoggerView: View {
                 .accessibilityIdentifier("trainingLogger.completeLocal")
             if !viewModel.isSubmitting, !viewModel.isAwaitingDurability, !viewModel.isFinishConfirmed {
                 secondaryButton("Back to Workout Review") { viewModel.go(to: .summary) }
+            }
+            if viewModel.canDiscardFailedConfirmedFinish {
+                Button("Discard Saved Workout", role: .destructive) {
+                    showingDiscardFailedFinishConfirmation = true
+                }
+                .buttonStyle(.bordered)
+                .tint(PhysiqueOSTheme.destructive)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("trainingLogger.discardFailedConfirmedFinish")
             }
         }
     }

@@ -623,6 +623,8 @@ final class Build83FinishLifecycleTests: XCTestCase {
         await viewModel.submit()
         XCTAssertNotNil(viewModel.validationMessage)
         XCTAssertTrue(viewModel.isFinishConfirmed)
+        XCTAssertTrue(viewModel.canDiscardFailedConfirmedFinish,
+                      "A definite commit failure exposes the guarded discard-after-finish escape hatch.")
         let frozen = try XCTUnwrap(authority.draft(id: "session-1"))
 
         viewModel.setValue(exerciseId: "a", setId: "a1", field: .reps, value: 99)
@@ -642,6 +644,29 @@ final class Build83FinishLifecycleTests: XCTestCase {
         XCTAssertEqual(commits[0].exercises, commits[1].exercises)
         XCTAssertEqual(commits[0].finishedAt, commits[1].finishedAt)
         XCTAssertTrue(authority.drafts.isEmpty)
+    }
+
+    func testFailedConfirmedFinishCanBeExplicitlyDiscardedWithoutCancellingTheWatchWorkout() async throws {
+        let clock = Clock(t0)
+        let authority = makeAuthority(Store([thirteenSetSession(done: true, step: .review)]), clock: clock)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: WriteAPI(outcomes: [.fail]), sessionAuthority: authority,
+            authority: .founderProduction, now: { clock.now }
+        )
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        await viewModel.submit()
+
+        let operationId = try XCTUnwrap(viewModel.draft?.watchFinishOperationId)
+        viewModel.discardFailedConfirmedFinish()
+
+        XCTAssertNil(viewModel.draft)
+        XCTAssertTrue(authority.drafts.isEmpty)
+        let terminal = try XCTUnwrap(authority.terminalRecord(sessionId: "session-1"))
+        XCTAssertEqual(terminal.outcome, .discardedAfterFinish)
+        XCTAssertEqual(terminal.finishOperationId, operationId)
+        XCTAssertFalse(authority.isCancelled(sessionId: "session-1"),
+                       "A confirmed Watch workout must still be saved to HealthKit.")
     }
 
     func testAFinishThatCannotBeCommittedIsNeverStamped() async throws {
@@ -680,7 +705,7 @@ final class Build83FinishLifecycleTests: XCTestCase {
         _ = router.route(command(.confirmFinish, authority, id: "op-kept"))
         coordinator.reconcile()
         await waitUntil("committed") { authority.drafts.isEmpty }
-        for index in 0..<5 {
+        for index in 0..<20 {
             clock.advance(60)
             var discarded = thirteenSetSession()
             discarded.id = "discard-\(index)"
@@ -690,6 +715,7 @@ final class Build83FinishLifecycleTests: XCTestCase {
         }
         let ended = router.unavailableProjection().recentlyEnded
         XCTAssertTrue(ended.contains { $0.sessionId == "session-1" && $0.outcome == .committed && $0.finishOperationId == "op-kept" })
+        XCTAssertGreaterThan(ended.count, 16, "The 48-hour ledger is not truncated at the former sixteen-record cap.")
         XCTAssertLessThanOrEqual(ended.count, WatchWorkoutContract.maximumRecentlyEndedSessions)
     }
 

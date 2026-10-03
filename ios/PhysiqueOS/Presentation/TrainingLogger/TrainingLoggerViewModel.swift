@@ -273,6 +273,19 @@ final class TrainingLoggerViewModel {
         if draft?.id == draftId { draft = nil }
     }
 
+    /// Explicit escape hatch after a confirmed Finish has returned a
+    /// definite failure. The authority preserves the finish operation in a
+    /// `discardedAfterFinish` terminal record, so a paired Watch still saves
+    /// its HealthKit workout while the unsaved structured draft is removed.
+    var canDiscardFailedConfirmedFinish: Bool {
+        isFinishConfirmed && !isSubmitting && !isAwaitingDurability && validationMessage != nil
+    }
+
+    func discardFailedConfirmedFinish() {
+        guard canDiscardFailedConfirmedFinish, let draftId = draft?.id else { return }
+        discardSavedDraft(draftId: draftId)
+    }
+
     func cancelWorkout() {
         guard canWrite, !isFinishConfirmed else { return }
         if let draftId = draft?.id {
@@ -493,7 +506,9 @@ final class TrainingLoggerViewModel {
     /// A confirmed finish (one operation stamped, not yet durable) is frozen
     /// on this phone too: no set edits, structural edits, Cancel or Save &
     /// Leave, so the committed payload (and its idempotency key) can never
-    /// change between attempts. Retry is the only action.
+    /// change between attempts. Retry is the normal action; after a definite
+    /// failed attempt, the user may explicitly discard through the guarded
+    /// `discardedAfterFinish` path above.
     var isFinishConfirmed: Bool {
         guard let draft, completedDraft == nil else { return false }
         return draft.watchFinishOperationId != nil && draft.step != .complete

@@ -397,4 +397,23 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
             "A known confirmed finish beats a later cancelled record."
         )
     }
+
+    @MainActor
+    func testDiscardAfterFinishIsPersistedBeforeTerminalProjectionIsCleared() {
+        let (store, _) = makeStore("finish.discarded.persisted")
+        let discarded = WatchWorkoutProjection.terminal(
+            sessionId: "current", revision: 0, phase: .unavailable,
+            recentlyEnded: [.init(
+                sessionId: "s1", outcome: .discardedAfterFinish,
+                finishOperationId: "op-1", finishedAt: now
+            )]
+        )
+
+        store.apply(discarded)
+
+        XCTAssertNil(store.projection)
+        XCTAssertEqual(store.finishKnowledge["s1"]?.operationId, "op-1",
+                       "Relaunch recovery must retain the finish after terminal context is consumed.")
+        XCTAssertEqual(store.finishKnowledge["s1"]?.finishedAt, now)
+    }
 }

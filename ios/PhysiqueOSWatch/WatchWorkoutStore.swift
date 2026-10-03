@@ -757,9 +757,15 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         if incoming.requiresHealthSave, let operationId = incoming.finish?.operationId {
             rememberFinish(sessionId: incoming.sessionId, operationId: operationId, finishedAt: incoming.finishedAt)
         }
-        for ended in incoming.recentlyEnded where ended.outcome == .committed {
+        for ended in incoming.recentlyEnded
+        where ended.outcome == .committed || ended.outcome == .discardedAfterFinish {
             if let operationId = ended.finishOperationId {
-                rememberFinish(sessionId: ended.sessionId, operationId: operationId, finishedAt: ended.finishedAt)
+                rememberFinish(
+                    sessionId: ended.sessionId,
+                    operationId: operationId,
+                    finishedAt: ended.finishedAt,
+                    recordedAt: ended.finishedAt
+                )
             }
         }
         resolveHealthSession(for: incoming)
@@ -887,10 +893,19 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         }
     }
 
-    private func rememberFinish(sessionId: String, operationId: String, finishedAt: Date?) {
+    private func rememberFinish(
+        sessionId: String,
+        operationId: String,
+        finishedAt: Date?,
+        recordedAt: Date? = nil
+    ) {
         var knowledge = finishKnowledge
         guard knowledge[sessionId]?.operationId != operationId else { return }
-        knowledge[sessionId] = FinishKnowledge(operationId: operationId, finishedAt: finishedAt, recordedAt: now())
+        knowledge[sessionId] = FinishKnowledge(
+            operationId: operationId,
+            finishedAt: finishedAt,
+            recordedAt: recordedAt ?? now()
+        )
         finishKnowledge = knowledge
     }
 

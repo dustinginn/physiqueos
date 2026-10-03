@@ -31,8 +31,9 @@ struct TrainingSessionTerminalRecord: Codable, Equatable, Sendable {
     var acknowledgedAt: String?
 }
 
-/// Persistence for the terminal ledger. Small and bounded; one per Native
-/// authority.
+/// Persistence for the terminal ledger. Age-bounded; one per Native
+/// authority. Keeping every record inside the short retention window avoids
+/// losing a confirmed finish merely because several later sessions ended.
 protocol TrainingSessionTerminalLedgerStore: AnyObject {
     func loadRecords() -> [TrainingSessionTerminalRecord]
     func saveRecords(_ records: [TrainingSessionTerminalRecord])
@@ -75,12 +76,13 @@ final class UserDefaultsTrainingSessionTerminalLedgerStore: TrainingSessionTermi
 }
 
 enum TrainingSessionTerminalLedger {
-    static let maximumRecords = 16
     /// Longer than the 12 h live-session window, so a Watch that reconnects
     /// the next morning still learns how its workout ended.
     static let retention: TimeInterval = 48 * 60 * 60
 
-    /// Newest first, bounded by count and age.
+    /// Newest first and bounded by age. The 48-hour window is naturally
+    /// small for human workouts, and is the authoritative late-command
+    /// guarantee; a count cap could discard a still-relevant finish.
     static func pruned(_ records: [TrainingSessionTerminalRecord], now: Date) -> [TrainingSessionTerminalRecord] {
         let fresh = records.filter { record in
             guard let recorded = TrainingSessionClock.date(from: record.recordedAt) else { return false }
@@ -90,6 +92,6 @@ enum TrainingSessionTerminalLedger {
         let date = { (record: TrainingSessionTerminalRecord) in
             TrainingSessionClock.date(from: record.recordedAt) ?? .distantPast
         }
-        return Array(fresh.sorted { date($0) > date($1) }.prefix(maximumRecords))
+        return fresh.sorted { date($0) > date($1) }
     }
 }
