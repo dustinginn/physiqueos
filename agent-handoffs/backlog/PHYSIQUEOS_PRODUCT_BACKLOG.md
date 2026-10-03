@@ -379,3 +379,27 @@ Training Logger / Live Activities
 - Do not duplicate it as a separate future backlog item.
 
 END BACKLOG.
+
+
+## DEXA -> Apple Health writeback — READY / HOLD (Founder decision 2026-10-02)
+
+Status: architecture audit complete; implementation intentionally NOT authorized yet while Watch Build 82 acceptance/corrections are prioritized.
+
+Audit authority:
+- agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md
+- main report commit 789aafd9cc2b4b95dee71c0fd3ee9eb0d51a2422
+
+Founder-approved product decisions:
+1. V1 writes Body Fat Percentage plus Apple Health Lean Body Mass calculated as fat-free mass = canonical DEXA totalMass - fatMass. Do not write raw DEXA lean soft tissue as Apple Health Lean Body Mass.
+2. Do NOT write DEXA total mass to Apple Health Weight.
+3. Permanent writeback is prospective-only for scan dates >= 2026-10-09. No historical Apple Health backfill is authorized.
+4. Write automatically after canonical DEXA acceptance, with quiet status/retry.
+5. Canonical corrections automatically replace PhysiqueOS-owned Apple Health samples using versioned exact-once semantics.
+6. One-time explicit opt-in plus persistent You -> Apple Health toggle. Turning off stops future writes but does not automatically delete prior samples.
+7. Physical pre-scan validation must use the Founder's REAL canonical 2026-09-12 DEXA, not fabricated health data. Temporarily authorize only that scan, write its real Body Fat % and calculated fat-free Lean Body Mass, verify source/timestamp/units/exactly-once/no feedback loop, then delete both PhysiqueOS-owned samples and verify removal. Permanent policy remains prospective from 2026-10-09.
+8. After the Sep 12 physical test passes, other real historical DEXA figures may be used freely as deterministic/simulator test fixtures for mapping, units, revisions and edge cases, but must NOT be written into the Founder's real Apple Health history unless separately authorized.
+
+Execution gate:
+- DO NOT implement, deploy, enable policy, create a Native build, write/delete HealthKit samples, or backfill until Founder explicitly resumes this backlog item.
+- When resumed, use the audit's Phase B-E plan and reverify current Native/Server authorities first.
+- Target readiness remains the Founder DEXA on Friday 2026-10-09.
