@@ -552,6 +552,21 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         sourceIdentity: exactLink.id,
         payload: exactLink,
       });
+      const existingReview = await records.get({
+        ownerUserId: context.ownerUserId,
+        collection: HEALTHKIT_WORKOUT_RECONCILIATION_COLLECTION,
+        recordId: getHealthKitWorkoutReconciliationId(persistedWorkout.id),
+      });
+      const founderUnlinked = insertedLink.record.status === HealthKitWorkoutLinkStatus.UNLINKED &&
+        insertedLink.record.statusHistory?.at(-1)?.by?.kind === "founder";
+      const founderTerminalReview = existingReview?.resolution?.by?.kind === "founder" &&
+        hasExactStoredHealthKitWorkoutReconciliationTerminal(existingReview, {
+          ownerUserId: context.ownerUserId,
+          canonicalWorkoutId: persistedWorkout.id,
+        });
+      if (founderUnlinked || founderTerminalReview) {
+        return Object.freeze({ outcome: "founder_override", link: insertedLink.record });
+      }
       const confirmed = await confirmHealthKitWorkoutRelationship({
         records,
         ownerUserId: context.ownerUserId,
@@ -566,7 +581,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         ownerUserId: context.ownerUserId,
         collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
       });
-      return linked;
+      return Object.freeze({ outcome: confirmed.outcome, link: linked });
     };
     const results = [];
     for (const observation of batch.observations) {
@@ -893,21 +908,23 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         };
         const exactCorrelation = exactCorrelations.get(observation.id);
         if (exactCorrelation && ["create", "update"].includes(decision.action)) {
-          const linked = await confirmTrustedExactCorrelation({ persistedWorkout, exactCorrelation });
-          reconciliation = {
-            ...reconciliation,
-            canonicalTrainingSessionId: exactCorrelation.canonicalTrainingSessionId,
-            workoutLinkId: linked.id,
-            associationAuthority: exactCorrelation.associationAuthority,
-          };
-          stored = await records.put({
-            ownerUserId: context.ownerUserId,
-            collection: "healthKitObservations",
-            recordId: stored.id,
-            expectedVersion: stored.version,
-            sourceIdentity: stored.id,
-            payload: { ...stored, reconciliation },
-          });
+          const exactResult = await confirmTrustedExactCorrelation({ persistedWorkout, exactCorrelation });
+          if (exactResult.outcome !== "founder_override") {
+            reconciliation = {
+              ...reconciliation,
+              canonicalTrainingSessionId: exactCorrelation.canonicalTrainingSessionId,
+              workoutLinkId: exactResult.link.id,
+              associationAuthority: exactCorrelation.associationAuthority,
+            };
+            stored = await records.put({
+              ownerUserId: context.ownerUserId,
+              collection: "healthKitObservations",
+              recordId: stored.id,
+              expectedVersion: stored.version,
+              sourceIdentity: stored.id,
+              payload: { ...stored, reconciliation },
+            });
+          }
         }
       }
       let exactAssociationPersisted = false;
@@ -921,24 +938,26 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           recordId: workoutRecordId,
         });
         if (persistedWorkout) {
-          const linked = await confirmTrustedExactCorrelation({
+          const exactResult = await confirmTrustedExactCorrelation({
             persistedWorkout, exactCorrelation: replayExactCorrelation,
           });
-          reconciliation = {
-            ...stored.reconciliation,
-            canonicalTrainingSessionId: replayExactCorrelation.canonicalTrainingSessionId,
-            workoutLinkId: linked.id,
-            associationAuthority: replayExactCorrelation.associationAuthority,
-          };
-          stored = await records.put({
-            ownerUserId: context.ownerUserId,
-            collection: "healthKitObservations",
-            recordId: stored.id,
-            expectedVersion: stored.version,
-            sourceIdentity: stored.id,
-            payload: { ...stored, reconciliation },
-          });
-          exactAssociationPersisted = true;
+          if (exactResult.outcome !== "founder_override") {
+            reconciliation = {
+              ...stored.reconciliation,
+              canonicalTrainingSessionId: replayExactCorrelation.canonicalTrainingSessionId,
+              workoutLinkId: exactResult.link.id,
+              associationAuthority: replayExactCorrelation.associationAuthority,
+            };
+            stored = await records.put({
+              ownerUserId: context.ownerUserId,
+              collection: "healthKitObservations",
+              recordId: stored.id,
+              expectedVersion: stored.version,
+              sourceIdentity: stored.id,
+              payload: { ...stored, reconciliation },
+            });
+            exactAssociationPersisted = true;
+          }
         }
       }
       const reconciliationChanged = existing &&
@@ -1076,11 +1095,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         })
         : null;
       if (exactCorrelation?.associationAuthority === "trusted_physiqueos_session_id_v1") {
-        const linked = await confirmTrustedExactCorrelation({
-          observation: sourceObservation,
+        const exactResult = await confirmTrustedExactCorrelation({
           persistedWorkout: workout,
           exactCorrelation,
         });
+        if (exactResult.outcome === "founder_override") continue;
+        const linked = exactResult.link;
         if (sourceObservation.reconciliation?.associationAuthority !== exactCorrelation.associationAuthority) {
           const reconciliation = {
             ...sourceObservation.reconciliation,
@@ -1098,7 +1118,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           });
           sourceObservationsById.set(savedObservation.id, savedObservation);
         }
-        summary.automaticallyConfirmed += 1;
+        if (exactResult.outcome === "confirmed") summary.automaticallyConfirmed += 1;
         continue;
       } else if (exactCorrelation?.reason === "trusted_session_not_found") {
         // The Watch workout arrived before its independently committed Logger

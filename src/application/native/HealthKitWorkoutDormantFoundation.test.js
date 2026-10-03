@@ -11,6 +11,7 @@ import { resolveHealthKitWorkoutActivationPolicy } from "../../domain/services/H
 import {
   confirmHealthKitWorkoutRelationship,
   getHealthKitWorkoutLinkClaimId,
+  unlinkHealthKitWorkoutRelationship,
 } from "../../domain/services/HealthKitWorkoutRelationshipService.js";
 import { getHealthKitWorkoutReconciliationId } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
 
@@ -993,6 +994,66 @@ describe("trusted PhysiqueOS Watch correlation", () => {
     expect(after.healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
     expect(after.evidenceReviews ?? []).toEqual([]);
     expect(after.canonicalEvidenceObjects).toHaveLength(1);
+  });
+
+  it("preserves an explicit Founder unlink across Activity ingestion and exact workout replay", async () => {
+    const records = store({ trustedWatchPolicy: true, evidence: [liveLogger(canonicalId, "10:00", "11:00", 3600)] });
+    const observedWorkout = workout({
+      externalId: "trusted-founder-unlink",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+    });
+    await ingest(records, [observedWorkout], "trusted-founder-unlink-initial");
+    const link = records.snapshot().healthKitWorkoutLinks[0];
+    await unlinkHealthKitWorkoutRelationship({
+      records,
+      ownerUserId: OWNER,
+      linkId: link.id,
+      by: { kind: "founder", ref: OWNER },
+      now: `${DAY}T23:31:00.000Z`,
+      reason: "founder_choice",
+    });
+
+    await ingest(records, [activity({ sourceRevision: 2 })], "trusted-founder-unlink-activity");
+    expect(records.snapshot().healthKitWorkoutLinks[0]).toMatchObject({ status: "unlinked" });
+    expect(records.snapshot().healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(0);
+
+    await ingest(records, [observedWorkout], "trusted-founder-unlink-replay");
+    expect(records.snapshot().healthKitWorkoutLinks[0]).toMatchObject({ status: "unlinked" });
+    expect(records.snapshot().healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(0);
+  });
+
+  it("preserves a terminal Founder no-match when exact metadata arrives on a later source revision", async () => {
+    const records = store({ trustedWatchPolicy: true, evidence: [liveLogger(canonicalId, "10:00", "11:00", 3600)] });
+    const initialWorkout = workout({
+      externalId: "trusted-founder-no-match",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      sourceRevision: 1,
+    });
+    await ingest(records, [initialWorkout], "trusted-founder-no-match-initial");
+    const review = records.snapshot().evidenceReviews[0];
+    await createCanonicalPersistenceCommandPorts({ records, now: () => new Date(`${DAY}T23:31:00.000Z`) })
+      .resolveWorkoutReconciliation({
+        ownerUserId: OWNER,
+        principal: { userId: OWNER, deviceId: "founder-iphone", sessionId: "native-session" },
+        metadata: { commandId: "trusted-founder-no-match", expectedVersion: String(review.version), idempotencyKey: "trusted-founder-no-match" },
+        payload: { reviewId: review.id, action: "no_match" },
+      });
+
+    await ingest(records, [workout({
+      externalId: "trusted-founder-no-match",
+      sourceBundleIdentifier: "com.physiqueos.native.dev",
+      isIndoorWorkout: true,
+      physiqueOSSessionId: sessionId,
+      sourceRevision: 2,
+    })], "trusted-founder-no-match-exact-revision", { receivedAt: `${DAY}T23:32:00.000Z` });
+
+    const after = records.snapshot();
+    expect(after.evidenceReviews[0]).toMatchObject({ status: "resolved_no_match", resolution: { action: "no_match" } });
+    expect(after.healthKitWorkoutLinks.filter((link) => link.status === "confirmed")).toHaveLength(0);
+    expect(after.healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(0);
   });
 
   it("revalidates exact source semantics before returning idempotent trusted confirmation", async () => {
