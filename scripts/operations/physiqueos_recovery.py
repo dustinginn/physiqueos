@@ -959,6 +959,7 @@ def normalized_status(cwd: pathlib.Path) -> bytes:
 
 
 def restore_smoke_test(generation: pathlib.Path, *, keep_scratch: bool = False) -> dict[str, Any]:
+    stage = "generation-verification"
     verification = verify_generation(generation)
     manifest = read_json(generation / "MANIFEST.json")
     home = runtime_home()
@@ -968,10 +969,12 @@ def restore_smoke_test(generation: pathlib.Path, *, keep_scratch: bool = False) 
     origin = os.environ.get("PHYSIQUEOS_RECOVERY_ORIGIN", manifest["git"]["origin"])
     restored_dirty = 0
     try:
+        stage = "fresh-origin-clone"
         clone = scratch / "repo"
         git(["clone", "--no-checkout", origin, str(clone)], timeout=240)
         bundle = generation / "git" / "local-only.bundle"
         if bundle.is_file():
+            stage = "bundle-verify-import"
             git(["bundle", "verify", str(bundle)], cwd=clone, timeout=120)
             git(["fetch", str(bundle), "+refs/recovery/*:refs/recovery/*"], cwd=clone, timeout=180)
             expected_refs = {item["recovery_ref"]: item["sha"] for db in manifest["git"]["databases"]
@@ -984,8 +987,10 @@ def restore_smoke_test(generation: pathlib.Path, *, keep_scratch: bool = False) 
             restored_authorities = [ref for ref, _ in ref_lines(git_dir, "refs/remotes/origin/")]
             restored_authorities.extend(ref for ref, _ in ref_lines(git_dir, "refs/tags/"))
             restored_recovery_refs = [ref for ref, _ in ref_lines(git_dir, "refs/recovery/")]
+            stage = "restored-git-secret-scan"
             scan_unpushed_blobs(git_dir, restored_recovery_refs, restored_authorities)
 
+        stage = "dirty-state-reconstruction"
         dirty_inventory = read_json(generation / "local-state" / "inventory.json")
         for index, entry in enumerate(item for item in dirty_inventory["worktrees"] if item["state"] == "DIRTY"):
             worktree = scratch / f"dirty-{index:02d}"
@@ -1025,6 +1030,7 @@ def restore_smoke_test(generation: pathlib.Path, *, keep_scratch: bool = False) 
                         raise GateFailure("FAIL_SCANNER_ERROR", "restored file hash/mode mismatch")
             restored_dirty += 1
 
+        stage = "safe-tool-syntax"
         tools = generation / "tool-inventory" / "safe-tools"
         for path in tools.glob("*") if tools.is_dir() else []:
             data = path.read_bytes()
@@ -1033,6 +1039,7 @@ def restore_smoke_test(generation: pathlib.Path, *, keep_scratch: bool = False) 
             else:
                 run(["/bin/sh", "-n", str(path)], timeout=30)
 
+        stage = "xcode-project-regeneration"
         generator = clone / "ios" / "Scripts" / "generate_project.py"
         if generator.is_file():
             git(["checkout", "--detach", "refs/remotes/origin/main"], cwd=clone, timeout=120)
@@ -1042,11 +1049,16 @@ def restore_smoke_test(generation: pathlib.Path, *, keep_scratch: bool = False) 
             if before != after:
                 raise GateFailure("FAIL_SCANNER_ERROR", "Xcode project generator is not deterministic against GitHub main")
 
+        stage = "restored-package-secret-scan"
         scan_generation(generation)
         result = {**verification, "result": "PASS", "source": str(generation),
                   "restored_local_ref_count": manifest["git"]["local_ref_count"],
                   "restored_dirty_worktree_count": restored_dirty, "scratch": str(scratch) if keep_scratch else "removed"}
         return result
+    except GateFailure:
+        raise
+    except Exception as exc:
+        raise GateFailure("FAIL_SCANNER_ERROR", f"restore stage failed safely: {stage}") from exc
     finally:
         if not keep_scratch:
             shutil.rmtree(scratch, ignore_errors=True)
