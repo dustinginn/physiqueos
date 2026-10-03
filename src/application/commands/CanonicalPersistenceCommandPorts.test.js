@@ -9,6 +9,34 @@ const principal = { userId: ownerUserId, deviceId: "device-one", sessionId: "ses
 const now = () => new Date("2026-08-11T12:00:00.000Z");
 
 describe("Phase 4 canonical command persistence ports", () => {
+  it("preserves materialized DEXA HealthKit state across a failed withdrawal receipt", async () => {
+    const records = createInMemoryCanonicalRecordStore({});
+    const ports = createCanonicalPersistenceCommandPorts({ records, now });
+    const base = {
+      intentIdentity: "dexa_hk_intent_a25ae7e524223ec3760b4fb0384c4060d2d2e0e44a6f3e46a39168f9c63083dd",
+      logicalScanKey: "dexa_scan|owner-one|2026-10-09",
+      canonicalRevision: 1,
+      measurementKind: "bodyFatPercentage",
+      syncIdentifier: "physiqueos.dexa.v1.d6386aacc9b687d0f496ba28d61683bc",
+    };
+    await ports.recordDexaHealthKitWritebackReceipt(commandContext({
+      ...base, desiredState: "present", outcome: "saved", healthKitCorrelationId: "own-sample",
+    }, null, "dexa-receipt-saved"));
+    await ports.recordDexaHealthKitWritebackReceipt(commandContext({
+      ...base, desiredState: "withdrawn", outcome: "permission_needed",
+    }, null, "dexa-receipt-withdrawal-pending"));
+
+    expect(records.snapshot().dexaHealthKitWritebackReceipts).toEqual([
+      expect.objectContaining({
+        desiredState: "withdrawn",
+        outcome: "permission_needed",
+        materializedState: "present",
+        materializedRevision: 1,
+        materializedCorrelationId: "own-sample",
+      }),
+    ]);
+  });
+
   it("returns all ambiguous catalog candidates without creating an identity or membership", async () => {
     const records = createInMemoryCanonicalRecordStore({ canonicalExerciseLibrary: [
       { id: "test_row_one", name: "Test Row One", aliases: ["test shared row"] },

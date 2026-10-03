@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   DEXA_HEALTHKIT_WRITEBACK_RECEIPT_COLLECTION,
+  mergeDexaHealthKitWritebackReceipt,
   normalizeDexaHealthKitWritebackReceipt,
 } from "../../domain/services/DexaHealthKitWritebackService.js";
 import {
@@ -396,6 +397,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       collection: DEXA_HEALTHKIT_WRITEBACK_RECEIPT_COLLECTION,
       recordId: receipt.id,
     });
+    const mergedReceipt = mergeDexaHealthKitWritebackReceipt(existing, receipt);
     const persisted = existing
       ? await records.put({
         ownerUserId: context.ownerUserId,
@@ -403,14 +405,14 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         recordId: receipt.id,
         expectedVersion: existing.version,
         sourceIdentity: receipt.intentIdentity,
-        payload: receipt,
+        payload: mergedReceipt,
       })
       : (await records.putIfAbsent({
         ownerUserId: context.ownerUserId,
         collection: DEXA_HEALTHKIT_WRITEBACK_RECEIPT_COLLECTION,
         recordId: receipt.id,
         sourceIdentity: receipt.intentIdentity,
-        payload: receipt,
+        payload: mergedReceipt,
       })).record;
     return {
       result: {

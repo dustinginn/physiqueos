@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { selectActiveCanonicalDexaScans } from "./CanonicalDexaScanService.js";
+import {
+  createDexaSemanticFingerprint,
+  selectActiveCanonicalDexaScans,
+} from "./CanonicalDexaScanService.js";
 import { localDateTimeToUtc } from "./IntelligenceLifecycleIdentityService.js";
 import { resolveLocalTimeZone } from "../utils/localDate.js";
 
@@ -140,14 +143,15 @@ export function projectDexaHealthKitWriteback({
   if (mode === "permanent") {
     const currentIdentities = new Set(currentIntents.map((intent) => intent.intentIdentity));
     for (const receipt of receipts) {
-      if (receipt.desiredState !== "present" || currentIdentities.has(receipt.intentIdentity)) continue;
+      if (!receiptHasMaterializedPresent(receipt) || currentIdentities.has(receipt.intentIdentity)) continue;
       if (!ALLOWED_KIND_SET.has(receipt.measurementKind) || !receipt.syncIdentifier) continue;
+      const materializedRevision = receipt.materializedRevision ?? receipt.canonicalRevision;
       currentIntents.push(Object.freeze({
         schemaVersion: DEXA_HEALTHKIT_WRITEBACK_SCHEMA_VERSION,
         intentIdentity: receipt.intentIdentity,
         canonicalId: receipt.canonicalId ?? null,
         logicalScanKey: receipt.logicalScanKey,
-        canonicalRevision: receipt.canonicalRevision,
+        canonicalRevision: materializedRevision,
         occurrenceDate: receipt.occurrenceDate ?? null,
         sampleInstant: receipt.sampleInstant ?? null,
         timeZone: receipt.timeZone ?? resolveLocalTimeZone(ownerTimeZone),
@@ -158,7 +162,7 @@ export function projectDexaHealthKitWriteback({
         derivation: receipt.derivation ?? null,
         desiredState: "withdrawn",
         syncIdentifier: receipt.syncIdentifier,
-        syncVersion: receipt.canonicalRevision,
+        syncVersion: materializedRevision,
         externalUUID: receipt.externalUUID ?? externalUUID(receipt.syncIdentifier.replace(/^physiqueos\.dexa\.v1\./, "")),
         mode: "permanent",
         latestReceipt: sanitizeReceipt(receipt),
@@ -214,6 +218,33 @@ export function normalizeDexaHealthKitWritebackReceipt(payload, { ownerUserId, r
     healthKitCorrelationId: optionalText(payload.healthKitCorrelationId, 100),
     errorCode: optionalText(payload.errorCode, 100),
     reportedAt: new Date(reportedAt).toISOString(),
+  });
+}
+
+export function mergeDexaHealthKitWritebackReceipt(previous, attempt) {
+  const prior = previous?.payload ?? previous ?? null;
+  let materializedState = prior?.materializedState ??
+    (receiptHasMaterializedPresent(prior) ? "present" : "unknown");
+  let materializedRevision = prior?.materializedRevision ??
+    (materializedState === "present" ? prior?.canonicalRevision ?? null : null);
+  let materializedCorrelationId = prior?.materializedCorrelationId ??
+    (materializedState === "present" ? prior?.healthKitCorrelationId ?? null : null);
+  const staleAttempt = Number.isSafeInteger(materializedRevision) &&
+    attempt.canonicalRevision < materializedRevision;
+  if (!staleAttempt && attempt.desiredState === "present" && ["saved", "already_present"].includes(attempt.outcome)) {
+    materializedState = "present";
+    materializedRevision = attempt.canonicalRevision;
+    materializedCorrelationId = attempt.healthKitCorrelationId ?? materializedCorrelationId;
+  } else if (!staleAttempt && attempt.desiredState === "withdrawn" && attempt.outcome === "deleted") {
+    materializedState = "absent";
+    materializedRevision = attempt.canonicalRevision;
+    materializedCorrelationId = null;
+  }
+  return Object.freeze({
+    ...attempt,
+    materializedState,
+    materializedRevision,
+    materializedCorrelationId,
   });
 }
 
@@ -285,19 +316,28 @@ function selectValidationScan(canonicalEvidenceObjects, ownerUserId) {
     userId: ownerUserId,
   });
   const diagnostics = [...selected.diagnostics];
+  if (diagnostics.length) return { record: null, diagnostics };
   if (selected.records.length !== 1) {
     diagnostics.push({ code: "DEXA_HEALTHKIT_VALIDATION_SCAN_COUNT_INVALID" });
     return { record: null, diagnostics };
   }
   const record = selected.records[0];
   const expectedLogicalKey = `dexa_scan|${ownerUserId}|${DEXA_HEALTHKIT_VALIDATION_DATE}`;
+  const computedFingerprint = createDexaSemanticFingerprint(record.payload ?? record);
   if (record.canonicalId !== expectedLogicalKey || record.dexaRevision?.logicalScanKey !== expectedLogicalKey ||
       record.dexaRevision?.revision !== DEXA_HEALTHKIT_VALIDATION_EXPECTED_REVISION ||
-      record.dexaRevision?.semanticFingerprint !== DEXA_HEALTHKIT_VALIDATION_EXPECTED_FINGERPRINT) {
+      record.dexaRevision?.semanticFingerprint !== DEXA_HEALTHKIT_VALIDATION_EXPECTED_FINGERPRINT ||
+      computedFingerprint !== record.dexaRevision?.semanticFingerprint) {
     diagnostics.push({ code: "DEXA_HEALTHKIT_VALIDATION_SCAN_IDENTITY_MISMATCH" });
     return { record: null, diagnostics };
   }
   return { record, diagnostics };
+}
+
+function receiptHasMaterializedPresent(receipt) {
+  if (!receipt) return false;
+  if (receipt.materializedState != null) return receipt.materializedState === "present";
+  return receipt.desiredState === "present" && ["saved", "already_present"].includes(receipt.outcome);
 }
 
 function validateCanonicalIdentity(record, ownerUserId) {
