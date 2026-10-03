@@ -878,6 +878,20 @@ describe("Native command request-start observability", () => {
     expect(current.executeCommand).not.toHaveBeenCalled();
   });
 
+  it("never lets a malformed identity break logging or change the response", async () => {
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const current = fixture({ logger });
+    const malformed = { toString: 1 };
+    await expect(current.service.command(trainingCommand({
+      commandType: "client-chosen.secret-ish.v9",
+      metadata: { commandId: malformed, idempotencyKey: ["not", "a", "string"], correlationId: "01999999-aaaa-7bbb-8ccc-dddddddddddd" },
+    }))).rejects.toMatchObject({ status: 400, code: "NATIVE_COMMAND_UNAVAILABLE" });
+    const received = fields(logger, "native.command.received");
+    expect(received.commandIdFingerprint).toBeNull();
+    expect(received.idempotencyFingerprint).toBeNull();
+    expect(current.executeCommand).not.toHaveBeenCalled();
+  });
+
   it("logs a null declared size and identity when absent or not a byte count", async () => {
     for (const [declaredBodySize, expected] of [
       [undefined, null], [null, null], ["", null], ["abc", null], ["-1", null], ["1e3", null], ["12.5", null],

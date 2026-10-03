@@ -501,9 +501,11 @@ function safeIdentityFingerprint(value) {
   return createHash("sha256").update(String(value ?? "")).digest("hex").slice(0, 16);
 }
 
-// An absent identity logs null rather than the fingerprint of an empty string.
+// Only a non-empty string identity is fingerprinted. Anything else (absent,
+// or a malformed value the later validation rejects with its own 400) logs
+// null, so this log line can never throw or change a command's outcome.
 function optionalIdentityFingerprint(value) {
-  return value == null || String(value) === "" ? null : safeIdentityFingerprint(value);
+  return typeof value === "string" && value !== "" ? safeIdentityFingerprint(value) : null;
 }
 
 // The client-declared Content-Length, as a non-negative safe integer, or null

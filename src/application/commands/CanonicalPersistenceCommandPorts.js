@@ -3552,7 +3552,9 @@ function healthKitObservationIdentityCollisionProblem(observation, storedObserva
 // order JSON.stringify and structuredClone use, without mutating the record,
 // so for JSON data (plain objects, arrays, strings, numbers, booleans, null,
 // undefined, Dates) this is byte-identical to the former
-// JSON.stringify(structuredClone(record)) form, minus the deep copy.
+// JSON.stringify(structuredClone(record)) form, minus the deep copy. Stored
+// canonical records are JSON; a non-JSON value (a nested toJSON class,
+// a function or symbol) would no longer compare identically.
 export function comparableRecord(record) {
   const { version: _version, ...value } = record ?? {};
   return JSON.stringify(value);
