@@ -34,9 +34,14 @@ protocol TrainingWriteAPI: Sendable {
     /// (a read-back recovery, a replayed older receipt, or deferred
     /// derivation). `nil` when they are not known.
     func sessionPerformanceRecords(for draft: TrainingLoggerDraft) async -> [TrainingPerformanceRecord]?
+    /// The commit's own local, deterministic validation (no network), run
+    /// before a Finish is confirmed: a confirmed finish is frozen, so it
+    /// must be committable. `nil` when the draft passes.
+    func localValidationError(for draft: TrainingLoggerDraft) -> TrainingWriteError?
 }
 
 extension TrainingWriteAPI {
+    func localValidationError(for draft: TrainingLoggerDraft) -> TrainingWriteError? { nil }
     func prewarmSupportingEvidence(for draft: TrainingLoggerDraft) async {}
     func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async {}
     func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { false }
@@ -99,6 +104,22 @@ struct ProductionTrainingWriteAPI: TrainingWriteAPI {
         self.attachmentStore = attachmentStore
         self.bindingStore = bindingStore
         self.durabilityRetryDelay = durabilityRetryDelay
+    }
+
+    func localValidationError(for draft: TrainingLoggerDraft) -> TrainingWriteError? {
+        Self.validateLocally(draft)
+    }
+
+    /// The same local checks `commit` applies before sending anything.
+    static func validateLocally(_ draft: TrainingLoggerDraft) -> TrainingWriteError? {
+        let performed = TrainingPerformedSessionProjection.make(from: draft)
+        for exercise in performed.exercises where exercise.canonicalExerciseId?.isEmpty != false {
+            guard exercise.isProvisional,
+                  !exercise.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !exercise.areaId.isEmpty
+            else { return .missingCanonicalExercise(exercise.name) }
+        }
+        return performed.exercises.isEmpty ? .noCompletedSets : nil
     }
 
     func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {

@@ -43,6 +43,7 @@ final class Build83FinishLifecycleTests: XCTestCase {
         private var gated: Bool
         private var waiters: [CheckedContinuation<Void, Never>] = []
         private(set) var durableIds: Set<String> = []
+        private(set) var evidenceReconciles = 0
 
         init(outcomes: [Outcome] = [], gated: Bool = false) {
             self.outcomes = outcomes
@@ -86,6 +87,10 @@ final class Build83FinishLifecycleTests: XCTestCase {
 
         var inFlight: Int { waiters.count }
         func isDraftAlreadyDurable(_ draft: TrainingLoggerDraft) async -> Bool { durableIds.contains(draft.id) }
+        func reconcileSupportingEvidenceAfterCommit(for draft: TrainingLoggerDraft) async { evidenceReconciles += 1 }
+        nonisolated func localValidationError(for draft: TrainingLoggerDraft) -> TrainingWriteError? {
+            ProductionTrainingWriteAPI.validateLocally(draft)
+        }
     }
 
     private func set(_ id: String, _ number: Int, done: Bool = false) -> TrainingLoggerDraftSet {
@@ -499,9 +504,10 @@ final class Build83FinishLifecycleTests: XCTestCase {
         let clock = Clock(t0)
         let authority = makeAuthority(Store([thirteenSetSession()]), clock: clock)
         let router = router(authority, clock)
+        _ = router.route(command(.completeSet, authority, id: "c1", exerciseId: "a", setId: "a1"))
         _ = router.route(command(.requestFinish, authority, id: "request"))
         _ = router.route(command(.confirmFinish, authority, id: "op"))
-        let set = authority.draft(id: "session-1")!.exercises[0].sets[0]
+        let set = authority.draft(id: "session-1")!.exercises[0].sets[1]
         let intent = authority.completeSet(
             sessionId: "session-1", exerciseId: "a", setId: set.id,
             context: .intent(mutationId: "late-intent", expectedRevision: authority.draft(id: "session-1")!.currentRevision)
@@ -554,6 +560,135 @@ final class Build83FinishLifecycleTests: XCTestCase {
         XCTAssertEqual(replay.projection?.phase, .cancelled)
         let unknown = router(relaunched, clock).route(command(.completeSet, relaunched, id: "x", session: "never-seen", exerciseId: "a", setId: "a1"))
         XCTAssertEqual(unknown.projection?.phase, .unavailable, "An unknown session is unavailable, not cancelled.")
+    }
+
+    // MARK: Review fixes (fresh independent review)
+
+    /// The real bridge wiring: every authority change re-enters the finish
+    /// coordinator synchronously. An interactive phone Finish still owns its
+    /// commit (lock taken before the finish is stamped), so the coordinator
+    /// never takes it over and supporting evidence reconciles exactly once.
+    func testInteractivePhoneFinishOwnsItsCommitWithTheRealCoordinatorWiring() async throws {
+        let clock = Clock(t0)
+        let authority = makeAuthority(Store([thirteenSetSession(done: true, step: .review)]), clock: clock)
+        let writeAPI = WriteAPI()
+        let coordinator = coordinator(authority, writeAPI)
+        let wiring = authority.observeChanges { _ in coordinator.reconcile() }
+        defer { wiring.cancel() }
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction, now: { clock.now }
+        )
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        await viewModel.submit()
+        XCTAssertFalse(coordinator.isCommitting(sessionId: "session-1"), "The coordinator never took the phone's commit.")
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+        try await Task.sleep(for: .milliseconds(100))
+        let commits = await writeAPI.commits
+        let reconciles = await writeAPI.evidenceReconciles
+        XCTAssertEqual(commits.count, 1)
+        XCTAssertEqual(reconciles, 1, "Supporting evidence reconciles exactly once.")
+    }
+
+    func testWatchFinishCommittedByTheCoordinatorReconcilesEvidenceOnce() async throws {
+        let clock = Clock(t0)
+        let authority = makeAuthority(Store([thirteenSetSession(done: true)]), clock: clock)
+        let router = router(authority, clock)
+        let writeAPI = WriteAPI()
+        let coordinator = coordinator(authority, writeAPI)
+        let wiring = authority.observeChanges { _ in coordinator.reconcile() }
+        defer { wiring.cancel() }
+        _ = router.route(command(.requestFinish, authority, id: "request"))
+        _ = router.route(command(.confirmFinish, authority, id: "op-1"))
+        await waitUntil("ended") { authority.drafts.isEmpty }
+        try await Task.sleep(for: .milliseconds(100))
+        let reconciles = await writeAPI.evidenceReconciles
+        let commits = await writeAPI.commits
+        XCTAssertEqual(commits.count, 1)
+        XCTAssertEqual(reconciles, 1, "The re-entrant callback no longer ends the session before its owner.")
+    }
+
+    func testAConfirmedFinishIsFrozenOnThePhoneAfterAFailedCommit() async throws {
+        let clock = Clock(t0)
+        let store = Store([thirteenSetSession(done: true, step: .review)])
+        let authority = makeAuthority(store, clock: clock)
+        let writeAPI = WriteAPI(outcomes: [.fail])
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction, now: { clock.now }
+        )
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        await viewModel.submit()
+        XCTAssertNotNil(viewModel.validationMessage)
+        XCTAssertTrue(viewModel.isFinishConfirmed)
+        let frozen = try XCTUnwrap(authority.draft(id: "session-1"))
+
+        viewModel.setValue(exerciseId: "a", setId: "a1", field: .reps, value: 99)
+        viewModel.setCompletion(exerciseId: "a", setId: "a2", completed: false)
+        viewModel.go(to: .workout)
+        viewModel.saveAndLeave()
+        viewModel.cancelWorkout()
+        XCTAssertEqual(authority.endSession(sessionId: "session-1", reason: .cancelled), .rejected(.sessionNotMutable))
+        XCTAssertEqual(authority.saveAndLeave(sessionId: "session-1", leftAt: "2026-10-02T23:59:00Z"), .rejected(.sessionNotMutable))
+        let after = try XCTUnwrap(authority.draft(id: "session-1"))
+        XCTAssertEqual(after.exercises, frozen.exercises, "The committed payload cannot change after confirm.")
+        XCTAssertNil(after.leftAt)
+
+        await viewModel.submit() // Retry: the same finish.
+        let commits = await writeAPI.commits
+        XCTAssertEqual(commits.count, 2)
+        XCTAssertEqual(commits[0].exercises, commits[1].exercises)
+        XCTAssertEqual(commits[0].finishedAt, commits[1].finishedAt)
+        XCTAssertTrue(authority.drafts.isEmpty)
+    }
+
+    func testAFinishThatCannotBeCommittedIsNeverStamped() async throws {
+        let clock = Clock(t0)
+        var draft = thirteenSetSession(done: true, step: .review)
+        draft.exercises[0].canonicalExerciseId = nil
+        let authority = makeAuthority(Store([draft]), clock: clock)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: WriteAPI(), sessionAuthority: authority, authority: .founderProduction, now: { clock.now }
+        )
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        await viewModel.submit()
+        XCTAssertNotNil(viewModel.validationMessage)
+        XCTAssertNil(authority.draft(id: "session-1")?.watchFinishOperationId, "Fixable locally: not frozen.")
+        XCTAssertFalse(viewModel.isFinishConfirmed)
+    }
+
+    func testWatchCannotFinishAWorkoutWithNoCompletedSet() throws {
+        let clock = Clock(t0)
+        let authority = makeAuthority(Store([thirteenSetSession()]), clock: clock)
+        let ack = router(authority, clock).route(command(.requestFinish, authority, id: "empty-finish"))
+        XCTAssertEqual(ack.status, .rejected)
+        XCTAssertEqual(ack.reason, .noCompletedSets)
+        XCTAssertNil(authority.draft(id: "session-1")?.finishConfirmationRequestedAt)
+    }
+
+    func testRecentlyEndedListsCommittedSessionsAheadOfDiscards() async throws {
+        let clock = Clock(t0)
+        let store = Store([thirteenSetSession(done: true)])
+        let authority = makeAuthority(store, clock: clock)
+        let router = router(authority, clock)
+        let writeAPI = WriteAPI()
+        let coordinator = coordinator(authority, writeAPI)
+        _ = router.route(command(.requestFinish, authority, id: "request"))
+        _ = router.route(command(.confirmFinish, authority, id: "op-kept"))
+        coordinator.reconcile()
+        await waitUntil("committed") { authority.drafts.isEmpty }
+        for index in 0..<5 {
+            clock.advance(60)
+            var discarded = thirteenSetSession()
+            discarded.id = "discard-\(index)"
+            try store.persist(discarded)
+            authority.reloadFromStore()
+            _ = authority.endSession(sessionId: discarded.id, reason: .discarded)
+        }
+        let ended = router.unavailableProjection().recentlyEnded
+        XCTAssertTrue(ended.contains { $0.sessionId == "session-1" && $0.outcome == .committed && $0.finishOperationId == "op-kept" })
+        XCTAssertLessThanOrEqual(ended.count, WatchWorkoutContract.maximumRecentlyEndedSessions)
     }
 
     // MARK: 13-set performed fixture

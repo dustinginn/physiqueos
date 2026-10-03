@@ -48,7 +48,8 @@ struct TrainingLoggerView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
         .toolbar {
-            if let viewModel, let draft = viewModel.draft, draft.step != .complete, draft.step != .workout {
+            if let viewModel, let draft = viewModel.draft, draft.step != .complete, draft.step != .workout,
+               !viewModel.isFinishConfirmed {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save & Leave") {
                         viewModel.saveAndLeave()
@@ -179,7 +180,10 @@ struct TrainingLoggerView: View {
     private func content(_ viewModel: TrainingLoggerViewModel) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                switch viewModel.draft?.step ?? .entry {
+                // A confirmed finish (from this phone or the Watch) is frozen:
+                // whatever step was showing, the screen becomes the saving /
+                // Retry state of Final Confirmation.
+                switch viewModel.isFinishConfirmed ? .review : (viewModel.draft?.step ?? .entry) {
                 case .entry: entry(viewModel)
                 case .areas: areaSelection(viewModel)
                 case .exercises: exercisePicker(viewModel)
@@ -202,7 +206,7 @@ struct TrainingLoggerView: View {
 
     @ViewBuilder
     private func persistentAction(_ viewModel: TrainingLoggerViewModel) -> some View {
-        switch viewModel.draft?.step {
+        switch viewModel.isFinishConfirmed ? .review : viewModel.draft?.step {
         case .exercises:
             let presentation = viewModel.selectionPresentation
             let adding = viewModel.draft?.isAddingExercises == true
@@ -1041,12 +1045,16 @@ struct TrainingLoggerView: View {
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
             }
             FinishProgressStatus(viewModel: viewModel)
-            PrimaryActionButton(title: viewModel.isAwaitingDurability ? "Finishing workout…" : viewModel.isSubmitting ? "Saving…" : "Finish Workout") {
+            PrimaryActionButton(
+                title: viewModel.isAwaitingDurability ? "Finishing workout…"
+                    : viewModel.isSubmitting ? "Saving…"
+                    : viewModel.isFinishConfirmed ? "Retry Finish" : "Finish Workout"
+            ) {
                 viewModel.finish()
             }
                 .disabled(viewModel.isSubmitting || viewModel.isAwaitingDurability)
                 .accessibilityIdentifier("trainingLogger.completeLocal")
-            if !viewModel.isSubmitting, !viewModel.isAwaitingDurability {
+            if !viewModel.isSubmitting, !viewModel.isAwaitingDurability, !viewModel.isFinishConfirmed {
                 secondaryButton("Back to Workout Review") { viewModel.go(to: .summary) }
             }
         }

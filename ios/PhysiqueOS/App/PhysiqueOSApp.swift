@@ -52,6 +52,9 @@ struct PhysiqueOSApp: App {
             homeWidget.coordinator.onSnapshotWritten = { [weak watchWorkoutConnectivity] snapshot in
                 watchWorkoutConnectivity?.publishDailyTotals(WatchDailyTotals(snapshot: snapshot))
             }
+            // Seed from the stored snapshot so the first publish already
+            // carries today's totals (a locked launch cannot refresh them).
+            watchWorkoutConnectivity.publishDailyTotals(WatchDailyTotals(snapshot: homeWidget.coordinator.storedSnapshot()))
             watchWorkoutConnectivity.install()
         }
         _watchWorkoutConnectivity = State(initialValue: watchWorkoutConnectivity)

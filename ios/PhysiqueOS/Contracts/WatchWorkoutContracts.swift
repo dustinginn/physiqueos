@@ -11,7 +11,9 @@ enum WatchWorkoutContract {
     static let schemaVersion = 3
     static let maximumIdentifierLength = 96
     static let maximumRows = 2
-    static let maximumRecentlyEndedSessions = 3
+    /// Committed sessions are listed first (up to 3), then cancelled ones
+    /// (up to 3), so discards can never crowd out a session to save.
+    static let maximumRecentlyEndedSessions = 6
     // Keep the transport slot stable across schema revisions so the newest
     // authoritative payload replaces an older cached projection in place.
     static let applicationContextProjectionKey = "physiqueos.watchWorkout.projection.v1"
@@ -92,6 +94,7 @@ struct WatchWorkoutAcknowledgement: Codable, Equatable, Sendable {
         case sessionNotMutable
         case persistenceFailed
         case finishConfirmationRequired
+        case noCompletedSets
         static let fallback: Self = .unsupportedContract
     }
 

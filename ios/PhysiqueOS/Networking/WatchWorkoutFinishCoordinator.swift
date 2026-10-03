@@ -56,9 +56,14 @@ final class WatchWorkoutFinishCoordinator {
     func reconcile() {
         let authority = dependencies.authority()
         for draft in authority.drafts where draft.finishedAt != nil && draft.watchFinishOperationId != nil {
+            // A commit this coordinator is running finalizes itself (and then
+            // reconciles supporting evidence exactly once); a re-entrant
+            // observer callback during it must not end the session first.
+            guard tasks[draft.id] == nil else { continue }
             if finalizeIfReady(draft, authority: authority) { continue }
-            // The interactive phone Finish owns its own commit while it runs.
-            guard draft.watchServerCommitState != .succeeded, tasks[draft.id] == nil,
+            // The interactive phone Finish owns its own commit while it runs
+            // (it takes the submission lock before it stamps the finish).
+            guard draft.watchServerCommitState != .succeeded,
                   !authority.isSubmitting(sessionId: draft.id)
             else { continue }
             beginServerRecovery(for: draft, authority: authority)

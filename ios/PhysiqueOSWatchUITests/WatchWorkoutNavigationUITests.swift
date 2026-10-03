@@ -96,8 +96,11 @@ final class WatchWorkoutNavigationUITests: XCTestCase {
         let finish = element(app, "watch.controls.finish")
         XCTAssertTrue(finish.waitForExistence(timeout: 5))
         finish.tap()
-        XCTAssertTrue(element(app, "watch.finishConfirmation").waitForExistence(timeout: 5))
+        // The same confirmation component, in place on the controls page
+        // (its container identifier is flattened into the controls page).
+        XCTAssertTrue(app.staticTexts["Finish workout?"].waitForExistence(timeout: 5))
         XCTAssertTrue(element(app, "watch.finishConfirmation.notYet").exists)
+        XCTAssertFalse(app.staticTexts["Finishing safely…"].exists)
     }
 
     func testWorkoutSavedHasAProminentDone() {

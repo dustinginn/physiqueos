@@ -242,6 +242,9 @@ enum TrainingSessionMutationRejection: Error, Equatable, Sendable {
     case restNotFound
     /// The draft store refused the write; memory still equals storage.
     case persistenceFailed
+    /// Finish needs at least one completed set (an empty workout cannot be
+    /// committed); Cancel is the way out.
+    case noCompletedSets
 }
 
 enum TrainingSessionMutationOutcome: Equatable, Sendable {

@@ -328,10 +328,12 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertNotNil(authority.draft(id: "session-1")?.finishedAt)
     }
 
-    /// A Watch-started session (one Watch HealthKit workout).
+    /// A Watch-started session (one Watch HealthKit workout) with one
+    /// completed set (Finish needs at least one).
     private func watchStartedSession() -> TrainingLoggerDraft {
         var draft = liveSession()
         draft.watchStartedAt = draft.startedAt
+        draft.exercises[0].sets[0].isCompleted = true
         return draft
     }
 
@@ -405,27 +407,39 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertTrue(WatchWorkoutFinishCoordinator.isTerminalReady(draft))
     }
 
-    func testWatchHealthSaveReportIsRevisionGuardedAndIdempotent() throws {
+    /// Build 83: a Health report is guarded by its finish operation, not by
+    /// the session revision (which moves while the structured commit runs;
+    /// revision-guarding made the Watch retry a stale report forever).
+    func testWatchHealthSaveReportIsOperationGuardedAndIdempotent() throws {
         let (authority, clock) = makeAuthority(RecordingStore([watchStartedSession()]))
         _ = authority.requestFinishConfirmation(sessionId: "session-1")
         _ = authority.confirmFinish(sessionId: "session-1", finishOperationId: "finish-one")
         let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
-        let stale = WatchWorkoutCommand(
-            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "health-stale", mutationId: "health-stale",
-            kind: .reportHealthSaved, sessionId: "session-1", expectedRevision: 1,
-            exerciseId: nil, setId: nil, finishOperationId: "finish-one", issuedAt: clock.now
+        let wrongOperation = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "health-wrong", mutationId: "health-wrong",
+            kind: .reportHealthSaved, sessionId: "session-1", expectedRevision: 0,
+            exerciseId: nil, setId: nil, finishOperationId: "another-finish", issuedAt: clock.now
         )
-        XCTAssertEqual(router.route(stale).status, .stale)
+        XCTAssertEqual(router.route(wrongOperation).status, .rejected)
         XCTAssertEqual(authority.draft(id: "session-1")?.watchHealthSaveState, .pending)
 
-        var accepted = stale
-        accepted.commandId = "health-current"
-        accepted.mutationId = "health-current"
-        accepted.expectedRevision = 2
-        XCTAssertEqual(router.route(accepted).status, .applied)
-        XCTAssertEqual(router.route(accepted).status, .unchanged)
+        var oldRevision = wrongOperation
+        oldRevision.commandId = "health-old-revision"
+        oldRevision.mutationId = "health-old-revision"
+        oldRevision.finishOperationId = "finish-one"
+        oldRevision.expectedRevision = 1
+        XCTAssertEqual(router.route(oldRevision).status, .applied, "An older revision does not make a report stale.")
+        XCTAssertEqual(router.route(oldRevision).status, .unchanged, "A replay is idempotent.")
         XCTAssertEqual(authority.draft(id: "session-1")?.watchHealthSaveState, .succeeded)
+
+        var lateFailure = oldRevision
+        lateFailure.kind = .reportHealthSaveFailed
+        lateFailure.commandId = "health-late-failure"
+        lateFailure.mutationId = "health-late-failure"
+        _ = router.route(lateFailure)
+        XCTAssertEqual(authority.draft(id: "session-1")?.watchHealthSaveState, .succeeded, "Never downgraded.")
     }
+
 
     func testWatchCancelActiveIsCanonicalTerminalAndDuplicateIsIdempotent() {
         let store = RecordingStore([liveSession()])

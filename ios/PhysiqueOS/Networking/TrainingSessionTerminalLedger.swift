@@ -51,7 +51,16 @@ final class UserDefaultsTrainingSessionTerminalLedgerStore: TrainingSessionTermi
 
     func loadRecords() -> [TrainingSessionTerminalRecord] {
         guard let data = defaults.data(forKey: key) else { return [] }
-        return (try? JSONDecoder().decode([TrainingSessionTerminalRecord].self, from: data)) ?? []
+        // One undecodable record (e.g. a future outcome after a downgrade)
+        // drops only itself, never the whole ledger.
+        return ((try? JSONDecoder().decode([LossyRecord].self, from: data)) ?? []).compactMap(\.record)
+    }
+
+    private struct LossyRecord: Decodable {
+        let record: TrainingSessionTerminalRecord?
+        init(from decoder: Decoder) throws {
+            record = try? TrainingSessionTerminalRecord(from: decoder)
+        }
     }
 
     func saveRecords(_ records: [TrainingSessionTerminalRecord]) {
@@ -73,6 +82,9 @@ enum TrainingSessionTerminalLedger {
             let age = now.timeIntervalSince(recorded)
             return age >= -5 * 60 && age <= retention
         }
-        return Array(fresh.sorted { $0.recordedAt > $1.recordedAt }.prefix(maximumRecords))
+        let date = { (record: TrainingSessionTerminalRecord) in
+            TrainingSessionClock.date(from: record.recordedAt) ?? .distantPast
+        }
+        return Array(fresh.sorted { date($0) > date($1) }.prefix(maximumRecords))
     }
 }

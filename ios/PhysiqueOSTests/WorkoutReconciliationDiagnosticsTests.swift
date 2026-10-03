@@ -91,12 +91,14 @@ final class NetworkFailureDiagnosticsTests: XCTestCase {
         XCTAssertEqual(event.errorCode, -1001)
     }
 
-    func testCapsAt64Events() throws {
+    /// Build 83: longer retention (64 -> 256) so a stall's failures survive
+    /// hours of HealthKit traffic until the Founder exports them.
+    func testCapsAt256Events() throws {
         let defaults = freshDefaults("NetworkFailureDiagnosticsTests.cap")
-        for _ in 0..<70 {
+        for _ in 0..<270 {
             NetworkFailureDiagnostics.record(path: "founder/commands", error: NSError(domain: "x", code: 0), defaults: defaults)
         }
-        XCTAssertEqual(NetworkFailureDiagnostics.recentEvents(defaults: defaults).count, 64)
+        XCTAssertEqual(NetworkFailureDiagnostics.recentEvents(defaults: defaults).count, 256)
     }
 
     func testClearRemovesAllEvents() throws {

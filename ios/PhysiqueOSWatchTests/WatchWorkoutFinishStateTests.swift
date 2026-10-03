@@ -137,9 +137,42 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         )
         XCTAssertEqual(
             WatchHealthSessionResolution.resolve(healthSessionId: "s1", incoming: bare, knownFinish: nil),
-            .discard,
-            "No phone record and no finish: Build 82 Cancel semantics."
+            .keep,
+            "No record either way (Save & Leave, a newer session): never discard; the Watch offers End & Save / Discard."
         )
+        var otherSession = try! fixture("start")
+        otherSession.sessionId = "next-prepared"
+        XCTAssertEqual(WatchHealthSessionResolution.resolve(healthSessionId: "s1", incoming: otherSession, knownFinish: nil), .keep)
+        let otherCancelled = WatchWorkoutProjection.terminal(sessionId: "s2", revision: 1, phase: .cancelled)
+        XCTAssertEqual(
+            WatchHealthSessionResolution.resolve(healthSessionId: "s1", incoming: otherCancelled, knownFinish: nil),
+            .keep,
+            "Cancelling another session never discards this workout."
+        )
+    }
+
+    final class MutableClock: @unchecked Sendable {
+        var now: Date
+        init(_ now: Date) { self.now = now }
+    }
+
+    @MainActor
+    func testFinishKnowledgeEvictsTheOldestNotAnArbitrarySession() throws {
+        let suite = "finish.knowledge.order"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let clock = MutableClock(now)
+        let store = WatchWorkoutStore(session: nil, defaults: defaults, now: { clock.now })
+        var finishing = try fixture("finishing")
+        for index in 0..<13 {
+            clock.now = now.addingTimeInterval(TimeInterval(index * 60))
+            finishing.sessionId = "session-\(String(format: "%02d", 12 - index))"
+            finishing.finish?.operationId = "op-\(index)"
+            store.apply(finishing)
+        }
+        XCTAssertEqual(store.finishKnowledge.count, 12)
+        XCTAssertNil(store.finishKnowledge["session-12"], "The oldest is evicted.")
+        XCTAssertEqual(store.finishKnowledge["session-00"]?.operationId, "op-12", "The newest is always kept.")
     }
 
     func testHealthKitEndsAtTheAuthoritativeFinishInstant() {

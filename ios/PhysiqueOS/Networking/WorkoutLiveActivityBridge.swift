@@ -69,7 +69,7 @@ final class WorkoutLiveActivityBridge {
             switch reason {
             case .staleRevision, .exerciseNotFound, .setNotFound: .stale
             case .sessionNotFound, .sessionEnded: .sessionEnded
-            case .sessionNotMutable, .sessionPaused, .originNotPermitted, .revisionRequired, .restNotFound, .writesNotAuthorized: .notMutable
+            case .sessionNotMutable, .sessionPaused, .originNotPermitted, .revisionRequired, .restNotFound, .writesNotAuthorized, .noCompletedSets: .notMutable
             case .setValuesIncomplete: .invalidValues
             case .persistenceFailed: .persistenceFailed
             }

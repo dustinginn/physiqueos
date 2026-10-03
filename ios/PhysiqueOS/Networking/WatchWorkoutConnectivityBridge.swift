@@ -59,14 +59,8 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
         observation?.cancel()
         let authority = environment.trainingSessionAuthority(for: environment.nativeAuthority)
         observation = authority.observeChanges { [weak self] change in
-            if change.kind == .ended(.cancelled) {
-                self?.publish(
-                    .terminal(
-                        sessionId: change.sessionId,
-                        revision: change.revision,
-                        phase: .cancelled
-                    )
-                )
+            if change.kind == .ended(.cancelled), let self {
+                self.publish(self.router().cancelledProjection(sessionId: change.sessionId, revision: change.revision))
             } else {
                 self?.publishCurrentProjection()
             }

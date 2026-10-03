@@ -87,9 +87,12 @@ extension WatchWorkoutProjection {
 
     @MainActor
     static func recentlyEnded(authority: TrainingSessionAuthority, excluding sessionId: String? = nil) -> [WatchWorkoutEndedSession] {
-        authority.recentlyEndedSessions(limit: WatchWorkoutContract.maximumRecentlyEndedSessions + 1)
+        let records = authority.recentlyEndedSessions(limit: TrainingSessionTerminalLedger.maximumRecords)
             .filter { $0.sessionId != sessionId }
-            .prefix(WatchWorkoutContract.maximumRecentlyEndedSessions)
+        let half = WatchWorkoutContract.maximumRecentlyEndedSessions / 2
+        let committed = records.filter { $0.outcome == .committed }.prefix(half)
+        let cancelled = records.filter { $0.outcome == .cancelled }.prefix(half)
+        return (Array(committed) + Array(cancelled))
             .map { record in
                 .init(
                     sessionId: record.sessionId,

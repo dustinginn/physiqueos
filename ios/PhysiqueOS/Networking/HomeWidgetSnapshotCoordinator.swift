@@ -285,6 +285,13 @@ final class HomeWidgetSnapshotCoordinator {
         }
     }
 
+    /// The last written canonical snapshot for the selected authority, if
+    /// any (no Server read). Seeds the paired Watch's Daily Totals at launch.
+    func storedSnapshot() -> HomeWidgetSnapshot? {
+        let authority = environment.nativeAuthority
+        return store?.read(authority: authority.rawValue, accountScope: accountScopes.scope(for: authority))
+    }
+
     func refreshWorkoutProjection() {
         guard let store else { return }
         let authority = environment.nativeAuthority

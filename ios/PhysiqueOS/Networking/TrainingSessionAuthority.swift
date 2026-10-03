@@ -370,6 +370,7 @@ final class TrainingSessionAuthority {
             else { throw TrainingSessionMutationRejection.sessionNotMutable }
             // Already confirmed (from either device): nothing left to ask.
             guard draft.finishedAt == nil else { return }
+            guard draft.completedSetCount > 0 else { throw TrainingSessionMutationRejection.noCompletedSets }
             if draft.finishConfirmationRequestedAt == nil {
                 draft.finishConfirmationRequestedAt = TrainingSessionClock.string(from: self.now())
             }
@@ -449,6 +450,8 @@ final class TrainingSessionAuthority {
             guard draft.watchFinishOperationId == finishOperationId else {
                 throw TrainingSessionMutationRejection.sessionNotMutable
             }
+            // A saved workout is never downgraded by a late failure report.
+            if draft.watchHealthSaveState == .succeeded, !succeeded { return }
             draft.watchHealthSaveState = succeeded ? .succeeded : .failed
         }
     }
@@ -473,6 +476,8 @@ final class TrainingSessionAuthority {
     @discardableResult
     func saveAndLeave(sessionId: String, leftAt: String) -> TrainingSessionMutationOutcome {
         mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { draft in
+            // A confirmed finish is being committed; it cannot be put aside.
+            guard draft.watchFinishOperationId == nil else { throw TrainingSessionMutationRejection.sessionNotMutable }
             draft.leftAt = leftAt
             draft.pausedAt = nil
             draft.rest = nil
@@ -516,7 +521,15 @@ final class TrainingSessionAuthority {
     /// commit. Attachment files are the caller's concern.
     @discardableResult
     func endSession(sessionId: String, reason: TrainingSessionEndReason) -> TrainingSessionMutationOutcome {
-        endSession(sessionId: sessionId, reason: reason, retainingPresentation: false)
+        // Cancel never races a confirmed finish: its commit may already have
+        // landed, and a cancelled record would make the Watch discard the
+        // HealthKit workout of a saved session. (Discarding a saved draft
+        // stays possible as the explicit escape hatch.)
+        if reason == .cancelled, let current = draft(id: sessionId),
+           current.watchFinishOperationId != nil || submittingSessionIds.contains(sessionId) {
+            return .rejected(.sessionNotMutable)
+        }
+        return endSession(sessionId: sessionId, reason: reason, retainingPresentation: false)
     }
 
     /// Canonical Watch Cancel boundary. It validates the same revision and

@@ -39,10 +39,12 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         UserDefaults.standard.string(forKey: savedCorrelationKey)
     }
 
-    /// The structured session whose HealthKit workout is currently live
-    /// (starting, running, paused, or ending) on this Watch.
+    /// The structured session whose HealthKit workout can still be saved
+    /// or discarded here: exactly the states `finish()` accepts (running or
+    /// paused). Starting, ending, saved or failed workouts are not offered,
+    /// so resolution can never loop on a workout that cannot be finished.
     var activeCorrelationId: String? {
-        guard workoutSession != nil, [.starting, .running, .paused, .ending].contains(lifecycle) else { return nil }
+        guard workoutSession != nil, lifecycle == .running || lifecycle == .paused else { return nil }
         return correlationId
     }
 

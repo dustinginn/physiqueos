@@ -138,10 +138,20 @@ struct WatchWorkoutRootView: View {
                 .tag(WatchWorkoutStore.Page.workout)
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.workoutPager")
     }
 
+    @ViewBuilder
     private var unavailable: some View {
+        if store.orphanedHealthSessionId != nil {
+            ScrollView { WatchOrphanHealthBanner(store: store).padding(.horizontal, 6) }
+        } else {
+            idle
+        }
+    }
+
+    private var idle: some View {
         VStack(spacing: 10) {
             Image(systemName: store.connectionState == .phoneUnavailable ? "iphone.slash" : "applewatch")
                 .font(.title2)
@@ -160,6 +170,7 @@ struct WatchWorkoutRootView: View {
                 .tint(WatchPhysiqueOSTheme.purple)
         }
         .padding()
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.idle")
     }
 }
@@ -224,9 +235,38 @@ struct WatchWorkoutStartView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(WatchPhysiqueOSTheme.purple)
                 .disabled(store.isMutationPending || store.connectionState != .reachable)
+                if store.orphanedHealthSessionId != nil {
+                    WatchOrphanHealthBanner(store: store)
+                }
             }
             .padding(.horizontal, 8)
         }
+    }
+}
+
+/// An Apple Health workout still recording on this Watch for a session the
+/// iPhone is not showing (Save & Leave, a newer session, a lost record).
+/// Nothing is discarded automatically; the Founder chooses.
+struct WatchOrphanHealthBanner: View {
+    @Bindable var store: WatchWorkoutStore
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "heart.text.square").font(.title3).foregroundStyle(WatchPhysiqueOSTheme.warning)
+            Text("Apple Health workout still recording")
+                .font(.system(size: 14, weight: .bold)).multilineTextAlignment(.center)
+            Text("iPhone isn't showing this workout. Save it to Apple Health or discard it.")
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(WatchPhysiqueOSTheme.muted)
+                .multilineTextAlignment(.center)
+            Button("End & Save") { store.saveOrphanedWorkout() }
+                .buttonStyle(.borderedProminent).tint(WatchPhysiqueOSTheme.purple)
+                .accessibilityIdentifier("watch.orphan.save")
+            Button("Discard", role: .destructive) { store.discardOrphanedWorkout() }
+                .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.destructive)
+                .accessibilityIdentifier("watch.orphan.discard")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("watch.orphan")
     }
 }
 
@@ -278,6 +318,7 @@ struct WatchWorkoutExecutionView: View {
                 .ignoresSafeArea(edges: [.top, .bottom])
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.execution")
     }
 
@@ -320,7 +361,11 @@ struct WatchWorkoutExecutionView: View {
         case .setPending: return ("SET PENDING…", WatchPhysiqueOSTheme.muted)
         case .staleRefreshed: return ("STATE REFRESHED", WatchPhysiqueOSTheme.muted)
         case .healthStartFailed: return ("HEALTH START FAILED", WatchPhysiqueOSTheme.warning)
-        case .rejected(let reason): return ("NOT RECORDED · \(reason.uppercased())", WatchPhysiqueOSTheme.warning)
+        case .rejected(let reason):
+            if reason == WatchWorkoutAcknowledgement.Reason.noCompletedSets.rawValue {
+                return ("COMPLETE A SET FIRST", WatchPhysiqueOSTheme.warning)
+            }
+            return ("NOT RECORDED · \(reason.uppercased())", WatchPhysiqueOSTheme.warning)
         case .finishPending, nil: return nil
         }
     }
@@ -504,6 +549,7 @@ struct WatchFinishConfirmationPanel: View {
                 .accessibilityIdentifier("watch.finishConfirmation.finish")
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.finishConfirmation")
     }
 }
@@ -548,6 +594,7 @@ struct WatchFinishingPanel: View {
                 Spacer(minLength: 0)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.finishing")
     }
 
@@ -629,6 +676,7 @@ struct WatchWorkoutMetricsView: View {
             .padding(.trailing, WatchWorkoutExecutionView.pageIndicatorClearance)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.metrics")
     }
 }
@@ -721,6 +769,7 @@ struct WatchDailyTotalsView: View {
             .padding(.trailing, WatchWorkoutExecutionView.pageIndicatorClearance)
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.dailyTotals")
     }
 }
@@ -781,6 +830,7 @@ struct WatchWorkoutControlsView: View {
             }
         }
         .ignoresSafeArea(edges: .bottom)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.controls")
     }
 
@@ -801,7 +851,7 @@ struct WatchWorkoutControlsView: View {
                 }
                 .accessibilityIdentifier("watch.controls.pauseResume")
                 controlButton("Finish Workout", icon: "flag.checkered", tint: WatchPhysiqueOSTheme.purple,
-                              enabled: canControl, layout) { store.requestFinish() }
+                              enabled: canControl && (store.projection?.completedSets ?? 0) > 0, layout) { store.requestFinish() }
                     .accessibilityIdentifier("watch.controls.finish")
                 controlButton("Cancel Workout", icon: "xmark", tint: WatchPhysiqueOSTheme.destructive,
                               enabled: canControl, layout) { store.requestCancelWorkout() }
@@ -912,6 +962,7 @@ struct WatchWorkoutSummaryView: View {
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .ignoresSafeArea(edges: .bottom)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.summary")
     }
 

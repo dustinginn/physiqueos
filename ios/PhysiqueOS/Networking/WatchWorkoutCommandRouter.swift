@@ -93,16 +93,23 @@ final class WatchWorkoutCommandRouter {
         if current.appliedMutationIds?.contains(command.mutationId) == true {
             return acknowledgement(command, .unchanged, nil, current.currentRevision)
         }
-        if current.currentRevision != command.expectedRevision {
+        // A Health report is identified by its finish operation (checked
+        // below), not by the session revision, which moves while the
+        // structured commit runs; revision-guarding it made the Watch retry
+        // a stale report forever.
+        let isHealthReport = command.kind == .reportHealthSaved || command.kind == .reportHealthSaveFailed
+        if !isHealthReport, current.currentRevision != command.expectedRevision {
             return acknowledgement(
                 command, .stale, .staleRevision, current.currentRevision,
                 stalenessReason: .revisionMismatch
             )
         }
-        let context = TrainingSessionMutationContext.intent(
-            mutationId: command.mutationId,
-            expectedRevision: command.expectedRevision
-        )
+        let context = isHealthReport
+            ? TrainingSessionMutationContext(origin: .system, mutationId: command.mutationId, expectedRevision: nil)
+            : TrainingSessionMutationContext.intent(
+                mutationId: command.mutationId,
+                expectedRevision: command.expectedRevision
+            )
         let outcome: TrainingSessionMutationOutcome
         switch command.kind {
         case .refreshProjection:
@@ -253,6 +260,7 @@ final class WatchWorkoutCommandRouter {
         case .sessionPaused: .sessionPaused
         case .persistenceFailed: .persistenceFailed
         case .sessionNotFound, .sessionEnded: .sessionUnavailable
+        case .noCompletedSets: .noCompletedSets
         default: .sessionNotMutable
         }
     }

@@ -131,6 +131,10 @@ final class TrainingLoggerViewModel {
         }
     }
 
+    isolated deinit {
+        authorityObservation?.cancel()
+    }
+
     private func noteAuthorityChange(_ change: TrainingSessionChange) {
         guard change.kind == .ended(.committed), completedDraft == nil,
               selectedDraftId == change.sessionId,
@@ -260,7 +264,7 @@ final class TrainingLoggerViewModel {
     }
 
     func cancelWorkout() {
-        guard canWrite else { return }
+        guard canWrite, !isFinishConfirmed else { return }
         if let draftId = draft?.id {
             attachmentStore.removeAll(draftId: draftId)
             sessionAuthority.endSession(sessionId: draftId, reason: .cancelled)
@@ -273,7 +277,7 @@ final class TrainingLoggerViewModel {
     /// Structural Logger edit, applied by the authority to its current
     /// draft (never to a copy held here).
     func update(_ mutation: (inout TrainingLoggerDraft) -> Void) {
-        guard canWrite, completedDraft == nil, let selectedDraftId,
+        guard canWrite, completedDraft == nil, !isFinishConfirmed, let selectedDraftId,
               sessionAuthority.draft(id: selectedDraftId) != nil else { return }
         validationMessage = nil
         noteRejection(sessionAuthority.edit(sessionId: selectedDraftId, mutation))
@@ -282,7 +286,7 @@ final class TrainingLoggerViewModel {
     /// Set-row checkmark. `completed` is the end state the row asked for,
     /// so a tap rendered before a newer change cannot invert it.
     func setCompletion(exerciseId: String, setId: String, completed: Bool) {
-        guard canWrite, completedDraft == nil, let selectedDraftId else { return }
+        guard canWrite, completedDraft == nil, !isFinishConfirmed, let selectedDraftId else { return }
         validationMessage = nil
         noteRejection(sessionAuthority.setCompletion(
             sessionId: selectedDraftId, exerciseId: exerciseId, setId: setId, completed: completed
@@ -290,7 +294,7 @@ final class TrainingLoggerViewModel {
     }
 
     func setValue(exerciseId: String, setId: String, field: TrainingSessionSetField, value: Double?) {
-        guard canWrite, completedDraft == nil, let selectedDraftId else { return }
+        guard canWrite, completedDraft == nil, !isFinishConfirmed, let selectedDraftId else { return }
         validationMessage = nil
         noteRejection(sessionAuthority.setValue(
             sessionId: selectedDraftId, exerciseId: exerciseId, setId: setId, field: field, value: value
@@ -417,6 +421,32 @@ final class TrainingLoggerViewModel {
 
     func submit() async {
         guard canWrite, completedDraft == nil, let sessionId = draft?.id, !isSubmitting else { return }
+        // A confirmed finish is frozen (its payload is the idempotency
+        // identity), so it must be committable before anything is stamped.
+        if authority == .founderProduction, let current = draft,
+           let problem = writeAPI.localValidationError(for: current) {
+            validationMessage = problem.errorDescription
+            return
+        }
+        isSubmitting = true
+        finishWaitStartedAt = now()
+        refreshWarning = nil
+        defer {
+            isSubmitting = false
+            if draft?.submissionState == nil { finishWaitStartedAt = nil }
+        }
+        // Own the commit BEFORE stamping the finish: stamping publishes a
+        // change synchronously, and the background finish coordinator must
+        // see this interactive Finish already holding the one submission
+        // lock (otherwise it would take the commit over). Another owner
+        // already committing this exact finish (a Watch Finish, recovery,
+        // another screen) is joined rather than refused.
+        if !sessionAuthority.beginSubmission(sessionId: sessionId) {
+            guard await joinInFlightSubmission(sessionId: sessionId),
+                  sessionAuthority.beginSubmission(sessionId: sessionId)
+            else { return }
+        }
+        defer { sessionAuthority.endSubmission(sessionId: sessionId) }
         if draft?.mode == .live {
             // Stamps `finishedAt` and the session's one finish operation
             // only the first time (reusing a Watch-confirmed one); always
@@ -434,28 +464,12 @@ final class TrainingLoggerViewModel {
                 return
             }
         }
-        guard draft != nil else { return }
+        validationMessage = nil
+        guard let submittedDraft = draft else { return }
         guard authority == .founderProduction else {
             completeLocalCapture()
             return
         }
-        isSubmitting = true
-        finishWaitStartedAt = now()
-        validationMessage = nil
-        refreshWarning = nil
-        defer {
-            isSubmitting = false
-            if draft?.submissionState == nil { finishWaitStartedAt = nil }
-        }
-        if !sessionAuthority.beginSubmission(sessionId: sessionId) {
-            // Another owner (the Watch finish, recovery, another screen) is
-            // committing this exact finish: join it rather than refusing.
-            guard await joinInFlightSubmission(sessionId: sessionId),
-                  sessionAuthority.beginSubmission(sessionId: sessionId)
-            else { return }
-        }
-        defer { sessionAuthority.endSubmission(sessionId: sessionId) }
-        guard let submittedDraft = draft else { return }
         if let scheduler = backgroundScheduler {
             // Finish is usually tapped right before the phone is locked.
             _ = try? await withBackgroundExecutionAssertion(
@@ -464,6 +478,15 @@ final class TrainingLoggerViewModel {
         } else {
             await commitSubmission(submittedDraft)
         }
+    }
+
+    /// A confirmed finish (one operation stamped, not yet durable) is frozen
+    /// on this phone too: no set edits, structural edits, Cancel or Save &
+    /// Leave, so the committed payload (and its idempotency key) can never
+    /// change between attempts. Retry is the only action.
+    var isFinishConfirmed: Bool {
+        guard let draft, completedDraft == nil else { return false }
+        return draft.watchFinishOperationId != nil && draft.step != .complete
     }
 
     /// Waits while another owner commits `sessionId`. Returns `true` when
@@ -625,7 +648,7 @@ final class TrainingLoggerViewModel {
 
     /// Save & Leave: keep the workout, and stop the Log tab routing into it.
     func saveAndLeave() {
-        guard canWrite, completedDraft == nil, let selectedDraftId,
+        guard canWrite, completedDraft == nil, !isFinishConfirmed, let selectedDraftId,
               sessionAuthority.draft(id: selectedDraftId) != nil else { return }
         noteRejection(sessionAuthority.saveAndLeave(
             sessionId: selectedDraftId, leftAt: ISO8601DateFormatter().string(from: now())
