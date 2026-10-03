@@ -1417,7 +1417,8 @@ def install_scheduler() -> dict[str, Any]:
     update_state({"scheduler": {"state": "INSTALLED", "plist": str(plist_path), "installed_at": iso_utc(),
                                 "next_run": next_schedule()},
                   "hooks": {"checkpoint": str(checkpoint), "release": str(release)},
-                  "icloud_upload_reported": "ICLOUD_UPLOAD_REPORTED_COMPLETE", "icloud_upload_metadata": live_upload})
+                  "icloud_upload_reported": "ICLOUD_UPLOAD_REPORTED_COMPLETE", "icloud_upload_metadata": live_upload,
+                  "last_failure": None})
     return {"scheduler": "INSTALLED", "plist": str(plist_path), "hooks": [str(checkpoint), str(release)],
             "installed_files": installed}
 
