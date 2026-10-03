@@ -32,3 +32,15 @@ Round 2 synthesizes the two Founder-selected Round 1 anchors, adds a true iOS li
 - `agent-handoffs/artifacts/home-design-round2-20261003/AUDIT.md`
 
 No Round 2 direction, ordering change, palette, component treatment or light-mode implementation is accepted. The next gate remains Founder visual review and explicit direction-setting.
+
+## Round 3 — convergence and provocation
+
+Status: **Home Round 3 ready for Founder review**
+
+Round 3 preserves the Founder-preferred dark/light foundations in a three-concept convergence lane, applies the stronger teal/navy color-field cue without displacing Latest Briefing, and adds four provocations that passed a documented grayscale structural-difference test.
+
+- `agent-handoffs/artifacts/home-design-round3-20261003/README.md`
+- `agent-handoffs/artifacts/home-design-round3-20261003/comparison-board.html`
+- `agent-handoffs/artifacts/home-design-round3-20261003/STRUCTURAL-DIFFERENCE.md`
+
+No Round 3 concept, hierarchy, ordering, palette, component treatment or light-mode direction is accepted. Founder review and explicit direction-setting remain the next gate.
