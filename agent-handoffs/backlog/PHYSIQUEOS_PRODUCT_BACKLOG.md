@@ -465,13 +465,14 @@ Completion result:
 - physical TestFlight acceptance remains observational and is listed in the final report.
 
 
-## Mac disaster-recovery / iCloud backup V1 — LOCAL IMPLEMENTATION VALIDATED / FIRST ICLOUD COPY GATED (2026-10-03)
+## Mac disaster-recovery / iCloud backup V1 — FIRST SMALL GENERATION UPLOADED + RESTORE VERIFIED / SCHEDULER REVIEW GATED (2026-10-03)
 
 Audit authority:
 - `agent-handoffs/reports/20261003T174554Z-mac-icloud-backup-disaster-recovery-audit-plan.md`
 - prompt authority `5b7ece032abc2a10fd83da6c6c36ad578f1c1e1b`
 - implementation prompt authority `b84428fe54121f5a0d5198157fe972d99586a59a`
 - local Phase 7 implementation authority `54b4ba82ed089a98e2c5950fecbe9b9a7a7e4dc8`
+- iCloud status/archive-integrity implementation authority `6a3e6199` (full SHA in post-copy checkpoint)
 
 Goal:
 Create a safe, automated backup path for non-reproducible PhysiqueOS development state on the Founder Mac, with iCloud Drive as a likely off-device destination.
@@ -549,6 +550,8 @@ Status / hard gate:
 - Live `audit`, deterministic tests, full `dry-run`, local `create`, checksum verification and fresh-GitHub scratch restore all pass. The first local immutable generation is `PhysiqueOS-Recovery-20261003-191629Z`, 5,260,954 bytes, manifest SHA-256 `7b712856eb9437ffce9d0e9d63d12abb80f177fe7a1d2bb78f49eb9d1e96413d`.
 - The generation contains 22 local-only recovery refs, five exact dirty-worktree reconstructions, four guarded tool sources, 37 schema-validated release receipts, and sanitized inventory. The secret scanner reports `PASS`; credentials, keychains/private keys, auth sessions, raw production/health exports, build trees, dependencies and caches remain excluded.
 - Fourteen File Provider/legacy checkouts are recorded `UNKNOWN_FILE_PROVIDER_OR_TIMEOUT`; their common-database refs are captured, but dirty-state coverage is not claimed.
-- **No iCloud write has occurred at this checkpoint.** The dedicated destination remains absent pending the mandatory pre-write GH-main checkpoint publication and verification.
-- Scheduler/hooks remain uninstalled until the copied generation passes restore from the iCloud destination and Foundation metadata reports upload complete. Retention is implemented but generation #1 deletion is disabled.
+- The mandatory pre-write checkpoint was published and verified on `origin/main` at `b181dd54c98ba27aab6717eef2996d0ce3039d8c` before the first iCloud write.
+- The dedicated destination now exists. Generation `PhysiqueOS-Recovery-20261003-191629Z` was copied through `.incoming`, destination-rehashed, renamed, and made current through atomic `LATEST.json`. Scratch restore from the final iCloud destination copy passes.
+- Foundation metadata now reports all 97 final files uploaded, none uploading and no errors: `ICLOUD_UPLOAD_REPORTED_COMPLETE`. This is not independent remote proof; `REMOTE_ICLOUD_SYNC_UNKNOWN` remains correct until distinct-session/device retrieval and checksum verification.
+- Scheduler/hooks remain uninstalled until a fresh clean-snapshot implementation review completes. Retention is implemented but generation #1 deletion is disabled.
 - Build 84 and Build 83 identity/archive selection is verified, but their separate iCloud copy is still pending and remains subject to the standing 15 GiB disk-safety floor.
