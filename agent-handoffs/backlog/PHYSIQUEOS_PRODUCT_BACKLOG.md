@@ -23,7 +23,7 @@ DELIVERY WORKFLOW RULE (durable, 2026-10-02)
 ACTIVE / NEXT
 
 00. DEXA -> Apple Health writeback — DUE before Founder DEXA Fri 2026-10-09
-Status: AUDIT + PLAN COMPLETE (2026-10-02); Founder decisions PENDING; implementation NOT started; nothing written to HealthKit; no production mutation; no backfill.
+Status: READY / HOLD (2026-10-02); Founder decisions locked; implementation intentionally NOT authorized or started; nothing written to HealthKit; no production mutation; no backfill.
 Report: agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md
 Audit result (summary):
 - No body measurement is written to Apple Health today (iPhone writes nothing; Watch writes workouts only). A dormant write registry exists (bodyMass + bodyFatPercentage); leanBodyMass is test-excluded.
@@ -32,8 +32,8 @@ Audit result (summary):
 - Apple Health has no type for BMC, VAT, android/gynoid, regional, BMD; RMR must never map to cumulative basalEnergyBurned.
 - PhysiqueOS leanMass = lean soft tissue (excludes BMC); Apple Lean Body Mass ≈ fat-free mass -> if written, write totalMass − fatMass.
 Recommended V1: automatic, prospective-only (scan date >= 2026-10-09) Native reconciler converging to Server-owned writeback intents; HKMetadataKeySyncIdentifier/SyncVersion exact-once + correction replace; own samples never re-ingested; write Body Fat % (+ Lean Body Mass as fat-free mass if approved); do NOT write Weight/RMR/BMI.
-Founder decisions pending (report §P): 1 measurement set; 2 DEXA Weight write (rec. No); 3 prospective-only vs backfill; 4 automatic vs manual; 5 correction auto-replace; 6 opt-in + toggle; 7 Phase D synthetic canary authorization.
-Delivery: Server additive deploy (dormant policy) + Native Build 83 on e2cbcd0c (iPhone-only). Phases A decide Oct 3 / B implement Oct 3-5 / C synthetic validation + TestFlight Oct 5-6 / D physical opt-in + canary Oct 7-8 / E real scan Oct 9. Scan-date eligibility means a late Build 83 still writes the Oct 9 scan exactly once.
+Founder decisions are recorded in the dedicated READY / HOLD section below. The execution gate remains closed until the Founder explicitly resumes the item.
+Future delivery, only after resume: separately reviewed Server additive deploy (dormant policy) plus a later Native build (iPhone-only). Build 83 shipped without DEXA writeback. Permanent scan-date eligibility remains prospective from 2026-10-09.
 Pre-scan prep: make sure the Oct 9 DEXA appointment in PhysiqueOS has its local time set (used as the sample timestamp).
 Incidental (not fixed): web Evidence Review discard lacks status guard; possible briefing-step lookup issue on same-date DEXA re-import (unverified).
 
@@ -99,7 +99,7 @@ Acceptance:
 4. HealthKit Sleep — prospective canary acceptance
 Status: HOLD (not PASS) since 2026-10-02 22:00Z. sleep-canon-v3 ACTIVE for ordinary prospective Sleep (effective 2026-10-02; policy healthkit_sleep_canonical_algorithm_policy). P2 Oura copy splice resolved prospectively: Oct 2 corrected v2 rev2 -> v3 rev3 (asleep ~455, deep ~98.5, REM ~117.5, core ~239, awake ~25 min, 73 segments; one coherent revision, 0 ambiguity). Activation changed exactly 2 of 52 collections (config + Oct 2 day); historical mutation 0; strategic mutation 0. Founder accepted the rare out-of-order Oura revision ambiguity as a known residual (visible via ambiguousContinuationCount). D0 2026-10-02 validation_only. Strategic Sleep OFF.
 Authority:
-- Server d0ff65965233fa44e108387f01b649a2bdb476df (deployment 64533990); Native Build 82 e2cbcd0c (TestFlight f3d09d99, Founder-installed, v2+v3 stage-capable).
+- Server `89fe0a0340adee22d15b92a1f074a0bbd348ac77` (deployment `28678d4a-e3cc-4b2b-a479-1851ab7093bf`) carries Sleep v3 unchanged; Native Build 83 `3e61dd215e8474c52bd54230d2d9dfb2f3a93534` (TestFlight delivery `507b409f-a29f-48a0-93b4-49ab46b5ad6d`, VALID) remains v2+v3 stage-capable.
 - activation report agent-handoffs/reports/20261002T220000Z-healthkit-sleep-canon-v3-prospective-activation.md
 - v3 design report agent-handoffs/reports/20261002T201500Z-healthkit-sleep-canon-v3-copy-coherence.md
 - canary audit agent-handoffs/reports/20261002T182755Z-healthkit-sleep-prospective-canary-audit.md
@@ -407,10 +407,13 @@ Execution gate:
 
 ## Build 83 Cardio classification — LOCKED Founder decision 2026-10-02
 
+Status: **SHIPPED and production-repaired 2026-10-02.** Server `89fe0a0340adee22d15b92a1f074a0bbd348ac77` is ACTIVE in deployment `28678d4a-e3cc-4b2b-a479-1851ab7093bf`; bounded D3 is complete and independently verified. Native Build 83 source `3e61dd215e8474c52bd54230d2d9dfb2f3a93534` is TestFlight `VALID`, delivery `507b409f-a29f-48a0-93b4-49ab46b5ad6d`. Final report: `agent-handoffs/reports/20261003T055504Z-build83-server-d3-native-testflight-final.md`.
+
 Continuation authority:
 - Build 83 continuity checkpoint: agent-handoffs/reports/20261003T033236Z-build83-first-real-workout-corrections-checkpoint3.md
 - checkpoint main commit: b2e1779aa8b639ca8508c817204b96df4b4ba511
 - pushed Native candidate: abb131d9e1a4cd9eeb6c1a5caca1e1ad9e1b9c4e
+- final reviewed Native authority: 3e61dd215e8474c52bd54230d2d9dfb2f3a93534
 
 Founder locked classification:
 - Stair Stepper / HealthKit type 44: canonical Cardio and prospectively strategically eligible under the accepted Cardio framework.
@@ -442,7 +445,7 @@ WITHDRAWN SERVER CANDIDATE:
 - 22925625 is explicitly withdrawn and MUST NOT be deployed or used for D3 repair.
 - A new exact Server SHA implementing the locked Cooldown non-Cardio rule must pass tests and fresh independent review before Founder deploy authorization.
 
-D3 remains authorized in principle only after the new Server candidate is reviewed/deployed:
+D3 completion contract was:
 - bounded repair of exactly the Oct 2 Stair Stepper and Cooldown source_only observations;
 - dry-run first;
 - Stair Stepper repaired as Cardio;
@@ -450,3 +453,12 @@ D3 remains authorized in principle only after the new Server candidate is review
 - no Activity calorie/exercise-minute inflation;
 - no other records affected;
 - no historical strategic artifact rewrite.
+
+Completion result:
+- the replacement Server candidate was reviewed, directly authorized and deployed; withdrawn `22925625` was never deployed and is not an ancestor;
+- the fail-closed dry run matched exactly the two reviewed Oct. 2 observations;
+- D3 applied exactly six writes: one audit row, two canonical creates, one Stair coexistence update and two observation reconciliation updates;
+- Stair Stepper is canonical strategically eligible Cardio;
+- Cooldown is canonical Cooldown history, reporting family `other`, strategic role `history_only`, and contributes nothing to Cardio reporting, targets, indicators or strategy;
+- duplicate workouts `0`; Activity canonical-day count/digest and live calories/exercise minutes unchanged; no historical strategic artifact rewritten;
+- physical TestFlight acceptance remains observational and is listed in the final report.

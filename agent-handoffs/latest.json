@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T05:10:50Z",
+  "generated_at_utc": "2026-10-03T05:55:04Z",
   "task": {
     "id": "build83-first-real-workout-comprehensive-correction-20261003",
-    "title": "Build 83 Server deployed and D3 independently verified",
+    "title": "Build 83 Server, D3 and Native TestFlight final",
     "agent": "codex",
-    "status": "in_progress_native_release"
+    "status": "complete"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
@@ -17,21 +17,23 @@
     "native_candidate_sha": "3e61dd215e8474c52bd54230d2d9dfb2f3a93534",
     "withdrawn_server_sha": "22925625ba377e67943ac5d63dd2c9613c897936",
     "native_build": 83,
-    "final_sha": null,
+    "final_sha": "3e61dd215e8474c52bd54230d2d9dfb2f3a93534",
     "base_sha": "d0ff65965233fa44e108387f01b649a2bdb476df"
   },
   "result": {
-    "summary": "Exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 is ACTIVE on web and worker. The fail-closed D3 dry run matched exactly the two reviewed Oct. 2 observations, the six-write apply completed, and fresh independent read-only verification approved the result. Stair Stepper is canonical eligible Cardio; Cooldown is canonical history but non-Cardio and history-only. Native Build 83 release work continues from exact reviewed SHA 3e61dd215e8474c52bd54230d2d9dfb2f3a93534.",
+    "summary": "Exact Server SHA 89fe0a0340adee22d15b92a1f074a0bbd348ac77 is ACTIVE, the exact two-record/six-write D3 repair is independently verified, and Native SHA 3e61dd215e8474c52bd54230d2d9dfb2f3a93534 shipped as Build 83. App Store Connect delivery 507b409f-a29f-48a0-93b4-49ab46b5ad6d is VALID. Stair Stepper is canonical eligible Cardio; Cooldown is canonical history but non-Cardio and history-only.",
     "success": true,
     "production_mutated": true,
     "deployed": true,
     "d3_run": true,
-    "testflight_uploaded": false
+    "testflight_uploaded": true,
+    "testflight_delivery_id": "507b409f-a29f-48a0-93b4-49ab46b5ad6d",
+    "testflight_state": "VALID"
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server candidate changed-test set 321/321 and independent focused D1-D3 set 88/88 passed; post-deploy exact-SHA focused tests passed 24/24. D3 replay, workout integrity, Activity integrity and historical strategic artifact checks passed. Native finish lifecycle 36/36, Watch 27/27, and final affected Watch finish-state 20/20 passed."
+      "summary": "Server sets passed 321/321, 88/88 and post-deploy 24/24. D3 replay/integrity checks passed. Native finish 36/36, Watch 27/27, affected finish-state 20/20 and fresh Watch UI 7/7 passed. Training class reproduced the known 10/16 order state leak; the exact remaining six passed 6/6 with individual fresh erases. Generator deterministic; signed archive and guarded upload gates passed."
     },
     "review": {
       "status": "approved",
@@ -40,8 +42,8 @@
   },
   "decisions_required": [],
   "blockers": [],
-  "recommended_next_step": "Continue the exact reviewed Native candidate through remaining UI, deterministic generation, signed archive and guarded TestFlight-first gates; wait for VALID and publish the final Build 83 authority checkpoint.",
-  "full_report_path": "agent-handoffs/reports/20261003T051050Z-build83-server-deployed-d3-verified-checkpoint.md",
+  "recommended_next_step": "Founder installs Build 83 from TestFlight and completes the physical first-real-workout acceptance checklist in the final report. DEXA HealthKit remains READY/HOLD; Sleep v3 remains unchanged.",
+  "full_report_path": "agent-handoffs/reports/20261003T055504Z-build83-server-d3-native-testflight-final.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
