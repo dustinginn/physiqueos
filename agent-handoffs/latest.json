@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T03:15:00Z",
+  "generated_at_utc": "2026-10-03T03:32:36Z",
   "task": {
     "id": "build83-first-real-workout-comprehensive-correction-20261003",
-    "title": "Build 83 first-real-workout corrections - checkpoint 2 (Native green locally; Server D1/D2 in progress; deploy awaits DIRECT exact-SHA authorization)",
+    "title": "Build 83 first-real-workout corrections - checkpoint 3 (continuity; Native abb131d9 pushed, N1-N8 re-review fixes; Server D1/D2 candidate in progress; deploy/D3 await DIRECT exact-SHA authorization)",
     "agent": "claude",
     "status": "partial"
   },
@@ -17,7 +17,7 @@
     "base_sha": "e2cbcd0cf40dca64a4c8490bf0ebd4077b2eb69c"
   },
   "result": {
-    "summary": "IN PROGRESS (checkpoint 2). Native candidate 152c813e (local), Server candidate f91d76c0 reviewed (local, not deployed); D1/D2 candidate in progress. Audits 14/15/16 proven (Stair Stepper/Cooldown stored source_only by design -> Founder D1/D2/D3; Activity 945/109 legitimate, no change; Add Set no defect). Native candidate 152c813e implements all corrections plus fixes for a fresh REQUEST CHANGES review (lock-before-stamp, phone freeze after confirmed finish, operation-guarded Health reports, never discard a saved workout); full iOS unit suite 1963 tests with only the baseline Peptide failure; Watch 20/20 unit + 7/7 UI (physical swipe-right proven); Training UI 6 order-dependent failures all pass on a clean simulator. Server f91d76c0 reviewed (APPROVE WITH NITS, fixed). D1/D2 Server candidate in progress (new SHA). Relayed authorization is not usable for deploy/repair: the Founder must authorize the exact SHA directly in session 79959d1b.",
+    "summary": "IN PROGRESS (checkpoint 3, continuity). Native candidate abb131d9 pushed (branch claude/build83-first-real-workout-corrections-20261003): all Build 83 Native corrections implemented plus fixes for two fresh REQUEST CHANGES reviews (B1/M1-M3 in 152c813e; N1-N8 in abb131d9); full iOS unit 1966 tests with only the Build-82 baseline Peptide failure; Watch unit 26/26; finish/authority/logger 197/197; Watch UI 7/7 on 152c813e (re-run on abb131d9 pending). Server candidate A f91d76c0 pushed and reviewed (APPROVE WITH NITS, fixed), NOT deployed. Server candidate B (Cardio D1 Stair Stepper canonical+eligible, D2 Cooldown canonical+strategically ineligible, D3 bounded two-record repair tool) is local uncommitted work in progress and NOT in any committed SHA. Audits: Stair Stepper/Cooldown source_only by policy; Activity 945/109 legitimate (no change); Add Set no defect. Zero PR events expected/closed; DEXA writeback READY/HOLD out of scope; Sleep v3 live and undisturbed. Nothing deployed, mutated or uploaded.",
     "success": false,
     "production_mutated": false,
     "deployed": false,
@@ -26,11 +26,11 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Native 152c813e: iOS unit 1963 tests (1 skipped, 1 baseline Peptide failure); Watch unit 20/20; Watch UI 7/7 (physical swipe-right); Training UI 10/16 in suite order, the 6 order-dependent failures pass 6/6 on a clean simulator. Server f91d76c0: targeted 157/157, full unit suite 304 pre-existing failures identical at base."
+      "summary": "Native abb131d9: full iOS unit 1966 tests (1 skipped, 1 failure = baseline PeptideSupportEditorViewModelTests sandbox test, reproduces on Build 82); Watch unit 26/26; Build83FinishLifecycle+TrainingSessionAuthority+TrainingLogger 197/197; Watch UI 7/7 on 152c813e (re-run on abb131d9 pending); Training UI acceptance 6 order-dependent failures pass on erased simulator (pre-existing). Server f91d76c0: targeted 157/157, full unit 304 pre-existing failures identical at base."
     },
     "review": {
       "status": "changes_requested",
-      "summary": "Native c2b171fe fresh review: CHANGES REQUESTED (1 blocker, 3 majors) -> all addressed in 152c813e; fresh re-review of 152c813e running. Server f91d76c0 fresh review: APPROVE WITH NITS (nit fixed)."
+      "summary": "Native review 1 (c2b171fe) REQUEST CHANGES -> fixed in 152c813e; review 2 (152c813e) REQUEST CHANGES N1-N8 -> fixed in abb131d9; fresh review 3 of abb131d9 not yet run. Server A f91d76c0 APPROVE WITH NITS (fixed). Server B not yet reviewed."
     },
     "zero_write_audit": {
       "status": "passed",
@@ -38,23 +38,25 @@
     }
   },
   "decisions_required": [
-    "Founder: post the deploy authorization DIRECTLY in Remote Control session 79959d1b naming the exact Server SHA that will be reported after the D1/D2 candidate passes fresh review (a relayed authorization is not usable for production actions).",
-    "Founder: confirm directly the D3 repair of exactly the two Oct 2 source_only observations (Stair Stepper 44, Cooldown 80), after deploy and a dry run."
+    "Founder: post the deploy authorization DIRECTLY in Remote Control session 79959d1b naming the exact Server SHA that will be reported after Server candidate B (D1/D2/D3) passes fresh review (a relayed authorization is not usable for production actions).",
+    "Founder: authorize directly the D3 repair of exactly the two Oct 2 source_only observations (Stair Stepper 44, Cooldown 80), after deploy and a dry run.",
+    "Founder: TestFlight upload of Build 83 after green tests and reviews (the assignment directs it; the classifier may require a direct chat sentence)."
   ],
   "blockers": [
-    "Production deploy and the D3 repair need direct Founder authorization of the exact SHA in this session.",
-    "Fresh re-review of Native 152c813e and the D1/D2 Server candidate + its review are still running."
+    "Production deploy and D3 repair need direct Founder authorization of the exact SHA in session 79959d1b.",
+    "Fresh review 3 of Native abb131d9 and Server candidate B completion + fresh review are pending."
   ],
   "unexpected_findings": [
     "training-session.commit.v1 had a 4 KiB request-body bound: workouts of about 30+ sets would be rejected with 413 (fixed in Server candidate: 64 KiB).",
     "The first Native candidate let the background finish coordinator take over the phone's own Finish commit and drop supporting-evidence reconciliation; found by fresh review, fixed in 152c813e.",
-    "Training UI acceptance journeys are order-dependent (6 fail in suite order, all pass on a clean simulator): pre-existing pattern."
+    "Training UI acceptance journeys are order-dependent (6 fail in suite order, all pass on a clean simulator): pre-existing pattern.",
+    "Fresh re-review found the Watch could drop a deferred Finish/Not Yet tap and a HealthKit save failure had become terminal (regression vs Build 82); both fixed in abb131d9 with store-level tests."
   ],
   "backlog": [
     "Durable backlog not yet updated; will be updated with Build 83 delivery, D1/D2/D3 decisions and the acceptance checklist in the final report."
   ],
-  "recommended_next_step": "Finish D1/D2 Server candidate + fresh review; report exact SHA to the Founder in session 79959d1b for direct authorization; close Native re-review; archive Build 83 and upload on authorization; wait VALID.",
-  "full_report_path": "agent-handoffs/reports/20261003T031500Z-build83-first-real-workout-corrections-checkpoint2.md",
+  "recommended_next_step": "Run Watch UI on abb131d9; fresh independent review 3 of abb131d9; finish, push and fresh-review Server candidate B; report its exact SHA to the Founder for direct authorization; then guarded deploy + D3 dry run/apply; Build 83 archive, upload on authorization, wait VALID; backlog; final report.",
+  "full_report_path": "agent-handoffs/reports/20261003T033236Z-build83-first-real-workout-corrections-checkpoint3.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
