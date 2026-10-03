@@ -285,6 +285,44 @@ describe("bounded Oct 2 unsupported-workout-type repair: apply", () => {
     expect(records.getMutationCount()).toBe(mutations);
   });
 
+  it("keeps the exact-id and fresh-facts fences closed on an apply replay", async () => {
+    const records = world();
+    await applyFromDryRun(records);
+    const replayDryRun = await run(records);
+    const snapshot = records.snapshot();
+    const mutations = records.getMutationCount();
+
+    expect(await run(records, {
+      apply: true,
+      expected: replayDryRun.facts,
+      authorization: { observationIds: [ids()[0], "healthkit_observation_wrong"], authorizationReference: AUTH_REF },
+    })).toMatchObject({ outcome: "refused", reasons: ["authorized_observation_ids_do_not_match_audit"] });
+    expect(await run(records, {
+      apply: true,
+      expected: {},
+      authorization: { observationIds: ids(), authorizationReference: AUTH_REF },
+    })).toMatchObject({ outcome: "drifted" });
+    expect(records.snapshot()).toEqual(snapshot);
+    expect(records.getMutationCount()).toBe(mutations);
+  });
+
+  it("refuses replay when the audit does not prove the exact date, types and canonical identities", async () => {
+    for (const mutate of [
+      (audit) => ({ ...audit, repairLocalDate: "2026-10-01" }),
+      (audit) => ({ ...audit, targets: audit.targets.map((target, index) => index === 0 ? { ...target, activityType: "80" } : target) }),
+      (audit) => ({ ...audit, targets: audit.targets.map((target, index) => index === 0 ? { ...target, canonicalWorkoutId: "healthkit_workout_wrong" } : target) }),
+    ]) {
+      const records = world();
+      await applyFromDryRun(records);
+      const audit = await records.get({ collection: "healthKitConfiguration", recordId: AUDIT_ID });
+      await records.put({
+        collection: "healthKitConfiguration", recordId: AUDIT_ID, expectedVersion: audit.version,
+        payload: mutate(audit),
+      });
+      expect(await run(records)).toMatchObject({ outcome: "refused", reasons: ["audit_row_present_state_inconsistent"] });
+    }
+  });
+
   it("refuses when the audit row exists but the state no longer matches it", async () => {
     const records = world();
     await records.putIfAbsent({ collection: "healthKitConfiguration", recordId: AUDIT_ID, payload: { id: AUDIT_ID, kind: "healthkit_unsupported_workout_type_repair_audit", targets: [] } });

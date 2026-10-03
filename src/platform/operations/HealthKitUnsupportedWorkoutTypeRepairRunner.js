@@ -76,8 +76,14 @@ export const HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_AUDIT_RECORD_ID = "healthkit_u
 export const HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_AUDIT_KIND = "healthkit_unsupported_workout_type_repair_audit";
 // Raw HKWorkoutActivityType -> what the DEPLOYED classifier must produce.
 export const HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_TYPES = Object.freeze({
-  44: Object.freeze({ label: "Stair Stepper", family: HealthKitWorkoutFamily.CARDIO, canonicalType: "stair_climbing" }),
-  80: Object.freeze({ label: "Cooldown", family: HealthKitWorkoutFamily.OTHER, canonicalType: "cooldown" }),
+  44: Object.freeze({
+    label: "Stair Stepper", family: HealthKitWorkoutFamily.CARDIO,
+    canonicalType: "stair_climbing", strategicRole: "graduation_candidate",
+  }),
+  80: Object.freeze({
+    label: "Cooldown", family: HealthKitWorkoutFamily.OTHER,
+    canonicalType: "cooldown", strategicRole: "history_only",
+  }),
 });
 
 const CONFIGURATION_COLLECTION = "healthKitConfiguration";
@@ -136,17 +142,22 @@ export async function runHealthKitUnsupportedWorkoutTypeRepair({
   const deploymentSummary = { expectedSha: expectedSha || null, runtimeSha: runtimeSha || null };
 
   // Idempotent replay: the fixed audit identity proves this exact repair
-  // already applied. Re-running is a zero-write no-op, never a second repair.
+  // already applied. Apply replays still have to prove that the caller named
+  // those exact targets and supplied facts from an immediately preceding
+  // read. The no-op is idempotent, not a bypass around the apply fences.
   if (state.audit) {
-    const consistent = state.audit.kind === HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_AUDIT_KIND &&
-      Array.isArray(state.audit.targets) && state.audit.targets.length === 2 &&
-      state.audit.targets.every((target) => {
-        const observation = state.observations.find((item) => item.id === target.observationId);
-        return observation?.reconciliation?.state === HealthKitReconciliationState.WORKOUT_CANONICALIZED &&
-          observation.reconciliation.canonicalId === target.canonicalWorkoutId &&
-          state.canonicalWorkouts.some((workout) => workout.id === target.canonicalWorkoutId);
-      });
+    const consistent = isExactCompletedRepair(state);
     if (!consistent) return refused("audit_row_present_state_inconsistent", facts, { auditRecordId: state.audit.id ?? null });
+    const auditObservationIds = state.audit.targets.map((target) => target.observationId).sort();
+    if (apply && [...observationIds].sort().join("\u0000") !== auditObservationIds.join("\u0000")) {
+      return refused("authorized_observation_ids_do_not_match_audit", facts, {
+        auditRecordId: HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_AUDIT_RECORD_ID,
+      });
+    }
+    if (apply) {
+      const drift = compareFacts(expected, facts);
+      if (drift.length > 0) return Object.freeze({ outcome: "drifted", drift, facts });
+    }
     return Object.freeze({
       outcome: "already_repaired",
       auditRecordId: HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_AUDIT_RECORD_ID,
@@ -439,6 +450,53 @@ export async function runHealthKitUnsupportedWorkoutTypeRepair({
     throw operationError("POST_WRITE_INVARIANT_FAILED", "Post-write invariants failed.", { invariants });
   }
   return Object.freeze({ outcome: "applied", ...resultSummary, invariants, observations: updatedObservations });
+}
+
+function isExactCompletedRepair(state) {
+  const audit = state.audit;
+  if (audit?.id !== HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_AUDIT_RECORD_ID ||
+    audit.kind !== HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_AUDIT_KIND ||
+    audit.repairLocalDate !== HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_LOCAL_DATE ||
+    audit.strategicEvidenceEligibility !== "quarantined" ||
+    !SHA.test(String(audit.deployedSha ?? "")) ||
+    !Array.isArray(audit.targets) || audit.targets.length !== 2) {
+    return false;
+  }
+  const targetTypes = audit.targets.map((target) => String(target?.activityType ?? "")).sort();
+  if (targetTypes[0] !== "44" || targetTypes[1] !== "80") return false;
+  const observationIds = new Set();
+  const canonicalWorkoutIds = new Set();
+  return audit.targets.every((target) => {
+    const activityType = String(target?.activityType ?? "");
+    const expectedType = HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_TYPES[activityType];
+    if (!expectedType || typeof target.observationId !== "string" || typeof target.canonicalWorkoutId !== "string" ||
+      observationIds.has(target.observationId) || canonicalWorkoutIds.has(target.canonicalWorkoutId) ||
+      target.canonicalType !== expectedType.canonicalType || target.strategicRole !== expectedType.strategicRole) {
+      return false;
+    }
+    observationIds.add(target.observationId);
+    canonicalWorkoutIds.add(target.canonicalWorkoutId);
+    const observation = state.observations.find((item) => item.id === target.observationId);
+    const canonicalWorkout = state.canonicalWorkouts.find((item) => item.id === target.canonicalWorkoutId);
+    return observation?.userId === HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_OWNER &&
+      observation.observationType === HealthKitObservationType.WORKOUT &&
+      (observation.ingestionPurpose ?? HealthKitIngestionPurpose.OPERATIONAL) === HealthKitIngestionPurpose.OPERATIONAL &&
+      activityTypeOf(observation) === activityType &&
+      effectiveLocalDateOf(observation) === HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_LOCAL_DATE &&
+      observation.occurrence?.localDate === HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_LOCAL_DATE &&
+      observation.reconciliation?.state === HealthKitReconciliationState.WORKOUT_CANONICALIZED &&
+      observation.reconciliation?.canonicalId === target.canonicalWorkoutId &&
+      getHealthKitCanonicalWorkoutRecordId(observation) === target.canonicalWorkoutId &&
+      canonicalWorkout?.userId === HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_OWNER &&
+      canonicalWorkout.localDate === HEALTHKIT_UNSUPPORTED_WORKOUT_REPAIR_LOCAL_DATE &&
+      canonicalWorkout.current?.sourceObservationId === target.observationId &&
+      canonicalWorkout.current?.family === expectedType.family &&
+      canonicalWorkout.current?.canonicalType === expectedType.canonicalType &&
+      canonicalWorkout.current?.strategicRole === expectedType.strategicRole &&
+      canonicalWorkout.evidenceEligibility?.state === "quarantined" &&
+      canonicalWorkout.evidenceEligibility?.strategic === false &&
+      canonicalWorkout.activityInteraction?.additiveToDailyActivity === false;
+  });
 }
 
 /**
