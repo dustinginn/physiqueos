@@ -1,4 +1,6 @@
-# Founder authorization request — DEXA -> Apple Health prospective activation
+# Founder authorization request — DEXA -> Apple Health prospective activation — AUTHORIZED AND APPLIED
+
+Status: Founder directly authorized the exact target in chat. The guarded create-only mutation completed at `2026-10-03T17:09:54.334Z` and passed parent plus independent read-only verification. Final report: `agent-handoffs/reports/20261003T171246Z-dexa-healthkit-prospective-policy-activation.md`.
 
 ## Decision requested
 

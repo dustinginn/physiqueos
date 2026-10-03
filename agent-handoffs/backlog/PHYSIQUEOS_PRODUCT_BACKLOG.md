@@ -23,15 +23,16 @@ DELIVERY WORKFLOW RULE (durable, 2026-10-02)
 ACTIVE / NEXT
 
 00. DEXA -> Apple Health writeback — DUE before Founder DEXA Fri 2026-10-09
-Status: **PHYSICAL VALIDATION PASS / PERMANENT POLICY DISABLED / WAITING FOR FOUNDER ACTIVATION AUTHORIZATION** (2026-10-03).
-Report: agent-handoffs/reports/20261003T162145Z-dexa-healthkit-physical-validation-closeout.md
+Status: **PROSPECTIVE POLICY ACTIVE / ZERO CURRENT INTENTS / OCT 9 ACCEPTANCE PENDING** (2026-10-03).
+Report: agent-handoffs/reports/20261003T171246Z-dexa-healthkit-prospective-policy-activation.md
 Current authority:
 - Server `b47663b32372a78010dbc8e4aa41303012d98dc7`, deployment `b9449c52-5444-4dae-9f44-fd0261b1a9d3`, remains ACTIVE and healthy.
 - Native Build 84 `bcd92c74602695766c270fe6af052de45afece4b`, delivery `a4b7b504-e0ba-4cb5-9909-3e01cc8156d5`, is installed and physically validated.
 - Founder confirmed the bounded Sep 12 pair in Apple Health: BF% `8.1%` and fat-free Lean Body Mass `160.5 lb`; no Weight. Guarded deletion removed both samples, and production receipts now show the exact two final `deleted` / `absent` states.
 - Read-only closeout found zero feedback-loop observations/evidence, zero DEXA Weight intent/receipt, no Sep 12 canonical semantic/revision change, no historical permanent intents, and zero current or candidate permanent intents.
-- Exact prospective activation candidate is create-only policy record `dexa_healthkit_writeback_policy`, effective canonical scan date `2026-10-09`, only `bodyFatPercentage` + `leanBodyMassFatFree`, prospective-only, no backfill. It was independently approved and dry-runs to zero because all three active DEXAs are pre-effective-date.
-- **Not active:** the production policy record remains absent/disabled. Founder direct authorization is required before the guarded one-record `putIfAbsent` activation.
+- Founder authorized and the guarded create-only mutation created exactly one version-1 policy record at `2026-10-03T17:09:54.334Z`: enabled, effective canonical scan date `2026-10-09`, only `bodyFatPercentage` + `leanBodyMassFatFree`, prospective-only, no backfill.
+- Fresh preflight, in-transaction checks, parent post-readback and an independent post-activation audit all passed. Current permanent intents remain `0`; all three existing DEXAs remain excluded; Sep 12 receipts remain final `deleted` / `absent`; all protected Weight/Evidence/Confidence/Briefing/Sleep/Training/Cardio counts and digests are unchanged.
+- **Active prospectively:** the first eligible permanent write can only arise from an accepted canonical DEXA dated `2026-10-09` or later. No historical writeback occurred.
 Validation controls: retain the guarded Sep 12 controls temporarily in installed Build 84 until the first real Oct 9 prospective write succeeds; do not invoke them again. Then hide/remove them in the next consolidated Native build rather than create a cosmetic-only build. The normal DEXA -> Apple Health toggle remains.
 Pre-scan prep: make sure the Oct 9 DEXA appointment in PhysiqueOS has its local time set (used as the sample timestamp).
 Incidental (not fixed): web Evidence Review discard lacks status guard; possible briefing-step lookup issue on same-date DEXA re-import (unverified).
@@ -380,9 +381,9 @@ Training Logger / Live Activities
 END BACKLOG.
 
 
-## DEXA -> Apple Health writeback — PHYSICAL PASS / ACTIVATION HOLD (updated 2026-10-03)
+## DEXA -> Apple Health writeback — PROSPECTIVE ACTIVE / OCT 9 ACCEPTANCE PENDING (updated 2026-10-03)
 
-Status: Server/Native implementation shipped in Build 84; bounded real Sep 12 write/verify/delete validation passed; permanent prospective policy remains disabled pending separate Founder authorization.
+Status: Server/Native implementation shipped in Build 84; bounded real Sep 12 write/verify/delete validation passed; permanent prospective policy activated create-once on 2026-10-03; zero current intents; Oct 9 real-scan acceptance pending.
 
 Audit authority:
 - agent-handoffs/reports/20261002T235405Z-dexa-healthkit-writeback-audit-plan.md
@@ -399,9 +400,9 @@ Founder-approved product decisions:
 8. After the Sep 12 physical test passes, other real historical DEXA figures may be used freely as deterministic/simulator test fixtures for mapping, units, revisions and edge cases, but must NOT be written into the Founder's real Apple Health history unless separately authorized.
 
 Execution gate:
-- DO NOT enable the permanent production policy until the Founder directly authorizes the exact create-only record published in the 2026-10-03 closeout report/review request.
 - DO NOT backfill or write another historical DEXA. The Sep 12 physical controls are complete and should not be invoked again.
-- After authorization, re-run the exact read-only drift fence immediately before activation, require zero candidate intents/no Oct 9+ canonical scan, create the absent policy record once, and verify exact readback plus zero post-write intents.
+- Permanent policy is now active. Do not update/overwrite it without a separately reviewed and authorized correction operation.
+- For the Oct 9 scan, use the normal DEXA intake and verify exactly two permanent intents/samples: Body Fat Percentage plus fat-free Lean Body Mass; no Weight. Retain the guarded Sep 12 controls until this succeeds, but do not invoke them.
 - Target readiness remains the Founder DEXA on Friday 2026-10-09.
 
 

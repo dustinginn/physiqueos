@@ -1,60 +1,61 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T16:27:19Z",
+  "generated_at_utc": "2026-10-03T17:12:46Z",
   "task": {
-    "id": "20261003T163500Z-sleep-v3-oct3-morning-canary-audit",
-    "title": "Sleep v3 Oct 3 morning canary read-only audit",
+    "id": "20261003-dexa-healthkit-prospective-policy-activation",
+    "title": "DEXA to Apple Health permanent prospective policy activation",
     "agent": "codex",
-    "status": "pass_with_display_note"
+    "status": "complete_active_zero_intents"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_sha": "1611eb8f7f5f18641a3f813cba6ec47fd0eae5c0",
-    "reporting_base_sha": "776dc6af3802709640b4f9335031fd940ed4eb90",
+    "founder_authorization": "direct chat authorization for exact create-only record",
     "production_server_sha": "b47663b32372a78010dbc8e4aa41303012d98dc7",
     "production_deployment": "b9449c52-5444-4dae-9f44-fd0261b1a9d3",
     "native_sha": "bcd92c74602695766c270fe6af052de45afece4b",
     "native_build": 84,
-    "native_delivery_id": "a4b7b504-e0ba-4cb5-9909-3e01cc8156d5",
-    "native_processing_state": "VALID"
+    "policy_digest": "15f04b12710a124475e2e02f70a5255cbe4a0c5f47b6655d701c3053b214bb98",
+    "preflight_facts_digest": "284474e2dd6bf535d83d2865bb3b6a2c80a17db0b5ff1851d0f7ff91f5c45fc9"
   },
   "result": {
-    "summary": "PASS WITH DISPLAY NOTE: exact Oct 3 sleep-canon-v3 revision 2 is internally correct and equals fresh v3; independent minute rounding explains displayed stages totaling 7h37 versus the 7h36 headline; 9h25 Time in Bed is the distinct Oura in-bed envelope; longest continuous asleep is exactly 4,560 seconds; provenance, quarantine and isolation invariants pass.",
+    "summary": "The exact create-only DEXA HealthKit prospective policy is active at version 1, effective from canonical scan date 2026-10-09 for Body Fat Percentage and fat-free Lean Body Mass only. Parent and independent read-only audits prove zero current intents/diagnostics, all historical DEXAs excluded, Sep. 12 receipts still absent, and every protected non-policy collection unchanged.",
     "success": true,
-    "verdict": "PASS_WITH_DISPLAY_NOTE",
-    "canonical_revision": 2,
-    "provisional_until_local": "2026-10-03T18:00:00-07:00",
-    "production_mutated": false,
-    "historical_mutated": false,
-    "strategic_leak_count": 0,
-    "patch_proposed": false
+    "policy_enabled": true,
+    "policy_version": 1,
+    "policy_created_at": "2026-10-03T17:09:54.334Z",
+    "effective_from_scan_date": "2026-10-09",
+    "prospective_only": true,
+    "historical_backfill": false,
+    "current_intent_count": 0,
+    "current_diagnostics_count": 0,
+    "historical_writeback_occurred": false,
+    "build_84_changed": false
   },
   "validation": {
-    "production_audit": {
+    "preflight": {
       "status": "passed",
-      "bundle_sha256": "27c9e39a7974d2fa5042b113cc4f49fc595e718f39506584b1255ef641b1a5f6",
-      "summary": "Exact runtime/build/owner gates, REPEATABLE READ READ ONLY, transaction_read_only=on, 21 SELECTs, zero blocked statements, zero record-store mutations and explicit rollback passed. Stored Oct 3 content equals fresh v3 exactly."
+      "bundle_sha256": "ab277a11e36e7510c108bf25ed4e8fe34af78b4953b02be9fe160c09cadbde2a",
+      "summary": "Exact runtime, policy absent, Sep. 12 receipts final absent, zero Oct. 9+ DEXAs, zero candidate intents/diagnostics, and zero feedback markers."
     },
-    "arithmetic": {
-      "status": "passed",
-      "summary": "Deep 5,370s + Core 15,060s + REM 6,930s = Asleep 27,360s exactly; Awake 4,110s completes the gap-free 31,470s main window. Independent minute rounding is non-additive by one displayed minute."
+    "mutation": {
+      "status": "applied_once",
+      "bundle_sha256": "7c5d3d89d9a8bf176390fd260af880ee4d34f1f83b6bab7461d6931a4efdb95c",
+      "summary": "One records.putIfAbsent created healthKitConfiguration/dexa_healthkit_writeback_policy with exact source identity and version 1; no retry or overwrite occurred."
     },
-    "continuity": {
+    "post_activation": {
       "status": "passed",
-      "summary": "Independent timeline derivation and served read model both return 4,560s; Core-Deep-Core-Deep remains contiguous, Awake breaks both sides, and timeline gaps/source-boundary artifacts are zero."
+      "bundle_sha256": "7bea5c9489371a0358709f5cd4b018670c47cf9d919dc1fedc18dc89440061ee",
+      "summary": "Exact storage readback, enabled resolver state, zero intents/diagnostics, final-absent Sep. 12 receipts, zero feedback markers, and all protected non-policy digests unchanged."
     },
-    "isolation": {
-      "status": "passed",
-      "summary": "Historical 87-day/8,601-sample/2,878-validation counts and digests exactly match the v3 activation fence; all historical days remain v2; strategic scan total is zero; current day remains validation-only quarantined."
+    "independent_review": {
+      "status": "approved",
+      "summary": "Fresh independent production read-only and source verification matched the exact policy and every supplied preflight protected-state digest."
     }
   },
-  "decisions_required": [
-    "Separate preserved gate: Founder direct authorization is still required before the already-published DEXA prospective writeback policy may be enabled."
-  ],
+  "decisions_required": [],
   "blockers": [],
-  "recommended_next_step": "After 6:00 PM PDT, manually confirm the updating badge clears, record the then-current revision and values with one bounded read-only check, confirm Oura provenance/quarantine/fresh-v3 equality, and watch for any unexplained later revision. Do not recalculate, backfill or force finalization.",
-  "preserved_separate_gate": "DEXA prospective writeback activation remains disabled and requires its separately published direct Founder authorization.",
-  "full_report_path": "agent-handoffs/reports/20261003T162719Z-sleep-v3-oct3-morning-canary-audit.md",
+  "recommended_next_step": "Use the normal Oct. 9 DEXA intake and acceptance checklist. Expect exactly BF% plus fat-free LBM, no Weight, with durable receipts and no feedback loop. Do not invoke the Sep. 12 validation controls again.",
+  "full_report_path": "agent-handoffs/reports/20261003T171246Z-dexa-healthkit-prospective-policy-activation.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
