@@ -473,7 +473,7 @@ Audit authority:
 - implementation prompt authority `b84428fe54121f5a0d5198157fe972d99586a59a`
 - local Phase 7 implementation authority `54b4ba82ed089a98e2c5950fecbe9b9a7a7e4dc8`
 - iCloud status/archive-integrity implementation authority `6a3e6199` (full SHA in post-copy checkpoint)
-- final scheduler-gate implementation authority `f367ea94` (full SHA in final report)
+- final scheduler/upload-gate implementation authority `b53c26ed8d3be583dd8b0dd3becece436689bcd9`
 
 Goal:
 Create a safe, automated backup path for non-reproducible PhysiqueOS development state on the Founder Mac, with iCloud Drive as a likely off-device destination.
@@ -554,7 +554,7 @@ Status / hard gate:
 - The mandatory pre-write checkpoint was published and verified on `origin/main` at `b181dd54c98ba27aab6717eef2996d0ce3039d8c` before the first iCloud write.
 - The dedicated destination now exists. Generation `PhysiqueOS-Recovery-20261003-191629Z` was copied through `.incoming`, destination-rehashed, renamed, and made current through atomic `LATEST.json`. Scratch restore from the final iCloud destination copy passes.
 - Foundation metadata produced a clean 97/97 `ICLOUD_UPLOAD_REPORTED_COMPLETE` observation during status refresh and again at scheduler installation, but later queries returned metadata unavailable. Historical upload-reported completion is recorded; current live state and independent remote state are conservatively `REMOTE_ICLOUD_SYNC_UNKNOWN`.
-- A clean exported `origin/main` snapshot review passed 19 tests before enablement; after the fresh-metadata gate was hardened, the suite passed 20 tests. The 03:30 local launchd agent is installed, loaded and idle with last exit `0`; its RunAtLoad catch-up correctly skipped because the generation was under 24 hours old.
+- A clean exported `origin/main` snapshot review passed 19 tests before enablement; after fresh-metadata, scheduled-upload failure and idempotent reinstall gates were hardened, the suite passed 22 tests. The 03:30 local launchd agent is installed, loaded and idle with last exit `0`; its RunAtLoad catch-up correctly skipped because the generation was under 24 hours old.
 - Explicit hooks are installed for post-major-main-checkpoint and post-TestFlight-VALID use, with recursion prevention verified against the recovery report.
 - Retention is implemented but generation #1 deletion is disabled. Current upload metadata unknown additionally disables all retention deletion.
 - Build 84 and Build 83 identity/archive selection is verified, but their separate iCloud copy is still pending and remains subject to the standing 15 GiB disk-safety floor.
