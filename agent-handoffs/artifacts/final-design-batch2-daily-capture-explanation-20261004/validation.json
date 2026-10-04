@@ -1,0 +1,237 @@
+{
+  "pass": true,
+  "authority": {
+    "prompt": "d7d59139f3aecff8a42c3f600addbeedc45d9e15",
+    "nativeBuild": 85,
+    "nativeSHA": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "serverSHA": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "scopeRows": [
+      "H02",
+      "L04",
+      "L05",
+      "B06"
+    ]
+  },
+  "renderedSurfaceCount": 20,
+  "screenCount": 40,
+  "pairCount": 20,
+  "actualTarget": {
+    "width": 402,
+    "minimumHeight": 874
+  },
+  "darkLightContentGeometryParity": true,
+  "minimumTapTarget": 44,
+  "noHorizontalOverflow": true,
+  "parity": {
+    "confidence-v3": {
+      "missing": [],
+      "fields": [],
+      "actions": []
+    },
+    "confidence-v2": {
+      "missing": [],
+      "fields": [],
+      "actions": []
+    },
+    "morning-reconcile": {
+      "missing": [],
+      "fields": [
+        "optional-note",
+        "optional-note",
+        "morning-weight"
+      ],
+      "actions": [
+        "Home",
+        "Completed",
+        "Skipped",
+        "Add note",
+        "Completed",
+        "Skipped",
+        "Add note",
+        "Complete Morning Weigh-In"
+      ]
+    },
+    "morning-existing": {
+      "missing": [],
+      "fields": [
+        "morning-weight"
+      ],
+      "actions": [
+        "Home",
+        "Complete Morning Weigh-In"
+      ]
+    },
+    "morning-empty": {
+      "missing": [],
+      "fields": [
+        "morning-weight"
+      ],
+      "actions": [
+        "Home",
+        "Complete Morning Weigh-In"
+      ]
+    },
+    "morning-validation": {
+      "missing": [],
+      "fields": [
+        "morning-weight"
+      ],
+      "actions": [
+        "Home",
+        "Complete Morning Weigh-In"
+      ]
+    },
+    "morning-saving": {
+      "missing": [],
+      "fields": [
+        "morning-weight"
+      ],
+      "actions": [
+        "Home",
+        "Saving…"
+      ]
+    },
+    "morning-processing": {
+      "missing": [],
+      "fields": [
+        "morning-weight"
+      ],
+      "actions": [
+        "Home",
+        "Complete Morning Weigh-In"
+      ]
+    },
+    "morning-complete": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Home",
+        "Return Home"
+      ]
+    },
+    "weight-new": {
+      "missing": [],
+      "fields": [
+        "date-measured",
+        "weight-value",
+        "weight-unit"
+      ],
+      "actions": [
+        "Log",
+        "Save Weight"
+      ]
+    },
+    "weight-correction": {
+      "missing": [],
+      "fields": [
+        "date-measured",
+        "weight-value",
+        "weight-unit"
+      ],
+      "actions": [
+        "Log",
+        "Save Weight"
+      ]
+    },
+    "weight-validation": {
+      "missing": [],
+      "fields": [
+        "date-measured",
+        "weight-value",
+        "weight-unit"
+      ],
+      "actions": [
+        "Log",
+        "Save Weight"
+      ]
+    },
+    "weight-saving": {
+      "missing": [],
+      "fields": [
+        "date-measured",
+        "weight-value",
+        "weight-unit"
+      ],
+      "actions": [
+        "Log",
+        "Saving…"
+      ]
+    },
+    "weight-processing": {
+      "missing": [],
+      "fields": [
+        "date-measured",
+        "weight-value",
+        "weight-unit"
+      ],
+      "actions": [
+        "Log",
+        "Save Weight"
+      ]
+    },
+    "weight-success": {
+      "missing": [],
+      "fields": [
+        "date-measured",
+        "weight-value",
+        "weight-unit"
+      ],
+      "actions": [
+        "Log",
+        "Save Weight",
+        "Return to Log"
+      ]
+    },
+    "weight-failed": {
+      "missing": [],
+      "fields": [
+        "date-measured",
+        "weight-value",
+        "weight-unit"
+      ],
+      "actions": [
+        "Log",
+        "Save Weight"
+      ]
+    },
+    "history-loaded": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Back"
+      ]
+    },
+    "history-empty": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Back"
+      ]
+    },
+    "history-loading": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Back"
+      ]
+    },
+    "history-failed": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Back"
+      ]
+    }
+  },
+  "confidenceAssumptionsRendered": false,
+  "briefingHistoryFiltersInvented": false,
+  "productionRecoveryFieldsAddedToMorningCheckIn": false,
+  "shippingNativeChanged": false,
+  "serverChanged": false,
+  "primaryFounderReview": "boards/daily-capture-explanation-primary-mobile.png",
+  "focusedBoards": [
+    "boards/confidence-detail-mobile.png",
+    "boards/morning-weight-capture-mobile.png",
+    "boards/briefing-history-mobile.png"
+  ]
+}

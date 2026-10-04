@@ -1,0 +1,36 @@
+{
+  "authority": {
+    "prompt": "d7d59139f3aecff8a42c3f600addbeedc45d9e15",
+    "nativeBuild": 85,
+    "nativeSHA": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "serverSHA": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "scopeRows": ["H02", "L04", "L05", "B06"]
+  },
+  "rendering": {
+    "widthPoints": 402,
+    "minimumHeightPoints": 874,
+    "appearances": ["dark", "light"]
+  },
+  "surfaces": {
+    "confidence-v3": {"title":"Confidence Detail · canonical V3","group":"confidence","sections":["Why confidence is 79%","Current confidence: Moderate","Why confidence is here","What increased it","What supports it now","What is holding it back","What could raise it","What could lower it","Next evidence","Coach's take"],"actions":[]},
+    "confidence-v2": {"title":"Confidence Detail · historical V2","group":"confidence","sections":["Why confidence is 74%","Current confidence: Moderate","What changed","What supports confidence","What limits confidence","What will make confidence clearer"],"actions":[]},
+    "morning-reconcile": {"title":"Morning Check-In · unfinished priorities","group":"morning","sections":["Morning Weigh-In","Good morning","Yesterday’s unfinished priorities","Tesamorelin","Foam Rolling","What’s your weight today?"],"actions":["Completed","Skipped","Add note","Complete Morning Weigh-In"]},
+    "morning-existing": {"title":"Morning Check-In · existing weight","group":"morning","sections":["Morning Weigh-In","Good morning","What’s your weight today?","172.9","lb"],"actions":["Complete Morning Weigh-In"]},
+    "morning-empty": {"title":"Morning Check-In · no reconciliation","group":"morning","sections":["Morning Weigh-In","Good morning","What’s your weight today?"],"actions":["Complete Morning Weigh-In"]},
+    "morning-validation": {"title":"Morning Check-In · validation","group":"morning","sections":["Enter a valid weight."],"actions":["Complete Morning Weigh-In"]},
+    "morning-saving": {"title":"Morning Check-In · saving","group":"morning","sections":["Saving…"],"actions":["Saving…"]},
+    "morning-processing": {"title":"Morning Check-In · reconciling","group":"morning","sections":["Morning Check-In was accepted and is still reconciling. It is safe to leave this screen or retry the same submission."],"actions":["Complete Morning Weigh-In"]},
+    "morning-complete": {"title":"Morning Check-In · complete","group":"morning","sections":["Weigh-in complete","Priorities reconciled and weight saved"],"actions":["Return Home"]},
+    "weight-new": {"title":"Manual Weight · new date","group":"weight","sections":["Log Weight","Record a weigh-in","Date measured","Weight","Unit"],"actions":["Save Weight"]},
+    "weight-correction": {"title":"Manual Weight · existing date","group":"weight","sections":["Record a weigh-in","Sep 10, 2026","172.9","lb"],"actions":["Save Weight"]},
+    "weight-validation": {"title":"Manual Weight · validation","group":"weight","sections":["Weight must be between 50 and 1,000 lb."],"actions":["Save Weight"]},
+    "weight-saving": {"title":"Manual Weight · saving","group":"weight","sections":["Record a weigh-in","Saving…"],"actions":["Saving…"]},
+    "weight-processing": {"title":"Manual Weight · reconciling","group":"weight","sections":["Weight accepted and still reconciling. It is safe to leave this screen or retry the same value."],"actions":["Save Weight"]},
+    "weight-success": {"title":"Manual Weight · saved","group":"weight","sections":["Weight saved for Sep 10, 2026."],"actions":["Save Weight","Return to Log"]},
+    "weight-failed": {"title":"Manual Weight · failed","group":"weight","sections":["This weigh-in could not be saved."],"actions":["Save Weight"]},
+    "history-loaded": {"title":"Briefing History · populated","group":"history","sections":["Briefing History","7 published briefings","Weekly Briefing","Midweek Briefing","Monthly Briefing","DEXA Event Briefing","Photo Event Briefing"],"actions":["Back"]},
+    "history-empty": {"title":"Briefing History · empty","group":"history","sections":["0 published briefings","No Briefings have been published yet."],"actions":["Back"]},
+    "history-loading": {"title":"Briefing History · loading","group":"history","sections":["Briefing History","Loading published briefings"],"actions":["Back"]},
+    "history-failed": {"title":"Briefing History · failed","group":"history","sections":["Briefing History could not be loaded."],"actions":["Back"]}
+  }
+}
