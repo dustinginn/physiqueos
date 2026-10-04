@@ -14,4 +14,3 @@
 5. Legacy Documents/File Provider worktree database and linked checkouts: recovery scanner returned `FAIL_SCANNER_ERROR` during active Xcode Git status; keep protected until an inactive-window audit proves dirty state, ownership, and durability for every entry.
 
 No recurring automation was created.
-

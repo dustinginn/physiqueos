@@ -54,4 +54,3 @@ The 30 GiB target is not safely reachable while active work is protected. Cleanu
 ## Safety statement
 
 No application source, worktree, branch, simulator, archive, credential, signing asset, process, or backup material has been deleted or modified. The only change is this report-only checkpoint.
-
