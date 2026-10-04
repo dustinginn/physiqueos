@@ -2,26 +2,29 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Operating Plan Edit Strategy verification
+- Task: Progress Photos + DEXA Evidence founder parity correction
 - Agent: Codex
-- Status: actual edit flows ready for Founder review; implementation not started
-- Generated (UTC): 2026-10-04T19:13:53Z
-- Work branch: `codex/operating-plan-edit-strategy-verification`
-- Work/report commit: `ef3cbe941d2f01b7c4fe622adabdb13991f7fc70`
-- Artifact commit: `be04cfa82efd9c5d38208427d3ca6f18ce150d03`
-- Main report commit before pointer update: `ef3cbe941d2f01b7c4fe622adabdb13991f7fc70`
-- Artifact root: `agent-handoffs/artifacts/operating-plan-edit-strategy-verification-20261004/`
-- Primary mobile review PNG: `agent-handoffs/artifacts/operating-plan-edit-strategy-verification-20261004/screens/operating-plan-edit-mobile-review.png`
-- Concise review page: `agent-handoffs/artifacts/operating-plan-edit-strategy-verification-20261004/comparison-board.html`
+- Status: corrected surfaces ready for Founder review; implementation not started
+- Generated (UTC): 2026-10-04T19:17:36Z
+- Work branch: `codex/photos-dexa-evidence-parity-correction`
+- Work/report commit: `f7e0402da40682ebccec0e97502d1264f48ed3b7`
+- Artifact commit: `47ed6d1a5c1daf00ba0577638dbeb6faaec31385`
+- Main report commit before pointer update: `c78ea32fc7403f36c5804936e6d440e0a54d24c4`
+- Artifact root: `agent-handoffs/artifacts/photos-dexa-evidence-founder-parity-correction-20261004/`
+- Primary review PNG: `agent-handoffs/artifacts/photos-dexa-evidence-founder-parity-correction-20261004/screens/photos-dexa-primary-mobile-review-board.png`
+- Photos board: `agent-handoffs/artifacts/photos-dexa-evidence-founder-parity-correction-20261004/screens/photos-focused-review-board.png`
+- DEXA board: `agent-handoffs/artifacts/photos-dexa-evidence-founder-parity-correction-20261004/screens/dexa-focused-review-board.png`
 
-Energy is intentionally read-only in production and exposes no Edit Strategy action. Nutrition and Training are rendered in dark and mineral light from the exact Build 85 editor contracts, including field order, current values, conditional controls, validation, Cancel/Save behavior, server-owned effective date, Goal ownership and successor-version history semantics.
+Evidence Hub and Timeline remain locked. The Photos root now preserves the visual Latest Photo Set, prominent full-width Briefing action and thumbnail history. Its Gallery preserves simultaneous Previous/Current media, Interpretation, Capture Conditions, Source History, canonical pose navigation and distinct single-image inspection.
 
-The representative Training rejection proves the production generic error state. Successful changed and unchanged saves both dismiss directly to the accepted strategy detail, so no fictional success screen was added. The existing Energy phase-history projection delta remains open; no new implementation gap was found.
+DEXA now follows exact production section order and directly proves every independent disclosure in collapsed and expanded states. All 17 graphs and every metric/unit survive expansion. Product UI contains no source-audit commentary.
 
-No shipping Native/Server source, production mutation, build, deployment or release state changed.
+Validation passed for 16 templates and 32 dark/mineral-light product renders with zero overflow, runtime errors or appearance-content mismatches. The implementation ledger was reviewed; no new shipping delta was created because the earlier problems were design-harness parity mistakes.
 
-Next: Founder reviews and confirms the actual Nutrition and Training editors; Energy remains read-only.
+No shipping code, production data, evidence/media, build, TestFlight or deployment state changed.
 
-Detailed report: `agent-handoffs/reports/20261004T201500Z-operating-plan-edit-strategy-verification.md`
+Next: Founder confirms or corrects Progress Photos and DEXA.
+
+Detailed report: `agent-handoffs/reports/20261004T201501Z-photos-dexa-evidence-founder-parity-correction.md`
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
