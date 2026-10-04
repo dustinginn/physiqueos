@@ -1,0 +1,222 @@
+{
+  "authority": {
+    "prompt": "f5d72b2be4ad214a05ede419a1db55443e489fcd",
+    "nativeBuild85": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "serverBuild85": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+  },
+  "generatedAt": "2026-10-04T18:40:59.158Z",
+  "expected": {
+    "total": 10,
+    "hub": 1,
+    "dexa": 3,
+    "photos": 4,
+    "timeline": 1,
+    "states": 1
+  },
+  "boards": {
+    "dark": {
+      "actualScreens": 10,
+      "familyCounts": {
+        "hub": 1,
+        "dexa": 3,
+        "photos": 4,
+        "timeline": 1,
+        "states": 1
+      },
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "runtimeErrors": [],
+      "pass": true
+    },
+    "light": {
+      "actualScreens": 10,
+      "familyCounts": {
+        "hub": 1,
+        "dexa": 3,
+        "photos": 4,
+        "timeline": 1,
+        "states": 1
+      },
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "runtimeErrors": [],
+      "pass": true
+    }
+  },
+  "parity": {
+    "checkedScreens": 10,
+    "textMismatches": [],
+    "pass": true
+  },
+  "semanticRules": {
+    "shippingSourceChanged": false,
+    "healthMetricsShown": false,
+    "comingSoonShown": false,
+    "dexaBriefingSubstituted": false,
+    "photoBriefingSubstituted": false,
+    "timelineFilterInvented": false,
+    "timelineNavigationInvented": false,
+    "founderMediaReboundToFixtureDates": false
+  },
+  "contentAssertions": {
+    "hubOrder": true,
+    "timelineLast": true,
+    "healthMetricsAbsent": true,
+    "comingSoonAbsent": true,
+    "dexaSummaryExact": true,
+    "dexaInlineHistory": true,
+    "dexaMetricsComplete": true,
+    "photosHierarchy": true,
+    "photoMediaStates": true,
+    "photoViewerCurrent": true,
+    "timelineBounded": true,
+    "timelineNoInventedControls": true,
+    "historicalPhotoIssuesNotPresentedAsOpen": true
+  },
+  "renders": [
+    {
+      "file": "coverage-board-light.png",
+      "width": 1500,
+      "height": 4390,
+      "sha256": "59b614d10e2ee365fc4f9ba7ad5aaf091d28a5e0a6d75dea26a4185c0e9193d2"
+    },
+    {
+      "file": "coverage-board.png",
+      "width": 1500,
+      "height": 4390,
+      "sha256": "83813049c7f32dc6d1678dce74c09b56e016a7af1e3a4840c090a0786076d045"
+    },
+    {
+      "file": "evidence-d1-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "4dddb37e15fc730985980eadcae2de0e8719b9f249a67de63e8c686f2f9778bc"
+    },
+    {
+      "file": "evidence-d1.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "74693da4543dad441ffb84904ef3ea9a142d4979b74f20c70cc75e5ba57bf7d7"
+    },
+    {
+      "file": "evidence-d2-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "d264458c02dcd1d20985247431b1c0a95d9e3cdf426831d00932aff6d93df7a2"
+    },
+    {
+      "file": "evidence-d2.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "a56cd3591269021a2ee1a6f064b965a7c16ca76ed00b9ad017a9b7f5b64d97ac"
+    },
+    {
+      "file": "evidence-d3-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "8c4e5af30a66ee01291fff3dda81af1e0ca070be07c29d2f21983318d978a1b2"
+    },
+    {
+      "file": "evidence-d3.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "d900bb69a837a4de8f5154d9c933f9a2ad0f06611440e406cfab276c63f42364"
+    },
+    {
+      "file": "evidence-h1-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "089f65220328fcedd6ae41458f9822f6c62f6114f77bc056dc92a29e45aeb2d8"
+    },
+    {
+      "file": "evidence-h1.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "4148292d8d8b487e46b5e4288c9b2a438853430ae7fbe9913fc72c86bbb05b91"
+    },
+    {
+      "file": "evidence-p1-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "55871f648d93e920b70cac86a205578131b8431b040a3adca83e64400b91c520"
+    },
+    {
+      "file": "evidence-p1.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "739a00379912da6e1f177b11cf4747b2c74c22b1c07e823b91c499ceb43744f4"
+    },
+    {
+      "file": "evidence-p2-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "be6b7c4d0e3a97d0a96113fcbaf00c39952b5ec693f5e8a476ba4b7df5158aa6"
+    },
+    {
+      "file": "evidence-p2.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "41cba711fe204969fb2b05fe36a12a9658f3c4ad0d75df732032e11474a107aa"
+    },
+    {
+      "file": "evidence-p3-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "4ac06be26e3bed986f82e3c692ddfb943072a2b0b0ea76cd10602806ee794213"
+    },
+    {
+      "file": "evidence-p3.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "67a2c9dce9ee0fbdae621ffa80e289127c1ba4e60f07f1ecc761480f20a1bd16"
+    },
+    {
+      "file": "evidence-p4-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "83b359db9f842ee9bf7d73e1dab38f93202d98a5850c719c8cdfc19cfddd604b"
+    },
+    {
+      "file": "evidence-p4.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "c58144b6741ebf335d0ce6b4e9b5155f135aafa9e4934d8442f083c1b842a91e"
+    },
+    {
+      "file": "evidence-s1-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "44b49f1f99f01cd8801ba0e1fd27e6205096d0ea2cd4fb579c397b020bfa3e13"
+    },
+    {
+      "file": "evidence-s1.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "85aeb4cfe86817bf9a2c8ad6849df399990aca02f152cebd7149c82d18204371"
+    },
+    {
+      "file": "evidence-t1-light.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "aa3de8ae98e3734d36db845f341638742bce23dd417948cdb928b4f4beb9f555"
+    },
+    {
+      "file": "evidence-t1.png",
+      "width": 1080,
+      "height": 2535,
+      "sha256": "59d66d0e2de9dd75f6ef380ee531de99790aa7dfd296cc48e331ac4dc0617df1"
+    },
+    {
+      "file": "primary-mobile-review-board.png",
+      "width": 1060,
+      "height": 12173,
+      "sha256": "14ffd05e064fde841aa2d90e2790b132c8b3555ff0658b6ec4b7b788670c642b"
+    }
+  ],
+  "primaryComposite": "screens/primary-mobile-review-board.png",
+  "pass": true
+}
