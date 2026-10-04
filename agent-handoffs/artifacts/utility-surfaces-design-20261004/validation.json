@@ -1,0 +1,96 @@
+{
+  "authority": {
+    "prompt": "960f83f4900ae6b12d5192f010054547eae36d9e",
+    "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "build": 85
+  },
+  "generatedAt": "2026-10-04T06:28:56.861Z",
+  "boards": {
+    "watch-dark": {
+      "expectedScreens": 17,
+      "actualScreens": 17,
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "pageWidth": 1560,
+      "viewportWidth": 1560,
+      "cardsWithOverflow": [],
+      "cardsWithoutProduct": [],
+      "cardsWithEscapedStage": [],
+      "pass": true
+    },
+    "watch-light": {
+      "expectedScreens": 17,
+      "actualScreens": 17,
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "pageWidth": 1560,
+      "viewportWidth": 1560,
+      "cardsWithOverflow": [],
+      "cardsWithoutProduct": [],
+      "cardsWithEscapedStage": [],
+      "pass": true
+    },
+    "live-dark": {
+      "expectedScreens": 9,
+      "actualScreens": 9,
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "pageWidth": 1560,
+      "viewportWidth": 1560,
+      "cardsWithOverflow": [],
+      "cardsWithoutProduct": [],
+      "cardsWithEscapedStage": [],
+      "pass": true
+    },
+    "live-light": {
+      "expectedScreens": 9,
+      "actualScreens": 9,
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "pageWidth": 1560,
+      "viewportWidth": 1560,
+      "cardsWithOverflow": [],
+      "cardsWithoutProduct": [],
+      "cardsWithEscapedStage": [],
+      "pass": true
+    },
+    "logger-dark": {
+      "expectedScreens": 19,
+      "actualScreens": 19,
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "pageWidth": 1560,
+      "viewportWidth": 1560,
+      "cardsWithOverflow": [],
+      "cardsWithoutProduct": [],
+      "cardsWithEscapedStage": [],
+      "pass": true
+    },
+    "logger-light": {
+      "expectedScreens": 19,
+      "actualScreens": 19,
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "pageWidth": 1560,
+      "viewportWidth": 1560,
+      "cardsWithOverflow": [],
+      "cardsWithoutProduct": [],
+      "cardsWithEscapedStage": [],
+      "pass": true
+    }
+  },
+  "rules": {
+    "shippingCodeChanged": false,
+    "phoneLoggerInventedTimer": false,
+    "phoneLoggerInventedPauseControl": false,
+    "phoneLoggerInventedWatchActiveBanner": false,
+    "liveActivityInventedMutationError": false
+  },
+  "pass": true
+}

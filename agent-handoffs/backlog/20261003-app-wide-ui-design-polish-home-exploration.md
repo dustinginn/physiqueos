@@ -258,3 +258,31 @@ Review set:
 - `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/PARITY-PROOF.md`
 
 Do not mark the Weekly/Midweek appearance pair locked until the Founder accepts these renders. No shipping UI, Server behavior, Recovery activation, theme implementation, build or TestFlight work occurred.
+
+## Utility surfaces — Apple Watch, Live Activity, and Training Logger
+
+Status: **Dark + mineral-light translations in Founder review; not locked; implementation not started**
+
+The complete Build 85 utility-surface inventory has been translated into the selected PhysiqueOS visual language without changing workflow, authority, HealthKit, ActivityKit, Watch gesture, Finish/Cancel, evidence, or reconciliation semantics.
+
+- Apple Watch utility-surface translation: **in review**
+- Live Activity / Dynamic Island translation: **in review**
+- Training Logger full-flow translation: **in review**
+- Shipping implementation: **not started**
+
+Review set:
+
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/README.md`
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/watch-coverage-board.png`
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/watch-coverage-board-light.png`
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/live-coverage-board.png`
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/live-coverage-board-light.png`
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/logger-coverage-board.png`
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/logger-coverage-board-light.png`
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/COVERAGE-MATRIX.md`
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/UTILITY-TOKENS.md`
+- `agent-handoffs/artifacts/utility-surfaces-design-20261004/IMPLEMENTATION-NOTES.md`
+
+All materially distinct templates are rendered, and every current state maps explicitly to a representative visual template or Apple-owned system surface. Yellow source-gap labels identify existing presentation limitations rather than inventing behavior. The mineral-light Watch and Live Activity boards are review translations, not an implementation commitment against platform constraints.
+
+Do not mark any of the three utility families locked until Founder review. No shipping Native source, Server behavior, workout contract, build, or TestFlight state changed.
