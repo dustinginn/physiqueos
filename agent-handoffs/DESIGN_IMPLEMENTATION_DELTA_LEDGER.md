@@ -98,6 +98,28 @@ Open each Progress Photos/DEXA stage through an exact occurrence route. The cano
 
 Status: OPEN.
 
+### Operating Plan DEXA appointment — Founder Production destination is unavailable
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION / LIKELY SHIPPING DEFECT
+
+Discovery:
+Final Operating Plan source audit after Supplements, including every current Native Build 85 route.
+Report: `agent-handoffs/reports/20261004T201405Z-operating-plan-finish-remaining.md`
+
+Current Build 85 behavior:
+`AppDestination.operatingPlanDexaAppointment` routes to `OperatingPlanDexaAppointmentView`. The screen has a complete detail/editor only in Sandbox. Under Founder Production it always renders: “Manage your production DEXA schedule in Coaching Updates, where Progress Photos and DEXA are saved together.” The separately tracked Priority Detail gap publishes `View DEXA Appointment` for the DEXA occurrence, so merely adding the missing href mapping would currently lead Founder Production into a terminal unavailable screen.
+
+Accepted/required target:
+The DEXA Priority action must reach a usable production schedule experience backed by the same canonical DEXA state already edited atomically inside Coaching Updates. Do not create a second DEXA record, independent write boundary or conflicting reminder owner.
+
+Implementation implication:
+Either route the action to the existing production Coaching Updates editor with the DEXA section focused, or add a bounded standalone Founder Production read/write that delegates to the same canonical composite ownership and concurrency fences. Preserve the current DEXA fields, future-date validation, reminders, upload reminder, preparation note and event-briefing semantics.
+
+Acceptance:
+From an exact DEXA priority occurrence, tap `View DEXA Appointment`. A usable production DEXA schedule opens immediately; changing it persists once to the canonical shared state, reads back identically in Coaching Updates, preserves all concurrency checks and never creates a second appointment/reminder record. The Sandbox flow remains unchanged.
+
+Status: OPEN.
+
 ### Photo Briefing — paired Previous/Current comparison viewer
 
 Classification: REQUIRED FOR DESIGN IMPLEMENTATION
