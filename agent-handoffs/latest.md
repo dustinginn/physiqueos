@@ -2,28 +2,26 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: DEXA, Progress Photos + Timeline Evidence UI style translation
+- Task: Operating Plan Edit Strategy verification
 - Agent: Codex
-- Status: remaining Evidence family ready for Founder review; implementation not started
-- Generated (UTC): 2026-10-04T18:46:16Z
-- Work branch: `codex/dexa-photos-timeline-evidence-design`
-- Work/report commit: `3cd351107d42e221e12a68eea53396f3b526e429`
-- Artifact commit: `f7d72f19bdabadc6cafb53354812e0e86fca353f`
-- Main report commit before pointer update: `a0b56ec62d11149641b4c3c82894a27d8251c33d`
-- Artifact root: `agent-handoffs/artifacts/dexa-photos-timeline-evidence-style-translation-20261004/`
-- Primary mobile review PNG: `agent-handoffs/artifacts/dexa-photos-timeline-evidence-style-translation-20261004/screens/primary-mobile-review-board.png`
-- Concise review page: `agent-handoffs/artifacts/dexa-photos-timeline-evidence-style-translation-20261004/comparison-board.html`
+- Status: actual edit flows ready for Founder review; implementation not started
+- Generated (UTC): 2026-10-04T19:13:53Z
+- Work branch: `codex/operating-plan-edit-strategy-verification`
+- Work/report commit: `ef3cbe941d2f01b7c4fe622adabdb13991f7fc70`
+- Artifact commit: `be04cfa82efd9c5d38208427d3ca6f18ce150d03`
+- Main report commit before pointer update: `ef3cbe941d2f01b7c4fe622adabdb13991f7fc70`
+- Artifact root: `agent-handoffs/artifacts/operating-plan-edit-strategy-verification-20261004/`
+- Primary mobile review PNG: `agent-handoffs/artifacts/operating-plan-edit-strategy-verification-20261004/screens/operating-plan-edit-mobile-review.png`
+- Concise review page: `agent-handoffs/artifacts/operating-plan-edit-strategy-verification-20261004/comparison-board.html`
 
-The Evidence Hub now shows only real current streams in the target design, with Recovery before Timeline and Timeline last. Health Metrics and all Coming Soon/future-placeholder UI are absent.
+Energy is intentionally read-only in production and exposes no Edit Strategy action. Nutrition and Training are rendered in dark and mineral light from the exact Build 85 editor contracts, including field order, current values, conditional controls, validation, Cancel/Save behavior, server-owned effective date, Goal ownership and successor-version history semantics.
 
-DEXA preserves its actual single-page report/history hierarchy, exact metric families, inline disclosures, BodySpec PDF and Health reconciliation states. Progress Photos preserves its actual root, inline Show All history, set detail, pose comparison, current one-image inspection viewer and authenticated-media states. Timeline remains a bounded, newest-first, read-only server-authored record with no invented filters, coaching or row destinations.
+The representative Training rejection proves the production generic error state. Successful changed and unchanged saves both dismiss directly to the accepted strategy detail, so no fictional success screen was added. The existing Energy phase-history projection delta remains open; no new implementation gap was found.
 
-The review package includes ten direct templates in both dark and mineral light, four zero-gap coverage matrices, a mobile-friendly primary composite and deterministic validation. Build 85 proves both historical Progress Photos issues are resolved; the canonical ledger now records those resolutions plus the genuine Hub implementation requirement.
+No shipping Native/Server source, production mutation, build, deployment or release state changed.
 
-No shipping Native/Server source, production data, build, deployment or release state changed.
+Next: Founder reviews and confirms the actual Nutrition and Training editors; Energy remains read-only.
 
-Next: Founder reviews and confirms the remaining Evidence family.
-
-Detailed report: `agent-handoffs/reports/20261004T193501Z-dexa-photos-timeline-evidence-ui-style-translation.md`
+Detailed report: `agent-handoffs/reports/20261004T201500Z-operating-plan-edit-strategy-verification.md`
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
