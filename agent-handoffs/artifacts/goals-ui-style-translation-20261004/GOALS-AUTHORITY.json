@@ -1,0 +1,56 @@
+{
+  "authority": {
+    "prompt": "31e8f9ce413b674ff8f3cfc77794209c88f34cfd",
+    "nativeBuild85": "b8ee8690b194cb90086f6f62816b9a2c8c400dc026",
+    "productionServer": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+  },
+  "activeGoal": {
+    "title": "Build Lean Mass",
+    "status": "Active Goal",
+    "destination": "Build 10 lb of lean mass by October 31, 2026",
+    "confidence": "79% · Moderate",
+    "confidenceThesis": "You are more than halfway to the 10 lb lean-mass goal. The build plan is clearly working. There is enough time to finish ahead of schedule if this level of progress continues.",
+    "confidenceProvenance": "As of the Sep 23 Midweek Briefing",
+    "phases": [
+      {"order": 1, "name": "Establish Maintenance", "status": "Completed", "dates": "Started Jul 19 · Completed", "progress": 100},
+      {"order": 2, "name": "Lean Mass Build", "status": "Active", "dates": "Started Aug 15 · Monthly DEXA", "progress": 58}
+    ],
+    "phasePurpose": "Build meaningful lean mass from the newly established maintenance baseline while protecting body composition.",
+    "composition": [
+      {"label": "Lean Mass", "baseline": "147.5 lb", "latest": "153.3 lb", "change": "+5.8 lb"},
+      {"label": "Fat Mass", "baseline": "12.8 lb", "latest": "14.2 lb", "change": "+1.4 lb"},
+      {"label": "Body Fat", "baseline": "7.7%", "latest": "8.1%", "change": "+0.4 pts"},
+      {"label": "Weight", "baseline": "167.4 lb", "latest": "174.7 lb", "change": "+7.3 lb"}
+    ],
+    "progress": {"percent": 58, "remaining": "4.2 lb to go", "cadence": "Measured by monthly DEXA"},
+    "guardrail": {"title": "Maintain approximately 8–9% body fat", "state": "8.1% · Within range", "interpretation": "Inside the range, so the guardrail is not limiting the build."},
+    "training": {"eyebrow": "Since Aug 15 · 38 training days", "summary": "15 of 23 comparable movements are improving, led by lower body, upper body and arms. Single-Leg Leg Press is down.", "highlights": ["Leg Press High And Narrow Feet · +67.2%", "Leg Extensions · +50.0%", "Hack Squats · +48.1%"]},
+    "turningPoints": [
+      {"date": "Jul 18", "title": "Goal baseline DEXA", "body": "The starting point every later scan is measured against."},
+      {"date": "Aug 15", "title": "Establish Maintenance completed · Lean Mass Build began", "body": "Establish Maintenance was completed and Lean Mass Build began. The Aug 15 DEXA showed +0.8 lb of lean mass from the baseline."},
+      {"date": "Sep 12", "title": "Past halfway to the lean-mass target", "body": "Lean mass rose 5.0 lb in the month since the Aug 15 scan, and body fat moved into the guardrail range."}
+    ],
+    "coach": {"attribution": "Sep 23 Midweek Briefing · Coach's Take", "whatToDo": "Keep executing consistently. Keep the current setup in place.", "whatToWatch": "Treat the calorie estimate as directional: calorie totals come from logged meals rather than a confirmed full-day total, active calories are a wearable estimate, and food and activity were both recorded on 2 of 3 days. Keep calorie targets where they are unless something more than the estimate calls for a change. The next DEXA will show whether this kind of progress continues while body fat stays in a good place."}
+  },
+  "completedGoal": {
+    "title": "Visible Abs at Rest",
+    "status": "Completed",
+    "dates": "May 24 → Jul 18",
+    "achievement": "7.7% Body Fat",
+    "recap": "This journey began with a clear finish line: reveal visible abdominal definition without sacrificing the muscle built before the cut. Across eight deliberate weeks, body fat moved from 13.6% to 7.7%, the waist and midsection became substantially leaner, and training continued to protect the shape underneath. The final DEXA and relaxed photos told the same story—the goal had reached its intended conclusion.",
+    "highlights": [
+      {"date": "May 24", "title": "The measured starting point", "body": "13.6% body fat established the journey baseline."},
+      {"date": "Jun 20", "title": "Definition became measurable", "body": "DEXA reached 10.7% body fat as upper-ab definition and waist separation became increasingly visible."},
+      {"date": "Jul 18", "title": "The finish line aligned", "body": "The final DEXA reached 7.7% body fat and the relaxed photo confirmed visible abdominal definition at rest."},
+      {"date": "Jul 18", "title": "Lean mass largely preserved", "body": "The journey finished with 147.5 lb of measured lean mass—within the established preservation tolerance."}
+    ],
+    "photos": [
+      {"role": "Beginning", "date": "May 24", "binding": "authenticated production mediaId"},
+      {"role": "Completion", "date": "Jul 18", "binding": "qualified front-relaxed completion mediaId"}
+    ],
+    "finalComposition": {"date": "Jul 18", "bodyFat": "7.7%", "leanMass": "147.5 lb", "fatMass": "12.8 lb", "weight": "167.4 lb"},
+    "finalNarrative": "This scan represents the successful conclusion of the cut because the numerical target and the final visual confirmation converged: fat mass fell meaningfully, abdominal definition was visible at rest, and measured lean mass remained within the journey’s preservation tolerance.",
+    "achievedBy": ["Body fat reduced from 13.6% to 7.7%.", "Lean mass largely preserved through the cut.", "Nutrition consistency maintained through the finish.", "Training performance remained strong enough to protect muscularity."],
+    "unlocked": "Reaching 7.7% body fat while largely preserving lean mass created an excellent foundation for the next Build Lean Mass journey."
+  }
+}

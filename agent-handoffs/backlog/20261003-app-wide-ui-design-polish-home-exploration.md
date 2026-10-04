@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home, Log, Weekly and Midweek design directions locked; Monthly dark/mineral-light exploration ready for Founder review**
+Status: **Home, Log, Weekly, Midweek, Monthly, DEXA and Photo locked; Goals hierarchy ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -358,4 +358,33 @@ Review set:
 - `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/VIEWER-FEASIBILITY.md`
 - `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/PARITY-PROOF.md`
 
-No DEXA/Photo design is newly marked accepted by this confirmation pass. No shipping Native UI, Server behavior, production photo binding, production content projection, build or TestFlight state changed.
+Founder subsequently accepted and locked DEXA and Photo in both appearances. The paired simultaneous comparison viewer with synchronized zoom/pan remains required implementation behavior. No shipping Native UI, Server behavior, production photo binding, production content projection, build or TestFlight state changed.
+
+## Goals hierarchy style translation
+
+Status: **ready for Founder review; Goals is not locked**
+
+One locked-family direction covers the complete current Founder Production Goals hierarchy in dark and mineral light:
+
+- Goals root with active Build Lean Mass, completed Visible Abs and read-only Add Goal;
+- active Build Lean Mass exact current-state order/content;
+- Your Journey with Phase 1/Phase 2 progress;
+- persistent cross-phase Guardrail, explicitly not a timeline milestone;
+- active Phase 2 and materially distinct completed Phase 1 detail;
+- completed Visible Abs journey, outcome, DEXA, evidence and authenticated first/final photo roles;
+- representative loading, error, empty/read-only and unavailable states.
+
+The source audit records three current Build 85 boundaries: historical completed phases lack rich phase content in the production adapter; supporting-objective detail is not resolvable by the production adapter; and completed-Goal `ProgressPhotoTile` loads authenticated pixels but has no expansion interaction. The design does not fabricate missing phase copy, supporting routes or media bindings.
+
+Review set:
+
+- `agent-handoffs/artifacts/goals-ui-style-translation-20261004/README.md`
+- `agent-handoffs/artifacts/goals-ui-style-translation-20261004/comparison-board.html`
+- `agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/goals-root-dark-light.png`
+- `agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/active-goal-dark-light.png`
+- `agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/phase-details.png`
+- `agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/completed-goal-dark-light.png`
+- `agent-handoffs/artifacts/goals-ui-style-translation-20261004/COVERAGE-MATRIX.md`
+- `agent-handoffs/artifacts/goals-ui-style-translation-20261004/SOURCE-AUDIT.md`
+
+No shipping Native or Server source, production content projection, media binding, build or TestFlight state changed.

@@ -1,0 +1,98 @@
+{
+  "pass": true,
+  "authority": {
+    "prompt": "31e8f9ce413b674ff8f3cfc77794209c88f34cfd",
+    "nativeBuild85": "b8ee8690b194cb90086f6f62816b9a2c8c400dc026",
+    "productionServer": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+  },
+  "surfaces": [
+    "root",
+    "active",
+    "phase-current",
+    "phase-completed",
+    "completed",
+    "journey",
+    "photos",
+    "relationship",
+    "states"
+  ],
+  "screenCount": 18,
+  "darkLightContentParity": true,
+  "active": {
+    "missing": [],
+    "sectionOrder": [
+      "hero",
+      "your-journey",
+      "body-composition",
+      "training-progress",
+      "evidence-turning-points",
+      "coachs-take"
+    ]
+  },
+  "completed": {
+    "missing": [],
+    "photos": [
+      "Beginning front relaxed photo, May 24",
+      "Completion front relaxed photo, Jul 18"
+    ]
+  },
+  "guardrail": {
+    "distinctFromTimeline": true,
+    "notPhase3": true
+  },
+  "states": [
+    "loading",
+    "error",
+    "empty",
+    "unavailable"
+  ],
+  "media": {
+    "pixelsInHarness": "redacted",
+    "productionBindings": "authenticated mediaId",
+    "tilesExpandable": false
+  },
+  "productionGaps": {
+    "completedPhaseRichContent": "not supplied by current Native production adapter",
+    "supportingGoalDetail": "unreachable from current Founder Production adapter",
+    "photoTileExpansion": "not implemented by ProgressPhotoTile"
+  },
+  "shippingChanges": false,
+  "files": {
+    "root": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/root-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/root-light.png"
+    },
+    "active": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/active-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/active-light.png"
+    },
+    "phase-current": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/phase-current-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/phase-current-light.png"
+    },
+    "phase-completed": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/phase-completed-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/phase-completed-light.png"
+    },
+    "completed": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/completed-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/completed-light.png"
+    },
+    "journey": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/journey-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/journey-light.png"
+    },
+    "photos": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/photos-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/photos-light.png"
+    },
+    "relationship": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/relationship-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/relationship-light.png"
+    },
+    "states": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/states-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/goals-ui-style-translation-20261004/screens/states-light.png"
+    }
+  }
+}

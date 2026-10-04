@@ -140,7 +140,7 @@ FUTURE MAJOR PROJECTS (roadmap only — NOT started; do not implement without a 
 
 F1. App-wide UI/design polish
 Position: design exploration active; shipping implementation not started.
-Current state: Home is locked in dark/mineral light. Weekly and Midweek dark/mineral-light briefing designs are locked, including the accepted richer selective mineral-light fields. Log Compact Command Center is locked in dark/mineral light at realistic density, with centralized Sources collapsed by default at the true bottom of Log content. Monthly dark/mineral-light translation is ready for Founder review and is not locked. Recovery remains graph-driven, future-only and uncoupled from Confidence. No implementation has started. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
+Current state: Home, Log Compact Command Center, Weekly, Midweek, Monthly, DEXA and Photo are design-direction locked in dark/mineral light under their accepted corrections. Nutrition and Activity are accepted as good in their separate lane. Goals hierarchy translation is ready for Founder review in dark/mineral light and remains unlocked. Recovery remains graph-driven, future-only and uncoupled from Confidence. Photo's simultaneous paired comparison viewer with synchronized zoom/pan remains required implementation work. No implementation has started. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
 Scope boundary: no Native implementation, Server behavior, production content projection, Recovery activation, build or TestFlight work is authorized by the exploration.
 
 Recurring Briefing implementation backlog, not started:
@@ -150,8 +150,16 @@ Recurring Briefing implementation backlog, not started:
 - Recovery: graph-driven Sleep treatment is required for Midweek, Weekly and Monthly after graduation; Midweek uses Sun–Tue points, Weekly Sun–Sat points, Monthly weekly aggregates. No DEXA/Photo Recovery V1.
 - Midweek: guarantee canonical Biggest Takeaway in the presentation contract and preserve shorter-horizon restraint.
 - Midweek Weight: use the shared Weekly metric/delta/context typography hierarchy.
-- Monthly: corrected dark/mineral-light translation is ready to lock pending Founder confirmation at `agent-handoffs/artifacts/monthly-correction-dexa-photo-briefing-ui-20261004/`; future implementation must remove redundant rendered Goal/Phase tags and move unchanged Strategic Summary after What Changed, before Month Ahead.
-- DEXA + Photo event briefings: focused dark/mineral-light confirmation is ready for Founder review at `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/`. DEXA restores 17/17 field-specific unit rows and the complete production Goal/Phase body-composition breakdown. Photo preserves the exact five-section, five-pose, five-comparison production-shaped flow with filler pixels only. Build 85's single-photo viewer is confirmed to support zoom/pan/aspect-fit, but paired comparisons still page one image at a time; a simultaneous side-by-side viewer with synchronized zoom/pan is a future implementation gap. Preserve Photo's no-Confidence presentation and no Recovery in either event surface.
+- Monthly: locked in dark/mineral light at `agent-handoffs/artifacts/monthly-correction-dexa-photo-briefing-ui-20261004/`; future implementation must remove redundant rendered Goal/Phase tags and move unchanged Strategic Summary after What Changed, before Month Ahead.
+- DEXA + Photo event briefings: locked in dark/mineral light at `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/`. DEXA preserves 17/17 field-specific unit rows and the complete production Goal/Phase body-composition breakdown. Photo preserves the exact five-section, five-pose, five-comparison production flow. Build 85's single-photo viewer supports zoom/pan/aspect-fit, but paired comparisons still page one image at a time; a simultaneous side-by-side viewer with synchronized zoom/pan is required implementation work. Preserve Photo's no-Confidence presentation and no Recovery in either event surface.
+
+Goals hierarchy review state:
+- one locked-family style translation covers Goals root, active Build Lean Mass, Your Journey, active/completed phase detail, persistent Guardrail, completed Visible Abs, first/final photo requirement and representative loading/error/empty/unavailable states;
+- dark/mineral-light content parity and canonical active/completed content are validator-checked;
+- completed historical phase detail receives only the chronology fields currently supplied by the production adapter; no strategy/success copy is fabricated;
+- completed Goal photo pixels are redacted in the harness, while the authenticated first/final `mediaId` binding requirement is preserved;
+- Goals remains pending Founder review and is not locked;
+- review root: `agent-handoffs/artifacts/goals-ui-style-translation-20261004/`.
 
 Final appearance-translation review state:
 - Founder accepted the dark Weekly/Midweek family and required one order correction: Weekly Body Composition now sits directly under Weight, matching Midweek.
