@@ -2,24 +2,23 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Nutrition + Activity Evidence UI style translation
+- Task: DEXA + Photo Event Founder-flow confirmation
 - Agent: Codex
-- Status: complete review package; Founder review next; implementation not started
-- Generated (UTC): 2026-10-04T16:25:00Z
-- Work branch: `codex/nutrition-activity-evidence-design`
-- Work/report commit: `8de163506d6e996328e60d510199562cdeb8dffb`
-- Artifact commit: `33ea64910c505cdf068909181c5317dadf6a0d5a`
-- Main report commit before pointer update: `3fdf1eb2c76afd22e2875fef109063b4066d06d0`
-- Artifact root: `agent-handoffs/artifacts/nutrition-activity-evidence-style-translation-20261004/`
+- Status: review ready; implementation not started
+- Generated (UTC): 2026-10-04T16:52:09Z
+- Work branch: `codex/dexa-photo-founder-flow-confirmation-main`
+- Artifact/backlog commit: `7e8d9f0fc8dd4717eca5985834cc635a2fc4f20e`
+- Main report commit before pointer update: `e49c97e6f53ce843fcbfdad5364903f47124c01b`
+- Artifact root: `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/`
 
-Nutrition and Activity were audited independently against exact Build 85 Native authority. The branch carries 8 Nutrition and 7 Activity direct templates in dark and mineral light, complete coverage matrices, source audits, navigation trees, individual full-resolution renders, and automated parity/semantic validation with zero uncovered states.
+The accepted event-briefing style is unchanged. DEXA now restores all canonical field-specific units across 17 rows and the complete production Goal/Phase body-composition breakdown. Photo now shows the exact production-shaped five-section flow, five session poses and five matched comparisons in dark and mineral light using clearly marked neutral filler pixels only.
 
-Nutrition keeps canonical day aggregation and non-additive provenance. Activity keeps the exact eight-metric day model and gains no invented reporting/chart/workout classifier. Cooldown remains non-Cardio; Run and Stair Stepper retain canonical Cardio identity.
+Build 85’s shared viewer already provides single-image full-screen inspection, pinch zoom, pan, double-tap zoom, aspect fit, paging and reset. It does not show both matched comparison images simultaneously. A dedicated side-by-side comparison viewer with synchronized zoom/pan is the recommended future target; it was designed and audited here but not implemented.
 
-Training Evidence is now explicitly locked with all 10 canonical Training Areas shown in exact production order/counts; no bucketing, merging, prioritization, pagination, or hiding.
+No shipping Native code, Server behavior, production photo binding, DEXA data, build number or TestFlight state changed.
 
-Next: Founder reviews the concise comparison page/screenshots. Shipping implementation remains unauthorized and has not started.
+Next: Founder reviews the focused correction/confirmation boards and confirms DEXA and Photo. Shipping implementation remains unauthorized.
 
-Detailed report: `agent-handoffs/reports/20261004T162500Z-nutrition-activity-evidence-ui-style-translation.md`
+Detailed report: `agent-handoffs/reports/20261004T164725Z-dexa-photo-founder-flow-confirmation.md`
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
