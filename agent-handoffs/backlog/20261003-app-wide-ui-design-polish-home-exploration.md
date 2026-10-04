@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home exploration in Founder review**
+Status: **Home + Log direction locked; Weekly Briefing exploration in Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -75,4 +75,31 @@ Review set:
 - `agent-handoffs/artifacts/selected-home-log-exploration-20261004/SOURCE-AUDIT.md`
 - `agent-handoffs/artifacts/selected-home-log-exploration-20261004/CONTENT-PARITY.md`
 
-No Home correction, Log architecture, palette, appearance implementation or component migration is accepted. Weekly Briefing remains a later exploration and has not started. The next gate is Founder review of the corrected Home pair and six full-resolution Log screens.
+This prior gate is now superseded by the Founder decisions below.
+
+## Locked Home + Log; Weekly Briefing exploration
+
+Status: **Weekly Briefing exploration ready for Founder review**
+
+Founder design-direction decisions now recorded:
+
+- Home is locked in dark and mineral-light appearance to the corrected immersive reference pair.
+- Log is locked to Compact Command Center, the middle option, in dark and mineral-light appearance.
+- These are design-direction locks only. Shipping implementation has not started.
+
+Weekly Briefing now has three independent dark/mineral-light compositions for review:
+
+- Structured Editorial;
+- Executive Brief;
+- Coaching Story.
+
+Review set:
+
+- `agent-handoffs/artifacts/weekly-briefing-exploration-20261004/README.md`
+- `agent-handoffs/artifacts/weekly-briefing-exploration-20261004/comparison-board.html`
+- `agent-handoffs/artifacts/weekly-briefing-exploration-20261004/SOURCE-AUDIT.md`
+- `agent-handoffs/artifacts/weekly-briefing-exploration-20261004/CONTENT-PARITY.md`
+
+Recovery is a required first-class recurring section in the future Weekly visual contract. It remains absent from the current production Weekly projection, strategically ineligible and uncoupled from Goal Confidence. Recovery values in this review set are explicitly synthetic fixture-only examples for layout evaluation; no Recovery activation is implied.
+
+No Weekly composition is accepted. No shipping Native source, Server behavior, production projection, Recovery strategy, palette migration, build or TestFlight state changed. The next gate is Founder review of the six complete Weekly renders.

@@ -1,0 +1,130 @@
+{
+  "authority": {
+    "promptSHA": "2e3b6f274e08db66aae270f240a4e89a2ce3417c",
+    "nativeSHA": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "serverProjection": "canonical_narrative_v3",
+    "sourceWindow": "real Sep 20–26 zero-write V3 preview from accepted production-data pipeline"
+  },
+  "briefing": {
+    "cadence": "Weekly",
+    "period": "Sep 20–26",
+    "periodLabel": "Completed week",
+    "goal": "Build Lean Mass",
+    "phase": "Lean Mass Build",
+    "recommendation": "Continue current strategy",
+    "headline": "Strong training week, but a quiet finish.",
+    "result": "The performance gains are real; the part to protect is the end of the week, where the routine has slipped before.",
+    "meaning": "Training kept moving forward, with new bests on seven lifts, but the routine slipped late in the week. The September 12 DEXA showed lean mass up 5 lb with body fat at 8.1%; the scale alone can't say how much of any recent gain is lean mass, and the next DEXA will.",
+    "action": "Get the usual training rhythm back this week.",
+    "watch": "Watch the weekly weight average and whether Friday and Saturday get their usual training back.",
+    "coachTake": "Keep pushing the same lifts; Hack Squats went from 6 to 12 reps at 115 lb. Your weight has been rising about 1.7 lb a week over the last four weeks, in the direction the goal wants. Thursday through Saturday's food logs were too patchy to read; complete logs from here on will make the next check clearer."
+  },
+  "confidence": {
+    "score": 79,
+    "priorScore": 79,
+    "delta": 0,
+    "movementDirection": "held",
+    "movementLabel": "No meaningful change",
+    "presentationLabel": "Confidence",
+    "explanation": "Confidence holds. The September 12 DEXA still sets the outlook, and a short break in routine isn't enough to change it.",
+    "why": "You are more than halfway to the 10 lb lean-mass goal. The measured progress in lean mass is real. There is enough time to finish ahead of schedule if this level of progress continues.",
+    "increased": [
+      "You added 5.0 lb of lean mass since August 15.",
+      "Body fat stayed controlled at 8.1%."
+    ],
+    "supports": [
+      "4.2 lb remain with 49 days left.",
+      "Active calories averaged 789 kcal/day, 11 kcal/day below the 800 kcal/day target (wearable estimate read from screenshots).",
+      "Calorie intake averaged 2639 kcal/day, 139 kcal/day above the 2500 kcal/day target."
+    ],
+    "limiting": [
+      "One excellent response does not guarantee the same result until the next DEXA."
+    ],
+    "couldRaise": [
+      "Consistent execution can strengthen confidence before the next DEXA.",
+      "The next DEXA showing that the progress continues.",
+      "Reaching the goal."
+    ],
+    "couldLower": [
+      "Meaningful missed work or persistent departures from the plan.",
+      "Body fat moving outside the intended range of 8–9%.",
+      "Training performance materially declining.",
+      "Progress stalling or a new result contradicting the current outlook.",
+      "Falling far enough behind that there is no longer enough time to finish the goal."
+    ],
+    "nextDecisiveEvidence": "Watch the weekly weight average and whether Friday and Saturday get their usual training back.",
+    "assumptions": [
+      "The outlook depends on appropriate continued execution.",
+      "The forecast uses a reduced recent rate, not an assumption that the latest result repeats exactly.",
+      "Consistent execution supports the outlook, but any progress since the last outcome check is still unconfirmed.",
+      "This is a coaching outlook, not a measured statistical probability."
+    ],
+    "unresolvedUncertainty": "None surfaced in the canonical confidence projection."
+  },
+  "domains": {
+    "training": {
+      "status": "Progressing",
+      "headline": "Seven new lift bests",
+      "detail": "Hack Squats moved from 6 to 12 reps at 115 lb.",
+      "watch": "The routine slipped late in the week; protect Friday and Saturday."
+    },
+    "energyActivity": {
+      "status": "Partly readable",
+      "intake": "2639 kcal/day",
+      "intakeContext": "+139 vs 2500 kcal target",
+      "activity": "789 active kcal/day",
+      "activityContext": "11 below 800 kcal target",
+      "limitation": "Thursday through Saturday's food logs were too patchy to read."
+    },
+    "weight": {
+      "status": "Moving with the goal",
+      "trend": "+1.7 lb/week",
+      "window": "Four-week rate",
+      "caveat": "The scale alone cannot distinguish recent lean-mass gain."
+    },
+    "bodyComposition": {
+      "status": "Guardrail clear",
+      "scanDate": "Sep 12 DEXA",
+      "leanMass": "+5.0 lb since Aug 15",
+      "bodyFat": "8.1%",
+      "goalRemaining": "4.2 lb remain",
+      "interpretation": "The measured lean-mass progress is real; the next DEXA is the decisive outcome check."
+    },
+    "photos": {
+      "status": "Unavailable this window",
+      "detail": "No visual-change evidence was selected for this briefing."
+    },
+    "uncertainty": {
+      "status": "Coverage limitation",
+      "detail": "Nutrition coverage was too patchy Thursday through Saturday to support a full-week read."
+    }
+  },
+  "recoveryFutureFixture": {
+    "fixtureOnly": true,
+    "productionStatus": "Recovery is not present in the current production Weekly projection.",
+    "contract": "recovery_briefing_v1 design preview",
+    "status": "Green — supporting the plan",
+    "sleepDuration": "7h 24m average",
+    "consistency": "5 of 6 observed nights within 45 min of the usual sleep window",
+    "continuity": "No sustained decline across the closed week",
+    "baseline": "+8 min vs prior 28-night personal baseline",
+    "stageContext": "No stage-level callout selected for the weekly synthesis",
+    "trainingRelationship": "Training output held while sleep remained near baseline. Association only; causality not inferred.",
+    "change": "Stable vs baseline",
+    "meaning": "Recovery is supporting the current plan, and this fixture does not suggest changing the strategy.",
+    "action": "Keep the usual sleep window through the next training week.",
+    "coverage": "6 of 7 nights observed · completed week through Sep 26",
+    "freshness": "Closed completed-week window",
+    "provenance": "Synthetic design fixture for the planned Recovery contract",
+    "caveat": "One night is missing. This preview is not production data and is not part of Goal Confidence.",
+    "confidenceCoupling": "none",
+    "strategicEligible": false
+  },
+  "provenance": {
+    "presentationModel": "canonical_narrative_v3",
+    "evidenceCutoff": "Sep 26",
+    "coverage": "Completed week · Sep 20–26",
+    "currentRecoveryProjection": "Unavailable",
+    "navigation": ["Home", "Briefing History"]
+  }
+}

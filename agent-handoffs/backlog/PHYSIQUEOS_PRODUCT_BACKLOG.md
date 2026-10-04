@@ -139,8 +139,9 @@ Next:
 FUTURE MAJOR PROJECTS (roadmap only — NOT started; do not implement without a separate Founder-authorized prompt)
 
 F1. App-wide UI/design polish
-Position: next major maturity project after the Apple Watch daily-driver is accepted.
-Scope placeholder: consistent PhysiqueOS design language across Native surfaces (spacing, typography, control patterns, empty/loading states, settings/editor consistency), informed by the accumulated small polish requests. Not started; no audit or implementation authorized yet.
+Position: design exploration active; shipping implementation not started.
+Current state: Home direction locked in dark/mineral light; Log Compact Command Center direction locked in dark/mineral light; Weekly Briefing has three dark/mineral-light compositions ready for Founder review. Recovery is represented only as a clearly bounded future-contract design fixture and is not strategically active. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
+Scope boundary: no Native implementation, Server behavior, production content projection, Recovery activation, build or TestFlight work is authorized by the exploration.
 
 F2. Briefing Narrative + Confidence quality/tuning audit
 Position: next major strategic-quality project.

@@ -1,0 +1,101 @@
+{
+  "authority": {
+    "promptSHA": "2e3b6f274e08db66aae270f240a4e89a2ce3417c",
+    "nativeSHA": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "serverProjection": "canonical_narrative_v3",
+    "sourceWindow": "real Sep 20–26 zero-write V3 preview from accepted production-data pipeline"
+  },
+  "target": {
+    "widthPoints": 402,
+    "scale": 3,
+    "safeAreaMode": "iPhone Dynamic Island, 51 pt simulated top status region"
+  },
+  "variants": {
+    "editorial-dark": {
+      "widthPoints": 402,
+      "heightPoints": 4065,
+      "semanticFields": 89,
+      "expectedFields": 89,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "confidenceGeometry": [
+        "79"
+      ],
+      "recoveryFixtureBoundaryVisible": true,
+      "bodySize": 13,
+      "pass": true
+    },
+    "editorial-light": {
+      "widthPoints": 402,
+      "heightPoints": 4065,
+      "semanticFields": 89,
+      "expectedFields": 89,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "confidenceGeometry": [
+        "79"
+      ],
+      "recoveryFixtureBoundaryVisible": true,
+      "bodySize": 13,
+      "pass": true
+    },
+    "executive-dark": {
+      "widthPoints": 402,
+      "heightPoints": 3715,
+      "semanticFields": 89,
+      "expectedFields": 89,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "confidenceGeometry": [
+        "79"
+      ],
+      "recoveryFixtureBoundaryVisible": true,
+      "bodySize": 13,
+      "pass": true
+    },
+    "executive-light": {
+      "widthPoints": 402,
+      "heightPoints": 3715,
+      "semanticFields": 89,
+      "expectedFields": 89,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "confidenceGeometry": [
+        "79"
+      ],
+      "recoveryFixtureBoundaryVisible": true,
+      "bodySize": 13,
+      "pass": true
+    },
+    "coaching-dark": {
+      "widthPoints": 402,
+      "heightPoints": 4114,
+      "semanticFields": 89,
+      "expectedFields": 89,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "confidenceGeometry": [],
+      "recoveryFixtureBoundaryVisible": true,
+      "bodySize": 13,
+      "pass": true
+    },
+    "coaching-light": {
+      "widthPoints": 402,
+      "heightPoints": 4114,
+      "semanticFields": 89,
+      "expectedFields": 89,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "confidenceGeometry": [],
+      "recoveryFixtureBoundaryVisible": true,
+      "bodySize": 13,
+      "pass": true
+    }
+  }
+}
