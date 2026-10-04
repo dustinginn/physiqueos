@@ -404,18 +404,46 @@ describe("confirmed HealthKit workout presentation", () => {
   });
 });
 
-describe("HK telemetry presentation for an unconfirmed Logger session (September 24)", () => {
-  it("resolves the sole same-day Strength workout as an unconfirmed candidate, with real HK telemetry -- never the Logger's frozen 94-minute duration", () => {
+describe("Logger presentation changes only for a CONFIRMED link (2026-10-04 correction)", () => {
+  function workoutDetailService(fixture, logger) {
+    return createTrainingNavigationReadService({
+      readCanonicalExerciseRegistry: async () => [],
+      store: {
+        run: (_name, callback) => callback(),
+        getCanonicalEvidenceObject: async (id) => id === logger.canonicalId ? logger : null,
+        listHealthKitCanonicalWorkouts: async () => fixture.canonicalWorkouts,
+        listHealthKitWorkoutLinks: async () => fixture.workoutLinks,
+        listHealthKitWorkoutLinkClaims: async () => fixture.workoutLinkClaims,
+      },
+    });
+  }
+
+  function snapshot(fixture) {
+    return structuredClone({
+      canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
+      canonicalWorkouts: fixture.canonicalWorkouts,
+      workoutLinks: fixture.workoutLinks,
+      workoutLinkClaims: fixture.workoutLinkClaims,
+    });
+  }
+
+  function asUnconfirmed(fixture, status) {
+    const link = fixture.workoutLinks[0];
+    link.status = status;
+    link.statusHistory = [link.statusHistory[0], ...(status === "unlinked"
+      ? [{ status: "unlinked", at: link.updatedAt, by: { kind: "founder", ref: "no_match" } }]
+      : [])];
+    if (status === "candidate") link.updatedAt = link.createdAt;
+    fixture.workoutLinkClaims = [];
+    return fixture;
+  }
+
+  it("a possible_match with no link row leaves the Logger's own timing on every presentation surface", async () => {
     const fixture = createSep24StrengthPresentationFixture();
+    const before = snapshot(fixture);
     const strengthWorkout = fixture.canonicalWorkouts.find((workout) => workout.id === fixture.ids.strengthWorkout);
 
-    // The audited stored state: no confirmed (or even candidate) link record
-    // exists yet for this pair.
-    expect(fixture.workoutLinks).toEqual([]);
-    expect(indexConfirmedHealthKitWorkoutAttachments(fixture).size).toBe(0);
-
-    // The deterministic matcher, called directly, reproduces the audited
-    // "live re-assessment": possible_match at 60% confidence.
+    // The matcher still finds the pair (reviews are unaffected) ...
     const assessment = assessHealthKitStrengthLinkCandidates({
       canonicalWorkout: strengthWorkout,
       canonicalObjects: fixture.canonicalEvidenceObjects,
@@ -425,122 +453,93 @@ describe("HK telemetry presentation for an unconfirmed Logger session (September
     expect(assessment.outcome).toBe(HealthKitStrengthMatchOutcome.POSSIBLE);
     expect(assessment.candidates[0]).toMatchObject({ confidence: 60, loggerSessionCanonicalId: fixture.ids.session });
 
-    const presentation = projectHealthKitStrengthWorkoutPresentationBySession(fixture);
-    expect(presentation.get(fixture.ids.session)).toMatchObject({
-      canonicalWorkoutId: fixture.ids.strengthWorkout,
-      family: "strength",
-      relationship: { status: "candidate", matchOutcome: "possible_match", confidence: 60 },
-      session: {
-        startedAt: "2026-09-24T18:22:10.000Z",
-        endedAt: "2026-09-24T18:50:09.000Z",
-        durationSeconds: 1679,
-        activeCalories: 206.205,
-        averageHeartRate: 120.14,
-      },
-    });
+    // ... but nothing unconfirmed changes how the Logger session is presented.
+    expect(projectHealthKitStrengthWorkoutPresentationBySession(fixture).has(fixture.ids.session)).toBe(false);
 
-    // This is presentation-only: it never created, confirmed, or altered any
-    // healthKitWorkoutLinks row, and the Logger session's own frozen evidence
-    // is untouched.
-    expect(fixture.workoutLinks).toEqual([]);
+    const report = createProviderActivityEvidenceReport(fixture);
+    const entry = report.linkedTrainingContext.find((item) => item.id === fixture.ids.session);
+    expect(entry.healthKitPresentation).toBeUndefined();
+    expect(entry.sourceEvidence).not.toContain("Apple Health");
+    expect(entry.detail).toContain("2026-09-24T11:22:10-07:00 · 1h 34m");
+    expect(entry.detail).not.toContain("28 min");
+    expect(report.latestActivityDay.workoutEnergyAttribution.confirmedHealthKitWorkoutCount).toBe(0);
+
     const logger = fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session);
-    expect(logger.payload.metadata.duration_seconds).toBe(5647);
-    expect(logger.payload.metadata.end_time).toBeUndefined();
+    const session = await workoutDetailService(fixture, logger).getSession({ sessionId: fixture.ids.session });
+    expect(session.healthKitAttachment).toBeUndefined();
+    expect(session.exercises).toEqual(before.canonicalEvidenceObjects
+      .find((record) => record.canonicalId === fixture.ids.session).payload.exercises);
+    expect(session.telemetry?.startTime).not.toBe("2026-09-24T18:22:10.000Z");
+    expect(session.telemetry?.durationSeconds).not.toBe(1679);
+
+    expect(snapshot(fixture)).toEqual(before);
   });
 
-  it("leaves the confirmed September 23 case byte-identical to the confirmed-only projection", () => {
-    const fixture = createSep23StrengthPresentationFixture();
-    const confirmedOnly = projectConfirmedHealthKitWorkoutAttachments(fixture);
-    const presentation = projectHealthKitStrengthWorkoutPresentationBySession(fixture);
-    expect(presentation.get(fixture.ids.session)).toEqual(confirmedOnly[0]);
-    expect(presentation.get(fixture.ids.session).relationship.status).toBe("confirmed");
+  it("a pending candidate link row (awaiting the Founder) never changes the Logger presentation", async () => {
+    const fixture = asUnconfirmed(createSep23StrengthPresentationFixture(), "candidate");
+    const before = snapshot(fixture);
+    expect(projectHealthKitStrengthWorkoutPresentationBySession(fixture).size).toBe(0);
+    const logger = fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session);
+    const session = await workoutDetailService(fixture, logger).getSession({ sessionId: fixture.ids.session });
+    expect(session.healthKitAttachment).toBeUndefined();
+    expect(session.telemetry?.startTime).not.toBe("2026-09-23T17:00:00.000Z");
+    const entry = createProviderActivityEvidenceReport(fixture).linkedTrainingContext
+      .find((item) => item.id === fixture.ids.session);
+    expect(entry.healthKitPresentation).toBeUndefined();
+    expect(snapshot(fixture)).toEqual(before);
   });
 
-  it("falls back to the Logger's own timing when no plausible HK candidate exists at all", () => {
+  it("a Founder No match (unlinked) never changes the Logger presentation", async () => {
+    const fixture = asUnconfirmed(createSep23StrengthPresentationFixture(), "unlinked");
+    const before = snapshot(fixture);
+    expect(projectHealthKitStrengthWorkoutPresentationBySession(fixture).size).toBe(0);
+    const logger = fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session);
+    const session = await workoutDetailService(fixture, logger).getSession({ sessionId: fixture.ids.session });
+    expect(session.healthKitAttachment).toBeUndefined();
+    const entry = createProviderActivityEvidenceReport(fixture).linkedTrainingContext
+      .find((item) => item.id === fixture.ids.session);
+    expect(entry.healthKitPresentation).toBeUndefined();
+    expect(entry.sourceEvidence).not.toContain("Apple Health");
+    expect(snapshot(fixture)).toEqual(before);
+  });
+
+  it("no Apple workout at all keeps the Logger's own timing", () => {
     const fixture = createSep24StrengthPresentationFixture();
     fixture.canonicalWorkouts = [];
-    const presentation = projectHealthKitStrengthWorkoutPresentationBySession(fixture);
-    expect(presentation.has(fixture.ids.session)).toBe(false);
+    expect(projectHealthKitStrengthWorkoutPresentationBySession(fixture).has(fixture.ids.session)).toBe(false);
   });
 
-  it("never selects a non-Strength workout (Indoor Walk) as the Strength Logger session's presentation candidate", () => {
+  it("never presents a non-Strength workout (Indoor Walk) on a Strength Logger session", () => {
     const fixture = createSep24StrengthPresentationFixture();
-    // Remove the real Strength workout; keep only the two Indoor Walk
-    // workouts, one of which (`walkAfter`) sits entirely inside the Logger
-    // session's own synthetic window and would otherwise look temporally
-    // plausible.
-    const walkAfter = fixture.canonicalWorkouts.find((workout) => workout.id === fixture.ids.walkAfter);
     fixture.canonicalWorkouts = fixture.canonicalWorkouts.filter((workout) => workout.id !== fixture.ids.strengthWorkout);
+    expect(projectHealthKitStrengthWorkoutPresentationBySession(fixture).has(fixture.ids.session)).toBe(false);
+  });
 
-    const assessment = assessHealthKitStrengthLinkCandidates({
-      canonicalWorkout: walkAfter,
-      canonicalObjects: fixture.canonicalEvidenceObjects,
-      existingLinks: fixture.workoutLinks,
-      canonicalWorkouts: fixture.canonicalWorkouts,
-    });
-    expect(assessment.outcome).toBe(HealthKitStrengthMatchOutcome.NONE);
-    expect(assessment.reason).toBe("not_a_strength_workout");
-
+  it("a confirmed link is exactly the confirmed-only projection, with confirmed telemetry intact", async () => {
+    const fixture = createSep23StrengthPresentationFixture();
+    const before = snapshot(fixture);
+    const confirmedOnly = projectConfirmedHealthKitWorkoutAttachments(fixture);
     const presentation = projectHealthKitStrengthWorkoutPresentationBySession(fixture);
-    expect(presentation.has(fixture.ids.session)).toBe(false);
-  });
+    expect([...presentation.values()]).toEqual(confirmedOnly);
+    expect(presentation.get(fixture.ids.session).relationship.status).toBe("confirmed");
 
-  it("presents the corrected HK telemetry on the Activity-Linked-Training-Context list without changing energy attribution", () => {
-    const fixture = createSep24StrengthPresentationFixture();
-    const report = createProviderActivityEvidenceReport(fixture);
-    const day = report.latestActivityDay;
-
-    // Unconfirmed: accounting must not count this workout's energy, and the
-    // confidence/eligibility machinery is untouched by this presentation fix.
-    expect(day.workoutEnergyAttribution.confirmedHealthKitWorkoutCount).toBe(0);
-    // "Linked Workouts" counts the day's workouts as Training Day does: the
-    // unconfirmed Strength session and the two eligible Cardio walks.
-    expect(day.linkedTrainingSessionCount).toBe(3);
-    expect(day.linkedWorkoutCount).toBe(3);
-
-    const entry = report.linkedTrainingContext.find((item) => item.id === fixture.ids.session);
-    expect(entry).toMatchObject({
-      value: "206 active cal",
-      sourceEvidence: ["Workout Logger", "Apple Health"],
-      healthKitPresentation: { status: "candidate", matchOutcome: "possible_match", confidence: 60 },
-    });
-    expect(entry.detail).toContain("28 min");
-    expect(entry.detail).not.toContain("94 min");
-  });
-
-  it("attaches the unconfirmed candidate's real Apple telemetry to Workout Detail, keeping the two Logger exercises attached and correct", async () => {
-    const fixture = createSep24StrengthPresentationFixture();
     const logger = fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session);
-    const exercisesBefore = structuredClone(logger.payload.exercises);
-    const service = createTrainingNavigationReadService({
-      readCanonicalExerciseRegistry: async () => [],
-      store: {
-        run: (_name, callback) => callback(),
-        getCanonicalEvidenceObject: async (id) => id === fixture.ids.session ? logger : null,
-        listHealthKitCanonicalWorkouts: async () => fixture.canonicalWorkouts,
-        listHealthKitWorkoutLinks: async () => fixture.workoutLinks,
-        listHealthKitWorkoutLinkClaims: async () => fixture.workoutLinkClaims,
-      },
-    });
-    const session = await service.getSession({ sessionId: fixture.ids.session });
-
-    expect(session.id).toBe(fixture.ids.session);
-    expect(session.exercises).toEqual(exercisesBefore);
-    expect(session.exercises).toHaveLength(2);
+    const session = await workoutDetailService(fixture, logger).getSession({ sessionId: fixture.ids.session });
     expect(session.healthKitAttachment).toMatchObject({
-      relationship: { status: "candidate", matchOutcome: "possible_match", confidence: 60 },
-      source: { application: "Apple Health", sourceName: "Apple Watch" },
-      session: { activeCalories: 206.205, durationSeconds: 1679, averageHeartRate: 120.14 },
+      relationship: { status: "confirmed" },
+      session: { activeCalories: 410, durationSeconds: 3600, averageHeartRate: 122 },
     });
-    // The Workout-Detail telemetry block itself must show the real ~28-minute
-    // HK window, never the Logger's own frozen 94-minute synthetic one.
+    // The existing confirmed-link contract presents the Apple workout's own
+    // window (here 17:00-18:00Z vs the Logger's 17:01Z start) as the session
+    // telemetry; sets/exercises stay the Logger's. Recorded so a late-started
+    // Apple workout's window is a visible product decision, not an accident.
     expect(session.telemetry).toMatchObject({
-      startTime: "2026-09-24T18:22:10.000Z",
-      endTime: "2026-09-24T18:50:09.000Z",
-      durationSeconds: 1679,
+      startTime: "2026-09-23T17:00:00.000Z",
+      endTime: "2026-09-23T18:00:00.000Z",
+      durationSeconds: 3600,
     });
-    expect(logger.payload.exercises).toEqual(exercisesBefore);
-    expect(logger.payload.metadata.duration_seconds).toBe(5647);
+    expect(session.exercises).toEqual(logger.payload.exercises);
+    expect(snapshot(fixture)).toEqual(before);
   });
 });
 

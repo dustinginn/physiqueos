@@ -272,26 +272,25 @@ describe("Item 12: the Sep 23 confirmed Strength detail is healthy and unchanged
   });
 });
 
-describe("Item 13: the Sep 24 candidate Strength detail (Server side of decode/render)", () => {
-  it("serves the candidate relationship and the real ~28-minute Apple window, byte-identical to production 01d1900b", async () => {
+describe("Item 13: the Sep 24 unconfirmed Strength detail (Server side of decode/render)", () => {
+  // 2026-10-04 correction: an unconfirmed (possible_match) Apple workout no
+  // longer replaces the Logger session's own presentation; only a confirmed
+  // link may. This supersedes the 01d1900b candidate-presentation contract.
+  it("serves the Logger-owned detail with no candidate attachment and no Apple window", async () => {
     const fixture = createSep24StrengthPresentationFixture();
     const detail = await strengthDetail(fixture);
-    const wire = JSON.stringify(detail);
-    expect(wire.length).toBe(2464);
-    expect(sha256(wire)).toBe("2fa149d44ca3991b12953fa554b4422619180036c81e7637fa0706297cc2ab61");
-    expect(sha256([...projectHealthKitStrengthWorkoutPresentationBySession(fixture).entries()]))
-      .toBe("4edb986f0b9ef35e958fd51d2dc35a5722099e2a04c5760e3edd47c4ab33c64a");
-    expect(Object.keys(detail.healthKitAttachment).sort()).toEqual(ATTACHMENT_KEYS);
-    expect(detail.healthKitAttachment.relationship).toEqual({
-      status: "candidate", matchOutcome: "possible_match", confidence: 60,
-      contentAuthority: { trainingContent: "workout_logger", telemetry: "healthkit" },
-    });
-    expect(detail.healthKitAttachment.session).toMatchObject({ durationSeconds: 1679, activeCalories: 206.205, averageHeartRate: 120.14 });
-    expect(detail.telemetry).toMatchObject({ startTime: "2026-09-24T18:22:10.000Z", endTime: "2026-09-24T18:50:09.000Z", durationSeconds: 1679 });
+    expect(projectHealthKitStrengthWorkoutPresentationBySession(fixture).size).toBe(0);
+    expect(detail.healthKitAttachment).toBeUndefined();
+    expect(JSON.stringify(detail)).not.toContain("2026-09-24T18:22:10.000Z");
+    expect(detail.telemetry?.durationSeconds).not.toBe(1679);
+    expect(detail.sourceEvidence ?? []).not.toContain("Apple Health");
   });
 
   it("is JSON-safe on the wire: no undefined, NaN, Date or function survives, so a strict decoder sees only JSON values", async () => {
-    const detail = await strengthDetail(createSep24StrengthPresentationFixture());
+    const unconfirmed = await strengthDetail(createSep24StrengthPresentationFixture());
+    expect(JSON.parse(JSON.stringify(unconfirmed))).toEqual(unconfirmed);
+    const detail = await strengthDetail(createSep23StrengthPresentationFixture());
+    expect(Object.keys(detail.healthKitAttachment).sort()).toEqual(ATTACHMENT_KEYS);
     expect(JSON.parse(JSON.stringify(detail))).toEqual(detail);
     const visit = (value, where) => {
       if (value === null) return;

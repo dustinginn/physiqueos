@@ -7,9 +7,7 @@ import {
 import {
   HEALTHKIT_WORKOUT_LINK_SCHEMA_VERSION,
   HEALTHKIT_WORKOUT_MATCHER_VERSION,
-  HealthKitStrengthMatchOutcome,
   HealthKitWorkoutLinkStatus,
-  assessHealthKitStrengthLinkCandidates,
   getHealthKitWorkoutLinkRecordId,
   isTrustedNativeLiveLoggerSession,
 } from "./HealthKitWorkoutLinkService.js";
@@ -96,25 +94,18 @@ export function indexConfirmedHealthKitWorkoutAttachments(input = {}) {
 }
 
 /**
- * Presentation-only HK telemetry resolution for a Logger Strength session,
- * independent of whether any relationship is CONFIRMED. This never creates,
- * confirms, or influences a `healthKitWorkoutLinks` row -- it only decides
- * which canonical HK workout's telemetry (if any) a Training / Workout-Detail
- * / Activity-Linked-Training-Context view is allowed to display for a given
- * Logger session, so that view never has to fall back to the Logger's own
- * frozen/synthetic timing when real Apple Health telemetry exists for the
- * same physical workout.
+ * Presentation-only HK telemetry resolution for a Logger Strength session:
+ * the one authority every Training / Workout-Detail / Activity-Linked-
+ * Training-Context / Logged Today view reads.
  *
- * A CONFIRMED attachment always wins and is passed through unchanged. Absent
- * one, this reuses the same deterministic, Server-owned matcher already used
- * to create link candidates (`assessHealthKitStrengthLinkCandidates`) and
- * only resolves a session when that matcher names it as the single
- * confident-or-possible winner for some same-day canonical HK Strength
- * workout. A non-Strength workout can never be resolved this way: the
- * matcher itself, and the canonical-workout presentability check reused
- * here, both require `family === "strength"`. An ambiguous match, or no
- * match at all, resolves to nothing -- callers must fall back to the
- * Logger's own (possibly synthetic) timing rather than inventing a winner.
+ * Only a CONFIRMED relationship may change how a Logger session is
+ * presented (2026-10-04 Founder correction). A candidate, a possible or
+ * confident matcher result, a Founder "No match" (unlinked) relationship, or
+ * no relationship at all leaves the structured Logger session's own canonical
+ * start/end/duration/energy presentation untouched -- an unconfirmed Apple
+ * workout (for example one started late by hand) can never replace it. This
+ * never creates, confirms, or alters a `healthKitWorkoutLinks` row, the
+ * Logger session, or its sets/exercises.
  */
 export function projectHealthKitStrengthWorkoutPresentationBySession({
   canonicalEvidenceObjects = [],
@@ -122,87 +113,12 @@ export function projectHealthKitStrengthWorkoutPresentationBySession({
   workoutLinks = [],
   workoutLinkClaims = [],
 } = {}) {
-  const confirmed = indexConfirmedHealthKitWorkoutAttachments({
+  return Object.freeze(indexConfirmedHealthKitWorkoutAttachments({
     canonicalEvidenceObjects,
     canonicalWorkouts,
     workoutLinks,
     workoutLinkClaims,
-  });
-  const activeStrengthSessions = canonicalEvidenceObjects
-    .filter(isActiveCanonicalEvidenceObject)
-    .filter(isActiveDetailedStrengthSession)
-    .filter((record) => isTrustedNativeLiveLoggerSession(record.payload ?? record));
-  const presentableWorkouts = canonicalWorkouts.filter(isPresentableCanonicalWorkout);
-
-  const result = new Map();
-  for (const record of activeStrengthSessions) {
-    const sessionId = String(record.canonicalId ?? (record.payload ?? record).id ?? "");
-    if (!sessionId) continue;
-    if (confirmed.has(sessionId)) {
-      result.set(sessionId, confirmed.get(sessionId));
-      continue;
-    }
-    const payload = record.payload ?? record;
-    const localDate = String(payload.observed_at ?? "").slice(0, 10);
-    let best = null;
-    for (const workout of presentableWorkouts) {
-      if (workout.localDate !== localDate) continue;
-      const assessment = assessHealthKitStrengthLinkCandidates({
-        canonicalWorkout: workout,
-        canonicalObjects: canonicalEvidenceObjects,
-        existingLinks: workoutLinks,
-        canonicalWorkouts,
-      });
-      if (![HealthKitStrengthMatchOutcome.CONFIDENT, HealthKitStrengthMatchOutcome.POSSIBLE].includes(assessment.outcome)) continue;
-      const [top] = assessment.candidates;
-      if (!top || top.loggerSessionCanonicalId !== sessionId) continue;
-      if (!best || top.confidence > best.candidate.confidence) {
-        best = { workout, assessment, candidate: top };
-      }
-    }
-    if (!best) continue;
-    result.set(sessionId, buildCandidateHealthKitWorkoutPresentation({
-      workout: best.workout,
-      sessionId,
-      assessment: best.assessment,
-      candidate: best.candidate,
-    }));
-  }
-  return Object.freeze(result);
-}
-
-function buildCandidateHealthKitWorkoutPresentation({ workout, sessionId, assessment, candidate }) {
-  const current = workout.current;
-  return Object.freeze({
-    canonicalWorkoutId: workout.id,
-    loggerSessionCanonicalId: sessionId,
-    family: current.family,
-    canonicalType: current.canonicalType,
-    relationship: Object.freeze({
-      status: "candidate",
-      matchOutcome: assessment.outcome,
-      confidence: candidate.confidence,
-      contentAuthority: Object.freeze({
-        trainingContent: "workout_logger",
-        telemetry: "healthkit",
-      }),
-    }),
-    source: Object.freeze({
-      application: "Apple Health",
-      sourceName: current.source?.sourceName ?? "Apple Health",
-      productType: current.source?.productType ?? null,
-    }),
-    session: Object.freeze({
-      startedAt: current.startedAt ?? null,
-      endedAt: current.endedAt ?? null,
-      durationSeconds: finiteOrNull(current.telemetry?.durationSeconds),
-      activeCalories: finiteOrNull(current.telemetry?.activeCalories),
-      totalCalories: finiteOrNull(current.telemetry?.totalCalories),
-      distance: finiteOrNull(current.telemetry?.distance),
-      distanceUnit: current.telemetry?.distanceUnit ?? null,
-      averageHeartRate: finiteOrNull(current.telemetry?.averageHeartRate),
-    }),
-  });
+  }));
 }
 
 function isPresentableCanonicalWorkout(workout) {
@@ -270,10 +186,9 @@ function isPresentableCanonicalWorkoutOfFamily(workout, family) {
  * Eligibility (a deliberate, documented product decision -- see the Part E
  * report for full reasoning):
  *  - Strength: CONFIRMED link only, reusing
- *    `projectConfirmedHealthKitWorkoutAttachments` unchanged. An unconfirmed
- *    candidate is real enough to *show* (Part B), but not confident enough to
- *    count in a Founder-facing whole-day calorie number -- Strength has an
- *    explicit confirm/deny step for exactly this reason.
+ *    `projectConfirmedHealthKitWorkoutAttachments` unchanged. Strength has an
+ *    explicit confirm/deny step for exactly this reason (and, since the
+ *    2026-10-04 correction, an unconfirmed candidate is not shown either).
  *  - Cardio: every canonicalized Cardio workout, confirmed or not. Cardio
  *    structurally has no Logger session and no confirm/deny step at all (see
  *    `HealthKitWorkoutLinkService.js`'s cardio-coexistence branch) --

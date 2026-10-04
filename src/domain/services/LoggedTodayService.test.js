@@ -158,7 +158,7 @@ describe("LoggedTodayService", () => {
     expect(row.summary).toBe("Strength Training · 94 min");
   });
 
-  it("end to end: getSummary corrects the audited September 24 Log row from the real resolver, not a stub", async () => {
+  it("end to end: an unconfirmed September 24 Apple candidate never overrides the Logger's own Log row (real resolver, not a stub)", async () => {
     const fixture = createSep24StrengthPresentationFixture();
     const list = vi.fn(async () => fixture.canonicalEvidenceObjects);
     const repositories = {
@@ -179,10 +179,10 @@ describe("LoggedTodayService", () => {
 
     // Strength and the day's two canonical walks, one line per modality.
     expect(result.rows[0]).toMatchObject({
-      summary: "Strength Training · 28 min, 2 Walks · 33 min",
+      summary: "Strength Training · 94 min, 2 Walks · 33 min",
       recordId: fixture.ids.session,
       lines: [
-        { kind: "logger", summary: "Strength Training · 28 min", recordId: fixture.ids.session },
+        { kind: "logger", summary: "Strength Training · 94 min", recordId: fixture.ids.session },
         { kind: "cardio", summary: "2 Walks · 33 min", recordId: null },
       ],
     });
