@@ -2,23 +2,33 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Global System / Dark / Mineral Light appearance infrastructure
-- Agent: Codex A
-- Status: Implemented on isolated branch; Release-compiled; ready for integration and Founder physical validation
-- Generated (UTC): 2026-10-04T22:42:39Z
-- Prompt authority: `af844a6ae61ffd3a3b897dbd297856e2ebaeb6ff`
-- Work branch: `codex/global-appearance-infrastructure-20261004`
-- Work head: `d5359e33845cba20a212dade24c25e94f02aee6e`
-- Main report commit: `7ca8517b860ce39f70808e5ccb534b329c9c73a9`
-- Report: `agent-handoffs/reports/20261004T224239Z-global-appearance-infrastructure.md`
-- Artifact root: `agent-handoffs/artifacts/20261004-global-appearance/`
-- Comparison: `agent-handoffs/artifacts/20261004-global-appearance/comparison-board.html`
-- Ownership matrix: `agent-handoffs/artifacts/20261004-global-appearance/appearance-ownership-matrix.md`
+- Task: Build 86 candidate — Watch HealthKit for phone-started workouts, Watch latency, Foam Rolling pilot
+- Agent: Claude (existing Remote Control lane)
+- Status: Candidate implemented, tested and Release-compiled; NOT uploaded; awaiting Founder/ChatGPT review
+- Generated (UTC): 2026-10-04T23:21:05Z
+- Prompt authority: `80c5fd558ff83f91eafad568616388909067cdcf`
+- Native branch: `claude/native-watch-healthkit-build86-20261004`
+- Native head (Build 86 candidate): `4f78fce663fb16c3cc6930b3b8e576a328defcbe`
+- Base: Foam Rolling pilot `b65deb00` on Build 85 `b8ee8690`
+- Main report commit: `1fd9bfa4aaed1eb64ca1211871e1f96e38ab39d8`
+- Report: `agent-handoffs/reports/20261004T232105Z-build86-watch-healthkit-candidate.md`
 
-System/Dark/Light infrastructure, device-local persistence, dynamic locked token pairs, narrow You → Settings → Appearance routing and WidgetKit-owned dark/Mineral behavior are implemented without Server or canonical-content changes. Twenty-two full-resolution simulator captures cover System-resolved and explicit appearances across representative real surfaces. Release compilation passes across the iPhone app, Watch app and extension graph.
+A phone-started structured workout now establishes exactly one Watch HealthKit workout automatically when the PhysiqueOS Watch app is open. The start is reported to the phone so the finish saves it once. The trusted-correlation boundary is unchanged.
 
-Claude's clean Watch/HealthKit authority is `claude/native-watch-healthkit-build86-20261004` at `d43ad7cd2cb18e230b44d2654a999e5f304fc586`. Integrate Claude first, then appearance commits `3ceb9a80` and `d5359e33`; the shared-base merge simulation is conflict-free and no Watch/HealthKit file overlaps.
+The Watch reports Health status truthfully: HEALTH ON only while recording, otherwise NOT RECORDING TO HEALTH, with explicit Retry. Read-only refreshes no longer disable Complete Set. A latency trace was added; the immediate phone→Watch push is deferred until on-device measurement.
 
-Next: integrate on the next-build candidate, rerun combined focused/Release gates, then complete the physical-device checklist. Do not upload TestFlight from this checkpoint.
+The Foam Rolling pilot is integrated unchanged, plus a generator pin fix.
+
+Today's late Apple strength workout appeared as the predicted 55% Pending Review. "Use Logger session 1" is legitimate; a Server presentation defect (timing display) is recorded in the ledger.
+
+Tests:
+- Watch unit: 47/47.
+- iOS unit: 1,998 with 1 pre-existing Peptide failure (fails identically at base).
+- Foam Rolling UI: 2/2.
+- Watch UI: 6/7, with 1 pre-existing fixture failure (fails identically at base).
+
+Release device build `1.0 (86)` succeeded unsigned.
+
+Next: Founder/ChatGPT review. Decide whether to integrate the parallel global-appearance branch (`d5359e33`) first, which this prompt excluded. Then authorize the guarded Build 86 upload and run physical-device acceptance. No TestFlight upload was performed.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
