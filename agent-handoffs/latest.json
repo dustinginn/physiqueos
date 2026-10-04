@@ -1,49 +1,55 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-04T19:46:08Z",
+  "generated_at_utc": "2026-10-04T19:49:46Z",
   "task": {
-    "id": "20261004-operating-plan-next-three-domains-ui-style-translation",
-    "title": "Operating Plan domains 4–6 UI style translation",
+    "id": "20261004-you-settings-profile-ui-design",
+    "title": "DEXA Evidence lock and You / Settings / Profile UI design",
     "agent": "codex",
-    "status": "recovery_peptides_supplements_ready_for_founder_review"
+    "status": "settings_family_ready_for_founder_review"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "abe3ae1de0f9ee98d01617788d9a4fe96c06c74a",
+    "prompt_commit": "ce0141a53e140fe9b0854d6a4df01d6a5dbae434",
     "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
     "native_build": 85,
-    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
-    "locked_operating_plan_artifact_commit": "89d05249f90cb65da5941d08d987eba50bfb18ce"
+    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024"
   },
   "publication": {
-    "source_work_branch": "codex/operating-plan-next-three-domains",
-    "source_work_commit": "9603235d3f34c032939ff68fe5191360de5cff2f",
-    "artifact_commit": "acafbd377db3b2cc71a26fd121a73841fdc02820",
-    "report_commit": "05bcafee64ea2422285701d206ac083f9b0576f5",
-    "report_path": "agent-handoffs/reports/20261004T194408Z-operating-plan-next-three-domains-ui-style-translation.md",
-    "artifact_root": "agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/",
-    "primary_review_png": "agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/boards/operating-plan-next-three-mobile-review.png",
-    "recovery_review_png": "agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/boards/recovery-review.png",
-    "peptides_review_png": "agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/boards/peptides-review.png",
-    "peptide_actions_review_png": "agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/boards/peptide-actions-review.png",
-    "supplements_review_png": "agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/boards/supplements-review.png",
-    "review_page": "agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/comparison-board.html"
+    "source_work_branch": "codex/you-settings-profile-ui-design",
+    "source_work_commit": "908d9d8dd32f94cc193d0862a30b071323d69e17",
+    "artifact_commit": "f208007cc7e1872d718efea372e6938f75b1a9aa",
+    "main_report_commit": "d4c379cd7134fb69a6e2949054799dcf6eb237fa",
+    "main_ledger_commit": "0e102bff957add7ef7b7045dd42b8d916794ae2a",
+    "report_path": "agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md",
+    "artifact_root": "agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/",
+    "primary_review_png": "agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/screens/you-settings-primary-mobile-review-board.png",
+    "review_page": "agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/review-board.html",
+    "architecture_summary_png": "agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/screens/beta-readiness-architecture-summary.png"
   },
   "result": {
-    "summary": "The exact next Server-ordered domains after Training are Recovery, Peptides and Supplements; their complete current Native families are translated into the locked PhysiqueOS system in dark and mineral light.",
-    "exact_root_order_verified": true,
-    "next_three_after_training": ["Recovery", "Peptides", "Supplements"],
-    "material_surfaces": 17,
-    "dark_light_product_renders": 34,
-    "dark_light_content_parity": true,
-    "minimum_tap_target_points": 44,
-    "new_implementation_delta_found": false,
+    "summary": "The final DEXA Since Prior Scan correction is complete and the entire Evidence family is locked. You, Settings, Profile, Data Sources, Apple Health states and Appearance now have one source-audited dark/Mineral-Light target with beta-readiness deltas documented.",
+    "evidence_family_locked": true,
+    "settings_family_pending_founder_review": true,
+    "direct_templates": 8,
+    "dark_light_product_renders": 16,
+    "profile_included_fields": [
+      "preferred_name",
+      "height",
+      "time_zone",
+      "weight_units"
+    ],
+    "appearance_modes": [
+      "system",
+      "dark",
+      "light_mineral"
+    ],
+    "new_required_implementation_deltas": 5,
     "shipping_code_changed": false,
-    "server_behavior_changed": false,
+    "dark_light_parity_pass": true,
     "validation_pass": true
   },
-  "recommended_next_step": "Founder reviews the primary/focused boards and confirms or corrects Recovery, Peptides and Supplements.",
-  "stop_reason": "All three exact domains, current subpages/actions, dark/mineral renders, focused boards and parity proof are complete.",
+  "recommended_next_step": "Founder reviews the primary composite and confirms or corrects the You / Settings family before implementation planning.",
+  "stop_reason": "All requested screens and material states are rendered or mapped, dark/Mineral-Light parity is validated, the final Evidence correction is locked, and implementation/beta gaps are published on main.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

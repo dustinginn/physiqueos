@@ -2,26 +2,31 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Operating Plan domains 4–6 UI style translation
+- Task: DEXA Evidence lock and You / Settings / Profile UI design
 - Agent: Codex
-- Status: Recovery, Peptides and Supplements ready for Founder review; implementation not started
-- Generated (UTC): 2026-10-04T19:46:08Z
-- Work branch: `codex/operating-plan-next-three-domains`
-- Work integration commit: `9603235d3f34c032939ff68fe5191360de5cff2f`
-- Report commit: `05bcafee64ea2422285701d206ac083f9b0576f5`
-- Artifact commit: `acafbd377db3b2cc71a26fd121a73841fdc02820`
-- Artifact root: `agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/`
-- Primary review PNG: `agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/boards/operating-plan-next-three-mobile-review.png`
-- Comparison page: `agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/comparison-board.html`
+- Status: Settings family ready for Founder review; implementation not started
+- Generated (UTC): 2026-10-04T19:49:46Z
+- Work branch: `codex/you-settings-profile-ui-design`
+- Work/report commit: `908d9d8dd32f94cc193d0862a30b071323d69e17`
+- Artifact commit: `f208007cc7e1872d718efea372e6938f75b1a9aa`
+- Main report commit: `d4c379cd7134fb69a6e2949054799dcf6eb237fa`
+- Main ledger commit before pointer update: `0e102bff957add7ef7b7045dd42b8d916794ae2a`
+- Report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
+- Artifact root: `agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/`
+- Primary review PNG: `agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/screens/you-settings-primary-mobile-review-board.png`
+- Review page: `agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/review-board.html`
+- Architecture summary: `agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/screens/beta-readiness-architecture-summary.png`
 
-The current Server order was audited directly. The next three domains after locked Training are Recovery, Peptides and Supplements. Their complete current Native families are covered in 17 materially distinct surfaces and 34 dark/mineral full-resolution renders, including schedule/timing editors, peptide focused sheets and lifecycle, Advanced/history disclosure, supplement Support and strategy create/edit.
+The final DEXA Since Prior Scan correction now matches production structure and the entire Evidence design family is locked.
 
-Validation passed for exact next-three order, dark/light text parity, required content/actions, 402 pt width and 44 pt controls. The implementation-delta ledger was reviewed; no new gap was found because every designed interaction maps to current production routes and commands.
+The new target preserves You, Goals and Operating Plan; replaces the dead Integrations doorway with Settings; limits Profile to Preferred name, Height, Time zone and Weight units; makes Apple Health connection/direction understandable without duplicating Evidence or inventing permission status; and supports System, Dark and locked Mineral Light.
 
-No shipping Native code, Server behavior, production record, build, TestFlight or deployment changed.
+Five genuine implementation deltas are in the canonical ledger: routes, profile storage/write contract, Native theme/persistence, user-safe Apple Health projection, and complete one-device Sign Out. No shipping code, schema, HealthKit permission, build, TestFlight or deployment state changed.
 
-Next: Founder reviews Recovery, Peptides and Supplements and either locks or corrects them.
+Validation passed for 8 templates and 16 dark/Mineral-Light product renders with zero overflow, runtime errors or broken board images.
 
-Detailed report: `agent-handoffs/reports/20261004T194408Z-operating-plan-next-three-domains-ui-style-translation.md`
+Next: Founder reviews and confirms or corrects the You / Settings family.
+
+Detailed report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
