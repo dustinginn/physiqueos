@@ -48,7 +48,7 @@ Implementation complexity: medium-high. Broad section backgrounds are straightfo
 
 ### C — Dense Analytical
 
-A compact ruled instrument with aligned metric rails, compact paired Energy plot, inline Weight/Photos, tabular Training highlights, two-column Priority analysis and the shortest page. Coach is the only high-emphasis field.
+A compact ruled instrument with aligned metric rails, compact paired Energy plot, inline Weight/Photos, tabular Training highlights, full-width Priority analysis and the shortest page. Coach is the only high-emphasis field.
 
 Implementation complexity: low-medium. It maps closely to LazyVStack/Grid, Divider, existing type tokens and Swift Charts.
 
