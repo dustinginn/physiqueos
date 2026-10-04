@@ -150,7 +150,8 @@ Recurring Briefing implementation backlog, not started:
 - Recovery: graph-driven Sleep treatment is required for Midweek, Weekly and Monthly after graduation; Midweek uses Sun–Tue points, Weekly Sun–Sat points, Monthly weekly aggregates. No DEXA/Photo Recovery V1.
 - Midweek: guarantee canonical Biggest Takeaway in the presentation contract and preserve shorter-horizon restraint.
 - Midweek Weight: use the shared Weekly metric/delta/context typography hierarchy.
-- Monthly: dark/mineral-light translation ready for Founder review at `agent-handoffs/artifacts/monthly-ui-locked-briefing-family-translation-20261004/`; preserve its own contract and do not mark locked yet.
+- Monthly: corrected dark/mineral-light translation is ready to lock pending Founder confirmation at `agent-handoffs/artifacts/monthly-correction-dexa-photo-briefing-ui-20261004/`; future implementation must remove redundant rendered Goal/Phase tags and move unchanged Strategic Summary after What Changed, before Month Ahead.
+- DEXA + Photo event briefings: dark/mineral-light explorations are ready for Founder review in the same artifact package. Preserve event-specific contracts, exact DEXA units/geometry, Build 85 Photo's no-Confidence presentation, authenticated photo inspection, and no Recovery in either surface.
 
 Final appearance-translation review state:
 - Founder accepted the dark Weekly/Midweek family and required one order correction: Weekly Body Composition now sits directly under Weight, matching Midweek.

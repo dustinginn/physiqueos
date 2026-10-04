@@ -316,3 +316,21 @@ Review set:
 - `agent-handoffs/artifacts/monthly-ui-locked-briefing-family-translation-20261004/PARITY-PROOF.md`
 
 Monthly remains intentionally prior-calendar-month/day-1 and has higher recurring precedence when cadences collide. Recovery remains ungraduated, presentation-only, weekly-aggregated for Monthly and uncoupled from Confidence. Monthly is **exploration pending Founder review**, not locked. No shipping Native/Server source, global theme, build, TestFlight, production policy or Recovery activation changed.
+
+## Monthly correction + DEXA / Photo event briefings
+
+Status: **Monthly ready to lock pending confirmation; DEXA and Photo ready for Founder review**
+
+The accepted Monthly design was preserved with exactly two Founder-authorized presentation changes: M07 Goal/Phase tags no longer render beneath the hero, and the unchanged M08 Strategic Summary / Coach's Take now follows What Changed and immediately precedes Month Ahead. A future Native presentation-order change is required; it was not implemented here.
+
+DEXA and Photo were audited independently against Build 85 Native and current production Server contracts, then translated into the locked briefing family in dark and mineral light. DEXA remains a quantitative measurement event with exact 63% Confidence and truthful two-scan geometry. Photo remains image-first and follows Build 85 Native's deliberate no-Confidence presentation. Actual app-rendered Founder Back Relaxed media is used as a clearly bounded Jun 20 → Jun 27 visual reference; it is not falsely bound to the selected synthetic Aug 16 → Aug 30 fixture. Current Build 85 photo inspection behavior is preserved as future implementation authority. Recovery remains excluded from both event briefings.
+
+Review set:
+
+- `agent-handoffs/artifacts/monthly-correction-dexa-photo-briefing-ui-20261004/README.md`
+- `agent-handoffs/artifacts/monthly-correction-dexa-photo-briefing-ui-20261004/screens/monthly-corrected-dark-light.png`
+- `agent-handoffs/artifacts/monthly-correction-dexa-photo-briefing-ui-20261004/screens/dexa-dark-light.png`
+- `agent-handoffs/artifacts/monthly-correction-dexa-photo-briefing-ui-20261004/screens/photo-dark-light.png`
+- `agent-handoffs/artifacts/monthly-correction-dexa-photo-briefing-ui-20261004/PARITY-PROOF.md`
+
+No shipping UI, Server behavior, production content projection, Recovery activation, build, or TestFlight work occurred.

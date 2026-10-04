@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "recovery_briefing_v1",
+  "fixtureOnly": true,
+  "sourceAuthority": "Recovery Briefing V1 prototype monthly-yellow at 4ade4f1d83badc192329289f85ba1b24f390f416",
+  "placement": "after Energy Evolution and before outcome/editorial sections",
+  "cadence": "monthly",
+  "period": "Synthetic month",
+  "status": "Yellow",
+  "title": "Sleep softened across the second half",
+  "summary": "6 hr 25 min average · 27 of 30 nights",
+  "weeklyAverageMinutes": [411, 402, 390, 372, 348],
+  "weekLabels": ["W1", "W2", "W3", "W4", "W5"],
+  "personalBaselineMinutes": 404,
+  "periodAverageMinutes": 385,
+  "commentary": {
+    "title": "A multi-week shift",
+    "body": "Two completed weeks were meaningfully below your prior 28-night baseline. No downstream training constraint was established."
+  },
+  "foam": {
+    "value": "18 of 22 completed",
+    "detail": "3 excused · 1 missed"
+  },
+  "caveat": "Sleep uses the prior 28 reliable nights and excludes this period. Foam rolling cannot set the Recovery status. Associations do not imply causation.",
+  "confidenceCoupling": "none",
+  "activated": false
+}
