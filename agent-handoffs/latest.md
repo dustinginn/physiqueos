@@ -2,23 +2,24 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: DEXA + Photo Event Founder-flow confirmation
+- Task: Nutrition + Activity Evidence Founder correction
 - Agent: Codex
-- Status: review ready; implementation not started
-- Generated (UTC): 2026-10-04T16:52:09Z
-- Work branch: `codex/dexa-photo-founder-flow-confirmation-main`
-- Artifact/backlog commit: `7e8d9f0fc8dd4717eca5985834cc635a2fc4f20e`
-- Main report commit before pointer update: `e49c97e6f53ce843fcbfdad5364903f47124c01b`
-- Artifact root: `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/`
+- Status: focused correction ready for Founder confirmation; ready to lock if accepted; implementation not started
+- Generated (UTC): 2026-10-04T16:54:00Z
+- Work branch: `codex/nutrition-activity-evidence-founder-correction`
+- Work/report commit: `d28d47d234af51249efa7f29dde74499daac804a`
+- Artifact commit: `8e6bd94bb029fe23f7a259de872a7a3f98ea8034`
+- Main report commit before pointer update: `27be721958002a80824219b0d739d20a642d05a3`
+- Artifact root: `agent-handoffs/artifacts/nutrition-activity-evidence-founder-correction-20261004/`
 
-The accepted event-briefing style is unchanged. DEXA now restores all canonical field-specific units across 17 rows and the complete production Goal/Phase body-composition breakdown. Photo now shows the exact production-shaped five-section flow, five session poses and five matched comparisons in dark and mineral light using clearly marked neutral filler pixels only.
+The accepted styling is unchanged. Both Evidence roots now visibly end with their canonical three-row Recent History preview and `Show All >`, using the same source collection and day routes as the existing full-history pages.
 
-Build 85’s shared viewer already provides single-image full-screen inspection, pinch zoom, pan, double-tap zoom, aspect fit, paging and reset. It does not show both matched comparison images simultaneously. A dedicated side-by-side comparison viewer with synchronized zoom/pan is the recommended future target; it was designed and audited here but not implemented.
+Nutrition retains only functional Calories/Macros/Meals Reporting on the root; duplicate/future-only Nutrition Areas navigation is absent. Activity retains its four current informational metrics and Linked Training Context, with no Reporting block or invented destination.
 
-No shipping Native code, Server behavior, production photo binding, DEXA data, build number or TestFlight state changed.
+Focused dark/mineral-light render validation passed with exact content parity, zero future-placeholder text, zero horizontal overflow, and no semantic or shipping change.
 
-Next: Founder reviews the focused correction/confirmation boards and confirms DEXA and Photo. Shipping implementation remains unauthorized.
+Next: Founder confirms the four corrected root renders and concise before/after board. If accepted, Nutrition Evidence and Activity Evidence are ready to lock.
 
-Detailed report: `agent-handoffs/reports/20261004T164725Z-dexa-photo-founder-flow-confirmation.md`
+Detailed report: `agent-handoffs/reports/20261004T165200Z-nutrition-activity-evidence-founder-correction.md`
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
