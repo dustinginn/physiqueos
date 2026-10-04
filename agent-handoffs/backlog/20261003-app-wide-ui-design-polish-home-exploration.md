@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log + Weekly visual language locked; final Weekly/Midweek dark + mineral-light family set ready for Founder review**
+Status: **Home + Log + Weekly visual language locked; final briefing-light polish and locked Log density validation ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -259,30 +259,35 @@ Review set:
 
 Do not mark the Weekly/Midweek appearance pair locked until the Founder accepts these renders. No shipping UI, Server behavior, Recovery activation, theme implementation, build or TestFlight work occurred.
 
-## Utility surfaces — Apple Watch, Live Activity, and Training Logger
+## Briefing mineral-light polish + locked Log density validation
 
-Status: **Dark + mineral-light translations in Founder review; not locked; implementation not started**
+Status: **Review artifacts ready; refinement candidates not yet accepted**
 
-The complete Build 85 utility-surface inventory has been translated into the selected PhysiqueOS visual language without changing workflow, authority, HealthKit, ActivityKit, Watch gesture, Finish/Cancel, evidence, or reconciliation semantics.
+The accepted Weekly/Midweek mineral-light structures now have two appearance candidates over the same immutable composition: selective tinted fields, and a richer navy/teal/violet color-field treatment that echoes the locked Log Training Logger. Exact content, section order, Energy/Recovery graphs, Body Composition placement, Recovery semantics and page height remain unchanged in both.
 
-- Apple Watch utility-surface translation: **in review**
-- Live Activity / Dynamic Island translation: **in review**
-- Training Logger full-flow translation: **in review**
-- Shipping implementation: **not started**
+Weekly Priority Muscle Groups now use a left-aligned 2×2 analytical rail. Exact names, statuses and counts are preserved while measured height falls from 254 pt to 143 pt, saving 111 pt / 44%.
+
+The locked Log Compact Command Center has also passed a realistic-density design validation with:
+
+- separate Strength Training and Stair Stepper lines/durations;
+- 2,516 calories plus 215P · 161C · 111F;
+- 771 active calories so far;
+- 176.7 lb;
+- one ready-to-review item;
+- unchanged Training Logger and quick-action hierarchy;
+- a centralized Sources disclosure at the true bottom of Log content, collapsed by default to one 44 pt row, that scopes Apple Health to Stair Stepper/Nutrition/Activity, PhysiqueOS Logger to Strength, and honestly marks Weight provenance unavailable in the current Log projection.
 
 Review set:
 
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/README.md`
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/watch-coverage-board.png`
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/watch-coverage-board-light.png`
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/live-coverage-board.png`
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/live-coverage-board-light.png`
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/logger-coverage-board.png`
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/screens/logger-coverage-board-light.png`
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/COVERAGE-MATRIX.md`
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/UTILITY-TOKENS.md`
-- `agent-handoffs/artifacts/utility-surfaces-design-20261004/IMPLEMENTATION-NOTES.md`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/README.md`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/briefing-light-before-after-four-up.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/briefing-light-rich-fields-pair.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/weekly-light-surface-intensity-comparison.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/midweek-light-surface-intensity-comparison.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/weekly-priority-muscle-groups-before-after.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/log-command-density-dark-light.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/log-sources-collapsed-dark-light.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/SOURCE-PROVENANCE-AUDIT.md`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/PARITY-PROOF.md`
 
-All materially distinct templates are rendered, and every current state maps explicitly to a representative visual template or Apple-owned system surface. Yellow source-gap labels identify existing presentation limitations rather than inventing behavior. The mineral-light Watch and Live Activity boards are review translations, not an implementation commitment against platform constraints.
-
-Do not mark any of the three utility families locked until Founder review. No shipping Native source, Server behavior, workout contract, build, or TestFlight state changed.
+Implementation backlog additions: centralized bottom-anchored expandable Log source/provenance; realistic Strength + Cardio + macro density; condensed Priority Muscle Groups; selective briefing mineral-light surface rhythm; and the richer navy/teal/violet mineral-light appearance candidate. Do not mark these refinements implemented or locked until Founder acceptance. No shipping code, projection, Server behavior, Recovery activation, build or TestFlight work occurred.
