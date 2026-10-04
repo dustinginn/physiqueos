@@ -1,42 +1,47 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-04T16:54:00Z",
+  "generated_at_utc": "2026-10-04T17:31:00Z",
   "task": {
-    "id": "20261004-nutrition-activity-evidence-founder-correction",
-    "title": "Nutrition + Activity Evidence Founder correction",
+    "id": "20261004-energy-weight-recovery-evidence-ui-style-translation",
+    "title": "Energy, Weight + Recovery Evidence UI style translation",
     "agent": "codex",
-    "status": "focused_correction_ready_for_confirmation_and_lock"
+    "status": "complete_ready_for_founder_review_implementation_not_started"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "edb8faca934666dfdb6bcaa233cd62410a6021a3",
-    "accepted_design_commit": "8de163506d6e996328e60d510199562cdeb8dffb",
+    "prompt_commit": "fbd6dd35e4e0dbabe5834d309170dcd2e724398a",
     "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
     "native_build": 85,
-    "training_evidence_status": "locked_unchanged"
+    "training_evidence_status": "locked_unchanged_all_10_areas",
+    "nutrition_evidence_status": "locked_unchanged",
+    "activity_evidence_status": "locked_unchanged"
   },
   "publication": {
-    "source_work_branch": "codex/nutrition-activity-evidence-founder-correction",
-    "source_work_commit": "d28d47d234af51249efa7f29dde74499daac804a",
-    "artifact_commit": "8e6bd94bb029fe23f7a259de872a7a3f98ea8034",
-    "main_report_commit": "27be721958002a80824219b0d739d20a642d05a3",
-    "report_path": "agent-handoffs/reports/20261004T165200Z-nutrition-activity-evidence-founder-correction.md",
-    "artifact_root": "agent-handoffs/artifacts/nutrition-activity-evidence-founder-correction-20261004/"
+    "source_work_branch": "codex/energy-weight-recovery-evidence-design",
+    "source_work_commit": "1badfd2a38a7196befe40a9547fb5d845ba0d8ee",
+    "artifact_commit": "1f8ba1b9abd0db1826ac911bffcdbd7536d332c8",
+    "main_report_commit": "36ac9b70cae5aebe1c82b007c7822ddfe6948593",
+    "report_path": "agent-handoffs/reports/20261004T173100Z-energy-weight-recovery-evidence-ui-style-translation.md",
+    "artifact_root": "agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/"
   },
   "result": {
-    "summary": "Accepted styling preserved. Canonical three-row Recent History and Show All are restored to both Evidence roots; future-only/dead navigation is removed; functional Nutrition Reporting and current Activity fields remain.",
-    "nutrition_root_history_rows": 3,
-    "activity_root_history_rows": 3,
-    "show_all_routes_preserved": true,
-    "functional_nutrition_reports_preserved": ["Calories", "Macros", "Meals"],
+    "summary": "Three independent Build 85 Evidence hierarchies translated into the locked dark/mineral-light system with exact contracts, histories, charts, DEXA and sleep provenance preserved.",
+    "direct_templates": 10,
+    "energy_templates": 2,
+    "weight_templates": 2,
+    "recovery_templates": 6,
+    "individual_theme_renders": 20,
+    "total_png_artifacts": 25,
+    "uncovered_matrix_states": 0,
     "future_placeholder_text_count": 0,
-    "activity_reporting_invented": false,
+    "recovery_score_invented": false,
+    "strategic_recovery_activated": false,
     "shipping_code_changed": false,
     "dark_light_parity_pass": true,
     "validation_pass": true
   },
-  "recommended_next_step": "Founder confirms the focused dark/mineral-light root corrections; if accepted, lock Nutrition Evidence and Activity Evidence.",
-  "stop_reason": "Focused corrected roots, history-section crops, before/after board, validation, and canonical main-branch report are ready for confirmation.",
+  "recommended_next_step": "Founder reviews the concise dark/mineral-light comparison page and, if accepted, locks Energy, Weight and Recovery Evidence for later implementation.",
+  "stop_reason": "All three current hierarchies are audited, zero-gap coverage matrices and validation pass, and concise dark/mineral-light review artifacts are published.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
