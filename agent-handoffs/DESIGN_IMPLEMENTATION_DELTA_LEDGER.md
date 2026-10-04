@@ -163,6 +163,49 @@ Start/restore a workout containing a timed set. Watch receives and displays the 
 
 Status: OPEN; reverify against implementation authority before patching.
 
+### Evidence Hub — remove Health Metrics placeholder and place Timeline last
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION
+
+Discovery:
+Remaining Evidence-family source audit against Build 85 Native and Server.
+Report: `agent-handoffs/reports/20261004T193501Z-dexa-photos-timeline-evidence-ui-style-translation.md`
+
+Current Build 85 behavior:
+Native production composition publishes Timeline before Recovery and appends a `Health Metrics` Coming Soon stream. Native and Server usage-order contracts also omit or position Timeline inconsistently and retain the Health Metrics placeholder.
+
+Accepted target:
+The Evidence Hub contains only current Evidence destinations. Preserve current real-stream order, place Recovery before Timeline, place Timeline at the absolute bottom, and remove the Health Metrics destination/page and all Coming Soon presentation.
+
+Implementation implication:
+Update Native production stream composition, Native canonical Evidence usage order, and matching Server/web canonical hub order together. Remove the Health Metrics placeholder route from the target navigation without removing any real evidence field or functional Reporting destination.
+
+Acceptance:
+Evidence Hub renders Training, Nutrition, Weight, Photos, DEXA, Activity, Energy, Recovery and Timeline in that exact order. Timeline is last. Health Metrics and Coming Soon are absent. Recently Used continues to rank only real streams.
+
+Status: OPEN.
+
+### Recovery Evidence — analytical Continuity mark translation
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION
+
+Discovery:
+Energy, Weight and Recovery founder-correction review; subsequently accepted and locked before the remaining Evidence-family task.
+
+Current Build 85 behavior:
+Recovery Sleep Trends renders Continuity with comparatively heavy vertical bar marks.
+
+Accepted target:
+Preserve the exact continuity data, missing-night gaps and range behavior, but render a lighter analytical mark treatment consistent with the locked Evidence system.
+
+Implementation implication:
+Replace only the Continuity chart marks/styles. Do not change the calculation, aggregation, range ownership, provenance, stage semantics or Recovery activation state.
+
+Acceptance:
+For the same fixture, every continuity value and gap matches Build 85. The visualization uses the accepted lighter analytical treatment in dark and mineral light and remains accessible without color-only meaning.
+
+Status: OPEN.
+
 ## Architectural context / do not automatically patch
 
 ### Training Evidence — performance record presentation level
@@ -223,6 +266,30 @@ Remaining gap:
 Paired simultaneous comparison is still OPEN above.
 
 Status: RESOLVED for single-photo expansion; do not close paired viewer requirement.
+
+### Progress Photos — recoverable Retry photo reread
+
+Classification: RESOLVED / OBSOLETE as a shipping-defect candidate.
+
+Earlier concern:
+An expired or masked authenticated media bearer could leave `Retry photo` unable to recover the tile.
+
+Build 85 audit result:
+`FounderServerAPITests.swift` proves one credential refresh plus one reread for the recoverable authorization case, and proves a tile retry performs a fresh reread and can recover without duplicate requests. Permanent or unsupported media resolves to the non-retryable unavailable state.
+
+Status: RESOLVED; preserve the current loading / Retry photo / unavailable state split.
+
+### Progress Photos — published Photo Briefing shown as preparing
+
+Classification: RESOLVED / OBSOLETE as a shipping-defect candidate.
+
+Earlier concern:
+A published Photo Briefing could remain represented as “being prepared.”
+
+Build 85 audit result:
+`FounderServerAPITests.swift` and `PhotoProcessingUXTests.swift` prove production availability is reread, pending is not cached as published, a published result becomes the deep link, and transport/server uncertainty does not falsely claim processing.
+
+Status: RESOLVED; do not re-add unless a new exact-authority regression is reproduced.
 
 ## Implementation transition rule
 
