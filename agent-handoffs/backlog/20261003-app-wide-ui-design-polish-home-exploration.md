@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log + Weekly visual language locked; final briefing-light polish and locked Log density validation ready for Founder review**
+Status: **Home + Log + Weekly visual language locked; Watch, Live Activity, and Logger locked; Training Evidence styling translation ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -294,11 +294,11 @@ Implementation backlog additions: centralized bottom-anchored expandable Log sou
 
 ## Utility surfaces — Founder acceptance corrections
 
-Status: **Overall direction accepted; two focused corrections ready for Founder confirmation; implementation not started**
+Status: **LOCKED; implementation not started**
 
-- Live Activity / Dynamic Island: **accepted unchanged; ready to lock as presented**.
-- Apple Watch: **accepted pending confirmation of restored Build 85 metric icon/color identity on Workout Metrics and Daily Totals**.
-- Training Logger: **accepted pending confirmation of restored larger Done checkmark-circle on active set rows**.
+- Live Activity / Dynamic Island: **locked unchanged as presented**.
+- Apple Watch: **locked with exact Build 85 metric icon/color identity restored on Workout Metrics and Daily Totals**.
+- Training Logger: **locked with the larger current Done checkmark-circle restored on every applicable active set row**.
 - Shipping implementation: **not started**.
 
 Focused review set:
@@ -316,4 +316,39 @@ Focused review set:
 - `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/logger-done-comparison.png`
 - `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/COVERAGE-PROPAGATION.md`
 
-Do not mark Watch or Logger locked until Founder confirms the focused correction renders. No other accepted utility design changed. No shipping Native source, Server behavior, workout authority, HealthKit, ActivityKit, evidence, build, or TestFlight state changed.
+Founder confirmation is now recorded. Do not reopen these surfaces in the Training Evidence pass. No shipping Native source, Server behavior, workout authority, HealthKit, ActivityKit, evidence, build, or TestFlight state changed.
+
+## Training Evidence styling translation
+
+Status: **EXPLORATION ready for Founder review; implementation not started**
+
+The complete Build 85 Training Evidence hierarchy has been audited and translated as a styling-only continuation of the locked PhysiqueOS visual language. Coverage includes:
+
+- Evidence Hub Training entry and Training landing;
+- chronological history and Show All sheet;
+- Training Day with single and multiple sessions;
+- structured Strength session detail;
+- Apple Health/Cardio detail and provenance treatment;
+- supersets, execution variants, timed sets, bodyweight and external load;
+- Training Library root, all canonical Areas, populated/empty browse states;
+- Exercise Detail benchmark, Last Session and inline historical set tables;
+- normalized current Performance Records, including Session Volume and Reps at Load;
+- Resistance and History Reporting plus the exact shared Foundation placeholder for Cardio, Volume, Frequency and Consistency;
+- loading, empty, error, not-found, media and reconciliation/HealthKit relationship states.
+
+Review set:
+
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/README.md`
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/comparison-board.html`
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/screens/training-evidence-coverage-board.png`
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/screens/training-evidence-coverage-board-light.png`
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/NAVIGATION-TREE.md`
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/COVERAGE-MATRIX.md`
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/SOURCE-AUDIT.md`
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/TOKEN-COMPONENT-MAPPING.md`
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/IMPLEMENTATION-NOTES.md`
+- `agent-handoffs/artifacts/training-evidence-style-translation-20261004/validation.json`
+
+Dark/mineral-light content parity passes across all 16 direct templates. Build 85 contains no Training Evidence chart today; the four placeholder reporting destinations remain text-only. Cooldown is explicitly preserved as historical non-Cardio, excluded from Cardio identity and totals. Read-only Evidence rows do not reuse Logger input or completion controls.
+
+No shipping Native source, Server behavior, evidence contract, HealthKit behavior, canonical identity, record semantics, navigation, build, or TestFlight state changed.
