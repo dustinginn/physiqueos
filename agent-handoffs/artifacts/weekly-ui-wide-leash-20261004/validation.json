@@ -1,0 +1,1752 @@
+{
+  "authority": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+  "fixtureId": "weekly_briefing_2026-08-23_2026-08-29",
+  "renderer": "single shared frozen-semantic renderer; direction classes alter visual composition only",
+  "target": {
+    "widthPoints": 402,
+    "scale": 3,
+    "safeAreaTopPoints": 51
+  },
+  "expectedSemanticFieldCount": 86,
+  "productionSequence": [
+    "W01",
+    "W02",
+    "W03",
+    "W04",
+    "W05",
+    "W06",
+    "W07",
+    "W08",
+    "W09",
+    "W10",
+    "W13",
+    "W14",
+    "W15",
+    "W16",
+    "W17",
+    "W18",
+    "W19",
+    "W20",
+    "W21",
+    "W23",
+    "W24",
+    "W25",
+    "W26",
+    "W27",
+    "W28",
+    "W29",
+    "W33",
+    "W34",
+    "W35",
+    "W36",
+    "W37"
+  ],
+  "conditionals": {
+    "W11": {
+      "name": "Energy comparison narrative",
+      "present": false,
+      "reason": "comparisonNarrative absent"
+    },
+    "W12": {
+      "name": "Energy daily semantic rows",
+      "present": false,
+      "reason": "showsDailySemanticRows defaults false"
+    },
+    "W22": {
+      "name": "View Photo Briefing link",
+      "present": false,
+      "reason": "photoEventDestination null"
+    },
+    "W30": {
+      "name": "Training watch",
+      "present": false,
+      "reason": "watch absent"
+    },
+    "W31": {
+      "name": "Body Composition",
+      "present": false,
+      "reason": "bodyComposition null"
+    },
+    "W32": {
+      "name": "Still Unresolved",
+      "present": false,
+      "reason": "uncertainty absent"
+    }
+  },
+  "graphInventory": [
+    {
+      "id": "W15",
+      "component": "WeeklyEnergyCard.chart",
+      "section": "Energy",
+      "type": "grouped-bar",
+      "series": [
+        "Intake",
+        "Estimated expenditure"
+      ],
+      "labels": [
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29"
+      ],
+      "pointCount": 7,
+      "markCount": 14,
+      "conditional": "showsChart && dailyBalances non-empty"
+    }
+  ],
+  "quantitativeMarkInventory": {
+    "confidence.score": "68",
+    "weekly.energy.dailyBalances.0.intakeKcal": "2800",
+    "weekly.energy.dailyBalances.0.expenditureKcal": "2420",
+    "weekly.energy.dailyBalances.1.intakeKcal": "2760",
+    "weekly.energy.dailyBalances.1.expenditureKcal": "2460",
+    "weekly.energy.dailyBalances.2.intakeKcal": "2820",
+    "weekly.energy.dailyBalances.2.expenditureKcal": "2450",
+    "weekly.energy.dailyBalances.3.intakeKcal": "2770",
+    "weekly.energy.dailyBalances.3.expenditureKcal": "2410",
+    "weekly.energy.dailyBalances.4.intakeKcal": "2830",
+    "weekly.energy.dailyBalances.4.expenditureKcal": "2470",
+    "weekly.energy.dailyBalances.5.intakeKcal": "2790",
+    "weekly.energy.dailyBalances.5.expenditureKcal": "2430",
+    "weekly.energy.dailyBalances.6.intakeKcal": "2760",
+    "weekly.energy.dailyBalances.6.expenditureKcal": "2440",
+    "weekly.training.trainingDayCount": "4",
+    "weekly.training.comparableCategoryCount": "4",
+    "weekly.training.improvingCount": "2",
+    "weekly.training.steadyCount": "2",
+    "weekly.training.plateauingCount": "1",
+    "weekly.training.insufficientCount": "2",
+    "weekly.training.priorityGroups.0.comparableExerciseCount": "3",
+    "weekly.training.priorityGroups.1.comparableExerciseCount": "4",
+    "weekly.training.priorityGroups.2.comparableExerciseCount": "3",
+    "weekly.training.priorityGroups.3.comparableExerciseCount": "4"
+  },
+  "renders": {
+    "data-editorial-dark": {
+      "widthPoints": 402,
+      "heightPoints": 4288,
+      "semanticFieldCount": 86,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "conflicts": [],
+      "sequence": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "R-FUTURE",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "productionOnly": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "parentage": [
+        {
+          "id": "W01",
+          "parent": "BriefingDetailView",
+          "component": "BriefingDetailPreHeroNavigation"
+        },
+        {
+          "id": "W02",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingLeadCard"
+        },
+        {
+          "id": "W03",
+          "parent": "W02",
+          "component": "LeadHeader"
+        },
+        {
+          "id": "W04",
+          "parent": "W02",
+          "component": "ConfidenceAnchor"
+        },
+        {
+          "id": "W05",
+          "parent": "W02",
+          "component": "LeadHeadline"
+        },
+        {
+          "id": "W06",
+          "parent": "W02",
+          "component": "LeadNarrative"
+        },
+        {
+          "id": "W07",
+          "parent": "W02",
+          "component": "LeadFooter"
+        },
+        {
+          "id": "W08",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyEnergyCard"
+        },
+        {
+          "id": "W09",
+          "parent": "W08",
+          "component": "EnergyHeader"
+        },
+        {
+          "id": "W10",
+          "parent": "W08",
+          "component": "EnergyLegacyNarrative"
+        },
+        {
+          "id": "W13",
+          "parent": "W08",
+          "component": "EnergyMetrics"
+        },
+        {
+          "id": "W14",
+          "parent": "W08",
+          "component": "EnergyChartTitle"
+        },
+        {
+          "id": "W15",
+          "parent": "W08",
+          "component": "WeeklyEnergyChart"
+        },
+        {
+          "id": "W16",
+          "parent": "W08",
+          "component": "EnergySeriesLegend"
+        },
+        {
+          "id": "W17",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyWeightCard"
+        },
+        {
+          "id": "W18",
+          "parent": "W17",
+          "component": "WeightMetrics"
+        },
+        {
+          "id": "W19",
+          "parent": "W17",
+          "component": "WeightNarrative"
+        },
+        {
+          "id": "W20",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyPhotosCard"
+        },
+        {
+          "id": "W21",
+          "parent": "W20",
+          "component": "PhotosNarrative"
+        },
+        {
+          "id": "W23",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingTrainingResponseCard"
+        },
+        {
+          "id": "W24",
+          "parent": "W23",
+          "component": "TrainingHeader"
+        },
+        {
+          "id": "W25",
+          "parent": "W23",
+          "component": "TrainingHeadline"
+        },
+        {
+          "id": "W26",
+          "parent": "W23",
+          "component": "TrainingNarrative"
+        },
+        {
+          "id": "W27",
+          "parent": "W23",
+          "component": "TrainingCoverage"
+        },
+        {
+          "id": "W28",
+          "parent": "W23",
+          "component": "TrainingHighlights"
+        },
+        {
+          "id": "W29",
+          "parent": "W23",
+          "component": "TrainingPriorityGroups"
+        },
+        {
+          "id": "R-FUTURE",
+          "parent": "WeeklyBriefingSections",
+          "component": "RecoveryBriefingFutureFixture"
+        },
+        {
+          "id": "W33",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingCoachFinale"
+        },
+        {
+          "id": "W34",
+          "parent": "W33",
+          "component": "FinaleTakeaway"
+        },
+        {
+          "id": "W35",
+          "parent": "W33",
+          "component": "FinaleRecommendation"
+        },
+        {
+          "id": "W36",
+          "parent": "W33",
+          "component": "FinaleActions"
+        },
+        {
+          "id": "W37",
+          "parent": "BriefingDetailView",
+          "component": "BriefingRevisionBanner"
+        }
+      ],
+      "hiddenConditionals": [],
+      "quantitativeMarks": [
+        {
+          "sourceKey": "confidence.score",
+          "value": "68",
+          "kind": "confidence"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.0.intakeKcal",
+          "value": "2800",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.0.expenditureKcal",
+          "value": "2420",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.1.intakeKcal",
+          "value": "2760",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.1.expenditureKcal",
+          "value": "2460",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.2.intakeKcal",
+          "value": "2820",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.2.expenditureKcal",
+          "value": "2450",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.3.intakeKcal",
+          "value": "2770",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.3.expenditureKcal",
+          "value": "2410",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.4.intakeKcal",
+          "value": "2830",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.4.expenditureKcal",
+          "value": "2470",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.5.intakeKcal",
+          "value": "2790",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.5.expenditureKcal",
+          "value": "2430",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.6.intakeKcal",
+          "value": "2760",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.6.expenditureKcal",
+          "value": "2440",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.training.trainingDayCount",
+          "value": "4",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.comparableCategoryCount",
+          "value": "4",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.improvingCount",
+          "value": "2",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.steadyCount",
+          "value": "2",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.plateauingCount",
+          "value": "1",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.insufficientCount",
+          "value": "2",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.0.comparableExerciseCount",
+          "value": "3",
+          "kind": "priority-comparable"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.1.comparableExerciseCount",
+          "value": "4",
+          "kind": "priority-comparable"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.2.comparableExerciseCount",
+          "value": "3",
+          "kind": "priority-comparable"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.3.comparableExerciseCount",
+          "value": "4",
+          "kind": "priority-comparable"
+        }
+      ],
+      "quantMissing": [],
+      "quantMismatches": [],
+      "quantExtra": [],
+      "recoveryCount": 1,
+      "recoveryPositionValid": true,
+      "recoveryFixtureBoundaryVisible": true,
+      "recoveryConfidenceCouplingAbsent": true,
+      "chart": {
+        "type": "grouped-bar",
+        "series": [
+          "Intake",
+          "Estimated expenditure"
+        ],
+        "title": "Daily intake vs estimated expenditure",
+        "pointCount": 7,
+        "bars": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-29"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "date": "2026-08-29"
+          }
+        ]
+      },
+      "navigation": [
+        "Home",
+        "Briefing History"
+      ],
+      "accessibility": {
+        "bodySizes": [
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15
+        ],
+        "priorityAlignments": [
+          "left",
+          "left",
+          "left",
+          "left"
+        ],
+        "priorityWidths": [
+          354,
+          354,
+          354,
+          354
+        ],
+        "chartLabel": "Daily intake and expenditure across 7 days"
+      },
+      "layoutSignature": {
+        "pageHeight": 4288,
+        "hero": [
+          354,
+          551
+        ],
+        "energy": [
+          354,
+          678
+        ],
+        "training": [
+          354,
+          1151
+        ],
+        "priorityDisplay": "block",
+        "priorityColumns": "none",
+        "heroRadius": "0px",
+        "energyRadius": "0px",
+        "trainingBackground": "rgba(0, 0, 0, 0)",
+        "chartDisplay": "grid",
+        "chartColumns": "42.8438px 42.8594px 42.8594px 42.8594px 42.8594px 42.8594px 42.8594px",
+        "highlightColumns": "270.281px 71.7188px"
+      },
+      "chartExact": true,
+      "sequenceExact": true,
+      "pass": true,
+      "accessibilityPass": true,
+      "parentageExact": true
+    },
+    "immersive-story-dark": {
+      "widthPoints": 402,
+      "heightPoints": 4802,
+      "semanticFieldCount": 86,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "conflicts": [],
+      "sequence": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "R-FUTURE",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "productionOnly": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "parentage": [
+        {
+          "id": "W01",
+          "parent": "BriefingDetailView",
+          "component": "BriefingDetailPreHeroNavigation"
+        },
+        {
+          "id": "W02",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingLeadCard"
+        },
+        {
+          "id": "W03",
+          "parent": "W02",
+          "component": "LeadHeader"
+        },
+        {
+          "id": "W04",
+          "parent": "W02",
+          "component": "ConfidenceAnchor"
+        },
+        {
+          "id": "W05",
+          "parent": "W02",
+          "component": "LeadHeadline"
+        },
+        {
+          "id": "W06",
+          "parent": "W02",
+          "component": "LeadNarrative"
+        },
+        {
+          "id": "W07",
+          "parent": "W02",
+          "component": "LeadFooter"
+        },
+        {
+          "id": "W08",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyEnergyCard"
+        },
+        {
+          "id": "W09",
+          "parent": "W08",
+          "component": "EnergyHeader"
+        },
+        {
+          "id": "W10",
+          "parent": "W08",
+          "component": "EnergyLegacyNarrative"
+        },
+        {
+          "id": "W13",
+          "parent": "W08",
+          "component": "EnergyMetrics"
+        },
+        {
+          "id": "W14",
+          "parent": "W08",
+          "component": "EnergyChartTitle"
+        },
+        {
+          "id": "W15",
+          "parent": "W08",
+          "component": "WeeklyEnergyChart"
+        },
+        {
+          "id": "W16",
+          "parent": "W08",
+          "component": "EnergySeriesLegend"
+        },
+        {
+          "id": "W17",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyWeightCard"
+        },
+        {
+          "id": "W18",
+          "parent": "W17",
+          "component": "WeightMetrics"
+        },
+        {
+          "id": "W19",
+          "parent": "W17",
+          "component": "WeightNarrative"
+        },
+        {
+          "id": "W20",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyPhotosCard"
+        },
+        {
+          "id": "W21",
+          "parent": "W20",
+          "component": "PhotosNarrative"
+        },
+        {
+          "id": "W23",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingTrainingResponseCard"
+        },
+        {
+          "id": "W24",
+          "parent": "W23",
+          "component": "TrainingHeader"
+        },
+        {
+          "id": "W25",
+          "parent": "W23",
+          "component": "TrainingHeadline"
+        },
+        {
+          "id": "W26",
+          "parent": "W23",
+          "component": "TrainingNarrative"
+        },
+        {
+          "id": "W27",
+          "parent": "W23",
+          "component": "TrainingCoverage"
+        },
+        {
+          "id": "W28",
+          "parent": "W23",
+          "component": "TrainingHighlights"
+        },
+        {
+          "id": "W29",
+          "parent": "W23",
+          "component": "TrainingPriorityGroups"
+        },
+        {
+          "id": "R-FUTURE",
+          "parent": "WeeklyBriefingSections",
+          "component": "RecoveryBriefingFutureFixture"
+        },
+        {
+          "id": "W33",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingCoachFinale"
+        },
+        {
+          "id": "W34",
+          "parent": "W33",
+          "component": "FinaleTakeaway"
+        },
+        {
+          "id": "W35",
+          "parent": "W33",
+          "component": "FinaleRecommendation"
+        },
+        {
+          "id": "W36",
+          "parent": "W33",
+          "component": "FinaleActions"
+        },
+        {
+          "id": "W37",
+          "parent": "BriefingDetailView",
+          "component": "BriefingRevisionBanner"
+        }
+      ],
+      "hiddenConditionals": [],
+      "quantitativeMarks": [
+        {
+          "sourceKey": "confidence.score",
+          "value": "68",
+          "kind": "confidence"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.0.intakeKcal",
+          "value": "2800",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.0.expenditureKcal",
+          "value": "2420",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.1.intakeKcal",
+          "value": "2760",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.1.expenditureKcal",
+          "value": "2460",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.2.intakeKcal",
+          "value": "2820",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.2.expenditureKcal",
+          "value": "2450",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.3.intakeKcal",
+          "value": "2770",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.3.expenditureKcal",
+          "value": "2410",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.4.intakeKcal",
+          "value": "2830",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.4.expenditureKcal",
+          "value": "2470",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.5.intakeKcal",
+          "value": "2790",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.5.expenditureKcal",
+          "value": "2430",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.6.intakeKcal",
+          "value": "2760",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.6.expenditureKcal",
+          "value": "2440",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.training.trainingDayCount",
+          "value": "4",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.comparableCategoryCount",
+          "value": "4",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.improvingCount",
+          "value": "2",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.steadyCount",
+          "value": "2",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.plateauingCount",
+          "value": "1",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.insufficientCount",
+          "value": "2",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.0.comparableExerciseCount",
+          "value": "3",
+          "kind": "priority-comparable"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.1.comparableExerciseCount",
+          "value": "4",
+          "kind": "priority-comparable"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.2.comparableExerciseCount",
+          "value": "3",
+          "kind": "priority-comparable"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.3.comparableExerciseCount",
+          "value": "4",
+          "kind": "priority-comparable"
+        }
+      ],
+      "quantMissing": [],
+      "quantMismatches": [],
+      "quantExtra": [],
+      "recoveryCount": 1,
+      "recoveryPositionValid": true,
+      "recoveryFixtureBoundaryVisible": true,
+      "recoveryConfidenceCouplingAbsent": true,
+      "chart": {
+        "type": "grouped-bar",
+        "series": [
+          "Intake",
+          "Estimated expenditure"
+        ],
+        "title": "Daily intake vs estimated expenditure",
+        "pointCount": 7,
+        "bars": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-29"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "date": "2026-08-29"
+          }
+        ]
+      },
+      "navigation": [
+        "Home",
+        "Briefing History"
+      ],
+      "accessibility": {
+        "bodySizes": [
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15
+        ],
+        "priorityAlignments": [
+          "left",
+          "left",
+          "left",
+          "left"
+        ],
+        "priorityWidths": [
+          169,
+          169,
+          169,
+          169
+        ],
+        "chartLabel": "Daily intake and expenditure across 7 days"
+      },
+      "layoutSignature": {
+        "pageHeight": 4802,
+        "hero": [
+          402,
+          756
+        ],
+        "energy": [
+          402,
+          801
+        ],
+        "training": [
+          402,
+          1303
+        ],
+        "priorityDisplay": "grid",
+        "priorityColumns": "169px 169px",
+        "heroRadius": "0px",
+        "energyRadius": "0px",
+        "trainingBackground": "rgba(0, 0, 0, 0)",
+        "chartDisplay": "grid",
+        "chartColumns": "354px",
+        "highlightColumns": "none"
+      },
+      "chartExact": true,
+      "sequenceExact": true,
+      "pass": true,
+      "accessibilityPass": true,
+      "parentageExact": true
+    },
+    "dense-analytical-dark": {
+      "widthPoints": 402,
+      "heightPoints": 3437,
+      "semanticFieldCount": 86,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "conflicts": [],
+      "sequence": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "R-FUTURE",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "productionOnly": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "parentage": [
+        {
+          "id": "W01",
+          "parent": "BriefingDetailView",
+          "component": "BriefingDetailPreHeroNavigation"
+        },
+        {
+          "id": "W02",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingLeadCard"
+        },
+        {
+          "id": "W03",
+          "parent": "W02",
+          "component": "LeadHeader"
+        },
+        {
+          "id": "W04",
+          "parent": "W02",
+          "component": "ConfidenceAnchor"
+        },
+        {
+          "id": "W05",
+          "parent": "W02",
+          "component": "LeadHeadline"
+        },
+        {
+          "id": "W06",
+          "parent": "W02",
+          "component": "LeadNarrative"
+        },
+        {
+          "id": "W07",
+          "parent": "W02",
+          "component": "LeadFooter"
+        },
+        {
+          "id": "W08",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyEnergyCard"
+        },
+        {
+          "id": "W09",
+          "parent": "W08",
+          "component": "EnergyHeader"
+        },
+        {
+          "id": "W10",
+          "parent": "W08",
+          "component": "EnergyLegacyNarrative"
+        },
+        {
+          "id": "W13",
+          "parent": "W08",
+          "component": "EnergyMetrics"
+        },
+        {
+          "id": "W14",
+          "parent": "W08",
+          "component": "EnergyChartTitle"
+        },
+        {
+          "id": "W15",
+          "parent": "W08",
+          "component": "WeeklyEnergyChart"
+        },
+        {
+          "id": "W16",
+          "parent": "W08",
+          "component": "EnergySeriesLegend"
+        },
+        {
+          "id": "W17",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyWeightCard"
+        },
+        {
+          "id": "W18",
+          "parent": "W17",
+          "component": "WeightMetrics"
+        },
+        {
+          "id": "W19",
+          "parent": "W17",
+          "component": "WeightNarrative"
+        },
+        {
+          "id": "W20",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyPhotosCard"
+        },
+        {
+          "id": "W21",
+          "parent": "W20",
+          "component": "PhotosNarrative"
+        },
+        {
+          "id": "W23",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingTrainingResponseCard"
+        },
+        {
+          "id": "W24",
+          "parent": "W23",
+          "component": "TrainingHeader"
+        },
+        {
+          "id": "W25",
+          "parent": "W23",
+          "component": "TrainingHeadline"
+        },
+        {
+          "id": "W26",
+          "parent": "W23",
+          "component": "TrainingNarrative"
+        },
+        {
+          "id": "W27",
+          "parent": "W23",
+          "component": "TrainingCoverage"
+        },
+        {
+          "id": "W28",
+          "parent": "W23",
+          "component": "TrainingHighlights"
+        },
+        {
+          "id": "W29",
+          "parent": "W23",
+          "component": "TrainingPriorityGroups"
+        },
+        {
+          "id": "R-FUTURE",
+          "parent": "WeeklyBriefingSections",
+          "component": "RecoveryBriefingFutureFixture"
+        },
+        {
+          "id": "W33",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingCoachFinale"
+        },
+        {
+          "id": "W34",
+          "parent": "W33",
+          "component": "FinaleTakeaway"
+        },
+        {
+          "id": "W35",
+          "parent": "W33",
+          "component": "FinaleRecommendation"
+        },
+        {
+          "id": "W36",
+          "parent": "W33",
+          "component": "FinaleActions"
+        },
+        {
+          "id": "W37",
+          "parent": "BriefingDetailView",
+          "component": "BriefingRevisionBanner"
+        }
+      ],
+      "hiddenConditionals": [],
+      "quantitativeMarks": [
+        {
+          "sourceKey": "confidence.score",
+          "value": "68",
+          "kind": "confidence"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.0.intakeKcal",
+          "value": "2800",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.0.expenditureKcal",
+          "value": "2420",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.1.intakeKcal",
+          "value": "2760",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.1.expenditureKcal",
+          "value": "2460",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.2.intakeKcal",
+          "value": "2820",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.2.expenditureKcal",
+          "value": "2450",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.3.intakeKcal",
+          "value": "2770",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.3.expenditureKcal",
+          "value": "2410",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.4.intakeKcal",
+          "value": "2830",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.4.expenditureKcal",
+          "value": "2470",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.5.intakeKcal",
+          "value": "2790",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.5.expenditureKcal",
+          "value": "2430",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.6.intakeKcal",
+          "value": "2760",
+          "kind": "energy.intake"
+        },
+        {
+          "sourceKey": "weekly.energy.dailyBalances.6.expenditureKcal",
+          "value": "2440",
+          "kind": "energy.expenditure"
+        },
+        {
+          "sourceKey": "weekly.training.trainingDayCount",
+          "value": "4",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.comparableCategoryCount",
+          "value": "4",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.improvingCount",
+          "value": "2",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.steadyCount",
+          "value": "2",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.plateauingCount",
+          "value": "1",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.insufficientCount",
+          "value": "2",
+          "kind": "training-count"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.0.comparableExerciseCount",
+          "value": "3",
+          "kind": "priority-comparable"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.1.comparableExerciseCount",
+          "value": "4",
+          "kind": "priority-comparable"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.2.comparableExerciseCount",
+          "value": "3",
+          "kind": "priority-comparable"
+        },
+        {
+          "sourceKey": "weekly.training.priorityGroups.3.comparableExerciseCount",
+          "value": "4",
+          "kind": "priority-comparable"
+        }
+      ],
+      "quantMissing": [],
+      "quantMismatches": [],
+      "quantExtra": [],
+      "recoveryCount": 1,
+      "recoveryPositionValid": true,
+      "recoveryFixtureBoundaryVisible": true,
+      "recoveryConfidenceCouplingAbsent": true,
+      "chart": {
+        "type": "grouped-bar",
+        "series": [
+          "Intake",
+          "Estimated expenditure"
+        ],
+        "title": "Daily intake vs estimated expenditure",
+        "pointCount": 7,
+        "bars": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-29"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "date": "2026-08-29"
+          }
+        ]
+      },
+      "navigation": [
+        "Home",
+        "Briefing History"
+      ],
+      "accessibility": {
+        "bodySizes": [
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15,
+          15
+        ],
+        "priorityAlignments": [
+          "left",
+          "left",
+          "left",
+          "left"
+        ],
+        "priorityWidths": [
+          364,
+          364,
+          364,
+          364
+        ],
+        "chartLabel": "Daily intake and expenditure across 7 days"
+      },
+      "layoutSignature": {
+        "pageHeight": 3437,
+        "hero": [
+          372,
+          412
+        ],
+        "energy": [
+          372,
+          558
+        ],
+        "training": [
+          372,
+          991
+        ],
+        "priorityDisplay": "grid",
+        "priorityColumns": "364px",
+        "heroRadius": "0px",
+        "energyRadius": "0px",
+        "trainingBackground": "rgba(0, 0, 0, 0)",
+        "chartDisplay": "grid",
+        "chartColumns": "47.7031px 47.7188px 47.7188px 47.7031px 47.7188px 47.7188px 47.7188px",
+        "highlightColumns": "162.406px 123.422px 62.1719px"
+      },
+      "chartExact": true,
+      "sequenceExact": true,
+      "pass": true,
+      "accessibilityPass": true,
+      "parentageExact": true
+    }
+  },
+  "grayscaleDifference": {
+    "signatures": {
+      "data-editorial": {
+        "pageHeight": 4288,
+        "hero": [
+          354,
+          551
+        ],
+        "energy": [
+          354,
+          678
+        ],
+        "training": [
+          354,
+          1151
+        ],
+        "priorityDisplay": "block",
+        "priorityColumns": "none",
+        "heroRadius": "0px",
+        "energyRadius": "0px",
+        "trainingBackground": "rgba(0, 0, 0, 0)",
+        "chartDisplay": "grid",
+        "chartColumns": "42.8438px 42.8594px 42.8594px 42.8594px 42.8594px 42.8594px 42.8594px",
+        "highlightColumns": "270.281px 71.7188px"
+      },
+      "immersive-story": {
+        "pageHeight": 4802,
+        "hero": [
+          402,
+          756
+        ],
+        "energy": [
+          402,
+          801
+        ],
+        "training": [
+          402,
+          1303
+        ],
+        "priorityDisplay": "grid",
+        "priorityColumns": "169px 169px",
+        "heroRadius": "0px",
+        "energyRadius": "0px",
+        "trainingBackground": "rgba(0, 0, 0, 0)",
+        "chartDisplay": "grid",
+        "chartColumns": "354px",
+        "highlightColumns": "none"
+      },
+      "dense-analytical": {
+        "pageHeight": 3437,
+        "hero": [
+          372,
+          412
+        ],
+        "energy": [
+          372,
+          558
+        ],
+        "training": [
+          372,
+          991
+        ],
+        "priorityDisplay": "grid",
+        "priorityColumns": "364px",
+        "heroRadius": "0px",
+        "energyRadius": "0px",
+        "trainingBackground": "rgba(0, 0, 0, 0)",
+        "chartDisplay": "grid",
+        "chartColumns": "47.7031px 47.7188px 47.7188px 47.7031px 47.7188px 47.7188px 47.7188px",
+        "highlightColumns": "162.406px 123.422px 62.1719px"
+      }
+    },
+    "uniqueSignatureCount": 3,
+    "priorityTreatment": {
+      "data-editorial": "full-width three-column editorial rails",
+      "immersive-story": "two-column left-aligned scene matrix",
+      "dense-analytical": "two-column compact analytical rows"
+    },
+    "pass": true
+  },
+  "pass": true
+}

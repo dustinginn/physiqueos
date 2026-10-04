@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log direction locked; Weekly creative-formatting pass ready for Founder review**
+Status: **Home + Log direction locked; Weekly wide-leash A/B/C ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -129,7 +129,7 @@ Founder accepted this pass as the correct content/order/parity baseline but reje
 
 ## Weekly Briefing creative-formatting pass
 
-Status: **Ready for Founder review**
+Status: **REJECTED — too conservative/card-driven**
 
 The exact accepted content/order baseline now appears in three genuinely different visual-formatting directions, each in dark and mineral light:
 
@@ -147,4 +147,29 @@ Review set:
 
 All six renders preserve the exact canonical strings, W-ID order, domains, parentage, Confidence, Energy graph data, Training, Recovery seam, Coach's Take, Into Next Week, revision content and conditionals. The three directions pass a measured grayscale-difference gate. Priority Muscle Groups are full-width, left-aligned and compact in every direction; the rejected narrow/centered treatment is gone.
 
-Home remains locked. Log remains locked to Compact Command Center. No Weekly direction is accepted yet. No shipping Native source, Server behavior, production projection, Recovery policy, build or TestFlight state changed. The next gate is Founder review of the six full-length creative-formatting renders.
+Home remains locked. Log remains locked to Compact Command Center. No Weekly direction was accepted. No shipping Native source, Server behavior, production projection, Recovery policy, build or TestFlight state changed.
+
+Founder rejected this pass as still too conservative and card-driven. It remains historical evidence only and is replaced by the wide-leash pass below.
+
+## Weekly Briefing wide-leash data-composition pass
+
+Status: **A/B/C dark concepts ready for Founder review**
+
+The exact frozen Weekly information contract now appears in three materially different dark compositions:
+
+- A — Data Editorial;
+- B — Immersive Story;
+- C — Dense Analytical.
+
+Review set:
+
+- `agent-handoffs/artifacts/weekly-ui-wide-leash-20261004/README.md`
+- `agent-handoffs/artifacts/weekly-ui-wide-leash-20261004/comparison-board.html`
+- `agent-handoffs/artifacts/weekly-ui-wide-leash-20261004/screens/full-all-directions.png`
+- `agent-handoffs/artifacts/weekly-ui-wide-leash-20261004/DATA-FIELD-INVENTORY.md`
+- `agent-handoffs/artifacts/weekly-ui-wide-leash-20261004/QUANTITATIVE-MAPPINGS.md`
+- `agent-handoffs/artifacts/weekly-ui-wide-leash-20261004/PARITY-PROOF.md`
+
+All three preserve exact canonical words, metrics, domain order, Confidence semantics, Energy point data, Training records, future-only Recovery seam, Coach's Take, Into Next Week, provenance and conditionals. Cards are now exceptions. The three concepts pass distinct grayscale-layout signatures; all extra quantitative geometry is source-bound and validator-checked.
+
+Home and Log locks remain unchanged. Weekly is still not locked; light translation is intentionally deferred until Founder composition selection/refinement. No shipping Native source, Server behavior, production projection, Recovery policy, build or TestFlight state changed.
