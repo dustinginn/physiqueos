@@ -12,7 +12,7 @@ Review root:
 
 - `agent-handoffs/artifacts/goals-ui-style-translation-20261004/`
 - start: `agent-handoffs/artifacts/goals-ui-style-translation-20261004/comparison-board.html`
-- artifact checkpoint: `a45c5609eb47621af89e0d02606389f0c4846c05`
+- artifact checkpoint: `6bdd5bf887cb484fb84b5c44c87ce67025169436`
 
 ## Locked-design record
 
