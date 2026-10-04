@@ -2,27 +2,26 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: App-wide redesign coverage audit
+- Task: Foam Rolling Priority Detail locked-design implementation parity pilot
 - Agent: Codex
-- Status: Audit complete; Founder/ChatGPT review required; no redesign or implementation
-- Generated (UTC): 2026-10-04T20:42:47Z
-- Prompt authority: `961c61236a43d4edb22a30c1884bd5b722c305fd`
-- Work branch: `codex/app-wide-redesign-coverage-audit`
-- Work commit: `a762e6c3fa8c170a984bdfda8204a4510ba0b709`
-- Main report commit: `33352cc7efb7f3d75d8ef708a1e43730527d5caa`
-- Report: `agent-handoffs/reports/20261004T204247Z-app-wide-redesign-coverage-audit.md`
-- Coverage artifact: `agent-handoffs/artifacts/app-wide-redesign-coverage-audit-20261004/`
+- Status: Ready for Founder review; pilot complete; not scaled
+- Generated (UTC): 2026-10-04T20:52:43Z
+- Prompt authority: `b29fd2a39da7d15836c0a0f4b808d63e9b95954d`
+- Work branch: `codex/foam-rolling-priority-parity-pilot`
+- Implementation commit: `b65deb00098713d824f14064e0362726997b5991`
+- Artifact commit: `d065c15675bcc4fa3603618dc43da7b3d90bfbde`
+- Main report commit: `808f10a254e277302da248bdc648432c891fc276`
+- Report: `agent-handoffs/reports/20261004T205243Z-foam-rolling-priority-parity-pilot.md`
+- Review board: `agent-handoffs/artifacts/foam-rolling-priority-parity-pilot-20261004/` at artifact commit `d065c15675bcc4fa3603618dc43da7b3d90bfbde`
 
-Build 85 remains the newest Native authority. The audit classified every material current Native route, sheet, modal, viewer, exceptional state and app-owned extension without reopening any locked family.
+The locked Foam Rolling Priority Detail is implemented as the first and only parity pilot. Real iPhone 17 Pro simulator Dark and Mineral Light captures are published beside the exact accepted references at the same 402 × 874 point geometry. Visual, canonical content/data, navigation, complete/skip safety, setup-route, terminal-state, and reconciliation behavior pass the focused gates.
 
-Classification totals: A 64, B 15, C 9, D 10, E 0.
+Three comparison mismatches were corrected before publication: iOS 26 Liquid Glass back-button chrome, the exact 46-point crumb geometry, and UI automation identifier containment. No unresolved product-surface mismatch remains.
 
-Nine surface/state groups still require explicit design review: Home Confidence detail; Morning Check-In; manual/backdated weight; Briefing History; generic Evidence intake; Progress Photos intake; DEXA intake; generic Evidence Review; and the Home Screen Widget.
+Focused validation: 41 unit tests passed, 2 real-simulator UI tests passed, and the full Release simulator build succeeded for the app plus embedded Watch and Live Activity targets.
 
-They can be completed in three final direct-translation batches: Evidence Intake + Review, Daily Capture + Explanation, and Home Screen Widget closeout. After those are locked, the current-Native redesign can be considered design-complete.
+No other Priority Detail page was migrated. No TestFlight build was uploaded and no production state was mutated.
 
-The implementation-delta ledger was reviewed in full. No new entry was added. No Native UI, Server behavior, schema, production state, build or TestFlight state changed.
-
-Next: Founder/ChatGPT reviews the remaining-coverage map and authorizes the first final design batch.
+Next: Founder reviews the pilot board and implementation method. Do not scale to the rest of Priority Detail until explicitly authorized.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`

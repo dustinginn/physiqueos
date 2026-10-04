@@ -1,64 +1,57 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-04T20:42:47Z",
+  "generated_at_utc": "2026-10-04T20:52:43Z",
   "task": {
-    "id": "20261004-app-wide-redesign-coverage-audit",
-    "title": "App-wide redesign coverage audit",
+    "id": "20261004-foam-rolling-priority-parity-pilot",
+    "title": "Foam Rolling Priority Detail locked-design implementation parity pilot",
     "agent": "codex",
-    "status": "audit_complete_awaiting_founder_review"
+    "status": "ready_for_founder_review_pilot_complete_not_scaled"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "961c61236a43d4edb22a30c1884bd5b722c305fd",
-    "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "prompt_commit": "b29fd2a39da7d15836c0a0f4b808d63e9b95954d",
+    "native_base_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
     "native_build": 85,
-    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "locked_design_branch": "codex/priority-detail-ui-style-translation",
+    "locked_design_commit": "1ff803ac"
   },
   "publication": {
-    "source_work_branch": "codex/app-wide-redesign-coverage-audit",
-    "source_work_commit": "a762e6c3fa8c170a984bdfda8204a4510ba0b709",
-    "main_report_commit": "33352cc7efb7f3d75d8ef708a1e43730527d5caa",
-    "report_path": "agent-handoffs/reports/20261004T204247Z-app-wide-redesign-coverage-audit.md",
-    "artifact_root": "agent-handoffs/artifacts/app-wide-redesign-coverage-audit-20261004/",
-    "coverage_matrix": "agent-handoffs/artifacts/app-wide-redesign-coverage-audit-20261004/SURFACE-COVERAGE-MATRIX.tsv",
-    "source_proof": "agent-handoffs/artifacts/app-wide-redesign-coverage-audit-20261004/SOURCE-COVERAGE-PROOF.md",
-    "validation": "agent-handoffs/artifacts/app-wide-redesign-coverage-audit-20261004/validation.json"
+    "source_work_branch": "codex/foam-rolling-priority-parity-pilot",
+    "implementation_commit": "b65deb00098713d824f14064e0362726997b5991",
+    "artifact_commit": "d065c15675bcc4fa3603618dc43da7b3d90bfbde",
+    "source_work_commit": "d065c15675bcc4fa3603618dc43da7b3d90bfbde",
+    "main_report_commit": "808f10a254e277302da248bdc648432c891fc276",
+    "report_path": "agent-handoffs/reports/20261004T205243Z-foam-rolling-priority-parity-pilot.md",
+    "artifact_root": "agent-handoffs/artifacts/foam-rolling-priority-parity-pilot-20261004/",
+    "review_board": "agent-handoffs/artifacts/foam-rolling-priority-parity-pilot-20261004/README.md",
+    "comparison_page": "agent-handoffs/artifacts/foam-rolling-priority-parity-pilot-20261004/comparison-board.html",
+    "validation": "agent-handoffs/artifacts/foam-rolling-priority-parity-pilot-20261004/validation.json"
   },
   "result": {
-    "summary": "The exhaustive Build 85 route/surface audit found nine material current Native surface/state groups still needing explicit design review, grouped into three final direct-translation batches.",
-    "material_surface_state_groups": 98,
-    "classification_counts": {
-      "A": 64,
-      "B": 15,
-      "C": 9,
-      "D": 10,
-      "E": 0
+    "summary": "The locked Foam Rolling Priority Detail is implemented as the first and only parity pilot. Exact locked references and unmodified real-simulator Dark/Mineral-Light captures are published together; visual, content/data and behavior parity pass with no unresolved product-surface mismatch.",
+    "visual_parity": "passed",
+    "content_data_parity": "passed",
+    "behavior_parity": "passed",
+    "unit_tests": {
+      "passed": 41,
+      "failed": 0
     },
-    "remaining_design_ids": [
-      "H02",
-      "L04",
-      "L05",
-      "B06",
-      "E20",
-      "E21",
-      "E22",
-      "E23",
-      "U04"
-    ],
-    "recommended_final_batches": [
-      "Evidence Intake and Review",
-      "Daily Capture and Explanation",
-      "Home Screen Widget closeout"
-    ],
-    "design_complete_now": false,
-    "design_complete_after_remaining_batches": true,
-    "new_implementation_deltas": 0,
-    "shipping_code_changed": false,
-    "server_behavior_changed": false,
+    "ui_tests": {
+      "passed": 2,
+      "failed": 0,
+      "device": "iPhone 17 Pro simulator",
+      "os": "iOS 26.5"
+    },
+    "release_compile": "passed",
+    "mismatches_found_and_corrected": 3,
+    "remaining_product_surface_mismatches": 0,
+    "other_priority_pages_migrated": false,
+    "testflight_uploaded": false,
     "production_mutated": false
   },
-  "recommended_next_step": "Founder/ChatGPT reviews the remaining-coverage map and authorizes the first final design batch.",
-  "stop_reason": "Every current material Native route, sheet, modal, viewer, exceptional state, system surface and app-owned extension is classified; no redesign or implementation was authorized in this task.",
+  "recommended_next_step": "Founder reviews the focused pilot board and implementation method; do not scale to other Priority Detail pages until explicitly authorized.",
+  "stop_reason": "Foam Rolling alone has reached the requested visual, content/data and behavior parity gates, with implementation and artifact commits published separately.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
