@@ -2,7 +2,8 @@
 
 - Generated (UTC): `2026-10-04T06:13:43Z`
 - Assignment authority: `8b82acfd569d3878166e96d8618fd1a475fc7987`
-- Reporting branch: `codex/mac-storage-audit-cleanup-20261004`
+- Clean final reporting branch: `codex/mac-storage-audit-cleanup-final-20261004`
+- Pre-cleanup checkpoint branch: `codex/mac-storage-audit-cleanup-20261004`
 - Pre-cleanup checkpoint: `ce95af38`
 - Status: **COMPLETE — all material Tier 1/2 candidates proven safe in the active-work context were cleaned; 30 GiB was not safely reachable**
 
