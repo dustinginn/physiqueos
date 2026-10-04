@@ -2,26 +2,28 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Priority Detail lock + Operating Plan UI style translation
+- Task: DEXA, Progress Photos + Timeline Evidence UI style translation
 - Agent: Codex
-- Status: Operating Plan ready for Founder review; implementation not started
-- Generated (UTC): 2026-10-04T18:42:09Z
-- Work branch: `codex/operating-plan-ui-style-translation`
-- Work/report commit: `5a1e14c19c622c29891732fe777a5aa73d6cdcf6`
-- Artifact commit: `89d05249f90cb65da5941d08d987eba50bfb18ce`
-- Artifact root: `agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/`
-- Primary review PNG: `agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/screens/operating-plan-mobile-review.png`
+- Status: remaining Evidence family ready for Founder review; implementation not started
+- Generated (UTC): 2026-10-04T18:46:16Z
+- Work branch: `codex/dexa-photos-timeline-evidence-design`
+- Work/report commit: `3cd351107d42e221e12a68eea53396f3b526e429`
+- Artifact commit: `f7d72f19bdabadc6cafb53354812e0e86fca353f`
+- Main report commit before pointer update: `a0b56ec62d11149641b4c3c82894a27d8251c33d`
+- Artifact root: `agent-handoffs/artifacts/dexa-photos-timeline-evidence-style-translation-20261004/`
+- Primary mobile review PNG: `agent-handoffs/artifacts/dexa-photos-timeline-evidence-style-translation-20261004/screens/primary-mobile-review-board.png`
+- Concise review page: `agent-handoffs/artifacts/dexa-photos-timeline-evidence-style-translation-20261004/comparison-board.html`
 
-Priority Detail is now locked. Tesamorelin has one Preparation section containing both canonical requirements without changing dose/completion semantics.
+The Evidence Hub now shows only real current streams in the target design, with Recovery before Timeline and Timeline last. Health Metrics and all Coming Soon/future-placeholder UI are absent.
 
-Operating Plan root, Energy, Nutrition and Training have one source-audited translation in dark and mineral light. The root retains all eight current domains in Server order. Energy remains read-only; Nutrition and Training retain their exact Edit Strategy routes. The visual hierarchy changes without turning strategy pages into Evidence or Logger surfaces.
+DEXA preserves its actual single-page report/history hierarchy, exact metric families, inline disclosures, BodySpec PDF and Health reconciliation states. Progress Photos preserves its actual root, inline Show All history, set detail, pose comparison, current one-image inspection viewer and authenticated-media states. Timeline remains a bounded, newest-first, read-only server-authored record with no invented filters, coaching or row destinations.
 
-Automated parity validation passed for all eight Operating Plan renders at 402 pt width. The source audit found one genuine gap: Founder-production Energy detail does not project preserved prior-phase strategy history even though the Server can resolve it and Native sandbox/view models support it. This is now in the implementation-delta ledger; no history was fabricated in the mockups.
+The review package includes ten direct templates in both dark and mineral light, four zero-gap coverage matrices, a mobile-friendly primary composite and deterministic validation. Build 85 proves both historical Progress Photos issues are resolved; the canonical ledger now records those resolutions plus the genuine Hub implementation requirement.
 
-No shipping Native code, Server behavior, production strategy, phase transition, build or TestFlight state changed.
+No shipping Native/Server source, production data, build, deployment or release state changed.
 
-Next: Founder reviews the primary mobile composite and confirms or corrects the Operating Plan translation.
+Next: Founder reviews and confirms the remaining Evidence family.
 
-Detailed report: `agent-handoffs/reports/20261004T193500Z-operating-plan-ui-style-translation.md`
+Detailed report: `agent-handoffs/reports/20261004T193501Z-dexa-photos-timeline-evidence-ui-style-translation.md`
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
