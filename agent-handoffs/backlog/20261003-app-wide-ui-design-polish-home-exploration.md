@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log direction locked; Weekly wide-leash A/B/C ready for Founder review**
+Status: **Home + Log direction locked; Weekly B-hero + C-body confirmation candidate ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -173,3 +173,21 @@ Review set:
 All three preserve exact canonical words, metrics, domain order, Confidence semantics, Energy point data, Training records, future-only Recovery seam, Coach's Take, Into Next Week, provenance and conditionals. Cards are now exceptions. The three concepts pass distinct grayscale-layout signatures; all extra quantitative geometry is source-bound and validator-checked.
 
 Home and Log locks remain unchanged. Weekly is still not locked; light translation is intentionally deferred until Founder composition selection/refinement. No shipping Native source, Server behavior, production projection, Recovery policy, build or TestFlight state changed.
+
+## Weekly Briefing B-hero + C-body hybrid
+
+Status: **Founder-requested confirmation candidate; not locked**
+
+The dark hybrid starts from C — Dense Analytical as the complete page and replaces only `W02` with B — Immersive Story's teal/navy lead field, large 68% Confidence trajectory, lead typography, integrated period/strategy treatment, and spacing rhythm. Energy through revision remain C without reinterpretation.
+
+Artifacts:
+
+- `agent-handoffs/artifacts/weekly-ui-b-hero-c-body-hybrid-20261004/README.md`
+- `agent-handoffs/artifacts/weekly-ui-b-hero-c-body-hybrid-20261004/screens/hybrid-dark-full.png`
+- `agent-handoffs/artifacts/weekly-ui-b-hero-c-body-hybrid-20261004/screens/b-c-hybrid-full-comparison.png`
+- `agent-handoffs/artifacts/weekly-ui-b-hero-c-body-hybrid-20261004/HYBRID-PROOF.md`
+- `agent-handoffs/artifacts/weekly-ui-b-hero-c-body-hybrid-20261004/validation.json`
+
+Validation remains exact: 86/86 semantic fields, canonical W-ID order and parentage, Confidence, Energy graph/dates/series/values, 25 provenance marks, Coach's Take, What To Do, Into Next Week, and revision provenance. Recovery appears exactly once in the approved future location, remains fixture-only, and has no Confidence coupling. Computed geometry and visual-style signatures prove exact B hero composition and exact C body composition.
+
+Home and Log locks remain unchanged. Weekly remains unaccepted pending Founder review. Mineral-light translation remains deferred. No shipping Native source, Server behavior, production projection, Recovery policy, build or TestFlight state changed.
