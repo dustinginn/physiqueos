@@ -9,7 +9,7 @@
 
 ## Outcome
 
-Two exact regenerable targets were deleted after process, Git-ignore, tracking, age, and open-handle gates. Data-volume free space rose from **14,020,088 KiB (13.371 GiB)** immediately before cleanup to **16,079,328 KiB (15.334 GiB)** at final measurement: a net filesystem gain of **2,059,240 KiB (1.964 GiB)**. The nominal allocated size of the two deleted targets was 2,234,800 KiB (2.131 GiB); concurrent macOS and active design work account for the difference.
+Two pre-existing regenerable targets were deleted after process, Git-ignore, tracking, age, and open-handle gates. After the report was published, the task-created clean report worktree was also removed with Git tooling. Data-volume free space rose from **14,020,088 KiB (13.371 GiB)** immediately before cleanup to **16,372,732 KiB (15.614 GiB)** at final measurement: a net filesystem gain of **2,352,644 KiB (2.244 GiB)**. The nominal allocated size of the three deleted targets was 2,616,244 KiB (2.495 GiB); concurrent macOS and active design work account for the difference.
 
 The result is above the standing 15 GiB hard floor but below the preferred 20–30 GiB development reserve. The 30 GiB target could not be reached without touching active/ambiguous work, active tooling caches, current simulator/runtime state, unique logs, or protected recovery/release material, so cleanup stopped.
 
@@ -122,7 +122,7 @@ All paths were also stat'ed and checked against process CWD/open-file evidence. 
 | `~/Developer/PhysiqueOS/server/.claude/worktrees/healthkit-sleep-phase-a-fresh-20260930` | `fcd2630906ae` | `claude/sleep-evidence-polish-20261001` | clean | yes |
 | `~/Developer/PhysiqueOS/unified-v3-base` | `895935bdbec8` | detached | clean | yes |
 
-The report-only worktree temporarily raised the registry to 51 and will be removed with `git worktree remove` after final publication, returning the current database to 50.
+The report-only worktree temporarily raised the registry to 51. After final publication it was clean, removed with `git worktree remove`, and the current database returned to its original 50 entries.
 
 ### Legacy Documents/File Provider Git database
 
@@ -175,6 +175,7 @@ The separate legacy common database reported **38 registered entries**. Registry
 |---|---|---:|---|
 | Apple-generated cache | `~/Library/Containers/com.apple.mediaanalysisd/Data/Library/Caches` | 1,553,788 KiB (1.482 GiB) | Entire target was under `Library/Caches`; no source media included; exact `lsof +D` was empty immediately before deletion; previously proven regenerable. Incremental free-space gain: 1,559,472 KiB. |
 | Next.js provider-check build output | `~/GitHub/physiqueos-server-plumbing-goal-phase-priority-reconciled/.next-provider-check` | 681,012 KiB (0.650 GiB) | Git-ignore rule `/.next-provider-check*/`; `git ls-files` proved untracked; worktree status was clean and identical before/after; contents were Next cache/server/standalone output; last written 2026-09-09; exact `lsof +D` empty. Incremental free-space gain: 685,424 KiB. |
+| Task-created report worktree | `/private/tmp/physiqueos-storage-audit-report` | 381,444 KiB (0.364 GiB) | Created only to isolate report publication from active design work; clean; all commits already on the GH final-report branch; removed with `git worktree remove`, not raw filesystem deletion. Registry returned 51 -> 50. Incremental free-space gain at removal: 293,404 KiB. |
 
 The second deletion removed only the ignored generated subtree. The legacy linked worktree, its `.git` pointer, all tracked files, screenshots, and unique source remained.
 
@@ -199,9 +200,9 @@ System swap could release several GiB after a user-directed restart or applicati
 
 | Metric | Result |
 |---|---:|
-| Data-volume used | 439,907,704 KiB (419.529 GiB) |
-| Data-volume available | **16,079,328 KiB (15.334 GiB)** |
-| Net filesystem gain | **2,059,240 KiB (1.964 GiB)** |
+| Data-volume used | 439,614,300 KiB (419.249 GiB) |
+| Data-volume available | **16,372,732 KiB (15.614 GiB)** |
+| Net filesystem gain | **2,352,644 KiB (2.244 GiB)** |
 
 - Primary common Git database: `git fsck --connectivity-only --no-reflogs` exited 0. It reported ordinary dangling objects but no corruption; none were pruned or expired.
 - Registered worktrees: all 50 original current-database worktrees remained present. No worktree was removed. The isolated report worktree is temporary and report-only.

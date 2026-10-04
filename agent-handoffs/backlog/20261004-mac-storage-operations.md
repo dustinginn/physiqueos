@@ -1,8 +1,8 @@
 # Mac storage operations backlog — 2026-10-04
 
 - Last conflict-safe cleanup: `2026-10-04T06:13:43Z`.
-- Free space after cleanup: **16,079,328 KiB (15.334 GiB)**.
-- Net reclaimed: **2,059,240 KiB (1.964 GiB)**; only an Apple media-analysis cache and an ignored September Next.js provider-check build were deleted.
+- Free space after cleanup and report-worktree housekeeping: **16,372,732 KiB (15.614 GiB)**.
+- Net reclaimed from the pre-delete checkpoint: **2,352,644 KiB (2.244 GiB)**. Pre-existing cleanup removed only an Apple media-analysis cache and an ignored September Next.js provider-check build; the clean task-created report worktree was then removed with Git tooling after publication.
 - Standing trigger: audit when free disk falls below **30 GiB**; never start or continue disk-intensive work below the existing **15 GiB hard floor**.
 
 ## Remaining Tier 3 candidates
