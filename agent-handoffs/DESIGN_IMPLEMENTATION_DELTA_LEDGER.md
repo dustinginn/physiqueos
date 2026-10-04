@@ -206,7 +206,133 @@ For the same fixture, every continuity value and gap matches Build 85. The visua
 
 Status: OPEN.
 
+### You / Settings — real route family and product boundary
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION
+
+Discovery:
+You / Settings / Profile source audit against Build 85 Native and Server.
+Report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
+
+Current Build 85 behavior:
+The You tab owns a NavigationStack but renders `YouPlaceholderView`. It exposes Operating Plan, Founder device-connection diagnostics and a DEXA writeback control. Native has no Settings, Profile, Data Sources, Apple Health detail or Appearance destinations. The current web You root preserves Goals and Operating Plan but its Integrations row has no destination.
+
+Accepted/required target:
+Preserve You, Goals and Operating Plan. Replace the dead Integrations doorway with a real Settings doorway. Add typed Settings, Profile, Data Sources, Apple Health detail and Appearance routes. Keep Founder engineering diagnostics out of the product hierarchy and do not turn Settings into another Evidence Hub.
+
+Implementation implication:
+Add destination cases, coding, shared router handling, screens/read models and tests. Preserve stack/back behavior and tab ownership. Do not add generic web-href routing.
+
+Acceptance:
+From You, Goals and Operating Plan behave unchanged. Settings opens the compact target root; each approved row reaches exactly one typed destination and returns correctly. No dead Integrations, Coming Soon, Founder device diagnostics, raw tokens or Evidence duplication appear.
+
+Status: OPEN.
+
+### Profile — canonical read, versioned edit and durable fields
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION
+
+Discovery:
+You / Settings / Profile source audit against Build 85 Native and Server.
+Report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
+
+Current Build 85 behavior:
+Server already publishes an authenticated owner-scoped `/api/v1/native/profile` read. Native has an unused partial decoder. The legacy user model contains display/first/last name, email, timezone, DOB, sex, height and weight-unit preference, while the durable foundation `user_profiles` table stores only display name and time zone. No allowlisted Native command updates the profile.
+
+Accepted/required target:
+Profile exposes only Preferred name, Height, Time zone and Weight units. Establish one canonical preferred-name rule. Date of birth, biological sex, email, Goal, Weight and DEXA values are excluded. Changes never rewrite historical Evidence or occurrence/source time zones.
+
+Implementation implication:
+Extend the Native read projection/decoder; add durable height and weight-unit storage; normalize one IANA time zone; define one versioned owner-scoped update command with validation, expected-version conflict and canonical response; reconcile the current `firstName` greeting fallback with the preferred-name rule.
+
+Acceptance:
+The four fields load from canonical Server state, save atomically, survive relaunch/re-pairing, reject invalid values without losing edits, and produce deterministic version conflicts. Unit changes affect presentation/input defaults only. Existing Evidence values and historical time zones remain unchanged. Excluded fields never appear or transmit.
+
+Status: OPEN.
+
+### Appearance — System, Dark and locked Mineral Light
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION
+
+Discovery:
+You / Settings / Profile source audit against Build 85 Native.
+Report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
+
+Current Build 85 behavior:
+`PhysiqueOSApp` forces `.preferredColorScheme(.dark)` and `PhysiqueOSTheme` is a static dark-only token set. Native has no appearance preference model or persistence. The web theme localStorage implementation does not provide a Native theme contract.
+
+Accepted/required target:
+Appearance offers System, Dark and Light. System is the default for new users. Light means the locked Mineral Light palette. Selection applies across product screens and system controls, is indicated by text plus checkmark, and persists on the device.
+
+Implementation implication:
+Add a typed device-local appearance preference/store, resolve System to a nil root override and explicit modes to light/dark, replace static dark colors with dynamic locked token pairs, and audit all app, widget, Live Activity and modal surfaces for correct ownership. Do not store this display-only preference in canonical Evidence.
+
+Acceptance:
+A fresh install follows the iPhone appearance. Choosing Dark or Light updates the whole app immediately and survives relaunch. System resumes following OS changes. Every locked key screen is readable in dark and Mineral Light, selected state is not color-only, and no screen remains fixed dark unintentionally.
+
+Status: OPEN.
+
+### Data Sources — user-safe Apple Health state projection
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION
+
+Discovery:
+You / Settings / Profile source audit against Build 85 Native HealthKit architecture.
+Report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
+
+Current Build 85 behavior:
+Activity, Nutrition and Workout HealthKit synchronization exist; Sleep is Server-capability-gated; DEXA may explicitly write Body Fat Percentage and Lean Body Mass; Weight write is absent. Authorization, last outcomes and durable stream acknowledgements exist internally, but there is no user-readable source projection. Apple does not disclose per-type read denial.
+
+Accepted/required target:
+Data Sources lists Apple Health as the actual external source and shows what PhysiqueOS receives/sends. It distinguishes connected, no-visible-data/action-needed, Server-inactive and unavailable states without claiming a read permission was denied. It never exposes cursors, raw source identifiers, error codes or Evidence content.
+
+Implementation implication:
+Create a typed user-safe source read model from HealthKit availability, authorization request state, Server capability, DEXA writeback preference and durable acknowledged times. Define freshness/stale thresholds before using those labels. Provide a supported review-access action and keep engineering diagnostics separate.
+
+Acceptance:
+Connected and limited fixtures render the exact audited domains/directions. Sleep is active only when the Server capability is active. Empty reads display no visible data, not denied. Weight remains Not sent. Raw diagnostics never reach the screen. Relaunch preserves the last confirmed state without inventing freshness.
+
+Status: OPEN.
+
+### Account — end-user one-device Sign Out boundary
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION
+
+Discovery:
+You / Settings / Profile beta-readiness audit against current Native session code and approved platform architecture.
+Report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
+
+Current Build 85 behavior:
+Founder Production can revoke the current session and delete its Keychain credential from a diagnostic connection screen. Production read snapshots are retired, but there is no end-user Settings action that guarantees all protected user-scoped caches/drafts are cleared and returns to a secure enrollment state.
+
+Accepted/required target:
+Settings shows the current device account state and a destructive Sign Out action for this device. Sign Out revokes the current session, clears local credentials and protected user-scoped state, and returns to secure pairing/re-enrollment. It never deletes canonical Server data.
+
+Implementation implication:
+Create one auditable sign-out coordinator spanning session revocation, Keychain deletion fallback, read/media cache retirement, user-scoped draft and widget/live surface cleanup, HealthKit owner/device state separation, and navigation reset. Define safe offline failure behavior without falsely claiming revocation.
+
+Acceptance:
+Online Sign Out revokes the session, clears protected local state, ends user-specific projections and opens enrollment. Relaunch cannot recover the old session or cached content. A failed/offline revocation reports the truth and does not silently delete the only local credential unless policy explicitly allows it. Canonical Server data remains intact.
+
+Status: OPEN.
+
 ## Architectural context / do not automatically patch
+
+### You / Settings — controlled-beta account boundary
+
+Classification: ARCHITECTURAL CONTEXT
+
+Discovery:
+You / Settings beta-readiness audit.
+Report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
+
+Current/target boundary:
+Owner-scoped identities, devices and sessions already support the controlled Founder/private-TestFlight model. The accepted initial Settings target does not authorize public signup, email/password identity, consumer recovery, billing, data export or account-deletion destinations. Operator-assisted recovery remains the current approved boundary.
+
+Implication:
+Do not add dead or Coming Soon account destinations during Settings implementation. Before a broader self-serve or external beta, Founder must separately decide distribution, recovery and privacy/deletion policy; those decisions may create new required contracts and UI.
+
+Status: DOCUMENTED.
 
 ### Training Evidence — performance record presentation level
 

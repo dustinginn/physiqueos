@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "screens": [
+    "D1",
+    "Y1",
+    "S1",
+    "P1",
+    "DS1",
+    "DS2",
+    "DS3",
+    "A1"
+  ],
+  "themes": [
+    "dark",
+    "light"
+  ],
+  "renderCount": 16,
+  "runtimeErrors": [],
+  "reviewMetrics": {
+    "width": 920,
+    "viewportWidth": 920,
+    "imageCount": 17,
+    "brokenImages": []
+  },
+  "mobileMetrics": {
+    "scrollWidth": 390,
+    "viewportWidth": 390,
+    "brokenImages": []
+  },
+  "results": [
+    {
+      "id": "D1",
+      "theme": "dark",
+      "output": "screens/d1-dark.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "D1",
+      "theme": "light",
+      "output": "screens/d1-light.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "Y1",
+      "theme": "dark",
+      "output": "screens/y1-dark.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "Y1",
+      "theme": "light",
+      "output": "screens/y1-light.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "S1",
+      "theme": "dark",
+      "output": "screens/s1-dark.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "S1",
+      "theme": "light",
+      "output": "screens/s1-light.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "P1",
+      "theme": "dark",
+      "output": "screens/p1-dark.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "P1",
+      "theme": "light",
+      "output": "screens/p1-light.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "DS1",
+      "theme": "dark",
+      "output": "screens/ds1-dark.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "DS1",
+      "theme": "light",
+      "output": "screens/ds1-light.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "DS2",
+      "theme": "dark",
+      "output": "screens/ds2-dark.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "DS2",
+      "theme": "light",
+      "output": "screens/ds2-light.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "DS3",
+      "theme": "dark",
+      "output": "screens/ds3-dark.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "DS3",
+      "theme": "light",
+      "output": "screens/ds3-light.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "A1",
+      "theme": "dark",
+      "output": "screens/a1-dark.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    },
+    {
+      "id": "A1",
+      "theme": "light",
+      "output": "screens/a1-light.png",
+      "bodyWidth": 430,
+      "viewportWidth": 430,
+      "phoneRight": 401,
+      "phoneLeft": 29,
+      "clippedContent": false
+    }
+  ],
+  "pass": true,
+  "failures": []
+}
