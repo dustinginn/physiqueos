@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "midweek_ui_semantic_manifest_v1",
+  "authority": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+  "currentProductionSequence": [
+    "M01", "M02", "M03", "M04", "M05", "M06", "M07", "M08", "M09", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21"
+  ],
+  "sections": [
+    {"id":"M01","name":"Pre-hero navigation","source":"BriefingDetailPreHeroNavigation"},
+    {"id":"M02","name":"Integrated lead","source":"MidweekBriefingSections.hero / BriefingLeadCard"},
+    {"id":"M03","name":"Confidence","source":"presentationContract.lead.confidence","conditional":"absent when contract Confidence absent"},
+    {"id":"M04","name":"Result headline","source":"presentationContract.lead.headline"},
+    {"id":"M05","name":"Meaning","source":"presentationContract.lead.meaning","conditional":"may be empty after Server dedup"},
+    {"id":"M06","name":"Goal & Phase","source":"presentationContract.lead.goal / phase"},
+    {"id":"M07","name":"Energy","source":"presentationContract.modules[id=energy] + energyBalance"},
+    {"id":"M08","name":"Energy daily semantic rows","source":"energyBalance.chartPoints"},
+    {"id":"M09","name":"Energy metrics","source":"energyBalance averages"},
+    {"id":"M10","name":"Energy grouped-bar chart","source":"energyBalance.chartPoints","conditional":"module.chartIncluded == true"},
+    {"id":"M11","name":"Energy legend","source":"chart series identities"},
+    {"id":"M12","name":"Weight Context","source":"presentationContract.modules[id=weight] + weightContext"},
+    {"id":"M13","name":"Body Composition","source":"presentationContract.modules[id=body_composition] + current scan/baseline"},
+    {"id":"M14","name":"Body Composition metrics","source":"bodyComposition newScan/baseline"},
+    {"id":"M15","name":"Training Response","source":"presentationContract.modules[id=training] + training"},
+    {"id":"M16","name":"Training highlight 1","source":"training.highlights[0]"},
+    {"id":"M17","name":"Training highlight 2","source":"training.highlights[1]"},
+    {"id":"M18","name":"Still Unresolved","source":"presentationContract.uncertainty.visibleItems","conditional":"absent when empty; max 2"},
+    {"id":"M19","name":"Coach's Take finale","source":"presentationContract.coaching"},
+    {"id":"M20","name":"What To Do","source":"coaching[section=action]","conditional":"absent when no distinct claim"},
+    {"id":"M21","name":"What To Watch","source":"coaching[section=watch]","conditional":"absent when no distinct claim"}
+  ],
+  "conditionalAbsencesInFixture": [
+    "Priority Muscle Groups",
+    "Training Watch",
+    "Biggest Takeaway",
+    "Revision banner",
+    "Production Recovery"
+  ],
+  "futureFixture": {
+    "id": "R-MIDWEEK-FUTURE",
+    "name": "Recovery V1 future contract",
+    "placement": "after M17 and before M18/M19",
+    "currentProduction": false,
+    "confidenceCoupling": "none"
+  }
+}

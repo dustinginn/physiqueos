@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log direction locked; Weekly B-hero + C-body confirmation candidate ready for Founder review**
+Status: **Home + Log + Weekly direction locked; Midweek dark translation ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -176,7 +176,7 @@ Home and Log locks remain unchanged. Weekly is still not locked; light translati
 
 ## Weekly Briefing B-hero + C-body hybrid
 
-Status: **Founder-requested confirmation candidate; not locked**
+Status: **LOCKED — briefing-family visual reference**
 
 The dark hybrid starts from C — Dense Analytical as the complete page and replaces only `W02` with B — Immersive Story's teal/navy lead field, large 68% Confidence trajectory, lead typography, integrated period/strategy treatment, and spacing rhythm. Energy through revision remain C without reinterpretation.
 
@@ -190,4 +190,23 @@ Artifacts:
 
 Validation remains exact: 86/86 semantic fields, canonical W-ID order and parentage, Confidence, Energy graph/dates/series/values, 25 provenance marks, Coach's Take, What To Do, Into Next Week, and revision provenance. Recovery appears exactly once in the approved future location, remains fixture-only, and has no Confidence coupling. Computed geometry and visual-style signatures prove exact B hero composition and exact C body composition.
 
-Home and Log locks remain unchanged. Weekly remains unaccepted pending Founder review. Mineral-light translation remains deferred. No shipping Native source, Server behavior, production projection, Recovery policy, build or TestFlight state changed.
+The Founder accepted this exact hybrid. Weekly is now locked for design purposes as the briefing-family reference. No shipping implementation has started; mineral-light translation remains deferred.
+
+## Midweek translation from locked Weekly visual family
+
+Status: **Dark translation ready for Founder review; not locked**
+
+The actual Build 85 Midweek V3 implementation and current production Server contract were audited independently from Weekly. The translation preserves Midweek's own cadence and exact structure: integrated lead; Energy; Weight; Body Composition; Training; bounded Still Unresolved; and contract-driven Coach's Take finale. It uses the locked immersive hero and dense analytical body grammar without importing Weekly content or layout requirements.
+
+Review set:
+
+- `agent-handoffs/artifacts/midweek-ui-locked-weekly-translation-20261004/README.md`
+- `agent-handoffs/artifacts/midweek-ui-locked-weekly-translation-20261004/screens/midweek-dark-full.png`
+- `agent-handoffs/artifacts/midweek-ui-locked-weekly-translation-20261004/screens/locked-weekly-midweek-family-board.png`
+- `agent-handoffs/artifacts/midweek-ui-locked-weekly-translation-20261004/CURRENT-MIDWEEK-AUDIT.md`
+- `agent-handoffs/artifacts/midweek-ui-locked-weekly-translation-20261004/PARITY-PROOF.md`
+- `agent-handoffs/artifacts/midweek-ui-locked-weekly-translation-20261004/validation.json`
+
+Validation passes 61/61 current rendered semantic fields, exact Midweek-specific M-ID order, exact 79% Confidence semantics/geometry, the sole current Energy graph with both dates/two series/four values, 23 quantitative provenance marks, Narrative V3 placement and all current conditional absences. The approved Recovery V1 architecture explicitly plans a Midweek surface after Training and before Coach's Take, so a separate **FUTURE CONTRACT · FIXTURE ONLY** surface appears there with no Confidence coupling. Current production Recovery remains excluded and unactivated.
+
+No shipping Native source, Server behavior, production content projection, Recovery policy, build or TestFlight state changed. Midweek implementation has not started; mineral-light remains deferred until Founder review.

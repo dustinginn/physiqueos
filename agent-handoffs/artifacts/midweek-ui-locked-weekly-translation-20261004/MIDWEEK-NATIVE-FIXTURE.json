@@ -1,0 +1,187 @@
+{
+  "fixtureId": "midweek-v3c",
+  "fixtureRole": "Build 85 production-shaped Midweek V3 presentation-contract fixture",
+  "authorities": {
+    "nativeBuild85": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "productionServer": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "prompt": "5a8d13f67f85cb3c5a93a43bb497f03207c07ca7",
+    "lockedWeeklyArtifact": "agent-handoffs/artifacts/weekly-ui-b-hero-c-body-hybrid-20261004"
+  },
+  "artifact": {
+    "artifactId": "midweek-v3c",
+    "cadence": "midweek",
+    "version": 3,
+    "evidenceWindow": {
+      "startDate": "2026-09-20",
+      "endDate": "2026-09-22",
+      "timeZone": "America/Los_Angeles",
+      "displayRange": "Sep 20–22"
+    }
+  },
+  "lead": {
+    "eyebrow": "MIDWEEK BRIEFING",
+    "headline": "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.",
+    "meaning": "Building Lean Mass, training stayed on track through midweek.",
+    "goal": "Build Lean Mass",
+    "phase": "Lean Mass Build",
+    "confidence": {
+      "score": 79,
+      "band": "high",
+      "movement": "no_meaningful_change",
+      "movementDirection": "held",
+      "delta": 0,
+      "reason": "Training stayed consistent and Confidence held steady.",
+      "movementLabel": "— No meaningful change"
+    }
+  },
+  "modules": [
+    {
+      "id": "energy",
+      "included": true,
+      "order": 1,
+      "reasonCode": "paired_evidence",
+      "pairedDayCount": 2,
+      "chartIncluded": true,
+      "chartReason": "minimum_pair_count_met"
+    },
+    {
+      "id": "weight",
+      "included": true,
+      "order": 2,
+      "reasonCode": "sufficient_observations",
+      "observationCount": 3
+    },
+    {
+      "id": "body_composition",
+      "included": true,
+      "order": 3,
+      "reasonCode": "phase_baseline"
+    },
+    {
+      "id": "training",
+      "included": true,
+      "order": 4,
+      "reasonCode": "qualifying_training_evidence"
+    },
+    {
+      "id": "recovery",
+      "included": false,
+      "order": 5,
+      "reasonCode": "no_eligible_evidence"
+    }
+  ],
+  "energy": {
+    "pairedDayCount": 2,
+    "eligibleDayCount": 2,
+    "headline": "Energy Balance",
+    "balanceHeadline": "50 kcal/day below",
+    "averageIntakeKcal": 2650,
+    "averageExpenditureKcal": 2700,
+    "averageBalanceKcal": -50,
+    "chartTitle": "Daily intake vs estimated expenditure",
+    "dailyBalances": [
+      {
+        "date": "2026-09-20",
+        "label": "Su",
+        "weekday": "Sunday",
+        "intakeKcal": 2600,
+        "expenditureKcal": 2680,
+        "balanceKcal": -80,
+        "complete": true
+      },
+      {
+        "date": "2026-09-21",
+        "label": "Mo",
+        "weekday": "Monday",
+        "intakeKcal": 2700,
+        "expenditureKcal": 2720,
+        "balanceKcal": -20,
+        "complete": true
+      }
+    ]
+  },
+  "weight": {
+    "averageWeightLb": 178.4,
+    "changeLb": -0.6,
+    "narrative": ""
+  },
+  "bodyComposition": {
+    "scanDate": "2026-09-21",
+    "scanDateDisplay": "Sep 21",
+    "bodyFatPercent": "14.2%",
+    "leanMassLb": "152 lb",
+    "fatMassLb": "25.1 lb",
+    "objective": "Track lean mass",
+    "narrative": ""
+  },
+  "training": {
+    "headline": "Training stayed on track.",
+    "narrative": "",
+    "trainingDayCount": 3,
+    "comparableCategoryCount": 5,
+    "improvingCount": 2,
+    "steadyCount": 3,
+    "highlights": [
+      {
+        "canonicalExerciseId": "lateral_raise_machine",
+        "exerciseName": "Lateral Raises Machine",
+        "recordType": "Heaviest Load",
+        "performanceValue": "90 lb",
+        "delta": "+5 lb",
+        "headline": "New heaviest load.",
+        "detail": "Up from 85 lb on Sep 22."
+      },
+      {
+        "canonicalExerciseId": "leg_extension",
+        "exerciseName": "Leg Extensions",
+        "recordType": "Heaviest Load",
+        "performanceValue": "90 lb",
+        "delta": "+10 lb",
+        "headline": "New heaviest load.",
+        "detail": "Up from 80 lb on Sep 21."
+      }
+    ],
+    "priorityCategories": [],
+    "watch": null
+  },
+  "uncertainty": {
+    "visibleItems": [
+      {
+        "uncertaintyId": "u-intake",
+        "type": "intake_uncertainty",
+        "materiality": "moderate",
+        "text": "Intake uncertainty this window."
+      }
+    ],
+    "coveredIds": ["u-wearable", "u-pairing", "u-guardrail"]
+  },
+  "coaching": [
+    {
+      "section": "action",
+      "label": "What To Do",
+      "text": "Keep loading presses through Friday."
+    },
+    {
+      "section": "watch",
+      "label": "What To Watch",
+      "text": "Watch sleep consistency this week."
+    }
+  ],
+  "suppressed": {
+    "coachTake": {
+      "text": "Leg extensions also reached 90 lb, a second strong movement this week.",
+      "reason": "second_movement_not_decision_changing"
+    },
+    "legacyHero": "Legacy hero summary — must never render when a contract is present.",
+    "legacyGoal": "LEGACY GOAL — must never render",
+    "legacyPhase": "LEGACY PHASE — must never render",
+    "legacyPriority": "LEGACY priority — must never render."
+  },
+  "narrativeV3": {
+    "result": "Machine lateral raises reached 90 lb.",
+    "meaning": "Building Lean Mass, training stayed on track.",
+    "action": "Keep loading presses through Friday.",
+    "watch": "Watch sleep consistency this week.",
+    "confidence": "Confidence held at 79."
+  }
+}

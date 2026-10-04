@@ -1,0 +1,356 @@
+{
+  "pass": true,
+  "authorities": {
+    "nativeBuild85": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "productionServer": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "prompt": "5a8d13f67f85cb3c5a93a43bb497f03207c07ca7",
+    "lockedWeeklyArtifact": "agent-handoffs/artifacts/weekly-ui-b-hero-c-body-hybrid-20261004"
+  },
+  "target": {
+    "widthPoints": 402,
+    "scale": 3,
+    "safeAreaTopPoints": 51
+  },
+  "expectedSemanticFieldCount": 61,
+  "productionSequence": [
+    "M01",
+    "M02",
+    "M03",
+    "M04",
+    "M05",
+    "M06",
+    "M07",
+    "M08",
+    "M09",
+    "M10",
+    "M11",
+    "M12",
+    "M13",
+    "M14",
+    "M15",
+    "M16",
+    "M17",
+    "M18",
+    "M19",
+    "M20",
+    "M21"
+  ],
+  "graphInventory": [
+    {
+      "id": "M10",
+      "component": "WeeklyEnergyCard.chart",
+      "section": "Energy",
+      "type": "grouped-bar",
+      "series": [
+        "Intake",
+        "Estimated expenditure"
+      ],
+      "dates": [
+        "2026-09-20",
+        "2026-09-21"
+      ],
+      "pointCount": 2,
+      "markCount": 4,
+      "conditional": "module.chartIncluded == true"
+    }
+  ],
+  "quantitativeMarkInventory": {
+    "lead.confidence.score": "79",
+    "energy.averageIntakeKcal": "2650",
+    "energy.averageExpenditureKcal": "2700",
+    "energy.averageBalanceKcal": "-50",
+    "weight.averageWeightLb": "178.4",
+    "weight.changeLb": "-0.6",
+    "bodyComposition.bodyFatPercent": "14.2%",
+    "bodyComposition.leanMassLb": "152 lb",
+    "bodyComposition.fatMassLb": "25.1 lb",
+    "training.trainingDayCount": "3",
+    "training.comparableCategoryCount": "5",
+    "training.improvingCount": "2",
+    "training.steadyCount": "3",
+    "energy.dailyBalances.0.intakeKcal": "2600",
+    "energy.dailyBalances.0.expenditureKcal": "2680",
+    "energy.dailyBalances.0.balanceKcal": "-80",
+    "energy.dailyBalances.1.intakeKcal": "2700",
+    "energy.dailyBalances.1.expenditureKcal": "2720",
+    "energy.dailyBalances.1.balanceKcal": "-20",
+    "training.highlights.0.performanceValue": "90 lb",
+    "training.highlights.0.delta": "+5 lb",
+    "training.highlights.1.performanceValue": "90 lb",
+    "training.highlights.1.delta": "+10 lb"
+  },
+  "conditionalInventory": {
+    "bodyComposition": "present: contract module included / phase baseline",
+    "priorityMuscleGroups": "absent: priorityCategories empty",
+    "trainingWatch": "absent: V3 projection clears legacy Training watch",
+    "biggestTakeaway": "absent: second movement not decision-changing",
+    "stillUnresolved": "present: one Server-selected visible item",
+    "revision": "absent: fixture has no revision provenance",
+    "productionRecovery": "absent: current contract module included=false / no eligible evidence",
+    "recoveryFutureFixture": "present only as approved planned future contract, after Training and before Still Unresolved/Coach; no Confidence coupling"
+  },
+  "inspection": {
+    "widthPoints": 402,
+    "heightPoints": 2733,
+    "semanticFieldCount": 61,
+    "missing": [],
+    "mismatches": [],
+    "extra": [],
+    "conflicts": [],
+    "allSections": [
+      "M01",
+      "M02",
+      "M03",
+      "M04",
+      "M05",
+      "M06",
+      "M07",
+      "M08",
+      "M09",
+      "M10",
+      "M11",
+      "M12",
+      "M13",
+      "M14",
+      "M15",
+      "M16",
+      "M17",
+      "R-MIDWEEK-FUTURE",
+      "M18",
+      "M19",
+      "M20",
+      "M21"
+    ],
+    "productionOnly": [
+      "M01",
+      "M02",
+      "M03",
+      "M04",
+      "M05",
+      "M06",
+      "M07",
+      "M08",
+      "M09",
+      "M10",
+      "M11",
+      "M12",
+      "M13",
+      "M14",
+      "M15",
+      "M16",
+      "M17",
+      "M18",
+      "M19",
+      "M20",
+      "M21"
+    ],
+    "recoveryPositionValid": true,
+    "recoveryFixtureBoundaryVisible": true,
+    "recoveryConfidenceCouplingAbsent": true,
+    "productionRecoveryAbsent": true,
+    "recoveryValues": {
+      "statusLabel": "Green",
+      "nightlyMinutes.0": "407",
+      "nightlyMinutes.1": "419",
+      "nightlyMinutes.2": "411",
+      "periodAverageMinutes": "412",
+      "personalBaselineMinutes": "405"
+    },
+    "chart": {
+      "type": "grouped-bar",
+      "series": [
+        "Intake",
+        "Estimated expenditure"
+      ],
+      "pointCount": 2,
+      "bars": [
+        {
+          "series": "Intake",
+          "value": 2600,
+          "date": "2026-09-20"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2680,
+          "date": "2026-09-20"
+        },
+        {
+          "series": "Intake",
+          "value": 2700,
+          "date": "2026-09-21"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2720,
+          "date": "2026-09-21"
+        }
+      ],
+      "label": "Daily intake and expenditure across 2 days"
+    },
+    "quant": [
+      {
+        "sourceKey": "lead.confidence.score",
+        "value": "79",
+        "kind": "ring"
+      },
+      {
+        "sourceKey": "energy.dailyBalances.0.balanceKcal",
+        "value": "-80",
+        "kind": "daily-balance"
+      },
+      {
+        "sourceKey": "energy.dailyBalances.1.balanceKcal",
+        "value": "-20",
+        "kind": "daily-balance"
+      },
+      {
+        "sourceKey": "energy.averageIntakeKcal",
+        "value": "2650",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "energy.averageExpenditureKcal",
+        "value": "2700",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "energy.averageBalanceKcal",
+        "value": "-50",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "energy.dailyBalances.0.intakeKcal",
+        "value": "2600",
+        "kind": "bar"
+      },
+      {
+        "sourceKey": "energy.dailyBalances.0.expenditureKcal",
+        "value": "2680",
+        "kind": "bar"
+      },
+      {
+        "sourceKey": "energy.dailyBalances.1.intakeKcal",
+        "value": "2700",
+        "kind": "bar"
+      },
+      {
+        "sourceKey": "energy.dailyBalances.1.expenditureKcal",
+        "value": "2720",
+        "kind": "bar"
+      },
+      {
+        "sourceKey": "weight.averageWeightLb",
+        "value": "178.4",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "weight.changeLb",
+        "value": "-0.6",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "bodyComposition.bodyFatPercent",
+        "value": "14.2%",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "bodyComposition.leanMassLb",
+        "value": "152 lb",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "bodyComposition.fatMassLb",
+        "value": "25.1 lb",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "training.trainingDayCount",
+        "value": "3",
+        "kind": "count"
+      },
+      {
+        "sourceKey": "training.comparableCategoryCount",
+        "value": "5",
+        "kind": "count"
+      },
+      {
+        "sourceKey": "training.improvingCount",
+        "value": "2",
+        "kind": "count"
+      },
+      {
+        "sourceKey": "training.steadyCount",
+        "value": "3",
+        "kind": "count"
+      },
+      {
+        "sourceKey": "training.highlights.0.performanceValue",
+        "value": "90 lb",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "training.highlights.0.delta",
+        "value": "+5 lb",
+        "kind": "delta"
+      },
+      {
+        "sourceKey": "training.highlights.1.performanceValue",
+        "value": "90 lb",
+        "kind": "metric"
+      },
+      {
+        "sourceKey": "training.highlights.1.delta",
+        "value": "+10 lb",
+        "kind": "delta"
+      }
+    ],
+    "quantMissing": [],
+    "quantMismatches": [],
+    "quantExtra": [],
+    "navigation": [
+      "Home",
+      "Briefing History"
+    ],
+    "narrativePlacement": {
+      "result": "M04",
+      "meaning": "M05",
+      "confidence": "M03",
+      "action": "M20",
+      "watch": "M21"
+    },
+    "conditionals": {
+      "bodyCompositionPresent": true,
+      "priorityGroupsAbsent": true,
+      "trainingWatchAbsent": true,
+      "biggestTakeawayAbsent": true,
+      "revisionAbsent": true,
+      "legacyStringsAbsent": true,
+      "oneConfidenceSurface": true
+    },
+    "accessibility": {
+      "narrativeSizes": [
+        15,
+        15,
+        15,
+        15
+      ],
+      "longFormAlignments": [
+        "start",
+        "start",
+        "start",
+        "start"
+      ],
+      "navTargetHeights": [
+        44,
+        44
+      ],
+      "chartLabel": "Daily intake and expenditure across 2 days"
+    },
+    "sequenceExact": true,
+    "chartExact": true,
+    "recoveryFixtureExact": true,
+    "narrativePlacementExact": true,
+    "accessibilityPass": true,
+    "pass": true
+  }
+}

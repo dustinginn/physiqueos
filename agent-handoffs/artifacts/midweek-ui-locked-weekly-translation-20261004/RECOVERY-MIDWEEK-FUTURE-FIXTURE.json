@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "recovery_briefing_v1",
+  "fixtureOnly": true,
+  "strategicallyActive": false,
+  "confidenceCoupling": "none",
+  "architectureAuthority": "agent-handoffs/reports/20261001T215335Z-recovery-briefing-v1-design-architecture.md",
+  "sourcePrototypeAuthority": "1bfa92ef874c3c96f05b23a9d3cbdfb956384156",
+  "placement": "after Training and before Coach's Take",
+  "cadence": "Midweek · Sun–Tue",
+  "period": "Oct 4–6",
+  "status": "green",
+  "statusLabel": "Green",
+  "nightlyMinutes": [407, 419, 411],
+  "periodAverageMinutes": 412,
+  "personalBaselineMinutes": 405,
+  "differenceMinutes": 7,
+  "foamRolling": {
+    "completed": 2,
+    "expected": 3,
+    "detail": "One miss · status unchanged"
+  },
+  "policyNote": "Personal baseline excludes this period. Foam rolling cannot change status. Associations do not imply causation."
+}

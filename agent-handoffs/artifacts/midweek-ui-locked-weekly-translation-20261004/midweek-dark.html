@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhysiqueOS Midweek · locked Weekly translation</title>
+<style>
+@font-face{font-family:Jakarta;src:url("fonts/PlusJakartaSans.ttf") format("truetype");font-display:swap}
+*{box-sizing:border-box}
+html,body{margin:0;background:#070b11;color:#f4f7f8;font-family:Jakarta,-apple-system,BlinkMacSystemFont,sans-serif}
+body{padding:28px}
+.board{display:grid;justify-content:center}
+.phone{--bg:#06121c;--surface:#0d2030;--surface2:#102a39;--text:#f4f7f8;--secondary:#c4d1d5;--muted:#91a5ad;--line:#9bb3bb31;--purple:#aa8cff;--green:#55df9a;--blue:#54c6e7;--amber:#f2bc4d;--cyan:#44d3df;--track:#294a52;--deep:#061a25;--navy:#102a4d;width:402px;overflow:hidden;border-radius:50px;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.4);font-size:14px;line-height:1.42;background:var(--bg);color:var(--text)}
+.status{height:51px;padding:18px 27px 0;display:flex;justify-content:space-between;align-items:flex-start;font-size:13px;font-weight:800}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:124px;height:36px;border-radius:22px;background:#02050a}
+.status-icons{letter-spacing:2px;font-size:11px}
+.content{padding:0 15px 60px}
+.nav{display:flex;gap:8px;padding:10px 0 10px}
+.nav-chip{height:44px;padding:0 12px;border-radius:12px;display:flex;align-items:center;gap:6px;font-weight:700;font-size:11px;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 72%,transparent);color:var(--text)}
+.stack{display:grid;gap:0}
+.hero{min-height:632px;margin:0 -15px;padding:30px 24px 28px;position:relative;overflow:hidden;isolation:isolate;background:linear-gradient(155deg,#087f76,#0b4860 58%,#142a55)}
+.hero:before{content:"";position:absolute;width:430px;height:430px;border:62px solid rgba(85,223,154,.22);border-radius:50%;right:-220px;bottom:-84px;z-index:-1}
+.topline{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;color:var(--purple)}
+.range{text-align:right;font-size:12px;color:var(--muted)}
+.confidence{position:relative;margin-top:22px;min-height:170px}
+.ring{--score:79;width:158px;height:158px;margin-left:auto;border-radius:50%;background:conic-gradient(var(--green) calc(var(--score)*1%),rgba(64,111,117,.62) 0);display:grid;place-items:center;position:relative}
+.ring:after{content:"";position:absolute;inset:10px;border-radius:50%;background:#0c4252}
+.ring-inner{position:relative;z-index:1;text-align:center}
+.ring-score{font-size:39px;font-weight:800;line-height:1}
+.ring-caption{font-size:10px;text-transform:uppercase;color:var(--secondary);margin-top:5px;font-weight:700}
+.confidence-copy{display:grid;gap:5px;margin-top:-48px;width:205px}
+.confidence-copy .band{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--green);font-weight:800}
+.confidence-copy strong{font-size:15px}
+.confidence-copy p{font-size:12px;line-height:1.48;color:var(--secondary);margin:0}
+.hero-rule{border:0;border-top:1px solid rgba(255,255,255,.18);margin:20px 0 18px}
+.hero h1{font-size:32px;line-height:1.08;margin:0;max-width:350px;letter-spacing:-.02em}
+.hero .meaning{font-size:15px;line-height:1.52;color:var(--secondary);margin:12px 0 0;max-width:330px}
+.hero-footer{display:grid;grid-template-columns:1fr;margin-top:24px;padding-top:14px;border-top:1px solid rgba(255,255,255,.18)}
+.label{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.hero-footer strong{display:block;font-size:13px;margin-top:4px}
+.section{padding:20px 4px;border-bottom:1px solid var(--line);position:relative}
+.section-head{display:flex;align-items:center;gap:8px}
+.section-head .pairing{margin-left:auto;color:var(--muted);font-size:12px}
+.icon{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-size:14px;font-weight:800;background:color-mix(in srgb,var(--tone) 15%,transparent);color:var(--tone)}
+.section-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;color:var(--tone)}
+.section-title{font-size:24px;line-height:1.08;margin:15px 0 0}
+.statement{font-size:27px;line-height:1.06;font-weight:800;margin:10px 0 0}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 0;margin-top:14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.metric-value{font-size:14px;font-weight:800;margin-top:4px}
+.daily-rows{display:grid;margin-top:12px;border-top:1px solid var(--line)}
+.daily-row{display:flex;justify-content:space-between;align-items:center;min-height:42px;border-bottom:1px solid var(--line);font-size:13px}
+.daily-row strong{font-size:13px}
+.chart-title{font-size:13px;font-weight:750;margin:16px 0 10px}
+.chart{height:145px;display:grid;grid-template-columns:repeat(2,1fr);gap:22px;align-items:end;padding:8px 14px 25px;position:relative;border-bottom:1px solid var(--line)}
+.day{height:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end;position:relative}
+.bar{min-height:4px;border-radius:2px 2px 0 0}
+.bar.intake{background:var(--amber)}
+.bar.expenditure{background:var(--blue)}
+.day-label{position:absolute;left:0;right:0;bottom:-22px;text-align:center;font-size:10px;color:var(--muted);font-weight:700}
+.legend{display:flex;gap:14px;margin-top:11px;color:var(--muted);font-size:11px}
+.swatch{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:-1px}
+.weight{display:grid;grid-template-columns:116px 1fr;gap:12px;align-items:end}
+.weight .section-head{grid-column:1/3}
+.weight-main{margin-top:13px}
+.weight-main strong{display:block;font-size:27px;line-height:1}
+.weight-main span{display:block;margin-top:6px;font-size:13px;color:var(--blue);font-weight:800}
+.weight-note{align-self:center;color:var(--secondary);font-size:15px;line-height:1.45}
+.body-top{display:flex;align-items:center}.body-top .scan-date{margin-left:auto;color:var(--muted);font-size:12px}
+.body-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.body-metric{padding:12px 9px}.body-metric+.body-metric{border-left:1px solid var(--line)}
+.body-metric strong{display:block;font-size:15px;margin-top:4px}
+.training .section-title{font-size:25px;max-width:320px}
+.coverage-copy{font-size:12px;color:var(--muted);margin-top:10px}
+.coverage-rail{height:9px;display:grid;grid-template-columns:2fr 3fr;margin-top:10px;background:var(--track);gap:3px}
+.coverage-rail i:first-child{background:var(--green)}.coverage-rail i:last-child{background:var(--blue)}
+.coverage-legend{display:flex;gap:14px;font-size:11px;color:var(--muted);margin-top:7px}
+.sub-label{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--green);margin:20px 0 0;padding-bottom:9px;border-bottom:1px solid var(--line)}
+.highlight{display:grid;grid-template-columns:1.2fr .75fr auto;gap:8px;padding:13px 0;border-bottom:1px solid var(--line);align-items:center}
+.highlight strong{display:block;font-size:13px}.highlight .record{font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:800;margin-top:2px}
+.highlight .performance{font-size:14px;font-weight:800}.highlight .delta{font-size:12px;color:var(--green);font-weight:800;white-space:nowrap}
+.highlight .detail{grid-column:1/4;color:var(--muted);font-size:11px;margin-top:-3px}
+.unresolved{padding:18px 4px;border-top:1px dashed var(--muted);border-bottom:1px dashed var(--muted)}
+.unresolved p{margin:8px 0 0;color:var(--secondary);font-size:15px;line-height:1.48}
+.recovery{padding:20px 4px;border-bottom:1px solid var(--line);background:linear-gradient(100deg,rgba(68,211,223,.05),transparent 72%)}
+.fixture-flag{margin-left:auto;font-size:9px;font-weight:800;color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 45%,transparent);border-radius:999px;padding:4px 7px;letter-spacing:.05em}
+.recovery-status{display:flex;align-items:end;justify-content:space-between;margin-top:14px}
+.recovery-status strong{font-size:24px}.recovery-status span{color:var(--green);font-size:13px;font-weight:800}
+.recovery-values{height:56px;display:flex;align-items:end;gap:5px;margin-top:12px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+.recovery-values i{display:block;flex:1;background:var(--cyan);opacity:.8;min-height:8px}
+.recovery-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.recovery-note{font-size:11px;color:var(--muted);margin-top:12px;line-height:1.45}
+.coach{padding:24px 18px 26px;margin:0 -4px;background:linear-gradient(120deg,#15354b,#172f59);color:#fff}
+.coach .eyebrow{color:rgba(255,255,255,.8)}
+.coach-block{padding:15px 0;border-top:1px solid rgba(255,255,255,.16)}
+.coach-block:first-of-type{margin-top:14px}
+.coach-block h3{font-size:15px;margin:0}.coach-block p{font-size:15px;line-height:1.5;color:rgba(255,255,255,.92);margin:7px 0 0}
+.screen-only{display:none!important}
+@media(max-width:520px){body{padding:12px}.phone{width:min(402px,100vw - 24px);border-radius:42px}}
+</style>
+</head>
+<body>
+<main class="board">
+<article class="phone" data-variant="midweek-dark" aria-label="PhysiqueOS Midweek Briefing dark translation">
+  <div class="status"><span>1:05</span><span class="island" aria-hidden="true"></span><span class="status-icons">▮▮▮⌁</span></div>
+  <div class="content">
+    <nav class="nav" data-section-id="M01" aria-label="Briefing navigation"><span class="nav-chip">‹ Home</span><span class="nav-chip">▦ Briefing History</span></nav>
+    <div class="stack">
+      <section data-section-id="M02" class="hero">
+        <div class="topline"><span class="eyebrow" data-semantic="lead.eyebrow" data-value="MIDWEEK BRIEFING">MIDWEEK BRIEFING</span><span class="range" data-semantic="artifact.evidenceWindow.displayRange" data-value="Sep 20–22">Sep 20–22</span></div>
+        <div class="confidence" data-section-id="M03" data-narrative-role="confidence">
+          <div class="ring" style="--score:79" role="img" aria-label="Confidence 79 percent"><div class="ring-inner"><div class="ring-score"><span data-semantic="lead.confidence.score" data-value="79" data-quant-mark="ring" data-source-key="lead.confidence.score">79</span>%</div><div class="ring-caption">Confidence</div></div></div>
+          <div class="confidence-copy"><span class="band" data-semantic="lead.confidence.band" data-value="high">High</span><strong data-semantic="lead.confidence.movementLabel" data-value="— No meaningful change">— No meaningful change</strong><p data-semantic="lead.confidence.reason" data-value="Training stayed consistent and Confidence held steady.">Training stayed consistent and Confidence held steady.</p></div>
+          <span class="screen-only" data-semantic="lead.confidence.movement" data-value="no_meaningful_change"></span><span class="screen-only" data-semantic="lead.confidence.movementDirection" data-value="held"></span><span class="screen-only" data-semantic="lead.confidence.delta" data-value="0"></span>
+        </div>
+        <hr class="hero-rule">
+        <h1 data-section-id="M04" data-narrative-role="result" data-semantic="lead.headline" data-value="Machine lateral raises reached 90 lb, up from the previous best of 85 lb.">Machine lateral raises reached 90 lb, up from the previous best of 85 lb.</h1>
+        <p class="meaning" data-section-id="M05" data-narrative-role="meaning" data-semantic="lead.meaning" data-value="Building Lean Mass, training stayed on track through midweek.">Building Lean Mass, training stayed on track through midweek.</p>
+        <div class="hero-footer" data-section-id="M06"><span class="label">Goal &amp; Phase</span><strong><span data-semantic="lead.goal" data-value="Build Lean Mass">Build Lean Mass</span> · <span data-semantic="lead.phase" data-value="Lean Mass Build">Lean Mass Build</span></strong></div>
+      </section>
+
+      <section data-section-id="M07" class="section energy" style="--tone:var(--amber)">
+        <div class="section-head"><span class="icon" aria-hidden="true">ϟ</span><span class="section-label">Energy Balance</span><span class="pairing"><span data-semantic="energy.pairedDayCount" data-value="2">2</span>/<span data-semantic="energy.eligibleDayCount" data-value="2">2</span> days paired</span></div>
+        <h2 class="section-title" data-semantic="energy.headline" data-value="Energy Balance">Energy Balance</h2>
+        <p class="statement" data-semantic="energy.balanceHeadline" data-value="50 kcal/day below">50 kcal/day below</p>
+        <div class="daily-rows" data-section-id="M08">
+          <div class="daily-row"><strong data-semantic="energy.dailyBalances.0.weekday" data-value="Sunday">Sunday</strong><span data-semantic="energy.dailyBalances.0.balanceKcal" data-value="-80" data-quant-mark="daily-balance" data-source-key="energy.dailyBalances.0.balanceKcal">−80 kcal</span></div>
+          <div class="daily-row"><strong data-semantic="energy.dailyBalances.1.weekday" data-value="Monday">Monday</strong><span data-semantic="energy.dailyBalances.1.balanceKcal" data-value="-20" data-quant-mark="daily-balance" data-source-key="energy.dailyBalances.1.balanceKcal">−20 kcal</span></div>
+        </div>
+        <div class="metrics" data-section-id="M09">
+          <div><span class="label">Avg Intake</span><div class="metric-value"><span data-semantic="energy.averageIntakeKcal" data-value="2650" data-quant-mark="metric" data-source-key="energy.averageIntakeKcal">2650</span> kcal</div></div>
+          <div><span class="label">Avg Expenditure</span><div class="metric-value"><span data-semantic="energy.averageExpenditureKcal" data-value="2700" data-quant-mark="metric" data-source-key="energy.averageExpenditureKcal">2700</span> kcal</div></div>
+          <div><span class="label">Avg Balance</span><div class="metric-value"><span data-semantic="energy.averageBalanceKcal" data-value="-50" data-quant-mark="metric" data-source-key="energy.averageBalanceKcal">−50</span> kcal</div></div>
+        </div>
+        <div class="chart-title" data-semantic="energy.chartTitle" data-value="Daily intake vs estimated expenditure">Daily intake vs estimated expenditure</div>
+        <div class="chart" data-section-id="M10" data-chart="midweek-energy" data-chart-type="grouped-bar" data-chart-series="Intake|Estimated expenditure" data-chart-point-count="2" role="img" aria-label="Daily intake and expenditure across 2 days">
+          <div class="day" data-date="2026-09-20"><i class="bar intake" style="height:95.588%" data-series="Intake" data-value="2600" data-semantic="energy.dailyBalances.0.intakeKcal" data-quant-mark="bar" data-source-key="energy.dailyBalances.0.intakeKcal"></i><i class="bar expenditure" style="height:98.529%" data-series="Estimated expenditure" data-value="2680" data-semantic="energy.dailyBalances.0.expenditureKcal" data-quant-mark="bar" data-source-key="energy.dailyBalances.0.expenditureKcal"></i><span class="day-label" data-semantic="energy.dailyBalances.0.label" data-value="Su">Su</span><span class="screen-only" data-semantic="energy.dailyBalances.0.date" data-value="2026-09-20"></span><span class="screen-only" data-semantic="energy.dailyBalances.0.complete" data-value="true"></span></div>
+          <div class="day" data-date="2026-09-21"><i class="bar intake" style="height:99.265%" data-series="Intake" data-value="2700" data-semantic="energy.dailyBalances.1.intakeKcal" data-quant-mark="bar" data-source-key="energy.dailyBalances.1.intakeKcal"></i><i class="bar expenditure" style="height:100%" data-series="Estimated expenditure" data-value="2720" data-semantic="energy.dailyBalances.1.expenditureKcal" data-quant-mark="bar" data-source-key="energy.dailyBalances.1.expenditureKcal"></i><span class="day-label" data-semantic="energy.dailyBalances.1.label" data-value="Mo">Mo</span><span class="screen-only" data-semantic="energy.dailyBalances.1.date" data-value="2026-09-21"></span><span class="screen-only" data-semantic="energy.dailyBalances.1.complete" data-value="true"></span></div>
+        </div>
+        <div class="legend" data-section-id="M11"><span><i class="swatch" style="background:var(--amber)"></i>Intake</span><span><i class="swatch" style="background:var(--blue)"></i>Estimated expenditure</span></div>
+      </section>
+
+      <section data-section-id="M12" class="section weight" style="--tone:var(--blue)">
+        <div class="section-head"><span class="icon" aria-hidden="true">↕</span><span class="section-label">Weight Context</span></div>
+        <div class="weight-main"><strong><span data-semantic="weight.averageWeightLb" data-value="178.4" data-quant-mark="metric" data-source-key="weight.averageWeightLb">178.4</span> lb</strong><span><span data-semantic="weight.changeLb" data-value="-0.6" data-quant-mark="metric" data-source-key="weight.changeLb">−0.6</span> lb</span></div>
+        <div class="weight-note">Sunday–Tuesday average · 3 observations</div>
+      </section>
+
+      <section data-section-id="M13" class="section body" style="--tone:var(--purple)">
+        <div class="body-top"><div class="section-head"><span class="icon" aria-hidden="true">◇</span><span class="section-label">Body Composition</span></div><span class="scan-date" data-semantic="bodyComposition.scanDateDisplay" data-value="Sep 21">Sep 21</span></div>
+        <div class="body-metrics" data-section-id="M14">
+          <div class="body-metric"><span class="label">Body Fat</span><strong data-semantic="bodyComposition.bodyFatPercent" data-value="14.2%" data-quant-mark="metric" data-source-key="bodyComposition.bodyFatPercent">14.2%</strong></div>
+          <div class="body-metric"><span class="label">Lean Mass</span><strong data-semantic="bodyComposition.leanMassLb" data-value="152 lb" data-quant-mark="metric" data-source-key="bodyComposition.leanMassLb">152 lb</strong></div>
+          <div class="body-metric"><span class="label">Fat Mass</span><strong data-semantic="bodyComposition.fatMassLb" data-value="25.1 lb" data-quant-mark="metric" data-source-key="bodyComposition.fatMassLb">25.1 lb</strong></div>
+        </div>
+      </section>
+
+      <section data-section-id="M15" class="section training" style="--tone:var(--green)">
+        <div class="section-head"><span class="icon" aria-hidden="true">◆</span><span class="section-label">Training Response</span></div>
+        <h2 class="section-title" data-semantic="training.headline" data-value="Training stayed on track.">Training stayed on track.</h2>
+        <p class="coverage-copy"><span data-semantic="training.trainingDayCount" data-value="3" data-quant-mark="count" data-source-key="training.trainingDayCount">3</span> training days · <span data-semantic="training.comparableCategoryCount" data-value="5" data-quant-mark="count" data-source-key="training.comparableCategoryCount">5</span> reviewed categories · <span data-semantic="training.improvingCount" data-value="2" data-quant-mark="count" data-source-key="training.improvingCount">2</span> improving · <span data-semantic="training.steadyCount" data-value="3" data-quant-mark="count" data-source-key="training.steadyCount">3</span> steady</p>
+        <div class="coverage-rail" role="img" aria-label="2 improving and 3 steady reviewed categories"><i></i><i></i></div><div class="coverage-legend"><span>● 2 improving</span><span>■ 3 steady</span></div>
+        <div class="sub-label">🔥 Highlights</div>
+        <div class="highlight" data-section-id="M16"><div><strong data-semantic="training.highlights.0.exerciseName" data-value="Lateral Raises Machine">Lateral Raises Machine</strong><span class="record" data-semantic="training.highlights.0.recordType" data-value="Heaviest Load">Heaviest Load</span></div><span class="performance" data-semantic="training.highlights.0.performanceValue" data-value="90 lb" data-quant-mark="metric" data-source-key="training.highlights.0.performanceValue">90 lb</span><span class="delta" data-semantic="training.highlights.0.delta" data-value="+5 lb" data-quant-mark="delta" data-source-key="training.highlights.0.delta">▲ +5 lb</span><span class="detail"><span data-semantic="training.highlights.0.headline" data-value="New heaviest load.">New heaviest load.</span> <span data-semantic="training.highlights.0.detail" data-value="Up from 85 lb on Sep 22.">Up from 85 lb on Sep 22.</span></span></div>
+        <div class="highlight" data-section-id="M17"><div><strong data-semantic="training.highlights.1.exerciseName" data-value="Leg Extensions">Leg Extensions</strong><span class="record" data-semantic="training.highlights.1.recordType" data-value="Heaviest Load">Heaviest Load</span></div><span class="performance" data-semantic="training.highlights.1.performanceValue" data-value="90 lb" data-quant-mark="metric" data-source-key="training.highlights.1.performanceValue">90 lb</span><span class="delta" data-semantic="training.highlights.1.delta" data-value="+10 lb" data-quant-mark="delta" data-source-key="training.highlights.1.delta">▲ +10 lb</span><span class="detail"><span data-semantic="training.highlights.1.headline" data-value="New heaviest load.">New heaviest load.</span> <span data-semantic="training.highlights.1.detail" data-value="Up from 80 lb on Sep 21.">Up from 80 lb on Sep 21.</span></span></div>
+      </section>
+
+      <section data-section-id="R-MIDWEEK-FUTURE" class="recovery" style="--tone:var(--cyan)">
+        <div class="section-head"><span class="icon" aria-hidden="true">◒</span><span class="section-label">Recovery</span><span class="fixture-flag">FUTURE CONTRACT · FIXTURE ONLY</span></div>
+        <div class="recovery-status"><strong>Midweek · Oct 4–6</strong><span data-recovery-semantic="statusLabel" data-value="Green">● Green</span></div>
+        <div class="recovery-values" role="img" aria-label="Sleep duration: 407, 419, and 411 minutes"><i style="height:67%" data-recovery-semantic="nightlyMinutes.0" data-value="407"></i><i style="height:100%" data-recovery-semantic="nightlyMinutes.1" data-value="419"></i><i style="height:78%" data-recovery-semantic="nightlyMinutes.2" data-value="411"></i></div>
+        <div class="recovery-meta"><div><span class="label">Period Average</span><div class="metric-value" data-recovery-semantic="periodAverageMinutes" data-value="412">6h 52m</div></div><div><span class="label">Personal Baseline</span><div class="metric-value" data-recovery-semantic="personalBaselineMinutes" data-value="405">6h 45m</div></div><div><span class="label">Foam Rolling</span><div class="metric-value">2 / 3</div></div></div>
+        <p class="recovery-note">One miss · status unchanged. Personal baseline excludes this period. Foam rolling cannot change status. Associations do not imply causation. Confidence coupling: none.</p>
+      </section>
+
+      <section data-section-id="M18" class="unresolved"><span class="eyebrow" style="color:var(--muted)">Still Unresolved</span><p data-semantic="uncertainty.visibleItems.0.text" data-value="Intake uncertainty this window.">• Intake uncertainty this window.</p></section>
+
+      <section data-section-id="M19" class="coach">
+        <span class="eyebrow">Coach's Take</span>
+        <div class="coach-block" data-section-id="M20" data-narrative-role="action"><h3>🧠 What To Do</h3><p data-semantic="coaching.action" data-value="Keep loading presses through Friday.">Keep loading presses through Friday.</p></div>
+        <div class="coach-block" data-section-id="M21" data-narrative-role="watch"><h3>👀 What To Watch</h3><p data-semantic="coaching.watch" data-value="Watch sleep consistency this week.">Watch sleep consistency this week.</p></div>
+      </section>
+    </div>
+  </div>
+</article>
+</main>
+<script>document.documentElement.dataset.ready="true";</script>
+</body>
+</html>
