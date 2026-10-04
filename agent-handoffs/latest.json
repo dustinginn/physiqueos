@@ -1,54 +1,53 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-04T21:36:58Z",
+  "generated_at_utc": "2026-10-04T22:42:39Z",
   "task": {
-    "id": "20261004-final-design-batch3-home-screen-widget-closeout",
-    "title": "Final Design Batch 3 — Home Screen Widget closeout",
+    "id": "20261004-global-appearance-infrastructure",
+    "title": "Global System / Dark / Mineral Light appearance infrastructure",
     "agent": "codex-a",
-    "status": "ready_for_founder_review_final_design_gate_pending_not_implemented"
+    "status": "implemented_isolated_release_compiled_ready_for_integration_and_physical_validation"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "c91e3ae1d958c11f5e6112b1edf715ff7f6b874f",
-    "native_base_sha": "b8ee8690b194cb90086f62816b9a2c8c400dc026",
-    "native_build": 85,
-    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
-    "scope_audit": "agent-handoffs/reports/20261004T204247Z-app-wide-redesign-coverage-audit.md",
-    "scope_rows": ["U04"]
+    "prompt_commit": "af844a6ae61ffd3a3b897dbd297856e2ebaeb6ff",
+    "shared_foam_base": "b65deb00098713d824f14064e0362726997b5991",
+    "claude_watch_healthkit_commit": "d43ad7cd2cb18e230b44d2654a999e5f304fc586"
   },
   "publication": {
-    "source_work_branch": "codex/final-design-batch3-widget-closeout-20261004",
-    "source_work_commit": "117fa31b832e8b37fa23171a94d1a28632121204",
-    "main_report_commit": "117fa31b832e8b37fa23171a94d1a28632121204",
-    "report_path": "agent-handoffs/reports/20261004T213658Z-final-design-batch3-home-screen-widget.md",
-    "artifact_root": "agent-handoffs/artifacts/final-design-batch3-home-widget-closeout-20261004/",
-    "primary_png": "agent-handoffs/artifacts/final-design-batch3-home-widget-closeout-20261004/boards/home-widget-primary-mobile.png",
-    "closeout_png": "agent-handoffs/artifacts/final-design-batch3-home-widget-closeout-20261004/boards/app-wide-design-closeout-matrix-mobile.png",
-    "comparison_page": "agent-handoffs/artifacts/final-design-batch3-home-widget-closeout-20261004/comparison-board.html",
-    "validation": "agent-handoffs/artifacts/final-design-batch3-home-widget-closeout-20261004/validation.json"
+    "source_work_branch": "codex/global-appearance-infrastructure-20261004",
+    "source_work_commit": "d5359e33845cba20a212dade24c25e94f02aee6e",
+    "source_commits": [
+      "3ceb9a803ffdde99a87e720b22f8c2b642644823",
+      "d5359e33845cba20a212dade24c25e94f02aee6e"
+    ],
+    "main_report_commit": "7ca8517b860ce39f70808e5ccb534b329c9c73a9",
+    "report_path": "agent-handoffs/reports/20261004T224239Z-global-appearance-infrastructure.md",
+    "artifact_root": "agent-handoffs/artifacts/20261004-global-appearance/",
+    "comparison_page": "agent-handoffs/artifacts/20261004-global-appearance/comparison-board.html",
+    "ownership_matrix": "agent-handoffs/artifacts/20261004-global-appearance/appearance-ownership-matrix.md",
+    "screenshot_root": "agent-handoffs/artifacts/20261004-global-appearance/screenshots/"
   },
   "result": {
-    "summary": "The current Home Screen Widget is source-audited and rendered in the locked dark/Mineral-Light system across every supported family and material state without changing content or behavior.",
-    "supported_families": ["systemSmall", "systemLarge"],
-    "material_states": ["fresh_full_data", "no_weight", "active_workout", "stale_offline", "waiting_for_today", "unavailable", "privacy_redacted", "long_training_summary"],
-    "full_resolution_screens": 32,
-    "pair_images": 16,
-    "appearances": ["dark", "mineral_light"],
-    "content_geometry_parity": "passed",
-    "visible_overflow": false,
-    "minimum_effective_interactive_target_points": 44,
-    "former_c_groups_with_design_authority": 9,
-    "former_c_groups_remaining_without_design_authority": 0,
-    "founder_decisions_remaining": ["U04 Home Screen Widget acceptance"],
-    "design_complete_after_widget_acceptance": true,
-    "locked_prior_batches_reopened": false,
-    "shipping_native_changed": false,
+    "appearance_options": ["system", "dark", "light"],
+    "fresh_install_default": "system",
+    "persistence": "device_local_user_defaults",
     "server_changed": false,
-    "production_mutated": false,
+    "canonical_content_changed": false,
+    "broad_redesign_implemented": false,
+    "release_compile": "passed",
+    "representative_full_resolution_screenshots": 22,
+    "focused_tests": "passed",
+    "full_unit_suite": {
+      "executed": 1998,
+      "skipped": 1,
+      "failures": 1,
+      "failure_scope": "unrelated existing PeptideSupportEditor fixture expectation"
+    },
+    "merge_tree_with_claude": "clean",
     "testflight_uploaded": false
   },
-  "recommended_next_step": "Founder reviews and accepts or corrects U04. If accepted, declare the current Native redesign program DESIGN COMPLETE; do not implement shipping UI without authorization.",
-  "stop_reason": "Every current widget family and material state is audited and rendered in both appearances, parity validation passes, and the final nine-item closeout matrix is published.",
+  "recommended_next_step": "Integrate Claude d43ad7cd first, then appearance commits 3ceb9a80 and d5359e33; rerun combined gates and complete physical-device validation before any release decision.",
+  "stop_reason": "Global appearance infrastructure and the narrow user-accessible control are implemented, tested, Release-compiled, documented and ready to integrate; TestFlight is explicitly out of scope.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
