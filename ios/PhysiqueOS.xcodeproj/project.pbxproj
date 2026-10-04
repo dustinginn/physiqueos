@@ -319,6 +319,7 @@
 		000000000000000000001297 /* TrainingAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001296 /* TrainingAcceptanceUITests.swift */; };
 		000000000000000000001299 /* GoalsAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001298 /* GoalsAcceptanceUITests.swift */; };
 		0000000000000000000013B7 /* RecoverySleepAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */; };
+		000000000000000000001C01 /* FoamRollingPriorityDetailUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001C00 /* FoamRollingPriorityDetailUITests.swift */; };
 		0000000000000000000012A8 /* HealthKitCapabilityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012A7 /* HealthKitCapabilityModels.swift */; };
 		0000000000000000000012AA /* HealthKitTypeRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012A9 /* HealthKitTypeRegistry.swift */; };
 		0000000000000000000012AC /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012AB /* HealthKitService.swift */; };
@@ -908,6 +909,7 @@
 		000000000000000000001296 /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		000000000000000000001298 /* GoalsAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepAcceptanceUITests.swift"; sourceTree = "<group>"; };
+		000000000000000000001C00 /* FoamRollingPriorityDetailUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FoamRollingPriorityDetailUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012B2 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		0000000000000000000012B4 /* WatchConnectivity.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WatchConnectivity.framework; path = System/Library/Frameworks/WatchConnectivity.framework; sourceTree = SDKROOT; };
 		000000000000000000001280 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1580,6 +1582,7 @@
 				000000000000000000001296 /* TrainingAcceptanceUITests.swift */,
 				000000000000000000001298 /* GoalsAcceptanceUITests.swift */,
 				0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */,
+				000000000000000000001C00 /* FoamRollingPriorityDetailUITests.swift */,
 			);
 			path = PhysiqueOSUITests;
 			sourceTree = "<group>";
@@ -2328,6 +2331,7 @@
 				000000000000000000001297 /* TrainingAcceptanceUITests.swift in Sources */,
 				000000000000000000001299 /* GoalsAcceptanceUITests.swift in Sources */,
 				0000000000000000000013B7 /* RecoverySleepAcceptanceUITests.swift in Sources */,
+				000000000000000000001C01 /* FoamRollingPriorityDetailUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

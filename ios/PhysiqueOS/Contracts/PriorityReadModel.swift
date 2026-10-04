@@ -175,6 +175,25 @@ enum PriorityDetailPresentation {
             return title != "related goals" && title != "completion" && title != "appointment completion"
         }
     }
+
+    /// The parity pilot is deliberately restricted to the one canonical
+    /// recurring Recovery Support. Identity, not display copy, selects the
+    /// locked treatment so another Priority titled similarly cannot inherit
+    /// it accidentally.
+    static func isFoamRolling(_ occurrence: PriorityOccurrence) -> Bool {
+        occurrence.executionItemId == "execution_foam_roll"
+            || occurrence.routePriorityId == "reminder_foam_roll_daily"
+            || occurrence.id == "reminder_foam_roll_daily"
+    }
+
+    static func foamRollingStateLabel(_ occurrence: PriorityOccurrence) -> String {
+        if occurrence.completed { return "Completed" }
+        if occurrence.skipped { return "Skipped" }
+        if occurrence.paused { return "Paused" }
+        if occurrence.urgency == .upcoming { return "Upcoming" }
+        if occurrence.completable { return "Open" }
+        return "Setup required"
+    }
 }
 
 struct PrioritySessionItem: Codable, Equatable, Identifiable {

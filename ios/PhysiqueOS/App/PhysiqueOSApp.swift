@@ -16,6 +16,20 @@ struct PhysiqueOSApp: App {
     @State private var watchWorkoutConnectivity: PhoneWatchWorkoutConnectivityBridge
     @Environment(\.scenePhase) private var scenePhase
 
+    /// Shipping remains on the accepted Build 85 dark baseline. The only
+    /// light override is a DEBUG launch seam used to capture the locked
+    /// Mineral Light Foam Rolling pilot in Simulator; this is not Settings,
+    /// persistence, or an app-wide appearance implementation.
+    private var preferredRootColorScheme: ColorScheme {
+#if DEBUG
+        if FoamRollingPriorityPilotLaunchConfiguration.isEnabled,
+           FoamRollingPriorityPilotLaunchConfiguration.appearance == "light" {
+            return .light
+        }
+#endif
+        return .dark
+    }
+
     init() {
         // A notification action may be the process-launch event. Registering
         // the delegate in RootTabView.task was too late: iOS could deliver
@@ -91,7 +105,7 @@ struct PhysiqueOSApp: App {
                 // system-provided controls follow the simulator/device's
                 // own light/dark setting instead, mismatching every
                 // custom-drawn view.
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(preferredRootColorScheme)
                 .task {
                     // Idempotent defensive refresh. The action-response path
                     // is already live from init; this is not its authority.

@@ -1160,14 +1160,15 @@ struct ProductionPriorityAPI: PriorityAPI {
     private struct Section: Decodable { var title: String; var items: [Item] }
     private struct Item: Decodable { var label: String; var detail: String? }
 
-    /// A narrow, honest mapping for the ONE real web `action.href` this
-    /// task confirmed (`createMorningWeighInPriorityDetail`'s
-    /// `action: {label:"Log Weight", href:"/check-in/morning"}`) — not a
-    /// general web-route-to-`AppDestination` router. An unrecognized href
-    /// stays `nil` rather than guessing.
+    /// Narrow, audited mappings for real Priority actions — not a general
+    /// web-route-to-`AppDestination` router. Foam Rolling's setup-required
+    /// state must retain the Server's Review Support route during the parity
+    /// pilot. An unrecognized href stays `nil` rather than guessing.
     private static func destination(forActionHref href: String?) -> AppDestination? {
         switch href {
         case "/check-in/morning": .checkIn(checkInType: "morning")
+        case "/profile/operating-plan/execution/execution_foam_roll":
+            .operatingPlanRecoverySupport(executionId: "execution_foam_roll")
         default: nil
         }
     }

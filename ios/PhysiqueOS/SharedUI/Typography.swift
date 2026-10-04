@@ -169,6 +169,20 @@ enum PhysiqueOSTypography {
     /// `text-base leading-7`, no weight class (Tailwind default scale: 16px, regular).
     static let screenSubtitle = Style(size: 16, weight: .regular)
 
+    // MARK: Locked Priority Detail pilot
+    // Exact hierarchy from the accepted 402 pt Priority Detail reference.
+    // These stay separate from the broader screen tokens while Foam Rolling
+    // proves the implementation method; the rest of the Priority family is
+    // intentionally not migrated in this pilot.
+    static let priorityDetailEyebrow = Style(size: 11, weight: .heavy, trackingEm: 0.09, uppercase: true)
+    static let priorityDetailTitle = Style(size: 32, weight: .heavy)
+    static let priorityDetailState = Style(size: 12, weight: .heavy)
+    static let priorityDetailSubtitle = Style(size: 14, weight: .medium)
+    static let priorityDetailSectionTitle = Style(size: 18, weight: .heavy)
+    static let priorityDetailFieldValue = Style(size: 15, weight: .heavy)
+    static let priorityDetailFieldDetail = Style(size: 14, weight: .medium)
+    static let priorityDetailAction = Style(size: 15, weight: .heavy)
+
     // MARK: Log cards (LogHubScreen.jsx, UploadAnythingForm.jsx)
     /// `text-xl font-black leading-tight` (Tailwind default scale: 20px) —
     /// "Training Logger", "Upload".

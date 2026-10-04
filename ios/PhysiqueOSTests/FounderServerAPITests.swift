@@ -2042,6 +2042,36 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(whenSection.items.first?.detail?.contains("5:00 PM") == true)
     }
 
+    func testFoamRollingSetupRequiredPreservesTheCanonicalReviewSupportRoute() async throws {
+        let json = productionEnvelope(resource: "priority", data: #"{"id":"reminder_foam_roll_daily","title":"Foam Rolling","subtitle":"Today · 7:15 PM","status":"Setup required","sections":[{"title":"What","items":[{"label":"Support setup required","detail":"Review the saved Support schedule before recording completion."}]}],"completionContext":null,"action":{"label":"Review Support","href":"/profile/operating-plan/execution/execution_foam_roll"},"executionProjection":{"executionId":"execution_foam_roll"},"executionContract":{"priorityId":"reminder_foam_roll_daily","occurrenceDate":"2026-10-04","expectedVersion":null}}"#)
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["priority": json]
+        )
+        let native = ProductionNativeAPI(
+            baseURL: testOrigin,
+            credentialStore: MemoryCredentialStore(),
+            transport: transport
+        )
+        _ = try await native.pair(
+            pairingCredential: String(repeating: "p", count: 43),
+            displayName: "Founder iPhone"
+        )
+
+        let fetched = try await ProductionPriorityAPI(api: native).fetchPriority(
+            priorityId: "reminder_foam_roll_daily",
+            occurrenceDate: "2026-10-04"
+        )
+        let priority = try XCTUnwrap(fetched)
+        XCTAssertFalse(priority.completable)
+        XCTAssertFalse(priority.skippable)
+        XCTAssertEqual(priority.actionLabel, "Review Support")
+        XCTAssertEqual(
+            priority.continueActionDestination,
+            .operatingPlanRecoverySupport(executionId: "execution_foam_roll")
+        )
+    }
+
     /// Build 22: production Priority detail carries its own exact-date
     /// Weight relationship. Native must not issue the current-day
     /// Morning Check-In read when a historical occurrence is opened.

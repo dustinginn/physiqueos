@@ -26,6 +26,19 @@ struct RootTabView: View {
     @State private var evidencePath = NavigationPath()
     @State private var youPath = NavigationPath()
 
+    init() {
+#if DEBUG
+        if FoamRollingPriorityPilotLaunchConfiguration.isEnabled {
+            _homePath = State(initialValue: NavigationPath([
+                AppDestination.priorityOccurrence(
+                    priorityId: FoamRollingPriorityPilotLaunchConfiguration.priorityId,
+                    occurrenceDate: FoamRollingPriorityPilotLaunchConfiguration.occurrenceDate
+                )
+            ]))
+        }
+#endif
+    }
+
     var body: some View {
         TabView(selection: Binding(get: { selectedTab }, set: selectTab)) {
             NavigationStack(path: $homePath) {

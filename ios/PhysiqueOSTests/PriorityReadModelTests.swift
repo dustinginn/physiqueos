@@ -37,6 +37,47 @@ final class PriorityReadModelTests: XCTestCase {
         XCTAssertEqual(context, .init(occurrenceDate: "2026-09-18", dose: "4 mg", protocolId: "retatrutide"))
     }
 
+    func testFoamRollingPilotUsesCanonicalIdentityAndTruthfulTerminalStates() {
+        var foam = PriorityOccurrence(
+            id: "reminder_foam_roll_daily",
+            routePriorityId: "reminder_foam_roll_daily",
+            executionItemId: "execution_foam_roll",
+            date: "2026-10-04",
+            title: "Foam Rolling",
+            subtitle: "Today · 7:15 PM",
+            metadata: nil,
+            changeLabel: nil,
+            icon: .activity,
+            color: .evidence,
+            urgency: .available,
+            completed: false,
+            completable: true,
+            actionLabel: nil,
+            completionContext: nil,
+            continueActionDestination: nil
+        )
+        XCTAssertTrue(PriorityDetailPresentation.isFoamRolling(foam))
+        XCTAssertEqual(PriorityDetailPresentation.foamRollingStateLabel(foam), "Open")
+
+        foam.completed = true
+        foam.completable = false
+        XCTAssertEqual(PriorityDetailPresentation.foamRollingStateLabel(foam), "Completed")
+
+        foam.completed = false
+        foam.skipped = true
+        XCTAssertEqual(PriorityDetailPresentation.foamRollingStateLabel(foam), "Skipped")
+
+        foam.skipped = false
+        var unrelated = foam
+        unrelated.id = "other"
+        unrelated.routePriorityId = "other"
+        unrelated.executionItemId = "other"
+        XCTAssertFalse(
+            PriorityDetailPresentation.isFoamRolling(unrelated),
+            "Display copy alone must never opt another Priority into the pilot."
+        )
+    }
+
     func testTookADifferentAmountParsesThePlannedDoseAndKeepsTheDefaultPathWhenUntouched() {
         XCTAssertEqual(PriorityDoseEntry.components(of: "1.5 mg")?.amount, "1.5")
         XCTAssertEqual(PriorityDoseEntry.components(of: "1.5 mg")?.unit, "mg")

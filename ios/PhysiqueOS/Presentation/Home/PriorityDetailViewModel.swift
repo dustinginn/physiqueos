@@ -1,5 +1,74 @@
 import Foundation
 
+#if DEBUG
+/// A DEBUG-only launch seam for deterministic simulator parity captures.
+/// It routes the real SwiftUI screen and real interaction structure through
+/// one source-shaped occurrence; Release builds contain neither the fixture
+/// nor an appearance override. Shipping Founder Production continues to read
+/// the canonical Server resource.
+enum FoamRollingPriorityPilotLaunchConfiguration {
+    static let enabledKey = "physiqueos.priority-pilot.enabled"
+    static let appearanceKey = "physiqueos.priority-pilot.appearance"
+    static let priorityId = "reminder_foam_roll_daily"
+    static let occurrenceDate = "2026-10-04"
+
+    static var isEnabled: Bool {
+        UserDefaults.standard.bool(forKey: enabledKey)
+    }
+
+    static var appearance: String? {
+        UserDefaults.standard.string(forKey: appearanceKey)?.lowercased()
+    }
+
+    static func occurrence(for requestedPriorityId: String) -> PriorityOccurrence? {
+        guard isEnabled, requestedPriorityId == priorityId else { return nil }
+        var occurrence = PriorityOccurrence(
+            id: priorityId,
+            routePriorityId: priorityId,
+            executionItemId: "execution_foam_roll",
+            date: occurrenceDate,
+            title: "Foam Rolling",
+            subtitle: "Today · 7:15 PM",
+            metadata: "Complete the scheduled recovery support.",
+            changeLabel: nil,
+            icon: .activity,
+            color: .evidence,
+            urgency: .available,
+            completed: false,
+            completable: true,
+            expectedVersion: 53,
+            actionLabel: "View Support",
+            completionContext: .init(
+                occurrenceDate: occurrenceDate,
+                dose: nil,
+                protocolId: "recovery"
+            ),
+            continueActionDestination: .operatingPlanRecoverySupport(executionId: "execution_foam_roll"),
+            detailSections: [
+                .init(title: "What", items: [
+                    .init(label: "Foam Rolling", detail: "Complete the scheduled recovery support.")
+                ]),
+                .init(title: "When", items: [
+                    .init(label: "Daily · 7:15 PM", detail: "Timing comes from the saved Support schedule.")
+                ]),
+                .init(title: "Execution Notes", items: [
+                    .init(label: "Saved Support note", detail: "Focus on lower body after leg sessions.")
+                ]),
+                .init(title: "Why it matters", items: [
+                    .init(
+                        label: "Supports the current recovery strategy",
+                        detail: "This recovery method supports training readiness and consistency."
+                    )
+                ])
+            ]
+        )
+        occurrence.skippable = true
+        occurrence.skipExpectedVersion = 53
+        return occurrence
+    }
+}
+#endif
+
 /// Reads/writes through the same shared `LoggingSandboxStore` Home and
 /// Morning Check-In use — never a second, independently-fetched Priority
 /// projection. See `PriorityReadModel.swift`'s type-level doc comment.
@@ -39,6 +108,12 @@ final class PriorityDetailViewModel {
     }
 
     func load() async {
+#if DEBUG
+        if let pilotOccurrence = FoamRollingPriorityPilotLaunchConfiguration.occurrence(for: priorityId) {
+            state = .loaded(pilotOccurrence)
+            return
+        }
+#endif
         if authority == .sandbox {
             state = .loaded(store.priorityOccurrence(id: priorityId))
             return
