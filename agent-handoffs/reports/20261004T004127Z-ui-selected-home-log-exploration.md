@@ -1,8 +1,11 @@
 # Selected Home refinement + Log UI exploration report
 
-Date: 2026-10-04 UTC  
-Assignment authority: `9d9a6b7d0b254c91aa8da93fd5f9ced3b17a9011`  
-Shipping Native authority: `b8ee8690b194cb90086b62816b9a2c8c400dc026` (Build 85)  
+Date: 2026-10-04 UTC
+
+Assignment authority: `9d9a6b7d0b254c91aa8da93fd5f9ced3b17a9011`
+
+Shipping Native authority: `b8ee8690b194cb90086b62816b9a2c8c400dc026` (Build 85)
+
 Artifact commit: `ec425a96b2f4b726fd75ed8e3b45a8159c6e4ae8`
 
 ## Result
