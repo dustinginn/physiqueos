@@ -1,0 +1,39 @@
+{
+  "authority": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+  "fixtureId": "weekly_briefing_2026-08-23_2026-08-29",
+  "productionOrder": [
+    "W01", "W02", "W03", "W04", "W05", "W06", "W07",
+    "W08", "W09", "W10", "W13", "W14", "W15", "W16",
+    "W17", "W18", "W19", "W20", "W21",
+    "W23", "W24", "W25", "W26", "W27", "W28", "W29",
+    "W33", "W34", "W35", "W36", "W37"
+  ],
+  "futureAdditiveOrder": [
+    "W01", "W02", "W03", "W04", "W05", "W06", "W07",
+    "W08", "W09", "W10", "W13", "W14", "W15", "W16",
+    "W17", "W18", "W19", "W20", "W21",
+    "W23", "W24", "W25", "W26", "W27", "W28", "W29",
+    "R-FUTURE", "W33", "W34", "W35", "W36", "W37"
+  ],
+  "conditionalAbsentForFixture": {
+    "W11": "Energy comparison narrative: comparisonNarrative absent",
+    "W12": "Energy daily semantic rows: showsDailySemanticRows defaults false",
+    "W22": "View Photo Briefing link: photoEventDestination is null",
+    "W30": "Training watch: absent",
+    "W31": "Body Composition: bodyComposition is null",
+    "W32": "Still Unresolved: no presentable uncertainty"
+  },
+  "graphs": [
+    {
+      "id": "W15",
+      "component": "WeeklyEnergyCard.chart",
+      "parent": "W08",
+      "type": "grouped bar chart",
+      "series": ["Intake", "Estimated expenditure"],
+      "labels": ["23", "24", "25", "26", "27", "28", "29"],
+      "pointCount": 7,
+      "markCount": 14,
+      "condition": "showsChart == true and dailyBalances is non-empty"
+    }
+  ]
+}

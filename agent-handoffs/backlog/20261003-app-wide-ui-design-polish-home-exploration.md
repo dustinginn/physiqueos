@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log direction locked; Weekly faithful-restyle corrective pass in Founder review**
+Status: **Home + Log direction locked; Weekly creative-formatting pass ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -106,7 +106,7 @@ The three prior Weekly compositions are **REJECTED by the Founder**. They change
 
 ## Weekly Briefing faithful-restyle corrective pass
 
-Status: **Ready for Founder review**
+Status: **Content/order baseline accepted; visual design too conservative**
 
 The corrective pass uses the actual Build 85 Weekly implementation as an immutable wireframe and produces one faithful structure in two visual appearances:
 
@@ -124,3 +124,27 @@ Review set:
 The same production content, copy, section/card order, parentage, metrics, narratives, Confidence anchor, Energy graph, Coach's Take, Into Next Week, revision provenance, navigation and fixture-driven conditional visibility are preserved. Recovery is the sole additive section, inserted after Training, clearly fixture-only, still ungraduated and uncoupled from Confidence.
 
 Home remains locked. Log remains locked to Compact Command Center. No Weekly direction is accepted yet. No shipping Native source, Server behavior, production projection, Recovery policy, build or TestFlight state changed. The next gate is Founder review of the faithful dark/mineral-light pair and parity proof.
+
+Founder accepted this pass as the correct content/order/parity baseline but rejected its visual conservatism. It remains the immutable semantic and structural authority for the next exploration, not the selected Weekly appearance.
+
+## Weekly Briefing creative-formatting pass
+
+Status: **Ready for Founder review**
+
+The exact accepted content/order baseline now appears in three genuinely different visual-formatting directions, each in dark and mineral light:
+
+- F1 Home-Language Evolution;
+- F2 Modular Briefing;
+- F3 Editorial Premium.
+
+Review set:
+
+- `agent-handoffs/artifacts/weekly-ui-creative-formatting-20261004/README.md`
+- `agent-handoffs/artifacts/weekly-ui-creative-formatting-20261004/comparison-board.html`
+- `agent-handoffs/artifacts/weekly-ui-creative-formatting-20261004/DESIGN-DIRECTIONS.md`
+- `agent-handoffs/artifacts/weekly-ui-creative-formatting-20261004/PARITY-PROOF.md`
+- `agent-handoffs/artifacts/weekly-ui-creative-formatting-20261004/TYPOGRAPHY-ACCESSIBILITY.md`
+
+All six renders preserve the exact canonical strings, W-ID order, domains, parentage, Confidence, Energy graph data, Training, Recovery seam, Coach's Take, Into Next Week, revision content and conditionals. The three directions pass a measured grayscale-difference gate. Priority Muscle Groups are full-width, left-aligned and compact in every direction; the rejected narrow/centered treatment is gone.
+
+Home remains locked. Log remains locked to Compact Command Center. No Weekly direction is accepted yet. No shipping Native source, Server behavior, production projection, Recovery policy, build or TestFlight state changed. The next gate is Founder review of the six full-length creative-formatting renders.

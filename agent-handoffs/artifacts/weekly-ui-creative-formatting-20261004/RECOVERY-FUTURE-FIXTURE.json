@@ -1,0 +1,11 @@
+{
+  "fixtureOnly": true,
+  "productionActive": false,
+  "strategicallyEligible": false,
+  "confidenceCoupling": "none",
+  "location": "after Training and before Body Composition / Coach interpretation",
+  "status": "Not enough data",
+  "reason": "Recovery remains unavailable until the prospective Sleep evidence gate graduates.",
+  "sleepSignal": "Not graduated",
+  "foamContext": "Context only"
+}
