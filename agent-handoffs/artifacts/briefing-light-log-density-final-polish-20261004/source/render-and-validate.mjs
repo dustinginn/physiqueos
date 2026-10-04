@@ -36,8 +36,8 @@ await page.goto(`file://${path.join(root, 'briefing-light-polish.html')}`, { wai
 await page.waitForFunction(() => document.documentElement.dataset.ready === 'true');
 await page.evaluate(() => document.fonts.ready);
 
-async function inspectBriefing(cadence) {
-  return page.locator(`.phone[data-variant="${cadence}-light"]`).evaluate((el, args) => {
+async function inspectBriefing(cadence, variant = 'light') {
+  return page.locator(`.phone[data-variant="${cadence}-${variant}"]`).evaluate((el, args) => {
     const actual = Object.fromEntries([...el.querySelectorAll('[data-semantic]')].map(node => [node.dataset.semantic, node.dataset.value ?? '']));
     const missing = Object.keys(args.expected).filter(key => !(key in actual));
     const mismatches = Object.keys(args.expected).filter(key => key in actual && args.expected[key] !== actual[key]).map(key => ({ key, expected: args.expected[key], actual: actual[key] }));
@@ -61,6 +61,7 @@ async function inspectBriefing(cadence) {
     const essentialSizes = [...el.querySelectorAll('.body-copy,.meaning,.weight-note,.priority strong,.priority-status,.priority-count,.coach-block p')].map(node => Number.parseFloat(getComputedStyle(node).fontSize));
     return {
       cadence: args.cadence,
+      variant: args.variant,
       widthPoints: Math.round(rect.width),
       heightPoints: Math.round(rect.height),
       semantic: actual,
@@ -84,14 +85,19 @@ async function inspectBriefing(cadence) {
       photosAbsent: !el.innerText.includes('Photos'),
       unresolvedAbsent: !el.innerText.includes('Still Unresolved'),
     };
-  }, { cadence, expected: expectedSemantics[cadence] });
+  }, { cadence, variant, expected: expectedSemantics[cadence] });
 }
 
 const briefingRenders = {
   weekly: await inspectBriefing('weekly'),
   midweek: await inspectBriefing('midweek'),
 };
-for (const [cadence, result] of Object.entries(briefingRenders)) {
+const briefingRichRenders = {
+  weekly: await inspectBriefing('weekly', 'light-rich'),
+  midweek: await inspectBriefing('midweek', 'light-rich'),
+};
+for (const [key, result] of Object.entries({ ...briefingRenders, ...Object.fromEntries(Object.entries(briefingRichRenders).map(([cadence, value]) => [`${cadence}-rich`, value])) })) {
+  const cadence = result.cadence;
   result.sectionOrderExact = JSON.stringify(result.sections) === JSON.stringify(expectedSections[cadence]);
   result.energyExact = JSON.stringify(result.energy) === JSON.stringify(previousValidation.renders[`${cadence}-light`].energy);
   result.recoveryExact = JSON.stringify(result.recovery) === JSON.stringify(previousValidation.renders[`${cadence}-light`].recovery);
@@ -103,13 +109,16 @@ for (const [cadence, result] of Object.entries(briefingRenders)) {
   result.pass = result.widthPoints === 402 && result.missing.length === 0 && result.mismatches.length === 0 && result.extra.length === 0
     && result.sectionOrderExact && result.energyExact && result.recoveryExact && result.surfaceRhythmPass && result.accessibilityPass
     && result.photosAbsent && result.unresolvedAbsent;
-  if (!result.pass) throw new Error(`${cadence} briefing validation failed:\n${JSON.stringify(result, null, 2)}`);
+  if (!result.pass) throw new Error(`${key} briefing validation failed:\n${JSON.stringify(result, null, 2)}`);
 }
 
 const expectedPriority = weeklyFixtures.find(item => item.id === 'weekly_briefing_2026-08-23_2026-08-29').weekly.training.priorityGroups
   .map(item => ({ label: item.label, status: item.statusLabel, count: `${item.comparableExerciseCount} exercises` }));
 if (JSON.stringify(briefingRenders.weekly.priorityContent) !== JSON.stringify(expectedPriority)) {
   throw new Error(`Priority content mismatch: ${JSON.stringify(briefingRenders.weekly.priorityContent)}`);
+}
+if (JSON.stringify(briefingRichRenders.weekly.priorityContent) !== JSON.stringify(expectedPriority)) {
+  throw new Error(`Rich Priority content mismatch: ${JSON.stringify(briefingRichRenders.weekly.priorityContent)}`);
 }
 
 const previousPage = await browser.newPage({ viewport: { width: 1000, height: 1000 }, deviceScaleFactor: 3 });
@@ -142,10 +151,14 @@ const priorityCompaction = {
 if (priorityCompaction.reductionPoints < 20 || !priorityCompaction.twoColumnLeftAligned) throw new Error(`Priority compaction insufficient: ${JSON.stringify(priorityCompaction)}`);
 
 const briefingFull = {};
+const briefingRichFull = {};
 for (const cadence of ['weekly','midweek']) {
   const file = path.join(screens, `${cadence}-light-refined-full.png`);
   await page.locator(`.phone[data-variant="${cadence}-light"]`).screenshot({ path: file });
   briefingFull[cadence] = file;
+  const richFile = path.join(screens, `${cadence}-light-rich-fields-full.png`);
+  await page.locator(`.phone[data-variant="${cadence}-light-rich"]`).screenshot({ path: richFile });
+  briefingRichFull[cadence] = richFile;
   for (const focus of ['recovery','finale']) {
     await page.locator(`.phone[data-variant="${cadence}-light"] [data-section="${cadence}-${focus}"]`).screenshot({ path: path.join(screens, `${cadence}-${focus}-light-refined.png`) });
   }
@@ -176,7 +189,9 @@ async function inspectLog(theme) {
       return { section: node.dataset.section, x: Math.round(r.x - rect.x), y: Math.round(r.y - rect.y), width: Math.round(r.width), height: Math.round(r.height) };
     });
     const tiles = [...el.querySelectorAll('.tile')];
-    const targets = [...el.querySelectorAll('.training-action,.tile,.quick-action,.details,.tab')].map(node => ({ text: node.innerText.trim(), height: Math.round(node.getBoundingClientRect().height) }));
+    const targets = [...el.querySelectorAll('.training-action,.tile,.quick-action,.details,.sources summary,.tab')].map(node => ({ text: node.innerText.trim(), height: Math.round(node.getBoundingClientRect().height) }));
+    const sources = el.querySelector('.sources');
+    const content = el.querySelector('.content');
     return {
       theme,
       widthPoints: Math.round(rect.width),
@@ -185,8 +200,11 @@ async function inspectLog(theme) {
       semantics,
       sectionGeometry,
       tileText: tiles.map(node => node.innerText),
-      sourcesText: el.querySelector('.sources').innerText,
-      sourceAria: el.querySelector('.sources').getAttribute('aria-label'),
+      sourcesText: sources.textContent,
+      sourceAria: sources.getAttribute('aria-label'),
+      sourceTag: sources.tagName,
+      sourceCollapsed: !sources.open,
+      sourceAtContentBottom: content.lastElementChild === sources,
       appleHealthInsideTiles: tiles.some(node => node.innerText.includes('Apple Health')),
       targets,
       visibleSizes: [...el.querySelectorAll('.tile *, .sources *, .review *, .quick-action, .details')].filter(node => getComputedStyle(node).display !== 'none').map(node => Number.parseFloat(getComputedStyle(node).fontSize)),
@@ -219,6 +237,9 @@ const logContentValidation = {
   allTargetsAtLeast44: logRenders.dark.targets.every(target => target.height >= 44),
   noTinyType: logRenders.dark.visibleSizes.every(size => size >= 11) && logRenders.light.visibleSizes.every(size => size >= 11),
   sourceVoiceOverGroup: logRenders.dark.sourceAria === 'Evidence sources',
+  sourceExpandable: logRenders.dark.sourceTag === 'DETAILS' && logRenders.light.sourceTag === 'DETAILS',
+  sourceCollapsedByDefault: logRenders.dark.sourceCollapsed && logRenders.light.sourceCollapsed,
+  sourceAtTrueBottom: logRenders.dark.sourceAtContentBottom && logRenders.light.sourceAtContentBottom,
 };
 logContentValidation.pass = Object.values(logContentValidation).every(Boolean);
 if (!logParity.pass || !logContentValidation.pass) throw new Error(`Log validation failed:\n${JSON.stringify({ logParity, logContentValidation, logRenders }, null, 2)}`);
@@ -229,7 +250,10 @@ for (const theme of ['dark','light']) {
   await logPage.locator(`.phone[data-variant="log-${theme}"]`).screenshot({ path: full });
   logFull[theme] = full;
   await logPage.locator(`.phone[data-variant="log-${theme}"] [data-section="log-today"]`).screenshot({ path: path.join(screens, `log-logged-today-${theme}.png`) });
+  await logPage.locator(`.phone[data-variant="log-${theme}"] [data-section="log-sources"]`).screenshot({ path: path.join(screens, `log-sources-collapsed-${theme}.png`) });
+  await logPage.locator(`.phone[data-variant="log-${theme}"] [data-section="log-sources"]`).evaluate(node => { node.open = true; });
   await logPage.locator(`.phone[data-variant="log-${theme}"] [data-section="log-sources"]`).screenshot({ path: path.join(screens, `log-sources-${theme}.png`) });
+  await logPage.locator(`.phone[data-variant="log-${theme}"] [data-section="log-sources"]`).evaluate(node => { node.open = false; });
 }
 
 async function makeBoard(items, name, title, width = 603) {
@@ -254,6 +278,18 @@ await makeBoard([
   { label: 'Weekly · refined mineral light', path: briefingFull.weekly },
   { label: 'Midweek · refined mineral light', path: briefingFull.midweek },
 ], 'briefing-light-refined-pair.png', 'Recurring briefings · final mineral-light polish');
+await makeBoard([
+  { label: 'Weekly · rich mineral light', path: briefingRichFull.weekly },
+  { label: 'Midweek · rich mineral light', path: briefingRichFull.midweek },
+], 'briefing-light-rich-fields-pair.png', 'Recurring briefings · mineral light with rich color fields');
+await makeBoard([
+  { label: 'Weekly · selective tint', path: briefingFull.weekly },
+  { label: 'Weekly · rich color fields', path: briefingRichFull.weekly },
+], 'weekly-light-surface-intensity-comparison.png', 'Weekly mineral light · surface intensity comparison');
+await makeBoard([
+  { label: 'Midweek · selective tint', path: briefingFull.midweek },
+  { label: 'Midweek · rich color fields', path: briefingRichFull.midweek },
+], 'midweek-light-surface-intensity-comparison.png', 'Midweek mineral light · surface intensity comparison');
 await makeBoard([
   { label: 'Weekly · previous accepted light', path: path.join(root, 'screens/weekly-light-before.png') },
   { label: 'Weekly · refined light', path: briefingFull.weekly },
@@ -283,7 +319,11 @@ await makeBoard([
 await makeBoard([
   { label: 'Sources · dark', path: path.join(screens, 'log-sources-dark.png') },
   { label: 'Sources · mineral light', path: path.join(screens, 'log-sources-light.png') },
-], 'log-sources-dark-light.png', 'Centralized source / provenance treatment');
+], 'log-sources-dark-light.png', 'Sources · compact disclosure expanded');
+await makeBoard([
+  { label: 'Collapsed at bottom · dark', path: path.join(screens, 'log-sources-collapsed-dark.png') },
+  { label: 'Collapsed at bottom · mineral light', path: path.join(screens, 'log-sources-collapsed-light.png') },
+], 'log-sources-collapsed-dark-light.png', 'Sources · default compact state');
 await makeBoard([
   { label: 'Locked Log · prior dark', path: path.join(root, 'screens/log-command-locked-before-dark.png') },
   { label: 'Density validation · dark', path: logFull.dark },
@@ -304,6 +344,17 @@ const briefingContrast = {
 };
 briefingContrast.pass = briefingContrast.primaryMinimum >= 4.5 && briefingContrast.secondaryMinimum >= 4.5 && Object.values(briefingContrast.accentChecks).every(value => value >= 4.5);
 if (!briefingContrast.pass) throw new Error(`Briefing contrast failed: ${JSON.stringify(briefingContrast)}`);
+const richSurfaces = ['#173746','#352f57','#103d3b','#16394a','#103743'];
+const richBriefingContrast = {
+  primaryMinimum: Math.min(...richSurfaces.map(surface => contrast('#f4f8f8', surface))),
+  secondaryMinimum: Math.min(...richSurfaces.map(surface => contrast('#d2dde0', surface))),
+  accentChecks: {
+    amberOnEnergy: contrast('#f2bc4d', '#173746'), purpleOnBody: contrast('#b7a4ff', '#352f57'),
+    greenOnTraining: contrast('#55df9a', '#103d3b'), cyanOnRecovery: contrast('#44d3df', '#16394a'),
+  },
+};
+richBriefingContrast.pass = richBriefingContrast.primaryMinimum >= 4.5 && richBriefingContrast.secondaryMinimum >= 4.5 && Object.values(richBriefingContrast.accentChecks).every(value => value >= 4.5);
+if (!richBriefingContrast.pass) throw new Error(`Rich briefing contrast failed: ${JSON.stringify(richBriefingContrast)}`);
 
 const validation = {
   pass: true,
@@ -316,8 +367,10 @@ const validation = {
   },
   target: { widthPoints: 402, scale: 3, viewportHeightPoints: 874 },
   briefingRenders,
+  briefingRichRenders,
   priorityCompaction,
   briefingContrast,
+  richBriefingContrast,
   logRenders,
   logParity,
   logContentValidation,
@@ -325,4 +378,4 @@ const validation = {
 };
 await fs.writeFile(path.join(root, 'validation.json'), `${JSON.stringify(validation, null, 2)}\n`);
 await previousPage.close(); await page.close(); await logPage.close(); await browser.close();
-console.log(JSON.stringify({ pass: true, priorityCompaction, briefingHeights: Object.fromEntries(Object.entries(briefingRenders).map(([key,value]) => [key,value.heightPoints])), logHeights: Object.fromEntries(Object.entries(logRenders).map(([key,value]) => [key,value.heightPoints])), logParity, logContentValidation, briefingContrast }, null, 2));
+console.log(JSON.stringify({ pass: true, priorityCompaction, briefingHeights: Object.fromEntries(Object.entries(briefingRenders).map(([key,value]) => [key,value.heightPoints])), richBriefingHeights: Object.fromEntries(Object.entries(briefingRichRenders).map(([key,value]) => [key,value.heightPoints])), logHeights: Object.fromEntries(Object.entries(logRenders).map(([key,value]) => [key,value.heightPoints])), logParity, logContentValidation, briefingContrast, richBriefingContrast }, null, 2));

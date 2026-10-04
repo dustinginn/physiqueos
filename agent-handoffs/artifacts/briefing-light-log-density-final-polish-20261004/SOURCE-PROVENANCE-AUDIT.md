@@ -31,7 +31,7 @@ The values are a clearly identified design-only fixture shaped exactly like the 
 
 ## Centralized treatment
 
-The refined command center removes `Apple Health` from individual tiles and places one compact `Sources` block at the bottom of Logged Today:
+The refined command center removes `Apple Health` from individual tiles and places one compact `Sources` disclosure at the true bottom of Log content, after the upload actions and immediately above navigation. It defaults to a single 44 pt tappable row and expands in place:
 
 - `Apple Health` → Stair Stepper, Nutrition, Activity;
 - `PhysiqueOS Logger` → Strength Training;
