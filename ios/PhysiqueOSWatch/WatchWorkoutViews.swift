@@ -160,7 +160,9 @@ struct WatchWorkoutRootView: View {
                 .font(.headline)
                 .multilineTextAlignment(.center)
             Text(store.connectionState == .phoneUnavailable
-                 ? "Health may continue. Set logging waits for iPhone."
+                 ? (store.health.recordingCorrelationId != nil
+                    ? "Apple Health keeps recording. Set logging waits for iPhone."
+                    : "Set logging waits for iPhone.")
                  : "Build the exercises and sets, then choose Ready for Watch.")
                 .font(.caption2)
                 .foregroundStyle(WatchPhysiqueOSTheme.muted)
@@ -355,7 +357,9 @@ struct WatchWorkoutExecutionView: View {
     static let pageIndicatorClearance: CGFloat = 9
 
     private var statusText: (text: String, color: Color)? {
-        if store.shouldShowAuthorityWarning(at: Date()) { return ("IPHONE UNAVAILABLE · HEALTH ON", WatchPhysiqueOSTheme.warning) }
+        if store.shouldShowAuthorityWarning(at: Date()) {
+            return (store.healthStatus.authorityWarningText, WatchPhysiqueOSTheme.warning)
+        }
         if projection.phase == .paused { return ("PAUSED", WatchPhysiqueOSTheme.warning) }
         switch store.notice {
         case .setPending: return ("SET PENDING…", WatchPhysiqueOSTheme.muted)
@@ -366,8 +370,12 @@ struct WatchWorkoutExecutionView: View {
                 return ("COMPLETE A SET FIRST", WatchPhysiqueOSTheme.warning)
             }
             return ("NOT RECORDED · \(reason.uppercased())", WatchPhysiqueOSTheme.warning)
-        case .finishPending, nil: return nil
+        case .finishPending, nil: break
         }
+        if let health = store.healthHeaderText {
+            return (health, store.healthStatus == .starting ? WatchPhysiqueOSTheme.muted : WatchPhysiqueOSTheme.warning)
+        }
+        return nil
     }
 
     private func contextRows(_ layout: WatchExecutionLayout) -> some View {
@@ -460,9 +468,12 @@ struct WatchWorkoutExecutionView: View {
             WatchEdgeCapsuleButton(
                 title: projection.phase == .paused ? "Paused" : "Complete Set",
                 layout: layout,
-                enabled: projection.canCompleteSet && !store.isMutationPending && store.connectionState == .reachable
+                enabled: store.isCompleteSetAvailable
             ) { store.completeSet() }
             .accessibilityIdentifier("watch.execution.completeSet")
+            .onChange(of: store.isCompleteSetAvailable, initial: true) { _, available in
+                store.noteCompleteSetAvailability(available)
+            }
         }
     }
 }
@@ -651,7 +662,14 @@ struct WatchWorkoutMetricsView: View {
             WatchBelowClockPage { size in
             let compact = size.height < 190
             VStack(spacing: compact ? 3 : 4) {
-                Text("WORKOUT METRICS").font(.system(size: 9, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.purple)
+                let values = WatchWorkoutMetricsPresentation(health: store.health)
+                if let caption = store.healthHeaderText {
+                    Text(caption).font(.system(size: 9, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.warning)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                        .accessibilityIdentifier("watch.metrics.healthStatus")
+                } else {
+                    Text("WORKOUT METRICS").font(.system(size: 9, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.purple)
+                }
                 WatchMetricRow(
                     compact: compact,
                     label: "TIME",
@@ -662,19 +680,19 @@ struct WatchWorkoutMetricsView: View {
                 WatchMetricRow(
                     compact: compact,
                     label: "ACTIVE CALORIES",
-                    value: store.health.activeCalories.map { "\(WatchWorkoutClock.wholeNumber($0)) CAL" } ?? "—",
+                    value: values.activeCalories,
                     icon: "flame.fill", accent: WatchPhysiqueOSTheme.activeEnergyAccent
                 )
                 WatchMetricRow(
                     compact: compact,
                     label: "TOTAL CALORIES",
-                    value: store.health.totalCalories.map { "\(WatchWorkoutClock.wholeNumber($0)) CAL" } ?? "—",
+                    value: values.totalCalories,
                     icon: "sum", accent: WatchPhysiqueOSTheme.totalEnergyAccent
                 )
                 WatchMetricRow(
                     compact: compact,
                     label: "HEART RATE",
-                    value: store.health.currentHeartRateBPM.map { "\(Int($0.rounded())) BPM" } ?? "—",
+                    value: values.heartRate,
                     icon: "heart.fill", accent: WatchPhysiqueOSTheme.heartRateAccent
                 )
             }
@@ -684,6 +702,23 @@ struct WatchWorkoutMetricsView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.metrics")
+    }
+}
+
+/// Workout Metrics values. Heart rate and energy come only from the Watch's
+/// live HealthKit workout builder; with no workout recording they are "—",
+/// never a daily total or any other substitute. TIME is separate: it is the
+/// phone's structured session clock (`WatchWorkoutClock`).
+struct WatchWorkoutMetricsPresentation: Equatable {
+    var activeCalories: String
+    var totalCalories: String
+    var heartRate: String
+
+    @MainActor
+    init(health: any WatchWorkoutHealthRecording) {
+        activeCalories = health.activeCalories.map { "\(WatchWorkoutClock.wholeNumber($0)) CAL" } ?? "—"
+        totalCalories = health.totalCalories.map { "\(WatchWorkoutClock.wholeNumber($0)) CAL" } ?? "—"
+        heartRate = health.currentHeartRateBPM.map { "\(Int($0.rounded())) BPM" } ?? "—"
     }
 }
 
@@ -870,10 +905,14 @@ struct WatchWorkoutControlsView: View {
                 controlButton("Cancel Workout", icon: "xmark", tint: WatchPhysiqueOSTheme.destructive,
                               enabled: canControl, layout) { store.requestCancelWorkout() }
                     .accessibilityIdentifier("watch.controls.cancel")
-                if store.notice == .healthStartFailed {
-                    controlButton("Retry Health Start", icon: "heart", tint: WatchPhysiqueOSTheme.warning, enabled: true, layout) {
+                if store.canStartHealthManually {
+                    controlButton(
+                        store.healthStatus == .failed ? "Retry Health Start" : "Record to Health",
+                        icon: "heart", tint: WatchPhysiqueOSTheme.warning, enabled: true, layout
+                    ) {
                         store.retryHealthStart()
                     }
+                    .accessibilityIdentifier("watch.controls.recordHealth")
                 }
             } else {
                 Text(phase == .finishing ? "Finishing — controls are closed." : "No workout in progress.")

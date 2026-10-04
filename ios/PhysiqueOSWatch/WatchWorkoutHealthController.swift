@@ -2,9 +2,57 @@ import Foundation
 import HealthKit
 import Observation
 
+/// Everything `WatchWorkoutStore` and the Watch views need from the Watch's
+/// HealthKit workout. The shipping implementation is
+/// `WatchWorkoutHealthController`; tests substitute a deterministic fake so
+/// start/pause/finish decisions are provable without HealthKit.
+@MainActor
+protocol WatchWorkoutHealthRecording: AnyObject {
+    var lifecycle: WatchWorkoutHealthController.Lifecycle { get }
+    var currentHeartRateBPM: Double? { get }
+    var activeCalories: Double? { get }
+    var basalCalories: Double? { get }
+    var totalCalories: Double? { get }
+    var averageHeartRateBPM: Double? { get }
+    var rawDurationSeconds: Double? { get }
+    var activeCorrelationId: String? { get }
+    var storedCorrelationId: String? { get }
+    var savedCorrelationPendingReport: String? { get }
+    /// The structured session whose workout is running or paused right now.
+    var recordingCorrelationId: String? { get }
+    func hasSaved(structuredSessionId: String) -> Bool
+    /// Returns the HealthKit workout's start instant.
+    @discardableResult
+    func start(structuredSessionId: String) async throws -> Date
+    func pause()
+    func resume()
+    func finish(structuredSessionId: String?, endAt: Date?) async throws
+    func cancel() async
+    func recover(structuredSessionId: String?) async throws
+    func resetPresentationMetrics()
+    func markSavedCorrelationReported(_ structuredSessionId: String)
+#if DEBUG
+    func installDebugMetrics(
+        heartRate: Double?, activeCalories: Double?, basalCalories: Double?, averageHeartRate: Double?,
+        recordingCorrelationId: String?
+    )
+#endif
+}
+
+#if DEBUG
+extension WatchWorkoutHealthRecording {
+    func installDebugMetrics(heartRate: Double?, activeCalories: Double?, basalCalories: Double?, averageHeartRate: Double?) {
+        installDebugMetrics(
+            heartRate: heartRate, activeCalories: activeCalories, basalCalories: basalCalories,
+            averageHeartRate: averageHeartRate, recordingCorrelationId: nil
+        )
+    }
+}
+#endif
+
 @MainActor
 @Observable
-final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuilderDelegate {
+final class WatchWorkoutHealthController: NSObject, WatchWorkoutHealthRecording, HKWorkoutSessionDelegate, HKLiveWorkoutBuilderDelegate {
     enum CancellationDisposition: Equatable { case discard }
     static let cancellationDisposition: CancellationDisposition = .discard
 
@@ -51,6 +99,14 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
     }
 
     static let savableStates: Set<Lifecycle> = [.running, .paused, .ending, .failed]
+
+    var recordingCorrelationId: String? {
+#if DEBUG
+        if let debugRecordingCorrelationId { return debugRecordingCorrelationId }
+#endif
+        guard workoutSession != nil, lifecycle == .running || lifecycle == .paused else { return nil }
+        return correlationId
+    }
     private var finishInFlight = false
     /// `endCollection` already succeeded for the current builder, so a
     /// retried save goes straight to `finishWorkout`.
@@ -73,16 +129,29 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         return end
     }
 
-    func start(structuredSessionId: String) async throws {
-        if correlationId == structuredSessionId, [.starting, .running, .paused].contains(lifecycle) { return }
+    /// The current workout's start instant (nil when none is live).
+    private(set) var workoutStartedAt: Date?
+
+    @discardableResult
+    func start(structuredSessionId: String) async throws -> Date {
+        if correlationId == structuredSessionId, [.starting, .running, .paused].contains(lifecycle) {
+            return workoutStartedAt ?? builder?.startDate ?? Date()
+        }
         guard workoutSession == nil else { throw ControllerError.anotherSessionActive }
         lifecycle = .authorizing
-        try await authorize()
-
+        lastErrorDescription = nil
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = .traditionalStrengthTraining
         configuration.locationType = .indoor
-        let session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
+        let session: HKWorkoutSession
+        do {
+            try await authorize()
+            session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
+        } catch {
+            lifecycle = .failed
+            lastErrorDescription = error.localizedDescription
+            throw error
+        }
         let builder = session.associatedWorkoutBuilder()
         builder.dataSource = HKLiveWorkoutDataSource(
             healthStore: healthStore,
@@ -98,11 +167,27 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         lifecycle = .starting
 
         let startedAt = Date()
-        try await builder.addMetadata([HKMetadataKeyExternalUUID: structuredSessionId])
-        session.startActivity(with: startedAt)
-        try await builder.beginCollection(at: startedAt)
+        do {
+            try await builder.addMetadata([HKMetadataKeyExternalUUID: structuredSessionId])
+            session.startActivity(with: startedAt)
+            try await builder.beginCollection(at: startedAt)
+        } catch {
+            // A half-started workout is torn down, never left blocking every
+            // later start (Retry Health Start must be able to succeed).
+            session.end()
+            builder.discardWorkout()
+            workoutSession = nil
+            self.builder = nil
+            correlationId = nil
+            UserDefaults.standard.removeObject(forKey: correlationKey)
+            lifecycle = .failed
+            lastErrorDescription = error.localizedDescription
+            throw error
+        }
+        workoutStartedAt = startedAt
         lifecycle = .running
         try? await session.startMirroringToCompanionDevice()
+        return startedAt
     }
 
     func pause() {
@@ -121,8 +206,7 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
     /// session) at the confirmed finish instant. Single flight: a second
     /// call while one is ending, or after it saved, throws `notRunning`;
     /// callers check `hasSaved(structuredSessionId:)`.
-    @discardableResult
-    func finish(structuredSessionId: String? = nil, endAt: Date? = nil) async throws -> HKWorkout? {
+    func finish(structuredSessionId: String? = nil, endAt: Date? = nil) async throws {
         guard let workoutSession, let builder, !finishInFlight,
               Self.savableStates.contains(lifecycle),
               structuredSessionId == nil || structuredSessionId == correlationId
@@ -146,9 +230,9 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
             }
             self.workoutSession = nil
             self.builder = nil
+            workoutStartedAt = nil
             collectionEnded = false
             UserDefaults.standard.removeObject(forKey: correlationKey)
-            return workout
         } catch {
             // Keep the session and builder: Retry Health Save (or End &
             // Save) can finish the same workout later.
@@ -186,6 +270,7 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         }
         workoutSession = nil
         builder = nil
+        workoutStartedAt = nil
         collectionEnded = false
         correlationId = nil
         currentHeartRateBPM = nil
@@ -194,6 +279,9 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         averageHeartRateBPM = nil
         rawDurationSeconds = nil
         lastErrorDescription = nil
+#if DEBUG
+        debugRecordingCorrelationId = nil
+#endif
         UserDefaults.standard.removeObject(forKey: correlationKey)
         // A different session's saved workout still owes its report.
         if cancelledCorrelationId != nil, savedCorrelationPendingReport == cancelledCorrelationId {
@@ -224,16 +312,22 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
     }
 
 #if DEBUG
+    /// Fixture captures only: presents a recording workout for exactly the
+    /// fixture session without touching HealthKit.
+    private var debugRecordingCorrelationId: String?
+
     func installDebugMetrics(
         heartRate: Double?,
         activeCalories: Double?,
         basalCalories: Double?,
-        averageHeartRate: Double?
+        averageHeartRate: Double?,
+        recordingCorrelationId: String?
     ) {
         currentHeartRateBPM = heartRate
         self.activeCalories = activeCalories
         self.basalCalories = basalCalories
         averageHeartRateBPM = averageHeartRate
+        debugRecordingCorrelationId = recordingCorrelationId
         lifecycle = .running
     }
 #endif
@@ -253,6 +347,7 @@ final class WatchWorkoutHealthController: NSObject, HKWorkoutSessionDelegate, HK
         builder.delegate = self
         workoutSession = recovered
         self.builder = builder
+        workoutStartedAt = builder.startDate
         collectionEnded = false
         correlationId = stored
         lifecycle = recovered.state == .paused ? .paused : .running

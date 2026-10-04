@@ -1534,3 +1534,165 @@ extension TrainingSessionAuthorityTests {
         XCTAssertTrue(authority.drafts.isEmpty)
     }
 }
+
+// MARK: - Build 86: Watch Health start for phone-started sessions
+
+extension TrainingSessionAuthorityTests {
+    private func healthStartCommand(
+        id: String, sessionId: String = "session-1", at healthStartedAt: Date?, revision: Int = 99
+    ) -> WatchWorkoutCommand {
+        WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: id, mutationId: id,
+            kind: .reportHealthStarted, sessionId: sessionId, expectedRevision: revision,
+            exerciseId: nil, setId: nil, healthStartedAt: healthStartedAt, issuedAt: t0
+        )
+    }
+
+    // 6: the phone records the Watch Health start exactly once and never moves the structured start.
+    func testWatchHealthStartIsRecordedOnceAndNeverMovesTheStructuredStart() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        let structuredStart = try XCTUnwrap(authority.draft(id: "session-1")?.startedAt)
+        let healthStart = t0.addingTimeInterval(300)
+
+        let first = router.route(healthStartCommand(id: "hs-1", at: healthStart))
+        XCTAssertEqual(first.status, .applied, "Identified by session, not revision-guarded.")
+        let recorded = try XCTUnwrap(authority.draft(id: "session-1"))
+        XCTAssertEqual(recorded.watchHealthStartedAt, TrainingSessionClock.string(from: healthStart))
+        XCTAssertEqual(recorded.startedAt, structuredStart, "The structured start (and every envelope) is unchanged.")
+        XCTAssertNil(recorded.watchStartedAt, "A phone-started session is not relabelled Watch-started.")
+        XCTAssertEqual(first.projection?.watchHealthStartedAt, healthStart)
+
+        XCTAssertEqual(router.route(healthStartCommand(id: "hs-1", at: healthStart)).status, .unchanged, "Replay.")
+        XCTAssertEqual(router.route(healthStartCommand(id: "hs-2", at: healthStart.addingTimeInterval(60))).status, .unchanged)
+        XCTAssertEqual(authority.draft(id: "session-1")?.watchHealthStartedAt, TrainingSessionClock.string(from: healthStart))
+        XCTAssertEqual(authority.draft(id: "session-1")?.currentRevision, recorded.currentRevision, "Exactly one mutation.")
+
+        let missingInstant = router.route(healthStartCommand(id: "hs-3", at: nil))
+        XCTAssertEqual(missingInstant.status, .rejected)
+        XCTAssertEqual(missingInstant.reason, .invalidCommand)
+        XCTAssertEqual(router.route(healthStartCommand(id: "hs-4", sessionId: "unknown", at: healthStart)).status, .rejected)
+    }
+
+    func testWatchStartedSessionAlreadyOwnsItsHealthWorkout() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        XCTAssertEqual(authority.setReadyForWatch(sessionId: "session-1", ready: true), .applied(revision: 1))
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        let start = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "start", mutationId: "start",
+            kind: .startPreparedWorkout, sessionId: "session-1", expectedRevision: 1,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+        let started = router.route(start)
+        XCTAssertEqual(started.status, .applied)
+        XCTAssertNotNil(started.projection?.watchHealthStartedAt, "The Watch never auto-starts a second workout.")
+        XCTAssertEqual(router.route(healthStartCommand(id: "hs", at: t0.addingTimeInterval(5))).status, .unchanged)
+        XCTAssertNil(authority.draft(id: "session-1")?.watchHealthStartedAt)
+    }
+
+    // 7 (phone half): a phone Finish after a reported start expects exactly one Health leg.
+    func testPhoneFinishAfterReportedHealthStartExpectsExactlyOneHealthSave() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        XCTAssertEqual(router.route(healthStartCommand(id: "hs", at: t0.addingTimeInterval(30))).status, .applied)
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
+        clock.advance(600)
+        XCTAssertTrue(authority.confirmPhoneFinish(
+            sessionId: "session-1", finishedAt: TrainingSessionClock.string(from: clock.now), finishOperationId: "op-1"
+        ).isAccepted)
+        let finished = try XCTUnwrap(authority.draft(id: "session-1"))
+        XCTAssertEqual(finished.watchHealthSaveState, .pending)
+        let projection = try XCTUnwrap(router.currentProjection())
+        XCTAssertTrue(projection.requiresHealthSave)
+        XCTAssertEqual(projection.finish?.healthExpected, true)
+
+        let save = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "save", mutationId: "save",
+            kind: .reportHealthSaved, sessionId: "session-1", expectedRevision: 0,
+            exerciseId: nil, setId: nil, finishOperationId: "op-1", issuedAt: clock.now
+        )
+        XCTAssertEqual(router.route(save).status, .applied)
+        XCTAssertEqual(router.route(save).status, .unchanged, "One Health save leg.")
+        XCTAssertEqual(authority.draft(id: "session-1")?.watchHealthSaveState, .succeeded)
+
+        // Without a Watch Health workout the Finish expects no Health leg (unchanged behavior).
+        let (plain, _) = makeAuthority(RecordingStore([liveSession(id: "session-2")]))
+        plain.completeSet(sessionId: "session-2", exerciseId: "bench", setId: "b1")
+        XCTAssertTrue(plain.confirmPhoneFinish(sessionId: "session-2", finishedAt: TrainingSessionClock.string(from: t0)).isAccepted)
+        XCTAssertNil(plain.draft(id: "session-2")?.watchHealthSaveState)
+    }
+
+    func testHealthStartReportedAfterTheFinishStampStillExpectsTheHealthLeg() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
+        XCTAssertTrue(authority.confirmPhoneFinish(
+            sessionId: "session-1", finishedAt: TrainingSessionClock.string(from: t0), finishOperationId: "op-1"
+        ).isAccepted)
+        XCTAssertNil(authority.draft(id: "session-1")?.watchHealthSaveState)
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        XCTAssertEqual(router.route(healthStartCommand(id: "late", at: t0.addingTimeInterval(-60))).status, .applied)
+        XCTAssertEqual(authority.draft(id: "session-1")?.watchHealthSaveState, .pending)
+    }
+
+    // 15: today's evidence set at the policy level. The trusted boundary is unchanged.
+    func testTodaysWorkoutSetNeverWidensTrustedCorrelation() throws {
+        let effective = t0.addingTimeInterval(-3_600)
+        let capability = HealthKitTrustedWorkoutCorrelationCapability.resolve(manifestBlock: .object([
+            "contractVersion": .string(HealthKitTrustedWorkoutCorrelationContract.contractVersion),
+            "enabled": .bool(true), "prospectiveOnly": .bool(true),
+            "trustedSourceBundleIdentifiers": .array([.string("com.physiqueos.native.dev")]),
+            "traditionalStrengthTrainingActivityTypes": .array([.string("50")]),
+            "clockToleranceSeconds": .number(120),
+            "effectiveAt": .string(ISO8601DateFormatter().string(from: effective))
+        ]), at: t0)
+        let gate = HealthKitTrustedWorkoutCorrelationGate(store: MemoryTrustedWorkoutCapabilityStore())
+        gate.update(capability)
+
+        // A phone-started session whose Watch Health workout began 20 minutes late.
+        let sessionID = UUID()
+        var session = liveSession(id: sessionID.uuidString, startedAt: TrainingSessionClock.string(from: t0))
+        session.watchHealthStartedAt = TrainingSessionClock.string(from: t0.addingTimeInterval(1_200))
+        session.finishedAt = TrainingSessionClock.string(from: t0.addingTimeInterval(4_200))
+        session.watchFinishOperationId = "finish-today"
+        let registryNow = t0.addingTimeInterval(4_300)
+        let registry = HealthKitTrustedWorkoutCorrelationRegistry(
+            gate: gate,
+            drafts: MemoryTrainingLoggerDraftStore(drafts: [session]),
+            terminalLedger: MemoryTrainingSessionTerminalLedgerStore(),
+            now: { registryNow }
+        )
+        let context = registry.context(ownerKey: "founder")
+        XCTAssertEqual(context.sessions.map(\.startedAt), [t0], "Envelope = structured start, never the Health start.")
+        XCTAssertEqual(context.clockToleranceSeconds, 120)
+
+        func extract(
+            uuid: String? = sessionID.uuidString, source: String = "com.physiqueos.native.dev",
+            activity: String = "50", start: TimeInterval, end: TimeInterval
+        ) -> String? {
+            HealthKitTrustedWorkoutCorrelation.extract(
+                externalUUID: uuid, sourceBundleIdentifier: source, activityType: activity, isIndoorWorkout: true,
+                startedAt: t0.addingTimeInterval(start), endedAt: t0.addingTimeInterval(end), context: context
+            )
+        }
+        // The PhysiqueOS Watch workout carrying the exact session UUID is the same session.
+        XCTAssertEqual(extract(start: 1_200, end: 4_200), sessionID.uuidString.lowercased())
+        // The 120 s boundary is exactly where it was.
+        XCTAssertNotNil(extract(start: -120, end: 4_200))
+        XCTAssertNil(extract(start: -121, end: 4_200))
+        XCTAssertNil(extract(start: 1_200, end: 4_321))
+        // Apple's Workout app strength workout, started late by hand: never trusted.
+        XCTAssertNil(extract(uuid: nil, source: "com.apple.health.workout", start: 1_500, end: 4_190))
+        XCTAssertNil(extract(source: "com.apple.health.workout", start: 1_500, end: 4_190))
+        // Two Stair Stepper workouts (stair climbing, type 44): never trusted strength.
+        XCTAssertNil(extract(activity: "44", start: -1_800, end: -600))
+        XCTAssertNil(extract(uuid: nil, source: "com.apple.health.workout", activity: "44", start: 4_400, end: 5_000))
+        // Before the prospective activation nothing is trusted.
+        var preActivation = context
+        preActivation.effectiveAt = t0.addingTimeInterval(1_300)
+        XCTAssertNil(HealthKitTrustedWorkoutCorrelation.extract(
+            externalUUID: sessionID.uuidString, sourceBundleIdentifier: "com.physiqueos.native.dev", activityType: "50",
+            isIndoorWorkout: true, startedAt: t0.addingTimeInterval(1_200), endedAt: t0.addingTimeInterval(4_200),
+            context: preActivation
+        ))
+    }
+}

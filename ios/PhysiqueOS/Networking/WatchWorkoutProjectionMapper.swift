@@ -70,7 +70,9 @@ extension WatchWorkoutProjection {
             finish: Self.finishStatus(draft, serverWaitingForNetwork: serverWaitingForNetwork),
             summary: Self.summary(draft, authority: authority, now: now),
             finishedAt: draft.finishedAt.flatMap(TrainingSessionClock.date(from:)),
-            recentlyEnded: Self.recentlyEnded(authority: authority, excluding: draft.id)
+            recentlyEnded: Self.recentlyEnded(authority: authority, excluding: draft.id),
+            watchHealthStartedAt: (draft.watchStartedAt ?? draft.watchHealthStartedAt)
+                .flatMap(TrainingSessionClock.date(from:))
         )
     }
 

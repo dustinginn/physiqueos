@@ -437,10 +437,32 @@ final class TrainingSessionAuthority {
         if draft.watchFinishOperationId == nil, let operationId {
             draft.watchFinishOperationId = operationId
             draft.watchServerCommitState = .pending
-            draft.watchHealthSaveState = draft.watchStartedAt != nil ? .pending : nil
+            draft.watchHealthSaveState = draft.expectsWatchHealthWorkout ? .pending : nil
         }
         draft.finishConfirmationRequestedAt = nil
         draft.rest = nil
+    }
+
+    /// The Watch began its HealthKit workout for this already-running live
+    /// session. Stamped once (a replay or a Watch-started session is
+    /// unchanged); the structured start is never moved. A start reported
+    /// after the finish was stamped (but before the session ended) still
+    /// makes the Finish expect the Health leg.
+    @discardableResult
+    func recordWatchHealthStart(
+        sessionId: String,
+        healthStartedAt: Date,
+        context: TrainingSessionMutationContext
+    ) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: context, scope: .lifecycle) { draft in
+            guard draft.mode == .live, draft.startedAt != nil, draft.leftAt == nil, draft.step != .complete
+            else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            guard !draft.expectsWatchHealthWorkout else { return }
+            draft.watchHealthStartedAt = TrainingSessionClock.string(from: healthStartedAt)
+            if draft.watchFinishOperationId != nil, draft.watchHealthSaveState == nil {
+                draft.watchHealthSaveState = .pending
+            }
+        }
     }
 
     @discardableResult

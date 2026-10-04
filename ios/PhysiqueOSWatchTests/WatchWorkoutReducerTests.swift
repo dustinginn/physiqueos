@@ -63,6 +63,8 @@ final class WatchWorkoutReducerTests: XCTestCase {
     @MainActor
     func testCancelConfirmationCanBeDismissedWithoutChangingWorkout() throws {
         let store = WatchWorkoutStore(session: nil)
+        // Display inactive: the real controller never starts HealthKit here.
+        store.setDisplayActive(false)
         let active = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("normal")?.projection)
         store.apply(active)
         store.showControls()
@@ -79,6 +81,8 @@ final class WatchWorkoutReducerTests: XCTestCase {
     @MainActor
     func testTerminalCancellationClearsExecutionControlsMetricsAndPendingPresentation() async throws {
         let store = WatchWorkoutStore(session: nil)
+        // Display inactive: the real controller never starts HealthKit here.
+        store.setDisplayActive(false)
         let active = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("paused")?.projection)
         store.apply(active)
         store.showControls()

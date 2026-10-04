@@ -195,7 +195,9 @@ extension ProductionNativeAPI: HealthKitTrustedWorkoutCorrelationCapabilitySourc
 /// presentation exists. A confirmed Watch finish is included before the
 /// independent Server commit completes because its HealthKit observer may
 /// run first; its UUID, Watch start, finish operation and frozen end are
-/// already durable phone authority at that point.
+/// already durable phone authority at that point. A Watch Health workout
+/// begun after a phone start is included the same way, with the same
+/// structured-start envelope (`watchHealthStartedAt` never moves it).
 final class HealthKitTrustedWorkoutCorrelationRegistry: @unchecked Sendable {
     private let gate: HealthKitTrustedWorkoutCorrelationGate
     private let drafts: TrainingLoggerDraftStore
@@ -220,7 +222,7 @@ final class HealthKitTrustedWorkoutCorrelationRegistry: @unchecked Sendable {
         else { return .disabled }
         var byID: [UUID: HealthKitTrustedWorkoutCorrelationContext.SessionEnvelope] = [:]
         for draft in drafts.loadAll()
-        where draft.watchStartedAt != nil && draft.watchFinishOperationId != nil && draft.finishedAt != nil {
+        where draft.expectsWatchHealthWorkout && draft.watchFinishOperationId != nil && draft.finishedAt != nil {
             guard let id = UUID(uuidString: draft.id),
                   let start = (draft.watchStartedAt ?? draft.startedAt).flatMap(TrainingSessionClock.date(from:)),
                   let end = draft.finishedAt.flatMap(TrainingSessionClock.date(from:)),

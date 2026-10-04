@@ -15,7 +15,8 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
         let now = now
-        return (WatchWorkoutStore(session: nil, defaults: defaults, now: { now }), defaults)
+        // A fake Health workout: these tests never touch HealthKit.
+        return (WatchWorkoutStore(session: nil, defaults: defaults, now: { now }, health: FakeWatchHealth(startDate: now)), defaults)
     }
 
     // MARK: Finish confirmation (today's exact sequence)
@@ -513,5 +514,523 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         XCTAssertEqual(store.finishKnowledge["s1"]?.operationId, "op-1",
                        "Relaunch recovery must retain the finish after terminal context is consumed.")
         XCTAssertEqual(store.finishKnowledge["s1"]?.finishedAt, now)
+    }
+}
+
+// MARK: - Build 86: Watch HealthKit start, truthful status, refresh lane
+
+/// Deterministic stand-in for the Watch HealthKit workout. Mirrors the
+/// controller's observable contract without touching HealthKit.
+@MainActor
+final class FakeWatchHealth: WatchWorkoutHealthRecording {
+    struct StartFailure: Error {}
+
+    var lifecycle: WatchWorkoutHealthController.Lifecycle = .idle
+    var currentHeartRateBPM: Double?
+    var activeCalories: Double?
+    var basalCalories: Double?
+    var totalCalories: Double? {
+        guard let activeCalories, let basalCalories else { return nil }
+        return activeCalories + basalCalories
+    }
+    var averageHeartRateBPM: Double?
+    var rawDurationSeconds: Double?
+    var correlationId: String?
+    var storedCorrelationId: String?
+    var savedCorrelationPendingReport: String?
+    var savedSessionIds: Set<String> = []
+
+    let startDate: Date
+    var failNextStart = false
+    /// Holds the next start until `releaseStart()` (start/cancel races).
+    var holdNextStart = false
+    private var heldStart: CheckedContinuation<Void, Never>?
+    private(set) var startCalls: [String] = []
+    private(set) var pauseCalls = 0
+    private(set) var resumeCalls = 0
+    private(set) var finishCalls: [String?] = []
+    private(set) var cancelCalls = 0
+
+    init(startDate: Date) { self.startDate = startDate }
+
+    var activeCorrelationId: String? {
+        guard let correlationId, [.running, .paused, .ending, .failed].contains(lifecycle) else { return nil }
+        return correlationId
+    }
+    var recordingCorrelationId: String? {
+        lifecycle == .running || lifecycle == .paused ? correlationId : nil
+    }
+
+    func hasSaved(structuredSessionId: String) -> Bool {
+        savedSessionIds.contains(structuredSessionId) || savedCorrelationPendingReport == structuredSessionId
+    }
+
+    func start(structuredSessionId: String) async throws -> Date {
+        startCalls.append(structuredSessionId)
+        lifecycle = .starting
+        if holdNextStart {
+            holdNextStart = false
+            await withCheckedContinuation { heldStart = $0 }
+        }
+        if failNextStart {
+            failNextStart = false
+            lifecycle = .failed
+            throw StartFailure()
+        }
+        correlationId = structuredSessionId
+        storedCorrelationId = structuredSessionId
+        lifecycle = .running
+        return startDate
+    }
+
+    func releaseStart() {
+        heldStart?.resume()
+        heldStart = nil
+    }
+
+    func pause() {
+        guard lifecycle == .running else { return }
+        pauseCalls += 1
+        lifecycle = .paused
+    }
+
+    func resume() {
+        guard lifecycle == .paused else { return }
+        resumeCalls += 1
+        lifecycle = .running
+    }
+
+    func finish(structuredSessionId: String?, endAt: Date?) async throws {
+        guard let correlationId, [.running, .paused, .ending, .failed].contains(lifecycle),
+              structuredSessionId == nil || structuredSessionId == correlationId
+        else { throw StartFailure() }
+        finishCalls.append(structuredSessionId)
+        savedSessionIds.insert(correlationId)
+        savedCorrelationPendingReport = correlationId
+        self.correlationId = nil
+        storedCorrelationId = nil
+        lifecycle = .saved
+    }
+
+    func cancel() async {
+        cancelCalls += 1
+        correlationId = nil
+        storedCorrelationId = nil
+        currentHeartRateBPM = nil
+        activeCalories = nil
+        basalCalories = nil
+        lifecycle = .cancelled
+    }
+
+    func recover(structuredSessionId: String?) async throws {}
+
+    func resetPresentationMetrics() {
+        guard correlationId == nil else { return }
+        currentHeartRateBPM = nil
+        activeCalories = nil
+        basalCalories = nil
+    }
+
+    func markSavedCorrelationReported(_ structuredSessionId: String) {
+        if savedCorrelationPendingReport == structuredSessionId { savedCorrelationPendingReport = nil }
+    }
+
+    func installDebugMetrics(
+        heartRate: Double?, activeCalories: Double?, basalCalories: Double?, averageHeartRate: Double?,
+        recordingCorrelationId: String?
+    ) {
+        currentHeartRateBPM = heartRate
+        self.activeCalories = activeCalories
+        self.basalCalories = basalCalories
+        averageHeartRateBPM = averageHeartRate
+    }
+}
+
+extension WatchWorkoutFinishStateTests {
+    @MainActor
+    private func healthStore(_ suite: String) -> (WatchWorkoutStore, CommandLog, FakeWatchHealth) {
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let now = now
+        let health = FakeWatchHealth(startDate: now.addingTimeInterval(-90))
+        let store = WatchWorkoutStore(session: nil, defaults: defaults, now: { now }, health: health)
+        let log = CommandLog()
+        store.commandSinkForTesting = { log.commands.append($0) }
+        return (store, log, health)
+    }
+
+    @MainActor
+    private func settle(_ store: WatchWorkoutStore) async {
+        await store.healthStartInFlight?.value
+        for _ in 0..<5 { await Task.yield() }
+    }
+
+    // 1 + 6 (Watch half): a phone-started active session records HealthKit exactly once and tells the phone.
+    @MainActor
+    func testPhoneStartedActiveSessionStartsHealthExactlyOnceAndReportsTheStart() async throws {
+        let (store, log, health) = healthStore("health.auto.start")
+        let active = try fixture("normal")
+        XCTAssertNil(active.watchHealthStartedAt, "Phone-started: the phone has no Watch Health start.")
+        XCTAssertEqual(store.healthStatus, .notRecording)
+
+        store.apply(active)
+        XCTAssertNotNil(store.healthStartInFlight)
+        XCTAssertEqual(store.healthStatus, .starting)
+        await settle(store)
+
+        XCTAssertEqual(health.startCalls, [active.sessionId])
+        XCTAssertEqual(store.healthStatus, .recording)
+        XCTAssertNil(store.healthHeaderText, "Recording shows the workout title, not a Health warning.")
+        XCTAssertEqual(log.commands.map(\.kind), [.reportHealthStarted])
+        XCTAssertEqual(log.commands[0].sessionId, active.sessionId)
+        XCTAssertEqual(log.commands[0].healthStartedAt, health.startDate)
+
+        // The phone records it; its projection now carries the start.
+        var recorded = active
+        recorded.revision += 1
+        recorded.watchHealthStartedAt = health.startDate
+        try acknowledge(store, log.commands[0], projection: recorded)
+        store.apply(recorded)
+        await settle(store)
+        XCTAssertEqual(health.startCalls.count, 1)
+        XCTAssertEqual(log.commands.count, 1, "The answered report is never re-sent.")
+        XCTAssertFalse(store.isMutationPending)
+    }
+
+    // 2: replay / reconnect / relaunch never start a second workout.
+    @MainActor
+    func testReplayReconnectAndRelaunchNeverStartASecondHealthWorkout() async throws {
+        let (store, log, health) = healthStore("health.auto.replay")
+        let active = try fixture("normal")
+        store.apply(active)
+        store.apply(active)                       // replayed context before the start lands
+        await settle(store)
+        store.apply(active)                       // replayed context after it landed
+        store.setDisplayActive(false)
+        store.setDisplayActive(true)              // wrist down / up
+        await settle(store)
+        XCTAssertEqual(health.startCalls, [active.sessionId])
+        XCTAssertEqual(log.commands.filter { $0.kind == .reportHealthStarted }.count, 1)
+
+        // Relaunch: a workout still running but not yet recovered is stored.
+        let (relaunched, relaunchedLog, relaunchedHealth) = healthStore("health.auto.relaunch.stored")
+        relaunchedHealth.storedCorrelationId = active.sessionId
+        relaunched.apply(active)
+        await settle(relaunched)
+        XCTAssertTrue(relaunchedHealth.startCalls.isEmpty)
+        XCTAssertTrue(relaunchedLog.commands.isEmpty)
+
+        // Relaunch: the phone already knows a Watch Health workout exists.
+        let (known, knownLog, knownHealth) = healthStore("health.auto.relaunch.known")
+        var started = active
+        started.watchHealthStartedAt = now.addingTimeInterval(-600)
+        known.apply(started)
+        await settle(known)
+        XCTAssertTrue(knownHealth.startCalls.isEmpty, "Never a silent second workout for the same session.")
+        XCTAssertTrue(knownLog.commands.isEmpty)
+        XCTAssertEqual(known.healthStatus, .notRecording, "Truthful when this Watch has nothing recording.")
+        XCTAssertTrue(known.canStartHealthManually, "An explicit Record to Health stays available.")
+
+        // Recovery still pending (cold launch): eligible, but waits.
+        var inputs = WatchHealthAutoStart.Inputs(
+            projection: active, displayActive: true, recoveryPending: true,
+            liveCorrelationId: nil, storedCorrelationId: nil,
+            startInFlight: false, alreadySaved: false, alreadyAttempted: false
+        )
+        XCTAssertEqual(WatchHealthAutoStart.decide(inputs), .wait)
+        inputs.recoveryPending = false
+        inputs.displayActive = false
+        XCTAssertEqual(WatchHealthAutoStart.decide(inputs), .wait, "HealthKit starts with the app in front.")
+        inputs.displayActive = true
+        XCTAssertEqual(WatchHealthAutoStart.decide(inputs), .start(paused: false))
+        inputs.alreadySaved = true
+        XCTAssertEqual(WatchHealthAutoStart.decide(inputs), .none)
+        inputs.alreadySaved = false
+        inputs.liveCorrelationId = "another-session"
+        XCTAssertEqual(WatchHealthAutoStart.decide(inputs), .none, "Never alongside another workout.")
+    }
+
+    // 3: a paused session establishes a paused workout; phone pause/resume follow.
+    @MainActor
+    func testPausedSessionStartsHealthPausedAndFollowsPhonePauseAndResume() async throws {
+        let (store, log, health) = healthStore("health.auto.paused")
+        var paused = try fixture("paused")
+        paused.pausedAt = now.addingTimeInterval(-30)
+        store.apply(paused)
+        await settle(store)
+        XCTAssertEqual(health.startCalls, [paused.sessionId])
+        XCTAssertEqual(health.pauseCalls, 1)
+        XCTAssertEqual(health.lifecycle, .paused)
+        XCTAssertEqual(store.healthStatus, .paused)
+        XCTAssertEqual(log.commands.map(\.kind), [.reportHealthStarted])
+
+        var resumed = paused
+        resumed.phase = .active
+        resumed.pausedAt = nil
+        resumed.revision += 1
+        resumed.watchHealthStartedAt = health.startDate
+        store.apply(resumed)                      // phone-originated resume
+        XCTAssertEqual(health.resumeCalls, 1)
+        XCTAssertEqual(health.lifecycle, .running)
+
+        var pausedAgain = resumed
+        pausedAgain.phase = .paused
+        pausedAgain.revision += 1
+        store.apply(pausedAgain)                  // phone-originated pause
+        XCTAssertEqual(health.pauseCalls, 2)
+        XCTAssertEqual(health.startCalls.count, 1)
+    }
+
+    // 4: terminal / cancelled / not-yet-running sessions never auto-start.
+    @MainActor
+    func testTerminalCancelledAndNonExecutingSessionsNeverStartHealth() async throws {
+        for name in ["start", "finish-confirmation", "finishing", "summary"] {
+            let (store, log, health) = healthStore("health.never.\(name)")
+            store.apply(try fixture(name))
+            await settle(store)
+            XCTAssertTrue(health.startCalls.isEmpty, name)
+            XCTAssertTrue(log.commands.isEmpty, name)
+        }
+        let (store, _, health) = healthStore("health.never.terminal")
+        store.apply(.terminal(sessionId: "current", revision: 1, phase: .unavailable))
+        store.apply(.terminal(sessionId: "gone", revision: 2, phase: .cancelled))
+        await settle(store)
+        XCTAssertTrue(health.startCalls.isEmpty)
+    }
+
+    // 4b: a Cancel that lands while the start is in flight discards it.
+    @MainActor
+    func testCancelArrivingDuringAutomaticStartDiscardsTheWorkoutAndReportsNothing() async throws {
+        let (store, log, health) = healthStore("health.cancel.during.start")
+        health.holdNextStart = true
+        let active = try fixture("normal")
+        store.apply(active)
+        for _ in 0..<3 { await Task.yield() }
+        XCTAssertEqual(health.startCalls, [active.sessionId])
+        store.apply(.terminal(sessionId: active.sessionId, revision: active.revision + 1, phase: .cancelled))
+        health.releaseStart()
+        await settle(store)
+        XCTAssertEqual(health.lifecycle, .cancelled)
+        XCTAssertNil(health.recordingCorrelationId)
+        XCTAssertFalse(log.commands.contains { $0.kind == .reportHealthStarted })
+    }
+
+    // 5: failure is visible, never loops, and an explicit retry succeeds once.
+    @MainActor
+    func testHealthStartFailureIsVisibleDoesNotLoopAndExplicitRetryStartsOnce() async throws {
+        let (store, log, health) = healthStore("health.start.failure")
+        health.failNextStart = true
+        var active = try fixture("normal")
+        store.apply(active)
+        await settle(store)
+        XCTAssertEqual(store.notice, .healthStartFailed)
+        XCTAssertEqual(store.healthStatus, .failed)
+        XCTAssertEqual(store.healthHeaderText, "HEALTH START FAILED")
+        XCTAssertTrue(store.canStartHealthManually)
+        XCTAssertTrue(log.commands.isEmpty, "A failed start is never reported as started.")
+
+        active.revision += 1
+        store.apply(active)
+        await settle(store)
+        XCTAssertEqual(health.startCalls.count, 1, "One automatic attempt; no retry loop.")
+
+        store.retryHealthStart()
+        await settle(store)
+        XCTAssertEqual(health.startCalls.count, 2)
+        XCTAssertEqual(store.healthStatus, .recording)
+        XCTAssertNil(store.notice)
+        XCTAssertFalse(store.canStartHealthManually)
+        XCTAssertEqual(log.commands.map(\.kind), [.reportHealthStarted])
+    }
+
+    // 7 (Watch half): a confirmed finish saves the auto-started workout exactly once.
+    @MainActor
+    func testFinishOfAnAutoStartedWorkoutSavesAndReportsExactlyOnce() async throws {
+        let (store, log, health) = healthStore("health.finish.once")
+        var active = try fixture("normal")
+        store.apply(active)
+        await settle(store)
+        active.revision += 1
+        active.watchHealthStartedAt = health.startDate
+        try acknowledge(store, log.commands[0], projection: active)
+
+        var finishing = try fixture("finishing")
+        finishing.revision = active.revision + 1
+        finishing.watchHealthStartedAt = health.startDate
+        finishing.finish?.healthSaved = false
+        store.apply(finishing)
+        await settle(store)
+        store.apply(finishing)
+        await settle(store)
+
+        XCTAssertEqual(health.finishCalls, [active.sessionId])
+        let saveReports = log.commands.filter { $0.kind == .reportHealthSaved }
+        XCTAssertEqual(saveReports.count, 1)
+        XCTAssertEqual(saveReports.first?.finishOperationId, finishing.finish?.operationId)
+        XCTAssertEqual(health.startCalls.count, 1)
+    }
+
+    // 8: the truthful Health status matrix.
+    func testHealthStatusMatrixIsTruthful() {
+        typealias L = WatchWorkoutHealthController.Lifecycle
+        func status(_ lifecycle: L, recording: String? = nil, inFlight: Bool = false, failed: Bool = false) -> WatchHealthStatus {
+            .of(lifecycle: lifecycle, recordingSessionId: recording, sessionId: "s1", startInFlight: inFlight, startFailed: failed)
+        }
+        XCTAssertEqual(status(.running, recording: "s1"), .recording)
+        XCTAssertEqual(status(.paused, recording: "s1"), .paused)
+        XCTAssertEqual(status(.running, recording: "other"), .notRecording, "Another session's workout is not this one's.")
+        XCTAssertEqual(status(.idle), .notRecording)
+        XCTAssertEqual(status(.saved), .notRecording)
+        XCTAssertEqual(status(.cancelled), .notRecording)
+        XCTAssertEqual(status(.authorizing), .starting)
+        XCTAssertEqual(status(.starting), .starting)
+        XCTAssertEqual(status(.idle, inFlight: true), .starting)
+        XCTAssertEqual(status(.failed, failed: true), .failed)
+
+        XCTAssertNil(WatchHealthStatus.recording.headerText)
+        XCTAssertNil(WatchHealthStatus.paused.headerText)
+        XCTAssertEqual(WatchHealthStatus.notRecording.headerText, "NOT RECORDING TO HEALTH")
+        XCTAssertEqual(WatchHealthStatus.starting.headerText, "STARTING HEALTH…")
+        XCTAssertEqual(WatchHealthStatus.failed.headerText, "HEALTH START FAILED")
+        XCTAssertEqual(WatchHealthStatus.recording.authorityWarningText, "IPHONE UNAVAILABLE · HEALTH ON")
+        XCTAssertEqual(WatchHealthStatus.paused.authorityWarningText, "IPHONE UNAVAILABLE · HEALTH ON")
+        for off in [WatchHealthStatus.notRecording, .starting, .failed] {
+            XCTAssertEqual(off.authorityWarningText, "IPHONE UNAVAILABLE · HEALTH OFF", "HEALTH ON only while recording.")
+        }
+    }
+
+    // 9: metrics come only from the live builder; TIME stays the phone clock.
+    @MainActor
+    func testWorkoutMetricsComeOnlyFromTheLiveHealthWorkout() throws {
+        let health = FakeWatchHealth(startDate: now)
+        var values = WatchWorkoutMetricsPresentation(health: health)
+        XCTAssertEqual(values, .init(health: health))
+        XCTAssertEqual(values.activeCalories, "—")
+        XCTAssertEqual(values.totalCalories, "—")
+        XCTAssertEqual(values.heartRate, "—")
+
+        health.activeCalories = 212.4
+        health.currentHeartRateBPM = 131.6
+        values = WatchWorkoutMetricsPresentation(health: health)
+        XCTAssertEqual(values.activeCalories, "212 CAL")
+        XCTAssertEqual(values.totalCalories, "—", "Total needs both active and basal energy.")
+        XCTAssertEqual(values.heartRate, "132 BPM")
+        health.basalCalories = 60
+        XCTAssertEqual(WatchWorkoutMetricsPresentation(health: health).totalCalories, "272 CAL")
+
+        var active = try fixture("normal")
+        active.startedAt = now.addingTimeInterval(-600)
+        active.pausedAt = nil
+        active.accumulatedPausedSeconds = 0
+        XCTAssertEqual(try XCTUnwrap(WatchWorkoutClock.sessionSeconds(active, at: now)), 600, accuracy: 0.001,
+                       "TIME is the structured session clock, independent of HealthKit.")
+    }
+
+    // 10: an activation/reachability refresh never disables Complete Set.
+    @MainActor
+    func testReadOnlyRefreshNeverDisablesCompleteSet() throws {
+        let (store, log, _) = healthStore("latency.refresh.lane")
+        var active = try fixture("normal")
+        active.watchHealthStartedAt = now           // isolate from the Health start
+        store.apply(active)
+        store.refresh()
+        XCTAssertEqual(log.commands.map(\.kind), [.refreshProjection])
+        XCTAssertNotNil(store.refreshInFlight)
+        XCTAssertFalse(store.isMutationPending, "A read is not a mutation.")
+        XCTAssertTrue(store.isCompleteSetAvailable)
+        XCTAssertFalse(store.isWaitingForPhone(at: now.addingTimeInterval(60)))
+        store.refresh()
+        XCTAssertEqual(log.commands.count, 1, "One refresh in flight at a time.")
+    }
+
+    // 11: Complete Set racing a refresh is sent once, never lost or duplicated.
+    @MainActor
+    func testCompleteSetDuringRefreshIsSentOnceAndSettlesExactlyOnce() throws {
+        let (store, log, _) = healthStore("latency.refresh.race")
+        var active = try fixture("normal")
+        active.watchHealthStartedAt = now
+        store.apply(active)
+        store.refresh()
+        store.completeSet()
+        XCTAssertEqual(log.commands.map(\.kind), [.refreshProjection, .completeSet])
+        XCTAssertTrue(store.isMutationPending)
+
+        try acknowledge(store, log.commands[0], status: .unchanged, projection: active)
+        XCTAssertNil(store.refreshInFlight)
+        XCTAssertTrue(store.isMutationPending, "The refresh reply never clears the in-flight mutation.")
+
+        var advanced = active
+        advanced.revision += 1
+        advanced.completedSets += 1
+        try acknowledge(store, log.commands[1], projection: advanced)
+        XCTAssertFalse(store.isMutationPending)
+        XCTAssertEqual(store.projection?.completedSets, advanced.completedSets)
+        XCTAssertEqual(log.commands.filter { $0.kind == .completeSet }.count, 1)
+    }
+
+    // 12: a stale Complete Set is re-sent once only when it still targets the same set.
+    @MainActor
+    func testStaleCompleteSetIsResentOnceForTheSameSetAndNeverForAMovedTarget() throws {
+        let (store, log, _) = healthStore("latency.stale")
+        var active = try fixture("normal")
+        active.watchHealthStartedAt = now
+        store.apply(active)
+        store.completeSet()
+        let target = try XCTUnwrap(store.currentRow)
+
+        // The phone edited something (revision moved); the same set is still next.
+        var edited = active
+        edited.revision += 1
+        try acknowledge(store, log.commands[0], status: .stale, projection: edited)
+        XCTAssertEqual(log.commands.map(\.kind), [.completeSet, .completeSet])
+        XCTAssertNotEqual(log.commands[1].mutationId, log.commands[0].mutationId)
+        XCTAssertEqual(log.commands[1].setId, target.setId)
+        XCTAssertEqual(log.commands[1].expectedRevision, edited.revision)
+        XCTAssertEqual(store.notice, .setPending)
+
+        // Stale again: bounded, surfaced, not re-sent a third time.
+        var editedAgain = edited
+        editedAgain.revision += 1
+        try acknowledge(store, log.commands[1], status: .stale, projection: editedAgain)
+        XCTAssertEqual(log.commands.count, 2)
+        XCTAssertEqual(store.notice, .staleRefreshed)
+
+        // The phone completed that set itself: the target moved, so no re-send.
+        let (other, otherLog, _) = healthStore("latency.stale.moved")
+        other.apply(active)
+        other.completeSet()
+        var moved = active
+        moved.revision += 1
+        // The tapped set is now "previous" and the next set is the target.
+        var done = try XCTUnwrap(moved.rows.first(where: \.isCompletionTarget))
+        done.role = "previous"
+        done.isCompletionTarget = false
+        var next = done
+        next.role = "current"
+        next.setNumber += 1
+        next.setId = "\(done.setId)-next"
+        next.isCompletionTarget = true
+        moved.rows = [done, next]
+        moved.completedSets += 1
+        try acknowledge(other, otherLog.commands[0], status: .stale, projection: moved)
+        XCTAssertEqual(otherLog.commands.count, 1, "Never completes a set the Founder did not tap.")
+        XCTAssertEqual(other.notice, .staleRefreshed)
+    }
+
+    // Instrumentation: activation -> refresh -> ack -> Complete Set enabled.
+    @MainActor
+    func testLatencyTraceMeasuresActivationToCompleteSetEnabled() {
+        var trace = WatchWorkoutLatencyTrace()
+        let t = Date(timeIntervalSince1970: 1_000)
+        trace.record(.displayActive, at: t)
+        trace.record(.reachable, at: t.addingTimeInterval(0.8))
+        trace.record(.refreshIssued, at: t.addingTimeInterval(0.81))
+        trace.record(.refreshAcknowledged, at: t.addingTimeInterval(1.4))
+        let enabled = trace.record(.completeSetEnabled, at: t.addingTimeInterval(0.82))
+        XCTAssertEqual(enabled.sinceActivation ?? -1, 0.82, accuracy: 0.0001)
+        XCTAssertEqual(trace.interval(from: .displayActive, to: .reachable) ?? -1, 0.8, accuracy: 0.0001)
+        XCTAssertEqual(trace.interval(from: .refreshIssued, to: .refreshAcknowledged) ?? -1, 0.59, accuracy: 0.0001)
+        for index in 0..<100 { trace.record(.contextApplied, at: t.addingTimeInterval(Double(index))) }
+        XCTAssertEqual(trace.entries.count, WatchWorkoutLatencyTrace.capacity, "Bounded.")
     }
 }

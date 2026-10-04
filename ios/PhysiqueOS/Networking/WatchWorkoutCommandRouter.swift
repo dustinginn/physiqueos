@@ -101,6 +101,7 @@ final class WatchWorkoutCommandRouter {
         // structured commit runs; revision-guarding it made the Watch retry
         // a stale report forever.
         let isHealthReport = command.kind == .reportHealthSaved || command.kind == .reportHealthSaveFailed
+            || command.kind == .reportHealthStarted
         if !isHealthReport, current.currentRevision != command.expectedRevision {
             return acknowledgement(
                 command, .stale, .staleRevision, current.currentRevision,
@@ -155,6 +156,15 @@ final class WatchWorkoutCommandRouter {
                 sessionId: command.sessionId,
                 finishOperationId: finishOperationId,
                 succeeded: command.kind == .reportHealthSaved,
+                context: context
+            )
+        case .reportHealthStarted:
+            guard let healthStartedAt = command.healthStartedAt else {
+                return acknowledgement(command, .rejected, .invalidCommand, command.expectedRevision)
+            }
+            outcome = authority.recordWatchHealthStart(
+                sessionId: command.sessionId,
+                healthStartedAt: healthStartedAt,
                 context: context
             )
         case .unknown:

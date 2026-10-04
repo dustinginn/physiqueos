@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 import WatchConnectivity
 import WatchKit
 
@@ -71,6 +72,132 @@ enum WatchHealthSessionResolution: Equatable {
     }
 }
 
+/// Whether the Watch begins its own HealthKit workout for the structured
+/// session it shows (Build 86: a session started on the iPhone). Pure, so
+/// every combination is unit-testable without HealthKit. The phone's
+/// `watchHealthStartedAt` makes it exactly-once across replays, reconnects
+/// and relaunches: once the phone knows a Watch Health workout exists for
+/// the session, the Watch never starts another one on its own.
+enum WatchHealthAutoStart: Equatable {
+    case start(paused: Bool)
+    /// Eligible, but not yet: the display is inactive (HealthKit may need
+    /// the app in front) or relaunch recovery has not finished.
+    case wait
+    case none
+
+    struct Inputs: Equatable {
+        var projection: WatchWorkoutProjection?
+        var displayActive: Bool
+        var recoveryPending: Bool
+        var liveCorrelationId: String?
+        var storedCorrelationId: String?
+        var startInFlight: Bool
+        var alreadySaved: Bool
+        var alreadyAttempted: Bool
+    }
+
+    static func decide(_ inputs: Inputs) -> Self {
+        guard let projection = inputs.projection,
+              projection.phase == .active || projection.phase == .paused,
+              projection.sessionId != "current",
+              projection.watchHealthStartedAt == nil,
+              // Never a second workout: none live, none stored (a running
+              // workout not yet recovered, or another session's orphan).
+              inputs.liveCorrelationId == nil,
+              inputs.storedCorrelationId == nil,
+              !inputs.startInFlight,
+              !inputs.alreadySaved,
+              // One automatic attempt per session per process; a failure
+              // stays visible with an explicit retry instead of looping.
+              !inputs.alreadyAttempted
+        else { return .none }
+        guard inputs.displayActive, !inputs.recoveryPending else { return .wait }
+        return .start(paused: projection.phase == .paused)
+    }
+}
+
+/// What the Watch truthfully says about Apple Health recording for the
+/// structured session it shows.
+enum WatchHealthStatus: Equatable {
+    case recording, paused, starting, failed, notRecording
+
+    static func of(
+        lifecycle: WatchWorkoutHealthController.Lifecycle,
+        recordingSessionId: String?,
+        sessionId: String?,
+        startInFlight: Bool,
+        startFailed: Bool
+    ) -> Self {
+        if let sessionId, recordingSessionId == sessionId {
+            return lifecycle == .paused ? .paused : .recording
+        }
+        if startInFlight || lifecycle == .authorizing || lifecycle == .starting { return .starting }
+        if startFailed { return .failed }
+        return .notRecording
+    }
+
+    var isOn: Bool { self == .recording || self == .paused }
+
+    /// Execution header text (nil shows the workout title).
+    var headerText: String? {
+        switch self {
+        case .recording, .paused: return nil
+        case .starting: return "STARTING HEALTH…"
+        case .failed: return "HEALTH START FAILED"
+        case .notRecording: return "NOT RECORDING TO HEALTH"
+        }
+    }
+
+    var authorityWarningText: String {
+        isOn ? "IPHONE UNAVAILABLE · HEALTH ON" : "IPHONE UNAVAILABLE · HEALTH OFF"
+    }
+}
+
+/// Bounded, privacy-safe timing trace of the Watch set-execution path:
+/// display activation -> reachability -> refresh issued -> acknowledgement
+/// -> projection applied -> Complete Set enabled. Event names and durations
+/// only; never workout content or identifiers. Mirrored to the unified log
+/// (subsystem `com.physiqueos.native.dev.watchkitapp`, category
+/// `WatchLatency`) for physical-device measurement.
+struct WatchWorkoutLatencyTrace: Equatable {
+    enum Event: String, Sendable {
+        case displayActive, displayInactive, reachable, unreachable
+        case refreshIssued, refreshAcknowledged, refreshFailed
+        case contextApplied, acknowledgementApplied
+        case commandIssued, commandAcknowledged
+        case completeSetEnabled, completeSetDisabled
+        case healthStartRequested, healthStarted, healthStartFailed
+    }
+
+    struct Entry: Equatable {
+        var event: Event
+        var at: Date
+        /// Seconds since the most recent display activation, if any.
+        var sinceActivation: TimeInterval?
+    }
+
+    static let capacity = 64
+    private(set) var entries: [Entry] = []
+    private(set) var lastActivationAt: Date?
+
+    @discardableResult
+    mutating func record(_ event: Event, at date: Date) -> Entry {
+        if event == .displayActive { lastActivationAt = date }
+        let entry = Entry(event: event, at: date, sinceActivation: lastActivationAt.map { date.timeIntervalSince($0) })
+        entries.append(entry)
+        if entries.count > Self.capacity { entries.removeFirst(entries.count - Self.capacity) }
+        return entry
+    }
+
+    /// Seconds from the latest `from` to the first `to` after it.
+    func interval(from: Event, to: Event) -> TimeInterval? {
+        guard let start = entries.lastIndex(where: { $0.event == from }),
+              let end = entries[start...].first(where: { $0.event == to })
+        else { return nil }
+        return end.at.timeIntervalSince(entries[start].at)
+    }
+}
+
 @MainActor
 @Observable
 final class WatchWorkoutStore: NSObject, WCSessionDelegate {
@@ -131,7 +258,23 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     /// When the Watch first saw the confirmed finish of the shown session.
     private(set) var finishingObservedAt: Date?
     private(set) var dailyTotals: WatchDailyTotals?
-    let health = WatchWorkoutHealthController()
+    let health: any WatchWorkoutHealthRecording
+    /// The read-only refresh in flight. Deliberately outside `gate`: a
+    /// refresh never mutates, so it never disables Complete Set (Build 86).
+    private(set) var refreshInFlight: WatchWorkoutCommand?
+    @ObservationIgnored private var refreshWatchdogTask: Task<Void, Never>?
+    @ObservationIgnored private(set) var latencyTrace = WatchWorkoutLatencyTrace()
+    private static let latencyLog = Logger(subsystem: "com.physiqueos.native.dev.watchkitapp", category: "WatchLatency")
+    /// The Watch's own HealthKit start (automatic or explicit) in flight.
+    private var healthStartTask: Task<Void, Never>?
+    /// Sessions this process already tried to start automatically.
+    @ObservationIgnored private var autoHealthStartAttemptedSessionIds: Set<String> = []
+    /// Relaunch recovery of a running workout has not finished yet.
+    private var healthRecoveryPending = false
+    /// A Watch Health start the phone has not acknowledged yet.
+    @ObservationIgnored private var pendingHealthStartReport: (sessionId: String, startedAt: Date)?
+    /// One automatic re-send of a Complete Set refused only as stale.
+    @ObservationIgnored private var staleCompleteSetRetries = 0
 
     private let session: WCSession?
     private let defaults: UserDefaults
@@ -171,14 +314,65 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         self.init(session: WCSession.isSupported() ? .default : nil)
     }
 
-    init(session: WCSession?, defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init) {
+    init(
+        session: WCSession?,
+        defaults: UserDefaults = .standard,
+        now: @escaping () -> Date = Date.init,
+        health: (any WatchWorkoutHealthRecording)? = nil
+    ) {
         self.session = session
         self.defaults = defaults
         self.now = now
+        self.health = health ?? WatchWorkoutHealthController()
         super.init()
     }
 
     var isMutationPending: Bool { gate.pending != nil }
+
+    /// Complete Set is tappable. A read-only refresh never blocks it.
+    var isCompleteSetAvailable: Bool {
+        projection?.canCompleteSet == true && !isMutationPending && connectionState == .reachable
+    }
+
+    var healthStatus: WatchHealthStatus {
+        .of(
+            lifecycle: health.lifecycle,
+            recordingSessionId: health.recordingCorrelationId,
+            sessionId: projection?.sessionId,
+            startInFlight: healthStartTask != nil,
+            startFailed: notice == .healthStartFailed
+        )
+    }
+
+    /// Health text for the execution header while sets are being executed.
+    var healthHeaderText: String? {
+        guard presentedPhase == .active || presentedPhase == .paused else { return nil }
+        return healthStatus.headerText
+    }
+
+    /// Record to Health / Retry Health Start is offered while sets are being
+    /// executed and no Watch Health workout is recording this session.
+    var canStartHealthManually: Bool {
+        guard let phase = projection?.phase, phase == .active || phase == .paused else { return false }
+        let status = healthStatus
+        return !status.isOn && status != .starting
+    }
+
+    /// The task of the HealthKit start in flight (tests await it).
+    var healthStartInFlight: Task<Void, Never>? { healthStartTask }
+
+    func noteCompleteSetAvailability(_ available: Bool) {
+        trace(available ? .completeSetEnabled : .completeSetDisabled)
+    }
+
+    private func trace(_ event: WatchWorkoutLatencyTrace.Event) {
+        let entry = latencyTrace.record(event, at: now())
+        if let since = entry.sinceActivation {
+            Self.latencyLog.notice("\(event.rawValue, privacy: .public) +\(Int((since * 1000).rounded()), privacy: .public)ms since activation")
+        } else {
+            Self.latencyLog.notice("\(event.rawValue, privacy: .public)")
+        }
+    }
     var currentRow: WatchWorkoutProjection.Row? {
         projection?.rows.first(where: \.isCompletionTarget)
             ?? projection?.rows.first(where: { $0.role == "current" || $0.role == "upNext" })
@@ -244,6 +438,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 
     func setDisplayActive(_ active: Bool) {
         displayIsActive = active
+        trace(active ? .displayActive : .displayInactive)
+        if active { evaluateAutomaticHealthStart() }
         guard active, session?.activationState == .activated, session?.isReachable == true else { return }
         connectionState = .reachable
         retryPending()
@@ -297,12 +493,18 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
                 heartRate: fixture.heartRate,
                 activeCalories: fixture.activeCalories,
                 basalCalories: fixture.basalCalories,
-                averageHeartRate: fixture.averageHeartRate
+                averageHeartRate: fixture.averageHeartRate,
+                // A fixture with live metrics presents a recording workout.
+                recordingCorrelationId: fixture.heartRate != nil || fixture.activeCalories != nil
+                    ? fixture.projection.sessionId : nil
             )
             return
         }
 #endif
         session?.delegate = self
+        // Nothing starts automatically until a running workout from before
+        // a relaunch has been recovered (never a second workout).
+        healthRecoveryPending = true
         session?.activate()
         if let context = session?.receivedApplicationContext {
             receiveApplicationContext(context, recordsAuthoritativeContact: false)
@@ -324,7 +526,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         if let known = finishKnowledge[sessionId] {
             saveHealthWorkout(sessionId: sessionId, operationId: known.operationId, endAt: known.finishedAt, automatic: false)
         } else {
-            Task { _ = try? await health.finish(structuredSessionId: sessionId) }
+            Task { try? await health.finish(structuredSessionId: sessionId, endAt: nil) }
         }
     }
 
@@ -343,8 +545,50 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         issue(.cancelWorkout)
     }
 
+    /// Read-only state refresh. It has its own lane: it never occupies the
+    /// mutation gate, so it never disables Complete Set or delays a tap.
     func refresh() {
-        issue(.refreshProjection)
+        guard refreshInFlight == nil else { return }
+        if commandSinkForTesting == nil {
+            guard let session, session.activationState == .activated, session.isReachable else {
+                connectionState = .phoneUnavailable
+                return
+            }
+        }
+        let command = makeCommand(.refreshProjection)
+        refreshInFlight = command
+        trace(.refreshIssued)
+        if let sink = commandSinkForTesting {
+            connectionState = .reachable
+            sink(command)
+            return
+        }
+        guard let session, let data = try? WatchWorkoutWireCodec.encode(command) else {
+            refreshInFlight = nil
+            return
+        }
+        connectionState = .reachable
+        let commandId = command.commandId
+        let replyHandler = WatchWorkoutCallbackBridge.reply { [weak self] data in
+            self?.receiveAcknowledgement(data)
+        }
+        let errorHandler = WatchWorkoutCallbackBridge.failure { [weak self] in
+            guard let self, refreshInFlight?.commandId == commandId else { return }
+            refreshInFlight = nil
+            refreshWatchdogTask?.cancel()
+            trace(.refreshFailed)
+            // A failed read changes no workout state: report reachability as
+            // it is rather than manufacturing a warning.
+            connectionState = self.session?.isReachable == true ? .reachable : .passive
+        }
+        session.sendMessageData(data, replyHandler: replyHandler, errorHandler: errorHandler)
+        refreshWatchdogTask?.cancel()
+        refreshWatchdogTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(Self.replyWatchdog)) } catch { return }
+            guard let self, refreshInFlight?.commandId == commandId else { return }
+            refreshInFlight = nil
+            trace(.refreshFailed)
+        }
     }
 
     func startPreparedWorkout() {
@@ -436,15 +680,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         refresh()
     }
 
+    /// Record to Health / Retry Health Start (explicit; never automatic).
     func retryHealthStart() {
-        guard let projection, projection.phase == .active || projection.phase == .paused else { return }
-        Task {
-            do {
-                try await health.start(structuredSessionId: projection.sessionId)
-                if projection.phase == .paused { health.pause() }
-                notice = nil
-            } catch { notice = .healthStartFailed }
-        }
+        guard canStartHealthManually, let projection else { return }
+        beginHealthWorkout(sessionId: projection.sessionId, automatic: false)
     }
 
     func retryHealthFinish() {
@@ -467,6 +706,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             issuePendingHealthReport()
             return
         }
+        if pendingHealthStartReport != nil {
+            issuePendingHealthStartReport()
+            if gate.pending != nil { return }
+        }
         // A Finish request that never reached the phone (it was unreachable)
         // is asked again; a queued confirm follows when it lands.
         if presentedPhase == .finishConfirmation,
@@ -487,17 +730,39 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         exerciseId: String? = nil,
         setId: String? = nil,
         finishOperationId: String? = nil,
-        sessionId: String? = nil
+        sessionId: String? = nil,
+        healthStartedAt: Date? = nil
     ) -> Bool {
+        precondition(kind != .refreshProjection, "Refresh has its own lane")
         if commandSinkForTesting == nil {
             guard let session, session.activationState == .activated, session.isReachable else {
                 connectionState = .phoneUnavailable
                 return false
             }
         }
+        let command = makeCommand(
+            kind, exerciseId: exerciseId, setId: setId, finishOperationId: finishOperationId,
+            sessionId: sessionId, healthStartedAt: healthStartedAt
+        )
+        guard gate.begin(command) else { return false }
+        pendingIssuedAt = now()
+        sendAttempts = 0
+        trace(.commandIssued)
+        send(command)
+        return true
+    }
+
+    private func makeCommand(
+        _ kind: WatchWorkoutCommand.Kind,
+        exerciseId: String? = nil,
+        setId: String? = nil,
+        finishOperationId: String? = nil,
+        sessionId: String? = nil,
+        healthStartedAt: Date? = nil
+    ) -> WatchWorkoutCommand {
         let identity = UUID().uuidString
         let targetSessionId = sessionId ?? projection?.sessionId ?? "current"
-        let command = WatchWorkoutCommand(
+        return WatchWorkoutCommand(
             schemaVersion: WatchWorkoutContract.schemaVersion,
             commandId: identity,
             mutationId: identity,
@@ -507,13 +772,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             exerciseId: exerciseId,
             setId: setId,
             finishOperationId: finishOperationId,
+            healthStartedAt: healthStartedAt,
             issuedAt: now()
         )
-        guard gate.begin(command) else { return false }
-        pendingIssuedAt = now()
-        sendAttempts = 0
-        send(command)
-        return true
     }
 
     private func send(_ command: WatchWorkoutCommand) {
@@ -572,10 +833,29 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         guard let acknowledgement = try? WatchWorkoutWireCodec.decode(
             WatchWorkoutAcknowledgement.self, from: data
         ) else { return }
+        if let refresh = refreshInFlight, refresh.commandId == acknowledgement.commandId {
+            refreshInFlight = nil
+            refreshWatchdogTask?.cancel()
+            connectionState = .reachable
+            lastAuthoritativeContactAt = now()
+            trace(.refreshAcknowledged)
+            if let incoming = acknowledgement.projection {
+                apply(incoming)
+                trace(.acknowledgementApplied)
+            }
+            return
+        }
         let command = gate.pending
         let kind = command?.kind
         let matched = gate.acknowledge(acknowledgement)
         let isReport = kind == .reportHealthSaved || kind == .reportHealthSaveFailed
+        let isStartReport = kind == .reportHealthStarted
+        if matched, isStartReport, let report = pendingHealthStartReport, report.sessionId == command?.sessionId {
+            // Applied, unchanged (already known) or refused (the session
+            // ended): either way the phone has answered; never re-send.
+            pendingHealthStartReport = nil
+        }
+        if matched { trace(.commandAcknowledged) }
         if matched {
             retryTask?.cancel()
             pendingIssuedAt = nil
@@ -601,7 +881,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         }
         defer { if matched { runDeferredCommands() } }
         let isTerminal = acknowledgement.projection?.isTerminalAuthorityState == true
-        if let incoming = acknowledgement.projection { apply(incoming) }
+        if let incoming = acknowledgement.projection {
+            apply(incoming)
+            trace(.acknowledgementApplied)
+        }
         guard matched else { return }
         if isTerminal {
             if kind == .cancelWorkout,
@@ -613,8 +896,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 
         switch acknowledgement.status {
         case .applied, .unchanged:
-            if kind != .reportHealthSaved && kind != .reportHealthSaveFailed { notice = nil }
-            if acknowledgement.status == .applied {
+            if kind == .completeSet { staleCompleteSetRetries = 0 }
+            if !isReport && !isStartReport { notice = nil }
+            if acknowledgement.status == .applied, !isStartReport {
                 WKInterfaceDevice.current().play(.success)
                 if kind == .completeSet,
                    acknowledgement.projection?.completedSets == acknowledgement.projection?.totalSets {
@@ -627,6 +911,21 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             if kind == .confirmFinish { localFinishConfirmation = false }
             runQueuedCommand(after: kind)
         case .stale:
+            // Stale means the phone applied nothing. When the refreshed state
+            // still targets the exact set that was tapped, send it once more
+            // (new mutation id) so the tap is neither lost nor duplicated.
+            if kind == .completeSet, let command, staleCompleteSetRetries < 1,
+               presentedPhase == .active, projection?.canCompleteSet == true,
+               let row = currentRow, row.exerciseId == command.exerciseId, row.setId == command.setId {
+                staleCompleteSetRetries += 1
+                notice = .setPending
+                if !issue(.completeSet, exerciseId: row.exerciseId, setId: row.setId) {
+                    notice = .staleRefreshed
+                    WKInterfaceDevice.current().play(.retry)
+                }
+                return
+            }
+            if kind == .completeSet { staleCompleteSetRetries = 0 }
             notice = .staleRefreshed
             WKInterfaceDevice.current().play(.retry)
             switch kind {
@@ -660,7 +959,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
                 localFinishConfirmation = false
                 if let projection { scheduleCountdownHaptics(for: projection) }
             }
-            if !isReport {
+            if kind == .completeSet { staleCompleteSetRetries = 0 }
+            if !isReport && !isStartReport {
                 notice = .rejected(acknowledgement.reason?.rawValue ?? "rejected")
                 WKInterfaceDevice.current().play(.failure)
             }
@@ -688,6 +988,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         if gate.pending == nil, pendingHealthReport != nil, healthReportStaleRetries <= 2 {
             issuePendingHealthReport()
         }
+        if gate.pending == nil { issuePendingHealthStartReport() }
     }
 
     private func runQueuedCommand(after kind: WatchWorkoutCommand.Kind?) {
@@ -712,10 +1013,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         else { return }
         switch originalKind {
         case .startPreparedWorkout:
-            Task {
-                do { try await health.start(structuredSessionId: projection.sessionId) }
-                catch { notice = .healthStartFailed }
-            }
+            // The phone stamped this Watch start already; no report is owed.
+            beginHealthWorkout(sessionId: projection.sessionId, automatic: false)
         case .pause: health.pause()
         case .resume: health.resume()
         default: break
@@ -739,7 +1038,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             defer { healthSaveTask = nil }
             let succeeded: Bool
             do {
-                _ = try await health.finish(structuredSessionId: sessionId, endAt: endAt)
+                try await health.finish(structuredSessionId: sessionId, endAt: endAt)
                 succeeded = true
             } catch {
                 succeeded = health.hasSaved(structuredSessionId: sessionId)
@@ -772,6 +1071,84 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         pendingHealthReport = nil
     }
 
+    // MARK: - HealthKit start (Build 86)
+
+    /// Starts the Watch HealthKit workout for an already-running structured
+    /// session when the policy allows it (see `WatchHealthAutoStart`).
+    func evaluateAutomaticHealthStart() {
+        // Fixture captures never touch HealthKit.
+        guard debugSurface == nil else { return }
+        let sessionId = projection?.sessionId
+        let decision = WatchHealthAutoStart.decide(.init(
+            projection: projection,
+            displayActive: displayIsActive,
+            recoveryPending: healthRecoveryPending,
+            liveCorrelationId: health.activeCorrelationId,
+            storedCorrelationId: health.storedCorrelationId,
+            startInFlight: healthStartTask != nil
+                || health.lifecycle == .authorizing || health.lifecycle == .starting,
+            alreadySaved: sessionId.map { health.hasSaved(structuredSessionId: $0) } ?? false,
+            alreadyAttempted: sessionId.map { autoHealthStartAttemptedSessionIds.contains($0) } ?? false
+        ))
+        guard case .start = decision, let sessionId else { return }
+        beginHealthWorkout(sessionId: sessionId, automatic: true)
+    }
+
+    /// The one Watch HealthKit start path (Watch Start, automatic start,
+    /// Record to Health / Retry). Single flight. A start for a session the
+    /// phone does not yet know about is reported so its Finish expects the
+    /// Health leg.
+    private func beginHealthWorkout(sessionId: String, automatic: Bool) {
+        guard healthStartTask == nil else { return }
+        if automatic { autoHealthStartAttemptedSessionIds.insert(sessionId) }
+        trace(.healthStartRequested)
+        healthStartTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let startedAt: Date
+            do {
+                startedAt = try await health.start(structuredSessionId: sessionId)
+            } catch {
+                healthStartTask = nil
+                trace(.healthStartFailed)
+                notice = .healthStartFailed
+                return
+            }
+            healthStartTask = nil
+            trace(.healthStarted)
+            if notice == .healthStartFailed { notice = nil }
+            // Cancelled while starting: the canonical Cancel discards.
+            if terminalSessionIds.contains(sessionId) {
+                await health.cancel()
+                return
+            }
+            guard let current = projection, current.sessionId == sessionId else { return }
+            if current.phase == .paused { health.pause() }
+            if current.watchHealthStartedAt == nil {
+                pendingHealthStartReport = (sessionId, startedAt)
+                issuePendingHealthStartReport()
+            }
+        }
+    }
+
+    /// Sends an owed Health-start report when the command lane is free and
+    /// the phone is reachable; otherwise it waits (never a false warning).
+    private func issuePendingHealthStartReport() {
+        guard gate.pending == nil, let report = pendingHealthStartReport else { return }
+        if commandSinkForTesting == nil, session?.isReachable != true { return }
+        issue(.reportHealthStarted, sessionId: report.sessionId, healthStartedAt: report.startedAt)
+    }
+
+    /// Keeps the Watch workout's pause state with the authoritative
+    /// structured state, whichever device paused or resumed.
+    private func synchronizeHealthPause(with incoming: WatchWorkoutProjection) {
+        guard health.recordingCorrelationId == incoming.sessionId else { return }
+        switch incoming.phase {
+        case .paused where health.lifecycle == .running: health.pause()
+        case .active where health.lifecycle == .paused: health.resume()
+        default: break
+        }
+    }
+
     private func resolveHealthSession(for incoming: WatchWorkoutProjection) {
         guard let healthSessionId = health.activeCorrelationId else {
             guard incoming.isTerminalAuthorityState else { return }
@@ -792,7 +1169,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             knownFinish: finishKnowledge[healthSessionId]
         ) {
         case .keep:
-            return
+            synchronizeHealthPause(with: incoming)
         case .save(let operationId, let endAt):
             saveHealthWorkout(sessionId: healthSessionId, operationId: operationId, endAt: endAt, automatic: true)
         case .discard:
@@ -869,6 +1246,11 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         projection = incoming
         authoritativeTerminalReceived = false
         connectionState = session?.isReachable == true ? .reachable : .passive
+        if incoming.watchHealthStartedAt != nil, pendingHealthStartReport?.sessionId == incoming.sessionId,
+           gate.pending?.kind != .reportHealthStarted {
+            pendingHealthStartReport = nil
+        }
+        defer { evaluateAutomaticHealthStart() }
         switch incoming.phase {
         case .finishConfirmation:
             // The phone (or this Watch, earlier) asked to finish: confirm
@@ -918,6 +1300,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         if let data = context[WatchWorkoutContract.applicationContextProjectionKey] as? Data,
            let incoming = try? WatchWorkoutWireCodec.decode(WatchWorkoutProjection.self, from: data) {
             apply(incoming, recordsAuthoritativeContact: recordsAuthoritativeContact)
+            trace(.contextApplied)
             resumeSavedHealthReportIfNeeded()
         }
     }
@@ -1031,6 +1414,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     /// asks the phone how that session stands. It never discards on a cached
     /// (possibly stale) terminal context: the authoritative reply decides.
     private func recoverHealthKitIfNeeded() async {
+        defer {
+            healthRecoveryPending = false
+            evaluateAutomaticHealthStart()
+        }
         do {
             // Recover whatever workout is stored, even if the cached context
             // names another session; resolution decides save, keep or discard.
@@ -1060,6 +1447,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         let reachable = session.isReachable
         Task { @MainActor [weak self] in
+            self?.trace(reachable ? .reachable : .unreachable)
             self?.connectionState = reachable ? .reachable : .passive
             if reachable { self?.retryPending() }
         }

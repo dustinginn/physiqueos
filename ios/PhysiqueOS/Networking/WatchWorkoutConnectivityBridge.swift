@@ -1,5 +1,6 @@
 import Foundation
 import HealthKit
+import OSLog
 import WatchConnectivity
 
 private final class WatchWorkoutReplyBox: @unchecked Sendable {
@@ -108,11 +109,21 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
         try? session.updateApplicationContext(context)
     }
 
+    /// Privacy-safe phone half of the Watch latency trace: command kind,
+    /// outcome and main-actor routing time only (category `WatchBridge`).
+    private static let latencyLog = Logger(subsystem: "com.physiqueos.native.dev", category: "WatchBridge")
+
     private func route(_ data: Data) -> Data? {
         guard let command = try? WatchWorkoutWireCodec.decode(WatchWorkoutCommand.self, from: data) else { return nil }
+        let started = ContinuousClock.now
         let acknowledgement = router().route(command)
         publishCurrentProjection()
         finishCoordinator.reconcile()
+        let elapsed = started.duration(to: .now)
+        let milliseconds = Int((Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15).rounded())
+        Self.latencyLog.notice(
+            "route \(command.kind.rawValue, privacy: .public) -> \(acknowledgement.status.rawValue, privacy: .public) \(milliseconds, privacy: .public)ms"
+        )
         return try? WatchWorkoutWireCodec.encode(acknowledgement)
     }
 

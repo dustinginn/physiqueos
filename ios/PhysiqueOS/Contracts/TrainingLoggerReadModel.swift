@@ -171,6 +171,15 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// When the paired Watch started this plan. A Watch-started session owns
     /// a Watch HealthKit workout, so its Finish expects a Health leg.
     var watchStartedAt: String? = nil
+    /// When the paired Watch began a HealthKit workout for a session that
+    /// was already running (started on the phone). Kept separate from
+    /// `watchStartedAt` so the structured start, and therefore every trusted
+    /// correlation envelope, is unchanged. Local-only.
+    var watchHealthStartedAt: String? = nil
+
+    /// The Watch owns a HealthKit workout for this session, so its Finish
+    /// expects a Health leg.
+    var expectsWatchHealthWorkout: Bool { watchStartedAt != nil || watchHealthStartedAt != nil }
     /// Persisted two-step finish gate shared by phone/Watch commands. Finish
     /// is never inferred from progress, including after the final set.
     var finishConfirmationRequestedAt: String? = nil

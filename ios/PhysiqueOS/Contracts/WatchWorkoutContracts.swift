@@ -52,6 +52,10 @@ struct WatchWorkoutCommand: Codable, Equatable, Sendable {
         case cancelWorkout
         case reportHealthSaved
         case reportHealthSaveFailed
+        /// The Watch began its HealthKit workout for an already-running
+        /// structured session (Build 86: phone-started sessions). Identified
+        /// by session, never revision-guarded; idempotent.
+        case reportHealthStarted
         case unknown
         static let fallback: Self = .unknown
     }
@@ -67,6 +71,8 @@ struct WatchWorkoutCommand: Codable, Equatable, Sendable {
     /// Stable saga identity. The confirm command's mutation id becomes this
     /// value; later HealthKit reports carry it across revision refreshes.
     var finishOperationId: String? = nil
+    /// `reportHealthStarted` only: the HealthKit workout's start instant.
+    var healthStartedAt: Date? = nil
     var issuedAt: Date
 
     var isBoundedAndSupported: Bool {
@@ -188,6 +194,10 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
     /// no longer current: save it when the session was committed, discard it
     /// only when it was cancelled.
     var recentlyEnded: [WatchWorkoutEndedSession] = []
+    /// When the phone authority recorded that the Watch owns a HealthKit
+    /// workout for this session (Watch Start, or a reported automatic start).
+    /// Absent on older phones and on sessions with no Watch Health workout.
+    var watchHealthStartedAt: Date? = nil
 
     var isTerminalAuthorityState: Bool {
         phase == .cancelled || phase == .unavailable
