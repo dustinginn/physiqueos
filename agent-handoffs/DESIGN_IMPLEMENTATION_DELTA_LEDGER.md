@@ -49,6 +49,29 @@ Do not silently fix these during design-only tasks.
 
 ## Open implementation deltas
 
+### Recovery Evidence — lighter Continuity trend marks
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION
+
+Discovery:
+Energy, Weight + Recovery founder-correction source audit.
+Prompt authority: 854d24c4d3640385c654c582578492c8d9e766fc.
+Artifact: agent-handoffs/artifacts/energy-weight-recovery-founder-correction-20261004/.
+
+Current Build 85 behavior:
+`SleepContinuityChart` renders Awake in sleep window as wide vertical `BarMark`s and longest continuous sleep as unconnected `PointMark`s. Available rows, seconds-based values, independent units/scales and unavailable-night gaps are already canonical.
+
+Accepted target:
+Keep the two separately scaled measures and exact canonical rows, but render each as a light point/line series. Unavailable or pending nights remain explicit gaps; do not smooth, impute, merge axes or change values.
+
+Implementation implication:
+Change only the marks and styling in `SleepContinuityChart`. Preserve range policy, data filtering, seconds-to-minutes/hours conversion, accessibility meaning and gap copy.
+
+Acceptance:
+For the audited Sep 20–Oct 1 fixture, Oct 1 remains 34m awake and 1h 33m longest continuous sleep; Sep 21 remains a gap. Both measures are legible in dark and mineral light, use their own axes and contain no wide histogram bars.
+
+Status: OPEN.
+
 ### Photo Briefing — paired Previous/Current comparison viewer
 
 Classification: REQUIRED FOR DESIGN IMPLEMENTATION
@@ -179,4 +202,3 @@ Before beginning the eventual shipping UI implementation phase:
 Future design prompts should state:
 
 "Review agent-handoffs/DESIGN_IMPLEMENTATION_DELTA_LEDGER.md before stopping. Append any newly discovered implementation-relevant behavior/data/navigation/accessibility delta. Do not bury such findings only in the task report."
-
