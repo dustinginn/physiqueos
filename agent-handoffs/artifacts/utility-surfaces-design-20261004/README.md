@@ -2,6 +2,8 @@
 
 Status: **in review; not locked; implementation not started**
 
+Founder acceptance update: the overall Watch, Live Activity, and Logger directions are accepted subject to two focused corrections. W2/W3 now restore production metric icon/color identity, and Logger active set rows restore the larger Done checkmark-circle. See `../utility-surfaces-acceptance-corrections-20261004/README.md`. The original full boards remain the accepted baseline and were not rerendered.
+
 This disposable design harness translates the selected PhysiqueOS visual language across the complete Build 85 Apple Watch workout experience, Live Activity / Dynamic Island, and Training Logger flow. It changes presentation only. Every board and individual screen is available in dark and mineral-light.
 
 ## Start here

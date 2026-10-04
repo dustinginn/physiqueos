@@ -291,3 +291,29 @@ Review set:
 - `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/PARITY-PROOF.md`
 
 Implementation backlog additions: centralized bottom-anchored expandable Log source/provenance; realistic Strength + Cardio + macro density; condensed Priority Muscle Groups; selective briefing mineral-light surface rhythm; and the richer navy/teal/violet mineral-light appearance candidate. Do not mark these refinements implemented or locked until Founder acceptance. No shipping code, projection, Server behavior, Recovery activation, build or TestFlight work occurred.
+
+## Utility surfaces — Founder acceptance corrections
+
+Status: **Overall direction accepted; two focused corrections ready for Founder confirmation; implementation not started**
+
+- Live Activity / Dynamic Island: **accepted unchanged; ready to lock as presented**.
+- Apple Watch: **accepted pending confirmation of restored Build 85 metric icon/color identity on Workout Metrics and Daily Totals**.
+- Training Logger: **accepted pending confirmation of restored larger Done checkmark-circle on active set rows**.
+- Shipping implementation: **not started**.
+
+Focused review set:
+
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/README.md`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/watch-metrics-dark.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/watch-metrics-light.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/watch-daily-dark.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/watch-daily-light.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/watch-metric-comparison.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/logger-weighted-dark.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/logger-weighted-light.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/logger-superset-dark.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/logger-superset-light.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/screens/logger-done-comparison.png`
+- `agent-handoffs/artifacts/utility-surfaces-acceptance-corrections-20261004/COVERAGE-PROPAGATION.md`
+
+Do not mark Watch or Logger locked until Founder confirms the focused correction renders. No other accepted utility design changed. No shipping Native source, Server behavior, workout authority, HealthKit, ActivityKit, evidence, build, or TestFlight state changed.

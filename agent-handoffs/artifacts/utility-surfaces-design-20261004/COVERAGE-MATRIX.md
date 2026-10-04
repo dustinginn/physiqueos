@@ -2,6 +2,16 @@
 
 Authority: Build 85 at `b8ee8690b194cb90086b62816b9a2c8c400dc026`.
 
+## Founder acceptance correction overlay
+
+Prompt `2b780cd80c15e0c8d057d3c9f4b9f752dd39d1b2` accepts the overall package with two corrections. The focused authoritative proofs are in `../utility-surfaces-acceptance-corrections-20261004/`.
+
+- W2 Workout Metrics and W3 Daily Totals retain their existing templates but restore exact Build 85 SF Symbol roles and per-metric accents. The correction propagates to present/missing metrics, Always-On, fresh/stale/offline totals, partial-day captions, and suppressed other-day values.
+- Every active Logger set-entry row replaces the proposed subtle circle with the restored `circle` / `checkmark.circle.fill` Done affordance at a 44×44 target. The correction propagates to weighted, reps-only, bodyweight, weighted-bodyweight, timed, superset/linked, numeric-focus, and Watch-coordinated active rows. Review/Confirmation remains read-only.
+- Live Activity remains accepted unchanged.
+
+No source state or prior template mapping changes; corrected-state uncovered count remains **0**.
+
 Every proof screen is rendered in dark and mineral-light. A light file adds `-light` to the listed PNG name. “Platform” means the state is fully governed by an Apple system surface and should not receive a PhysiqueOS facsimile.
 
 ## Apple Watch

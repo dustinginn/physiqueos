@@ -1,0 +1,28 @@
+{
+  "authority": {
+    "prompt": "2b780cd80c15e0c8d057d3c9f4b9f752dd39d1b2",
+    "package": "29d2fe1fcd343e4da077b020a120c1e2f14f37ea",
+    "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "build": 85
+  },
+  "expected": 10,
+  "actual": 10,
+  "missing": [],
+  "extra": [],
+  "pageOverflow": false,
+  "escaped": [],
+  "doneTargetCount": 22,
+  "undersizedDoneTargets": [],
+  "requiredIcons": [
+    "timer",
+    "flame",
+    "sum",
+    "heart",
+    "stopwatch",
+    "nutrition"
+  ],
+  "missingIcons": [],
+  "liveActivityChanged": false,
+  "shippingCodeChanged": false,
+  "pass": true
+}
