@@ -1,0 +1,330 @@
+{
+  "id": "dexa_event_dexa-fixture-005",
+  "occurrence": {
+    "value": "founder|event|dexa_event_dexa-fixture-005"
+  },
+  "cadence": "event",
+  "generatedAt": "2026-08-31T14:00:00.000Z",
+  "evidenceWindow": {
+    "id": "dexa-event:dexa-fixture-005",
+    "startDate": "2026-08-30",
+    "endDate": "2026-08-30",
+    "briefingDate": "2026-08-31",
+    "relativeLabel": "DEXA scan",
+    "timeZone": "America/Los_Angeles"
+  },
+  "lifecycleState": "published",
+  "attribution": {
+    "goalId": "goal_fixture_build_lean_mass",
+    "goalTitle": "Build Lean Mass",
+    "phaseId": "phase_fixture_lean_mass_build",
+    "phaseName": "Lean Mass Build"
+  },
+  "confidence": {
+    "score": 63,
+    "band": "developing",
+    "priorScore": 70,
+    "delta": -7,
+    "movementDirection": "decreased",
+    "primaryReason": "Lean mass continued climbing but fat mass grew alongside it faster than the modeled surplus predicted, widening the uncertainty band on how clean this gain is.",
+    "supportingReasons": [
+      "Lean tissue is trending upward for the second scan in a row."
+    ],
+    "limitingReasons": [
+      "Fat mass grew 1.0 lb in two weeks — above the modeled rate for this surplus size.",
+      "Regional fat gain concentrated in the trunk, worth watching."
+    ],
+    "unresolvedUncertainty": [
+      "Whether the next scan confirms this as a real trend or normal scan-to-scan noise."
+    ],
+    "goalId": "goal_fixture_build_lean_mass",
+    "phaseId": "phase_fixture_lean_mass_build",
+    "capturedAt": "2026-08-31T14:00:00.000Z",
+    "source": "canonical_pi_snapshot"
+  },
+  "revisionProvenance": {
+    "priorPublicationId": "dexa_event_dexa-fixture-005",
+    "priorPublicationVersion": "2026-08-31T09:00:00.000Z",
+    "replacementTimestamp": "2026-08-31T14:00:00.000Z",
+    "reason": "A confirmed training-evidence review arrived after the initial publish and updated the regional fat-change figures."
+  },
+  "replacedHistory": [
+    {
+      "generatedAt": "2026-08-31T09:00:00.000Z",
+      "headline": "Two weeks into the surplus, growth continues.",
+      "replacedReason": "A training-evidence confirmation updated the regional breakdown."
+    }
+  ],
+  "eventConsumedAt": "2026-09-10T09:00:00.000Z",
+  "weekly": null,
+  "midweek": null,
+  "monthly": null,
+  "dexa": {
+    "scanId": "dexa-fixture-005",
+    "priorScanId": "dexa-fixture-004",
+    "scanDate": "2026-08-30",
+    "priorScanDate": "2026-08-16",
+    "daysBetweenScans": 14,
+    "hero": {
+      "title": "Two weeks into the surplus, the gain is real — and mostly lean.",
+      "body": "This scan compares against your August 16 baseline, the day the lean mass phase began. Weight is up 2.4 lb, and just over 60% of that gain measured as lean tissue.",
+      "results": [
+        {
+          "emoji": "⚖️",
+          "label": "DEXA Weight",
+          "value": "179.4 lb",
+          "context": "+2.4 lb vs Aug 16"
+        },
+        {
+          "emoji": "📊",
+          "label": "Body Fat",
+          "value": "9.4%",
+          "context": "+0.4 pts vs Aug 16"
+        },
+        {
+          "emoji": "💪",
+          "label": "Lean Tissue",
+          "value": "159.5 lb",
+          "context": "+1.5 lb vs Aug 16"
+        },
+        {
+          "emoji": "🔥",
+          "label": "Fat Mass",
+          "value": "16.9 lb",
+          "context": "+1.0 lb vs Aug 16"
+        }
+      ],
+      "milestones": []
+    },
+    "snapshot": {
+      "scanDate": "2026-08-30",
+      "daysBetweenScans": 14,
+      "weightLb": "179.4 lb",
+      "bodyFatPercent": "9.4%",
+      "fatMassLb": "16.9 lb",
+      "leanMassLb": "159.5 lb",
+      "restingMetabolicRateKcal": "2240"
+    },
+    "progress": {
+      "headline": [
+        {
+          "label": "DEXA Weight",
+          "previous": "177.0 lb",
+          "current": "179.4 lb",
+          "delta": "+2.4 lb"
+        },
+        {
+          "label": "Body Fat",
+          "previous": "9.0%",
+          "current": "9.4%",
+          "delta": "+0.4 pts"
+        },
+        {
+          "label": "Fat Mass",
+          "previous": "15.9 lb",
+          "current": "16.9 lb",
+          "delta": "+1.0 lb"
+        },
+        {
+          "label": "Lean Tissue",
+          "previous": "158.0 lb",
+          "current": "159.5 lb",
+          "delta": "+1.5 lb"
+        }
+      ],
+      "regionalFat": [
+        {
+          "region": "Arms",
+          "previous": "1.8 lb",
+          "current": "1.9 lb",
+          "delta": "+0.1 lb"
+        },
+        {
+          "region": "Legs",
+          "previous": "5.1 lb",
+          "current": "5.4 lb",
+          "delta": "+0.3 lb"
+        },
+        {
+          "region": "Trunk",
+          "previous": "7.6 lb",
+          "current": "8.1 lb",
+          "delta": "+0.5 lb"
+        },
+        {
+          "region": "Android",
+          "previous": "1.0 lb",
+          "current": "1.1 lb",
+          "delta": "+0.1 lb"
+        },
+        {
+          "region": "Gynoid",
+          "previous": "1.9 lb",
+          "current": "2.0 lb",
+          "delta": "+0.1 lb"
+        }
+      ],
+      "regionalLean": [
+        {
+          "region": "Arms",
+          "previous": "18.3 lb",
+          "current": "18.6 lb",
+          "delta": "+0.3 lb"
+        },
+        {
+          "region": "Legs",
+          "previous": "54.6 lb",
+          "current": "55.1 lb",
+          "delta": "+0.5 lb"
+        },
+        {
+          "region": "Trunk",
+          "previous": "72.9 lb",
+          "current": "73.7 lb",
+          "delta": "+0.8 lb"
+        },
+        {
+          "region": "Android",
+          "previous": "10.5 lb",
+          "current": "10.6 lb",
+          "delta": "+0.1 lb"
+        },
+        {
+          "region": "Gynoid",
+          "previous": "18.1 lb",
+          "current": "18.3 lb",
+          "delta": "+0.2 lb"
+        }
+      ],
+      "supplemental": [
+        {
+          "label": "Visceral Fat",
+          "previous": "1.0 lb",
+          "current": "1.1 lb",
+          "delta": "+0.1 lb"
+        },
+        {
+          "label": "A:G Ratio",
+          "previous": "1.41",
+          "current": "1.43",
+          "delta": "+0.02"
+        },
+        {
+          "label": "RMR",
+          "previous": "2220 cal/day",
+          "current": "2240 cal/day",
+          "delta": "+20 cal/day"
+        }
+      ],
+      "timeline": {
+        "timelineLabel": "Since Starting the Lean Mass Phase",
+        "isSimulated": false,
+        "baselineDate": "2026-08-16",
+        "currentDate": "2026-08-30",
+        "elapsedDays": 14,
+        "scans": [
+          {
+            "scanId": "dexa-fixture-004",
+            "date": "2026-08-16",
+            "value": "—"
+          },
+          {
+            "scanId": "dexa-fixture-005",
+            "date": "2026-08-30",
+            "value": "—"
+          }
+        ],
+        "metrics": [
+          {
+            "label": "DEXA Weight",
+            "unit": "lb",
+            "delta": "+2.4 lb",
+            "points": [
+              {
+                "scanId": "dexa-fixture-004",
+                "date": "2026-08-16",
+                "value": "177.0"
+              },
+              {
+                "scanId": "dexa-fixture-005",
+                "date": "2026-08-30",
+                "value": "179.4"
+              }
+            ]
+          },
+          {
+            "label": "Body Fat",
+            "unit": "%",
+            "delta": "+0.4 pts",
+            "points": [
+              {
+                "scanId": "dexa-fixture-004",
+                "date": "2026-08-16",
+                "value": "9.0"
+              },
+              {
+                "scanId": "dexa-fixture-005",
+                "date": "2026-08-30",
+                "value": "9.4"
+              }
+            ]
+          },
+          {
+            "label": "Fat Mass",
+            "unit": "lb",
+            "delta": "+1.0 lb",
+            "points": [
+              {
+                "scanId": "dexa-fixture-004",
+                "date": "2026-08-16",
+                "value": "15.9"
+              },
+              {
+                "scanId": "dexa-fixture-005",
+                "date": "2026-08-30",
+                "value": "16.9"
+              }
+            ]
+          },
+          {
+            "label": "Lean Tissue",
+            "unit": "lb",
+            "delta": "+1.5 lb",
+            "points": [
+              {
+                "scanId": "dexa-fixture-004",
+                "date": "2026-08-16",
+                "value": "158.0"
+              },
+              {
+                "scanId": "dexa-fixture-005",
+                "date": "2026-08-30",
+                "value": "159.5"
+              }
+            ]
+          }
+        ],
+        "summary": "14 days into the lean mass phase, weight is up 2.4 lb and lean tissue accounts for about 60% of that — right in line with the modeled surplus."
+      }
+    },
+    "interpretation": {
+      "opening": "This is the second scan since the lean mass phase began, and the surplus is producing measurable tissue gain rather than just scale weight.",
+      "fatLoss": "Fat mass grew slightly faster than modeled over these two weeks — not a guardrail breach, but worth watching if it continues at this rate.",
+      "leanMass": "Lean tissue gained 1.5 lb, consistent with the training progression logged over the same window.",
+      "regional": "Most of the fat gain concentrated in the trunk; lean gain was distributed fairly evenly across arms, legs, and trunk.",
+      "phaseMeaning": "The lean mass phase calls for exactly this kind of controlled gain — the question going forward is whether the fat-to-lean ratio holds as the surplus continues.",
+      "stoodOut": null,
+      "supportingEvidence": "Fourteen days of consistent nutrition and training logging back this comparison.",
+      "uncertainty": "One more scan is needed to know whether the trunk fat gain is a real trend or normal scan-to-scan noise."
+    },
+    "semanticGoalType": "lean_mass_gain",
+    "coachInsight": {
+      "biggestWin": "Lean tissue is climbing for the second scan in a row.",
+      "protect": "Keep the current surplus size — don't cut calories over one slightly-faster-than-modeled fat gain.",
+      "watch": "Trunk fat gain rate at the next scan.",
+      "next": "Hold intake steady and reassess at the next DEXA."
+    },
+    "phaseReview": null,
+    "goalCompletionHandoff": null
+  }
+}

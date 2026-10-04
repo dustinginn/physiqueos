@@ -334,3 +334,28 @@ Review set:
 - `agent-handoffs/artifacts/monthly-correction-dexa-photo-briefing-ui-20261004/PARITY-PROOF.md`
 
 No shipping UI, Server behavior, production content projection, Recovery activation, build, or TestFlight work occurred.
+
+## DEXA + Photo Founder-flow confirmation
+
+Status: **focused dark/mineral-light correction package ready for Founder review; implementation not started**
+
+The accepted event-briefing styling remains unchanged. DEXA now visibly restores all canonical field-specific units across 17 comparison rows and restores the complete production `Since Starting the Lean Mass Phase` Goal/Phase body-composition breakdown: Goal, active phase, dates, elapsed days, scan count, DEXA Weight, Body Fat, Fat Mass, Lean Tissue, deltas and canonical summary.
+
+Photo now uses the exact production-shaped five-section flow with five session poses and five matched comparisons. Neutral prototype filler pixels replace Founder evidence for this formatting confirmation only; canonical labels, dates, facts, weight, conditions, per-pose interpretations, synthesis, Coach copy and next milestone remain unchanged.
+
+The Build 85 interaction audit confirms the shared viewer already supports individual-photo full-screen paging, pinch zoom, pan, double-tap zoom, aspect fit and dismissal. It does **not** show both matched comparison images simultaneously. A dedicated side-by-side paired viewer with synchronized zoom/pan is the recommended future implementation target and remains unimplemented.
+
+Review set:
+
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/README.md`
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/comparison-board.html`
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/dexa-units-dark-light.png`
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/dexa-phase-breakdown-dark-light.png`
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-flow-dark-light.png`
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-interaction-states-dark.png`
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-interaction-states-light.png`
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/SOURCE-BEHAVIOR-AUDIT.md`
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/VIEWER-FEASIBILITY.md`
+- `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/PARITY-PROOF.md`
+
+No DEXA/Photo design is newly marked accepted by this confirmation pass. No shipping Native UI, Server behavior, production photo binding, production content projection, build or TestFlight state changed.

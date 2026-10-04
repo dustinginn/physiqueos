@@ -1,0 +1,247 @@
+{
+  "pass": true,
+  "authorities": {
+    "prompt": "e5f303aff07e830be25f7a397e21f84ce6257fba",
+    "nativeBuild85": "b8ee8690b194cb90086f6f62816b9a2c8c400dc026",
+    "productionServer": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "photoFixture": "src/fixtures/briefingFamilyV3/photoEventArtifact.json"
+  },
+  "dexa": {
+    "dark": {
+      "unitAudit": {
+        "width": 402,
+        "text": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nDEXA CORRECTION CONFIRMATION\nField-specific units restored\nSince Last Scan\nMETRIC\tPREVIOUS\tCURRENT\tDELTA\nDEXA Weight\t177.0 lb\t179.4 lb\t+2.4 lb\nBody Fat\t9.0%\t9.4%\t+0.4 pts\nFat Mass\t15.9 lb\t16.9 lb\t+1.0 lb\nLean Tissue\t158.0 lb\t159.5 lb\t+1.5 lb\nRegional Fat Change\nMETRIC\tPREVIOUS\tCURRENT\tDELTA\nArms\t1.8 lb\t1.9 lb\t+0.1 lb\nLegs\t5.1 lb\t5.4 lb\t+0.3 lb\nTrunk\t7.6 lb\t8.1 lb\t+0.5 lb\nAndroid\t1.0 lb\t1.1 lb\t+0.1 lb\nGynoid\t1.9 lb\t2.0 lb\t+0.1 lb\nMeasured Lean Tissue Change\nMETRIC\tPREVIOUS\tCURRENT\tDELTA\nArms\t18.3 lb\t18.6 lb\t+0.3 lb\nLegs\t54.6 lb\t55.1 lb\t+0.5 lb\nTrunk\t72.9 lb\t73.7 lb\t+0.8 lb\nAndroid\t10.5 lb\t10.6 lb\t+0.1 lb\nGynoid\t18.1 lb\t18.3 lb\t+0.2 lb\nOther Notable Changes\nMETRIC\tPREVIOUS\tCURRENT\tDELTA\nVisceral Fat\t1.0 lb\t1.1 lb\t+0.1 lb\nA:G Ratio\t1.41\t1.43\t+0.02\nRMR\t2220 cal/day\t2240 cal/day\t+20 cal/day",
+        "tables": 4,
+        "rows": 17,
+        "exactValues": true,
+        "pass": true
+      },
+      "phaseAudit": {
+        "width": 402,
+        "text": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nDEXA CORRECTION CONFIRMATION\nSince starting Lean Mass Build\nSINCE STARTING THE LEAN MASS PHASE\nGoal\nBuild Lean Mass\nActive phase\nLean Mass Build\nSTART\nAug 16\nCURRENT SCAN\nAug 30\nELAPSED\n14 days\nBODY-COMPOSITION SCANS\n2\nDEXA Weight\n+2.4 lb\nSTART\n177.0 lb\n→\nCURRENT\n179.4 lb\nBody Fat\n+0.4 pts\nSTART\n9.0%\n→\nCURRENT\n9.4%\nFat Mass\n+1.0 lb\nSTART\n15.9 lb\n→\nCURRENT\n16.9 lb\nLean Tissue\n+1.5 lb\nSTART\n158.0 lb\n→\nCURRENT\n159.5 lb\n\n14 days into the lean mass phase, weight is up 2.4 lb and lean tissue accounts for about 60% of that — right in line with the modeled surplus.",
+        "metricCount": 4,
+        "sectionCount": 1,
+        "exactValues": true,
+        "pass": true
+      },
+      "unitFile": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/dexa-corrected-units-dark.png",
+      "phaseFile": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/dexa-restored-phase-breakdown-dark.png"
+    },
+    "light": {
+      "unitAudit": {
+        "width": 402,
+        "text": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nDEXA CORRECTION CONFIRMATION\nField-specific units restored\nSince Last Scan\nMETRIC\tPREVIOUS\tCURRENT\tDELTA\nDEXA Weight\t177.0 lb\t179.4 lb\t+2.4 lb\nBody Fat\t9.0%\t9.4%\t+0.4 pts\nFat Mass\t15.9 lb\t16.9 lb\t+1.0 lb\nLean Tissue\t158.0 lb\t159.5 lb\t+1.5 lb\nRegional Fat Change\nMETRIC\tPREVIOUS\tCURRENT\tDELTA\nArms\t1.8 lb\t1.9 lb\t+0.1 lb\nLegs\t5.1 lb\t5.4 lb\t+0.3 lb\nTrunk\t7.6 lb\t8.1 lb\t+0.5 lb\nAndroid\t1.0 lb\t1.1 lb\t+0.1 lb\nGynoid\t1.9 lb\t2.0 lb\t+0.1 lb\nMeasured Lean Tissue Change\nMETRIC\tPREVIOUS\tCURRENT\tDELTA\nArms\t18.3 lb\t18.6 lb\t+0.3 lb\nLegs\t54.6 lb\t55.1 lb\t+0.5 lb\nTrunk\t72.9 lb\t73.7 lb\t+0.8 lb\nAndroid\t10.5 lb\t10.6 lb\t+0.1 lb\nGynoid\t18.1 lb\t18.3 lb\t+0.2 lb\nOther Notable Changes\nMETRIC\tPREVIOUS\tCURRENT\tDELTA\nVisceral Fat\t1.0 lb\t1.1 lb\t+0.1 lb\nA:G Ratio\t1.41\t1.43\t+0.02\nRMR\t2220 cal/day\t2240 cal/day\t+20 cal/day",
+        "tables": 4,
+        "rows": 17,
+        "exactValues": true,
+        "pass": true
+      },
+      "phaseAudit": {
+        "width": 402,
+        "text": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nDEXA CORRECTION CONFIRMATION\nSince starting Lean Mass Build\nSINCE STARTING THE LEAN MASS PHASE\nGoal\nBuild Lean Mass\nActive phase\nLean Mass Build\nSTART\nAug 16\nCURRENT SCAN\nAug 30\nELAPSED\n14 days\nBODY-COMPOSITION SCANS\n2\nDEXA Weight\n+2.4 lb\nSTART\n177.0 lb\n→\nCURRENT\n179.4 lb\nBody Fat\n+0.4 pts\nSTART\n9.0%\n→\nCURRENT\n9.4%\nFat Mass\n+1.0 lb\nSTART\n15.9 lb\n→\nCURRENT\n16.9 lb\nLean Tissue\n+1.5 lb\nSTART\n158.0 lb\n→\nCURRENT\n159.5 lb\n\n14 days into the lean mass phase, weight is up 2.4 lb and lean tissue accounts for about 60% of that — right in line with the modeled surplus.",
+        "metricCount": 4,
+        "sectionCount": 1,
+        "exactValues": true,
+        "pass": true
+      },
+      "unitFile": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/dexa-corrected-units-light.png",
+      "phaseFile": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/dexa-restored-phase-breakdown-light.png"
+    }
+  },
+  "photo": {
+    "dark": {
+      "audit": {
+        "width": 402,
+        "height": 3583,
+        "sections": [
+          "photo-hero",
+          "photo-session",
+          "photo-visible-change",
+          "photo-meaning",
+          "photo-coach"
+        ],
+        "poseNames": [
+          "Front relaxed",
+          "Rear relaxed",
+          "Rear flexed — double biceps",
+          "Right side relaxed",
+          "Front flexed"
+        ],
+        "poseDates": [
+          "Sep 19",
+          "Sep 19",
+          "Sep 19",
+          "Sep 19",
+          "Sep 19"
+        ],
+        "comparisons": [
+          {
+            "pose": "front-relaxed",
+            "text": "Front relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nWaist line appears slightly more tapered and less soft than before."
+          },
+          {
+            "pose": "back-relaxed",
+            "text": "Rear relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nShoulder and upper back width maintained with no visible reduction in muscle fullness."
+          },
+          {
+            "pose": "back-flexed",
+            "text": "Rear flexed — double biceps\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nUpper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+          },
+          {
+            "pose": "right-side-relaxed",
+            "text": "Right side relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nVisible tightening and flattening of waist and lower abdomen compared to prior photo."
+          },
+          {
+            "pose": "front-flexed",
+            "text": "Front flexed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nUpper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging."
+          }
+        ],
+        "fillerCount": 15,
+        "imageCount": 0,
+        "text": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nPHOTO EVENT\nSep 19\nToday’s photos show your recent condition is holding steady.\n\nThe matched views support maintenance of your recent lean condition and provide an early baseline for the current phase.\n\nTHIS PHOTO SESSION\n5 CONFIRMED VIEWS\nDATE\nSep 19\nSET\n5 confirmed views\nWEIGHT\n172.7 lb\n\nFront relaxed · Rear relaxed · Rear flexed — double biceps · Right side relaxed · Front flexed\nTaken after your workout, after eating.\n\n↗\nFront relaxed\nSep 19\n↗\nRear relaxed\nSep 19\n↗\nRear flexed — double biceps\nSep 19\n↗\nRight side relaxed\nSep 19\n↗\nFront flexed\nSep 19\nWHAT VISIBLY CHANGED\nMatching historical views show what changed and what remained stable.\nFront relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nWaist line appears slightly more tapered and less soft than before.\n\nRear relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nShoulder and upper back width maintained with no visible reduction in muscle fullness.\n\nRear flexed — double biceps\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nUpper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.\n\nRight side relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nVisible tightening and flattening of waist and lower abdomen compared to prior photo.\n\nFront flexed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nUpper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.\n\nWHAT THE COMPLETE EVIDENCE MEANS\n\nAcross the matched views, your current physique remains lean and upper-body muscularity appears maintained. These photos are most useful as an early maintenance and lean-gain baseline, not proof of new tissue gain.\n\nThe continued weight trend reinforces the visual pattern, with the latest DEXA serving as the body-composition baseline.\n\nThe matching poses make broad visual changes easier to judge. Interpret small changes cautiously over this short interval. DEXA on Friday, Oct 9 at 7:00 AM will give us the next body-composition comparison.\n\nCOACH’S INSIGHT\n\nYou are more than halfway to the 10 lb lean-mass goal. The last DEXA still supports the plan. The plan is working. Stay consistent. Keep executing. The next DEXA is about whether this kind of progress continues while body fat stays in a good place—not whether the plan works. That question has been answered.\n\nNext milestone\nDEXA on Friday, Oct 9 at 7:00 AM",
+        "sourceText": "1:05▮▮▮⌁‹ Home▦ Briefing HistoryPhoto EventSep 19Today’s photos show your recent condition is holding steady.The matched views support maintenance of your recent lean condition and provide an early baseline for the current phase.This photo session5 confirmed viewsDateSep 19Set5 confirmed viewsWeight172.7 lbFront relaxed · Rear relaxed · Rear flexed — double biceps · Right side relaxed · Front flexedTaken after your workout, after eating.↗Front relaxedSep 19↗Rear relaxedSep 19↗Rear flexed — double bicepsSep 19↗Right side relaxedSep 19↗Front flexedSep 19What visibly changedMatching historical views show what changed and what remained stable.Front relaxedAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Waist line appears slightly more tapered and less soft than before.Rear relaxedAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Shoulder and upper back width maintained with no visible reduction in muscle fullness.Rear flexed — double bicepsAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.Right side relaxedAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Visible tightening and flattening of waist and lower abdomen compared to prior photo.Front flexedAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.What the complete evidence meansAcross the matched views, your current physique remains lean and upper-body muscularity appears maintained. These photos are most useful as an early maintenance and lean-gain baseline, not proof of new tissue gain.The continued weight trend reinforces the visual pattern, with the latest DEXA serving as the body-composition baseline.The matching poses make broad visual changes easier to judge. Interpret small changes cautiously over this short interval. DEXA on Friday, Oct 9 at 7:00 AM will give us the next body-composition comparison.Coach’s InsightYou are more than halfway to the 10 lb lean-mass goal. The last DEXA still supports the plan. The plan is working. Stay consistent. Keep executing. The next DEXA is about whether this kind of progress continues while body fat stays in a good place—not whether the plan works. That question has been answered.Next milestoneDEXA on Friday, Oct 9 at 7:00 AM",
+        "missingCopy": [],
+        "pass": true
+      },
+      "files": {
+        "full": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-event-flow-dark-full.png",
+        "hero": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-hero-dark.png",
+        "session": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-session-dark.png",
+        "meaning": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-meaning-dark.png",
+        "coach": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-coach-dark.png",
+        "firstComparisons": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-visible-change-first-dark.png",
+        "remainingComparisons": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-visible-change-remaining-dark.png"
+      }
+    },
+    "light": {
+      "audit": {
+        "width": 402,
+        "height": 3583,
+        "sections": [
+          "photo-hero",
+          "photo-session",
+          "photo-visible-change",
+          "photo-meaning",
+          "photo-coach"
+        ],
+        "poseNames": [
+          "Front relaxed",
+          "Rear relaxed",
+          "Rear flexed — double biceps",
+          "Right side relaxed",
+          "Front flexed"
+        ],
+        "poseDates": [
+          "Sep 19",
+          "Sep 19",
+          "Sep 19",
+          "Sep 19",
+          "Sep 19"
+        ],
+        "comparisons": [
+          {
+            "pose": "front-relaxed",
+            "text": "Front relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nWaist line appears slightly more tapered and less soft than before."
+          },
+          {
+            "pose": "back-relaxed",
+            "text": "Rear relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nShoulder and upper back width maintained with no visible reduction in muscle fullness."
+          },
+          {
+            "pose": "back-flexed",
+            "text": "Rear flexed — double biceps\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nUpper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period."
+          },
+          {
+            "pose": "right-side-relaxed",
+            "text": "Right side relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nVisible tightening and flattening of waist and lower abdomen compared to prior photo."
+          },
+          {
+            "pose": "front-flexed",
+            "text": "Front flexed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nUpper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging."
+          }
+        ],
+        "fillerCount": 15,
+        "imageCount": 0,
+        "text": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nPHOTO EVENT\nSep 19\nToday’s photos show your recent condition is holding steady.\n\nThe matched views support maintenance of your recent lean condition and provide an early baseline for the current phase.\n\nTHIS PHOTO SESSION\n5 CONFIRMED VIEWS\nDATE\nSep 19\nSET\n5 confirmed views\nWEIGHT\n172.7 lb\n\nFront relaxed · Rear relaxed · Rear flexed — double biceps · Right side relaxed · Front flexed\nTaken after your workout, after eating.\n\n↗\nFront relaxed\nSep 19\n↗\nRear relaxed\nSep 19\n↗\nRear flexed — double biceps\nSep 19\n↗\nRight side relaxed\nSep 19\n↗\nFront flexed\nSep 19\nWHAT VISIBLY CHANGED\nMatching historical views show what changed and what remained stable.\nFront relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nWaist line appears slightly more tapered and less soft than before.\n\nRear relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nShoulder and upper back width maintained with no visible reduction in muscle fullness.\n\nRear flexed — double biceps\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nUpper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.\n\nRight side relaxed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nVisible tightening and flattening of waist and lower abdomen compared to prior photo.\n\nFront flexed\nAUG 22 → SEP 19\n↗\nPREVIOUS\nAug 22\n↗\nCURRENT\nSep 19\n\nUpper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.\n\nWHAT THE COMPLETE EVIDENCE MEANS\n\nAcross the matched views, your current physique remains lean and upper-body muscularity appears maintained. These photos are most useful as an early maintenance and lean-gain baseline, not proof of new tissue gain.\n\nThe continued weight trend reinforces the visual pattern, with the latest DEXA serving as the body-composition baseline.\n\nThe matching poses make broad visual changes easier to judge. Interpret small changes cautiously over this short interval. DEXA on Friday, Oct 9 at 7:00 AM will give us the next body-composition comparison.\n\nCOACH’S INSIGHT\n\nYou are more than halfway to the 10 lb lean-mass goal. The last DEXA still supports the plan. The plan is working. Stay consistent. Keep executing. The next DEXA is about whether this kind of progress continues while body fat stays in a good place—not whether the plan works. That question has been answered.\n\nNext milestone\nDEXA on Friday, Oct 9 at 7:00 AM",
+        "sourceText": "1:05▮▮▮⌁‹ Home▦ Briefing HistoryPhoto EventSep 19Today’s photos show your recent condition is holding steady.The matched views support maintenance of your recent lean condition and provide an early baseline for the current phase.This photo session5 confirmed viewsDateSep 19Set5 confirmed viewsWeight172.7 lbFront relaxed · Rear relaxed · Rear flexed — double biceps · Right side relaxed · Front flexedTaken after your workout, after eating.↗Front relaxedSep 19↗Rear relaxedSep 19↗Rear flexed — double bicepsSep 19↗Right side relaxedSep 19↗Front flexedSep 19What visibly changedMatching historical views show what changed and what remained stable.Front relaxedAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Waist line appears slightly more tapered and less soft than before.Rear relaxedAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Shoulder and upper back width maintained with no visible reduction in muscle fullness.Rear flexed — double bicepsAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Upper back and shoulder muscle fullness are visually maintained with no signs of loss, supporting muscle retention during this period.Right side relaxedAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Visible tightening and flattening of waist and lower abdomen compared to prior photo.Front flexedAug 22 → Sep 19↗PreviousAug 22↗CurrentSep 19Upper abs and obliques show clearer, sharper separation lines indicating definition appears to be emerging.What the complete evidence meansAcross the matched views, your current physique remains lean and upper-body muscularity appears maintained. These photos are most useful as an early maintenance and lean-gain baseline, not proof of new tissue gain.The continued weight trend reinforces the visual pattern, with the latest DEXA serving as the body-composition baseline.The matching poses make broad visual changes easier to judge. Interpret small changes cautiously over this short interval. DEXA on Friday, Oct 9 at 7:00 AM will give us the next body-composition comparison.Coach’s InsightYou are more than halfway to the 10 lb lean-mass goal. The last DEXA still supports the plan. The plan is working. Stay consistent. Keep executing. The next DEXA is about whether this kind of progress continues while body fat stays in a good place—not whether the plan works. That question has been answered.Next milestoneDEXA on Friday, Oct 9 at 7:00 AM",
+        "missingCopy": [],
+        "pass": true
+      },
+      "files": {
+        "full": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-event-flow-light-full.png",
+        "hero": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-hero-light.png",
+        "session": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-session-light.png",
+        "meaning": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-meaning-light.png",
+        "coach": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-coach-light.png",
+        "firstComparisons": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-visible-change-first-light.png",
+        "remainingComparisons": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/photo-visible-change-remaining-light.png"
+      }
+    }
+  },
+  "viewers": {
+    "dark": {
+      "single-viewer": {
+        "width": 402,
+        "fillers": 1,
+        "text": "1:05\n▮▮▮⌁\n×\nFront relaxed\nSep 19 · 1 of 5\n↗\nPinch to zoom · Pan when zoomed\n1×",
+        "zoomed": 0,
+        "closeHeight": 44,
+        "pass": true,
+        "file": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/single-photo-viewer-dark.png"
+      },
+      "pair-viewer": {
+        "width": 402,
+        "fillers": 2,
+        "text": "1:05\n▮▮▮⌁\n×\nFront relaxed\nAug 22 → Sep 19\n↗\nPrevious · Aug 22\n↗\nCurrent · Sep 19\nPinch to zoom · synchronized pan\n1×",
+        "zoomed": 0,
+        "closeHeight": 44,
+        "pass": true,
+        "file": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/paired-comparison-viewer-dark.png"
+      },
+      "pair-zoom": {
+        "width": 402,
+        "fillers": 2,
+        "text": "1:05\n▮▮▮⌁\n×\nFront relaxed\nAug 22 → Sep 19\n↗\nPrevious · Aug 22\n↗\nCurrent · Sep 19\nPan both images together\n2.4× · Reset",
+        "zoomed": 1,
+        "closeHeight": 44,
+        "pass": true,
+        "file": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/paired-comparison-viewer-zoomed-dark.png"
+      }
+    },
+    "light": {
+      "single-viewer": {
+        "width": 402,
+        "fillers": 1,
+        "text": "1:05\n▮▮▮⌁\n×\nFront relaxed\nSep 19 · 1 of 5\n↗\nPinch to zoom · Pan when zoomed\n1×",
+        "zoomed": 0,
+        "closeHeight": 44,
+        "pass": true,
+        "file": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/single-photo-viewer-light.png"
+      },
+      "pair-viewer": {
+        "width": 402,
+        "fillers": 2,
+        "text": "1:05\n▮▮▮⌁\n×\nFront relaxed\nAug 22 → Sep 19\n↗\nPrevious · Aug 22\n↗\nCurrent · Sep 19\nPinch to zoom · synchronized pan\n1×",
+        "zoomed": 0,
+        "closeHeight": 44,
+        "pass": true,
+        "file": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/paired-comparison-viewer-light.png"
+      },
+      "pair-zoom": {
+        "width": 402,
+        "fillers": 2,
+        "text": "1:05\n▮▮▮⌁\n×\nFront relaxed\nAug 22 → Sep 19\n↗\nPrevious · Aug 22\n↗\nCurrent · Sep 19\nPan both images together\n2.4× · Reset",
+        "zoomed": 1,
+        "closeHeight": 44,
+        "pass": true,
+        "file": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/screens/paired-comparison-viewer-zoomed-light.png"
+      }
+    }
+  },
+  "intentionalSubstitution": {
+    "fillerPixelsOnly": true,
+    "canonicalContentSubstitutions": 0,
+    "founderMediaIncluded": false
+  },
+  "shippingChanges": false
+}
