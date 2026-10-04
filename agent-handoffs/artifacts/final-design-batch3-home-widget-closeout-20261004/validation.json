@@ -1,0 +1,427 @@
+{
+  "pass": true,
+  "authority": {
+    "nativeBuild": 85,
+    "nativeCommit": "b8ee8690b194cb90086f62816b9a2c8c400dc026",
+    "serverCommit": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "promptCommit": "c91e3ae1d958c11f5e6112b1edf715ff7f6b874f"
+  },
+  "supportedFamilies": [
+    "small",
+    "large"
+  ],
+  "materialStates": [
+    "fresh",
+    "no-weight",
+    "active-workout",
+    "stale-offline",
+    "waiting",
+    "unavailable",
+    "privacy-redacted",
+    "long-training"
+  ],
+  "appearances": [
+    "dark",
+    "light"
+  ],
+  "screenCount": 32,
+  "pairCount": 16,
+  "exactPointGeometry": {
+    "small": {
+      "widthPoints": 170,
+      "heightPoints": 170,
+      "contentMarginPoints": 12,
+      "cornerRadiusPoints": 22
+    },
+    "large": {
+      "widthPoints": 360,
+      "heightPoints": 376,
+      "contentMarginPoints": 16,
+      "cornerRadiusPoints": 26
+    }
+  },
+  "darkLightContentParity": true,
+  "systemMarginFeasible": true,
+  "minimumEffectiveTapTarget": 44,
+  "noHorizontalOrVerticalOverflow": true,
+  "privacyStateRendered": true,
+  "staleOfflineStateRendered": true,
+  "waitingAndUnavailableStatesRendered": true,
+  "activeWorkoutStateRendered": true,
+  "noInventedMetricsControlsOrFamilies": true,
+  "shippingNativeChanged": false,
+  "serverChanged": false,
+  "parity": {
+    "small": {
+      "fresh": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 30
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 170,
+            "visibleHeight": 31
+          }
+        ]
+      },
+      "no-weight": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 30
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 170,
+            "visibleHeight": 31
+          }
+        ]
+      },
+      "active-workout": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 30
+          },
+          {
+            "action": "Resume Workout",
+            "hit": 170,
+            "visibleHeight": 31
+          }
+        ]
+      },
+      "stale-offline": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 30
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 170,
+            "visibleHeight": 31
+          }
+        ]
+      },
+      "waiting": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 30
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 170,
+            "visibleHeight": 31
+          }
+        ]
+      },
+      "unavailable": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 30
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 170,
+            "visibleHeight": 31
+          }
+        ]
+      },
+      "privacy-redacted": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 30
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 170,
+            "visibleHeight": 31
+          }
+        ]
+      },
+      "long-training": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 30
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 170,
+            "visibleHeight": 31
+          }
+        ]
+      }
+    },
+    "large": {
+      "fresh": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 36
+          },
+          {
+            "action": "Open Training",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Nutrition",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Activity",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Weight",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 49,
+            "visibleHeight": 49
+          }
+        ]
+      },
+      "no-weight": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 36
+          },
+          {
+            "action": "Open Training",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Nutrition",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Activity",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Weight",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 49,
+            "visibleHeight": 49
+          }
+        ]
+      },
+      "active-workout": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 36
+          },
+          {
+            "action": "Open Training",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Nutrition",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Activity",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Weight",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Resume Workout",
+            "hit": 49,
+            "visibleHeight": 49
+          }
+        ]
+      },
+      "stale-offline": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 36
+          },
+          {
+            "action": "Open Training",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Nutrition",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Activity",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Weight",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 49,
+            "visibleHeight": 49
+          }
+        ]
+      },
+      "waiting": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 36
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 49,
+            "visibleHeight": 49
+          }
+        ]
+      },
+      "unavailable": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 36
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 49,
+            "visibleHeight": 49
+          }
+        ]
+      },
+      "privacy-redacted": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 36
+          },
+          {
+            "action": "Open Training",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Nutrition",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Activity",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Weight",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 49,
+            "visibleHeight": 49
+          }
+        ]
+      },
+      "long-training": {
+        "missing": [],
+        "actions": [
+          {
+            "action": "Refresh totals in PhysiqueOS",
+            "hit": 44,
+            "visibleHeight": 36
+          },
+          {
+            "action": "Open Training",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Nutrition",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Activity",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Open Weight",
+            "hit": 58,
+            "visibleHeight": 58
+          },
+          {
+            "action": "Start Workout Logger",
+            "hit": 49,
+            "visibleHeight": 49
+          }
+        ]
+      }
+    }
+  },
+  "primaryFounderReview": "boards/home-widget-primary-mobile.png",
+  "focusedBoards": [
+    "boards/home-widget-small-state-coverage-mobile.png",
+    "boards/home-widget-large-state-coverage-mobile.png",
+    "boards/widget-source-behavior-matrix-mobile.png",
+    "boards/app-wide-design-closeout-matrix-mobile.png"
+  ]
+}

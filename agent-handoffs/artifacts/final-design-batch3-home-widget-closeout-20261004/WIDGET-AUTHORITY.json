@@ -1,0 +1,120 @@
+{
+  "authority": {
+    "nativeBuild": 85,
+    "nativeCommit": "b8ee8690b194cb90086f62816b9a2c8c400dc026",
+    "serverCommit": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "promptCommit": "c91e3ae1d958c11f5e6112b1edf715ff7f6b874f"
+  },
+  "rendering": {
+    "families": {
+      "small": { "widthPoints": 170, "heightPoints": 170, "contentMarginPoints": 12, "cornerRadiusPoints": 22 },
+      "large": { "widthPoints": 360, "heightPoints": 376, "contentMarginPoints": 16, "cornerRadiusPoints": 26 }
+    },
+    "themes": ["dark", "light"]
+  },
+  "states": {
+    "fresh": {
+      "title": "Fresh · full data",
+      "freshnessSmall": "18m",
+      "freshnessLarge": "Updated 18m ago",
+      "training": ["Strength Training · 58 min", "Outdoor Walk · 24 min"],
+      "calories": "2,463",
+      "protein": "182",
+      "carbs": "167",
+      "fat": "110",
+      "active": "890",
+      "weight": "176.1 lb",
+      "workout": "none"
+    },
+    "no-weight": {
+      "title": "Fresh · no weight",
+      "freshnessSmall": "18m",
+      "freshnessLarge": "Updated 18m ago",
+      "training": ["Strength Training · 58 min", "Outdoor Walk · 24 min"],
+      "calories": "2,463",
+      "protein": "182",
+      "carbs": "167",
+      "fat": "110",
+      "active": "890",
+      "weight": null,
+      "workout": "none"
+    },
+    "active-workout": {
+      "title": "Active workout",
+      "freshnessSmall": "18m",
+      "freshnessLarge": "Updated 18m ago",
+      "training": ["Strength Training · 58 min", "Outdoor Walk · 24 min"],
+      "calories": "2,463",
+      "protein": "182",
+      "carbs": "167",
+      "fat": "110",
+      "active": "890",
+      "weight": "176.1 lb",
+      "workout": "active",
+      "workoutProgress": "Chest & Shoulders · 6/18 sets"
+    },
+    "stale-offline": {
+      "title": "Stale · offline",
+      "freshnessSmall": "Offline 5h",
+      "freshnessLarge": "Offline · 5h ago",
+      "training": ["Strength Training · 58 min", "Outdoor Walk · 24 min"],
+      "calories": "2,463",
+      "protein": "182",
+      "carbs": "167",
+      "fat": "110",
+      "active": "890",
+      "weight": "176.1 lb",
+      "workout": "none",
+      "warning": true
+    },
+    "waiting": {
+      "title": "Waiting for today",
+      "freshnessSmall": "Waiting",
+      "freshnessLarge": "Waiting for today",
+      "emptyTitleSmall": "Waiting for today",
+      "emptyTitleLarge": "Waiting for today’s totals",
+      "emptyDetailSmall": "Prior-day totals stay hidden.",
+      "emptyDetailLarge": "Yesterday’s Nutrition, Activity, and Weight are intentionally hidden.",
+      "workout": "none",
+      "empty": true
+    },
+    "unavailable": {
+      "title": "Unavailable / no snapshot",
+      "freshnessSmall": "Refresh",
+      "freshnessLarge": "Open PhysiqueOS to refresh",
+      "emptyTitleSmall": "Open app to refresh",
+      "emptyTitleLarge": "Open PhysiqueOS to refresh",
+      "emptyDetailSmall": "Prior-day totals stay hidden.",
+      "emptyDetailLarge": "Today’s canonical Logged Today summary is not available yet.",
+      "workout": "none",
+      "empty": true
+    },
+    "privacy-redacted": {
+      "title": "Privacy redacted",
+      "freshnessSmall": "18m",
+      "freshnessLarge": "Updated 18m ago",
+      "training": ["Strength Training · 58 min", "Outdoor Walk · 24 min"],
+      "calories": "2,463",
+      "protein": "182",
+      "carbs": "167",
+      "fat": "110",
+      "active": "890",
+      "weight": "176.1 lb",
+      "workout": "none",
+      "privacy": true
+    },
+    "long-training": {
+      "title": "Long training summary",
+      "freshnessSmall": "18m",
+      "freshnessLarge": "Updated 18m ago",
+      "training": ["Traditional Strength Training · Chest, Shoulders & Triceps · 1 hr 42 min", "2 Outdoor Walks · 37 min"],
+      "calories": "2,463",
+      "protein": "182",
+      "carbs": "167",
+      "fat": "110",
+      "active": "890",
+      "weight": "176.1 lb",
+      "workout": "none"
+    }
+  }
+}

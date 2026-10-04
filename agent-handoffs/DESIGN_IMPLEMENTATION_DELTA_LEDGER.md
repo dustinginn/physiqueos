@@ -49,6 +49,28 @@ Do not silently fix these during design-only tasks.
 
 ## Open implementation deltas
 
+### Home Screen Widget — refresh action hit target
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION / ACCESSIBILITY
+
+Discovery:
+Final Design Batch 3 Home Screen Widget source audit against Native Build 85.
+Report: `agent-handoffs/reports/20261004T213658Z-final-design-batch3-home-screen-widget.md`
+
+Current Build 85 behavior:
+The independent widget refresh action has a `24 × 24 pt` frame in `systemSmall` and a `28 × 28 pt` frame in `systemLarge`. Its accessibility label is correct, but its effective hit region is smaller than the practical 44 pt target used by the locked design system. The small widget's Start/Resume behavior remains safe because the whole small widget owns that workout deep link; this delta is only the separate refresh control.
+
+Accepted/required target:
+Keep the same refresh behavior and compact visible glyph while providing an effective target of at least 44 × 44 pt in both supported widget families. Do not add a new control or enlarge the header visually.
+
+Implementation implication:
+Use padding/content shape/layout that expands the interactive region without crowding or overlapping the freshness label. Reverify WidgetKit interaction routing so the refresh AppIntent/link remains distinct from the small widget's whole-widget workout URL.
+
+Acceptance:
+On `systemSmall` and `systemLarge`, the visible refresh glyph remains compact, the effective target is at least 44 × 44 pt, VoiceOver announces “Refresh totals in PhysiqueOS,” and tapping it never triggers Start/Resume or a metric destination.
+
+Status: OPEN.
+
 ### Operating Plan Energy — production phase-history projection
 
 Classification: REQUIRED FOR DESIGN IMPLEMENTATION
