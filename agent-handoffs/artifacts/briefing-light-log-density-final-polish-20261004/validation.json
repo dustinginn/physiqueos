@@ -1,0 +1,925 @@
+{
+  "pass": true,
+  "authorities": {
+    "prompt": "bd1887ab95b5c8519ba6c8b0f792d038a71ffb41",
+    "nativeBuild85": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "productionServer": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "acceptedBriefingPair": "5284ed16539664574eff4d55fb336fc061361ae5",
+    "lockedLogExploration": "ec425a96b2f4b726fd75ed8e3b45a8159c6e4ae8"
+  },
+  "target": {
+    "widthPoints": 402,
+    "scale": 3,
+    "viewportHeightPoints": 874
+  },
+  "briefingRenders": {
+    "weekly": {
+      "cadence": "weekly",
+      "widthPoints": 402,
+      "heightPoints": 3860,
+      "semantic": {
+        "weekly.periodLabel": "Completed week",
+        "weekly.reportingRangeLabel": "Aug 23–Aug 29",
+        "weekly.confidence.score": "68",
+        "weekly.confidence.band": "moderate",
+        "weekly.confidence.movementDirection": "increased",
+        "weekly.confidence.delta": "5",
+        "weekly.confidence.primaryReason": "Two consistent weeks into the controlled surplus with steady training progression is a healthy early signal for the lean-mass build.",
+        "weekly.heroHeadline": "Two straight weeks of clean progression.",
+        "weekly.heroBody": "Every tracked lift either matched or beat last week's working numbers, and the surplus stayed inside the planned range all seven days.",
+        "weekly.strategyPhaseLabel": "Current strategy: Lean Mass Build",
+        "weekly.strategyWeekLabel": "Week 2",
+        "weekly.strategyNextMilestone": "Next: DEXA review, Oct 31",
+        "weekly.energy.pairedDayCount": "7",
+        "weekly.energy.eligibleDayCount": "7",
+        "weekly.energy.averageBalanceKcal": "350",
+        "weekly.energy.narrative": "A steady controlled surplus, right in the middle of the 2,750–2,850 kcal target range.",
+        "weekly.energy.averageIntakeKcal": "2790",
+        "weekly.energy.averageExpenditureKcal": "2440",
+        "weekly.weight.averageWeightLb": "170.6",
+        "weekly.weight.changeLb": "0.6",
+        "weekly.weight.narrative": "Up 0.6 lb on the weekly average — tracking the modeled controlled-surplus rate closely.",
+        "weekly.training.headline": "Performance became the lead early indicator.",
+        "weekly.training.narrative": "Bench and lower-body work both progressed; arms and back held steady. The useful signal is broad progression across distinct movement patterns, not one isolated record.",
+        "weekly.training.trainingDayCount": "4",
+        "weekly.training.comparableCategoryCount": "4",
+        "weekly.training.improvingCount": "2",
+        "weekly.training.steadyCount": "2",
+        "weekly.training.plateauingCount": "1",
+        "weekly.training.highlights.0.exerciseName": "Lat Pulldown",
+        "weekly.training.highlights.0.recordType": "Volume PR",
+        "weekly.training.highlights.0.performanceValue": "3,340 lb volume",
+        "weekly.training.highlights.0.delta": "+280 lb",
+        "weekly.training.highlights.0.detail": "3,340 lb of working volume, 280 lb above the prior comparable session.",
+        "weekly.training.highlights.1.exerciseName": "Barbell Bench Press",
+        "weekly.training.highlights.1.recordType": "Reps at Load",
+        "weekly.training.highlights.1.performanceValue": "9 reps at 155 lb",
+        "weekly.training.highlights.1.delta": "+1 rep",
+        "weekly.training.highlights.1.detail": "The top working set improved without sacrificing the rest of the session.",
+        "weekly.training.highlights.2.exerciseName": "Overhead Triceps Extension",
+        "weekly.training.highlights.2.recordType": "Reps at Load",
+        "weekly.training.highlights.2.performanceValue": "12 reps at 45 lb",
+        "weekly.training.highlights.2.delta": "+2 reps",
+        "weekly.training.highlights.2.detail": "Two additional repetitions at the same working load.",
+        "weekly.training.priorityGroups.0.label": "Chest",
+        "weekly.training.priorityGroups.0.comparableExerciseCount": "3",
+        "weekly.training.priorityGroups.0.statusLabel": "Improving",
+        "weekly.training.priorityGroups.1.label": "Back",
+        "weekly.training.priorityGroups.1.comparableExerciseCount": "4",
+        "weekly.training.priorityGroups.1.statusLabel": "Improving",
+        "weekly.training.priorityGroups.2.label": "Shoulders",
+        "weekly.training.priorityGroups.2.comparableExerciseCount": "3",
+        "weekly.training.priorityGroups.2.statusLabel": "Steady",
+        "weekly.training.priorityGroups.3.label": "Legs",
+        "weekly.training.priorityGroups.3.comparableExerciseCount": "4",
+        "weekly.training.priorityGroups.3.statusLabel": "Plateauing",
+        "weekly.coachTake.biggestTakeaway": "The surplus is producing training progression without the scale running away.",
+        "weekly.coachTake.recommendation": "Hold the current intake and rhythm through the next DEXA rather than adjusting on scale weight alone.",
+        "weekly.coachTake.intoNextWeek.0": "Keep the surplus in the 2,750–2,850 kcal range.",
+        "weekly.coachTake.intoNextWeek.1": "Push for another working-weight increase on arms this week.",
+        "weekly.coachTake.intoNextWeek.2": "Log Thursday's workout the same day to avoid another late confirmation.",
+        "weekly.revision.reason": "A confirmed evidence review (Thursday's workout) arrived after the original publish and changed the week's training conclusion.",
+        "weekly.revision.previousHeadline": "A quiet week with one still-pending workout."
+      },
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "sections": [
+        "weekly-navigation",
+        "weekly-hero",
+        "weekly-energy",
+        "weekly-weight",
+        "weekly-body-composition",
+        "weekly-training",
+        "weekly-recovery",
+        "weekly-finale",
+        "weekly-provenance"
+      ],
+      "innerText": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nWEEKLY BRIEFING\nCompleted week\nAug 23–Aug 29\n68%\nCONFIDENCE\nMODERATE\nConfidence increased +5\n\nTwo consistent weeks into the controlled surplus with steady training progression is a healthy early signal for the lean-mass build.\n\nTwo straight weeks of clean progression.\n\nEvery tracked lift either matched or beat last week's working numbers, and the surplus stayed inside the planned range all seven days.\n\nSTRATEGY\nCurrent strategy: Lean Mass Build\nWEEK\nWeek 2\nNEXT\nNext: DEXA review, Oct 31\nϟ\nENERGY BALANCE\n7/7 days paired\nEnergy Balance\n\n+350 kcal/day above\n\nA steady controlled surplus, right in the middle of the 2,750–2,850 kcal target range.\n\nAVG INTAKE\n2790 kcal\nAVG EXPENDITURE\n2440 kcal\nAVG BALANCE\n+350 kcal\nDaily intake vs estimated expenditure\n23\n24\n25\n26\n27\n28\n29\nIntake\nEstimated expenditure\n↕\nWEIGHT CONTEXT\n170.6 lb\n+0.6 lb this week\n\nUp 0.6 lb on the weekly average — tracking the modeled controlled-surplus rate closely.\n\n◇\nBODY COMPOSITION\nJul 18\nBODY FAT\n8.2%\nLEAN MASS\n149.0 lb\nFAT MASS\n13.4 lb\n\nThis scan closed the goal: the numerical target and the visual confirmation converged.\n\nCurrent objective · Visible Abs at Rest · latest real available fixture context\n\n◆\nTRAINING RESPONSE\nPerformance became the lead early indicator.\n\nBench and lower-body work both progressed; arms and back held steady. The useful signal is broad progression across distinct movement patterns, not one isolated record.\n\n4 training days · 4 reviewed categories · 2 improving · 2 steady · 1 plateauing\n\n🔥 Highlights\nLat Pulldown\nVOLUME PR\n3,340 lb volume\n▲ +280 lb\n3,340 lb of working volume, 280 lb above the prior comparable session.\nBarbell Bench Press\nREPS AT LOAD\n9 reps at 155 lb\n▲ +1 rep\nThe top working set improved without sacrificing the rest of the session.\nOverhead Triceps Extension\nREPS AT LOAD\n12 reps at 45 lb\n▲ +2 reps\nTwo additional repetitions at the same working load.\n🎯 Priority Muscle Groups\nChest\n3 exercises\nImproving\nBack\n4 exercises\nImproving\nShoulders\n3 exercises\nSteady\nLegs\n4 exercises\nPlateauing\n◒\nRECOVERY\nFUTURE CONTRACT · FIXTURE ONLY\nSleep stayed in your usual range\n6h 47m average · 7 of 7 nights\nGreen\n6h 47m\nPERIOD AVERAGE\n28-night baseline · 6h 45m\nPERSONAL BASELINE\nSu\nMo\nTu\nWe\nTh\nFr\nSa\nFoam rolling\nThree misses · status unchanged\n4 of 7 completed\n\nPersonal baseline excludes this period. Foam rolling cannot change status. Associations do not imply causation. Confidence coupling: none.\n\nCOACH'S TAKE\n💡 Biggest Takeaway\n\nThe surplus is producing training progression without the scale running away.\n\n🧠 What To Do\n\nHold the current intake and rhythm through the next DEXA rather than adjusting on scale weight alone.\n\n🎯 Into Next Week\n1\n\nKeep the surplus in the 2,750–2,850 kcal range.\n\n2\n\nPush for another working-weight increase on arms this week.\n\n3\n\nLog Thursday's workout the same day to avoid another late confirmation.\n\nThis Briefing was revised\n\nA confirmed evidence review (Thursday's workout) arrived after the original publish and changed the week's training conclusion.\n\nFirst published Aug 30, 9:15 AM · A quiet week with one still-pending workout.",
+      "energy": {
+        "pointCount": 7,
+        "marks": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "sourceKey": "weekly.energy.dailyBalances.0.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "sourceKey": "weekly.energy.dailyBalances.0.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "sourceKey": "weekly.energy.dailyBalances.1.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "sourceKey": "weekly.energy.dailyBalances.1.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "sourceKey": "weekly.energy.dailyBalances.2.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "sourceKey": "weekly.energy.dailyBalances.2.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "sourceKey": "weekly.energy.dailyBalances.3.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "sourceKey": "weekly.energy.dailyBalances.3.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "sourceKey": "weekly.energy.dailyBalances.4.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "sourceKey": "weekly.energy.dailyBalances.4.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "sourceKey": "weekly.energy.dailyBalances.5.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "sourceKey": "weekly.energy.dailyBalances.5.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "sourceKey": "weekly.energy.dailyBalances.6.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "sourceKey": "weekly.energy.dailyBalances.6.expenditureKcal"
+          }
+        ],
+        "label": "Daily intake and estimated expenditure across 7 days"
+      },
+      "recovery": {
+        "points": [
+          403,
+          412,
+          395,
+          418,
+          407,
+          399,
+          416
+        ],
+        "label": "weekly Sleep trend: Su 403 minutes, Mo 412 minutes, Tu 395 minutes, We 418 minutes, Th 407 minutes, Fr 399 minutes, Sa 416 minutes. Baseline 405 minutes. Status Green.",
+        "fixtureOnly": "true",
+        "confidenceCoupling": "none",
+        "status": "Green"
+      },
+      "surfaces": {
+        "energy": {
+          "background": "rgba(0, 0, 0, 0) linear-gradient(145deg, rgb(238, 229, 213), rgb(229, 236, 232) 72%) repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "18px"
+        },
+        "weight": {
+          "background": "rgba(0, 0, 0, 0) none repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "0px"
+        },
+        "body-composition": {
+          "background": "rgb(233, 229, 241) none repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "0px"
+        },
+        "training": {
+          "background": "rgba(0, 0, 0, 0) linear-gradient(145deg, rgb(223, 236, 230), rgb(232, 239, 235)) repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "18px"
+        },
+        "recovery": {
+          "background": "rgba(0, 0, 0, 0) linear-gradient(120deg, rgb(225, 239, 234), rgb(235, 232, 242) 72%) repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "18px"
+        },
+        "finale": {
+          "background": "rgba(0, 0, 0, 0) linear-gradient(120deg, rgb(220, 231, 235), rgb(230, 226, 239)) repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "0px"
+        }
+      },
+      "priorityContent": [
+        {
+          "label": "Chest",
+          "status": "Improving",
+          "count": "3 exercises"
+        },
+        {
+          "label": "Back",
+          "status": "Improving",
+          "count": "4 exercises"
+        },
+        {
+          "label": "Shoulders",
+          "status": "Steady",
+          "count": "3 exercises"
+        },
+        {
+          "label": "Legs",
+          "status": "Plateauing",
+          "count": "4 exercises"
+        }
+      ],
+      "priorityGridColumns": "177px 177px",
+      "essentialSizes": [
+        15,
+        15,
+        15,
+        15,
+        15,
+        12,
+        11,
+        11,
+        12,
+        11,
+        11,
+        12,
+        11,
+        11,
+        12,
+        11,
+        11,
+        15,
+        15,
+        15,
+        15,
+        15
+      ],
+      "photosAbsent": true,
+      "unresolvedAbsent": true,
+      "sectionOrderExact": true,
+      "energyExact": true,
+      "recoveryExact": true,
+      "surfaceRhythmPass": true,
+      "accessibilityPass": true,
+      "pass": true
+    },
+    "midweek": {
+      "cadence": "midweek",
+      "widthPoints": 402,
+      "heightPoints": 3015,
+      "semantic": {
+        "midweek.lead.eyebrow": "MIDWEEK BRIEFING",
+        "midweek.evidenceWindow.displayRange": "Sep 20–22",
+        "midweek.lead.confidence.score": "79",
+        "midweek.lead.confidence.band": "high",
+        "midweek.lead.confidence.movementLabel": "— No meaningful change",
+        "midweek.lead.confidence.reason": "Training stayed consistent and Confidence held steady.",
+        "midweek.lead.headline": "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.",
+        "midweek.lead.meaning": "Building Lean Mass, training stayed on track through midweek.",
+        "midweek.lead.goal": "Build Lean Mass",
+        "midweek.lead.phase": "Lean Mass Build",
+        "midweek.energy.headline": "Energy Balance",
+        "midweek.energy.balanceHeadline": "50 kcal/day below",
+        "midweek.energy.dailyBalances.0.weekday": "Sunday",
+        "midweek.energy.dailyBalances.1.weekday": "Monday",
+        "midweek.energy.averageIntakeKcal": "2650",
+        "midweek.energy.averageExpenditureKcal": "2700",
+        "midweek.energy.chartTitle": "Daily intake vs estimated expenditure",
+        "midweek.weight.averageWeightLb": "178.4",
+        "midweek.weight.changeLb": "-0.6",
+        "midweek.bodyComposition.scanDateDisplay": "Sep 21",
+        "midweek.bodyComposition.bodyFatPercent": "14.2%",
+        "midweek.bodyComposition.leanMassLb": "152 lb",
+        "midweek.bodyComposition.fatMassLb": "25.1 lb",
+        "midweek.training.headline": "Training stayed on track.",
+        "midweek.training.trainingDayCount": "3",
+        "midweek.training.comparableCategoryCount": "5",
+        "midweek.training.improvingCount": "2",
+        "midweek.training.steadyCount": "3",
+        "midweek.training.highlights.0.exerciseName": "Lateral Raises Machine",
+        "midweek.training.highlights.0.recordType": "Heaviest Load",
+        "midweek.training.highlights.0.performanceValue": "90 lb",
+        "midweek.training.highlights.0.delta": "+5 lb",
+        "midweek.training.highlights.0.headline": "New heaviest load.",
+        "midweek.training.highlights.0.detail": "Up from 85 lb on Sep 22.",
+        "midweek.training.highlights.1.exerciseName": "Leg Extensions",
+        "midweek.training.highlights.1.recordType": "Heaviest Load",
+        "midweek.training.highlights.1.performanceValue": "90 lb",
+        "midweek.training.highlights.1.delta": "+10 lb",
+        "midweek.training.highlights.1.headline": "New heaviest load.",
+        "midweek.training.highlights.1.detail": "Up from 80 lb on Sep 21.",
+        "midweek.coaching.action": "Keep loading presses through Friday.",
+        "midweek.coaching.watch": "Watch sleep consistency this week."
+      },
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "sections": [
+        "midweek-navigation",
+        "midweek-hero",
+        "midweek-energy",
+        "midweek-weight",
+        "midweek-body-composition",
+        "midweek-training",
+        "midweek-recovery",
+        "midweek-finale",
+        "midweek-provenance"
+      ],
+      "innerText": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nMIDWEEK BRIEFING\nSep 20–22\n79%\nCONFIDENCE\nHIGH\n— No meaningful change\n\nTraining stayed consistent and Confidence held steady.\n\nMachine lateral raises reached 90 lb, up from the previous best of 85 lb.\n\nBuilding Lean Mass, training stayed on track through midweek.\n\nGOAL & PHASE\nBuild Lean Mass · Lean Mass Build\nϟ\nENERGY BALANCE\n2/2 days paired\nEnergy Balance\n\n50 kcal/day below\n\nSunday\n−80 kcal\nMonday\n−20 kcal\nAVG INTAKE\n2650 kcal\nAVG EXPENDITURE\n2700 kcal\nAVG BALANCE\n−50 kcal\nDaily intake vs estimated expenditure\nSu\nMo\nIntake\nEstimated expenditure\n↕\nWEIGHT CONTEXT\n178.4 lb\n−0.6 lb\n\nSunday–Tuesday average · 3 observations\n\n◇\nBODY COMPOSITION\nSep 21\nBODY FAT\n14.2%\nLEAN MASS\n152 lb\nFAT MASS\n25.1 lb\n◆\nTRAINING RESPONSE\nTraining stayed on track.\n\n3 training days · 5 reviewed categories · 2 improving · 3 steady\n\n● 2 improving\n■ 3 steady\n🔥 Highlights\nLateral Raises Machine\nHEAVIEST LOAD\n90 lb\n▲ +5 lb\nNew heaviest load. Up from 85 lb on Sep 22.\nLeg Extensions\nHEAVIEST LOAD\n90 lb\n▲ +10 lb\nNew heaviest load. Up from 80 lb on Sep 21.\n◒\nRECOVERY\nFUTURE CONTRACT · FIXTURE ONLY\nSleep stayed in your usual range\n6h 52m average · 3 of 3 nights\nGreen\n6h 52m\nPERIOD AVERAGE\n28-night baseline · 6h 45m\nPERSONAL BASELINE\nSu\nMo\nTu\nFoam rolling\nOne miss · status unchanged\n2 of 3 completed\n\nPersonal baseline excludes this period. Foam rolling cannot change status. Associations do not imply causation. Confidence coupling: none.\n\nCOACH'S TAKE\n💡 Biggest Takeaway\n\nLeg extensions also reached 90 lb, a second strong movement this week.\n\n🧠 What To Do\n\nKeep loading presses through Friday.\n\n👀 What To Watch\n\nWatch sleep consistency this week.\n\nCurrent production-shaped V3 fixture\n\nSep 20–22 · canonical Narrative V3 and Confidence V3 projection",
+      "energy": {
+        "pointCount": 2,
+        "marks": [
+          {
+            "series": "Intake",
+            "value": 2600,
+            "sourceKey": "midweek.energy.dailyBalances.0.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2680,
+            "sourceKey": "midweek.energy.dailyBalances.0.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2700,
+            "sourceKey": "midweek.energy.dailyBalances.1.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2720,
+            "sourceKey": "midweek.energy.dailyBalances.1.expenditureKcal"
+          }
+        ],
+        "label": "Daily intake and estimated expenditure across 2 days"
+      },
+      "recovery": {
+        "points": [
+          407,
+          419,
+          411
+        ],
+        "label": "midweek Sleep trend: Su 407 minutes, Mo 419 minutes, Tu 411 minutes. Baseline 405 minutes. Status Green.",
+        "fixtureOnly": "true",
+        "confidenceCoupling": "none",
+        "status": "Green"
+      },
+      "surfaces": {
+        "energy": {
+          "background": "rgba(0, 0, 0, 0) linear-gradient(145deg, rgb(238, 229, 213), rgb(229, 236, 232) 72%) repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "18px"
+        },
+        "weight": {
+          "background": "rgba(0, 0, 0, 0) none repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "0px"
+        },
+        "body-composition": {
+          "background": "rgb(233, 229, 241) none repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "0px"
+        },
+        "training": {
+          "background": "rgba(0, 0, 0, 0) linear-gradient(145deg, rgb(223, 236, 230), rgb(232, 239, 235)) repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "18px"
+        },
+        "recovery": {
+          "background": "rgba(0, 0, 0, 0) linear-gradient(120deg, rgb(225, 239, 234), rgb(235, 232, 242) 72%) repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "18px"
+        },
+        "finale": {
+          "background": "rgba(0, 0, 0, 0) linear-gradient(120deg, rgb(220, 231, 235), rgb(230, 226, 239)) repeat scroll 0% 0% / auto padding-box border-box",
+          "borderRadius": "0px"
+        }
+      },
+      "priorityContent": [],
+      "priorityGridColumns": null,
+      "essentialSizes": [
+        15,
+        15,
+        15,
+        15,
+        15
+      ],
+      "photosAbsent": true,
+      "unresolvedAbsent": true,
+      "sectionOrderExact": true,
+      "energyExact": true,
+      "recoveryExact": true,
+      "surfaceRhythmPass": true,
+      "accessibilityPass": true,
+      "pass": true
+    }
+  },
+  "priorityCompaction": {
+    "oldHeightPoints": 254,
+    "newHeightPoints": 143,
+    "reductionPoints": 111,
+    "reductionPercent": 44,
+    "exactSemanticContent": true,
+    "twoColumnLeftAligned": true
+  },
+  "briefingContrast": {
+    "primaryMinimum": 12.157004463445046,
+    "secondaryMinimum": 4.877437772721468,
+    "accentChecks": {
+      "amberOnEnergy": 5.094723756607736,
+      "greenOnTraining": 5.358524116801364,
+      "purpleOnBody": 4.993660397648088,
+      "cyanOnRecovery": 5.627628413223314
+    },
+    "pass": true
+  },
+  "logRenders": {
+    "dark": {
+      "theme": "dark",
+      "widthPoints": 402,
+      "heightPoints": 989,
+      "innerText": "1:05\n▮▮▮ ᯤ ▰\nLOG\nWhat happened?\nUpload a screenshot, photo, PDF, or note and PhysiqueOS will organize it.\nTraining Logger\n\nStart a workout or log a past workout with exercises, sets, variants, and supersets.\n\n◆\nLogged Today\n2026-10-03\nTRAINING\nStrength Training · 64 min\nStair Stepper · 13 min\nNUTRITION\n2,516 calories\n215P · 161C · 111F\nACTIVITY\n771 active calories so far\nWEIGHT\n176.7 lb\n⌁\nSources\nApple Health\nStair Stepper · Nutrition · Activity\nPhysiqueOS Logger\nStrength Training\nWeight\nSource unavailable\nUPLOADS READY TO REVIEW\nFinish checking these uploads before adding them to your history.\nCheck-in ready to review\n\nSaturday, October 3 · 1 weight entry\n\nReview before adding to your history →\nLog weight for another date\n＋\nAdd evidence\n⇧\nAdd details without an asset\nUpload · Add photos, files, or a note.\n⌂\nHome\n◎\nGoals\n＋\nLog\n◫\nEvidence\n●\nYou",
+      "semantics": {
+        "header.eyebrow": "Log",
+        "header.title": "What happened?",
+        "header.subtitle": "Upload a screenshot, photo, PDF, or note and PhysiqueOS will organize it.",
+        "trainingLogger.title": "Training Logger",
+        "trainingLogger.subtitle": "Start a workout or log a past workout with exercises, sets, variants, and supersets.",
+        "trainingLogger.destination": "training.logger",
+        "loggedToday.title": "Logged Today",
+        "localDate": "2026-10-03",
+        "loggedToday.rows.0.label": "Training",
+        "loggedToday.rows.0.lines.0.summary": "Strength Training · 64 min",
+        "loggedToday.rows.0.lines.0.kind": "logger",
+        "loggedToday.rows.0.lines.1.summary": "Stair Stepper · 13 min",
+        "loggedToday.rows.0.lines.1.kind": "cardio",
+        "loggedToday.rows.0.context": "",
+        "loggedToday.rows.0.kind": "training",
+        "loggedToday.rows.0.summary": "Strength Training · 64 min, Stair Stepper · 13 min",
+        "loggedToday.rows.0.destination": "training.day:2026-10-03",
+        "loggedToday.rows.1.label": "Nutrition",
+        "loggedToday.rows.1.summary": "2,516 calories",
+        "loggedToday.rows.1.context": "215P · 161C · 111F",
+        "loggedToday.rows.1.kind": "nutrition",
+        "loggedToday.rows.1.destination": "nutrition.day:nutrition-day-2026-10-03",
+        "loggedToday.rows.2.label": "Activity",
+        "loggedToday.rows.2.summary": "771 active calories so far",
+        "loggedToday.rows.2.context": "",
+        "loggedToday.rows.2.kind": "activity",
+        "loggedToday.rows.2.destination": "activity.day:2026-10-03",
+        "loggedToday.rows.3.label": "Weight",
+        "loggedToday.rows.3.summary": "176.7 lb",
+        "loggedToday.rows.3.context": "",
+        "loggedToday.rows.3.kind": "weight",
+        "loggedToday.rows.3.destination": "progress.stream:weight",
+        "loggedToday.sources.title": "Sources",
+        "loggedToday.sources.0.source": "Apple Health",
+        "loggedToday.sources.0.scope": "Stair Stepper · Nutrition · Activity",
+        "loggedToday.sources.1.source": "PhysiqueOS Logger",
+        "loggedToday.sources.1.scope": "Strength Training",
+        "loggedToday.sources.2.source": "Weight",
+        "loggedToday.sources.2.scope": "Source unavailable",
+        "pendingEvidenceReviews.sectionTitle": "Uploads ready to review",
+        "pendingEvidenceReviews.sectionSubtitle": "Finish checking these uploads before adding them to your history.",
+        "pendingEvidenceReviews.items.0.title": "Check-in ready to review",
+        "pendingEvidenceReviews.items.0.date": "Saturday, October 3",
+        "pendingEvidenceReviews.items.0.summary": "1 weight entry",
+        "pendingEvidenceReviews.items.0.actionLabel": "Review before adding to your history",
+        "pendingEvidenceReviews.items.0.id": "review-weight-2026-10-03",
+        "pendingEvidenceReviews.items.0.likelyDuplicate": "false",
+        "pendingEvidenceReviews.items.0.destination": "evidence.review:review-weight-2026-10-03",
+        "weightAction.label": "Log weight for another date",
+        "weightAction.destination": "manual.weigh-in",
+        "upload.primaryAction": "Add evidence",
+        "upload.secondaryAction": "Add details without an asset",
+        "upload.title": "Upload",
+        "upload.subtitle": "Add photos, files, or a note.",
+        "upload.destination": "evidence.intake",
+        "viewState": "loaded",
+        "upload.sourceOptions.0": "Photos",
+        "upload.sourceOptions.1": "Files",
+        "navigation.0": "Home",
+        "navigation.1": "Goals",
+        "navigation.2": "Log",
+        "navigation.3": "Evidence",
+        "navigation.4": "You"
+      },
+      "sectionGeometry": [
+        {
+          "section": "log-header",
+          "x": 16,
+          "y": 67,
+          "width": 370,
+          "height": 102
+        },
+        {
+          "section": "log-training-logger",
+          "x": 16,
+          "y": 175,
+          "width": 370,
+          "height": 96
+        },
+        {
+          "section": "log-today",
+          "x": 16,
+          "y": 271,
+          "width": 370,
+          "height": 352
+        },
+        {
+          "section": "log-sources",
+          "x": 16,
+          "y": 506,
+          "width": 370,
+          "height": 115
+        },
+        {
+          "section": "log-review",
+          "x": 16,
+          "y": 631,
+          "width": 370,
+          "height": 134
+        },
+        {
+          "section": "log-quick-actions",
+          "x": 16,
+          "y": 774,
+          "width": 370,
+          "height": 60
+        }
+      ],
+      "tileText": [
+        "TRAINING\nStrength Training · 64 min\nStair Stepper · 13 min",
+        "NUTRITION\n2,516 calories\n215P · 161C · 111F",
+        "ACTIVITY\n771 active calories so far",
+        "WEIGHT\n176.7 lb"
+      ],
+      "sourcesText": "⌁\nSources\nApple Health\nStair Stepper · Nutrition · Activity\nPhysiqueOS Logger\nStrength Training\nWeight\nSource unavailable",
+      "sourceAria": "Evidence sources",
+      "appleHealthInsideTiles": false,
+      "targets": [
+        {
+          "text": "Training Logger\n\nStart a workout or log a past workout with exercises, sets, variants, and supersets.\n\n◆",
+          "height": 96
+        },
+        {
+          "text": "TRAINING\nStrength Training · 64 min\nStair Stepper · 13 min",
+          "height": 104
+        },
+        {
+          "text": "NUTRITION\n2,516 calories\n215P · 161C · 111F",
+          "height": 104
+        },
+        {
+          "text": "ACTIVITY\n771 active calories so far",
+          "height": 74
+        },
+        {
+          "text": "WEIGHT\n176.7 lb",
+          "height": 74
+        },
+        {
+          "text": "Log weight for another date\n＋",
+          "height": 60
+        },
+        {
+          "text": "Add evidence\n⇧",
+          "height": 60
+        },
+        {
+          "text": "Add details without an asset",
+          "height": 44
+        },
+        {
+          "text": "⌂\nHome",
+          "height": 44
+        },
+        {
+          "text": "◎\nGoals",
+          "height": 44
+        },
+        {
+          "text": "＋\nLog",
+          "height": 44
+        },
+        {
+          "text": "◫\nEvidence",
+          "height": 44
+        },
+        {
+          "text": "●\nYou",
+          "height": 44
+        }
+      ],
+      "visibleSizes": [
+        11,
+        11,
+        13,
+        13,
+        13,
+        13,
+        13,
+        11,
+        11,
+        13,
+        13,
+        12,
+        12,
+        11,
+        11,
+        13,
+        13,
+        11,
+        11,
+        13,
+        13,
+        12,
+        12,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        12,
+        12,
+        14,
+        14,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        13
+      ]
+    },
+    "light": {
+      "theme": "light",
+      "widthPoints": 402,
+      "heightPoints": 989,
+      "innerText": "1:05\n▮▮▮ ᯤ ▰\nLOG\nWhat happened?\nUpload a screenshot, photo, PDF, or note and PhysiqueOS will organize it.\nTraining Logger\n\nStart a workout or log a past workout with exercises, sets, variants, and supersets.\n\n◆\nLogged Today\n2026-10-03\nTRAINING\nStrength Training · 64 min\nStair Stepper · 13 min\nNUTRITION\n2,516 calories\n215P · 161C · 111F\nACTIVITY\n771 active calories so far\nWEIGHT\n176.7 lb\n⌁\nSources\nApple Health\nStair Stepper · Nutrition · Activity\nPhysiqueOS Logger\nStrength Training\nWeight\nSource unavailable\nUPLOADS READY TO REVIEW\nFinish checking these uploads before adding them to your history.\nCheck-in ready to review\n\nSaturday, October 3 · 1 weight entry\n\nReview before adding to your history →\nLog weight for another date\n＋\nAdd evidence\n⇧\nAdd details without an asset\nUpload · Add photos, files, or a note.\n⌂\nHome\n◎\nGoals\n＋\nLog\n◫\nEvidence\n●\nYou",
+      "semantics": {
+        "header.eyebrow": "Log",
+        "header.title": "What happened?",
+        "header.subtitle": "Upload a screenshot, photo, PDF, or note and PhysiqueOS will organize it.",
+        "trainingLogger.title": "Training Logger",
+        "trainingLogger.subtitle": "Start a workout or log a past workout with exercises, sets, variants, and supersets.",
+        "trainingLogger.destination": "training.logger",
+        "loggedToday.title": "Logged Today",
+        "localDate": "2026-10-03",
+        "loggedToday.rows.0.label": "Training",
+        "loggedToday.rows.0.lines.0.summary": "Strength Training · 64 min",
+        "loggedToday.rows.0.lines.0.kind": "logger",
+        "loggedToday.rows.0.lines.1.summary": "Stair Stepper · 13 min",
+        "loggedToday.rows.0.lines.1.kind": "cardio",
+        "loggedToday.rows.0.context": "",
+        "loggedToday.rows.0.kind": "training",
+        "loggedToday.rows.0.summary": "Strength Training · 64 min, Stair Stepper · 13 min",
+        "loggedToday.rows.0.destination": "training.day:2026-10-03",
+        "loggedToday.rows.1.label": "Nutrition",
+        "loggedToday.rows.1.summary": "2,516 calories",
+        "loggedToday.rows.1.context": "215P · 161C · 111F",
+        "loggedToday.rows.1.kind": "nutrition",
+        "loggedToday.rows.1.destination": "nutrition.day:nutrition-day-2026-10-03",
+        "loggedToday.rows.2.label": "Activity",
+        "loggedToday.rows.2.summary": "771 active calories so far",
+        "loggedToday.rows.2.context": "",
+        "loggedToday.rows.2.kind": "activity",
+        "loggedToday.rows.2.destination": "activity.day:2026-10-03",
+        "loggedToday.rows.3.label": "Weight",
+        "loggedToday.rows.3.summary": "176.7 lb",
+        "loggedToday.rows.3.context": "",
+        "loggedToday.rows.3.kind": "weight",
+        "loggedToday.rows.3.destination": "progress.stream:weight",
+        "loggedToday.sources.title": "Sources",
+        "loggedToday.sources.0.source": "Apple Health",
+        "loggedToday.sources.0.scope": "Stair Stepper · Nutrition · Activity",
+        "loggedToday.sources.1.source": "PhysiqueOS Logger",
+        "loggedToday.sources.1.scope": "Strength Training",
+        "loggedToday.sources.2.source": "Weight",
+        "loggedToday.sources.2.scope": "Source unavailable",
+        "pendingEvidenceReviews.sectionTitle": "Uploads ready to review",
+        "pendingEvidenceReviews.sectionSubtitle": "Finish checking these uploads before adding them to your history.",
+        "pendingEvidenceReviews.items.0.title": "Check-in ready to review",
+        "pendingEvidenceReviews.items.0.date": "Saturday, October 3",
+        "pendingEvidenceReviews.items.0.summary": "1 weight entry",
+        "pendingEvidenceReviews.items.0.actionLabel": "Review before adding to your history",
+        "pendingEvidenceReviews.items.0.id": "review-weight-2026-10-03",
+        "pendingEvidenceReviews.items.0.likelyDuplicate": "false",
+        "pendingEvidenceReviews.items.0.destination": "evidence.review:review-weight-2026-10-03",
+        "weightAction.label": "Log weight for another date",
+        "weightAction.destination": "manual.weigh-in",
+        "upload.primaryAction": "Add evidence",
+        "upload.secondaryAction": "Add details without an asset",
+        "upload.title": "Upload",
+        "upload.subtitle": "Add photos, files, or a note.",
+        "upload.destination": "evidence.intake",
+        "viewState": "loaded",
+        "upload.sourceOptions.0": "Photos",
+        "upload.sourceOptions.1": "Files",
+        "navigation.0": "Home",
+        "navigation.1": "Goals",
+        "navigation.2": "Log",
+        "navigation.3": "Evidence",
+        "navigation.4": "You"
+      },
+      "sectionGeometry": [
+        {
+          "section": "log-header",
+          "x": 16,
+          "y": 67,
+          "width": 370,
+          "height": 102
+        },
+        {
+          "section": "log-training-logger",
+          "x": 16,
+          "y": 175,
+          "width": 370,
+          "height": 96
+        },
+        {
+          "section": "log-today",
+          "x": 16,
+          "y": 271,
+          "width": 370,
+          "height": 352
+        },
+        {
+          "section": "log-sources",
+          "x": 16,
+          "y": 506,
+          "width": 370,
+          "height": 115
+        },
+        {
+          "section": "log-review",
+          "x": 16,
+          "y": 631,
+          "width": 370,
+          "height": 134
+        },
+        {
+          "section": "log-quick-actions",
+          "x": 16,
+          "y": 774,
+          "width": 370,
+          "height": 60
+        }
+      ],
+      "tileText": [
+        "TRAINING\nStrength Training · 64 min\nStair Stepper · 13 min",
+        "NUTRITION\n2,516 calories\n215P · 161C · 111F",
+        "ACTIVITY\n771 active calories so far",
+        "WEIGHT\n176.7 lb"
+      ],
+      "sourcesText": "⌁\nSources\nApple Health\nStair Stepper · Nutrition · Activity\nPhysiqueOS Logger\nStrength Training\nWeight\nSource unavailable",
+      "sourceAria": "Evidence sources",
+      "appleHealthInsideTiles": false,
+      "targets": [
+        {
+          "text": "Training Logger\n\nStart a workout or log a past workout with exercises, sets, variants, and supersets.\n\n◆",
+          "height": 96
+        },
+        {
+          "text": "TRAINING\nStrength Training · 64 min\nStair Stepper · 13 min",
+          "height": 104
+        },
+        {
+          "text": "NUTRITION\n2,516 calories\n215P · 161C · 111F",
+          "height": 104
+        },
+        {
+          "text": "ACTIVITY\n771 active calories so far",
+          "height": 74
+        },
+        {
+          "text": "WEIGHT\n176.7 lb",
+          "height": 74
+        },
+        {
+          "text": "Log weight for another date\n＋",
+          "height": 60
+        },
+        {
+          "text": "Add evidence\n⇧",
+          "height": 60
+        },
+        {
+          "text": "Add details without an asset",
+          "height": 44
+        },
+        {
+          "text": "⌂\nHome",
+          "height": 44
+        },
+        {
+          "text": "◎\nGoals",
+          "height": 44
+        },
+        {
+          "text": "＋\nLog",
+          "height": 44
+        },
+        {
+          "text": "◫\nEvidence",
+          "height": 44
+        },
+        {
+          "text": "●\nYou",
+          "height": 44
+        }
+      ],
+      "visibleSizes": [
+        11,
+        11,
+        13,
+        13,
+        13,
+        13,
+        13,
+        11,
+        11,
+        13,
+        13,
+        12,
+        12,
+        11,
+        11,
+        13,
+        13,
+        11,
+        11,
+        13,
+        13,
+        12,
+        12,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        11,
+        12,
+        12,
+        14,
+        14,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        13
+      ]
+    }
+  },
+  "logParity": {
+    "contentExact": true,
+    "semanticsExact": true,
+    "geometryExact": true,
+    "heightExact": true,
+    "pass": true
+  },
+  "logContentValidation": {
+    "allRequiredPresent": true,
+    "cooldownAbsent": true,
+    "appleHealthCentralized": true,
+    "sourceMappingExact": true,
+    "allTargetsAtLeast44": true,
+    "noTinyType": true,
+    "sourceVoiceOverGroup": true,
+    "pass": true
+  },
+  "shippingIsolation": {
+    "nativeChanged": false,
+    "serverChanged": false,
+    "recoveryActivated": false,
+    "buildCreated": false
+  }
+}

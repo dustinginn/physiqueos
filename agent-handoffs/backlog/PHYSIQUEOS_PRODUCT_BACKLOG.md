@@ -140,7 +140,7 @@ FUTURE MAJOR PROJECTS (roadmap only — NOT started; do not implement without a 
 
 F1. App-wide UI/design polish
 Position: design exploration active; shipping implementation not started.
-Current state: Home direction locked in dark/mineral light; Log Compact Command Center direction locked in dark/mineral light; Weekly **B Immersive Story hero + C Dense Analytical body is LOCKED** as the briefing-family visual reference. The dark recurring-family refinement is now ready for Founder review: Weekly and Midweek share the same core section inventory; Photos and the invalid standing Still Unresolved section are absent; Body Composition is represented in both when real context exists; Midweek gains its exact canonical Biggest Takeaway; Weight typography is aligned; and both cadences use graph-driven future-only Recovery fixtures with no Confidence coupling. Validation covers 104 canonical semantic fields, both Energy graphs, both Sleep graphs and all Founder-authorized changes. Midweek and this structural refinement remain exploration; no implementation has started. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
+Current state: Home direction locked in dark/mineral light; Log Compact Command Center direction locked in dark/mineral light; Weekly **B Immersive Story hero + C Dense Analytical body is LOCKED** as the briefing-family visual reference. Weekly/Midweek now share the approved recurring section family, and the final mineral-light surface-rhythm pass plus locked Log realistic-density/source treatment are ready for Founder review. Photos and the invalid standing Still Unresolved section are absent; Body Composition appears directly below Weight; Midweek carries its exact canonical Biggest Takeaway; Weight typography is aligned; Recovery remains graph-driven, future-only and uncoupled from Confidence; Weekly Priority Muscle Groups have a measured compact candidate. No implementation has started. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
 Scope boundary: no Native implementation, Server behavior, production content projection, Recovery activation, build or TestFlight work is authorized by the exploration.
 
 Recurring Briefing implementation backlog, not started:
@@ -157,6 +157,13 @@ Final appearance-translation review state:
 - Corrected dark Weekly, unchanged dark Midweek, and direct mineral-light versions of both are ready at `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/`.
 - Automated proof confirms exact dark/light content, semantics, geometry, Energy graphs, Recovery graphs and page-height parity. The accepted dark Midweek is structurally unchanged; all dark Weekly sections are unchanged apart from the authorized Body Composition move.
 - Do not mark Weekly/Midweek dark + mineral light locked until the Founder confirms this final set.
+
+Final polish review state:
+- Selective mineral-light surface rhythm for Weekly/Midweek is ready at `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/`; exact content/order/graphs remain unchanged.
+- Weekly Priority Muscle Groups compact candidate preserves all canonical labels/statuses/counts and reduces the measured block from 254 pt to 143 pt.
+- Locked Log Compact Command Center realistic-density candidate covers simultaneous Strength + Cardio, calories + P/C/F, Activity, Weight and pending review in dark/mineral light with exact appearance parity.
+- Centralized Log source/provenance candidate removes repeated Apple Health tile copy while preserving scope; Weight remains explicitly source-unavailable because the current Log projection exposes no Weight provenance.
+- Implementation remains not started. Do not mark the light polish, muscle-group compaction or source treatment locked until Founder acceptance.
 
 F2. Briefing Narrative + Confidence quality/tuning audit
 Position: next major strategic-quality project.
