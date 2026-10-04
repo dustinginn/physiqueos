@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-10-04T20:42:47Z",
+  "authority": {
+    "prompt_commit": "961c61236a43d4edb22a30c1884bd5b722c305fd",
+    "native_build": 85,
+    "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+  },
+  "enumeration": {
+    "app_destination_cases": 46,
+    "top_level_tabs": 5,
+    "presentation_modifiers_audited": 41,
+    "material_surface_state_groups": 98
+  },
+  "classification_counts": {
+    "A": 64,
+    "B": 15,
+    "C": 9,
+    "D": 10,
+    "E": 0
+  },
+  "remaining_design_ids": [
+    "H02",
+    "L04",
+    "L05",
+    "B06",
+    "E20",
+    "E21",
+    "E22",
+    "E23",
+    "U04"
+  ],
+  "assertions": {
+    "operating_plan_fully_locked": true,
+    "all_app_destinations_classified": true,
+    "all_material_sheets_and_covers_classified": true,
+    "watch_live_activity_and_widget_checked": true,
+    "system_owned_surfaces_checked": true,
+    "diagnostic_and_sandbox_surfaces_separated": true,
+    "implementation_delta_ledger_reviewed": true,
+    "new_implementation_deltas_added": 0,
+    "shipping_native_changed": false,
+    "server_changed": false,
+    "redesign_rendered": false
+  },
+  "result": "pass"
+}

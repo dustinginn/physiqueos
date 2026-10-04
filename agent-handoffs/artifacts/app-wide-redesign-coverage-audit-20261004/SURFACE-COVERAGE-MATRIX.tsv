@@ -1,0 +1,99 @@
+id	family	surface_or_state	route_or_entry	classification	authority_or_reason
+S01	App shell	Five-tab root and bottom navigation	RootTabView	A	Locked Home family establishes the shared dark and Mineral Light shell and tab grammar.
+S02	App shell	Home tab root	AppTab.home -> HomeView	A	Founder-locked Home target.
+S03	App shell	Goals tab root	AppTab.goals -> GoalsView	A	Founder-locked Goals target.
+S04	App shell	Log tab root	AppTab.log -> LogView	A	Founder-locked Compact Command Center.
+S05	App shell	Evidence tab root	AppTab.evidence -> EvidenceView	A	Founder-locked Evidence Hub.
+S06	App shell	You tab root	AppTab.you -> YouPlaceholderView today	A	Founder-locked You target replaces the placeholder without reopening its design.
+S07	App shell	Global Dark / Mineral Light / System appearance	PhysiqueOSApp + Settings Appearance target	A	Founder-locked appearance target; implementation delta is not missing design.
+S08	App shell	Navigation bars, back affordances, pull to refresh and tab reselection	NavigationStack / shared chrome	B	Use locked family chrome and native iOS behavior; no standalone composition is needed.
+H01	Home	Trajectory, goal journey, Guardrail, weight action, latest briefing and priorities	HomeView	A	Founder-locked Home.
+H02	Home	Confidence explanation sheet	HomeView.sheet -> ConfidenceDetailSheet	C	Reachable long-form factor sheet was not rendered or reviewed in Home rounds and has distinct hierarchy beyond the ring.
+H03	Home	Inline priority completion in-flight and failure alert	HomeView completion flow	B	Locked Home priority tile plus locked Priority Detail semantics; system alert requires no bespoke mockup.
+H04	Home	Notifications disabled and last-known-data notices	NotificationsDisabledNotice / LastKnownHomeNotice	B	Banner treatment inherits locked Home semantic fields and shared status language.
+H05	Home	Home loading, failed and refresh states	HomeView LoadState	B	No new information architecture; inherit locked Home skeleton/state treatment.
+G01	Goals	Goals index	goal root	A	Founder-locked Goals hierarchy.
+G02	Goals	Active Build Lean Mass detail and Your Journey	goalDetail(active)	A	Founder-locked Goals hierarchy.
+G03	Goals	Current and completed phase detail	goalPhase	A	Founder-locked Goals hierarchy.
+G04	Goals	Completed Visible Abs and first/final photos	goalDetail(completed)	A	Founder-locked completed Goal treatment; photos intentionally static.
+G05	Goals	Goal loading, empty, error and unavailable states	GoalsView / GoalUnavailableView	A	Directly included in the locked Goals coverage package.
+G06	Goals	Supporting objective unavailable state	goalDetail(supporting)	A	Explicitly audited and covered by locked Goals unavailable template.
+G07	Goals	Goal edit, transition, protocol transition and success tree	goalEdit / goalTransition / goalProtocolTransition / goalProtocolTransitionEdit / goalTransitionReview / goalTransitionSuccess	D	Sandbox-only or not linked by Founder Production current-state routes.
+G08	Goals	Phase transition wizard and Goal plan strategy editors	goalPhaseTransition / goalPlan	D	Founder Production routes unavailable; current writable flows are excluded from the production design program.
+L01	Log	Compact Command Center root and dense Logged Today	LogView	A	Founder-locked Log.
+L02	Log	Pending and processing review summaries	LogView conditional cards	A	Included in locked dense Log package.
+L03	Log	Training Logger doorway	trainingLogger entry card	A	Doorway is locked in Log; full flow is separately locked.
+L04	Daily capture	Morning Weigh-In / Morning Check-In reconciliation	checkIn(morning*) -> MorningCheckInView	C	High-frequency production form includes unfinished-priority dispositions, notes, weight validation, pending reconciliation and success; never received an explicit new-system pass.
+L05	Daily capture	Backdated/manual weight entry	manualWeighIn -> ManualWeighInView	C	Current destination is reachable from locked Log but the date/unit/save/error form itself was not reviewed.
+L06	Log	Log source disclosure and source chooser	UploadCardView / EvidenceSourceMenu	B	Collapsed Sources is Founder-locked; the compact chooser can inherit the same Log action grammar.
+B01	Briefings	Weekly briefing	briefingDetail(weekly)	A	Founder-locked recurring briefing.
+B02	Briefings	Midweek briefing	briefingDetail(midweek)	A	Founder-locked recurring briefing.
+B03	Briefings	Monthly briefing	briefingDetail(monthly)	A	Founder-locked recurring briefing.
+B04	Briefings	DEXA event briefing	briefingDetail(dexa)	A	Founder-locked event briefing.
+B05	Briefings	Photo event briefing	briefingDetail(photo)	A	Founder-locked event briefing.
+B06	Briefings	Briefing History index	briefingList -> BriefingHistoryView	C	Reachable chronological cross-cadence page still uses the old repeated-card list and was not part of any accepted full-page briefing render.
+B07	Briefings	Briefing loading, unavailable, revision banner and conditional-section states	BriefingDetailView shared states	B	Inherit locked briefing family; content/conditional behavior is already frozen.
+B08	Briefings	Single-photo and paired Previous/Current briefing viewers	PhotoInspectionViewer / accepted paired target	A	Viewer target was explicitly reviewed and locked; paired behavior remains an implementation delta only.
+E01	Evidence	Evidence Hub root and stream order	EvidenceView	A	Founder-locked Evidence Hub.
+E02	Training Evidence	Training landing	progressStream(training)	A	Founder-locked Training Evidence.
+E03	Training Evidence	Training day	trainingDay	A	Founder-locked Training Evidence.
+E04	Training Evidence	Training session and supporting media	trainingSession	A	Founder-locked Training Evidence.
+E05	Training Evidence	Training library root, area and exercise detail	progressStream(training/library) / trainingLibraryArea / trainingExercise	A	Founder-locked Training Evidence.
+E06	Training Evidence	Training reporting, analysis and history sheets	progressStream(training/reporting/*)	A	Founder-locked Training Evidence including intentional Foundation placeholders.
+E07	Nutrition Evidence	Nutrition landing and day detail	progressStream(nutrition) / nutritionDay	A	Founder-locked Nutrition Evidence.
+E08	Nutrition Evidence	Calories, macros, meals reporting and history sheets	progressStream(nutrition/reporting/*)	A	Founder-locked Nutrition Evidence.
+E09	Activity Evidence	Activity landing, day detail and all-history sheet	progressStream(activity) / activityDay	A	Founder-locked Activity Evidence.
+E10	Energy Evidence	Energy landing, weekly and daily history sheets	progressStream(energy)	A	Founder-locked Energy Evidence.
+E11	Weight Evidence	Weight root, inline weekly averages and history expansion	progressStream(weight)	A	Founder-locked Weight Evidence.
+E12	Recovery Evidence	Recovery root and recent nights	progressStream(recovery)	A	Founder-locked Recovery Evidence.
+E13	Recovery Evidence	Sleep Trends	progressStream(recovery/sleep/trends)	A	Founder-locked Recovery Evidence.
+E14	Recovery Evidence	Night detail and All Nights sheets	progressStream(recovery/sleep/day/*)	A	Founder-locked Recovery Evidence.
+E15	Progress Photos Evidence	Photos root, uploaded history and set/pose detail	progressStream(photos) / photoSetDetail	A	Founder-locked corrected Photos Evidence.
+E16	Progress Photos Evidence	Full-screen single-photo inspection	PhotoInspectionViewer	A	Explicitly audited and covered in locked Photos and Photo Briefing work.
+E17	DEXA Evidence	DEXA root, trend disclosures, scan history and BodySpec PDF sheet	progressStream(dexa)	A	Founder-locked corrected DEXA Evidence.
+E18	Timeline	Cross-domain read-only timeline	progressStream(timeline)	A	Founder-locked Timeline.
+E19	Evidence	Locked-family loading, empty, retry and media-failure states	Evidence view-model states	B	Existing accepted family matrices directly cover or map these shared states.
+E20	Evidence intake	Generic screenshot, photo, PDF, file, note and manual evidence intake	evidenceIntake / Log Add evidence -> ProductionEvidenceUploadView	C	Current production workflow has multiple capture modes, domain resolution, attachment progress and validation but no accepted new-system design.
+E21	Evidence intake	Progress Photos capture, pose identity and metadata confirmation	photoUpload -> ProductionEvidenceUploadView(.progressPhotos)	C	Material image-first form with pose/orientation/contraction, notices and multi-photo states needs direct review.
+E22	Evidence intake	DEXA upload and manual measurement entry	dexaUpload -> ProductionEvidenceUploadView(.dexa)	C	Material scan/PDF/manual-entry flow and unit validation was not covered by locked DEXA Evidence or DEXA Briefing pages.
+E23	Evidence review	Generic Nutrition, DEXA, Photo, text and mixed Evidence Review correction/commit flow	evidenceReview(reviewId) -> EvidenceReviewDetailView	C	Pending/processing/correction/confirm/dismiss states are a separate transactional surface; only the workout-match variant was designed.
+E24	Evidence review	Ambiguous Apple Health workout match and resolution	evidenceReview(reviewId) with workoutReconciliation	A	Explicitly covered and locked in the Training Logger utility package.
+E25	Evidence intake	Photos picker, document picker and native menus	photosPicker / fileImporter / Picker / Menu	B	System-owned surfaces; apply locked tint and truthful labels but do not custom redesign.
+E26	Evidence intake	Fixture EvidenceIntake and LocalEvidenceReview editors	evidenceIntake / localEvidenceReview under Sandbox	D	Sandbox-only fixtures, not Founder Production product UI.
+E27	Evidence intake	Production evidence-recovery placeholder	evidenceRecoveryUpload	D	Founder Production does not publish these sandbox recovery items and the router intentionally falls through to a placeholder.
+E28	Evidence	Health Metrics Coming Soon destination	legacy Evidence stream	D	Explicitly superseded by the locked Evidence Hub decision to remove it.
+P01	Priority Detail	Generic/manual and completion-context detail	priorityDetail / priorityOccurrence	A	Founder-locked Priority Detail family.
+P02	Priority Detail	Morning, Foam Rolling, peptide dose-aware, paused and supplement variants	priorityDetail / priorityOccurrence	A	Founder-locked Priority Detail family.
+P03	Priority Detail	Progress Photos and DEXA evidence-driven variants	priorityDetail / priorityOccurrence	A	Founder-locked design; missing destinations are implementation deltas, not missing design.
+P04	Priority Detail	Completed, skipped, setup-required, failed and unavailable states	priority detail terminal states	A	Founder-locked terminal-state templates.
+O01	Operating Plan	Root	operatingPlan	A	Entire Operating Plan is Founder-locked.
+O02	Operating Plan	Energy detail and history	operatingPlanStrategy(energy)	A	Founder-locked.
+O03	Operating Plan	Nutrition detail and editor	operatingPlanStrategy(nutrition) / operatingPlanStrategyEdit(nutrition)	A	Founder-locked.
+O04	Operating Plan	Training detail, editor and conditional builder	operatingPlanStrategy(training) / operatingPlanStrategyEdit(training) / operatingPlanTrainingStrategyBuilder	A	Founder-locked.
+O05	Operating Plan	Recovery domain and recurring support editor	operatingPlanProtocolDomain / operatingPlanRecoverySupport	A	Founder-locked.
+O06	Operating Plan	Peptide domain, execution, dose, days, time and notes sheets	operatingPlanProtocolDomain / operatingPlanPeptideExecution	A	Founder-locked.
+O07	Operating Plan	Supplements domain, support, add and edit	operatingPlanProtocolDomain / operatingPlanSupplementSupport / operatingPlanSupplementNew / operatingPlanSupplementEdit	A	Founder-locked.
+O08	Operating Plan	Tracking root and Morning Weigh-In support editor	operatingPlanTracking / operatingPlanTrackingSupport	A	Founder-locked by current task authority.
+O09	Operating Plan	Coaching Updates detail/editor including Photos and DEXA schedule states	operatingPlanStrategy(briefings) / edit	A	Founder-locked by current task authority.
+O10	Operating Plan	Standalone DEXA appointment current unavailable state	operatingPlanDexaAppointment	A	Explicitly rendered in locked final Operating Plan package; usability remains an implementation delta.
+O11	Operating Plan	Generic Operating Plan status destination	operatingPlanStatus	D	No current Founder Production landing row or action resolves here.
+Y01	You / Settings	You root target	You tab	A	Founder-locked You target.
+Y02	You / Settings	Settings root	You -> Settings	A	Founder-locked Settings target.
+Y03	You / Settings	Profile view/edit/save/error states	Settings -> Profile	A	Founder-locked Profile target.
+Y04	You / Settings	Data Sources and Apple Health connected/limited/unavailable states	Settings -> Data Sources -> Apple Health	A	Founder-locked Data Sources target.
+Y05	You / Settings	Appearance System/Dark/Light	Settings -> Appearance	A	Founder-locked Appearance target.
+Y06	You / Settings	Account state, Sign Out confirmation and signed-out/reconnect state	Settings account section	B	Explicitly mapped by the locked You coverage matrix to the same Settings account shell and secure enrollment authority; no broader consumer-auth design is authorized.
+Y07	You / Settings	Founder device connection, authority picker, pairing proof and network export	founderServerConnection	D	Engineering/operator diagnostics superseded in product navigation by locked Settings/Data Sources/Sign Out targets.
+Y08	You / Settings	Sleep canary, historical import/validation and network diagnostics	FounderServerConnectionView nested sections	D	Founder-only validation/diagnostic tools, not beta product UI.
+Y09	You / Settings	DEXA physical-validation write/delete controls	current YouPlaceholderView	D	One-off Founder validation controls; locked Data Sources owns end-user DEXA writeback status.
+U01	Training Logger	Entry through review, final confirmation, completion and saved/retry states	trainingLogger	A	Founder-locked Training Logger utility family.
+U02	Apple Watch	Workout handoff, execution, metrics, totals, controls, save/recovery and summary	PhysiqueOSWatch WatchWorkoutRootView	A	Founder-locked Watch family with production icons/colors.
+U03	Live Activity	Lock Screen and Dynamic Island active/rest/stale/finishing/saved/privacy states	WorkoutLiveActivityWidget	A	Founder-locked Live Activity family.
+U04	Home Screen Widget	Small/large Logged Today widget and fresh/stale/offline/redacted/workout states	Widget gallery -> HomeLoggedTodayWidget	C	Current Build 85 widget predates the selected visual system, retains the older purple treatment and was omitted from the later utility redesign lock.
+U05	System surfaces	Apple Health authorization sheets on iPhone/Watch	HealthKit authorization APIs	B	System-owned; locked Data Sources/Watch copy and semantic context are sufficient.
+U06	System surfaces	Notification permission alert and delivered notification chrome	UNUserNotificationCenter	B	System-owned; canonical Priority/Briefing content and actions are already locked.
+U07	System surfaces	Keyboards, date pickers, confirmation dialogs, share sheet and native menus	SwiftUI/UIKit system presentations	B	System-owned controls inherit appearance/tint and accessibility; no bespoke product surface.
+U08	System surfaces	App icon, launch snapshot and widget gallery chrome	iOS/watchOS system	B	No rebrand is authorized; current app identity and system containers remain outside screen redesign.
+U09	Routing	Notification deep links	PriorityNotificationDelegate -> Home stack	B	They resolve into locked Priority or Briefing destinations; no independent screen.
+U10	Routing	Home Widget and Live Activity deep links	RootTabView.onOpenURL	B	They resolve into locked Log/Logger destinations; no independent screen.
+U11	Routing	Unknown/unmapped destination placeholder	DestinationPlaceholderView	D	Not emitted by current Founder Production links; fallback/diagnostic only.
