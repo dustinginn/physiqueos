@@ -1,0 +1,114 @@
+{
+  "authority": {
+    "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "server": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "prompt": "d315c2372dd2b2f08b55ceeb0be758510f5fee05"
+  },
+  "rendering": {
+    "widthPoints": 402,
+    "minimumHeightPoints": 874,
+    "appearances": ["dark", "light"]
+  },
+  "surfaces": {
+    "generic-chooser": {
+      "title": "Generic intake · type and source",
+      "sections": ["What kind of evidence?", "Date", "Screenshots or PDF"],
+      "actions": ["Choose Photos", "Choose PDF", "Upload"]
+    },
+    "generic-auto-review": {
+      "title": "Generic intake · automatic classification",
+      "sections": ["Screenshots or PDF", "Grouped: Nutrition 1 · Activity 1.", "Choose type for IMG_4921.PNG"],
+      "actions": ["Choose Photos", "Choose PDF", "Upload"]
+    },
+    "generic-domain-handoffs": {
+      "title": "Generic intake · delegated and unavailable types",
+      "sections": ["Training has its own entry point.", "Weight has its own entry point.", "General evidence has no canonical intake type yet"],
+      "actions": ["Open Training", "Open Weight"]
+    },
+    "generic-nutrition-manual": {
+      "title": "Nutrition · manual entry",
+      "sections": ["Daily totals", "Calories", "Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)"],
+      "actions": ["Save"]
+    },
+    "generic-activity-manual": {
+      "title": "Activity · manual entry",
+      "sections": ["Daily activity", "Active calories", "Total calories", "Exercise minutes", "Stand hours", "Move goal"],
+      "actions": ["Save"]
+    },
+    "generic-transaction-states": {
+      "title": "Generic intake · transaction states",
+      "sections": ["Checking what kind of evidence this is…", "Transferring… 64%", "Reading what you uploaded…", "Evidence received", "Evidence saved", "This evidence could not be uploaded."],
+      "actions": ["Review Nutrition", "Return to Log", "Try Again"]
+    },
+    "photos-pose-review": {
+      "title": "Progress Photos · pose review",
+      "sections": ["Photo set", "Photo 1", "Rear", "Flexed", "Double Biceps", "Double Biceps uses Flexed.", "Session conditions", "These are original, unedited photos."],
+      "actions": ["Choose Photos", "Confirm pose", "Upload"]
+    },
+    "photos-ready": {
+      "title": "Progress Photos · ready to upload",
+      "sections": ["Rear Relaxed", "Confirmed", "Afternoon", "Fasted", "Post-workout", "Pump"],
+      "actions": ["Pose confirmed", "Upload"]
+    },
+    "photos-resume": {
+      "title": "Progress Photos · staged recovery",
+      "sections": ["Photo upload waiting", "1 of 3 photos from 2026-09-23 reached PhysiqueOS."],
+      "actions": ["Resume upload", "Discard"]
+    },
+    "photos-transfer-states": {
+      "title": "Progress Photos · transfer and rejection states",
+      "sections": ["Uploading photo 2 of 3… 47%", "All 3 photos received. Waiting for durable acceptance…", "PhysiqueOS did not accept this photo set"],
+      "actions": ["Discard"]
+    },
+    "dexa-empty": {
+      "title": "DEXA intake · empty",
+      "sections": ["DEXA Scan", "Date", "BodySpec PDF", "Attach one BodySpec PDF report."],
+      "actions": ["Choose PDF", "Upload"]
+    },
+    "dexa-selected": {
+      "title": "DEXA intake · selected PDF",
+      "sections": ["BodySpec PDF", "BodySpec_DXA_2026-09-23.pdf", "One PDF · 2.8 MB"],
+      "actions": ["Remove", "Choose PDF", "Upload"]
+    },
+    "dexa-validation-error": {
+      "title": "DEXA intake · validation failure",
+      "sections": ["DEXA intake requires exactly one BodySpec PDF."],
+      "actions": ["Try Again"]
+    },
+    "review-mixed": {
+      "title": "Evidence Review · mixed daily evidence",
+      "sections": ["Pending Review", "Captured Evidence", "1 nutrition entry and 1 activity entry", "Screenshot", "Included", "Excluded"],
+      "actions": ["Confirm", "Dismiss"]
+    },
+    "review-photo": {
+      "title": "Evidence Review · Progress Photos",
+      "sections": ["Progress Photos", "PHOTO SESSION", "Time of day: Afternoon", "Rear Relaxed", "Progress photos"],
+      "actions": ["Confirm", "Dismiss"]
+    },
+    "review-dexa": {
+      "title": "Evidence Review · DEXA",
+      "sections": ["DEXA", "Total mass", "Body fat", "Fat tissue", "Lean tissue", "Bone mineral", "RMR", "VAT mass", "VAT volume", "PDF"],
+      "actions": ["Correct Measurements", "Confirm", "Dismiss"]
+    },
+    "review-dexa-correction": {
+      "title": "Evidence Review · DEXA correction",
+      "sections": ["Correct the interpreted scan", "Measured date (YYYY-MM-DD)", "Total mass (lb)", "Body fat (%)", "Resting metabolic rate (kcal/day)", "Visceral fat volume (in³)"],
+      "actions": ["Cancel", "Save Corrections"]
+    },
+    "review-lifecycle": {
+      "title": "Evidence Review · lifecycle states",
+      "sections": ["Saving corrections…", "Confirming…", "Dismissing review…", "Dismissed", "Confirmation accepted", "Confirmed", "Still confirming", "Refresh required", "This review could not be updated."],
+      "actions": ["Back to Log", "Check Now", "Refresh Review", "Try Again"]
+    },
+    "review-load-states": {
+      "title": "Evidence Review · loading and unavailable states",
+      "sections": ["Loading Evidence Review", "This Evidence Review could not be loaded.", "This Evidence Review could not be found."],
+      "actions": []
+    },
+    "review-status-semantics": {
+      "title": "Evidence Review · server status semantics",
+      "sections": ["Pending Review", "Needs Attention", "Partially Confirmed", "Confirming", "Confirmed", "Review unavailable"],
+      "actions": ["Confirm", "Dismiss"]
+    }
+  }
+}
