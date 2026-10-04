@@ -49,12 +49,12 @@
   "media": {
     "pixelsInHarness": "redacted",
     "productionBindings": "authenticated mediaId",
-    "tilesExpandable": false
+    "tilesExpandable": false,
+    "staticPhotosAccepted": true
   },
   "productionGaps": {
     "completedPhaseRichContent": "not supplied by current Native production adapter",
-    "supportingGoalDetail": "unreachable from current Founder Production adapter",
-    "photoTileExpansion": "not implemented by ProgressPhotoTile"
+    "supportingGoalDetail": "unreachable from current Founder Production adapter"
   },
   "shippingChanges": false,
   "files": {

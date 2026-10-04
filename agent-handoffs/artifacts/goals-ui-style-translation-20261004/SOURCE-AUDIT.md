@@ -45,4 +45,4 @@ The requested target / energy / activity / history / transition audit resolves a
 
 The Native wire now carries opaque `mediaId` values and `CompletedGoalDetailContent` loads them through `.authenticatedProduction(mediaId:)`.
 
-`ProgressPhotoTile` has authenticated loading/retry/unavailable states, but the tile has no tap action and no large inspection viewer. This is a current Goals media UX gap, not a fabricated design binding. The review harness redacts pixels while preserving role/date labels and the authenticated media requirement.
+`ProgressPhotoTile` has authenticated loading/retry/unavailable states and no tap action. Founder accepted static first/final photos on Goals, so this is intentional for the locked Goals direction and is not an implementation gap. The review harness redacts pixels while preserving role/date labels and the authenticated media requirement.

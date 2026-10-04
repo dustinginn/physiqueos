@@ -362,7 +362,7 @@ Founder subsequently accepted and locked DEXA and Photo in both appearances. The
 
 ## Goals hierarchy style translation
 
-Status: **ready for Founder review; Goals is not locked**
+Status: **Goals locked; Priority Detail translation ready for Founder review**
 
 One locked-family direction covers the complete current Founder Production Goals hierarchy in dark and mineral light:
 
@@ -374,7 +374,9 @@ One locked-family direction covers the complete current Founder Production Goals
 - completed Visible Abs journey, outcome, DEXA, evidence and authenticated first/final photo roles;
 - representative loading, error, empty/read-only and unavailable states.
 
-The source audit records three current Build 85 boundaries: historical completed phases lack rich phase content in the production adapter; supporting-objective detail is not resolvable by the production adapter; and completed-Goal `ProgressPhotoTile` loads authenticated pixels but has no expansion interaction. The design does not fabricate missing phase copy, supporting routes or media bindings.
+The source audit records two current Build 85 boundaries: historical completed phases lack rich phase content in the production adapter, and supporting-objective detail is not resolvable by the production adapter. Completed-Goal `ProgressPhotoTile` loads authenticated pixels and intentionally remains static under the Founder-accepted Goals direction; this is not an implementation gap. The design does not fabricate missing phase copy, supporting routes or media bindings.
+
+Founder subsequently accepted and locked the complete Goals hierarchy in dark and mineral light. Priority Detail translation now covers the complete current family in the same locked visual system. The audit resolves completed Morning Check-In routing and Home-versus-detail peptide completion as correct current behavior, while adding the missing Progress Photos/DEXA Priority Detail action destinations to the implementation-delta ledger.
 
 Review set:
 

@@ -49,6 +49,33 @@ Do not silently fix these during design-only tasks.
 
 ## Open implementation deltas
 
+### Priority Detail — Progress Photos and DEXA action destinations
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION / LIKELY SHIPPING DEFECT
+
+Discovery:
+Priority Detail family source audit against Build 85 Native and current production Server.
+Report: `agent-handoffs/reports/20261004T181549Z-priority-detail-ui-style-translation.md`
+
+Current Build 85 behavior:
+The Server's Priority Detail contract publishes non-completable actions for:
+- Progress Photos: `Upload Photos` → `/evidence/photos`;
+- DEXA pre-appointment: `View DEXA Appointment` → `/profile/operating-plan/execution/dexa`;
+- DEXA after appointment: `Upload DEXA Results` → `/evidence/dexa`.
+
+Native decodes the label/href, but `ProductionPriorityAPI.destination(forActionHref:)` maps only `/check-in/morning`. Paused peptide has a separate execution-projection fallback. For Progress Photos and DEXA, `continueActionDestination` is therefore nil and `PriorityDetailView.actionSection` renders no action.
+
+Accepted target:
+Preserve each Server-owned evidence/appointment action on its Priority Detail surface and navigate to the existing Native upload/evidence/Operating Plan destination. Do not add manual completion for evidence-driven priorities.
+
+Implementation implication:
+Prefer a typed `action.destination` in the Native contract, or add narrow mappings for the three verified hrefs. Do not create a general web-href router.
+
+Acceptance:
+Open each Progress Photos/DEXA stage through an exact occurrence route. The canonical action is visible, has a 44 pt target, opens the correct Native destination, keeps the occurrence date, and never shows Mark Complete. Morning Check-In and paused peptide routing remain unchanged.
+
+Status: OPEN.
+
 ### Photo Briefing — paired Previous/Current comparison viewer
 
 Classification: REQUIRED FOR DESIGN IMPLEMENTATION
@@ -148,6 +175,18 @@ Status: DOCUMENTED.
 
 ## Resolved / obsolete discoveries
 
+### Goals — Completed-Goal ProgressPhotoTile expansion
+
+Classification: RESOLVED / OBSOLETE as an implementation-gap candidate.
+
+Founder decision:
+Static first/final photos on the completed Goal are acceptable. `ProgressPhotoTile` does not need tap-to-expand on Goals.
+
+Boundary:
+This does not change the open Photo Briefing requirement for a simultaneous paired Previous/Current viewer with synchronized zoom/pan.
+
+Status: CLOSED; do not re-add as a Goals implementation delta.
+
 ### Photo Briefing — single-photo tap-to-expand
 
 Classification: RESOLVED / OBSOLETE as a general single-image bug.
@@ -179,4 +218,3 @@ Before beginning the eventual shipping UI implementation phase:
 Future design prompts should state:
 
 "Review agent-handoffs/DESIGN_IMPLEMENTATION_DELTA_LEDGER.md before stopping. Append any newly discovered implementation-relevant behavior/data/navigation/accessibility delta. Do not bury such findings only in the task report."
-

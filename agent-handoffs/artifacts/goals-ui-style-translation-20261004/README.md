@@ -1,6 +1,6 @@
 # Goals UI style translation
 
-Status: **ready for Founder review — Goals remains unlocked**
+Status: **LOCKED by Founder decision on 2026-10-04**
 
 One visual direction, directly translated from the locked Home system, covers the current Founder Production Goals hierarchy in dark and mineral light.
 
@@ -25,4 +25,3 @@ Authority:
 The harness uses redacted photo planes only. It preserves the real first/final authenticated media roles and dates without fabricating pixels or bindings.
 
 No shipping Native or Server source changed. No build or TestFlight action occurred.
-

@@ -140,7 +140,7 @@ FUTURE MAJOR PROJECTS (roadmap only — NOT started; do not implement without a 
 
 F1. App-wide UI/design polish
 Position: design exploration active; shipping implementation not started.
-Current state: Home, Log Compact Command Center, Weekly, Midweek, Monthly, DEXA and Photo are design-direction locked in dark/mineral light under their accepted corrections. Nutrition and Activity are accepted as good in their separate lane. Goals hierarchy translation is ready for Founder review in dark/mineral light and remains unlocked. Recovery remains graph-driven, future-only and uncoupled from Confidence. Photo's simultaneous paired comparison viewer with synchronized zoom/pan remains required implementation work. No implementation has started. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
+Current state: Home, Log Compact Command Center, Weekly, Midweek, Monthly, DEXA, Photo and the complete Goals hierarchy are design-direction locked in dark/mineral light under their accepted corrections. Nutrition and Activity are accepted as good in their separate lane. Priority Detail is now in source-audited style translation and remains pending Founder review. Recovery remains graph-driven, future-only and uncoupled from Confidence. Photo's simultaneous paired comparison viewer with synchronized zoom/pan remains required implementation work. No implementation has started. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
 Scope boundary: no Native implementation, Server behavior, production content projection, Recovery activation, build or TestFlight work is authorized by the exploration.
 
 Recurring Briefing implementation backlog, not started:
@@ -158,7 +158,7 @@ Goals hierarchy review state:
 - dark/mineral-light content parity and canonical active/completed content are validator-checked;
 - completed historical phase detail receives only the chronology fields currently supplied by the production adapter; no strategy/success copy is fabricated;
 - completed Goal photo pixels are redacted in the harness, while the authenticated first/final `mediaId` binding requirement is preserved;
-- Goals remains pending Founder review and is not locked;
+- Goals is locked in dark/mineral light. Completed-Goal `ProgressPhotoTile` remains intentionally static; tap-to-expand is not required and is not an implementation gap;
 - review root: `agent-handoffs/artifacts/goals-ui-style-translation-20261004/`.
 
 Final appearance-translation review state:

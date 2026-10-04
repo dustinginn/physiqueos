@@ -19,4 +19,4 @@ Current result: **PASS**
 - photo roles: Beginning front relaxed · May 24; Completion front relaxed · Jul 18
 - shipping changes: false
 
-The validator intentionally treats redacted photo pixels as presentation-only substitution. It requires the canonical authenticated production media role labels and records that `ProgressPhotoTile` is not expandable in Build 85.
+The validator intentionally treats redacted photo pixels as presentation-only substitution. It requires the canonical authenticated production media role labels and records the accepted static `ProgressPhotoTile` behavior on Goals.

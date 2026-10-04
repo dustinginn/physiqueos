@@ -1,0 +1,202 @@
+{
+  "pass": true,
+  "authority": {
+    "prompt": "46ca8600e4659518ea3bc21dbbfc43256d6d78a2",
+    "native": "b8ee8690b194cb90086f6f62816b9a2c8c400dc026",
+    "server": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+  },
+  "surfaces": [
+    "generic",
+    "morning",
+    "foam",
+    "peptide",
+    "paused",
+    "supplement",
+    "evidence",
+    "dexa",
+    "completed",
+    "error"
+  ],
+  "screenCount": 20,
+  "actualTarget": {
+    "width": 402,
+    "minHeight": 874
+  },
+  "darkLightContentParity": true,
+  "forbiddenSectionsAbsent": [
+    "Related Goals",
+    "Appointment Completion"
+  ],
+  "templatesCovered": [
+    "generic ordinary",
+    "morning evidence",
+    "recovery support",
+    "dose-aware peptide",
+    "paused peptide",
+    "supplement",
+    "progress photos",
+    "DEXA appointment",
+    "completed",
+    "error"
+  ],
+  "parity": {
+    "generic": {
+      "missing": [],
+      "presentForbidden": [],
+      "sections": [
+        "What",
+        "When"
+      ],
+      "actions": [
+        "Mark Complete"
+      ]
+    },
+    "morning": {
+      "missing": [],
+      "presentForbidden": [],
+      "sections": [
+        "What",
+        "When",
+        "Execution Notes",
+        "Why it matters"
+      ],
+      "actions": []
+    },
+    "foam": {
+      "missing": [],
+      "presentForbidden": [],
+      "sections": [
+        "What",
+        "When",
+        "Execution Notes",
+        "Why it matters"
+      ],
+      "actions": [
+        "Mark Complete"
+      ]
+    },
+    "peptide": {
+      "missing": [],
+      "presentForbidden": [],
+      "sections": [
+        "What",
+        "When",
+        "Dose",
+        "Preparation",
+        "Preparation",
+        "Execution Notes",
+        "Why it matters",
+        "Next Execution Change"
+      ],
+      "actions": [
+        "Mark Complete"
+      ]
+    },
+    "paused": {
+      "missing": [],
+      "presentForbidden": [],
+      "sections": [
+        "What",
+        "When",
+        "Dose",
+        "Next Execution Change"
+      ],
+      "actions": [
+        "Go to Retatrutide"
+      ]
+    },
+    "supplement": {
+      "missing": [],
+      "presentForbidden": [],
+      "sections": [
+        "What",
+        "When",
+        "Dose / Quantity",
+        "Execution Notes",
+        "Why it matters"
+      ],
+      "actions": [
+        "Mark Complete"
+      ]
+    },
+    "evidence": {
+      "missing": [],
+      "presentForbidden": [],
+      "sections": [
+        "What",
+        "When",
+        "Execution Notes",
+        "Why it matters"
+      ],
+      "actions": [
+        "Upload Photos"
+      ]
+    },
+    "dexa": {
+      "missing": [],
+      "presentForbidden": [],
+      "sections": [
+        "What",
+        "When",
+        "Preparation",
+        "Why it matters"
+      ],
+      "actions": [
+        "View DEXA Appointment"
+      ]
+    },
+    "completed": {
+      "missing": [],
+      "presentForbidden": [],
+      "sections": [
+        "What",
+        "When",
+        "Why it matters"
+      ],
+      "actions": []
+    }
+  },
+  "shippingChanges": false,
+  "files": {
+    "generic": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/generic-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/generic-light.png"
+    },
+    "morning": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/morning-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/morning-light.png"
+    },
+    "foam": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/foam-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/foam-light.png"
+    },
+    "peptide": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/peptide-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/peptide-light.png"
+    },
+    "paused": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/paused-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/paused-light.png"
+    },
+    "supplement": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/supplement-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/supplement-light.png"
+    },
+    "evidence": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/evidence-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/evidence-light.png"
+    },
+    "dexa": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/dexa-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/dexa-light.png"
+    },
+    "completed": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/completed-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/completed-light.png"
+    },
+    "error": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/error-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/error-light.png"
+    }
+  }
+}

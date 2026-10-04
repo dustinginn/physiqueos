@@ -14,5 +14,6 @@ Photo paired Previous/Current simultaneous comparison with synchronized zoom/pan
 
 Nutrition and Activity are accepted as good in their separate lane and are not reopened here.
 
-Goals is **not locked**. This package is pending Founder review.
+Goals is **LOCKED** in dark and mineral light by Founder decision on 2026-10-04.
 
+Completed-Goal `ProgressPhotoTile` is intentionally static. Tap-to-expand is not required and is not an implementation gap. Photo Briefing's dedicated paired Previous/Current viewer remains a separate required implementation delta.

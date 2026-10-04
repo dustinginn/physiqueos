@@ -1,0 +1,129 @@
+{
+  "authority": {
+    "prompt": "46ca8600e4659518ea3bc21dbbfc43256d6d78a2",
+    "native": "b8ee8690b194cb90086f6f62816b9a2c8c400dc026",
+    "server": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+  },
+  "screens": {
+    "generic": {
+      "title": "Server Priority",
+      "subtitle": "Server-owned occurrence",
+      "status": "Open",
+      "sections": [
+        ["What", "Server Priority", "Production"],
+        ["When", "Sep 10", "Scheduled by the operating plan."]
+      ],
+      "primary": "Mark Complete",
+      "secondary": "Mark Skipped"
+    },
+    "morning": {
+      "title": "Morning Weigh-In",
+      "subtitle": "Daily · Morning",
+      "status": "Open",
+      "sections": [
+        ["What", "Record your weight", "A valid Weight recorded for Oct 4 satisfies this routine automatically."],
+        ["When", "Daily · Morning", "Timing comes from the saved Support schedule."],
+        ["Execution Notes", "Saved Support note", "Before food or fluids."],
+        ["Why it matters", "Track the body-weight trend", "This evidence helps PI evaluate progress and energy strategy against the current goal."]
+      ],
+      "primary": "Log Weight"
+    },
+    "foam": {
+      "title": "Foam Rolling",
+      "subtitle": "Today · 7:15 PM",
+      "status": "Open",
+      "sections": [
+        ["What", "Foam Rolling", "Complete the scheduled recovery support."],
+        ["When", "Daily · 7:15 PM", "Timing comes from the saved Support schedule."],
+        ["Execution Notes", "Saved Support note", "Focus on lower body after leg sessions."],
+        ["Why it matters", "Supports the current recovery strategy", "This recovery method supports training readiness and consistency."]
+      ],
+      "primary": "Mark Complete",
+      "secondary": "Mark Skipped"
+    },
+    "peptide": {
+      "title": "Tesamorelin",
+      "subtitle": "Tonight · 10:29 PM",
+      "status": "Open",
+      "sections": [
+        ["What", "Tesamorelin", "Complete the scheduled Execution action."],
+        ["When", "Sun–Thu · 10:29 PM", "fasted before bed"],
+        ["Dose", "0.5 mg", "May 24 – Until changed"],
+        ["Preparation", "Finish eating approximately 2–3 hours before injection", "Preserve the normal fasted-before-bed timing window."],
+        ["Preparation", "Take fasted before bed", "Use the saved Execution conditions."],
+        ["Execution Notes", "Saved Support note", "Taken five times per week, Sunday through Thursday, at night, fasted before bed."],
+        ["Why it matters", "Supports the current operating plan", "This Execution action supports the current operating plan."],
+        ["Next Execution Change", "None scheduled", "No upcoming Execution phase is scheduled."]
+      ],
+      "dosePrompt": "Took a different amount?",
+      "doseCaption": "Planned 0.5 mg. Edit only if you took a different amount.",
+      "primary": "Mark Complete",
+      "secondary": "Mark Skipped"
+    },
+    "paused": {
+      "title": "Retatrutide",
+      "subtitle": "Thursday · 9:45 PM",
+      "status": "Paused",
+      "sections": [
+        ["What", "Retatrutide is paused", "Resume it from the Operating Plan to record doses again."],
+        ["When", "Thursday · 9:45 PM", "fasted before bed"],
+        ["Dose", "1.5 mg", "Aug 6 – Until changed"],
+        ["Next Execution Change", "2.5 mg", "Begins Oct 8."]
+      ],
+      "pausedCopy": "Paused since Sep 12. Resume from the Operating Plan to continue.",
+      "primary": "Go to Retatrutide"
+    },
+    "supplement": {
+      "title": "Fadogia Agrestis",
+      "subtitle": "Every other day",
+      "status": "Open",
+      "sections": [
+        ["What", "Fadogia Agrestis", "Complete the scheduled supplement support."],
+        ["When", "Every other day", "Timing comes from the saved Support schedule."],
+        ["Dose / Quantity", "Not specified", "No quantity is currently configured."],
+        ["Execution Notes", "Saved Support note", "Every-other-day supplement. Available for reminders if desired, but not currently surfaced by default."],
+        ["Why it matters", "Supports the current supplement strategy", "This supplement supports the current strategy."]
+      ],
+      "primary": "Mark Complete"
+    },
+    "evidence": {
+      "title": "Progress Photos",
+      "subtitle": "Scheduled for this afternoon.",
+      "status": "Open",
+      "sections": [
+        ["What", "Progress Photos", "Upload Front Relaxed, Back Relaxed, and Back Flexed to complete today's check-in."],
+        ["When", "Saturday · Afternoon", "This occurrence follows your saved Progress Photos schedule."],
+        ["Execution Notes", "Saved Support note", "Capture the grouped progress photo set under comparable conditions."],
+        ["Why it matters", "Visual calibration", "Progress photos support qualitative goals without replacing DEXA or weight evidence."]
+      ],
+      "primary": "Upload Photos"
+    },
+    "dexa": {
+      "title": "DEXA tomorrow",
+      "subtitle": "Tomorrow at 7:30 AM",
+      "status": "Upcoming",
+      "sections": [
+        ["What", "DEXA tomorrow", "Your DEXA appointment remains scheduled. This priority does not complete the scan itself."],
+        ["When", "Saturday, August 15, 2026 · 7:30 AM", "Timing uses America/Los_Angeles."],
+        ["Preparation", "Saved preparation note", "Use the saved clinic instructions."],
+        ["Why it matters", "Body-composition calibration", "Confirmed DEXA evidence updates the body-composition record supporting your current strategy."]
+      ],
+      "primary": "View DEXA Appointment"
+    },
+    "completed": {
+      "title": "Foam Rolling",
+      "subtitle": "Today · 7:15 PM",
+      "status": "Completed",
+      "sections": [
+        ["What", "Foam Rolling", "Complete the scheduled recovery support."],
+        ["When", "Daily · 7:15 PM", "Timing comes from the saved Support schedule."],
+        ["Why it matters", "Supports the current recovery strategy", "This recovery method supports training readiness and consistency."]
+      ],
+      "completedCopy": "Priority complete for today."
+    },
+    "error": {
+      "title": "Priority",
+      "message": "This priority could not be loaded. Pull to refresh and try again."
+    }
+  }
+}
