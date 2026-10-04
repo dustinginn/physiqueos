@@ -1,0 +1,64 @@
+{
+  "authority": {
+    "prompt": "edb8faca934666dfdb6bcaa233cd62410a6021a3",
+    "acceptedDesign": "8de163506d6e996328e60d510199562cdeb8dffb",
+    "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "build": 85
+  },
+  "generatedAt": "2026-10-04T16:51:39.949Z",
+  "appearances": {
+    "dark": {
+      "nutritionHistoryRows": 3,
+      "activityHistoryRows": 3,
+      "nutritionShowAll": true,
+      "activityShowAll": true,
+      "nutritionHorizontalOverflow": false,
+      "activityHorizontalOverflow": false,
+      "fullNutritionHistoryPresent": true,
+      "fullActivityHistoryPresent": true,
+      "userFacingFuturePlaceholderText": false,
+      "runtimeErrors": [],
+      "pass": true
+    },
+    "light": {
+      "nutritionHistoryRows": 3,
+      "activityHistoryRows": 3,
+      "nutritionShowAll": true,
+      "activityShowAll": true,
+      "nutritionHorizontalOverflow": false,
+      "activityHorizontalOverflow": false,
+      "fullNutritionHistoryPresent": true,
+      "fullActivityHistoryPresent": true,
+      "userFacingFuturePlaceholderText": false,
+      "runtimeErrors": [],
+      "pass": true
+    }
+  },
+  "parity": {
+    "nutritionRootTextEqual": true,
+    "activityRootTextEqual": true,
+    "nutritionHistoryTextEqual": true,
+    "activityHistoryTextEqual": true,
+    "pass": true
+  },
+  "semanticRules": {
+    "shippingSourceChanged": false,
+    "nutritionAggregationChanged": false,
+    "activityMetricsChanged": false,
+    "activityReportingInvented": false,
+    "cooldownStyledOrCountedAsCardio": false,
+    "canonicalCardioSemanticsChanged": false,
+    "trainingEvidenceChanged": false
+  },
+  "contentAssertions": {
+    "nutritionHistoryAtRoot": true,
+    "nutritionFunctionalReportsPreserved": true,
+    "nutritionFutureAreasRemoved": true,
+    "nutritionRowsRetainCanonicalDetail": true,
+    "activityHistoryAtRoot": true,
+    "activityCurrentFieldsPreserved": true,
+    "noActivityReporting": true,
+    "showAllRoutesVisible": true
+  },
+  "pass": true
+}

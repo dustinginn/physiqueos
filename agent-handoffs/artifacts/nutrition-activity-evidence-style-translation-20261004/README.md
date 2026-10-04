@@ -1,15 +1,17 @@
 # PhysiqueOS Nutrition + Activity Evidence — Founder review
 
-Status: **complete design translation ready for Founder review; implementation not started**
+Status: **accepted styling; focused root correction ready for Founder confirmation; implementation not started**
 
 This package independently audits and translates the complete Build 85 Nutrition Evidence and Activity Evidence hierarchies into the locked PhysiqueOS dark and mineral-light system. It preserves current information architecture, values, navigation, aggregation, provenance, HealthKit behavior, and historical semantics.
 
 ## Start here
 
-- [Concise review index](comparison-board.html)
-- [Coverage board — dark](screens/nutrition-activity-coverage-board.png)
-- [Coverage board — mineral light](screens/nutrition-activity-coverage-board-light.png)
+- [Concise corrected review index](comparison-board.html)
+- [Focused before/after board](../nutrition-activity-evidence-founder-correction-20261004/screens/before-after-history-placeholders.png)
+- [Corrected Nutrition root — dark](../nutrition-activity-evidence-founder-correction-20261004/screens/nutrition-root-corrected.png)
+- [Corrected Activity root — mineral light](../nutrition-activity-evidence-founder-correction-20261004/screens/activity-root-corrected-light.png)
 - `evidence-board.html` and `evidence-board.html?theme=light` for inspectable full-resolution boards
+- [Complete focused Founder correction package](../nutrition-activity-evidence-founder-correction-20261004/README.md)
 
 ## Coverage at a glance
 
@@ -18,9 +20,9 @@ This package independently audits and translates the complete Build 85 Nutrition
 | Nutrition | 8 | 8 | 8 | All | 0 |
 | Activity | 7 | 7 | 7 | All | 0 |
 
-Nutrition: N1 root/latest/reporting, N2 areas/history, N3 structured day, N4 Apple Health totals-only day, N5 Calories Reporting, N6 Macros Reporting, N7 Meals Reporting, N8 load/failure/empty templates.
+Nutrition: N1 corrected root/latest/functional reporting/three-row Recent History, N2 full history, N3 structured day, N4 Apple Health totals-only day, N5 Calories Reporting, N6 Macros Reporting, N7 Meals Reporting, N8 load/failure/empty templates.
 
-Activity: A1 root/latest, A2 areas/linked Training/history, A3 full day, A4 partial Apple Health day, A5 history sheet, A6 empty sections, A7 load/failure/not-found templates.
+Activity: A1 corrected root/latest/areas/linked Training/three-row Recent History, A2 focused current context, A3 full day, A4 partial Apple Health day, A5 full history sheet, A6 empty sections, A7 load/failure/not-found templates.
 
 ## Review documents
 
@@ -41,6 +43,7 @@ Activity: A1 root/latest, A2 areas/linked Training/history, A3 full day, A4 part
 - Build 85 Activity has no reporting destination, chart, or workout-type list; none was invented.
 - Cooldown remains historical non-Cardio. Run and Stair Stepper remain canonical Cardio wherever Training/HealthKit source exposes them. This package does not reclassify workouts.
 - Evidence rows remain read-only and do not inherit Logger editing affordances.
+- User-facing future-only placeholders and dead destinations are absent. Nutrition keeps the functional Calories, Macros, and Meals reports; Activity keeps its real informational metrics and has no Reporting block.
 
 ## Authority and isolation
 

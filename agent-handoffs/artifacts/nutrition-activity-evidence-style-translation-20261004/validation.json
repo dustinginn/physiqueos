@@ -68,5 +68,12 @@
     "noActivityReportingTitle": true,
     "noCooldownMisclassification": true
   },
+  "focusedCorrection": {
+    "prompt": "edb8faca934666dfdb6bcaa233cd62410a6021a3",
+    "validationPath": "../nutrition-activity-evidence-founder-correction-20261004/validation.json",
+    "rootHistoryRestored": true,
+    "futurePlaceholderNavigationRemoved": true,
+    "pass": true
+  },
   "pass": true
 }

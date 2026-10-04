@@ -3,6 +3,7 @@
 ## Authority
 
 - Prompt: `eb186ba2bb0862daf4f487c334ef445336bcab46`
+- Founder correction: `edb8faca934666dfdb6bcaa233cd62410a6021a3`
 - Native source: `b8ee8690b194cb90086b62816b9a2c8c400dc026` (Build 85)
 - Audit checkout: `/private/tmp/physiqueos-build85-native`
 
@@ -14,9 +15,11 @@ The two families were audited independently. Neither hierarchy was inferred from
 
 `EvidenceView` / `EvidenceStreamRowView` opens `NutritionHistoryView` through `AppDestinationRouterView`.
 
-Loaded order is fixed: Evidence Report header → goal/phase/all scope selector and date range → Latest Nutrition Day → Reporting → Nutrition Areas → Recent Nutrition History. Recent History shows three rows and a Show All sheet; every day row opens `NutritionDayView`.
+Build 85 loaded order is Evidence Report header → goal/phase/all scope selector and date range → Latest Nutrition Day → Reporting → Nutrition Areas → Recent Nutrition History. Recent History uses `historyPreviewLimit = 3`; Show All presents `NutritionHistorySheet`, and both preview/full rows open `NutritionDayView` from the same `[NutritionDayRecord]` collection.
 
-Reporting has exactly three current destinations: Calories, Macros, Meals. Nutrition Areas has six informational rows: Calories, Macros, Meals, Micronutrients, Supplements, Hydration. The latter three retain the live `Coming soon` treatment and do not gain destinations.
+Reporting has exactly three current destinations: Calories, Macros, Meals. The source Nutrition Areas collection has three duplicate informational categories plus three future-only placeholders, all without current Native destinations. Founder correction hides that entire block in the target design: functional Calories/Macros/Meals remain in Reporting, and no valid Nutrition Day or report field is suppressed.
+
+Corrected target order is header → scope → Latest Nutrition Day → functional Reporting → Recent Nutrition History. The original mock's omission of Recent History from N1 was a design-harness discoverability regression, not a source/UI deficiency.
 
 Root states: loading, failure (`Nutrition could not be loaded.`), loaded, latest-day empty, history empty, and Show All sheet.
 
@@ -56,6 +59,8 @@ Exact fixtures used include Aug 30 structured totals (2140 cal, 180P, 220C, 90F,
 `EvidenceView` opens `ActivityHistoryView`. Loaded order is fixed: header → scope/date range → Today/Latest Activity Day → Activity Areas → Linked Training Context → Recent Activity History. Activity Areas are four informational metrics: Active Calories, Exercise Minutes, Workout Activity, Non-Workout Activity. They are not reporting links.
 
 Recent History shows three rows and a Show All sheet; rows open `ActivityDayView`. Linked Training Context is a non-navigating preview.
+
+The accepted mock split Areas/context/history into A2, which made them disappear from the A1 root viewport. Build 85 itself does expose all three sections correctly. The corrected A1 restores the full production-equivalent composition; no Activity source discrepancy exists.
 
 Root states: loading, failure (`Activity could not be loaded.`), loaded, latest-day empty, linked-context empty, history empty, and Show All sheet.
 

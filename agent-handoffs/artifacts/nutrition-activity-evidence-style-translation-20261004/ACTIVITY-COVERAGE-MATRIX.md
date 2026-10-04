@@ -12,10 +12,10 @@ Legend: **Direct** = rendered mock. **Template** = explicitly mapped to a render
 | Goal/phase/all scope | scope selector | options/date range | local re-fetch | Quiet pills + date | A1 | Yes |
 | Today/latest day populated | latest card | current day aggregate + eight metrics | root → day | Contained hero + exact metric grid | A1 | Yes |
 | Latest day empty | latest card | current empty copy | root | Open empty copy | A6 | Yes |
-| Activity Areas | areas card | four informational metrics | root only | Compact analytical grid; no chevrons | A2 | Yes |
-| Linked Training Context populated | linked card | session label/date/duration/detail | root only | Read-only Strength rail; no route | A2 | Yes |
+| Activity Areas | areas card | four current informational metrics | root only | Compact analytical grid; no chevrons or dead destinations | Corrected A1 | Yes |
+| Linked Training Context populated | linked card | session label/date/duration/detail | root only | Read-only Strength rail; no route | Corrected A1 | Yes |
 | Linked Training Context empty | linked card | current empty copy | root | Open empty copy | A6 | Yes |
-| Recent History preview | history card | three chronological days/status | root → day | Open date rows | A2 | Yes |
+| Recent History preview | history card | exactly three chronological days/status values | root → Activity Day | Open date rows at bottom of root | Corrected A1 + focused dark/light | Yes |
 | Show All history sheet | history sheet | all days | sheet → day | Chronological list | A5 | Yes |
 | Recent History empty | history card | current empty copy | root | Open empty copy | A6 | Yes |
 | Day loading | `ActivityDayView` | progress | day route | Shared state field | A7 | Yes |

@@ -19,13 +19,12 @@ Evidence Hub
       │     ├─ Weekly Meal Summary sheet
       │     ├─ Recurring Meals sheet
       │     └─ Recent Meal History sheet → NutritionDayView
-      ├─ Nutrition Areas (six informational rows; no route)
       └─ Recent Nutrition History
-         ├─ Preview day → NutritionDayView
+         ├─ Three-row root preview → NutritionDayView
          └─ Show All sheet → NutritionDayView
 ```
 
-There is no current Native Nutrition library route, enrichment-review route, correction flow, or standalone Data Sources page.
+The Build 85 read model still carries a six-row Nutrition Areas collection, but the three current categories duplicate functional Reporting and the remaining three are future-only placeholders. Founder target hides that entire non-navigating block rather than advertising roadmap. No current data field is removed from Nutrition Day or Reporting. There is no current Native Nutrition library route, enrichment-review route, correction flow, or standalone Data Sources page.
 
 ## Activity Evidence
 
@@ -38,7 +37,7 @@ Evidence Hub
       ├─ Activity Areas (four informational metrics; no route)
       ├─ Linked Training Context (preview; no route)
       └─ Recent Activity History
-         ├─ Preview day → ActivityDayView
+         ├─ Three-row root preview → ActivityDayView
          └─ Show All sheet → ActivityDayView
 ```
 

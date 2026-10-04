@@ -176,7 +176,7 @@ Monthly exploration state:
 Utility + Evidence design state:
 - Apple Watch workout, Live Activity / Dynamic Island, and Training Logger directions are accepted and locked in dark + mineral light; implementation has not started.
 - Training Evidence is accepted and locked. Its Training Areas treatment preserves all 10 canonical live-app areas in exact order/count and never buckets, merges, prioritizes, paginates, or hides them.
-- Nutrition Evidence and Activity Evidence dark/mineral-light translations are ready for Founder review at `agent-handoffs/artifacts/nutrition-activity-evidence-style-translation-20261004/`; implementation has not started.
+- Nutrition Evidence and Activity Evidence styling is accepted. Focused dark/mineral-light root corrections are ready for Founder lock confirmation at `agent-handoffs/artifacts/nutrition-activity-evidence-founder-correction-20261004/`: both roots restore their canonical three-row Recent History + Show All, future-only/dead navigation is absent, functional Nutrition Reporting and current Activity fields remain. Implementation has not started.
 
 F2. Briefing Narrative + Confidence quality/tuning audit
 Position: next major strategic-quality project.

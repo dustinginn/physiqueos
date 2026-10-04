@@ -21,11 +21,11 @@ Implementation should preserve the existing view models, routes, ordering, and c
 ## Regression plan
 
 1. Snapshot both appearances for N1–N8 and A1–A7 at standard and large Dynamic Type.
-2. Assert Nutrition root order, six Areas, three reporting routes, preview count, and sheet/day navigation.
+2. Assert corrected Nutrition root order: latest day, three functional Reporting routes, then exactly three Recent History rows; assert no future-only Areas block, preview-row day navigation, and Show All sheet navigation.
 3. Assert Nutrition Day five-total order and the two distinct no-meal messages.
 4. Assert all Nutrition reporting sections and current chart controls remain reachable in source order.
 5. Test a structured-meal day and Apple Health totals-only day; confirm no displayed duplicate total and no fabricated meal.
-6. Assert Activity root order, four informational Areas, non-navigating linked context, preview count, and sheet/day navigation.
+6. Assert Activity root order, four informational Areas, non-navigating linked context, exactly three Recent History rows, and Show All sheet/day navigation.
 7. Assert the eight Activity Day metrics remain in exact production order.
 8. Test partial Apple Health day with exact pending/anomaly copy and complete day without the warning.
 9. Assert no Activity reporting destination exists and no Area obtains a chevron/button action.
@@ -40,3 +40,4 @@ Implementation should preserve the existing view models, routes, ordering, and c
 - Turning informational Areas or linked Training context into unsupported routes.
 - Inventing Activity charts to match Nutrition's richer reporting hierarchy.
 - Making Evidence history look editable by reusing Logger set/row controls.
+- Reintroducing duplicate/future-only Nutrition Areas or any dead chevron while cleaning up root composition.
