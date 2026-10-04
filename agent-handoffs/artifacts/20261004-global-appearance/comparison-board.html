@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PhysiqueOS global appearance implementation</title>
+  <style>
+    :root { color-scheme: dark; --bg:#070b12; --panel:#101826; --line:#263448; --text:#f3f6fb; --muted:#9aa8ba; --accent:#8b8cff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    header { padding:28px 20px 20px; max-width:1180px; margin:auto; }
+    h1 { margin:0 0 8px; font-size:clamp(26px,5vw,44px); letter-spacing:-.035em; }
+    h2 { margin:34px 0 12px; font-size:20px; }
+    p { color:var(--muted); max-width:760px; }
+    main { max-width:1180px; margin:auto; padding:0 20px 48px; }
+    .pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    figure { margin:0; padding:10px; background:var(--panel); border:1px solid var(--line); border-radius:18px; }
+    img { width:100%; height:auto; display:block; border-radius:12px; }
+    figcaption { padding:10px 4px 2px; font-weight:700; }
+    .tag { color:var(--accent); text-transform:uppercase; letter-spacing:.11em; font-size:11px; }
+    @media (max-width:640px) { .pair { grid-template-columns:1fr; } header,main { padding-left:12px; padding-right:12px; } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="tag">Shipping infrastructure review</div>
+  <h1>System · Dark · Mineral Light</h1>
+  <p>Real iPhone 17 Pro simulator captures. The page shows current production geometry using the new global appearance infrastructure; it is not a broad implementation of the locked redesign.</p>
+</header>
+<main>
+  <h2>System follows iOS</h2>
+  <div class="pair"><figure><img src="screenshots/system-dark-home.png" alt="System mode resolved dark"><figcaption>System · iOS Dark</figcaption></figure><figure><img src="screenshots/system-light-home.png" alt="System mode resolved light"><figcaption>System · iOS Light</figcaption></figure></div>
+  <h2>Explicit appearance</h2>
+  <div class="pair"><figure><img src="screenshots/dark-home.png" alt="Explicit dark Home"><figcaption>Dark · Home</figcaption></figure><figure><img src="screenshots/light-home.png" alt="Explicit Mineral Light Home"><figcaption>Light · Home</figcaption></figure></div>
+  <h2>Appearance control</h2>
+  <div class="pair"><figure><img src="screenshots/dark-appearance.png" alt="Appearance control dark"><figcaption>Dark · You → Settings → Appearance</figcaption></figure><figure><img src="screenshots/light-appearance.png" alt="Appearance control Mineral Light"><figcaption>Mineral Light · You → Settings → Appearance</figcaption></figure></div>
+  <h2>Log</h2>
+  <div class="pair"><figure><img src="screenshots/dark-log.png" alt="Log dark"><figcaption>Dark · Log</figcaption></figure><figure><img src="screenshots/light-log.png" alt="Log Mineral Light"><figcaption>Mineral Light · Log</figcaption></figure></div>
+  <h2>Briefing</h2>
+  <div class="pair"><figure><img src="screenshots/dark-briefing.png" alt="Briefing dark"><figcaption>Dark · Weekly briefing</figcaption></figure><figure><img src="screenshots/light-briefing.png" alt="Briefing Mineral Light"><figcaption>Mineral Light · Weekly briefing</figcaption></figure></div>
+  <h2>Evidence</h2>
+  <div class="pair"><figure><img src="screenshots/dark-evidence.png" alt="Evidence dark"><figcaption>Dark · Evidence</figcaption></figure><figure><img src="screenshots/light-evidence.png" alt="Evidence Mineral Light"><figcaption>Mineral Light · Evidence</figcaption></figure></div>
+  <h2>Training Logger</h2>
+  <div class="pair"><figure><img src="screenshots/dark-training-logger.png" alt="Training Logger dark"><figcaption>Dark · Training Logger</figcaption></figure><figure><img src="screenshots/light-training-logger.png" alt="Training Logger Mineral Light"><figcaption>Mineral Light · Training Logger</figcaption></figure></div>
+  <h2>Goals</h2>
+  <div class="pair"><figure><img src="screenshots/dark-goals.png" alt="Goals dark"><figcaption>Dark · Goals</figcaption></figure><figure><img src="screenshots/light-goals.png" alt="Goals Mineral Light"><figcaption>Mineral Light · Goals</figcaption></figure></div>
+  <h2>Operating Plan</h2>
+  <div class="pair"><figure><img src="screenshots/dark-operating-plan.png" alt="Operating Plan dark"><figcaption>Dark · Operating Plan</figcaption></figure><figure><img src="screenshots/light-operating-plan.png" alt="Operating Plan Mineral Light"><figcaption>Mineral Light · Operating Plan</figcaption></figure></div>
+  <h2>You</h2>
+  <div class="pair"><figure><img src="screenshots/dark-you.png" alt="You dark"><figcaption>Dark · You</figcaption></figure><figure><img src="screenshots/light-you.png" alt="You Mineral Light"><figcaption>Mineral Light · You</figcaption></figure></div>
+  <h2>Form / modal representative</h2>
+  <div class="pair"><figure><img src="screenshots/dark-manual-weight.png" alt="Manual weight dark"><figcaption>Dark · Manual/backdated Weight</figcaption></figure><figure><img src="screenshots/light-manual-weight.png" alt="Manual weight Mineral Light"><figcaption>Mineral Light · Manual/backdated Weight</figcaption></figure></div>
+</main>
+</body>
+</html>
+

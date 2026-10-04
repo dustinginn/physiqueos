@@ -357,7 +357,7 @@ Add a typed device-local appearance preference/store, resolve System to a nil ro
 Acceptance:
 A fresh install follows the iPhone appearance. Choosing Dark or Light updates the whole app immediately and survives relaunch. System resumes following OS changes. Every locked key screen is readable in dark and Mineral Light, selected state is not color-only, and no screen remains fixed dark unintentionally.
 
-Status: OPEN.
+Status: IMPLEMENTED ON ISOLATED BRANCH; RELEASE-GATED. Source: `codex/global-appearance-infrastructure-20261004` at `d5359e33845cba20a212dade24c25e94f02aee6e`. System/Dark/Light state, local persistence, nil System override, dynamic locked token pairs, narrow Appearance route, WidgetKit-owned paired behavior and ownership audit are complete. Merge with Claude's next-build authority and physical-device extension validation remain before release.
 
 ### Data Sources — user-safe Apple Health state projection
 
