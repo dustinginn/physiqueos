@@ -1,0 +1,99 @@
+{
+  "authority": {
+    "nativeSHA": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "projection": "ProductionLogAPI + LogReadModel",
+    "sourceEvidence": "FounderServerAPITests.productionLogJSON + productionWeightForLogJSON"
+  },
+  "viewState": "loaded",
+  "localDate": "2026-09-10",
+  "header": {
+    "eyebrow": "Log",
+    "title": "What happened?",
+    "subtitle": "Upload a screenshot, photo, PDF, or note and PhysiqueOS will organize it."
+  },
+  "loggedToday": {
+    "title": "Logged Today",
+    "rows": [
+      {
+        "kind": "training",
+        "label": "Training",
+        "systemImage": "figure.strengthtraining.traditional",
+        "summary": "Traditional Strength Training · 45 min",
+        "context": null,
+        "processing": false,
+        "destination": "training.session:session-canonical"
+      },
+      {
+        "kind": "nutrition",
+        "label": "Nutrition",
+        "systemImage": "fork.knife",
+        "summary": "4 meals · 2300 calories",
+        "context": null,
+        "processing": false,
+        "destination": "nutrition.day:nutrition-day-canonical"
+      },
+      {
+        "kind": "activity",
+        "label": "Activity",
+        "systemImage": "waveform.path.ecg",
+        "summary": "650 active calories",
+        "context": null,
+        "processing": false,
+        "destination": "activity.day:2026-09-10"
+      },
+      {
+        "kind": "weight",
+        "label": "Weight",
+        "systemImage": "scalemass",
+        "summary": "172.9 lb",
+        "context": null,
+        "processing": false,
+        "destination": "progress.stream:weight"
+      }
+    ]
+  },
+  "pendingEvidenceReviews": {
+    "sectionTitle": "Uploads ready to review",
+    "sectionSubtitle": "Finish checking these uploads before adding them to your history.",
+    "items": [
+      {
+        "id": "review-canonical",
+        "title": "Check-in ready to review",
+        "date": "Thursday, September 10",
+        "summary": "1 weight entry",
+        "likelyDuplicate": false,
+        "actionLabel": "Review before adding to your history",
+        "destination": "evidence.review:review-canonical"
+      }
+    ]
+  },
+  "processingEvidenceReviews": [],
+  "trainingLogger": {
+    "title": "Training Logger",
+    "subtitle": "Start a workout or log a past workout with exercises, sets, variants, and supersets.",
+    "destination": "training.logger"
+  },
+  "weightAction": {
+    "label": "Log weight for another date",
+    "destination": "manual.weigh-in"
+  },
+  "upload": {
+    "title": "Upload",
+    "subtitle": "Add photos, files, or a note.",
+    "primaryAction": "Add evidence",
+    "secondaryAction": "Add details without an asset",
+    "sourceOptions": ["Photos", "Files"],
+    "loadingLabel": "Loading selected photos…",
+    "continueDraftLabel": "Continue draft",
+    "destination": "evidence.intake"
+  },
+  "conditionalStates": {
+    "loading": "Loading",
+    "error": "Log could not be loaded.",
+    "processingTitle": "Processing",
+    "processingSuffix": "confirmation accepted · No action required",
+    "emptySummary": "Nothing logged yet",
+    "possibleDuplicate": "This may be another copy of an earlier upload."
+  },
+  "navigation": ["Home", "Goals", "Log", "Evidence", "You"]
+}

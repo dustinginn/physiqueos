@@ -1,0 +1,182 @@
+{
+  "authority": {
+    "prompt": "9d9a6b7d0b254c91aa8da93fd5f9ced3b17a9011",
+    "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026"
+  },
+  "target": {
+    "points": [
+      402,
+      874
+    ],
+    "scale": 3
+  },
+  "variants": {
+    "home-dark": {
+      "semanticFields": 52,
+      "expectedFields": 52,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "widthPoints": 402,
+      "heightPoints": 1073,
+      "targetPresentationLabel": "Target Date",
+      "confidenceGeometry": [
+        "79",
+        "79"
+      ],
+      "hiddenRedundantHomeLabels": [
+        "hero.goalLabel",
+        "goal.title"
+      ],
+      "pass": true
+    },
+    "home-light": {
+      "semanticFields": 52,
+      "expectedFields": 52,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "widthPoints": 402,
+      "heightPoints": 1073,
+      "targetPresentationLabel": "Target Date",
+      "confidenceGeometry": [
+        "79",
+        "79"
+      ],
+      "hiddenRedundantHomeLabels": [
+        "hero.goalLabel",
+        "goal.title"
+      ],
+      "pass": true
+    },
+    "baseline": {
+      "semanticFields": 69,
+      "expectedFields": 69,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "widthPoints": 402,
+      "heightPoints": 1219,
+      "targetPresentationLabel": null,
+      "confidenceGeometry": [],
+      "hiddenRedundantHomeLabels": [],
+      "pass": true
+    },
+    "direct-dark": {
+      "semanticFields": 69,
+      "expectedFields": 69,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "widthPoints": 402,
+      "heightPoints": 1048,
+      "targetPresentationLabel": null,
+      "confidenceGeometry": [],
+      "hiddenRedundantHomeLabels": [],
+      "pass": true
+    },
+    "direct-light": {
+      "semanticFields": 69,
+      "expectedFields": 69,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "widthPoints": 402,
+      "heightPoints": 1048,
+      "targetPresentationLabel": null,
+      "confidenceGeometry": [],
+      "hiddenRedundantHomeLabels": [],
+      "pass": true
+    },
+    "command-dark": {
+      "semanticFields": 69,
+      "expectedFields": 69,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "widthPoints": 402,
+      "heightPoints": 874,
+      "targetPresentationLabel": null,
+      "confidenceGeometry": [],
+      "hiddenRedundantHomeLabels": [],
+      "pass": true
+    },
+    "command-light": {
+      "semanticFields": 69,
+      "expectedFields": 69,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "widthPoints": 402,
+      "heightPoints": 874,
+      "targetPresentationLabel": null,
+      "confidenceGeometry": [],
+      "hiddenRedundantHomeLabels": [],
+      "pass": true
+    },
+    "editorial-dark": {
+      "semanticFields": 69,
+      "expectedFields": 69,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "widthPoints": 402,
+      "heightPoints": 1019,
+      "targetPresentationLabel": null,
+      "confidenceGeometry": [],
+      "hiddenRedundantHomeLabels": [],
+      "pass": true
+    },
+    "editorial-light": {
+      "semanticFields": 69,
+      "expectedFields": 69,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "widthPoints": 402,
+      "heightPoints": 1019,
+      "targetPresentationLabel": null,
+      "confidenceGeometry": [],
+      "hiddenRedundantHomeLabels": [],
+      "pass": true
+    }
+  },
+  "verticalImpact": {
+    "home-dark": {
+      "fullHeightPoints": 1073,
+      "relation": "selected Home reference; no Log baseline comparison"
+    },
+    "home-light": {
+      "fullHeightPoints": 1073,
+      "relation": "selected Home reference; no Log baseline comparison"
+    },
+    "baseline": {
+      "fullHeightPoints": 1219,
+      "deltaVsCurrentLogPoints": 0
+    },
+    "direct-dark": {
+      "fullHeightPoints": 1048,
+      "deltaVsCurrentLogPoints": -171
+    },
+    "direct-light": {
+      "fullHeightPoints": 1048,
+      "deltaVsCurrentLogPoints": -171
+    },
+    "command-dark": {
+      "fullHeightPoints": 874,
+      "deltaVsCurrentLogPoints": -345
+    },
+    "command-light": {
+      "fullHeightPoints": 874,
+      "deltaVsCurrentLogPoints": -345
+    },
+    "editorial-dark": {
+      "fullHeightPoints": 1019,
+      "deltaVsCurrentLogPoints": -200
+    },
+    "editorial-light": {
+      "fullHeightPoints": 1019,
+      "deltaVsCurrentLogPoints": -200
+    }
+  }
+}

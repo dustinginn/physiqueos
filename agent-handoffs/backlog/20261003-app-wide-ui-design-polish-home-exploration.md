@@ -57,3 +57,22 @@ Round 4 advances the three Founder-selected tracks independently: a locked struc
 - `agent-handoffs/artifacts/home-design-round4-20261003/IMPLEMENTATION-NOTES.md`
 
 No track, palette, hierarchy, component treatment, light-mode implementation or Log translation is accepted. Founder review and explicit direction-setting remain the next gate.
+
+## Selected Home refinement + Log exploration
+
+Status: **Selected Home under refinement; Log exploration ready for Founder review**
+
+The Founder-selected immersive dark/mineral-light Home pair has received the requested redundancy, Primary Goal, metric-label, target-label and 79%-ring corrections. That corrected visual grammar is frozen as the design reference for three independent Log explorations, each in dark and mineral-light appearance:
+
+- Direct Translation
+- Compact Command Center
+- Editorial / Open Log
+
+Review set:
+
+- `agent-handoffs/artifacts/selected-home-log-exploration-20261004/README.md`
+- `agent-handoffs/artifacts/selected-home-log-exploration-20261004/comparison-board.html`
+- `agent-handoffs/artifacts/selected-home-log-exploration-20261004/SOURCE-AUDIT.md`
+- `agent-handoffs/artifacts/selected-home-log-exploration-20261004/CONTENT-PARITY.md`
+
+No Home correction, Log architecture, palette, appearance implementation or component migration is accepted. Weekly Briefing remains a later exploration and has not started. The next gate is Founder review of the corrected Home pair and six full-resolution Log screens.
