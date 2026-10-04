@@ -1,42 +1,43 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-04T18:15:49Z",
+  "generated_at_utc": "2026-10-04T18:17:00Z",
   "task": {
-    "id": "20261004-priority-detail-ui-style-translation",
-    "title": "Priority Detail family UI style translation",
+    "id": "20261004-energy-weight-recovery-founder-correction",
+    "title": "Energy, Weight + Recovery founder correction",
     "agent": "codex",
-    "status": "complete_priority_detail_family_ready_for_founder_review"
+    "status": "focused_correction_ready_for_founder_confirmation"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "46ca8600e4659518ea3bc21dbbfc43256d6d78a2",
-    "native_sha": "b8ee8690b194cb90086f6f62816b9a2c8c400dc026",
-    "native_build": 85,
-    "production_server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+    "prompt_commit": "854d24c4d3640385c654c582578492c8d9e766fc",
+    "accepted_design_prompt_commit": "fbd6dd35e4e0dbabe5834d309170dcd2e724398a",
+    "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "native_build": 85
   },
   "publication": {
-    "source_work_branch": "codex/priority-detail-ui-style-translation",
-    "source_work_commit": "ee7346cd82754f44d308db122ab55e6a914b516a",
-    "artifact_commit": "ee7346cd82754f44d308db122ab55e6a914b516a",
-    "main_report_commit": "ee7346cd82754f44d308db122ab55e6a914b516a",
-    "report_path": "agent-handoffs/reports/20261004T181549Z-priority-detail-ui-style-translation.md",
-    "artifact_root": "agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/"
+    "source_work_branch": "codex/energy-weight-recovery-founder-correction",
+    "source_work_commit": "1baa3a40389fb3dfafd6a19c6745f89ae51cdfcb",
+    "artifact_commit": "a21296ec4fb6f13d639d294d120218d2aedc7d33",
+    "main_report_commit": "71662448a0b51d167ef6745a4c93d5be393ac436",
+    "report_path": "agent-handoffs/reports/20261004T190500Z-energy-weight-recovery-founder-correction.md",
+    "artifact_root": "agent-handoffs/artifacts/energy-weight-recovery-founder-correction-20261004/"
   },
   "result": {
-    "summary": "One action-forward translation covers the complete current Priority Detail family in locked dark/mineral styling while preserving server-owned sections, occurrence identity, evidence, dose, pause, skip and completion semantics.",
-    "rendered_surfaces": 10,
-    "rendered_screens": 20,
-    "dark_light_parity_pass": true,
-    "coverage_complete": true,
-    "goals_locked": true,
-    "morning_routing_resolved": true,
-    "home_peptide_completion_dose_aware": true,
-    "new_open_implementation_delta": "Progress Photos and DEXA Priority Detail action destinations",
+    "summary": "Energy retains separate weekly/daily sheets and context links; Weight exactly reproduces the two Build 85 inline disclosures; Recovery timeline clipping is fixed and Continuity uses lighter point/line marks without changing data.",
+    "focused_templates": 8,
+    "dark_light_product_renders": 16,
+    "energy_history_destinations_separate": true,
+    "energy_context_links_preserved": true,
+    "weight_disclosures_exact_build85": true,
+    "recovery_timeline_contained": true,
+    "recovery_continuity_values_preserved": true,
+    "implementation_delta_appended": true,
     "shipping_code_changed": false,
+    "dark_light_parity_pass": true,
     "validation_pass": true
   },
-  "recommended_next_step": "Founder reviews the concise Priority Detail family and either locks the direction or requests focused corrections; do not implement shipping UI yet.",
-  "stop_reason": "The complete source-audited Priority Detail family, paired appearances, route/completion proof, delta-ledger update and parity validation are ready for Founder review.",
+  "recommended_next_step": "Founder confirms the focused dark/mineral-light Energy, Weight and Recovery correction package.",
+  "stop_reason": "Exact interaction audit, eight focused templates, paired appearances, ledger review and deterministic validation are complete and ready for confirmation.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

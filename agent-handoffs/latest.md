@@ -2,26 +2,24 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Priority Detail family UI style translation
+- Task: Energy, Weight + Recovery founder correction
 - Agent: Codex
-- Status: complete family ready for Founder review; Priority Detail not locked; implementation not started
-- Generated (UTC): 2026-10-04T18:15:49Z
-- Work branch: `codex/priority-detail-ui-style-translation`
-- Work/report commit: `ee7346cd82754f44d308db122ab55e6a914b516a`
-- Artifact commit: `ee7346cd82754f44d308db122ab55e6a914b516a`
-- Main report commit: `ee7346cd82754f44d308db122ab55e6a914b516a`
-- Artifact root: `agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/`
+- Status: focused correction ready for Founder confirmation; implementation not started
+- Generated (UTC): 2026-10-04T18:17:00Z
+- Work branch: `codex/energy-weight-recovery-founder-correction`
+- Work/report commit: `1baa3a40389fb3dfafd6a19c6745f89ae51cdfcb`
+- Artifact commit: `a21296ec4fb6f13d639d294d120218d2aedc7d33`
+- Main report commit before pointer update: `71662448a0b51d167ef6745a4c93d5be393ac436`
+- Artifact root: `agent-handoffs/artifacts/energy-weight-recovery-founder-correction-20261004/`
 
-One action-forward locked-family translation covers ordinary/manual Priority, Morning Weigh-In, Foam Rolling, dose-aware Tesamorelin/Retatrutide, paused peptide, Fadogia supplement Support, Progress Photos, DEXA, completed and error states in dark/mineral light.
+Energy now preserves two independent Show All sheets and the canonical conditional Nutrition Day / Activity links. Weight’s two Show All actions are source-verified Build 85 inline disclosures, each with a three-row preview, full expanded list and Close state—no inferred sheet or route.
 
-Automated validation passed 20 full-resolution renders at 402 pt with exact dark/light content parity, 44 pt actions, all materially distinct templates covered, and no retired Related Goals or informational Completion cards.
+Recovery’s Night Detail timeline is contained at phone width. Continuity alone is lighter: two separately scaled thin point/line series preserve every value and the missing-night gap. Dark/mineral-light validation passed across all eight focused templates.
 
-The completed Morning Check-In route and Home planned-dose peptide completion are both resolved/intentional in Build 85. A genuine Progress Photos/DEXA Priority Detail action-destination gap was added to the implementation-delta ledger with source proof.
+The implementation-delta ledger now records the accepted Continuity mark change. No shipping source changed.
 
-Goals is now locked. Static completed-Goal photos are accepted and are not an implementation gap; the separate Photo Briefing paired viewer requirement remains open.
+Next: Founder confirms the focused correction package. The exact source audit, interaction matrix and concise review board are ready.
 
-Next: Founder reviews the concise Priority Detail family and either locks it or requests focused corrections. No shipping implementation is authorized.
-
-Detailed report: `agent-handoffs/reports/20261004T181549Z-priority-detail-ui-style-translation.md`
+Detailed report: `agent-handoffs/reports/20261004T190500Z-energy-weight-recovery-founder-correction.md`
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
