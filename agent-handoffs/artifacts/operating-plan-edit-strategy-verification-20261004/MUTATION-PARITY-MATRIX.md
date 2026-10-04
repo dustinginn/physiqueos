@@ -1,0 +1,10 @@
+# Mutation parity matrix
+
+| Surface | Production action | Editable fields | Validation | Save semantics | History/effective-date semantics | Target design |
+|---|---|---|---|---|---|---|
+| Energy Strategy | none | none | n/a | intentionally read-only; no edit destination | phase-owned strategy remains read-only; production history projection gap remains separately logged | reuse accepted detail as negative proof; no button, form or unavailable-route fiction |
+| Nutrition Edit Strategy | `Edit Strategy` → bounded Nutrition editor | protein basis; active basis value; carbohydrate approach; fat approach | ratio 0.5–2.0; fixed 50–400 g; exact approach allowlists | one direct Save; current-version concurrency; updated/unchanged success dismisses; failure retains draft with generic error | Server-local current date; current Goal supports link; new successor preserves hidden intake strategy and supersedes prior version | exact order and choices; compact stepper/pills; Cancel + Save Strategy |
+| Training Edit Strategy | `Edit Strategy` → bounded Training editor | six area frequencies; prioritized muscle groups; progression | each 0–7 integer; total ≥1; ≥1 priority; exact progression allowlist | one direct Save; current-version concurrency; updated/unchanged success dismisses; failure retains draft with generic error | Server-local current date; current Goal supports link; hidden phase/context preserved; prior version retained | exact order, frequency relationships and selected states; compact rows; Cancel + Save Strategy |
+| Representative invalid Training draft | user sets all frequencies to zero and removes priorities, then saves | same local draft remains visible | Server rejects; Native surfaces generic production error | no mutation, no dismiss | current version/history unchanged | exact generic error above unchanged Save action |
+
+No page adds Evidence logging, workout controls, an effective-date field, Goal/phase pickers, rationale/notes or a second confirmation step.

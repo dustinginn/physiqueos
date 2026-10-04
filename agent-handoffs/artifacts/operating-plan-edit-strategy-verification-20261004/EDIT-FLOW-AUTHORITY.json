@@ -1,0 +1,77 @@
+{
+  "authority": {
+    "promptCommit": "0f48134e058d651edcaee7408784917ff84501ca",
+    "acceptedOperatingPlanArtifactCommit": "89d05249f90cb65da5941d08d987eba50bfb18ce",
+    "nativeBuild85": "b8ee8690b194cb90086f6f62816b9a2c8c400dc026",
+    "server": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "shippingChanges": false
+  },
+  "energy": {
+    "productionAction": null,
+    "editable": false,
+    "proof": "ProductionEnergyStrategyAPI requires intentionallyReadOnly=true and editLabel=null; OperatingPlanStrategyDetailReadModel therefore has no editDestination.",
+    "historyContext": "Production detail currently projects no energyPhaseHistory; existing open delta remains authoritative."
+  },
+  "nutrition": {
+    "title": "Edit Strategy",
+    "eyebrow": "Nutrition",
+    "subtitle": "Macro targets that translate the Energy strategy into daily nutrition.",
+    "sections": ["Protein Basis", "Carbohydrate Approach", "Fat Approach"],
+    "current": {
+      "proteinBasis": "Per body weight",
+      "proteinRatio": "1.0 g per lb bodyweight",
+      "fixedProteinGramsHidden": 150,
+      "carbohydrateStrategy": "Performance",
+      "fatStrategy": "Sustainable minimum"
+    },
+    "options": {
+      "proteinBasis": ["Per body weight", "Fixed grams"],
+      "carbohydrateStrategy": ["Performance", "Balanced", "Lower carbohydrate"],
+      "fatStrategy": ["Sustainable minimum", "Balanced", "Higher fat"]
+    },
+    "validation": [
+      "Body-weight ratio: 0.5–2.0 g per lb, step 0.1 in Native.",
+      "Fixed protein: 50–400 g, step 5 in Native.",
+      "Carbohydrate and fat values must belong to the exact server allowlists.",
+      "Unchanged save is an idempotent unchanged success."
+    ],
+    "saveAction": "Save Strategy",
+    "error": "This strategy was not saved. Refresh before retrying."
+  },
+  "training": {
+    "title": "Edit Strategy",
+    "eyebrow": "Training",
+    "subtitle": "Weekly structure and progression intent for the current phase.",
+    "sections": ["Weekly Frequency", "Training Focus", "Progression"],
+    "frequencies": [
+      ["Arms", 2],
+      ["Core", 2],
+      ["Lower Body", 2],
+      ["Back", 1],
+      ["Chest", 1],
+      ["Shoulders", 1]
+    ],
+    "priorities": ["Chest", "Back"],
+    "progression": "Moderate",
+    "progressionOptions": ["Conservative", "Moderate", "Aggressive"],
+    "validation": [
+      "Each area must be a whole number from 0 to 7.",
+      "Total weekly area sessions must be at least 1.",
+      "At least one prioritized muscle group is required.",
+      "Progression must belong to conservative, moderate or aggressive.",
+      "Unchanged save is an idempotent unchanged success."
+    ],
+    "saveAction": "Save Strategy",
+    "error": "This strategy was not saved. Refresh before retrying."
+  },
+  "mutationSemantics": {
+    "cancel": "Cancel dismisses and discards the local draft; there is no unsaved-change confirmation.",
+    "effectiveDate": "Server stamps the successor with the current America/Los_Angeles local date; the date is not user-editable.",
+    "goalOwnership": "Server carries the active protocol's currentGoalIds[0] or relatedGoalIds[0] as a supports relationship; Goal is not user-editable here.",
+    "phaseOwnership": "Training preserves hidden phase/context fields; neither editor exposes a phase selector.",
+    "save": "One direct Save Strategy action sends expectedCurrentVersionId. No second confirmation step.",
+    "success": "Updated or unchanged success dismisses the editor back to strategy detail; there is no separate success page or toast.",
+    "failure": "Native retains the draft and renders the generic editor error; stale/invalid/persistence details remain Server-owned.",
+    "history": "A valid update appends a canonical successor, supersedes and ends the previous version at the successor effective date, advances currentVersionId, and preserves historical date resolution."
+  }
+}

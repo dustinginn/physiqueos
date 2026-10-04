@@ -362,7 +362,7 @@ Founder subsequently accepted and locked DEXA and Photo in both appearances. The
 
 ## Goals hierarchy style translation
 
-Status: **Goals and Priority Detail locked; Operating Plan translation ready for Founder review**
+Status: **Operating Plan root and three strategy details accepted; Edit Strategy verification ready for Founder review**
 
 One locked-family direction covers the complete current Founder Production Goals hierarchy in dark and mineral light:
 
@@ -378,7 +378,7 @@ The source audit records two current Build 85 boundaries: historical completed p
 
 Founder subsequently accepted and locked the complete Goals hierarchy in dark and mineral light. Priority Detail is now accepted and locked after consolidating both Tesamorelin preparation requirements into one Preparation section. The audit resolves completed Morning Check-In routing and Home-versus-detail peptide completion as correct current behavior, while the missing Progress Photos/DEXA Priority Detail action destinations remain in the implementation-delta ledger.
 
-Operating Plan root plus Energy, Nutrition and Training strategy details have now entered locked-system visual translation in dark and mineral light. The source audit preserves the actual eight-domain root order, existing read/edit/navigation semantics and strategy-only information ownership. Operating Plan remains pending Founder review. Production Energy phase history is not currently projected despite existing sandbox/view support and is recorded as a required implementation delta; no historical values were fabricated in the design.
+Founder accepted the Operating Plan root plus Energy, Nutrition and Training strategy details in dark and mineral light. The focused edit-flow verification confirms Energy is intentionally read-only with no edit destination; Nutrition and Training retain their exact production fields, option sets, validation boundary, current-version concurrency, Goal ownership and successor-history semantics. These editor renders are pending Founder review. Production Energy phase history is still not projected despite existing sandbox/view support and remains an open required implementation delta; no historical values or edit route were fabricated.
 
 Review set:
 
