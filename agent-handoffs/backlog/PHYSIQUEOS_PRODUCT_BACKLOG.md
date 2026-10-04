@@ -1,6 +1,6 @@
 PhysiqueOS product backlog — durable authority
 
-Last updated: 2026-10-03
+Last updated: 2026-10-04
 Owner: Founder
 Purpose: durable cross-chat authority for outstanding product work, accepted deferrals, natural acceptance gates, and next-build integration items.
 
@@ -172,6 +172,11 @@ Monthly exploration state:
 - Monthly remains prior-calendar-month/day-1 and higher-precedence among recurring cadences on collision;
 - Monthly Recovery is fixture-only, uses weekly aggregates, and remains inactive/Confidence-decoupled;
 - Monthly is pending Founder review and is not locked.
+
+Utility + Evidence design state:
+- Apple Watch workout, Live Activity / Dynamic Island, and Training Logger directions are accepted and locked in dark + mineral light; implementation has not started.
+- Training Evidence is accepted and locked. Its Training Areas treatment preserves all 10 canonical live-app areas in exact order/count and never buckets, merges, prioritizes, paginates, or hides them.
+- Nutrition Evidence and Activity Evidence dark/mineral-light translations are ready for Founder review at `agent-handoffs/artifacts/nutrition-activity-evidence-style-translation-20261004/`; implementation has not started.
 
 F2. Briefing Narrative + Confidence quality/tuning audit
 Position: next major strategic-quality project.

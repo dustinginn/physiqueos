@@ -1,0 +1,72 @@
+{
+  "authority": {
+    "prompt": "eb186ba2bb0862daf4f487c334ef445336bcab46",
+    "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "build": 85,
+    "trainingLock": "ca088e80e851c83d0d3e168d88f918232f5338d6"
+  },
+  "generatedAt": "2026-10-04T16:24:11.010Z",
+  "expected": {
+    "nutrition": 8,
+    "activity": 7,
+    "total": 15
+  },
+  "boards": {
+    "dark": {
+      "actualScreens": 15,
+      "familyCounts": {
+        "nutrition": 8,
+        "activity": 7
+      },
+      "missing": [],
+      "extra": [],
+      "duplicates": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "missingPhone": [],
+      "runtimeErrors": [],
+      "pass": true
+    },
+    "light": {
+      "actualScreens": 15,
+      "familyCounts": {
+        "nutrition": 8,
+        "activity": 7
+      },
+      "missing": [],
+      "extra": [],
+      "duplicates": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "missingPhone": [],
+      "runtimeErrors": [],
+      "pass": true
+    }
+  },
+  "parity": {
+    "checkedScreens": 15,
+    "textMismatches": [],
+    "pass": true
+  },
+  "semanticRules": {
+    "shippingSourceChanged": false,
+    "inventedNutritionChart": false,
+    "inventedActivityChart": false,
+    "nutritionSourcesPresentedAsAdditive": false,
+    "nutritionAggregationChanged": false,
+    "activityWorkoutClassificationInvented": false,
+    "cooldownStyledOrCountedAsCardio": false,
+    "evidenceRowsStyledEditable": false,
+    "healthKitSemanticsChanged": false
+  },
+  "contentAssertions": {
+    "nutritionCanonicalOrder": true,
+    "nutritionSourceScoped": true,
+    "totalsOnlyCopyExact": true,
+    "activityMetricOrder": true,
+    "partialDayExact": true,
+    "noActivityReportingTitle": true,
+    "noCooldownMisclassification": true
+  },
+  "pass": true
+}
