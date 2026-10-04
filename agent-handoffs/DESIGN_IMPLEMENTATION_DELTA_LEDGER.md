@@ -227,7 +227,7 @@ For an active/paused session with no live, stored or saved Watch workout, offer 
 Acceptance:
 A phone-started session, then Watch Record with Apple Health, gives exactly one PhysiqueOS HealthKit workout with HR/energy populating, and finish saves and reports it once. With no session the Watch never claims HEALTH ON. A Watch-started session is unchanged. Test seam: an injectable Watch health controller.
 
-Status: OPEN; awaiting Founder decision (auto vs explicit; late-start correlation).
+Status: FIXED IN BUILD 86 CANDIDATE (unreleased) — Native `claude/native-watch-healthkit-build86-20261004` at `4f78fce663fb16c3cc6930b3b8e576a328defcbe`; report `agent-handoffs/reports/20261004T232105Z-build86-watch-healthkit-candidate.md`. Automatic exactly-once start (prompt-directed); trust boundary unchanged. Close only after physical-device acceptance.
 
 ### Apple Watch Logger — activation refresh disables Complete Set
 
@@ -248,7 +248,29 @@ Separate refresh from the mutation gate, or exclude it from the enablement predi
 Acceptance:
 With a reachable active projection, a display activation does not disable Complete Set. A tap during a refresh is delivered once. A stale race yields one refresh and no lost tap.
 
-Status: OPEN; measure on device before choosing the variant.
+Status: FIXED IN BUILD 86 CANDIDATE (unreleased; refresh has its own lane, stale Complete Set re-sent once for the same set, latency trace added) — `4f78fce6`; report `agent-handoffs/reports/20261004T232105Z-build86-watch-healthkit-candidate.md`. Immediate phone→Watch push deferred pending on-device measurement. Close only after physical-device acceptance (including 10–15 ft).
+
+### Workout presentation — unconfirmed HealthKit candidate replaces the Logger session window
+
+Classification: LIKELY SHIPPING DEFECT (Server)
+
+Discovery:
+Build 86 Part A read-only reconciliation audit of Server `3c0f4aef` for the 2026-10-04 workout (late-started Apple Traditional Strength Training vs the PhysiqueOS Logger session; production review: 55% `possible_match`).
+Report: `agent-handoffs/reports/20261004T232105Z-build86-watch-healthkit-candidate.md`
+
+Current behavior:
+Even an unconfirmed (55%) candidate link replaces the Logger session's displayed start/end/duration/calories with the HealthKit workout's (shorter, late) window (`HealthKitWorkoutPresentationService.js:119-172`, `ProgressReportingService.js:3042-3080`, `TrainingNavigationReadService.js:428-441`, `LoggedTodayService.js:41`). The presentation path does not read Founder-unlinked state, so it appears to persist after "No match". Stored records are not mutated.
+
+Target:
+The structured Logger session keeps its own window unless a link is confirmed; a Founder "No match" removes any candidate presentation.
+
+Implementation implication:
+Server presentation reads link resolution state (confirmed only) before substituting HealthKit timing/energy; add tests for pending, confirmed and unlinked candidates.
+
+Acceptance:
+A pending or rejected candidate never changes the Logger session's displayed window; a confirmed link shows the agreed presentation; no record mutation.
+
+Status: OPEN; reverify against Server authority before patching. No production record was touched.
 
 ### Evidence Hub — remove Health Metrics placeholder and place Timeline last
 
