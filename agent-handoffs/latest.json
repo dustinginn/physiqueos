@@ -1,55 +1,60 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-04T19:49:46Z",
+  "generated_at_utc": "2026-10-04T20:18:53Z",
   "task": {
-    "id": "20261004-you-settings-profile-ui-design",
-    "title": "DEXA Evidence lock and You / Settings / Profile UI design",
+    "id": "20261004-operating-plan-finish-remaining",
+    "title": "Operating Plan — finish all remaining current surfaces",
     "agent": "codex",
-    "status": "settings_family_ready_for_founder_review"
+    "status": "founder_review_artifacts_ready"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "ce0141a53e140fe9b0854d6a4df01d6a5dbae434",
+    "prompt_commit": "3232c64a4a27cfe41678e7b8ffe6b3cd97eb0305",
     "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
     "native_build": 85,
-    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "accepted_operating_plan_artifact_commit": "89d05249f90cb65da5941d08d987eba50bfb18ce",
+    "locked_domains_artifact_commit": "acafbd377db3b2cc71a26fd121a73841fdc02820"
   },
   "publication": {
-    "source_work_branch": "codex/you-settings-profile-ui-design",
-    "source_work_commit": "908d9d8dd32f94cc193d0862a30b071323d69e17",
-    "artifact_commit": "f208007cc7e1872d718efea372e6938f75b1a9aa",
-    "main_report_commit": "d4c379cd7134fb69a6e2949054799dcf6eb237fa",
-    "main_ledger_commit": "0e102bff957add7ef7b7045dd42b8d916794ae2a",
-    "report_path": "agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md",
-    "artifact_root": "agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/",
-    "primary_review_png": "agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/screens/you-settings-primary-mobile-review-board.png",
-    "review_page": "agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/review-board.html",
-    "architecture_summary_png": "agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/screens/beta-readiness-architecture-summary.png"
+    "source_work_branch": "codex/operating-plan-finish-remaining",
+    "source_work_commit": "ab1f22bb4f9f4a597224f6c768347237403f67d8",
+    "artifact_commit": "ab1f22bb4f9f4a597224f6c768347237403f67d8",
+    "main_report_commit": "a6c830db534a11f61b7996a5e767bf9b4cb816d6",
+    "main_ledger_commit": "a6c830db534a11f61b7996a5e767bf9b4cb816d6",
+    "report_path": "agent-handoffs/reports/20261004T201405Z-operating-plan-finish-remaining.md",
+    "artifact_root": "agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/",
+    "primary_review_png": "agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/boards/operating-plan-remaining-mobile-review.png",
+    "review_page": "agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/comparison-board.html",
+    "focused_review_pngs": [
+      "agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/boards/tracking-review.png",
+      "agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/boards/coaching-updates-review.png",
+      "agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/boards/dexa-current-state-review.png"
+    ]
   },
   "result": {
-    "summary": "The final DEXA Since Prior Scan correction is complete and the entire Evidence family is locked. You, Settings, Profile, Data Sources, Apple Health states and Appearance now have one source-audited dark/Mineral-Light target with beta-readiness deltas documented.",
-    "evidence_family_locked": true,
-    "settings_family_pending_founder_review": true,
-    "direct_templates": 8,
-    "dark_light_product_renders": 16,
-    "profile_included_fields": [
-      "preferred_name",
-      "height",
-      "time_zone",
-      "weight_units"
+    "summary": "The source-audited final Operating Plan package covers every current surface after locked Supplements: Tracking, Coaching Updates and the current non-root DEXA utility state.",
+    "locked_before_this_pass": [
+      "Operating Plan root",
+      "Energy Strategy",
+      "Nutrition",
+      "Training",
+      "Recovery",
+      "Peptides",
+      "Supplements"
     ],
-    "appearance_modes": [
-      "system",
-      "dark",
-      "light_mineral"
-    ],
-    "new_required_implementation_deltas": 5,
-    "shipping_code_changed": false,
+    "remaining_root_rows": ["Tracking", "Coaching Updates"],
+    "rendered_surfaces": 7,
+    "dark_light_product_renders": 14,
     "dark_light_parity_pass": true,
-    "validation_pass": true
+    "validation_pass": true,
+    "no_remaining_operating_plan_pages_proven": true,
+    "new_required_implementation_deltas": 1,
+    "shipping_code_changed": false,
+    "server_behavior_changed": false
   },
-  "recommended_next_step": "Founder reviews the primary composite and confirms or corrects the You / Settings family before implementation planning.",
-  "stop_reason": "All requested screens and material states are rendered or mapped, dark/Mineral-Light parity is validated, the final Evidence correction is locked, and implementation/beta gaps are published on main.",
+  "recommended_next_step": "Founder reviews Tracking and Coaching Updates and either locks them or provides focused corrections.",
+  "stop_reason": "Every current Operating Plan surface and material state after Supplements is rendered and validated in dark and Mineral Light; no shipping implementation is authorized.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

@@ -2,31 +2,26 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: DEXA Evidence lock and You / Settings / Profile UI design
+- Task: Operating Plan — finish all remaining current surfaces
 - Agent: Codex
-- Status: Settings family ready for Founder review; implementation not started
-- Generated (UTC): 2026-10-04T19:49:46Z
-- Work branch: `codex/you-settings-profile-ui-design`
-- Work/report commit: `908d9d8dd32f94cc193d0862a30b071323d69e17`
-- Artifact commit: `f208007cc7e1872d718efea372e6938f75b1a9aa`
-- Main report commit: `d4c379cd7134fb69a6e2949054799dcf6eb237fa`
-- Main ledger commit before pointer update: `0e102bff957add7ef7b7045dd42b8d916794ae2a`
-- Report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
-- Artifact root: `agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/`
-- Primary review PNG: `agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/screens/you-settings-primary-mobile-review-board.png`
-- Review page: `agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/review-board.html`
-- Architecture summary: `agent-handoffs/artifacts/you-settings-profile-ui-design-20261004/screens/beta-readiness-architecture-summary.png`
+- Status: Founder review artifacts ready; no shipping implementation
+- Generated (UTC): 2026-10-04T20:18:53Z
+- Work branch: `codex/operating-plan-finish-remaining`
+- Work/artifact commit: `ab1f22bb4f9f4a597224f6c768347237403f67d8`
+- Main report/artifact commit: `a6c830db534a11f61b7996a5e767bf9b4cb816d6`
+- Report: `agent-handoffs/reports/20261004T201405Z-operating-plan-finish-remaining.md`
+- Artifact root: `agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/`
+- Primary review PNG: `agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/boards/operating-plan-remaining-mobile-review.png`
+- Review page: `agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/comparison-board.html`
 
-The final DEXA Since Prior Scan correction now matches production structure and the entire Evidence design family is locked.
+The source audit proves the exact current rows after locked Supplements are Tracking and conditional Coaching Updates. Their complete current root/detail/support/editor hierarchy, the material monthly Progress Photos cadence state and the non-root Founder Production DEXA appointment unavailable state are rendered in dark and Mineral Light.
 
-The new target preserves You, Goals and Operating Plan; replaces the dead Integrations doorway with Settings; limits Profile to Preferred name, Height, Time zone and Weight units; makes Apple Health connection/direction understandable without duplicating Evidence or inventing permission status; and supports System, Dark and locked Mineral Light.
+Validation passed for seven surfaces/states, 14 full-resolution product PNGs and exact dark/light parity. The audit found no other current Operating Plan page or subpage left undesigned.
 
-Five genuine implementation deltas are in the canonical ledger: routes, profile storage/write contract, Native theme/persistence, user-safe Apple Health projection, and complete one-device Sign Out. No shipping code, schema, HealthKit permission, build, TestFlight or deployment state changed.
+One genuine implementation delta was added: the Priority Detail DEXA action cannot become usable merely by adding its missing route mapping because the destination itself is unavailable in Founder Production. No fix or shipping source change was made.
 
-Validation passed for 8 templates and 16 dark/Mineral-Light product renders with zero overflow, runtime errors or broken board images.
+Next: Founder reviews Tracking and Coaching Updates and either locks them or provides corrections.
 
-Next: Founder reviews and confirms or corrects the You / Settings family.
-
-Detailed report: `agent-handoffs/reports/20261004T203501Z-you-settings-profile-ui-design.md`
+Detailed report: `agent-handoffs/reports/20261004T201405Z-operating-plan-finish-remaining.md`
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
