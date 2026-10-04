@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Locked system translated through Operating Plan Training; Recovery, Peptides and Supplements ready for Founder review**
+Status: **Operating Plan translated end to end; Tracking and Coaching Updates ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -19,9 +19,33 @@ Scope boundary remains:
 - no rebrand decision made;
 - no palette, typography or component migration approved.
 
+## Operating Plan — final remaining surfaces
+
+Status: **Tracking and Coaching Updates ready for Founder review**
+
+Founder has now accepted and locked the Operating Plan root, Energy, Nutrition, Training, Recovery, Peptides and Supplements. The exact current Server order leaves only Tracking and conditional Coaching Updates after Supplements.
+
+The final source-audited package covers:
+
+- the unchanged locked-root tail proving Tracking then Coaching Updates;
+- Tracking root and the complete Morning Weigh-In Support editor;
+- Coaching Updates detail and the complete composite editor;
+- the materially distinct monthly Progress Photos cadence controls;
+- the current Founder Production DEXA appointment unavailable utility state.
+
+Review package:
+
+- `agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/README.md`
+- `agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/comparison-board.html`
+- `agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/boards/operating-plan-remaining-mobile-review.png`
+- `agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/COVERAGE-MATRIX.md`
+- `agent-handoffs/artifacts/operating-plan-finish-remaining-20261004/PARITY-PROOF.md`
+
+The audit proves there are no remaining current Operating Plan pages/subpages after this package. Tracking and Coaching Updates are not yet visually accepted. The Founder Production DEXA utility limitation is recorded in the design-to-implementation delta ledger. No shipping code changed.
+
 ## Operating Plan — domains 4–6
 
-Status: **Recovery, Peptides and Supplements ready for Founder review**
+Status: **Recovery, Peptides and Supplements accepted and locked**
 
 Founder-locked before this pass:
 
@@ -43,9 +67,9 @@ Review package:
 - `agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/boards/operating-plan-next-three-mobile-review.png`
 - `agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/PARITY-PROOF.md`
 
-No Recovery/Peptide/Supplement visual is accepted yet. No shipping Native or Server code changed.
+Founder accepted and locked Recovery, Peptides and Supplements in both appearances. No shipping Native or Server code changed.
 
-Next gate: Founder visual review and direction-setting.
+Next gate: Founder review of the final Tracking and Coaching Updates package above.
 
 ## Round 2 — hybrid, light appearance and experimental directions
 
