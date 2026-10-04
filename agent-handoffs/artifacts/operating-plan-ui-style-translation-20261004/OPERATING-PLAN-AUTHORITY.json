@@ -1,0 +1,71 @@
+{
+  "authority": {
+    "promptCommit": "ecf54c6ce22e90075e613eb8208b19fc6249e2a3",
+    "nativeBuild85": "b8ee8690b194cb90086f6f62816b9a2c8c400dc026",
+    "server": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "shippingChanges": false
+  },
+  "appearance": ["dark", "mineral-light"],
+  "surfaces": {
+    "root": {
+      "eyebrow": "OPERATING PLAN",
+      "title": "Your Operating Plan",
+      "purpose": "Current strategy across every domain, and the protocols that support it.",
+      "scopedDomains": [
+        {"domain":"ENERGY STRATEGY","title":"Current Phase Energy Plan","detail":"2,500 kcal/day intake · 800 kcal/day activity · Monthly review","status":"Active","destination":"native.operating-plan.strategy / energy"},
+        {"domain":"NUTRITION","title":"Calorie Calibration","detail":"1 g per lb of body weight · intake adjusted gradually","status":"Active","destination":"native.operating-plan.strategy / nutrition"},
+        {"domain":"TRAINING","title":"Maintenance Training Strategy","detail":"9 weekly area sessions · Moderate progression","status":"Active","destination":"native.operating-plan.strategy / training"}
+      ],
+      "remainingDomainOrder": ["Recovery", "Peptides", "Supplements", "Tracking", "Coaching Updates"]
+    },
+    "energy": {
+      "eyebrow": "ENERGY STRATEGY",
+      "title": "Lean Mass Build Energy Plan",
+      "purpose": "Follow the current intake and activity targets for this phase while watching how the body responds and keeping the Guardrail in view.",
+      "goal": "Your Build Lean Mass goal",
+      "started": "August 15, 2026",
+      "status": "Active",
+      "fields": [
+        ["Plan Type", "Following the active phase's targets"],
+        ["Caloric Intake", "2,500 kcal/day"],
+        ["Activity Target", "800 kcal/day"],
+        ["Evidence Monitoring", "Weekly evidence review"],
+        ["Strategic Review", "Monthly · DEXA and body composition aligned"],
+        ["Strategy Changes", "Adjusted as the evidence supports it"]
+      ],
+      "editAction": null,
+      "productionPhaseHistory": []
+    },
+    "nutrition": {
+      "eyebrow": "NUTRITION STRATEGY",
+      "title": "Macro Strategy",
+      "purpose": "Define how daily intake is composed across protein, carbohydrates, and fats to support your Build Lean Mass goal.",
+      "goal": "Your Build Lean Mass goal",
+      "started": "July 25, 2026",
+      "status": "Active",
+      "fields": [
+        ["Protein Target", "1 g per lb of body weight"],
+        ["Carbohydrate Approach", "Performance"],
+        ["Fat Approach", "Sustainable Minimum"],
+        ["Macro Philosophy", "Flexible across training and rest days"]
+      ],
+      "editAction": "Edit Strategy"
+    },
+    "training": {
+      "eyebrow": "TRAINING STRATEGY",
+      "title": "Build Lean Mass Training",
+      "purpose": "Build the weekly structure, training focus, and progression needed to support your Build Lean Mass goal.",
+      "goal": "Your Build Lean Mass goal",
+      "started": "July 25, 2026",
+      "status": "Active",
+      "fields": [
+        ["Weekly Structure", "9 area sessions"],
+        ["Training Focus", "Chest, Back"],
+        ["Progression", "Moderate"],
+        ["Current Goal Phase", "Lean Mass Build"],
+        ["Training Context", "Goal-level strategy"]
+      ],
+      "editAction": "Edit Strategy"
+    }
+  }
+}

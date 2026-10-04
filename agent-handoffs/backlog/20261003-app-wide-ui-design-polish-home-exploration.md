@@ -362,7 +362,7 @@ Founder subsequently accepted and locked DEXA and Photo in both appearances. The
 
 ## Goals hierarchy style translation
 
-Status: **Goals locked; Priority Detail translation ready for Founder review**
+Status: **Goals and Priority Detail locked; Operating Plan translation ready for Founder review**
 
 One locked-family direction covers the complete current Founder Production Goals hierarchy in dark and mineral light:
 
@@ -376,7 +376,9 @@ One locked-family direction covers the complete current Founder Production Goals
 
 The source audit records two current Build 85 boundaries: historical completed phases lack rich phase content in the production adapter, and supporting-objective detail is not resolvable by the production adapter. Completed-Goal `ProgressPhotoTile` loads authenticated pixels and intentionally remains static under the Founder-accepted Goals direction; this is not an implementation gap. The design does not fabricate missing phase copy, supporting routes or media bindings.
 
-Founder subsequently accepted and locked the complete Goals hierarchy in dark and mineral light. Priority Detail translation now covers the complete current family in the same locked visual system. The audit resolves completed Morning Check-In routing and Home-versus-detail peptide completion as correct current behavior, while adding the missing Progress Photos/DEXA Priority Detail action destinations to the implementation-delta ledger.
+Founder subsequently accepted and locked the complete Goals hierarchy in dark and mineral light. Priority Detail is now accepted and locked after consolidating both Tesamorelin preparation requirements into one Preparation section. The audit resolves completed Morning Check-In routing and Home-versus-detail peptide completion as correct current behavior, while the missing Progress Photos/DEXA Priority Detail action destinations remain in the implementation-delta ledger.
+
+Operating Plan root plus Energy, Nutrition and Training strategy details have now entered locked-system visual translation in dark and mineral light. The source audit preserves the actual eight-domain root order, existing read/edit/navigation semantics and strategy-only information ownership. Operating Plan remains pending Founder review. Production Energy phase history is not currently projected despite existing sandbox/view support and is recorded as a required implementation delta; no historical values were fabricated in the design.
 
 Review set:
 

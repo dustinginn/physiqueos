@@ -66,6 +66,7 @@ await pair('generic','generic-dark-light.png','Generic completion template');
 await pair('morning','morning-weigh-in-dark-light.png','Morning Weigh-In');
 await pair('foam','foam-rolling-dark-light.png','Foam Rolling');
 await pair('peptide','tesamorelin-dose-aware-dark-light.png','Tesamorelin · dose-aware');
+await pair('peptide','tesamorelin-preparation-consolidated-dark-light.png','Tesamorelin · one Preparation section');
 await pair('paused','retatrutide-paused-dark-light.png','Retatrutide · paused');
 await pair('supplement','fadogia-dark-light.png','Fadogia Agrestis · every other day');
 await board([{label:'Progress Photos · dark',path:files.evidence.dark},{label:'Progress Photos · mineral',path:files.evidence.light},{label:'DEXA · dark',path:files.dexa.dark},{label:'DEXA · mineral',path:files.dexa.light}],'evidence-priorities.png','Evidence-driven priorities',260);
@@ -78,6 +79,8 @@ await board([
 ],'priority-family-board-light.png','Priority Detail family · mineral light',210);
 
 const validation={pass:true,authority:authority.authority,surfaces,screenCount:surfaces.length*2,actualTarget:{width:402,minHeight:874},darkLightContentParity:true,forbiddenSectionsAbsent:forbidden,templatesCovered:['generic ordinary','morning evidence','recovery support','dose-aware peptide','paused peptide','supplement','progress photos','DEXA appointment','completed','error'],parity,shippingChanges:false,files};
+if(audits.peptide.dark.sections.filter(x=>x==='Preparation').length!==1)throw new Error('Tesamorelin must render exactly one Preparation section');
+validation.tesamorelinPreparationSections=1;
 await fs.writeFile(path.join(root,'validation.json'),JSON.stringify(validation,null,2)+'\n');
 await browser.close();
 console.log(JSON.stringify({pass:true,screenCount:validation.screenCount,templates:validation.templatesCovered},null,2));

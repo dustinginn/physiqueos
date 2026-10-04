@@ -1,8 +1,8 @@
 # Priority Detail family · locked-system translation
 
-Status: **ready for Founder review; Priority Detail is not locked**.
+Status: **LOCKED by Founder after the Tesamorelin Preparation consolidation**.
 
-This package translates the complete current Priority Detail family into the locked PhysiqueOS dark/mineral visual system. It is one direction, not an exploration set. The canonical information and action contract remains unchanged.
+This package translates the complete current Priority Detail family into the locked PhysiqueOS dark/mineral visual system. It is one direction, not an exploration set. The canonical information and action contract remains unchanged. The accepted correction consolidates Tesamorelin's two visually redundant Preparation rows into one Preparation section while preserving both instructions: finish eating approximately 2–3 hours before injection, and take fasted before bed.
 
 ## Fast review
 

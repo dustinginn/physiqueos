@@ -49,6 +49,28 @@ Do not silently fix these during design-only tasks.
 
 ## Open implementation deltas
 
+### Operating Plan Energy — production phase-history projection
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION
+
+Discovery:
+Operating Plan Build 85 Native/Server source audit under the Founder rule that Phase 1 strategy history must remain distinct after Phase 2 begins.
+Report: `agent-handoffs/reports/20261004T193500Z-operating-plan-ui-style-translation.md`
+
+Current Build 85 behavior:
+The Server can resolve an Energy Strategy for a Goal/phase/as-of date through `resolveOperatingPlanEnergyStrategyAt`, and the Native sandbox fixture plus `OperatingPlanStrategyDetailView` support `energyPhaseHistory`. The bounded Founder-production `operating-plan-energy-strategy` response projects only the active protocol. `EnergyStrategyDetail.readModel` then hardcodes `energyPhaseHistory: []`. Production therefore cannot display the preserved Phase 1 Maintenance Calibration strategy beside the active Phase 2 strategy.
+
+Accepted/required target:
+When a new phase establishes a new Energy Strategy, the current detail must keep the active phase strategy first and expose earlier phase-owned strategy snapshots as read-only history. Historical values must remain their original values; they must not be collapsed into or rewritten as the active strategy.
+
+Implementation implication:
+Extend the bounded Energy detail projection with canonical prior phase strategy snapshots (stable phase identity, order, effective dates, intake/activity targets, review cadence and current/completed state). Reuse the existing Native history model/view or replace it with an equivalent typed contract. Do not infer history from current targets in Native.
+
+Acceptance:
+After a Phase 1 → Phase 2 transition, Founder Production Energy detail shows exactly one active Phase 2 strategy and the unchanged Phase 1 snapshot below it. No edit action appears. Re-reading, app relaunch and a later Phase 2 strategy revision preserve the original Phase 1 values. A Goal with no prior Energy Strategy shows no empty history shell.
+
+Status: OPEN.
+
 ### Priority Detail — Progress Photos and DEXA action destinations
 
 Classification: REQUIRED FOR DESIGN IMPLEMENTATION / LIKELY SHIPPING DEFECT

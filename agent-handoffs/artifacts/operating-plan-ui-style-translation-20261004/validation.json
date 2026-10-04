@@ -1,0 +1,94 @@
+{
+  "pass": true,
+  "authority": {
+    "promptCommit": "ecf54c6ce22e90075e613eb8208b19fc6249e2a3",
+    "nativeBuild85": "b8ee8690b194cb90086f6f62816b9a2c8c400dc026",
+    "server": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "shippingChanges": false
+  },
+  "screenCount": 8,
+  "actualTarget": {
+    "width": 402,
+    "minHeight": 874
+  },
+  "darkLightContentParity": true,
+  "rootDomainOrder": [
+    "ENERGY STRATEGY",
+    "NUTRITION",
+    "TRAINING",
+    "RECOVERY",
+    "PEPTIDES",
+    "SUPPLEMENTS",
+    "TRACKING",
+    "COACHING UPDATES"
+  ],
+  "parity": {
+    "root": {
+      "missing": [],
+      "domainOrder": [
+        "ENERGY STRATEGY",
+        "NUTRITION",
+        "TRAINING",
+        "RECOVERY",
+        "PEPTIDES",
+        "SUPPLEMENTS",
+        "TRACKING",
+        "COACHING UPDATES"
+      ]
+    },
+    "energy": {
+      "missing": [],
+      "fieldOrder": [
+        "Activity Target",
+        "Evidence Monitoring",
+        "Strategic Review",
+        "Strategy Changes"
+      ],
+      "actions": []
+    },
+    "nutrition": {
+      "missing": [],
+      "fieldOrder": [
+        "Fat Approach",
+        "Macro Philosophy"
+      ],
+      "actions": [
+        "Edit Strategy"
+      ]
+    },
+    "training": {
+      "missing": [],
+      "fieldOrder": [
+        "Training Focus",
+        "Progression",
+        "Current Goal Phase",
+        "Training Context"
+      ],
+      "actions": [
+        "Edit Strategy"
+      ]
+    }
+  },
+  "energyPhaseHistoryProjected": false,
+  "energyEditActionProjected": false,
+  "shippingChanges": false,
+  "primaryFounderReview": "screens/operating-plan-mobile-review.png",
+  "files": {
+    "root": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/screens/root-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/screens/root-light.png"
+    },
+    "energy": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/screens/energy-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/screens/energy-light.png"
+    },
+    "nutrition": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/screens/nutrition-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/screens/nutrition-light.png"
+    },
+    "training": {
+      "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/screens/training-dark.png",
+      "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/operating-plan-ui-style-translation-20261004/screens/training-light.png"
+    }
+  }
+}

@@ -83,7 +83,6 @@
         "When",
         "Dose",
         "Preparation",
-        "Preparation",
         "Execution Notes",
         "Why it matters",
         "Next Execution Change"
@@ -198,5 +197,6 @@
       "dark": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/error-dark.png",
       "light": "/private/tmp/physiqueos-midweek-translation/agent-handoffs/artifacts/priority-detail-ui-style-translation-20261004/screens/error-light.png"
     }
-  }
+  },
+  "tesamorelinPreparationSections": 1
 }

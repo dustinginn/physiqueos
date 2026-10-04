@@ -49,8 +49,7 @@
         ["What", "Tesamorelin", "Complete the scheduled Execution action."],
         ["When", "Sun–Thu · 10:29 PM", "fasted before bed"],
         ["Dose", "0.5 mg", "May 24 – Until changed"],
-        ["Preparation", "Finish eating approximately 2–3 hours before injection", "Preserve the normal fasted-before-bed timing window."],
-        ["Preparation", "Take fasted before bed", "Use the saved Execution conditions."],
+        ["Preparation", "Finish eating approximately 2–3 hours before injection", "Take fasted before bed. Preserve the normal fasted-before-bed timing window. Use the saved Execution conditions."],
         ["Execution Notes", "Saved Support note", "Taken five times per week, Sunday through Thursday, at night, fasted before bed."],
         ["Why it matters", "Supports the current operating plan", "This Execution action supports the current operating plan."],
         ["Next Execution Change", "None scheduled", "No upcoming Execution phase is scheduled."]

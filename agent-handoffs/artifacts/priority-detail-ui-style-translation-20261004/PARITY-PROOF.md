@@ -1,5 +1,9 @@
 # Parity proof
 
+## Locked Tesamorelin correction
+
+The dose-aware Tesamorelin state now has exactly one rendered `Preparation` section. It retains both canonical requirements verbatim in that section: `Finish eating approximately 2–3 hours before injection` and `Take fasted before bed`. Completion, dose override, skip, timing and saved Execution semantics are unchanged.
+
 Automated validation renders every representative surface at 402 pt iPhone width in dark and mineral light, then checks:
 
 - exact dark/light text parity;
