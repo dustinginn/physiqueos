@@ -1,0 +1,293 @@
+{
+  "pass": true,
+  "authority": {
+    "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "server": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "prompt": "d315c2372dd2b2f08b55ceeb0be758510f5fee05"
+  },
+  "renderedSurfaceCount": 20,
+  "screenCount": 40,
+  "pairCount": 20,
+  "actualTarget": {
+    "width": 402,
+    "minimumHeight": 874
+  },
+  "darkLightContentGeometryParity": true,
+  "minimumTapTarget": 44,
+  "noHorizontalOverflow": true,
+  "parity": {
+    "generic-chooser": {
+      "missing": [],
+      "fields": [
+        "Automatic",
+        "Nutrition",
+        "Activity",
+        "DEXA",
+        "Training",
+        "Weight",
+        "Progress Photos",
+        "Other / General",
+        "Date"
+      ],
+      "actions": [
+        "Choose Photos",
+        "Choose PDF",
+        "Upload"
+      ]
+    },
+    "generic-auto-review": {
+      "missing": [],
+      "fields": [
+        "Date",
+        "MyFitnessPal-Sep-23.PNG",
+        "Fitness-Rings-Sep-23.PNG",
+        "IMG_4921.PNG",
+        "Choose type for IMG_4921.PNG"
+      ],
+      "actions": [
+        "Choose Photos",
+        "Choose PDF",
+        "Upload"
+      ]
+    },
+    "generic-domain-handoffs": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Open Training",
+        "Open Weight"
+      ]
+    },
+    "generic-nutrition-manual": {
+      "missing": [],
+      "fields": [
+        "Calories",
+        "Protein (g)",
+        "Carbs (g)",
+        "Fat (g)",
+        "Fiber (g)"
+      ],
+      "actions": [
+        "Screenshot",
+        "Manual",
+        "Save"
+      ]
+    },
+    "generic-activity-manual": {
+      "missing": [],
+      "fields": [
+        "Active calories",
+        "Total calories",
+        "Exercise minutes",
+        "Stand hours",
+        "Move goal"
+      ],
+      "actions": [
+        "Screenshot",
+        "Manual",
+        "Save"
+      ]
+    },
+    "generic-transaction-states": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Review Nutrition",
+        "Return to Log",
+        "Try Again"
+      ]
+    },
+    "photos-pose-review": {
+      "missing": [],
+      "fields": [
+        "Date",
+        "Orientation",
+        "Contraction",
+        "Pose",
+        "Time of day",
+        "Fasted",
+        "Post-workout",
+        "Pump",
+        "These are original, unedited photos."
+      ],
+      "actions": [
+        "Confirm pose",
+        "Choose Photos",
+        "Upload"
+      ]
+    },
+    "photos-ready": {
+      "missing": [],
+      "fields": [
+        "Date",
+        "Orientation",
+        "Contraction",
+        "Pose",
+        "Time of day",
+        "Fasted",
+        "Post-workout",
+        "Pump",
+        "These are original, unedited photos."
+      ],
+      "actions": [
+        "✓ Pose confirmed",
+        "Choose Photos",
+        "Upload"
+      ]
+    },
+    "photos-resume": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Resume upload",
+        "Discard"
+      ]
+    },
+    "photos-transfer-states": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Discard"
+      ]
+    },
+    "dexa-empty": {
+      "missing": [],
+      "fields": [
+        "Date"
+      ],
+      "actions": [
+        "Choose PDF",
+        "Upload"
+      ]
+    },
+    "dexa-selected": {
+      "missing": [],
+      "fields": [
+        "Date",
+        "BodySpec_DXA_2026-09-23.pdf"
+      ],
+      "actions": [
+        "Remove",
+        "Choose PDF",
+        "Upload"
+      ]
+    },
+    "dexa-validation-error": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Try Again"
+      ]
+    },
+    "review-mixed": {
+      "missing": [],
+      "fields": [
+        "Calories",
+        "Protein",
+        "Carbs",
+        "Fat",
+        "Active calories",
+        "Exercise"
+      ],
+      "actions": [
+        "Confirm",
+        "Dismiss"
+      ]
+    },
+    "review-photo": {
+      "missing": [],
+      "fields": [
+        "Poses",
+        "Time of day",
+        "Goal relationship",
+        "Source"
+      ],
+      "actions": [
+        "Confirm",
+        "Dismiss"
+      ]
+    },
+    "review-dexa": {
+      "missing": [],
+      "fields": [
+        "Total mass",
+        "Body fat",
+        "Fat tissue",
+        "Lean tissue",
+        "Bone mineral",
+        "RMR",
+        "VAT mass",
+        "VAT volume",
+        "PDF"
+      ],
+      "actions": [
+        "Correct Measurements",
+        "Confirm",
+        "Dismiss"
+      ]
+    },
+    "review-dexa-correction": {
+      "missing": [],
+      "fields": [
+        "Measured date (YYYY-MM-DD)",
+        "Total mass (lb)",
+        "Body fat (%)",
+        "Fat mass (lb)",
+        "Lean mass (lb)",
+        "Bone mineral content (lb)",
+        "Resting metabolic rate (kcal/day)",
+        "Visceral fat mass (lb)",
+        "Visceral fat volume (in³)"
+      ],
+      "actions": [
+        "Cancel",
+        "Save Corrections"
+      ]
+    },
+    "review-lifecycle": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Back to Log",
+        "Back to Log",
+        "Check Now",
+        "Refresh Review",
+        "Try Again"
+      ]
+    },
+    "review-load-states": {
+      "missing": [],
+      "fields": [],
+      "actions": []
+    },
+    "review-status-semantics": {
+      "missing": [],
+      "fields": [],
+      "actions": [
+        "Confirm",
+        "Dismiss"
+      ]
+    }
+  },
+  "excludedLockedWork": [
+    "Evidence Hub",
+    "Training Evidence",
+    "Nutrition Evidence",
+    "Activity Evidence",
+    "Energy Evidence",
+    "Weight Evidence",
+    "Recovery Evidence",
+    "Progress Photos presentation",
+    "DEXA presentation",
+    "Timeline",
+    "Workout reconciliation"
+  ],
+  "shippingNativeChanged": false,
+  "serverChanged": false,
+  "primaryFounderReview": "boards/evidence-intake-review-primary-mobile.png",
+  "focusedBoards": [
+    "boards/generic-intake-review-mobile.png",
+    "boards/progress-photos-intake-mobile.png",
+    "boards/dexa-intake-review-mobile.png"
+  ]
+}
