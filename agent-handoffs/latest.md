@@ -2,19 +2,24 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Build 85 Watch physical-acceptance corrections
+- Task: Nutrition + Activity Evidence UI style translation
 - Agent: Codex
-- Status: complete — exact Server deployed, prospective trusted-Watch policy active, Native Build 85 uploaded and Apple VALID
-- Generated (UTC): 2026-10-03T22:55:00Z
+- Status: complete review package; Founder review next; implementation not started
+- Generated (UTC): 2026-10-04T16:25:00Z
+- Work branch: `codex/nutrition-activity-evidence-design`
+- Work/report commit: `8de163506d6e996328e60d510199562cdeb8dffb`
+- Artifact commit: `33ea64910c505cdf068909181c5317dadf6a0d5a`
+- Main report commit before pointer update: `3fdf1eb2c76afd22e2875fef109063b4066d06d0`
+- Artifact root: `agent-handoffs/artifacts/nutrition-activity-evidence-style-translation-20261004/`
 
-Production Server authority is exact `3c0f4aefddbb9a6886f6ad012443978303d47024`, deployment `e9ffc644-ba32-48d0-afc7-ec3d809d8c77`, ACTIVE 9/9. Web and worker match the SHA; live/ready are HTTP 200.
+Nutrition and Activity were audited independently against exact Build 85 Native authority. The branch carries 8 Nutrition and 7 Activity direct templates in dark and mineral light, complete coverage matrices, source audits, navigation trees, individual full-resolution renders, and automated parity/semantic validation with zero uncovered states.
 
-The create-only prospective trusted-Watch policy is version 1, effective `2026-10-05T07:00:00.000Z`, and independently verified. It created exactly the policy row and audit `healthkit_trusted_watch_correlation_audit_6dbb503923b0247b369bbd5e91b39e5c`; no historical workout, strategic, Sleep or DEXA state changed. The Founder-manually-confirmed pre-activation 95% workout match remains untouched.
+Nutrition keeps canonical day aggregation and non-additive provenance. Activity keeps the exact eight-metric day model and gains no invented reporting/chart/workout classifier. Cooldown remains non-Cardio; Run and Stair Stepper retain canonical Cardio identity.
 
-Exact Native `b8ee8690b194cb90086b62816b9a2c8c400dc026` is App Store Connect Build 85 delivery `a8c393e7-7d2c-41f0-9ba0-d37f43e53dc1`, independently reconfirmed build/import `VALID` and present on App Store Connect.
+Training Evidence is now explicitly locked with all 10 canonical Training Areas shown in exact production order/counts; no bucketing, merging, prioritization, pagination, or hiding.
 
-Next: Founder installs Build 85 remotely and physically accepts inactive/Always-On connectivity presentation. After the future policy boundary, a new PhysiqueOS-created indoor strength workout should exact-correlate automatically without generic Pending Review.
+Next: Founder reviews the concise comparison page/screenshots. Shipping implementation remains unauthorized and has not started.
 
-Detailed report: `agent-handoffs/reports/20261003T225500Z-build85-server-policy-native-testflight-final.md`
+Detailed report: `agent-handoffs/reports/20261004T162500Z-nutrition-activity-evidence-ui-style-translation.md`
 
-Protocol: `agent-handoffs/README.md`
+Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`

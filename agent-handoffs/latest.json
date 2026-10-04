@@ -1,53 +1,46 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-03T22:55:00Z",
+  "generated_at_utc": "2026-10-04T16:25:00Z",
   "task": {
-    "id": "20261003-build85-founder-authorized-release",
-    "title": "Build 85 Watch corrections release",
+    "id": "20261004-nutrition-activity-evidence-style-translation",
+    "title": "Nutrition + Activity Evidence UI style translation",
     "agent": "codex",
-    "status": "complete_testflight_valid_physical_acceptance_next"
+    "status": "complete_review_ready_implementation_not_started"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "ca4198de3d47cfdc48e20cccf742dc3c0fc09465",
-    "production_server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
-    "production_deployment": "e9ffc644-ba32-48d0-afc7-ec3d809d8c77",
+    "prompt_commit": "eb186ba2bb0862daf4f487c334ef445336bcab46",
     "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
     "native_build": 85,
-    "testflight_delivery": "a8c393e7-7d2c-41f0-9ba0-d37f43e53dc1"
+    "training_evidence_lock": "ca088e80e851c83d0d3e168d88f918232f5338d6"
+  },
+  "publication": {
+    "source_work_branch": "codex/nutrition-activity-evidence-design",
+    "source_work_commit": "8de163506d6e996328e60d510199562cdeb8dffb",
+    "artifact_commit": "33ea64910c505cdf068909181c5317dadf6a0d5a",
+    "main_report_commit": "3fdf1eb2c76afd22e2875fef109063b4066d06d0",
+    "report_path": "agent-handoffs/reports/20261004T162500Z-nutrition-activity-evidence-ui-style-translation.md",
+    "artifact_root": "agent-handoffs/artifacts/nutrition-activity-evidence-style-translation-20261004/"
   },
   "result": {
-    "summary": "Exact Build 85 Server is ACTIVE and healthy; the prospective trusted-Watch policy and audit are active and independently verified; exact Native Build 85 is uploaded and Apple reports build/import VALID. The pre-activation Founder-confirmed match, DEXA and Sleep remain unchanged.",
-    "production_mutated": true,
-    "server_deployed": true,
-    "server_review_approved": true,
-    "policy_active": true,
-    "policy_post_activation_independent_pass": true,
-    "policy_effective_at": "2026-10-05T07:00:00.000Z",
-    "policy_planned_record_digest": "fc028029635cb7ba1de6301206f5f8a8",
-    "policy_stored_digest": "677fde8eb02cf879eb2ee92551b18208",
-    "policy_version": 1,
-    "policy_audit_id": "healthkit_trusted_watch_correlation_audit_6dbb503923b0247b369bbd5e91b39e5c",
-    "historical_workout_mutations": 0,
-    "strategic_mutations": 0,
-    "sleep_mutations": 0,
-    "dexa_mutations": 0,
-    "native_review_approved": true,
-    "ios_tests_executed": 288,
-    "ios_test_failures": 0,
-    "watch_tests_executed": 27,
-    "watch_test_failures": 0,
-    "testflight_valid": true,
-    "testflight_import_valid": true,
-    "testflight_on_app_store_connect": true
+    "summary": "Independent Build 85 audits and complete dark/mineral-light design translations are ready for Nutrition and Activity Evidence. Canonical aggregation, provenance, HealthKit semantics, routes, values, history, and workout classification remain unchanged.",
+    "nutrition_direct_templates": 8,
+    "activity_direct_templates": 7,
+    "dark_renders": 15,
+    "mineral_light_renders": 15,
+    "uncovered_states": 0,
+    "invented_charts": 0,
+    "shipping_code_changed": false,
+    "training_areas_exact_all_10": true,
+    "validation_pass": true
   },
-  "recommended_next_step": "Install Build 85 remotely and physically accept inactive/Always-On connectivity presentation; after the future policy boundary, verify a new eligible PhysiqueOS-created indoor strength workout exact-correlates without generic Pending Review.",
-  "full_report_path": "agent-handoffs/reports/20261003T225500Z-build85-server-policy-native-testflight-final.md",
+  "recommended_next_step": "Founder reviews the concise comparison page and focused dark/mineral-light renders; shipping implementation remains unauthorized and not started.",
+  "stop_reason": "Complete Nutrition and Activity hierarchy coverage, Training Areas lock clarification, validated review artifacts, and canonical main-branch discoverability report are ready.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
     "contains_production_exports": false,
-    "contains_founder_evidence": true,
+    "contains_founder_evidence": false,
     "safe_for_chatgpt_retrieval": true
   }
 }
