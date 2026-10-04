@@ -204,6 +204,10 @@ struct AppDestinationRouterView: View {
             OperatingPlanTrainingProtocolBuilderView(onNavigate: onNavigate)
         case .founderServerConnection:
             FounderServerConnectionView()
+        case .settings:
+            SettingsView(onNavigate: onNavigate)
+        case .appearance:
+            AppearanceView()
         default:
             DestinationPlaceholderView(destination: destination)
         }

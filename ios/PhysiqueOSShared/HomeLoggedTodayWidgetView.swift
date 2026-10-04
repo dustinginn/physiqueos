@@ -49,6 +49,7 @@ struct HomeLoggedTodayWidgetView: View {
     let privacyRedactedForPreview: Bool
     let familyOverrideForPreview: WidgetFamily?
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         snapshot: HomeWidgetSnapshot?,
@@ -62,9 +63,7 @@ struct HomeLoggedTodayWidgetView: View {
         self.familyOverrideForPreview = familyOverrideForPreview
     }
 
-    private let accent = Color(red: 0.55, green: 0.55, blue: 1.0)
-    private let background = Color(red: 0.035, green: 0.055, blue: 0.095)
-    private let secondary = Color.white.opacity(0.62)
+    private var palette: HomeWidgetPalette { HomeWidgetPalette(colorScheme: colorScheme) }
 
     @ViewBuilder
     var body: some View {
@@ -79,13 +78,13 @@ struct HomeLoggedTodayWidgetView: View {
     private var largeBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             largeHeader
-            Divider().overlay(Color.white.opacity(0.10)).padding(.vertical, 7)
+            Divider().overlay(palette.divider).padding(.vertical, 7)
             content
                 .redacted(reason: privacyRedactedForPreview ? .privacy : [])
             Spacer(minLength: 6)
             workoutAction
         }
-        .containerBackground(background, for: .widget)
+        .containerBackground(palette.background, for: .widget)
         .widgetAccentable()
     }
 
@@ -94,18 +93,18 @@ struct HomeLoggedTodayWidgetView: View {
             HStack(spacing: 4) {
                 Text("Today")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(palette.text)
                 Spacer(minLength: 2)
                 Text(compactFreshnessText)
                     .font(.system(size: 8, weight: .bold, design: .rounded))
-                    .foregroundStyle(freshnessIsWarning ? Color.orange : secondary)
+                    .foregroundStyle(freshnessIsWarning ? palette.warning : palette.secondary)
                     .lineLimit(1)
                 Button(intent: RefreshHomeWidgetTotalsIntent(
                     authority: snapshot?.authority ?? "founderProduction"
                 )) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(accent)
+                        .foregroundStyle(palette.accent)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
                 }
@@ -116,7 +115,7 @@ struct HomeLoggedTodayWidgetView: View {
             if rendersToday, let snapshot {
                 VStack(alignment: .leading, spacing: 5) {
                     smallNutrition(snapshot.nutrition)
-                    Divider().overlay(Color.white.opacity(0.10))
+                    Divider().overlay(palette.divider)
                     smallActivityAndWeight(activity: snapshot.activity, weight: snapshot.weight)
                 }
                 .privacySensitive()
@@ -125,10 +124,10 @@ struct HomeLoggedTodayWidgetView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(presentationState == .waitingForToday ? "Waiting for today" : "Open app to refresh")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(palette.text)
                     Text("Prior-day totals stay hidden.")
                         .font(.system(size: 8, weight: .semibold, design: .rounded))
-                        .foregroundStyle(secondary)
+                        .foregroundStyle(palette.secondary)
                         .lineLimit(2)
                 }
                 .padding(.top, 8)
@@ -137,7 +136,7 @@ struct HomeLoggedTodayWidgetView: View {
             Spacer(minLength: 3)
             smallWorkoutAction
         }
-        .containerBackground(background, for: .widget)
+        .containerBackground(palette.background, for: .widget)
         .widgetAccentable()
     }
 
@@ -156,18 +155,18 @@ struct HomeLoggedTodayWidgetView: View {
         HStack(alignment: .firstTextBaseline) {
             Text("Logged Today")
                 .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(palette.text)
             Spacer(minLength: 8)
             Text(freshnessText)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                .foregroundStyle(freshnessIsWarning ? Color.orange : secondary)
+                .foregroundStyle(freshnessIsWarning ? palette.warning : palette.secondary)
                 .lineLimit(1)
             Link(destination: HomeWidgetDeepLink.refresh(
                 authority: snapshot?.authority ?? "founderProduction"
             ).url) {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(palette.accent)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
@@ -180,25 +179,25 @@ struct HomeLoggedTodayWidgetView: View {
             Text("NUTRITION")
                 .font(.system(size: 7, weight: .bold, design: .rounded))
                 .tracking(0.5)
-                .foregroundStyle(secondary)
+                .foregroundStyle(palette.secondary)
             if let nutrition {
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(HomeWidgetValueFormatter.calories(nutrition.calories))
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                     Text("cal")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(secondary)
+                        .foregroundStyle(palette.secondary)
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(palette.text)
                 Text("P \(HomeWidgetValueFormatter.grams(nutrition.proteinG))  C \(HomeWidgetValueFormatter.grams(nutrition.carbsG))  F \(HomeWidgetValueFormatter.grams(nutrition.fatG))")
                     .font(.system(size: 8, weight: .semibold, design: .rounded))
-                    .foregroundStyle(secondary)
+                    .foregroundStyle(palette.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             } else {
                 Text("—  Not logged")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(secondary)
+                    .foregroundStyle(palette.secondary)
             }
         }
     }
@@ -213,7 +212,7 @@ struct HomeLoggedTodayWidgetView: View {
                 value: activity?.activeCalories.map { "\(HomeWidgetValueFormatter.activeCalories($0)) cal" } ?? HomeWidgetValueFormatter.missing
             )
             if let weight = HomeWidgetValueFormatter.weight(weight) {
-                Divider().overlay(Color.white.opacity(0.10)).frame(height: 25)
+                Divider().overlay(palette.divider).frame(height: 25)
                 smallMetric(label: "WEIGHT", value: weight)
             }
         }
@@ -224,10 +223,10 @@ struct HomeLoggedTodayWidgetView: View {
             Text(label)
                 .font(.system(size: 7, weight: .bold, design: .rounded))
                 .tracking(0.4)
-                .foregroundStyle(secondary)
+                .foregroundStyle(palette.secondary)
             Text(value)
                 .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(palette.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
@@ -238,18 +237,18 @@ struct HomeLoggedTodayWidgetView: View {
     private var content: some View {
         if rendersToday, let snapshot {
             VStack(spacing: 0) {
-                row(icon: "figure.strengthtraining.traditional", label: "Training", destination: .training(localDate: snapshot.localDate)) {
+                row(icon: "figure.strengthtraining.traditional", color: palette.training, label: "Training", destination: .training(localDate: snapshot.localDate)) {
                     trainingValue(snapshot.training)
                 }
-                row(icon: "fork.knife", label: "Nutrition", destination: .nutrition(localDate: snapshot.localDate)) {
+                row(icon: "fork.knife", color: palette.nutrition, label: "Nutrition", destination: .nutrition(localDate: snapshot.localDate)) {
                     nutritionValue(snapshot.nutrition)
                 }
-                row(icon: "waveform.path.ecg", label: "Activity", destination: .activity(localDate: snapshot.localDate)) {
+                row(icon: "waveform.path.ecg", color: palette.activity, label: "Activity", destination: .activity(localDate: snapshot.localDate)) {
                     activityValue(snapshot.activity)
                 }
-                row(icon: "scalemass", label: "Weight", destination: .weight(localDate: snapshot.localDate)) {
+                row(icon: "scalemass", color: palette.weight, label: "Weight", destination: .weight(localDate: snapshot.localDate)) {
                     Text(HomeWidgetValueFormatter.weight(snapshot.weight) ?? "—  Not logged today")
-                        .valueStyle(present: snapshot.weight != nil)
+                        .valueStyle(present: snapshot.weight != nil, palette: palette)
                 }
             }
             .privacySensitive()
@@ -257,10 +256,10 @@ struct HomeLoggedTodayWidgetView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label(waitingTitle, systemImage: "clock.arrow.circlepath")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(palette.text)
                 Text(waitingDetail)
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(secondary)
+                    .foregroundStyle(palette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.vertical, 18)
@@ -269,6 +268,7 @@ struct HomeLoggedTodayWidgetView: View {
 
     private func row<Content: View>(
         icon: String,
+        color: Color,
         label: String,
         destination: HomeWidgetDeepLink,
         @ViewBuilder value: () -> Content
@@ -277,19 +277,19 @@ struct HomeLoggedTodayWidgetView: View {
             HStack(spacing: 11) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(color)
                     .frame(width: 21)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label.uppercased())
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .tracking(0.7)
-                        .foregroundStyle(secondary)
+                        .foregroundStyle(palette.secondary)
                     value()
                 }
                 Spacer(minLength: 4)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.30))
+                    .foregroundStyle(palette.tertiary)
             }
             .contentShape(Rectangle())
             .frame(minHeight: 47)
@@ -305,13 +305,13 @@ struct HomeLoggedTodayWidgetView: View {
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                     Text(line)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(palette.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
                 }
             }
         } else {
-            Text("—  Nothing logged yet").valueStyle(present: false)
+            Text("—  Nothing logged yet").valueStyle(present: false, palette: palette)
         }
     }
 
@@ -325,7 +325,7 @@ struct HomeLoggedTodayWidgetView: View {
                 metric(HomeWidgetValueFormatter.grams(nutrition.fatG), unit: "F")
             }
         } else {
-            Text("—  Nothing logged yet").valueStyle(present: false)
+            Text("—  Nothing logged yet").valueStyle(present: false, palette: palette)
         }
     }
 
@@ -333,19 +333,19 @@ struct HomeLoggedTodayWidgetView: View {
     private func activityValue(_ activity: HomeWidgetActivitySummary?) -> some View {
         if let activity, let calories = activity.activeCalories {
             Text("\(HomeWidgetValueFormatter.activeCalories(calories)) active cal\(activity.isPartialDay ? " so far" : "")")
-                .valueStyle(present: true)
+                .valueStyle(present: true, palette: palette)
         } else {
-            Text("—  Nothing logged yet").valueStyle(present: false)
+            Text("—  Nothing logged yet").valueStyle(present: false, palette: palette)
         }
     }
 
     private func metric(_ value: String, unit: String) -> some View {
         HStack(spacing: 2) {
             Text(value).fontWeight(.bold)
-            Text(unit).foregroundStyle(secondary)
+            Text(unit).foregroundStyle(palette.secondary)
         }
         .font(.system(size: 12, weight: .semibold, design: .rounded))
-        .foregroundStyle(.white)
+        .foregroundStyle(palette.text)
         .lineLimit(1)
     }
 
@@ -372,7 +372,7 @@ struct HomeLoggedTodayWidgetView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 13)
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(accent.opacity(0.88), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(palette.actionGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .accessibilityLabel(active ? "Resume Workout" : "Start Workout Logger")
     }
@@ -393,7 +393,7 @@ struct HomeLoggedTodayWidgetView: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, minHeight: 30)
-        .background(accent.opacity(0.88), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(palette.actionGradient, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(active ? "Resume Workout" : "Start Workout Logger")
     }
@@ -453,10 +453,67 @@ struct HomeLoggedTodayWidgetView: View {
 }
 
 private extension View {
-    func valueStyle(present: Bool) -> some View {
+    func valueStyle(present: Bool, palette: HomeWidgetPalette) -> some View {
         font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundStyle(present ? Color.white : Color.white.opacity(0.48))
+            .foregroundStyle(present ? palette.text : palette.tertiary)
             .lineLimit(1)
             .minimumScaleFactor(0.82)
+    }
+}
+
+/// Widget-owned paired tokens. WidgetKit supplies its own environment and
+/// does not inherit the iPhone app's device-local preference.
+private struct HomeWidgetPalette {
+    let background: Color
+    let text: Color
+    let secondary: Color
+    let tertiary: Color
+    let divider: Color
+    let accent: Color
+    let warning: Color
+    let training: Color
+    let nutrition: Color
+    let activity: Color
+    let weight: Color
+    let actionGradient: LinearGradient
+
+    init(colorScheme: ColorScheme) {
+        if colorScheme == .dark {
+            background = Color(hex: 0x06131E)
+            text = Color(hex: 0xF5F8F7)
+            secondary = Color(hex: 0x91A6AE)
+            tertiary = Color(hex: 0x647A84)
+            divider = Color(hex: 0x203441)
+            accent = Color(hex: 0x9F7CFF)
+            warning = Color(hex: 0xF3BA49)
+            training = Color(hex: 0x9F7CFF)
+            nutrition = Color(hex: 0x4EE09A)
+            activity = Color(hex: 0xF3BA49)
+            weight = Color(hex: 0x40C7D7)
+            actionGradient = LinearGradient(colors: [Color(hex: 0x20BDB2), Color(hex: 0x123D61)], startPoint: .leading, endPoint: .trailing)
+        } else {
+            background = Color(hex: 0xEEF1EB)
+            text = Color(hex: 0x0A1C29)
+            secondary = Color(hex: 0x60737C)
+            tertiary = Color(hex: 0x7A8B91)
+            divider = Color(hex: 0xCAD4CF)
+            accent = Color(hex: 0x7255DC)
+            warning = Color(hex: 0xB47510)
+            training = Color(hex: 0x7255DC)
+            nutrition = Color(hex: 0x0C9363)
+            activity = Color(hex: 0xB47510)
+            weight = Color(hex: 0x0E8CA7)
+            actionGradient = LinearGradient(colors: [Color(hex: 0x0B817F), Color(hex: 0x163F62)], startPoint: .leading, endPoint: .trailing)
+        }
+    }
+}
+
+private extension Color {
+    init(hex: UInt32) {
+        self.init(
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255
+        )
     }
 }

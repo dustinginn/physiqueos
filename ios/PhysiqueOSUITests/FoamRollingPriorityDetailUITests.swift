@@ -33,6 +33,43 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         capture("foam-rolling-simulator-light")
     }
 
+    func testAppearanceControlAppliesImmediateNonColorSelectionState() {
+        app.launchArguments += [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+        ]
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["You"].waitForExistence(timeout: 8))
+        app.tabBars.buttons["You"].tap()
+        XCTAssertTrue(app.buttons["you.settings"].waitForExistence(timeout: 5))
+        app.buttons["you.settings"].tap()
+        XCTAssertTrue(app.buttons["settings.appearance"].waitForExistence(timeout: 5))
+        app.buttons["settings.appearance"].tap()
+
+        let light = app.buttons["appearance.light"]
+        XCTAssertTrue(light.waitForExistence(timeout: 5))
+        light.tap()
+        XCTAssertEqual(light.value as? String, "Selected")
+        XCTAssertEqual(app.buttons["appearance.dark"].value as? String, "Not selected")
+        capture("appearance-control-mineral-light")
+
+        app.buttons["appearance.dark"].tap()
+        XCTAssertEqual(app.buttons["appearance.dark"].value as? String, "Selected")
+        capture("appearance-control-dark")
+    }
+
+    func testRepresentativeShippingSurfacesDark() {
+        captureRepresentativeSurfaces(appearance: "dark")
+    }
+
+    func testRepresentativeShippingSurfacesMineralLight() {
+        captureRepresentativeSurfaces(appearance: "light")
+    }
+
+    func testSystemAppearanceResolution() {
+        launchReview(route: "home", appearance: "system")
+        capture("system-resolved-home")
+    }
+
     private func launch(appearance: String) {
         app.launchArguments += [
             "-physiqueos.native.authority-selection.v1", "sandbox",
@@ -64,6 +101,28 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         XCTAssertFalse(app.tabBars.firstMatch.exists, "Locked Priority Detail has no persistent tab bar.")
     }
 
+    private func captureRepresentativeSurfaces(appearance: String) {
+        for route in [
+            "home", "log", "briefing", "evidence", "training-logger",
+            "goals", "operating-plan", "you", "appearance", "manual-weight",
+        ] {
+            launchReview(route: route, appearance: appearance)
+            capture("\(appearance)-\(route)")
+        }
+    }
+
+    private func launchReview(route: String, appearance: String) {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance.preference.v1", appearance,
+            "-physiqueos.appearance-review.route", route,
+        ]
+        app.launch()
+        XCTAssertEqual(app.state, .runningForeground)
+        Thread.sleep(forTimeInterval: 1.2)
+    }
+
     private func capture(_ name: String) {
         Thread.sleep(forTimeInterval: 0.8)
         let screenshot = XCUIScreen.main.screenshot()
@@ -72,7 +131,8 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
 
-        guard let directory = ProcessInfo.processInfo.environment["FOAM_ROLLING_SCREENSHOT_DIR"],
+        guard let directory = ProcessInfo.processInfo.environment["APPEARANCE_SCREENSHOT_DIR"]
+                ?? ProcessInfo.processInfo.environment["FOAM_ROLLING_SCREENSHOT_DIR"],
               !directory.isEmpty
         else { return }
         try? screenshot.pngRepresentation.write(

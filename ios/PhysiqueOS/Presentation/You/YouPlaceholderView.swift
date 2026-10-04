@@ -45,7 +45,17 @@ struct YouPlaceholderView: View {
                     dexaHealthSettings
                 }
 
-                Text("Founder profile and settings arrive in a later slice.")
+                Button { onNavigate(.settings) } label: {
+                    settingsRow(
+                        icon: "gearshape.fill",
+                        title: "Settings",
+                        detail: "Appearance on this iPhone"
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("you.settings")
+
+                Text("Profile and data-source settings remain intentionally deferred.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -81,6 +91,25 @@ struct YouPlaceholderView: View {
             Button("Cancel", role: .cancel) { validationAction = nil }
         } message: {
             Text(validationAction?.message ?? "")
+        }
+    }
+
+    private func settingsRow(icon: String, title: String, detail: String) -> some View {
+        CardContainer(padding: .sm) {
+            HStack(spacing: 10) {
+                IconBadge(systemImage: icon, color: .primary, size: .sm, isCircular: true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    Text(detail)
+                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+            }
         }
     }
 
@@ -129,6 +158,150 @@ struct YouPlaceholderView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+/// Deliberately narrow Settings shell. The accepted Profile, Data Sources
+/// and Sign Out designs remain deferred until their product contracts land;
+/// this screen exposes no dead destinations.
+struct SettingsView: View {
+    let onNavigate: (AppDestination) -> Void
+    @Environment(AppAppearanceStore.self) private var appearance
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                OperatingPlanScreenHeader(
+                    eyebrow: "SETTINGS",
+                    title: "Settings",
+                    subtitle: "Device-local presentation preferences."
+                )
+
+                Button { onNavigate(.appearance) } label: {
+                    CardContainer(padding: .sm) {
+                        HStack(spacing: 12) {
+                            IconBadge(systemImage: "circle.lefthalf.filled", color: .primary, size: .sm, isCircular: true)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Appearance")
+                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                Text(appearance.selection.title == "Light" ? "Mineral Light" : appearance.selection.title)
+                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("settings.appearance")
+
+                Text("Profile, data sources, and account actions are not available in this implementation slice.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+        }
+        .background(PhysiqueOSTheme.background)
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct AppearanceView: View {
+    @Environment(AppAppearanceStore.self) private var appearance
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                OperatingPlanScreenHeader(
+                    eyebrow: "APPEARANCE",
+                    title: "Choose how PhysiqueOS looks.",
+                    subtitle: "System is the default. Light uses the locked Mineral Light palette."
+                )
+
+                VStack(spacing: 10) {
+                    ForEach(AppAppearance.allCases) { option in
+                        Button { appearance.select(option) } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: option.systemImage)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(option.semanticColor)
+                                    .frame(width: 38, height: 38)
+                                    .background(option.semanticColor.opacity(0.14), in: Circle())
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(option.title)
+                                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
+                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    Text(option.detail)
+                                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .multilineTextAlignment(.leading)
+                                }
+
+                                Spacer(minLength: 8)
+                                Image(systemName: appearance.selection == option ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 23, weight: .semibold))
+                                    .foregroundStyle(appearance.selection == option ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textMuted)
+                                    .accessibilityHidden(true)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+                        }
+                        .buttonStyle(AppearanceChoiceButtonStyle(isSelected: appearance.selection == option))
+                        .accessibilityIdentifier("appearance.\(option.rawValue)")
+                        .accessibilityValue(appearance.selection == option ? "Selected" : "Not selected")
+                        .accessibilityAddTraits(appearance.selection == option ? .isSelected : [])
+                    }
+                }
+
+                Text("Selecting Dark or Light moves the checkmark and applies that appearance immediately across the app.")
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+        }
+        .background(PhysiqueOSTheme.background)
+        .navigationTitle("Appearance")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct AppearanceChoiceButtonStyle: ButtonStyle {
+    let isSelected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(14)
+            .background(isSelected ? PhysiqueOSTheme.surfaceAccent : PhysiqueOSTheme.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(isSelected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.divider, lineWidth: isSelected ? 2 : 1)
+            )
+            .opacity(configuration.isPressed ? 0.82 : 1)
+    }
+}
+
+private extension AppAppearance {
+    var systemImage: String {
+        switch self {
+        case .system: "iphone.gen3"
+        case .dark: "moon.stars.fill"
+        case .light: "sun.max.fill"
+        }
+    }
+
+    var semanticColor: Color {
+        switch self {
+        case .system: PhysiqueOSTheme.chartEvidence
+        case .dark: PhysiqueOSTheme.accent
+        case .light: PhysiqueOSTheme.chartEffort
         }
     }
 }
