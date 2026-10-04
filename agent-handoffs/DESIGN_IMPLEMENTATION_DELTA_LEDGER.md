@@ -431,6 +431,28 @@ Status: DOCUMENTED.
 
 ## Resolved / obsolete discoveries
 
+### Priority Detail — Foam Rolling setup review destination
+
+Classification: RESOLVED / LIKELY SHIPPING DEFECT.
+
+Discovery:
+Foam Rolling Priority Detail locked-design implementation pilot against Build 85 Native and current Server authority.
+Report: `agent-handoffs/reports/20261004T205243Z-foam-rolling-priority-parity-pilot.md`
+
+Build 85 behavior:
+The Server published the setup-required action `Review Support` with href `/profile/operating-plan/execution/execution_foam_roll`. Native decoded the label and href, but its intentionally narrow Priority action mapper recognized only Morning Check-In. The Foam action therefore had no Native destination.
+
+Required target:
+Preserve the Server-owned setup action and navigate to the existing canonical Operating Plan Recovery Support detail. Do not add manual completion in setup-required state and do not create a general web router.
+
+Resolution:
+Implementation commit `b65deb00098713d824f14064e0362726997b5991` adds only the audited Foam href mapping to `.operatingPlanRecoverySupport(executionId: "execution_foam_roll")`. A deterministic production-envelope test proves the action label, non-completable/non-skippable state, and exact destination.
+
+Acceptance:
+Exact setup-required payload maps to the Recovery Support destination; open/completable Foam retains existing complete/skip semantics; Morning Check-In mapping and every unrecognized href remain unchanged.
+
+Status: RESOLVED in the pilot branch; pending Founder review/merge.
+
 ### Goals — Completed-Goal ProgressPhotoTile expansion
 
 Classification: RESOLVED / OBSOLETE as an implementation-gap candidate.
