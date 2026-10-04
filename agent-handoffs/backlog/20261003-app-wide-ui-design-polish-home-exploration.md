@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log + Weekly visual language locked; recurring Weekly/Midweek dark family refinement ready for Founder review**
+Status: **Home + Log + Weekly visual language locked; final Weekly/Midweek dark + mineral-light family set ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -236,3 +236,25 @@ Review set:
 - `agent-handoffs/artifacts/recurring-briefing-family-refinement-20261004/PARITY-PROOF.md`
 
 Implementation remains separate future work. Photos removal, Still Unresolved removal, Midweek Biggest Takeaway guarantee and Recovery publication each require explicit contract/Native work after approval. Recovery remains ungraduated and inactive. Monthly translation is next only after the Founder accepts this family refinement. No shipping Native source, Server behavior, production projection, build or TestFlight state changed.
+
+## Final Weekly/Midweek light translation
+
+Status: **Corrected dark + mineral-light four-up ready; awaiting Founder lock confirmation**
+
+The Founder accepted the dark pair with one correction. Weekly Body Composition now appears directly under Weight, producing the shared recurring order:
+
+`Hero → Energy → Weight → Body Composition → Training → Recovery → finale → provenance`.
+
+No other dark composition changed. The missing mineral-light Weekly and Midweek appearances are direct translations through the locked Home/Log mineral system. Automated proof confirms exact content, semantic, section-geometry, graph, Recovery, finale, navigation and page-height parity between appearances.
+
+Review set:
+
+- `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/README.md`
+- `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/screens/weekly-dark-full.png`
+- `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/screens/weekly-light-full.png`
+- `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/screens/midweek-dark-full.png`
+- `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/screens/midweek-light-full.png`
+- `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/screens/recurring-family-four-up.png`
+- `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/PARITY-PROOF.md`
+
+Do not mark the Weekly/Midweek appearance pair locked until the Founder accepts these renders. No shipping UI, Server behavior, Recovery activation, theme implementation, build or TestFlight work occurred.

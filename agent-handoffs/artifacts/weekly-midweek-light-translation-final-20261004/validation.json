@@ -1,0 +1,1085 @@
+{
+  "pass": true,
+  "authorities": {
+    "prompt": "f01c03002071f92f2742c1679eaa6bdebd1abc2f",
+    "acceptedDark": "2599068c327111b7f3622cfc1918d4df07f7f789",
+    "nativeBuild85": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "productionServer": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "recoveryPrototype": "1bfa92ef874c3c96f05b23a9d3cbdfb956384156"
+  },
+  "target": {
+    "widthPoints": 402,
+    "scale": 3,
+    "safeAreaTopPoints": 51
+  },
+  "requiredOrder": {
+    "weekly": [
+      "weekly-navigation",
+      "weekly-hero",
+      "weekly-energy",
+      "weekly-weight",
+      "weekly-body-composition",
+      "weekly-training",
+      "weekly-recovery",
+      "weekly-finale",
+      "weekly-provenance"
+    ],
+    "midweek": [
+      "midweek-navigation",
+      "midweek-hero",
+      "midweek-energy",
+      "midweek-weight",
+      "midweek-body-composition",
+      "midweek-training",
+      "midweek-recovery",
+      "midweek-finale",
+      "midweek-provenance"
+    ]
+  },
+  "renders": {
+    "weekly-dark": {
+      "variant": "weekly-dark",
+      "cadence": "weekly",
+      "appearance": "dark",
+      "widthPoints": 402,
+      "heightPoints": 3969,
+      "innerText": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nWEEKLY BRIEFING\nCompleted week\nAug 23–Aug 29\n68%\nCONFIDENCE\nMODERATE\nConfidence increased +5\n\nTwo consistent weeks into the controlled surplus with steady training progression is a healthy early signal for the lean-mass build.\n\nTwo straight weeks of clean progression.\n\nEvery tracked lift either matched or beat last week's working numbers, and the surplus stayed inside the planned range all seven days.\n\nSTRATEGY\nCurrent strategy: Lean Mass Build\nWEEK\nWeek 2\nNEXT\nNext: DEXA review, Oct 31\nϟ\nENERGY BALANCE\n7/7 days paired\nEnergy Balance\n\n+350 kcal/day above\n\nA steady controlled surplus, right in the middle of the 2,750–2,850 kcal target range.\n\nAVG INTAKE\n2790 kcal\nAVG EXPENDITURE\n2440 kcal\nAVG BALANCE\n+350 kcal\nDaily intake vs estimated expenditure\n23\n24\n25\n26\n27\n28\n29\nIntake\nEstimated expenditure\n↕\nWEIGHT CONTEXT\n170.6 lb\n+0.6 lb this week\n\nUp 0.6 lb on the weekly average — tracking the modeled controlled-surplus rate closely.\n\n◇\nBODY COMPOSITION\nJul 18\nBODY FAT\n8.2%\nLEAN MASS\n149.0 lb\nFAT MASS\n13.4 lb\n\nThis scan closed the goal: the numerical target and the visual confirmation converged.\n\nCurrent objective · Visible Abs at Rest · latest real available fixture context\n\n◆\nTRAINING RESPONSE\nPerformance became the lead early indicator.\n\nBench and lower-body work both progressed; arms and back held steady. The useful signal is broad progression across distinct movement patterns, not one isolated record.\n\n4 training days · 4 reviewed categories · 2 improving · 2 steady · 1 plateauing\n\n🔥 Highlights\nLat Pulldown\nVOLUME PR\n3,340 lb volume\n▲ +280 lb\n3,340 lb of working volume, 280 lb above the prior comparable session.\nBarbell Bench Press\nREPS AT LOAD\n9 reps at 155 lb\n▲ +1 rep\nThe top working set improved without sacrificing the rest of the session.\nOverhead Triceps Extension\nREPS AT LOAD\n12 reps at 45 lb\n▲ +2 reps\nTwo additional repetitions at the same working load.\n🎯 Priority Muscle Groups\nChest\nImproving\nacross\n3\nexercises.\nBack\nImproving\nacross\n4\nexercises.\nShoulders\nSteady\nacross\n3\nexercises.\nLegs\nPlateauing\nacross\n4\nexercises.\n◒\nRECOVERY\nFUTURE CONTRACT · FIXTURE ONLY\nSleep stayed in your usual range\n6h 47m average · 7 of 7 nights\nGreen\n6h 47m\nPERIOD AVERAGE\n28-night baseline · 6h 45m\nPERSONAL BASELINE\nSu\nMo\nTu\nWe\nTh\nFr\nSa\nFoam rolling\nThree misses · status unchanged\n4 of 7 completed\n\nPersonal baseline excludes this period. Foam rolling cannot change status. Associations do not imply causation. Confidence coupling: none.\n\nCOACH'S TAKE\n💡 Biggest Takeaway\n\nThe surplus is producing training progression without the scale running away.\n\n🧠 What To Do\n\nHold the current intake and rhythm through the next DEXA rather than adjusting on scale weight alone.\n\n🎯 Into Next Week\n1\n\nKeep the surplus in the 2,750–2,850 kcal range.\n\n2\n\nPush for another working-weight increase on arms this week.\n\n3\n\nLog Thursday's workout the same day to avoid another late confirmation.\n\nThis Briefing was revised\n\nA confirmed evidence review (Thursday's workout) arrived after the original publish and changed the week's training conclusion.\n\nFirst published Aug 30, 9:15 AM · A quiet week with one still-pending workout.",
+      "semantic": {
+        "weekly.periodLabel": "Completed week",
+        "weekly.reportingRangeLabel": "Aug 23–Aug 29",
+        "weekly.confidence.score": "68",
+        "weekly.confidence.band": "moderate",
+        "weekly.confidence.movementDirection": "increased",
+        "weekly.confidence.delta": "5",
+        "weekly.confidence.primaryReason": "Two consistent weeks into the controlled surplus with steady training progression is a healthy early signal for the lean-mass build.",
+        "weekly.heroHeadline": "Two straight weeks of clean progression.",
+        "weekly.heroBody": "Every tracked lift either matched or beat last week's working numbers, and the surplus stayed inside the planned range all seven days.",
+        "weekly.strategyPhaseLabel": "Current strategy: Lean Mass Build",
+        "weekly.strategyWeekLabel": "Week 2",
+        "weekly.strategyNextMilestone": "Next: DEXA review, Oct 31",
+        "weekly.energy.pairedDayCount": "7",
+        "weekly.energy.eligibleDayCount": "7",
+        "weekly.energy.averageBalanceKcal": "350",
+        "weekly.energy.narrative": "A steady controlled surplus, right in the middle of the 2,750–2,850 kcal target range.",
+        "weekly.energy.averageIntakeKcal": "2790",
+        "weekly.energy.averageExpenditureKcal": "2440",
+        "weekly.weight.averageWeightLb": "170.6",
+        "weekly.weight.changeLb": "0.6",
+        "weekly.weight.narrative": "Up 0.6 lb on the weekly average — tracking the modeled controlled-surplus rate closely.",
+        "weekly.training.headline": "Performance became the lead early indicator.",
+        "weekly.training.narrative": "Bench and lower-body work both progressed; arms and back held steady. The useful signal is broad progression across distinct movement patterns, not one isolated record.",
+        "weekly.training.trainingDayCount": "4",
+        "weekly.training.comparableCategoryCount": "4",
+        "weekly.training.improvingCount": "2",
+        "weekly.training.steadyCount": "2",
+        "weekly.training.plateauingCount": "1",
+        "weekly.training.highlights.0.exerciseName": "Lat Pulldown",
+        "weekly.training.highlights.0.recordType": "Volume PR",
+        "weekly.training.highlights.0.performanceValue": "3,340 lb volume",
+        "weekly.training.highlights.0.delta": "+280 lb",
+        "weekly.training.highlights.0.detail": "3,340 lb of working volume, 280 lb above the prior comparable session.",
+        "weekly.training.highlights.1.exerciseName": "Barbell Bench Press",
+        "weekly.training.highlights.1.recordType": "Reps at Load",
+        "weekly.training.highlights.1.performanceValue": "9 reps at 155 lb",
+        "weekly.training.highlights.1.delta": "+1 rep",
+        "weekly.training.highlights.1.detail": "The top working set improved without sacrificing the rest of the session.",
+        "weekly.training.highlights.2.exerciseName": "Overhead Triceps Extension",
+        "weekly.training.highlights.2.recordType": "Reps at Load",
+        "weekly.training.highlights.2.performanceValue": "12 reps at 45 lb",
+        "weekly.training.highlights.2.delta": "+2 reps",
+        "weekly.training.highlights.2.detail": "Two additional repetitions at the same working load.",
+        "weekly.training.priorityGroups.0.label": "Chest",
+        "weekly.training.priorityGroups.0.statusLabel": "Improving",
+        "weekly.training.priorityGroups.0.comparableExerciseCount": "3",
+        "weekly.training.priorityGroups.1.label": "Back",
+        "weekly.training.priorityGroups.1.statusLabel": "Improving",
+        "weekly.training.priorityGroups.1.comparableExerciseCount": "4",
+        "weekly.training.priorityGroups.2.label": "Shoulders",
+        "weekly.training.priorityGroups.2.statusLabel": "Steady",
+        "weekly.training.priorityGroups.2.comparableExerciseCount": "3",
+        "weekly.training.priorityGroups.3.label": "Legs",
+        "weekly.training.priorityGroups.3.statusLabel": "Plateauing",
+        "weekly.training.priorityGroups.3.comparableExerciseCount": "4",
+        "weekly.coachTake.biggestTakeaway": "The surplus is producing training progression without the scale running away.",
+        "weekly.coachTake.recommendation": "Hold the current intake and rhythm through the next DEXA rather than adjusting on scale weight alone.",
+        "weekly.coachTake.intoNextWeek.0": "Keep the surplus in the 2,750–2,850 kcal range.",
+        "weekly.coachTake.intoNextWeek.1": "Push for another working-weight increase on arms this week.",
+        "weekly.coachTake.intoNextWeek.2": "Log Thursday's workout the same day to avoid another late confirmation.",
+        "weekly.revision.reason": "A confirmed evidence review (Thursday's workout) arrived after the original publish and changed the week's training conclusion.",
+        "weekly.revision.previousHeadline": "A quiet week with one still-pending workout."
+      },
+      "semanticCount": 62,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "sections": [
+        "weekly-navigation",
+        "weekly-hero",
+        "weekly-energy",
+        "weekly-weight",
+        "weekly-body-composition",
+        "weekly-training",
+        "weekly-recovery",
+        "weekly-finale",
+        "weekly-provenance"
+      ],
+      "geometry": [
+        {
+          "section": "weekly-navigation",
+          "x": 15,
+          "y": 51,
+          "width": 372,
+          "height": 64
+        },
+        {
+          "section": "weekly-hero",
+          "x": 0,
+          "y": 115,
+          "width": 402,
+          "height": 716
+        },
+        {
+          "section": "weekly-energy",
+          "x": 15,
+          "y": 831,
+          "width": 372,
+          "height": 494
+        },
+        {
+          "section": "weekly-weight",
+          "x": 15,
+          "y": 1325,
+          "width": 372,
+          "height": 178
+        },
+        {
+          "section": "weekly-body-composition",
+          "x": 15,
+          "y": 1503,
+          "width": 372,
+          "height": 252
+        },
+        {
+          "section": "weekly-training",
+          "x": 15,
+          "y": 1756,
+          "width": 372,
+          "height": 911
+        },
+        {
+          "section": "weekly-recovery",
+          "x": 15,
+          "y": 2667,
+          "width": 372,
+          "height": 525
+        },
+        {
+          "section": "weekly-finale",
+          "x": 11,
+          "y": 3191,
+          "width": 380,
+          "height": 583
+        },
+        {
+          "section": "weekly-provenance",
+          "x": 15,
+          "y": 3774,
+          "width": 372,
+          "height": 135
+        }
+      ],
+      "photosAbsent": true,
+      "unresolvedAbsent": true,
+      "confidenceCount": 1,
+      "energy": {
+        "pointCount": 7,
+        "marks": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "sourceKey": "weekly.energy.dailyBalances.0.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "sourceKey": "weekly.energy.dailyBalances.0.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "sourceKey": "weekly.energy.dailyBalances.1.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "sourceKey": "weekly.energy.dailyBalances.1.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "sourceKey": "weekly.energy.dailyBalances.2.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "sourceKey": "weekly.energy.dailyBalances.2.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "sourceKey": "weekly.energy.dailyBalances.3.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "sourceKey": "weekly.energy.dailyBalances.3.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "sourceKey": "weekly.energy.dailyBalances.4.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "sourceKey": "weekly.energy.dailyBalances.4.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "sourceKey": "weekly.energy.dailyBalances.5.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "sourceKey": "weekly.energy.dailyBalances.5.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "sourceKey": "weekly.energy.dailyBalances.6.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "sourceKey": "weekly.energy.dailyBalances.6.expenditureKcal"
+          }
+        ],
+        "label": "Daily intake and estimated expenditure across 7 days"
+      },
+      "recovery": {
+        "points": [
+          403,
+          412,
+          395,
+          418,
+          407,
+          399,
+          416
+        ],
+        "label": "weekly Sleep trend: Su 403 minutes, Mo 412 minutes, Tu 395 minutes, We 418 minutes, Th 407 minutes, Fr 399 minutes, Sa 416 minutes. Baseline 405 minutes. Status Green.",
+        "fixtureOnly": "true",
+        "confidenceCoupling": "none",
+        "status": "Green"
+      },
+      "bodySource": "weekly_briefing_2026-07-12_2026-07-18",
+      "biggestTakeaway": true,
+      "navTargets": [
+        44,
+        44
+      ],
+      "narrativeSizes": [
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15
+      ],
+      "weightTypography": {
+        "value": 27,
+        "delta": 13,
+        "context": 15
+      },
+      "appearanceTokens": {
+        "background": "#06121c",
+        "text": "#f4f7f8",
+        "secondary": "#c4d1d5",
+        "muted": "#91a5ad",
+        "purple": "#aa8cff",
+        "green": "#55df9a",
+        "blue": "#54c6e7",
+        "amber": "#f2bc4d",
+        "cyan": "#44d3df"
+      },
+      "sectionOrderExact": true,
+      "energyExact": true,
+      "recoveryExact": true,
+      "accessibilityPass": true,
+      "pass": true
+    },
+    "weekly-light": {
+      "variant": "weekly-light",
+      "cadence": "weekly",
+      "appearance": "light",
+      "widthPoints": 402,
+      "heightPoints": 3969,
+      "innerText": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nWEEKLY BRIEFING\nCompleted week\nAug 23–Aug 29\n68%\nCONFIDENCE\nMODERATE\nConfidence increased +5\n\nTwo consistent weeks into the controlled surplus with steady training progression is a healthy early signal for the lean-mass build.\n\nTwo straight weeks of clean progression.\n\nEvery tracked lift either matched or beat last week's working numbers, and the surplus stayed inside the planned range all seven days.\n\nSTRATEGY\nCurrent strategy: Lean Mass Build\nWEEK\nWeek 2\nNEXT\nNext: DEXA review, Oct 31\nϟ\nENERGY BALANCE\n7/7 days paired\nEnergy Balance\n\n+350 kcal/day above\n\nA steady controlled surplus, right in the middle of the 2,750–2,850 kcal target range.\n\nAVG INTAKE\n2790 kcal\nAVG EXPENDITURE\n2440 kcal\nAVG BALANCE\n+350 kcal\nDaily intake vs estimated expenditure\n23\n24\n25\n26\n27\n28\n29\nIntake\nEstimated expenditure\n↕\nWEIGHT CONTEXT\n170.6 lb\n+0.6 lb this week\n\nUp 0.6 lb on the weekly average — tracking the modeled controlled-surplus rate closely.\n\n◇\nBODY COMPOSITION\nJul 18\nBODY FAT\n8.2%\nLEAN MASS\n149.0 lb\nFAT MASS\n13.4 lb\n\nThis scan closed the goal: the numerical target and the visual confirmation converged.\n\nCurrent objective · Visible Abs at Rest · latest real available fixture context\n\n◆\nTRAINING RESPONSE\nPerformance became the lead early indicator.\n\nBench and lower-body work both progressed; arms and back held steady. The useful signal is broad progression across distinct movement patterns, not one isolated record.\n\n4 training days · 4 reviewed categories · 2 improving · 2 steady · 1 plateauing\n\n🔥 Highlights\nLat Pulldown\nVOLUME PR\n3,340 lb volume\n▲ +280 lb\n3,340 lb of working volume, 280 lb above the prior comparable session.\nBarbell Bench Press\nREPS AT LOAD\n9 reps at 155 lb\n▲ +1 rep\nThe top working set improved without sacrificing the rest of the session.\nOverhead Triceps Extension\nREPS AT LOAD\n12 reps at 45 lb\n▲ +2 reps\nTwo additional repetitions at the same working load.\n🎯 Priority Muscle Groups\nChest\nImproving\nacross\n3\nexercises.\nBack\nImproving\nacross\n4\nexercises.\nShoulders\nSteady\nacross\n3\nexercises.\nLegs\nPlateauing\nacross\n4\nexercises.\n◒\nRECOVERY\nFUTURE CONTRACT · FIXTURE ONLY\nSleep stayed in your usual range\n6h 47m average · 7 of 7 nights\nGreen\n6h 47m\nPERIOD AVERAGE\n28-night baseline · 6h 45m\nPERSONAL BASELINE\nSu\nMo\nTu\nWe\nTh\nFr\nSa\nFoam rolling\nThree misses · status unchanged\n4 of 7 completed\n\nPersonal baseline excludes this period. Foam rolling cannot change status. Associations do not imply causation. Confidence coupling: none.\n\nCOACH'S TAKE\n💡 Biggest Takeaway\n\nThe surplus is producing training progression without the scale running away.\n\n🧠 What To Do\n\nHold the current intake and rhythm through the next DEXA rather than adjusting on scale weight alone.\n\n🎯 Into Next Week\n1\n\nKeep the surplus in the 2,750–2,850 kcal range.\n\n2\n\nPush for another working-weight increase on arms this week.\n\n3\n\nLog Thursday's workout the same day to avoid another late confirmation.\n\nThis Briefing was revised\n\nA confirmed evidence review (Thursday's workout) arrived after the original publish and changed the week's training conclusion.\n\nFirst published Aug 30, 9:15 AM · A quiet week with one still-pending workout.",
+      "semantic": {
+        "weekly.periodLabel": "Completed week",
+        "weekly.reportingRangeLabel": "Aug 23–Aug 29",
+        "weekly.confidence.score": "68",
+        "weekly.confidence.band": "moderate",
+        "weekly.confidence.movementDirection": "increased",
+        "weekly.confidence.delta": "5",
+        "weekly.confidence.primaryReason": "Two consistent weeks into the controlled surplus with steady training progression is a healthy early signal for the lean-mass build.",
+        "weekly.heroHeadline": "Two straight weeks of clean progression.",
+        "weekly.heroBody": "Every tracked lift either matched or beat last week's working numbers, and the surplus stayed inside the planned range all seven days.",
+        "weekly.strategyPhaseLabel": "Current strategy: Lean Mass Build",
+        "weekly.strategyWeekLabel": "Week 2",
+        "weekly.strategyNextMilestone": "Next: DEXA review, Oct 31",
+        "weekly.energy.pairedDayCount": "7",
+        "weekly.energy.eligibleDayCount": "7",
+        "weekly.energy.averageBalanceKcal": "350",
+        "weekly.energy.narrative": "A steady controlled surplus, right in the middle of the 2,750–2,850 kcal target range.",
+        "weekly.energy.averageIntakeKcal": "2790",
+        "weekly.energy.averageExpenditureKcal": "2440",
+        "weekly.weight.averageWeightLb": "170.6",
+        "weekly.weight.changeLb": "0.6",
+        "weekly.weight.narrative": "Up 0.6 lb on the weekly average — tracking the modeled controlled-surplus rate closely.",
+        "weekly.training.headline": "Performance became the lead early indicator.",
+        "weekly.training.narrative": "Bench and lower-body work both progressed; arms and back held steady. The useful signal is broad progression across distinct movement patterns, not one isolated record.",
+        "weekly.training.trainingDayCount": "4",
+        "weekly.training.comparableCategoryCount": "4",
+        "weekly.training.improvingCount": "2",
+        "weekly.training.steadyCount": "2",
+        "weekly.training.plateauingCount": "1",
+        "weekly.training.highlights.0.exerciseName": "Lat Pulldown",
+        "weekly.training.highlights.0.recordType": "Volume PR",
+        "weekly.training.highlights.0.performanceValue": "3,340 lb volume",
+        "weekly.training.highlights.0.delta": "+280 lb",
+        "weekly.training.highlights.0.detail": "3,340 lb of working volume, 280 lb above the prior comparable session.",
+        "weekly.training.highlights.1.exerciseName": "Barbell Bench Press",
+        "weekly.training.highlights.1.recordType": "Reps at Load",
+        "weekly.training.highlights.1.performanceValue": "9 reps at 155 lb",
+        "weekly.training.highlights.1.delta": "+1 rep",
+        "weekly.training.highlights.1.detail": "The top working set improved without sacrificing the rest of the session.",
+        "weekly.training.highlights.2.exerciseName": "Overhead Triceps Extension",
+        "weekly.training.highlights.2.recordType": "Reps at Load",
+        "weekly.training.highlights.2.performanceValue": "12 reps at 45 lb",
+        "weekly.training.highlights.2.delta": "+2 reps",
+        "weekly.training.highlights.2.detail": "Two additional repetitions at the same working load.",
+        "weekly.training.priorityGroups.0.label": "Chest",
+        "weekly.training.priorityGroups.0.statusLabel": "Improving",
+        "weekly.training.priorityGroups.0.comparableExerciseCount": "3",
+        "weekly.training.priorityGroups.1.label": "Back",
+        "weekly.training.priorityGroups.1.statusLabel": "Improving",
+        "weekly.training.priorityGroups.1.comparableExerciseCount": "4",
+        "weekly.training.priorityGroups.2.label": "Shoulders",
+        "weekly.training.priorityGroups.2.statusLabel": "Steady",
+        "weekly.training.priorityGroups.2.comparableExerciseCount": "3",
+        "weekly.training.priorityGroups.3.label": "Legs",
+        "weekly.training.priorityGroups.3.statusLabel": "Plateauing",
+        "weekly.training.priorityGroups.3.comparableExerciseCount": "4",
+        "weekly.coachTake.biggestTakeaway": "The surplus is producing training progression without the scale running away.",
+        "weekly.coachTake.recommendation": "Hold the current intake and rhythm through the next DEXA rather than adjusting on scale weight alone.",
+        "weekly.coachTake.intoNextWeek.0": "Keep the surplus in the 2,750–2,850 kcal range.",
+        "weekly.coachTake.intoNextWeek.1": "Push for another working-weight increase on arms this week.",
+        "weekly.coachTake.intoNextWeek.2": "Log Thursday's workout the same day to avoid another late confirmation.",
+        "weekly.revision.reason": "A confirmed evidence review (Thursday's workout) arrived after the original publish and changed the week's training conclusion.",
+        "weekly.revision.previousHeadline": "A quiet week with one still-pending workout."
+      },
+      "semanticCount": 62,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "sections": [
+        "weekly-navigation",
+        "weekly-hero",
+        "weekly-energy",
+        "weekly-weight",
+        "weekly-body-composition",
+        "weekly-training",
+        "weekly-recovery",
+        "weekly-finale",
+        "weekly-provenance"
+      ],
+      "geometry": [
+        {
+          "section": "weekly-navigation",
+          "x": 15,
+          "y": 51,
+          "width": 372,
+          "height": 64
+        },
+        {
+          "section": "weekly-hero",
+          "x": 0,
+          "y": 115,
+          "width": 402,
+          "height": 716
+        },
+        {
+          "section": "weekly-energy",
+          "x": 15,
+          "y": 831,
+          "width": 372,
+          "height": 494
+        },
+        {
+          "section": "weekly-weight",
+          "x": 15,
+          "y": 1325,
+          "width": 372,
+          "height": 178
+        },
+        {
+          "section": "weekly-body-composition",
+          "x": 15,
+          "y": 1503,
+          "width": 372,
+          "height": 252
+        },
+        {
+          "section": "weekly-training",
+          "x": 15,
+          "y": 1756,
+          "width": 372,
+          "height": 911
+        },
+        {
+          "section": "weekly-recovery",
+          "x": 15,
+          "y": 2667,
+          "width": 372,
+          "height": 525
+        },
+        {
+          "section": "weekly-finale",
+          "x": 11,
+          "y": 3191,
+          "width": 380,
+          "height": 583
+        },
+        {
+          "section": "weekly-provenance",
+          "x": 15,
+          "y": 3774,
+          "width": 372,
+          "height": 135
+        }
+      ],
+      "photosAbsent": true,
+      "unresolvedAbsent": true,
+      "confidenceCount": 1,
+      "energy": {
+        "pointCount": 7,
+        "marks": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "sourceKey": "weekly.energy.dailyBalances.0.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "sourceKey": "weekly.energy.dailyBalances.0.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "sourceKey": "weekly.energy.dailyBalances.1.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "sourceKey": "weekly.energy.dailyBalances.1.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "sourceKey": "weekly.energy.dailyBalances.2.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "sourceKey": "weekly.energy.dailyBalances.2.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "sourceKey": "weekly.energy.dailyBalances.3.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "sourceKey": "weekly.energy.dailyBalances.3.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "sourceKey": "weekly.energy.dailyBalances.4.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "sourceKey": "weekly.energy.dailyBalances.4.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "sourceKey": "weekly.energy.dailyBalances.5.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "sourceKey": "weekly.energy.dailyBalances.5.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "sourceKey": "weekly.energy.dailyBalances.6.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "sourceKey": "weekly.energy.dailyBalances.6.expenditureKcal"
+          }
+        ],
+        "label": "Daily intake and estimated expenditure across 7 days"
+      },
+      "recovery": {
+        "points": [
+          403,
+          412,
+          395,
+          418,
+          407,
+          399,
+          416
+        ],
+        "label": "weekly Sleep trend: Su 403 minutes, Mo 412 minutes, Tu 395 minutes, We 418 minutes, Th 407 minutes, Fr 399 minutes, Sa 416 minutes. Baseline 405 minutes. Status Green.",
+        "fixtureOnly": "true",
+        "confidenceCoupling": "none",
+        "status": "Green"
+      },
+      "bodySource": "weekly_briefing_2026-07-12_2026-07-18",
+      "biggestTakeaway": true,
+      "navTargets": [
+        44,
+        44
+      ],
+      "narrativeSizes": [
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15
+      ],
+      "weightTypography": {
+        "value": 27,
+        "delta": 13,
+        "context": 15
+      },
+      "appearanceTokens": {
+        "background": "#f1f1e9",
+        "text": "#102638",
+        "secondary": "#4e6470",
+        "muted": "#576b73",
+        "purple": "#684ac7",
+        "green": "#0b6b4d",
+        "blue": "#0e607a",
+        "amber": "#875400",
+        "cyan": "#0d6670"
+      },
+      "sectionOrderExact": true,
+      "energyExact": true,
+      "recoveryExact": true,
+      "accessibilityPass": true,
+      "pass": true
+    },
+    "midweek-dark": {
+      "variant": "midweek-dark",
+      "cadence": "midweek",
+      "appearance": "dark",
+      "widthPoints": 402,
+      "heightPoints": 3014,
+      "innerText": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nMIDWEEK BRIEFING\nSep 20–22\n79%\nCONFIDENCE\nHIGH\n— No meaningful change\n\nTraining stayed consistent and Confidence held steady.\n\nMachine lateral raises reached 90 lb, up from the previous best of 85 lb.\n\nBuilding Lean Mass, training stayed on track through midweek.\n\nGOAL & PHASE\nBuild Lean Mass · Lean Mass Build\nϟ\nENERGY BALANCE\n2/2 days paired\nEnergy Balance\n\n50 kcal/day below\n\nSunday\n−80 kcal\nMonday\n−20 kcal\nAVG INTAKE\n2650 kcal\nAVG EXPENDITURE\n2700 kcal\nAVG BALANCE\n−50 kcal\nDaily intake vs estimated expenditure\nSu\nMo\nIntake\nEstimated expenditure\n↕\nWEIGHT CONTEXT\n178.4 lb\n−0.6 lb\n\nSunday–Tuesday average · 3 observations\n\n◇\nBODY COMPOSITION\nSep 21\nBODY FAT\n14.2%\nLEAN MASS\n152 lb\nFAT MASS\n25.1 lb\n◆\nTRAINING RESPONSE\nTraining stayed on track.\n\n3 training days · 5 reviewed categories · 2 improving · 3 steady\n\n● 2 improving\n■ 3 steady\n🔥 Highlights\nLateral Raises Machine\nHEAVIEST LOAD\n90 lb\n▲ +5 lb\nNew heaviest load. Up from 85 lb on Sep 22.\nLeg Extensions\nHEAVIEST LOAD\n90 lb\n▲ +10 lb\nNew heaviest load. Up from 80 lb on Sep 21.\n◒\nRECOVERY\nFUTURE CONTRACT · FIXTURE ONLY\nSleep stayed in your usual range\n6h 52m average · 3 of 3 nights\nGreen\n6h 52m\nPERIOD AVERAGE\n28-night baseline · 6h 45m\nPERSONAL BASELINE\nSu\nMo\nTu\nFoam rolling\nOne miss · status unchanged\n2 of 3 completed\n\nPersonal baseline excludes this period. Foam rolling cannot change status. Associations do not imply causation. Confidence coupling: none.\n\nCOACH'S TAKE\n💡 Biggest Takeaway\n\nLeg extensions also reached 90 lb, a second strong movement this week.\n\n🧠 What To Do\n\nKeep loading presses through Friday.\n\n👀 What To Watch\n\nWatch sleep consistency this week.\n\nCurrent production-shaped V3 fixture\n\nSep 20–22 · canonical Narrative V3 and Confidence V3 projection",
+      "semantic": {
+        "midweek.lead.eyebrow": "MIDWEEK BRIEFING",
+        "midweek.evidenceWindow.displayRange": "Sep 20–22",
+        "midweek.lead.confidence.score": "79",
+        "midweek.lead.confidence.band": "high",
+        "midweek.lead.confidence.movementLabel": "— No meaningful change",
+        "midweek.lead.confidence.reason": "Training stayed consistent and Confidence held steady.",
+        "midweek.lead.headline": "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.",
+        "midweek.lead.meaning": "Building Lean Mass, training stayed on track through midweek.",
+        "midweek.lead.goal": "Build Lean Mass",
+        "midweek.lead.phase": "Lean Mass Build",
+        "midweek.energy.headline": "Energy Balance",
+        "midweek.energy.balanceHeadline": "50 kcal/day below",
+        "midweek.energy.dailyBalances.0.weekday": "Sunday",
+        "midweek.energy.dailyBalances.1.weekday": "Monday",
+        "midweek.energy.averageIntakeKcal": "2650",
+        "midweek.energy.averageExpenditureKcal": "2700",
+        "midweek.energy.chartTitle": "Daily intake vs estimated expenditure",
+        "midweek.weight.averageWeightLb": "178.4",
+        "midweek.weight.changeLb": "-0.6",
+        "midweek.bodyComposition.scanDateDisplay": "Sep 21",
+        "midweek.bodyComposition.bodyFatPercent": "14.2%",
+        "midweek.bodyComposition.leanMassLb": "152 lb",
+        "midweek.bodyComposition.fatMassLb": "25.1 lb",
+        "midweek.training.headline": "Training stayed on track.",
+        "midweek.training.trainingDayCount": "3",
+        "midweek.training.comparableCategoryCount": "5",
+        "midweek.training.improvingCount": "2",
+        "midweek.training.steadyCount": "3",
+        "midweek.training.highlights.0.exerciseName": "Lateral Raises Machine",
+        "midweek.training.highlights.0.recordType": "Heaviest Load",
+        "midweek.training.highlights.0.performanceValue": "90 lb",
+        "midweek.training.highlights.0.delta": "+5 lb",
+        "midweek.training.highlights.0.headline": "New heaviest load.",
+        "midweek.training.highlights.0.detail": "Up from 85 lb on Sep 22.",
+        "midweek.training.highlights.1.exerciseName": "Leg Extensions",
+        "midweek.training.highlights.1.recordType": "Heaviest Load",
+        "midweek.training.highlights.1.performanceValue": "90 lb",
+        "midweek.training.highlights.1.delta": "+10 lb",
+        "midweek.training.highlights.1.headline": "New heaviest load.",
+        "midweek.training.highlights.1.detail": "Up from 80 lb on Sep 21.",
+        "midweek.coaching.action": "Keep loading presses through Friday.",
+        "midweek.coaching.watch": "Watch sleep consistency this week."
+      },
+      "semanticCount": 42,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "sections": [
+        "midweek-navigation",
+        "midweek-hero",
+        "midweek-energy",
+        "midweek-weight",
+        "midweek-body-composition",
+        "midweek-training",
+        "midweek-recovery",
+        "midweek-finale",
+        "midweek-provenance"
+      ],
+      "geometry": [
+        {
+          "section": "midweek-navigation",
+          "x": 15,
+          "y": 51,
+          "width": 372,
+          "height": 64
+        },
+        {
+          "section": "midweek-hero",
+          "x": 0,
+          "y": 115,
+          "width": 402,
+          "height": 632
+        },
+        {
+          "section": "midweek-energy",
+          "x": 15,
+          "y": 747,
+          "width": 372,
+          "height": 540
+        },
+        {
+          "section": "midweek-weight",
+          "x": 15,
+          "y": 1287,
+          "width": 372,
+          "height": 157
+        },
+        {
+          "section": "midweek-body-composition",
+          "x": 15,
+          "y": 1443,
+          "width": 372,
+          "height": 148
+        },
+        {
+          "section": "midweek-training",
+          "x": 15,
+          "y": 1592,
+          "width": 372,
+          "height": 390
+        },
+        {
+          "section": "midweek-recovery",
+          "x": 15,
+          "y": 1981,
+          "width": 372,
+          "height": 525
+        },
+        {
+          "section": "midweek-finale",
+          "x": 11,
+          "y": 2506,
+          "width": 380,
+          "height": 352
+        },
+        {
+          "section": "midweek-provenance",
+          "x": 15,
+          "y": 2858,
+          "width": 372,
+          "height": 96
+        }
+      ],
+      "photosAbsent": true,
+      "unresolvedAbsent": true,
+      "confidenceCount": 1,
+      "energy": {
+        "pointCount": 2,
+        "marks": [
+          {
+            "series": "Intake",
+            "value": 2600,
+            "sourceKey": "midweek.energy.dailyBalances.0.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2680,
+            "sourceKey": "midweek.energy.dailyBalances.0.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2700,
+            "sourceKey": "midweek.energy.dailyBalances.1.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2720,
+            "sourceKey": "midweek.energy.dailyBalances.1.expenditureKcal"
+          }
+        ],
+        "label": "Daily intake and estimated expenditure across 2 days"
+      },
+      "recovery": {
+        "points": [
+          407,
+          419,
+          411
+        ],
+        "label": "midweek Sleep trend: Su 407 minutes, Mo 419 minutes, Tu 411 minutes. Baseline 405 minutes. Status Green.",
+        "fixtureOnly": "true",
+        "confidenceCoupling": "none",
+        "status": "Green"
+      },
+      "bodySource": null,
+      "biggestTakeaway": true,
+      "navTargets": [
+        44,
+        44
+      ],
+      "narrativeSizes": [
+        15,
+        15,
+        15,
+        15,
+        15
+      ],
+      "weightTypography": {
+        "value": 27,
+        "delta": 13,
+        "context": 15
+      },
+      "appearanceTokens": {
+        "background": "#06121c",
+        "text": "#f4f7f8",
+        "secondary": "#c4d1d5",
+        "muted": "#91a5ad",
+        "purple": "#aa8cff",
+        "green": "#55df9a",
+        "blue": "#54c6e7",
+        "amber": "#f2bc4d",
+        "cyan": "#44d3df"
+      },
+      "sectionOrderExact": true,
+      "energyExact": true,
+      "recoveryExact": true,
+      "accessibilityPass": true,
+      "pass": true
+    },
+    "midweek-light": {
+      "variant": "midweek-light",
+      "cadence": "midweek",
+      "appearance": "light",
+      "widthPoints": 402,
+      "heightPoints": 3014,
+      "innerText": "1:05\n▮▮▮⌁\n‹ Home\n▦ Briefing History\nMIDWEEK BRIEFING\nSep 20–22\n79%\nCONFIDENCE\nHIGH\n— No meaningful change\n\nTraining stayed consistent and Confidence held steady.\n\nMachine lateral raises reached 90 lb, up from the previous best of 85 lb.\n\nBuilding Lean Mass, training stayed on track through midweek.\n\nGOAL & PHASE\nBuild Lean Mass · Lean Mass Build\nϟ\nENERGY BALANCE\n2/2 days paired\nEnergy Balance\n\n50 kcal/day below\n\nSunday\n−80 kcal\nMonday\n−20 kcal\nAVG INTAKE\n2650 kcal\nAVG EXPENDITURE\n2700 kcal\nAVG BALANCE\n−50 kcal\nDaily intake vs estimated expenditure\nSu\nMo\nIntake\nEstimated expenditure\n↕\nWEIGHT CONTEXT\n178.4 lb\n−0.6 lb\n\nSunday–Tuesday average · 3 observations\n\n◇\nBODY COMPOSITION\nSep 21\nBODY FAT\n14.2%\nLEAN MASS\n152 lb\nFAT MASS\n25.1 lb\n◆\nTRAINING RESPONSE\nTraining stayed on track.\n\n3 training days · 5 reviewed categories · 2 improving · 3 steady\n\n● 2 improving\n■ 3 steady\n🔥 Highlights\nLateral Raises Machine\nHEAVIEST LOAD\n90 lb\n▲ +5 lb\nNew heaviest load. Up from 85 lb on Sep 22.\nLeg Extensions\nHEAVIEST LOAD\n90 lb\n▲ +10 lb\nNew heaviest load. Up from 80 lb on Sep 21.\n◒\nRECOVERY\nFUTURE CONTRACT · FIXTURE ONLY\nSleep stayed in your usual range\n6h 52m average · 3 of 3 nights\nGreen\n6h 52m\nPERIOD AVERAGE\n28-night baseline · 6h 45m\nPERSONAL BASELINE\nSu\nMo\nTu\nFoam rolling\nOne miss · status unchanged\n2 of 3 completed\n\nPersonal baseline excludes this period. Foam rolling cannot change status. Associations do not imply causation. Confidence coupling: none.\n\nCOACH'S TAKE\n💡 Biggest Takeaway\n\nLeg extensions also reached 90 lb, a second strong movement this week.\n\n🧠 What To Do\n\nKeep loading presses through Friday.\n\n👀 What To Watch\n\nWatch sleep consistency this week.\n\nCurrent production-shaped V3 fixture\n\nSep 20–22 · canonical Narrative V3 and Confidence V3 projection",
+      "semantic": {
+        "midweek.lead.eyebrow": "MIDWEEK BRIEFING",
+        "midweek.evidenceWindow.displayRange": "Sep 20–22",
+        "midweek.lead.confidence.score": "79",
+        "midweek.lead.confidence.band": "high",
+        "midweek.lead.confidence.movementLabel": "— No meaningful change",
+        "midweek.lead.confidence.reason": "Training stayed consistent and Confidence held steady.",
+        "midweek.lead.headline": "Machine lateral raises reached 90 lb, up from the previous best of 85 lb.",
+        "midweek.lead.meaning": "Building Lean Mass, training stayed on track through midweek.",
+        "midweek.lead.goal": "Build Lean Mass",
+        "midweek.lead.phase": "Lean Mass Build",
+        "midweek.energy.headline": "Energy Balance",
+        "midweek.energy.balanceHeadline": "50 kcal/day below",
+        "midweek.energy.dailyBalances.0.weekday": "Sunday",
+        "midweek.energy.dailyBalances.1.weekday": "Monday",
+        "midweek.energy.averageIntakeKcal": "2650",
+        "midweek.energy.averageExpenditureKcal": "2700",
+        "midweek.energy.chartTitle": "Daily intake vs estimated expenditure",
+        "midweek.weight.averageWeightLb": "178.4",
+        "midweek.weight.changeLb": "-0.6",
+        "midweek.bodyComposition.scanDateDisplay": "Sep 21",
+        "midweek.bodyComposition.bodyFatPercent": "14.2%",
+        "midweek.bodyComposition.leanMassLb": "152 lb",
+        "midweek.bodyComposition.fatMassLb": "25.1 lb",
+        "midweek.training.headline": "Training stayed on track.",
+        "midweek.training.trainingDayCount": "3",
+        "midweek.training.comparableCategoryCount": "5",
+        "midweek.training.improvingCount": "2",
+        "midweek.training.steadyCount": "3",
+        "midweek.training.highlights.0.exerciseName": "Lateral Raises Machine",
+        "midweek.training.highlights.0.recordType": "Heaviest Load",
+        "midweek.training.highlights.0.performanceValue": "90 lb",
+        "midweek.training.highlights.0.delta": "+5 lb",
+        "midweek.training.highlights.0.headline": "New heaviest load.",
+        "midweek.training.highlights.0.detail": "Up from 85 lb on Sep 22.",
+        "midweek.training.highlights.1.exerciseName": "Leg Extensions",
+        "midweek.training.highlights.1.recordType": "Heaviest Load",
+        "midweek.training.highlights.1.performanceValue": "90 lb",
+        "midweek.training.highlights.1.delta": "+10 lb",
+        "midweek.training.highlights.1.headline": "New heaviest load.",
+        "midweek.training.highlights.1.detail": "Up from 80 lb on Sep 21.",
+        "midweek.coaching.action": "Keep loading presses through Friday.",
+        "midweek.coaching.watch": "Watch sleep consistency this week."
+      },
+      "semanticCount": 42,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "sections": [
+        "midweek-navigation",
+        "midweek-hero",
+        "midweek-energy",
+        "midweek-weight",
+        "midweek-body-composition",
+        "midweek-training",
+        "midweek-recovery",
+        "midweek-finale",
+        "midweek-provenance"
+      ],
+      "geometry": [
+        {
+          "section": "midweek-navigation",
+          "x": 15,
+          "y": 51,
+          "width": 372,
+          "height": 64
+        },
+        {
+          "section": "midweek-hero",
+          "x": 0,
+          "y": 115,
+          "width": 402,
+          "height": 632
+        },
+        {
+          "section": "midweek-energy",
+          "x": 15,
+          "y": 747,
+          "width": 372,
+          "height": 540
+        },
+        {
+          "section": "midweek-weight",
+          "x": 15,
+          "y": 1287,
+          "width": 372,
+          "height": 157
+        },
+        {
+          "section": "midweek-body-composition",
+          "x": 15,
+          "y": 1443,
+          "width": 372,
+          "height": 148
+        },
+        {
+          "section": "midweek-training",
+          "x": 15,
+          "y": 1592,
+          "width": 372,
+          "height": 390
+        },
+        {
+          "section": "midweek-recovery",
+          "x": 15,
+          "y": 1981,
+          "width": 372,
+          "height": 525
+        },
+        {
+          "section": "midweek-finale",
+          "x": 11,
+          "y": 2506,
+          "width": 380,
+          "height": 352
+        },
+        {
+          "section": "midweek-provenance",
+          "x": 15,
+          "y": 2858,
+          "width": 372,
+          "height": 96
+        }
+      ],
+      "photosAbsent": true,
+      "unresolvedAbsent": true,
+      "confidenceCount": 1,
+      "energy": {
+        "pointCount": 2,
+        "marks": [
+          {
+            "series": "Intake",
+            "value": 2600,
+            "sourceKey": "midweek.energy.dailyBalances.0.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2680,
+            "sourceKey": "midweek.energy.dailyBalances.0.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2700,
+            "sourceKey": "midweek.energy.dailyBalances.1.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2720,
+            "sourceKey": "midweek.energy.dailyBalances.1.expenditureKcal"
+          }
+        ],
+        "label": "Daily intake and estimated expenditure across 2 days"
+      },
+      "recovery": {
+        "points": [
+          407,
+          419,
+          411
+        ],
+        "label": "midweek Sleep trend: Su 407 minutes, Mo 419 minutes, Tu 411 minutes. Baseline 405 minutes. Status Green.",
+        "fixtureOnly": "true",
+        "confidenceCoupling": "none",
+        "status": "Green"
+      },
+      "bodySource": null,
+      "biggestTakeaway": true,
+      "navTargets": [
+        44,
+        44
+      ],
+      "narrativeSizes": [
+        15,
+        15,
+        15,
+        15,
+        15
+      ],
+      "weightTypography": {
+        "value": 27,
+        "delta": 13,
+        "context": 15
+      },
+      "appearanceTokens": {
+        "background": "#f1f1e9",
+        "text": "#102638",
+        "secondary": "#4e6470",
+        "muted": "#576b73",
+        "purple": "#684ac7",
+        "green": "#0b6b4d",
+        "blue": "#0e607a",
+        "amber": "#875400",
+        "cyan": "#0d6670"
+      },
+      "sectionOrderExact": true,
+      "energyExact": true,
+      "recoveryExact": true,
+      "accessibilityPass": true,
+      "pass": true
+    }
+  },
+  "appearanceParity": {
+    "weekly": {
+      "contentExact": true,
+      "semanticsExact": true,
+      "sectionOrderExact": true,
+      "sectionGeometryExact": true,
+      "energyExact": true,
+      "recoveryExact": true,
+      "heightExact": true,
+      "appearanceTokensDifferent": true,
+      "pass": true
+    },
+    "midweek": {
+      "contentExact": true,
+      "semanticsExact": true,
+      "sectionOrderExact": true,
+      "sectionGeometryExact": true,
+      "energyExact": true,
+      "recoveryExact": true,
+      "heightExact": true,
+      "appearanceTokensDifferent": true,
+      "pass": true
+    }
+  },
+  "darkPreservation": {
+    "midweekSections": {
+      "midweek-navigation": true,
+      "midweek-hero": true,
+      "midweek-energy": true,
+      "midweek-weight": true,
+      "midweek-body-composition": true,
+      "midweek-training": true,
+      "midweek-recovery": true,
+      "midweek-finale": true,
+      "midweek-provenance": true
+    },
+    "weeklySections": {
+      "weekly-hero": true,
+      "weekly-energy": true,
+      "weekly-weight": true,
+      "weekly-body-composition": true,
+      "weekly-training": true,
+      "weekly-recovery": true,
+      "weekly-finale": true,
+      "weekly-provenance": true
+    },
+    "onlyWeeklyOrderChanged": true
+  },
+  "lightContrast": {
+    "background": "#f1f1e9",
+    "ratios": {
+      "text": 13.638424502324419,
+      "secondary": 5.471789290533545,
+      "muted": 4.925311919178304,
+      "purple": 5.452358883834813,
+      "green": 5.737036116103667,
+      "blue": 6.222620693878267,
+      "amber": 5.608605061007668,
+      "cyan": 5.869629361882222
+    },
+    "pass": true
+  }
+}

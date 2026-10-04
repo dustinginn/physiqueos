@@ -152,6 +152,12 @@ Recurring Briefing implementation backlog, not started:
 - Midweek Weight: use the shared Weekly metric/delta/context typography hierarchy.
 - Monthly: translate the accepted recurring-family system next, only after this Weekly/Midweek refinement is accepted.
 
+Final appearance-translation review state:
+- Founder accepted the dark Weekly/Midweek family and required one order correction: Weekly Body Composition now sits directly under Weight, matching Midweek.
+- Corrected dark Weekly, unchanged dark Midweek, and direct mineral-light versions of both are ready at `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/`.
+- Automated proof confirms exact dark/light content, semantics, geometry, Energy graphs, Recovery graphs and page-height parity. The accepted dark Midweek is structurally unchanged; all dark Weekly sections are unchanged apart from the authorized Body Composition move.
+- Do not mark Weekly/Midweek dark + mineral light locked until the Founder confirms this final set.
+
 F2. Briefing Narrative + Confidence quality/tuning audit
 Position: next major strategic-quality project.
 Scope placeholder: audit and tune Briefing narrative quality and Goal Confidence behavior across Daily/Midweek/Weekly/Monthly/Event briefings (accuracy, calibration, tone, repetition, evidence grounding). Not started; no audit or implementation authorized yet.
