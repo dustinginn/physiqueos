@@ -1,0 +1,107 @@
+{
+  "fixtureId": "monthly_september_mtd_review_v3_zero_write_20260927",
+  "provenance": {
+    "kind": "engine_generated_zero_write_preview",
+    "sourceReport": "agent-handoffs/reports/20260928T110000Z-briefing-intelligence-september-mtd-monthly-review-preview.md",
+    "evidenceWindow": "September 1–26, 2026",
+    "periodLabel": "Month to date",
+    "generatedAt": "2026-09-27T22:50:00Z",
+    "published": false,
+    "revision": null
+  },
+  "goalContext": {
+    "goal": "Build Lean Mass",
+    "phase": "Lean Mass Build"
+  },
+  "hero": {
+    "eyebrow": "MONTHLY BRIEFING",
+    "range": "September 1–26",
+    "period": "Month to date",
+    "confidence": {
+      "score": 79,
+      "band": "Moderate",
+      "movement": "No meaningful change",
+      "delta": 0,
+      "explanation": "No meaningful change — Confidence holds. The September 12 DEXA sets the outlook, and a few off-routine days aren't enough to change it."
+    },
+    "headline": "Real measured progress, but two off-routine stretches.",
+    "narrative": "So far, September has brought measured progress in lean mass on the September 12 DEXA, new training bests across most of the month, and two short off-routine stretches. You are more than halfway to the 10 lb lean-mass goal, with body fat at 8.1%.",
+    "highlights": [
+      {"label": "Lean mass", "value": "+5 lb", "detail": "September 12 DEXA, since August 15"},
+      {"label": "Training", "value": "12 new bests", "detail": "21 training days"},
+      {"label": "Scale weight", "value": "+1.7 lb/week", "detail": "26-day trend"}
+    ]
+  },
+  "strategy": {
+    "label": "Coach's Take",
+    "recommendation": "continue_current_strategy",
+    "copy": "Put together, the measured result moved the goal forward and training kept progressing; the misses were short-lived rather than a slide. Nothing in the month argues for changing the plan; what to tighten is execution: keeping the usual sessions and the daily calorie number. What the month can't settle is how much of the scale's climb is lean mass. Intake is the least certain part of the picture, because some logged days were too incomplete to read."
+  },
+  "training": {
+    "label": "TRAINING PROGRESS",
+    "headline": "Progress was spread across the month.",
+    "narrative": "New bests came on 12 lifts through September 26, and they landed in three of the four weeks rather than in one good week. There were 21 training days, a few fewer than your usual rhythm; the missed days fall within the routine stretches below.",
+    "records": [
+      {"name": "Plated Chest Fly Machine", "value": "70 lb", "detail": "up from 50 lb · September 18"},
+      {"name": "Sumo Squat Machine", "value": "15 reps at 180 lb", "detail": "up from 12 reps · September 10"},
+      {"name": "Hyperextension Machine", "value": "95 lb", "detail": "up from 80 lb · September 17"}
+    ],
+    "insightLabel": "Why it matters",
+    "insight": "Between checks, performance is the clearest read on training: it shows the work moving forward, while lean mass itself is only measured by the DEXA."
+  },
+  "energy": {
+    "label": "ENERGY EVOLUTION",
+    "headline": "Intake ran above the plan's target on the readable days.",
+    "phase": "Lean Mass Build · Sep 1–Sep 26",
+    "narrative": "Food was logged on all 26 days through September 26, and 21 were complete enough to read. On those days intake averaged about 2,800 calories against a 2,500 target, and protein held around 186 g, in line with your usual. September 6, September 22, and September 24 through 26 were too patchy to read and are left out of that average.",
+    "insight": "Expenditure is a wearable estimate, so read the weekly balance as directional; the scale's trend is the steadier read of where intake sits against the work.",
+    "weeks": [
+      {"label": "Sep 1–7", "intake": 3157, "expenditure": 2562, "readableDays": 6, "shown": true},
+      {"label": "Sep 8–14", "intake": 2640, "expenditure": 2732, "readableDays": 7, "shown": true},
+      {"label": "Sep 15–21", "intake": 2659, "expenditure": 2728, "readableDays": 7, "shown": true},
+      {"label": "Sep 22–26", "intake": null, "expenditure": null, "readableDays": 1, "shown": false}
+    ]
+  },
+  "bodyComposition": {
+    "label": "NEW BASELINE",
+    "headline": "The September 12 DEXA is the new reference point.",
+    "referenceDate": "September 12, 2026",
+    "metrics": [
+      {"label": "Body fat", "value": "8.1%"},
+      {"label": "Lean mass", "value": "153.3 lb"},
+      {"label": "Fat mass", "value": "14.2 lb"}
+    ],
+    "narrative": "It measured lean mass up 5 lb since August 15, and body fat stayed inside its limit. On the scale, the weekly average went from about 170 lb in the first week to about 174 lb in the latest, roughly 1.7 lb a week on the recent trend. The scale can't tell lean mass apart from other weight, so it adds pace, not a verdict.",
+    "calloutLabel": "Baseline Read",
+    "callout": "The next DEXA will be compared with this one."
+  },
+  "changes": {
+    "label": "WHAT CHANGED",
+    "title": "September changed how progress should be judged.",
+    "items": [
+      {"label": "Early-month stretch · September 3 through 7", "copy": "Calories ran above usual September 3 through 5, the wearable showed less activity September 4 through 7, and training stopped September 5 through 7."},
+      {"label": "Late-month stretch · September 24 through 26", "copy": "The wearable showed less activity September 24 through 26, and training and weigh-ins stopped September 25 and 26. It runs up to the latest complete day, so whether it has passed isn't known yet."},
+      {"label": "Pattern · Two short stretches, not a pattern.", "copy": "Together they cover eight days; outside them the routine held, and wearable activity stayed at its usual level."}
+    ]
+  },
+  "monthAhead": {
+    "label": "MONTH AHEAD",
+    "title": "Turn September's signals into repeatable evidence.",
+    "introduction": "October's job is to keep the progress going on a steadier rhythm.",
+    "items": [
+      {"label": "Priority", "title": "Get the usual training rhythm back", "copy": "Protecting the usual training days matters more than any single big week."},
+      {"label": "Training", "title": "Keep the progression going", "copy": "Build on the lifts that moved; repeating a best matters as much as beating it."},
+      {"label": "Intake", "title": "Bring intake back down to the target", "copy": "Hitting the target on most days across the month counts for more than any single day."},
+      {"label": "Logging", "title": "Log complete days", "copy": "A full day's log, every day, makes intake the easiest part of October to read."},
+      {"label": "Watch", "title": "The weekly weight average", "copy": "It shows the pace between scans; a single weigh-in never does."},
+      {"label": "Next evidence", "title": "The next DEXA", "copy": "It is the check that settles what the scale can't."}
+    ]
+  },
+  "conditions": {
+    "goalMilestone": "absent",
+    "definingMoments": "absent_by_review_allocation",
+    "uncertainty": "absent_none_surfaced",
+    "photos": "no_standalone_section_no_comparison",
+    "revisionBanner": "absent_no_revision_provenance"
+  }
+}

@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log + Weekly visual language locked; final briefing-light polish and locked Log density validation ready for Founder review**
+Status: **Home, Log, Weekly and Midweek design directions locked; Monthly dark/mineral-light exploration ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -291,3 +291,28 @@ Review set:
 - `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/PARITY-PROOF.md`
 
 Implementation backlog additions: centralized bottom-anchored expandable Log source/provenance; realistic Strength + Cardio + macro density; condensed Priority Muscle Groups; selective briefing mineral-light surface rhythm; and the richer navy/teal/violet mineral-light appearance candidate. Do not mark these refinements implemented or locked until Founder acceptance. No shipping code, projection, Server behavior, Recovery activation, build or TestFlight work occurred.
+
+## Founder locks + Monthly Briefing translation
+
+Status: **Weekly, Midweek and Log accepted/locked; Monthly exploration ready for Founder review**
+
+Founder lock decisions recorded on 2026-10-04:
+
+- Weekly dark + mineral light are locked, including the immersive teal/navy lead, Dense Analytical body, Body Composition under Weight, graph-driven future Recovery, compact left-aligned Priority Muscle Groups, exact finale, and richer selective mineral-light fields.
+- Midweek dark + mineral light are locked, including the cadence-condensed family structure, Body Composition under Weight, graph-driven future Recovery, exact Biggest Takeaway / What To Do / What To Watch, corrected Weight typography, and stronger mineral-light fields.
+- Log Compact Command Center dark + mineral light is locked at realistic density. Centralized Sources is locked collapsed by default at the bottom of Log content above navigation, expanding to exact scope.
+- These locks do not mean implementation has started. Reopen only for a demonstrated technical blocker.
+
+Monthly has now been audited independently from Weekly and translated into the locked family in dark and mineral light. Its own canonical order remains lead → strategic summary → Training Progress → Energy Evolution → future-only Recovery fixture → New Baseline → What Changed → conditional Defining Moments → Month Ahead → conditional uncertainty/provenance. The selected exact current-V3 source-shaped fixture does not earn Goal Milestone, Defining Moments, uncertainty, standalone Photos, or revision provenance, so they remain absent without changing their conditions.
+
+Review set:
+
+- `agent-handoffs/artifacts/monthly-ui-locked-briefing-family-translation-20261004/README.md`
+- `agent-handoffs/artifacts/monthly-ui-locked-briefing-family-translation-20261004/screens/monthly-dark-full.png`
+- `agent-handoffs/artifacts/monthly-ui-locked-briefing-family-translation-20261004/screens/monthly-light-full.png`
+- `agent-handoffs/artifacts/monthly-ui-locked-briefing-family-translation-20261004/screens/monthly-dark-light.png`
+- `agent-handoffs/artifacts/monthly-ui-locked-briefing-family-translation-20261004/screens/recurring-family-dark.png`
+- `agent-handoffs/artifacts/monthly-ui-locked-briefing-family-translation-20261004/screens/recurring-family-light.png`
+- `agent-handoffs/artifacts/monthly-ui-locked-briefing-family-translation-20261004/PARITY-PROOF.md`
+
+Monthly remains intentionally prior-calendar-month/day-1 and has higher recurring precedence when cadences collide. Recovery remains ungraduated, presentation-only, weekly-aggregated for Monthly and uncoupled from Confidence. Monthly is **exploration pending Founder review**, not locked. No shipping Native/Server source, global theme, build, TestFlight, production policy or Recovery activation changed.
