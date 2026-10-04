@@ -1,0 +1,404 @@
+{
+  "pass": true,
+  "authorities": {
+    "prompt": "d3501e1a747d05a888b786a0ca1f014dea03f299",
+    "nativeBuild85": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "productionServer": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "recoveryPrototype": "1bfa92ef874c3c96f05b23a9d3cbdfb956384156"
+  },
+  "target": {
+    "widthPoints": 402,
+    "scale": 3,
+    "safeAreaTopPoints": 51
+  },
+  "sectionParity": {
+    "weekly": [
+      "Hero / Confidence",
+      "Energy",
+      "Weight",
+      "Training",
+      "Recovery — future contract",
+      "Body Composition — founder parity target",
+      "Biggest Takeaway",
+      "What To Do",
+      "Into Next Week",
+      "Revision / provenance"
+    ],
+    "midweek": [
+      "Hero / Confidence",
+      "Energy",
+      "Weight",
+      "Body Composition",
+      "Training",
+      "Recovery — future contract",
+      "Biggest Takeaway",
+      "What To Do",
+      "What To Watch",
+      "Revision / provenance"
+    ],
+    "intentionallyAbsent": [
+      "Photos",
+      "Still Unresolved"
+    ]
+  },
+  "graphInventory": [
+    {
+      "cadence": "weekly",
+      "section": "Energy",
+      "type": "grouped bar",
+      "pointCount": 7,
+      "markCount": 14
+    },
+    {
+      "cadence": "midweek",
+      "section": "Energy",
+      "type": "grouped bar",
+      "pointCount": 2,
+      "markCount": 4
+    },
+    {
+      "cadence": "weekly",
+      "section": "Recovery",
+      "type": "Sleep trend line + area + baseline",
+      "pointCount": 7,
+      "status": "Green",
+      "fixtureOnly": true
+    },
+    {
+      "cadence": "midweek",
+      "section": "Recovery",
+      "type": "Sleep trend line + area + baseline",
+      "pointCount": 3,
+      "status": "Green",
+      "fixtureOnly": true
+    }
+  ],
+  "inspection": {
+    "width": {
+      "weekly": 402,
+      "midweek": 402
+    },
+    "heights": {
+      "weekly": 3969,
+      "midweek": 3014
+    },
+    "semanticFieldCount": 104,
+    "missing": [],
+    "mismatches": [],
+    "extra": [],
+    "sections": {
+      "weekly": [
+        "weekly-navigation",
+        "weekly-hero",
+        "weekly-energy",
+        "weekly-weight",
+        "weekly-training",
+        "weekly-recovery",
+        "weekly-body-composition",
+        "weekly-finale",
+        "weekly-provenance"
+      ],
+      "midweek": [
+        "midweek-navigation",
+        "midweek-hero",
+        "midweek-energy",
+        "midweek-weight",
+        "midweek-body-composition",
+        "midweek-training",
+        "midweek-recovery",
+        "midweek-finale",
+        "midweek-provenance"
+      ]
+    },
+    "photosAbsent": true,
+    "unresolvedAbsent": true,
+    "biggestTakeaway": {
+      "weekly": true,
+      "midweek": true
+    },
+    "bodyComposition": {
+      "weekly": {
+        "bodyComposition.bodyFatPercent": "8.2%",
+        "bodyComposition.leanMassLb": "149.0 lb",
+        "bodyComposition.fatMassLb": "13.4 lb"
+      },
+      "weeklySource": "weekly_briefing_2026-07-12_2026-07-18",
+      "expectedWeekly": {
+        "bodyComposition.bodyFatPercent": "8.2%",
+        "bodyComposition.leanMassLb": "149.0 lb",
+        "bodyComposition.fatMassLb": "13.4 lb"
+      },
+      "midweekPresent": true
+    },
+    "confidenceCount": {
+      "weekly": 1,
+      "midweek": 1
+    },
+    "energy": {
+      "weekly": {
+        "pointCount": 7,
+        "marks": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "sourceKey": "weekly.energy.dailyBalances.0.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "sourceKey": "weekly.energy.dailyBalances.0.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "sourceKey": "weekly.energy.dailyBalances.1.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "sourceKey": "weekly.energy.dailyBalances.1.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "sourceKey": "weekly.energy.dailyBalances.2.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "sourceKey": "weekly.energy.dailyBalances.2.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "sourceKey": "weekly.energy.dailyBalances.3.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "sourceKey": "weekly.energy.dailyBalances.3.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "sourceKey": "weekly.energy.dailyBalances.4.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "sourceKey": "weekly.energy.dailyBalances.4.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "sourceKey": "weekly.energy.dailyBalances.5.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "sourceKey": "weekly.energy.dailyBalances.5.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "sourceKey": "weekly.energy.dailyBalances.6.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "sourceKey": "weekly.energy.dailyBalances.6.expenditureKcal"
+          }
+        ]
+      },
+      "midweek": {
+        "pointCount": 2,
+        "marks": [
+          {
+            "series": "Intake",
+            "value": 2600,
+            "sourceKey": "midweek.energy.dailyBalances.0.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2680,
+            "sourceKey": "midweek.energy.dailyBalances.0.expenditureKcal"
+          },
+          {
+            "series": "Intake",
+            "value": 2700,
+            "sourceKey": "midweek.energy.dailyBalances.1.intakeKcal"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2720,
+            "sourceKey": "midweek.energy.dailyBalances.1.expenditureKcal"
+          }
+        ]
+      },
+      "expectedWeekly": [
+        {
+          "series": "Intake",
+          "value": 2800,
+          "sourceKey": "weekly.energy.dailyBalances.0.intakeKcal"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2420,
+          "sourceKey": "weekly.energy.dailyBalances.0.expenditureKcal"
+        },
+        {
+          "series": "Intake",
+          "value": 2760,
+          "sourceKey": "weekly.energy.dailyBalances.1.intakeKcal"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2460,
+          "sourceKey": "weekly.energy.dailyBalances.1.expenditureKcal"
+        },
+        {
+          "series": "Intake",
+          "value": 2820,
+          "sourceKey": "weekly.energy.dailyBalances.2.intakeKcal"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2450,
+          "sourceKey": "weekly.energy.dailyBalances.2.expenditureKcal"
+        },
+        {
+          "series": "Intake",
+          "value": 2770,
+          "sourceKey": "weekly.energy.dailyBalances.3.intakeKcal"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2410,
+          "sourceKey": "weekly.energy.dailyBalances.3.expenditureKcal"
+        },
+        {
+          "series": "Intake",
+          "value": 2830,
+          "sourceKey": "weekly.energy.dailyBalances.4.intakeKcal"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2470,
+          "sourceKey": "weekly.energy.dailyBalances.4.expenditureKcal"
+        },
+        {
+          "series": "Intake",
+          "value": 2790,
+          "sourceKey": "weekly.energy.dailyBalances.5.intakeKcal"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2430,
+          "sourceKey": "weekly.energy.dailyBalances.5.expenditureKcal"
+        },
+        {
+          "series": "Intake",
+          "value": 2760,
+          "sourceKey": "weekly.energy.dailyBalances.6.intakeKcal"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2440,
+          "sourceKey": "weekly.energy.dailyBalances.6.expenditureKcal"
+        }
+      ],
+      "expectedMidweek": [
+        {
+          "series": "Intake",
+          "value": 2600,
+          "sourceKey": "midweek.energy.dailyBalances.0.intakeKcal"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2680,
+          "sourceKey": "midweek.energy.dailyBalances.0.expenditureKcal"
+        },
+        {
+          "series": "Intake",
+          "value": 2700,
+          "sourceKey": "midweek.energy.dailyBalances.1.intakeKcal"
+        },
+        {
+          "series": "Estimated expenditure",
+          "value": 2720,
+          "sourceKey": "midweek.energy.dailyBalances.1.expenditureKcal"
+        }
+      ]
+    },
+    "recovery": {
+      "weekly": {
+        "fixtureOnly": true,
+        "confidenceCoupling": "none",
+        "points": [
+          403,
+          412,
+          395,
+          418,
+          407,
+          399,
+          416
+        ],
+        "aria": "weekly Sleep trend: Su 403 minutes, Mo 412 minutes, Tu 395 minutes, We 418 minutes, Th 407 minutes, Fr 399 minutes, Sa 416 minutes. Baseline 405 minutes. Status Green.",
+        "status": "Green"
+      },
+      "midweek": {
+        "fixtureOnly": true,
+        "confidenceCoupling": "none",
+        "points": [
+          407,
+          419,
+          411
+        ],
+        "aria": "midweek Sleep trend: Su 407 minutes, Mo 419 minutes, Tu 411 minutes. Baseline 405 minutes. Status Green.",
+        "status": "Green"
+      }
+    },
+    "weightTypography": {
+      "weekly": {
+        "value": 27,
+        "delta": 13,
+        "context": 15
+      },
+      "midweek": {
+        "value": 27,
+        "delta": 13,
+        "context": 15
+      }
+    },
+    "navTargets": [
+      44,
+      44,
+      44,
+      44
+    ],
+    "narrativeSizes": [
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15
+    ],
+    "sectionOrderExact": true,
+    "bodyCompositionExact": true,
+    "energyExact": true,
+    "recoveryExact": true,
+    "weightTypographyExact": true,
+    "accessibilityPass": true,
+    "pass": true
+  }
+}

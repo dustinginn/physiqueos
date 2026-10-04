@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log + Weekly direction locked; Midweek dark translation ready for Founder review**
+Status: **Home + Log + Weekly visual language locked; recurring Weekly/Midweek dark family refinement ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -210,3 +210,29 @@ Review set:
 Validation passes 61/61 current rendered semantic fields, exact Midweek-specific M-ID order, exact 79% Confidence semantics/geometry, the sole current Energy graph with both dates/two series/four values, 23 quantitative provenance marks, Narrative V3 placement and all current conditional absences. The approved Recovery V1 architecture explicitly plans a Midweek surface after Training and before Coach's Take, so a separate **FUTURE CONTRACT · FIXTURE ONLY** surface appears there with no Confidence coupling. Current production Recovery remains excluded and unactivated.
 
 No shipping Native source, Server behavior, production content projection, Recovery policy, build or TestFlight state changed. Midweek implementation has not started; mineral-light remains deferred until Founder review.
+
+## Recurring Weekly/Midweek family refinement
+
+Status: **Dark pair ready for Founder review; structural refinement not yet locked**
+
+Founder-directed recurring-family rules are now represented in one updated Weekly/Midweek pair:
+
+- the locked Weekly B-hero/C-body visual language is retained;
+- both cadences share the same core section inventory, with Midweek condensed for Sunday–Tuesday;
+- Photos is absent from recurring Weekly and Midweek;
+- Still Unresolved is absent and recorded as a presentation discrepancy, not a legitimate Briefing section;
+- Body Composition appears in both when genuine context exists;
+- Midweek includes the exact canonical Narrative V3 coachTake as Biggest Takeaway;
+- Midweek Weight uses the same 27/13/15 point value/delta/context hierarchy as Weekly;
+- Weekly and Midweek Recovery use graph-driven approved prototype fixtures, remain clearly future-contract/fixture-only, and retain `Confidence coupling: none`.
+
+Review set:
+
+- `agent-handoffs/artifacts/recurring-briefing-family-refinement-20261004/README.md`
+- `agent-handoffs/artifacts/recurring-briefing-family-refinement-20261004/screens/weekly-dark-full.png`
+- `agent-handoffs/artifacts/recurring-briefing-family-refinement-20261004/screens/midweek-dark-full.png`
+- `agent-handoffs/artifacts/recurring-briefing-family-refinement-20261004/screens/weekly-midweek-family-board.png`
+- `agent-handoffs/artifacts/recurring-briefing-family-refinement-20261004/SECTION-PARITY.md`
+- `agent-handoffs/artifacts/recurring-briefing-family-refinement-20261004/PARITY-PROOF.md`
+
+Implementation remains separate future work. Photos removal, Still Unresolved removal, Midweek Biggest Takeaway guarantee and Recovery publication each require explicit contract/Native work after approval. Recovery remains ungraduated and inactive. Monthly translation is next only after the Founder accepts this family refinement. No shipping Native source, Server behavior, production projection, build or TestFlight state changed.

@@ -140,8 +140,17 @@ FUTURE MAJOR PROJECTS (roadmap only — NOT started; do not implement without a 
 
 F1. App-wide UI/design polish
 Position: design exploration active; shipping implementation not started.
-Current state: Home direction locked in dark/mineral light; Log Compact Command Center direction locked in dark/mineral light; Weekly **B Immersive Story hero + C Dense Analytical body is LOCKED** as the briefing-family visual reference. One dark Midweek translation from the actual Build 85 Midweek V3 contract is ready for Founder review with 61/61 rendered semantic fields, exact Midweek-specific ordering, the current Energy graph, 23 source-bound quantitative marks, exact Narrative/Confidence/Coach conditional behavior and one clearly bounded future-only Recovery fixture in the approved Midweek location. Midweek remains exploration and no implementation has started. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
+Current state: Home direction locked in dark/mineral light; Log Compact Command Center direction locked in dark/mineral light; Weekly **B Immersive Story hero + C Dense Analytical body is LOCKED** as the briefing-family visual reference. The dark recurring-family refinement is now ready for Founder review: Weekly and Midweek share the same core section inventory; Photos and the invalid standing Still Unresolved section are absent; Body Composition is represented in both when real context exists; Midweek gains its exact canonical Biggest Takeaway; Weight typography is aligned; and both cadences use graph-driven future-only Recovery fixtures with no Confidence coupling. Validation covers 104 canonical semantic fields, both Energy graphs, both Sleep graphs and all Founder-authorized changes. Midweek and this structural refinement remain exploration; no implementation has started. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
 Scope boundary: no Native implementation, Server behavior, production content projection, Recovery activation, build or TestFlight work is authorized by the exploration.
+
+Recurring Briefing implementation backlog, not started:
+- Photos: remove from recurring Weekly/Midweek presentation only; preserve Photo evidence/event and Photo Briefing.
+- Still Unresolved: not a Briefing section; remove the current recurring presentation seam and do not replace it with another standing uncertainty card.
+- Section parity: Hero/Confidence, Energy, Weight, Body Composition when available, Training, Recovery after graduation, Biggest Takeaway, What To Do, cadence-specific close, provenance.
+- Recovery: graph-driven Sleep treatment is required for Midweek, Weekly and Monthly after graduation; Midweek uses Sun–Tue points, Weekly Sun–Sat points, Monthly weekly aggregates. No DEXA/Photo Recovery V1.
+- Midweek: guarantee canonical Biggest Takeaway in the presentation contract and preserve shorter-horizon restraint.
+- Midweek Weight: use the shared Weekly metric/delta/context typography hierarchy.
+- Monthly: translate the accepted recurring-family system next, only after this Weekly/Midweek refinement is accepted.
 
 F2. Briefing Narrative + Confidence quality/tuning audit
 Position: next major strategic-quality project.
