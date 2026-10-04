@@ -2,22 +2,27 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Live workout audit — HealthKit workout recording + Phone/Watch latency
-- Agent: Claude (Remote Control lane)
-- Status: Audit complete; no code changed; awaiting Founder/ChatGPT decision
-- Generated (UTC): 2026-10-04T20:25:18Z
-- Work branch: `claude/live-workout-healthkit-watch-audit-20261004`
-- Main report commit: `6682a426bb8a94694eb4e42d208b4e321d17cf38`
-- Prompt commit: `e887e0108d4444ec1d7b0ab6c2175f024dc1d85f`
-- Native authority audited: Build 85 `b8ee8690b194cb90086b62816b9a2c8c400dc026` (still newest; no Build 86)
-- Report: `agent-handoffs/reports/20261004T202256Z-live-workout-healthkit-watch-audit.md`
+- Task: App-wide redesign coverage audit
+- Agent: Codex
+- Status: Audit complete; Founder/ChatGPT review required; no redesign or implementation
+- Generated (UTC): 2026-10-04T20:42:47Z
+- Prompt authority: `961c61236a43d4edb22a30c1884bd5b722c305fd`
+- Work branch: `codex/app-wide-redesign-coverage-audit`
+- Work commit: `a762e6c3fa8c170a984bdfda8204a4510ba0b709`
+- Main report commit: `33352cc7efb7f3d75d8ef708a1e43730527d5caa`
+- Report: `agent-handoffs/reports/20261004T204247Z-app-wide-redesign-coverage-audit.md`
+- Coverage artifact: `agent-handoffs/artifacts/app-wide-redesign-coverage-audit-20261004/`
 
-Build 85 starts a Watch HealthKit workout only through iPhone **Ready for Watch** followed by Watch **Start Workout**. A live session started or logged on iPhone reaches the Watch as active, with no HKWorkoutSession and no way to start one after the first set. Workout Metrics TIME comes from the phone's session anchors. Active/Total Calories and Heart Rate come only from the Watch HKLiveWorkoutBuilder, so they show "—". The Watch also claims "HEALTH ON" without checking HealthKit.
+Build 85 remains the newest Native authority. The audit classified every material current Native route, sheet, modal, viewer, exceptional state and app-owned extension without reopening any locked family.
 
-Latency: every Watch wake/reachability event sends a read-only refresh through the single-flight command gate, which disables Complete Set until the phone replies. Phone-originated changes reach the Watch only through application context. Durations have not been measured on device.
+Classification totals: A 64, B 15, C 9, D 10, E 0.
 
-Two OPEN entries were appended to the delta ledger. The fix plan (F1–F4) and tests are in the report. Nothing was implemented, built, deployed or mutated, and the live workout was untouched.
+Nine surface/state groups still require explicit design review: Home Confidence detail; Morning Check-In; manual/backdated weight; Briefing History; generic Evidence intake; Progress Photos intake; DEXA intake; generic Evidence Review; and the Home Screen Widget.
 
-Next: Founder/ChatGPT decide whether to patch during or after the workout, auto vs explicit Watch Health start, and the late-start correlation policy.
+They can be completed in three final direct-translation batches: Evidence Intake + Review, Daily Capture + Explanation, and Home Screen Widget closeout. After those are locked, the current-Native redesign can be considered design-complete.
+
+The implementation-delta ledger was reviewed in full. No new entry was added. No Native UI, Server behavior, schema, production state, build or TestFlight state changed.
+
+Next: Founder/ChatGPT reviews the remaining-coverage map and authorizes the first final design batch.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
