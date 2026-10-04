@@ -364,7 +364,6 @@ struct RecoverySleepNightsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
-        .preferredColorScheme(.dark)
         .task {
             if viewModel == nil { viewModel = RecoverySleepNightsViewModel(api: environment.recoverySleepAPI, range: range) }
             await viewModel?.loadFirstPage()
