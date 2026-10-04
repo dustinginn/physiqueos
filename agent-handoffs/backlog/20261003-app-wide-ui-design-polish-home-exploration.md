@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home, Log, Weekly, Midweek, Monthly, DEXA and Photo locked; Goals hierarchy ready for Founder review**
+Status: **Locked system translated through Operating Plan Training; Recovery, Peptides and Supplements ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -18,6 +18,32 @@ Scope boundary remains:
 - no TestFlight build created;
 - no rebrand decision made;
 - no palette, typography or component migration approved.
+
+## Operating Plan — domains 4–6
+
+Status: **Recovery, Peptides and Supplements ready for Founder review**
+
+Founder-locked before this pass:
+
+- Operating Plan root;
+- Energy Strategy detail (read-only);
+- Nutrition Strategy detail and actual Edit Strategy flow;
+- Training Strategy detail and actual Edit Strategy flow.
+
+The exact Server/root order was re-audited. The next three domains after Training are Recovery, Peptides and Supplements. Their complete current Native surface families are translated directly into the locked dark/mineral system:
+
+- Recovery domain, Foam Rolling Support detail and shared schedule/reminder edit;
+- Peptide domain, Retatrutide/Tesamorelin Manage, active/paused lifecycle, focused Dose/Days/Time/Notes sheets, Advanced plan/history and Pause/Resume confirmation;
+- Supplement domain, active/paused lifecycle, Add Supplement, Support detail/edit and Strategy edit.
+
+Review package:
+
+- `agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/README.md`
+- `agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/comparison-board.html`
+- `agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/boards/operating-plan-next-three-mobile-review.png`
+- `agent-handoffs/artifacts/operating-plan-next-three-domains-ui-style-translation-20261004/PARITY-PROOF.md`
+
+No Recovery/Peptide/Supplement visual is accepted yet. No shipping Native or Server code changed.
 
 Next gate: Founder visual review and direction-setting.
 

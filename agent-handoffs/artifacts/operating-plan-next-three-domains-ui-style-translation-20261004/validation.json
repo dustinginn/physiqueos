@@ -1,0 +1,282 @@
+{
+  "pass": true,
+  "authority": {
+    "prompt": "agent-handoffs/inbox/prompts/20261004T203500Z-operating-plan-next-three-domains-ui-style-translation.md",
+    "promptAuthority": "abe3ae1de0f9ee98d01617788d9a4fe96c06c74a",
+    "nativeBuild": 85,
+    "nativeSha": "b8ee8690b194cb90086f6ad012443978303d47024",
+    "serverSha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "acceptedOperatingPlanArtifactCommit": "89d05249f90cb65da5941d08d987eba50bfb18ce"
+  },
+  "exactRootOrder": [
+    "Energy Strategy",
+    "Nutrition",
+    "Training",
+    "Recovery",
+    "Peptides",
+    "Supplements",
+    "Tracking",
+    "Coaching Updates"
+  ],
+  "nextThreeAfterTraining": [
+    "Recovery",
+    "Peptides",
+    "Supplements"
+  ],
+  "screenCount": 34,
+  "pairCount": 17,
+  "actualTarget": {
+    "width": 402,
+    "minimumHeight": 874
+  },
+  "darkLightContentParity": true,
+  "minimumTapTarget": 44,
+  "parity": {
+    "recovery-domain": {
+      "missing": [],
+      "methods": [
+        "Foam Rolling"
+      ],
+      "fields": [],
+      "actions": [
+        "Edit Support"
+      ]
+    },
+    "recovery-detail": {
+      "missing": [],
+      "methods": [],
+      "fields": [
+        "Summary",
+        "Schedule",
+        "Starts",
+        "Ends",
+        "Reminder",
+        "Next due",
+        "Execution Notes"
+      ],
+      "actions": [
+        "Edit Support"
+      ]
+    },
+    "recovery-edit": {
+      "missing": [],
+      "methods": [],
+      "fields": [],
+      "actions": [
+        "Daily",
+        "Weekly",
+        "Specific days",
+        "Every X days",
+        "Morning",
+        "Afternoon",
+        "Evening",
+        "Specific time",
+        "On",
+        "Off",
+        "Save Support"
+      ]
+    },
+    "peptide-domain": {
+      "missing": [],
+      "methods": [
+        "Retatrutide",
+        "Tesamorelin"
+      ],
+      "fields": [],
+      "actions": [
+        "Manage",
+        "Resume",
+        "Manage"
+      ]
+    },
+    "peptide-reta": {
+      "missing": [],
+      "methods": [],
+      "fields": [
+        "Dose",
+        "Days",
+        "Time",
+        "Next dose",
+        "Planned change",
+        "Notes"
+      ],
+      "actions": [
+        "Pause Retatrutide"
+      ]
+    },
+    "peptide-tesa": {
+      "missing": [],
+      "methods": [],
+      "fields": [
+        "Dose",
+        "Days",
+        "Time",
+        "Next dose",
+        "Notes"
+      ],
+      "actions": [
+        "Pause Tesamorelin"
+      ]
+    },
+    "peptide-paused": {
+      "missing": [],
+      "methods": [],
+      "fields": [
+        "Dose",
+        "Days",
+        "Time",
+        "Paused since",
+        "Planned change",
+        "Notes"
+      ],
+      "actions": [
+        "Resume Retatrutide"
+      ]
+    },
+    "peptide-dose": {
+      "missing": [],
+      "methods": [],
+      "fields": [],
+      "actions": [
+        "Cancel",
+        "Save",
+        "Today",
+        "Next dose",
+        "Pick date",
+        "From this date on",
+        "Only next dose"
+      ]
+    },
+    "peptide-days": {
+      "missing": [],
+      "methods": [],
+      "fields": [],
+      "actions": [
+        "Cancel",
+        "Save",
+        "Specific days",
+        "Every X days",
+        "S",
+        "M",
+        "T",
+        "W",
+        "T",
+        "F",
+        "S"
+      ]
+    },
+    "peptide-time": {
+      "missing": [],
+      "methods": [],
+      "fields": [],
+      "actions": [
+        "Cancel",
+        "Save"
+      ]
+    },
+    "peptide-notes": {
+      "missing": [],
+      "methods": [],
+      "fields": [],
+      "actions": [
+        "Cancel",
+        "Save"
+      ]
+    },
+    "peptide-pause": {
+      "missing": [],
+      "methods": [],
+      "fields": [],
+      "actions": [
+        "Starting Today",
+        "Starting Tomorrow",
+        "Pause",
+        "Cancel"
+      ]
+    },
+    "supplement-domain": {
+      "missing": [],
+      "methods": [
+        "Electrolytes",
+        "Fadogia Agrestis",
+        "Multivitamin",
+        "Tongkat Ali"
+      ],
+      "fields": [],
+      "actions": [
+        "Add Supplement",
+        "Edit Support",
+        "Edit Strategy",
+        "Pause",
+        "Edit Support",
+        "Edit Strategy",
+        "Pause",
+        "Restore",
+        "Edit Support",
+        "Edit Strategy",
+        "Pause"
+      ]
+    },
+    "supplement-support": {
+      "missing": [],
+      "methods": [],
+      "fields": [
+        "Dose / Quantity",
+        "Schedule",
+        "Reminder",
+        "Execution Notes"
+      ],
+      "actions": [
+        "Edit Support"
+      ]
+    },
+    "supplement-support-edit": {
+      "missing": [],
+      "methods": [],
+      "fields": [],
+      "actions": [
+        "Daily",
+        "Weekly",
+        "Specific days",
+        "Every X days",
+        "Morning",
+        "Afternoon",
+        "Evening",
+        "Specific time",
+        "On",
+        "Off",
+        "Save Support"
+      ]
+    },
+    "supplement-strategy": {
+      "missing": [],
+      "methods": [],
+      "fields": [],
+      "actions": [
+        "Save Strategy"
+      ]
+    },
+    "supplement-add": {
+      "missing": [],
+      "methods": [],
+      "fields": [],
+      "actions": [
+        "Add Supplement"
+      ]
+    }
+  },
+  "forbiddenInventions": {
+    "recoveryStrategyEditor": false,
+    "supplementDelete": false,
+    "separatePeptideHistoryPage": false
+  },
+  "shippingNativeChanged": false,
+  "serverChanged": false,
+  "primaryFounderReview": "boards/operating-plan-next-three-mobile-review.png",
+  "focusedBoards": [
+    "boards/recovery-review.png",
+    "boards/peptides-review.png",
+    "boards/peptide-actions-review.png",
+    "boards/supplements-review.png"
+  ]
+}

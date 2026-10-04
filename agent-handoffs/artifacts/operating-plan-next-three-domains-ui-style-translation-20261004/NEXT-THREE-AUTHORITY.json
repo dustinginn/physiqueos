@@ -1,0 +1,34 @@
+{
+  "authority": {
+    "prompt": "agent-handoffs/inbox/prompts/20261004T203500Z-operating-plan-next-three-domains-ui-style-translation.md",
+    "promptAuthority": "abe3ae1de0f9ee98d01617788d9a4fe96c06c74a",
+    "nativeBuild": 85,
+    "nativeSha": "b8ee8690b194cb90086f6ad012443978303d47024",
+    "serverSha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "acceptedOperatingPlanArtifactCommit": "89d05249f90cb65da5941d08d987eba50bfb18ce"
+  },
+  "exactRootOrder": ["Energy Strategy", "Nutrition", "Training", "Recovery", "Peptides", "Supplements", "Tracking", "Coaching Updates"],
+  "scopedDomains": ["Recovery", "Peptides", "Supplements"],
+  "surfaces": {
+    "recovery-domain": {"title":"Recovery Strategy","methods":["Foam Rolling"],"actions":["Edit Support"]},
+    "recovery-detail": {"title":"Foam Rolling","fields":["Summary","Schedule","Starts","Ends","Reminder","Next due","Execution Notes"],"actions":["Edit Support"]},
+    "recovery-edit": {"title":"Edit Foam Rolling Support","sections":["Frequency","Timing","Schedule window","Reminder","Execution Notes"],"actions":["Cancel","Save Support"]},
+    "peptide-domain": {"title":"Peptide Strategy","methods":["Retatrutide","Tesamorelin"],"actions":["Manage","Resume"]},
+    "peptide-reta": {"title":"Retatrutide","fields":["Dose","Days","Time","Next dose","Planned change","Reminder","Notes"],"actions":["Pause Retatrutide"]},
+    "peptide-tesa": {"title":"Tesamorelin","fields":["Dose","Days","Time","Next dose","Reminder","Notes"],"actions":["Pause Tesamorelin"]},
+    "peptide-paused": {"title":"Retatrutide","fields":["Dose","Days","Time","Paused since","Planned change","Reminder","Notes"],"actions":["Resume Retatrutide"]},
+    "peptide-dose": {"title":"Change dose","sections":["Amount and unit","Starts","Apply change"],"actions":["Cancel","Save"]},
+    "peptide-days": {"title":"Change days","sections":["Specific days","Every X days","Days","Schedule Preview"],"actions":["Cancel","Save"]},
+    "peptide-time": {"title":"Change time","actions":["Cancel","Save"]},
+    "peptide-notes": {"title":"Edit notes","sections":["Execution Notes"],"actions":["Cancel","Save"]},
+    "peptide-pause": {"title":"Pause Retatrutide?","actions":["Pause","Cancel"]},
+    "supplement-domain": {"title":"Supplement Strategy","methods":["Electrolytes","Fadogia Agrestis","Multivitamin","Tongkat Ali"],"actions":["Add Supplement","Edit Support","Edit Strategy","Pause","Restore"]},
+    "supplement-support": {"title":"Fadogia Agrestis","fields":["Dose / Quantity","Schedule","Reminder","Execution Notes"],"actions":["Edit Support"]},
+    "supplement-support-edit": {"title":"Edit Fadogia Agrestis Support","sections":["Dose / Quantity","Frequency","Timing","Schedule window","Reminder","Execution Notes"],"actions":["Cancel","Save Support"]},
+    "supplement-strategy": {"title":"Edit Strategy","fields":["Name","Purpose","Current Strategy / Role","Goal"],"actions":["Cancel","Save Strategy"]},
+    "supplement-add": {"title":"Add Supplement","fields":["Name","Purpose","Current Strategy / Role","Goal","Start Date"],"actions":["Cancel","Add Supplement"]}
+  },
+  "rendering": {"widthPoints":402,"minimumHeightPoints":874,"appearances":["dark","mineral light"]},
+  "shippingNativeChanged": false,
+  "serverChanged": false
+}
