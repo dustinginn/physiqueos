@@ -1,0 +1,226 @@
+{
+  "authority": {
+    "prompt": "fbd6dd35e4e0dbabe5834d309170dcd2e724398a",
+    "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "build": 85
+  },
+  "generatedAt": "2026-10-04T17:32:10.933Z",
+  "expected": {
+    "energy": 2,
+    "weight": 2,
+    "recovery": 6,
+    "total": 10
+  },
+  "boards": {
+    "dark": {
+      "actualScreens": 10,
+      "familyCounts": {
+        "energy": 2,
+        "weight": 2,
+        "recovery": 6
+      },
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "runtimeErrors": [],
+      "pass": true
+    },
+    "light": {
+      "actualScreens": 10,
+      "familyCounts": {
+        "energy": 2,
+        "weight": 2,
+        "recovery": 6
+      },
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "runtimeErrors": [],
+      "pass": true
+    }
+  },
+  "parity": {
+    "checkedScreens": 10,
+    "textMismatches": [],
+    "pass": true
+  },
+  "semanticRules": {
+    "shippingSourceChanged": false,
+    "inventedEnergyCalculation": false,
+    "inventedWeightCalculation": false,
+    "inventedRecoveryScore": false,
+    "strategicRecoveryActivated": false,
+    "sleepProvenanceChanged": false,
+    "dexaMarkersRemoved": false,
+    "historyMadeEditable": false,
+    "roadmapPlaceholderShown": false
+  },
+  "contentAssertions": {
+    "energySummaryExact": true,
+    "energySemanticsDistinct": true,
+    "energyCompletenessCovered": true,
+    "weightDexaVisible": true,
+    "weightVisibleAbsSummaryExact": true,
+    "weightSinglePageDeclared": true,
+    "recoveryHistoryDiscoverable": true,
+    "recoveryContinuityAndStages": true,
+    "recoveryProvenanceExact": true,
+    "recoveryStrategicAbsent": true,
+    "noRoadmapCopy": true
+  },
+  "renders": [
+    {
+      "file": "energy-weight-recovery-coverage-board-light.png",
+      "width": 1510,
+      "height": 4445,
+      "sha256": "5abff90431599ced386ec9fb8a619bb906da2caa1d4f8496116ca3c1f4526324"
+    },
+    {
+      "file": "energy-weight-recovery-coverage-board.png",
+      "width": 1510,
+      "height": 4445,
+      "sha256": "b5bbf04be177f96f19da9f57423d76216b4a2f12d31ab3d100b679321e3fc36e"
+    },
+    {
+      "file": "energy-weight-recovery-coverage-preview-light.png",
+      "width": 1100,
+      "height": 3238,
+      "sha256": "090a7d55a38d359ca56d266ad10dbf9fdb4a51f07bcfd860fbb33680d5c83cc0"
+    },
+    {
+      "file": "energy-weight-recovery-coverage-preview.png",
+      "width": 1100,
+      "height": 3238,
+      "sha256": "7446849a0dddc282b7e07136274763517cea0dbaa1da2260f9254282afa9e346"
+    },
+    {
+      "file": "evidence-e1-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "aca9fc86bb83ccd8033389997e873fc08ecb00b095ebdb108735cccbfe99607e"
+    },
+    {
+      "file": "evidence-e1.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "cbef83d3ee4d1061f67b6975cdc158550aec541fc640278ae1aa270de73cb09c"
+    },
+    {
+      "file": "evidence-e2-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "b31bbee8d87e74073c8f045fd252d7d720acedc2a6ff1f1499ca3e847d90aed1"
+    },
+    {
+      "file": "evidence-e2.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "3d9b06114050242e7ffadfed0c215ca287d3dd188a88af23f34cecd54a0b8cd3"
+    },
+    {
+      "file": "evidence-r1-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "7b44d9c9290d5210b6c2cfafdea6f1ec85602f38cec42108472c6cbc29897a57"
+    },
+    {
+      "file": "evidence-r1.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "1149f502cb1077abadba1e4147c46ce3b7782b70724eb6b5effba2001bf0b50d"
+    },
+    {
+      "file": "evidence-r2-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "bd86edd1a105f768ca5c33a920ff24cf9d31c5d36216dd24f95185623e605cc8"
+    },
+    {
+      "file": "evidence-r2.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "7c00dc75532db151d6171464c6ae15cbfe2b710aa6b3b8a0bcd3324b32d1bd76"
+    },
+    {
+      "file": "evidence-r3-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "7e63f7dec74b58d4c4af624847deffb75a871d5b7b9fe55fbeb2526f839494ba"
+    },
+    {
+      "file": "evidence-r3.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "9ac22145b44f3a130d951d1c1994a4eaae2bdee41a5d50cbaa522c56ebe0c151"
+    },
+    {
+      "file": "evidence-r4-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "0c43d0eae60a7d618bf5a645fc74483229e311eca7b68ba983b6b8fdd8b2e426"
+    },
+    {
+      "file": "evidence-r4.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "6e83fa0d4d60990508db18cffb8bc90f2b043317b238375464439f58b8aca539"
+    },
+    {
+      "file": "evidence-r5-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "aabea1d3e689fc5aecf1d5ca2b79051873a22f9b81ba231d994dc1bffa219507"
+    },
+    {
+      "file": "evidence-r5.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "5d46099b334cbc44c42664952c5697e94311709dc1c80fc07fc65f2b4d676463"
+    },
+    {
+      "file": "evidence-r6-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "b17d1438dba8c4edbd00716ab6ccb7f0b29b2e24351f7d5a180b002e73fc36fe"
+    },
+    {
+      "file": "evidence-r6.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "5a47a7983ba722df65fedf1cdc096bcf5e4c220da5ee558f3dada4effbcdb383"
+    },
+    {
+      "file": "evidence-w1-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "3deda0cd0d217bd30e2a535f044e750f55b6e9cc1e73eecf9c65656d1743fedb"
+    },
+    {
+      "file": "evidence-w1.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "197f1b0a4389fc613428eee0504d76aa6fe3ef56c0184d0f2c7c2406f19be252"
+    },
+    {
+      "file": "evidence-w2-light.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "7d177200d895fa339d3d5224e5708ea2c28070650503f6ad6f0fb2cdb670a05f"
+    },
+    {
+      "file": "evidence-w2.png",
+      "width": 1116,
+      "height": 2535,
+      "sha256": "c1b2c5d6bf9b1a9eff677024334ba44fa73c60b8908256bc6a5bbfcf369e75eb"
+    },
+    {
+      "file": "review-index.png",
+      "width": 1500,
+      "height": 2158,
+      "sha256": "c0aba92158e8226a836a53bc73148b3d1a0ef710fc3ce34db9674f0cd31fcf77"
+    }
+  ],
+  "pass": true
+}

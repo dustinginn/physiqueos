@@ -359,3 +359,29 @@ Review set:
 - `agent-handoffs/artifacts/dexa-photo-founder-flow-confirmation-20261004/PARITY-PROOF.md`
 
 No DEXA/Photo design is newly marked accepted by this confirmation pass. No shipping Native UI, Server behavior, production photo binding, production content projection, build or TestFlight state changed.
+
+## Evidence family locks + Energy / Weight / Recovery translation
+
+Status: **Training, Nutrition and Activity locked; Energy, Weight and Recovery ready for Founder review**
+
+Founder lock decisions recorded on 2026-10-04:
+
+- Training Evidence is locked with all 10 canonical Training Areas exactly preserved.
+- Nutrition Evidence is locked with three-row Recent Nutrition History + Show All on the root, functional Calories/Macros/Meals Reporting, canonical non-duplicate aggregation and no future placeholder UI.
+- Activity Evidence is locked with three-row Recent Activity History + Show All on the root, current informational fields and Linked Training Context, no invented Reporting, no future placeholder UI, and Cooldown remaining historical non-Cardio.
+- Reopen these three only for a demonstrated implementation blocker.
+
+Energy, Weight and Recovery were audited independently against Native Build 85 and translated directly into the locked Evidence language in dark and mineral light. Ten source-faithful templates cover all materially distinct current routes and states, with zero uncovered matrix rows. Energy preserves separate intake, active calories, estimated expenditure and balance semantics plus both current chart families and root history. Weight preserves literal Goal-dependent summary behavior, rolling/weekly averages, inline history and purple DEXA markers on its genuine single-page hierarchy. Recovery preserves its root, nightly/weekly Trends, Recent/All Nights, night timeline, stages, continuity, time in bed, additional sleep, finality, clock certainty and counted-source provenance.
+
+Review set:
+
+- `agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/README.md`
+- `agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/screens/review-index.png`
+- `agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/screens/energy-weight-recovery-coverage-board.png`
+- `agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/screens/energy-weight-recovery-coverage-board-light.png`
+- `agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/ENERGY-COVERAGE-MATRIX.md`
+- `agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/WEIGHT-COVERAGE-MATRIX.md`
+- `agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/RECOVERY-COVERAGE-MATRIX.md`
+- `agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/validation.json`
+
+Energy, Weight and Recovery remain exploration pending Founder review. Recovery stays Evidence-only: no score, coaching, strategic interpretation or Confidence activation. No shipping Native/Server source, evidence contract, HealthKit behavior, build or TestFlight state changed.
