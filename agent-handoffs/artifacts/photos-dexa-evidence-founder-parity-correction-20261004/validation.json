@@ -1,0 +1,307 @@
+{
+  "authority": {
+    "prompt": "cb40f5df4a392d40a717355c5e6db559a76609a9",
+    "nativeBuild85": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "serverBuild85": "3c0f4aefddbb9a6886f6ad012443978303d47024"
+  },
+  "generatedAt": "2026-10-04T19:13:21.935Z",
+  "expected": {
+    "total": 16,
+    "photos": 6,
+    "dexa": 10
+  },
+  "boards": {
+    "dark": {
+      "actualScreens": 16,
+      "familyCounts": {
+        "photos": 6,
+        "dexa": 10
+      },
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "runtimeErrors": [],
+      "pass": true
+    },
+    "light": {
+      "actualScreens": 16,
+      "familyCounts": {
+        "photos": 6,
+        "dexa": 10
+      },
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "runtimeErrors": [],
+      "pass": true
+    }
+  },
+  "parity": {
+    "checkedScreens": 16,
+    "textMismatches": [],
+    "pass": true
+  },
+  "semanticRules": {
+    "shippingSourceChanged": false,
+    "hubReopened": false,
+    "timelineReopened": false,
+    "photoBriefingSubstituted": false,
+    "dexaBriefingSubstituted": false,
+    "founderMediaRebound": false,
+    "sourceAuditCommentaryInProduct": false
+  },
+  "contentAssertions": {
+    "photosRootOrder": true,
+    "photosBriefingProminent": true,
+    "photosRootThumbnailHistory": true,
+    "photosExpandedThumbnailHistory": true,
+    "photosPairedComparison": true,
+    "photosSourceExpanded": true,
+    "photosInspection": true,
+    "photosMediaStates": true,
+    "dexaRootOrder": true,
+    "coreAllGraphs": true,
+    "supplementalCollapsed": true,
+    "supplementalExpanded": true,
+    "regionalLeanCollapsed": true,
+    "regionalLeanExpanded": true,
+    "regionalFatCollapsed": true,
+    "regionalFatExpanded": true,
+    "historyCollapsed": true,
+    "historyExpanded": true,
+    "noAuditCopyInProduct": true,
+    "noRoadmapCopy": true
+  },
+  "renders": [
+    {
+      "file": "coverage-board-light.png",
+      "width": 1500,
+      "height": 11220,
+      "sha256": "58b81bbdfd846532aa9d9634334dcd5316dee102089e1d822c086734bb03e727"
+    },
+    {
+      "file": "coverage-board.png",
+      "width": 1500,
+      "height": 11220,
+      "sha256": "e427cbc84b9252b5cde160699bfa30bf7e9741319c78ae11e083070b66cccfcd"
+    },
+    {
+      "file": "dexa-focused-review-board.png",
+      "width": 1060,
+      "height": 19280,
+      "sha256": "3fe286c0d6b0afed0c2d22b87baae309c13e8d50f253a44d4bdd138144c2b6ee"
+    },
+    {
+      "file": "evidence-d1-light.png",
+      "width": 720,
+      "height": 4742,
+      "sha256": "8946f6255c21d6d1f35480209d7a0d54ad4a8813b92e295a879ec267bc571c5a"
+    },
+    {
+      "file": "evidence-d1.png",
+      "width": 720,
+      "height": 4742,
+      "sha256": "28c78d6a61cef72fd13e241b5919ff364e2b75838a29b75759501c1e883209e2"
+    },
+    {
+      "file": "evidence-d10-light.png",
+      "width": 720,
+      "height": 2742,
+      "sha256": "acbe0d85bf0f667c3465fd33284c7f2f131ad73b7c15dd506a54b93805291beb"
+    },
+    {
+      "file": "evidence-d10.png",
+      "width": 720,
+      "height": 2742,
+      "sha256": "fc9ded1c651185e30c0d3a1be8792cc327b9cd32aac6b4ccbc33abcfd72043e6"
+    },
+    {
+      "file": "evidence-d2-light.png",
+      "width": 720,
+      "height": 2582,
+      "sha256": "589981882a3fcbf6c7885f482193ce75866fb22cf1c718bab3b5412f2ec31492"
+    },
+    {
+      "file": "evidence-d2.png",
+      "width": 720,
+      "height": 2582,
+      "sha256": "53a459b5a9dd6fbfd1e3061f7ecaf8cc53349613d111e3de2be008fe4bb24284"
+    },
+    {
+      "file": "evidence-d3-light.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "483cadbcd854b3c331791f772a5213dc4df99b073bb4430399f0e7f7d8628bbd"
+    },
+    {
+      "file": "evidence-d3.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "43b5ea60a4df896778b582faf9474ce3b651512421a010a4058340858368a716"
+    },
+    {
+      "file": "evidence-d4-light.png",
+      "width": 720,
+      "height": 3062,
+      "sha256": "4f5379cc15fa6361e1705e750ce9ea7bb8d23758d4748bebeaad2231614a3e3c"
+    },
+    {
+      "file": "evidence-d4.png",
+      "width": 720,
+      "height": 3062,
+      "sha256": "028b85b83e065837ec93220b42890617e97869e287675915e0f44fc78b590778"
+    },
+    {
+      "file": "evidence-d5-light.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "fc6d56e8df607b09657468f8788f5b824f3b40b828e8553fd5859d0d0bb0c549"
+    },
+    {
+      "file": "evidence-d5.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "a7190226a160d815bf457089ab8c57f15adc9f91b75563fbd5347783a8d4dcbe"
+    },
+    {
+      "file": "evidence-d6-light.png",
+      "width": 720,
+      "height": 3782,
+      "sha256": "0ff900a0af5d6a77d048f8da3a6c063379a59259ed8635518590a3df6b493562"
+    },
+    {
+      "file": "evidence-d6.png",
+      "width": 720,
+      "height": 3782,
+      "sha256": "a47d5e9568d7ce34091f738d91784c7a134526cc2b088e56f1a8b45157867e9c"
+    },
+    {
+      "file": "evidence-d7-light.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "91d805bba4750439eefdd41724aa37d525d5ecc4c4d147dd2fdb46f492945270"
+    },
+    {
+      "file": "evidence-d7.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "c1b55f7dcc109b55a62cff77b0a104491a77b0a9b91a383c0a152af01a1491f4"
+    },
+    {
+      "file": "evidence-d8-light.png",
+      "width": 720,
+      "height": 3782,
+      "sha256": "efb52d8eff5fe3b6c1b4b5b27112359e418bcfd9fc3f7482ac5a628f4ae8c1fa"
+    },
+    {
+      "file": "evidence-d8.png",
+      "width": 720,
+      "height": 3782,
+      "sha256": "93e60a6163327028f306a9be55408ca29ac89698e84fff801cba3417d09e25dd"
+    },
+    {
+      "file": "evidence-d9-light.png",
+      "width": 720,
+      "height": 2082,
+      "sha256": "1ca409f63b74e90521d8f26fd1e02acc7d900873b55fdf5857cfdc098ffc4db8"
+    },
+    {
+      "file": "evidence-d9.png",
+      "width": 720,
+      "height": 2082,
+      "sha256": "689ddcee83807d11a31668183a4181ff91377ff8ff1fee847f885e9b3aaf231e"
+    },
+    {
+      "file": "evidence-p1-light.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "e5e9e801aaa4dac0ba7d33c4cf5025d7bd105a65a4b30114c8fcdb3cef47f038"
+    },
+    {
+      "file": "evidence-p1.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "034518c256009ff3d45f5944ea49a1a6dbef98f58cab32ad1cf6170bc8227c92"
+    },
+    {
+      "file": "evidence-p2-light.png",
+      "width": 720,
+      "height": 2082,
+      "sha256": "7df12bad6af17a0702eee16ebf1f891acfed4381ccc3e40471f702f526a37c38"
+    },
+    {
+      "file": "evidence-p2.png",
+      "width": 720,
+      "height": 2082,
+      "sha256": "c5446cadc82b822f63afd2c1f16c1f328c059b684d57c66d008f2d2a8c7c1767"
+    },
+    {
+      "file": "evidence-p3-light.png",
+      "width": 720,
+      "height": 2362,
+      "sha256": "2747b109935df4021152fd23326dc156d16bde34ed8e9dae9144114582e9df23"
+    },
+    {
+      "file": "evidence-p3.png",
+      "width": 720,
+      "height": 2362,
+      "sha256": "ffc54aaa8e41aec2260cfff95dead1f8c2c2e42c6bdd9329cdf4291ce57589e0"
+    },
+    {
+      "file": "evidence-p4-light.png",
+      "width": 720,
+      "height": 2482,
+      "sha256": "d0fa5abeae025edec5d8ae8543690205ce4c7027f1b5d3b9eb5a5231bb21a3b6"
+    },
+    {
+      "file": "evidence-p4.png",
+      "width": 720,
+      "height": 2482,
+      "sha256": "c49cdd3b256f85f3e11412e6c8771a540856c23150feaa98c81d69e66afe7213"
+    },
+    {
+      "file": "evidence-p5-light.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "d7d5dccba4b22c529fe91d655581611ee4d9f78f482b2014f9299b357a470556"
+    },
+    {
+      "file": "evidence-p5.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "b2ca57d9c3ffeb0f403c22ce5088d07f4986179b691196e549abe8dc2fa7c4b1"
+    },
+    {
+      "file": "evidence-p6-light.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "f9c23138d12ffb1b8ad20e0ad8a70494cc7cc3010ca57d60d8fc26d85beb3a74"
+    },
+    {
+      "file": "evidence-p6.png",
+      "width": 720,
+      "height": 1690,
+      "sha256": "982f3b3ff50407157981f169e5dc2d52e48ca5e6e8adca7325dbeb7e512437ea"
+    },
+    {
+      "file": "photos-dexa-primary-mobile-review-board.png",
+      "width": 1060,
+      "height": 27665,
+      "sha256": "a96383a245488e4bb7fdf5b79e0eb1e4acd68b52f818befb706fca8936bad089"
+    },
+    {
+      "file": "photos-focused-review-board.png",
+      "width": 1060,
+      "height": 8596,
+      "sha256": "93828fd5df667947d17ecb751e3c23c6249f93004355f0e94349f881a78cf0e5"
+    }
+  ],
+  "reviewBoards": {
+    "primary": "screens/photos-dexa-primary-mobile-review-board.png",
+    "photos": "screens/photos-focused-review-board.png",
+    "dexa": "screens/dexa-focused-review-board.png"
+  },
+  "pass": true
+}
