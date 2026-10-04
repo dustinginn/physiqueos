@@ -7,9 +7,9 @@ Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 - Status: complete hierarchy ready for Founder review; Goals not locked; implementation not started
 - Generated (UTC): 2026-10-04T17:35:00Z
 - Work branch: `codex/goals-ui-style-translation`
-- Work/report commit: `718c7397020aceb841ba3af213f746cae3b7408b`
+- Work/report commit: `31b49b175a1158958964df10080f5ee728eb5335`
 - Artifact commit: `6bdd5bf887cb484fb84b5c44c87ce67025169436`
-- Main report commit: `718c7397020aceb841ba3af213f746cae3b7408b`
+- Main report commit: `31b49b175a1158958964df10080f5ee728eb5335`
 - Artifact root: `agent-handoffs/artifacts/goals-ui-style-translation-20261004/`
 
 One direct locked-family translation covers Goals root, active Build Lean Mass, current Phase 2, completed Phase 1, completed Visible Abs, Your Journey, the persistent cross-phase Guardrail, authenticated first/final photo roles, and representative loading/error/empty/unavailable states in dark and mineral light.
