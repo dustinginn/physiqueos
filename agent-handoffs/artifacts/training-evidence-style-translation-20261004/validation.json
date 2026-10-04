@@ -1,0 +1,44 @@
+{
+  "authority": {
+    "prompt": "2bae36cfa5f3364880abf8966800c658bd30aafc",
+    "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "build": 85
+  },
+  "generatedAt": "2026-10-04T15:39:34.928Z",
+  "boards": {
+    "dark": {
+      "expectedScreens": 16,
+      "actualScreens": 16,
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "missingPhone": [],
+      "pass": true
+    },
+    "light": {
+      "expectedScreens": 16,
+      "actualScreens": 16,
+      "missing": [],
+      "extra": [],
+      "horizontalPageOverflow": false,
+      "cardOverflow": [],
+      "missingPhone": [],
+      "pass": true
+    }
+  },
+  "parity": {
+    "checkedScreens": 16,
+    "textMismatches": [],
+    "pass": true
+  },
+  "semanticRules": {
+    "shippingSourceChanged": false,
+    "inventedTrainingChart": false,
+    "evidenceRowsStyledEditable": false,
+    "cooldownStyledOrCountedAsCardio": false,
+    "performanceRecordSemanticsChanged": false,
+    "healthKitProvenanceContractChanged": false
+  },
+  "pass": true
+}
