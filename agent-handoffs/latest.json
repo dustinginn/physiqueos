@@ -1,52 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-04T17:31:00Z",
-  "task": {
-    "id": "20261004-energy-weight-recovery-evidence-ui-style-translation",
-    "title": "Energy, Weight + Recovery Evidence UI style translation",
-    "agent": "codex",
-    "status": "complete_ready_for_founder_review_implementation_not_started"
-  },
+  "generated_at_utc": "2026-10-04T17:35:00Z",
+  "task": {"id":"20261004-goals-ui-style-translation","title":"Goals hierarchy UI style translation","agent":"codex","status":"complete_goals_hierarchy_ready_for_founder_review"},
   "repository": "dustinginn/physiqueos",
-  "authority": {
-    "prompt_commit": "fbd6dd35e4e0dbabe5834d309170dcd2e724398a",
-    "native_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
-    "native_build": 85,
-    "training_evidence_status": "locked_unchanged_all_10_areas",
-    "nutrition_evidence_status": "locked_unchanged",
-    "activity_evidence_status": "locked_unchanged"
-  },
-  "publication": {
-    "source_work_branch": "codex/energy-weight-recovery-evidence-design",
-    "source_work_commit": "1badfd2a38a7196befe40a9547fb5d845ba0d8ee",
-    "artifact_commit": "1f8ba1b9abd0db1826ac911bffcdbd7536d332c8",
-    "main_report_commit": "36ac9b70cae5aebe1c82b007c7822ddfe6948593",
-    "report_path": "agent-handoffs/reports/20261004T173100Z-energy-weight-recovery-evidence-ui-style-translation.md",
-    "artifact_root": "agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/"
-  },
-  "result": {
-    "summary": "Three independent Build 85 Evidence hierarchies translated into the locked dark/mineral-light system with exact contracts, histories, charts, DEXA and sleep provenance preserved.",
-    "direct_templates": 10,
-    "energy_templates": 2,
-    "weight_templates": 2,
-    "recovery_templates": 6,
-    "individual_theme_renders": 20,
-    "total_png_artifacts": 25,
-    "uncovered_matrix_states": 0,
-    "future_placeholder_text_count": 0,
-    "recovery_score_invented": false,
-    "strategic_recovery_activated": false,
-    "shipping_code_changed": false,
-    "dark_light_parity_pass": true,
-    "validation_pass": true
-  },
-  "recommended_next_step": "Founder reviews the concise dark/mineral-light comparison page and, if accepted, locks Energy, Weight and Recovery Evidence for later implementation.",
-  "stop_reason": "All three current hierarchies are audited, zero-gap coverage matrices and validation pass, and concise dark/mineral-light review artifacts are published.",
-  "safety": {
-    "contains_secrets": false,
-    "contains_credentials": false,
-    "contains_production_exports": false,
-    "contains_founder_evidence": false,
-    "safe_for_chatgpt_retrieval": true
-  }
+  "authority": {"prompt_commit":"31e8f9ce413b674ff8f3cfc77794209c88f34cfd","native_sha":"b8ee8690b194cb90086f6f62816b9a2c8c400dc026","native_build":85,"production_server_sha":"3c0f4aefddbb9a6886f6ad012443978303d47024"},
+  "publication": {"source_work_branch":"codex/goals-ui-style-translation","source_work_commit":"fcc60b64c891eb815b4b82fb83b26d5f8e0a0d47","artifact_commit":"a45c5609eb47621af89e0d02606389f0c4846c05","main_report_commit":"fcc60b64c891eb815b4b82fb83b26d5f8e0a0d47","report_path":"agent-handoffs/reports/20261004T173438Z-goals-ui-style-translation.md","artifact_root":"agent-handoffs/artifacts/goals-ui-style-translation-20261004/"},
+  "result": {"summary":"One locked-family translation covers Goals root, active Build Lean Mass, current/completed phase detail, completed Visible Abs, Your Journey, persistent Guardrail, authenticated first/final photo roles and representative states in dark/mineral light.","rendered_surfaces":9,"rendered_screens":18,"dark_light_parity_pass":true,"coverage_complete":true,"guardrail_distinct_from_phases":true,"goals_locked":false,"shipping_code_changed":false,"validation_pass":true},
+  "recommended_next_step": "Founder reviews the concise Goals hierarchy board and either locks the direction or requests focused corrections; do not implement shipping UI yet.",
+  "stop_reason": "The complete Goals hierarchy, paired appearances, coverage matrix, parity proof and source audit are ready for Founder review.",
+  "safety": {"contains_secrets":false,"contains_credentials":false,"contains_production_exports":false,"contains_founder_evidence":false,"safe_for_chatgpt_retrieval":true}
 }

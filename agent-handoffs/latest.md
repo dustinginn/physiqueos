@@ -2,24 +2,24 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Energy, Weight + Recovery Evidence UI style translation
+- Task: Goals hierarchy UI style translation
 - Agent: Codex
-- Status: complete source-audited design translation; ready for Founder review; implementation not started
-- Generated (UTC): 2026-10-04T17:31:00Z
-- Work branch: `codex/energy-weight-recovery-evidence-design`
-- Work/report commit: `1badfd2a38a7196befe40a9547fb5d845ba0d8ee`
-- Artifact commit: `1f8ba1b9abd0db1826ac911bffcdbd7536d332c8`
-- Main report commit before pointer update: `36ac9b70cae5aebe1c82b007c7822ddfe6948593`
-- Artifact root: `agent-handoffs/artifacts/energy-weight-recovery-evidence-style-translation-20261004/`
+- Status: complete hierarchy ready for Founder review; Goals not locked; implementation not started
+- Generated (UTC): 2026-10-04T17:35:00Z
+- Work branch: `codex/goals-ui-style-translation`
+- Work/report commit: `fcc60b64c891eb815b4b82fb83b26d5f8e0a0d47`
+- Artifact commit: `a45c5609eb47621af89e0d02606389f0c4846c05`
+- Main report commit: `fcc60b64c891eb815b4b82fb83b26d5f8e0a0d47`
+- Artifact root: `agent-handoffs/artifacts/goals-ui-style-translation-20261004/`
 
-Training, Nutrition and Activity Evidence remain locked. Energy, Weight and Recovery were independently audited against Native Build 85 and translated into one source-faithful dark/mineral-light direction.
+One direct locked-family translation covers Goals root, active Build Lean Mass, current Phase 2, completed Phase 1, completed Visible Abs, Your Journey, the persistent cross-phase Guardrail, authenticated first/final photo roles, and representative loading/error/empty/unavailable states in dark and mineral light.
 
-Ten direct templates cover all materially distinct current route/state families: Energy 2, Weight 2, Recovery 6. Three coverage matrices report zero uncovered states. Validation produced 20 individual phone renders and five board/index PNGs with exact dark/light text parity, zero overflow, zero runtime errors, no roadmap UI and no semantic or shipping change.
+Automated validation passed 18 renders with exact dark/light text parity, canonical active/completed Goal content, required first/final photo labels, Guardrail-not-Phase-3 semantics and zero uncovered Founder Production states.
 
-Energy keeps its two current graph families and root history. Weight keeps literal Goal-dependent summaries, inline history and purple DEXA markers. Recovery keeps nightly/weekly trends, sleep timeline/stages/continuity, finality and counted-source provenance, with no score or strategic activation.
+Current production gaps are explicit: completed phases lack rich phase content in the adapter; supporting objective detail is not resolvable; completed Goal photo tiles load authenticated media but are not expandable.
 
-Next: Founder reviews the concise comparison page and, if accepted, locks Energy, Weight and Recovery Evidence for later implementation.
+Next: Founder reviews the concise Goals board and either locks this direction or requests focused corrections. No shipping implementation is authorized.
 
-Detailed report: `agent-handoffs/reports/20261004T173100Z-energy-weight-recovery-evidence-ui-style-translation.md`
+Detailed report: `agent-handoffs/reports/20261004T173438Z-goals-ui-style-translation.md`
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
