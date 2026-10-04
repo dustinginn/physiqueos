@@ -2,26 +2,22 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Foam Rolling Priority Detail locked-design implementation parity pilot
-- Agent: Codex
-- Status: Ready for Founder review; pilot complete; not scaled
-- Generated (UTC): 2026-10-04T20:52:43Z
-- Prompt authority: `b29fd2a39da7d15836c0a0f4b808d63e9b95954d`
-- Work branch: `codex/foam-rolling-priority-parity-pilot`
-- Implementation commit: `b65deb00098713d824f14064e0362726997b5991`
-- Artifact commit: `d065c15675bcc4fa3603618dc43da7b3d90bfbde`
-- Main report commit: `808f10a254e277302da248bdc648432c891fc276`
-- Report: `agent-handoffs/reports/20261004T205243Z-foam-rolling-priority-parity-pilot.md`
-- Review board: `agent-handoffs/artifacts/foam-rolling-priority-parity-pilot-20261004/` at artifact commit `d065c15675bcc4fa3603618dc43da7b3d90bfbde`
+- Task: Final Design Batch 1 — Evidence Intake + Review
+- Agent: Codex A
+- Status: Ready for Founder review; design complete; not implemented
+- Generated (UTC): 2026-10-04T21:03:23Z
+- Prompt authority: `d315c2372dd2b2f08b55ceeb0be758510f5fee05`
+- Work branch: `codex/final-design-batch1-evidence-intake-review-20261004`
+- Source artifact commit: `3cd77842852207c5e1f39da86f89f3b31bd24788`
+- Main report/artifact commit: `85ef2a6c916903b05a3c8594d90725b53ef8b96f`
+- Report: `agent-handoffs/reports/20261004T210118Z-final-design-batch1-evidence-intake-review.md`
+- Artifact root: `agent-handoffs/artifacts/final-design-batch1-evidence-intake-review-20261004/`
+- Primary PNG: `agent-handoffs/artifacts/final-design-batch1-evidence-intake-review-20261004/boards/evidence-intake-review-primary-mobile.png`
 
-The locked Foam Rolling Priority Detail is implemented as the first and only parity pilot. Real iPhone 17 Pro simulator Dark and Mineral Light captures are published beside the exact accepted references at the same 402 × 874 point geometry. Visual, canonical content/data, navigation, complete/skip safety, setup-route, terminal-state, and reconciliation behavior pass the focused gates.
+Generic Evidence Intake, Progress Photos Intake, DEXA Intake and Generic Evidence Review are source-audited and translated into the locked dark/Mineral-Light PhysiqueOS system. The package contains 20 material workflow/state surfaces in both appearances, 40 full-resolution renders, focused mobile boards and automated content/geometry/state parity proof.
 
-Three comparison mismatches were corrected before publication: iOS 26 Liquid Glass back-button chrome, the exact 46-point crumb geometry, and UI automation identifier containment. No unresolved product-surface mismatch remains.
+No locked downstream Evidence presentation family was reopened. No Native or Server shipping code, schema, production state, build or TestFlight artifact changed.
 
-Focused validation: 41 unit tests passed, 2 real-simulator UI tests passed, and the full Release simulator build succeeded for the app plus embedded Watch and Live Activity targets.
-
-No other Priority Detail page was migrated. No TestFlight build was uploaded and no production state was mutated.
-
-Next: Founder reviews the pilot board and implementation method. Do not scale to the rest of Priority Detail until explicitly authorized.
+Next: Founder reviews and accepts/corrects these four pending Evidence transaction groups. Do not implement shipping UI or proceed past review without authorization.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
