@@ -1,38 +1,38 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-04T21:03:23Z",
+  "generated_at_utc": "2026-10-04T21:27:26Z",
   "task": {
-    "id": "20261004-final-design-batch1-evidence-intake-review",
-    "title": "Final Design Batch 1 — Evidence Intake + Review",
+    "id": "20261004-final-design-batch2-daily-capture-explanation",
+    "title": "Final Design Batch 2 — Daily Capture + Explanation",
     "agent": "codex-a",
     "status": "ready_for_founder_review_design_complete_not_implemented"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "d315c2372dd2b2f08b55ceeb0be758510f5fee05",
+    "prompt_commit": "d7d59139f3aecff8a42c3f600addbeedc45d9e15",
     "native_base_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
     "native_build": 85,
     "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
     "scope_audit": "agent-handoffs/reports/20261004T204247Z-app-wide-redesign-coverage-audit.md",
-    "scope_rows": ["E20", "E21", "E22", "E23"]
+    "scope_rows": ["H02", "L04", "L05", "B06"]
   },
   "publication": {
-    "source_work_branch": "codex/final-design-batch1-evidence-intake-review-20261004",
-    "source_work_commit": "3cd77842852207c5e1f39da86f89f3b31bd24788",
-    "main_report_commit": "85ef2a6c916903b05a3c8594d90725b53ef8b96f",
-    "report_path": "agent-handoffs/reports/20261004T210118Z-final-design-batch1-evidence-intake-review.md",
-    "artifact_root": "agent-handoffs/artifacts/final-design-batch1-evidence-intake-review-20261004/",
-    "primary_png": "agent-handoffs/artifacts/final-design-batch1-evidence-intake-review-20261004/boards/evidence-intake-review-primary-mobile.png",
-    "comparison_page": "agent-handoffs/artifacts/final-design-batch1-evidence-intake-review-20261004/comparison-board.html",
-    "validation": "agent-handoffs/artifacts/final-design-batch1-evidence-intake-review-20261004/validation.json"
+    "source_work_branch": "codex/final-design-batch2-daily-capture-20261004",
+    "source_work_commit": "fb726a22f112e2291bc4c6a3e347eb82b706010a",
+    "main_report_commit": "f5b7a40c6691e4bbc86b8ca0b7ef380d571bcc46",
+    "report_path": "agent-handoffs/reports/20261004T212411Z-final-design-batch2-daily-capture-explanation.md",
+    "artifact_root": "agent-handoffs/artifacts/final-design-batch2-daily-capture-explanation-20261004/",
+    "primary_png": "agent-handoffs/artifacts/final-design-batch2-daily-capture-explanation-20261004/boards/daily-capture-explanation-primary-mobile.png",
+    "comparison_page": "agent-handoffs/artifacts/final-design-batch2-daily-capture-explanation-20261004/comparison-board.html",
+    "validation": "agent-handoffs/artifacts/final-design-batch2-daily-capture-explanation-20261004/validation.json"
   },
   "result": {
-    "summary": "The four remaining Evidence transaction groups are source-audited and rendered in the locked dark/Mineral-Light system without changing current production content, behavior or state semantics.",
+    "summary": "The four remaining Daily Capture + Explanation groups are source-audited and rendered in the locked dark/Mineral-Light system without changing canonical content or behavior.",
     "surface_groups": [
-      "Generic Evidence Intake",
-      "Progress Photos Intake",
-      "DEXA Intake",
-      "Generic Evidence Review"
+      "Home Confidence Detail",
+      "Morning Check-In",
+      "Manual/backdated Weight",
+      "Briefing History"
     ],
     "material_surfaces": 20,
     "full_resolution_screens": 40,
@@ -41,19 +41,22 @@
     "content_geometry_parity": "passed",
     "horizontal_overflow": false,
     "minimum_interactive_target_points": 44,
-    "locked_evidence_presentation_reopened": false,
+    "confidence_assumptions_presented": false,
+    "morning_production_contract_expanded": false,
+    "briefing_history_filters_invented": false,
+    "locked_batch1_reopened": false,
     "shipping_native_changed": false,
     "server_changed": false,
     "production_mutated": false,
     "testflight_uploaded": false
   },
-  "recommended_next_step": "Founder reviews and accepts or corrects the four pending Evidence transaction groups; do not implement shipping UI without authorization.",
-  "stop_reason": "All four authorized Evidence intake/review groups are source-audited, all material current states are represented in both appearances, parity validation passes and mobile review artifacts are published.",
+  "recommended_next_step": "Founder reviews and accepts or corrects the four pending Batch 2 groups; do not implement shipping UI without authorization.",
+  "stop_reason": "All four authorized groups are source-audited, all material current states are represented in both appearances, parity validation passes and mobile review artifacts are published.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
     "contains_production_exports": false,
-    "contains_founder_evidence": true,
+    "contains_founder_evidence": false,
     "safe_for_chatgpt_retrieval": true
   }
 }
