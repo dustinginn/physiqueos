@@ -1,0 +1,124 @@
+{
+  "authority": {
+    "nativeSHA": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "productionServerSHA": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "projection": "ProductionLogAPI + LogReadModel + LoggedTodayService",
+    "fixtureStatus": "Design-only busy-but-normal fixture derived from the current canonical field schema"
+  },
+  "viewState": "loaded",
+  "localDate": "2026-10-03",
+  "header": {
+    "eyebrow": "Log",
+    "title": "What happened?",
+    "subtitle": "Upload a screenshot, photo, PDF, or note and PhysiqueOS will organize it."
+  },
+  "loggedToday": {
+    "title": "Logged Today",
+    "rows": [
+      {
+        "kind": "training",
+        "label": "Training",
+        "summary": "Strength Training · 64 min, Stair Stepper · 13 min",
+        "lines": [
+          {
+            "kind": "logger",
+            "summary": "Strength Training · 64 min"
+          },
+          {
+            "kind": "cardio",
+            "summary": "Stair Stepper · 13 min"
+          }
+        ],
+        "destination": "training.day:2026-10-03"
+      },
+      {
+        "kind": "nutrition",
+        "label": "Nutrition",
+        "summary": "2,516 calories",
+        "context": "215P · 161C · 111F",
+        "macroOrder": [
+          "Protein",
+          "Carbohydrates",
+          "Fat"
+        ],
+        "destination": "nutrition.day:nutrition-day-2026-10-03"
+      },
+      {
+        "kind": "activity",
+        "label": "Activity",
+        "summary": "771 active calories so far",
+        "destination": "activity.day:2026-10-03"
+      },
+      {
+        "kind": "weight",
+        "label": "Weight",
+        "summary": "176.7 lb",
+        "destination": "progress.stream:weight"
+      }
+    ],
+    "sources": [
+      {
+        "source": "Apple Health",
+        "scope": [
+          "Stair Stepper",
+          "Nutrition",
+          "Activity"
+        ]
+      },
+      {
+        "source": "PhysiqueOS Logger",
+        "scope": [
+          "Strength Training"
+        ]
+      },
+      {
+        "source": "Weight",
+        "scope": [
+          "Source unavailable"
+        ]
+      }
+    ]
+  },
+  "pendingEvidenceReviews": {
+    "sectionTitle": "Uploads ready to review",
+    "sectionSubtitle": "Finish checking these uploads before adding them to your history.",
+    "items": [
+      {
+        "id": "review-weight-2026-10-03",
+        "title": "Check-in ready to review",
+        "date": "Saturday, October 3",
+        "summary": "1 weight entry",
+        "likelyDuplicate": false,
+        "actionLabel": "Review before adding to your history",
+        "destination": "evidence.review:review-weight-2026-10-03"
+      }
+    ]
+  },
+  "trainingLogger": {
+    "title": "Training Logger",
+    "subtitle": "Start a workout or log a past workout with exercises, sets, variants, and supersets.",
+    "destination": "training.logger"
+  },
+  "weightAction": {
+    "label": "Log weight for another date",
+    "destination": "manual.weigh-in"
+  },
+  "upload": {
+    "title": "Upload",
+    "subtitle": "Add photos, files, or a note.",
+    "primaryAction": "Add evidence",
+    "secondaryAction": "Add details without an asset",
+    "sourceOptions": [
+      "Photos",
+      "Files"
+    ],
+    "destination": "evidence.intake"
+  },
+  "navigation": [
+    "Home",
+    "Goals",
+    "Log",
+    "Evidence",
+    "You"
+  ]
+}

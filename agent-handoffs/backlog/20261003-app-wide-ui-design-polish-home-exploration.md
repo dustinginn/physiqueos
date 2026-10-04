@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log + Weekly visual language locked; final Weekly/Midweek dark + mineral-light family set ready for Founder review**
+Status: **Home + Log + Weekly visual language locked; final briefing-light polish and locked Log density validation ready for Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -258,3 +258,32 @@ Review set:
 - `agent-handoffs/artifacts/weekly-midweek-light-translation-final-20261004/PARITY-PROOF.md`
 
 Do not mark the Weekly/Midweek appearance pair locked until the Founder accepts these renders. No shipping UI, Server behavior, Recovery activation, theme implementation, build or TestFlight work occurred.
+
+## Briefing mineral-light polish + locked Log density validation
+
+Status: **Review artifacts ready; refinement candidates not yet accepted**
+
+The accepted Weekly/Midweek mineral-light structures now use selective tinted fields for Energy, Body Composition, Training, Recovery and the coaching finale while Weight and provenance remain open on the mineral canvas. Exact content, section order, Energy/Recovery graphs, Body Composition placement and Recovery semantics remain unchanged.
+
+Weekly Priority Muscle Groups now use a left-aligned 2×2 analytical rail. Exact names, statuses and counts are preserved while measured height falls from 254 pt to 143 pt, saving 111 pt / 44%.
+
+The locked Log Compact Command Center has also passed a realistic-density design validation with:
+
+- separate Strength Training and Stair Stepper lines/durations;
+- 2,516 calories plus 215P · 161C · 111F;
+- 771 active calories so far;
+- 176.7 lb;
+- one ready-to-review item;
+- unchanged Training Logger and quick-action hierarchy;
+- a centralized Sources block that scopes Apple Health to Stair Stepper/Nutrition/Activity, PhysiqueOS Logger to Strength, and honestly marks Weight provenance unavailable in the current Log projection.
+
+Review set:
+
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/README.md`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/briefing-light-before-after-four-up.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/weekly-priority-muscle-groups-before-after.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/log-command-density-dark-light.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/SOURCE-PROVENANCE-AUDIT.md`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/PARITY-PROOF.md`
+
+Implementation backlog additions: centralized Log source/provenance; realistic Strength + Cardio + macro density; condensed Priority Muscle Groups; and briefing mineral-light surface rhythm. Do not mark these refinements implemented or locked until Founder acceptance. No shipping code, projection, Server behavior, Recovery activation, build or TestFlight work occurred.
