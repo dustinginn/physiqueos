@@ -263,7 +263,7 @@ Do not mark the Weekly/Midweek appearance pair locked until the Founder accepts 
 
 Status: **Review artifacts ready; refinement candidates not yet accepted**
 
-The accepted Weekly/Midweek mineral-light structures now use selective tinted fields for Energy, Body Composition, Training, Recovery and the coaching finale while Weight and provenance remain open on the mineral canvas. Exact content, section order, Energy/Recovery graphs, Body Composition placement and Recovery semantics remain unchanged.
+The accepted Weekly/Midweek mineral-light structures now have two appearance candidates over the same immutable composition: selective tinted fields, and a richer navy/teal/violet color-field treatment that echoes the locked Log Training Logger. Exact content, section order, Energy/Recovery graphs, Body Composition placement, Recovery semantics and page height remain unchanged in both.
 
 Weekly Priority Muscle Groups now use a left-aligned 2×2 analytical rail. Exact names, statuses and counts are preserved while measured height falls from 254 pt to 143 pt, saving 111 pt / 44%.
 
@@ -275,15 +275,19 @@ The locked Log Compact Command Center has also passed a realistic-density design
 - 176.7 lb;
 - one ready-to-review item;
 - unchanged Training Logger and quick-action hierarchy;
-- a centralized Sources block that scopes Apple Health to Stair Stepper/Nutrition/Activity, PhysiqueOS Logger to Strength, and honestly marks Weight provenance unavailable in the current Log projection.
+- a centralized Sources disclosure at the true bottom of Log content, collapsed by default to one 44 pt row, that scopes Apple Health to Stair Stepper/Nutrition/Activity, PhysiqueOS Logger to Strength, and honestly marks Weight provenance unavailable in the current Log projection.
 
 Review set:
 
 - `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/README.md`
 - `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/briefing-light-before-after-four-up.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/briefing-light-rich-fields-pair.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/weekly-light-surface-intensity-comparison.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/midweek-light-surface-intensity-comparison.png`
 - `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/weekly-priority-muscle-groups-before-after.png`
 - `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/log-command-density-dark-light.png`
+- `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/screens/log-sources-collapsed-dark-light.png`
 - `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/SOURCE-PROVENANCE-AUDIT.md`
 - `agent-handoffs/artifacts/briefing-light-log-density-final-polish-20261004/PARITY-PROOF.md`
 
-Implementation backlog additions: centralized Log source/provenance; realistic Strength + Cardio + macro density; condensed Priority Muscle Groups; and briefing mineral-light surface rhythm. Do not mark these refinements implemented or locked until Founder acceptance. No shipping code, projection, Server behavior, Recovery activation, build or TestFlight work occurred.
+Implementation backlog additions: centralized bottom-anchored expandable Log source/provenance; realistic Strength + Cardio + macro density; condensed Priority Muscle Groups; selective briefing mineral-light surface rhythm; and the richer navy/teal/violet mineral-light appearance candidate. Do not mark these refinements implemented or locked until Founder acceptance. No shipping code, projection, Server behavior, Recovery activation, build or TestFlight work occurred.
