@@ -1,6 +1,6 @@
 # App-wide UI/design polish — Home exploration
 
-Status: **Home + Log direction locked; Weekly Briefing exploration in Founder review**
+Status: **Home + Log direction locked; Weekly faithful-restyle corrective pass in Founder review**
 Entered: 2026-10-03
 
 App-wide UI/design polish has entered its Home exploration phase. A design-only Build 84 audit and seven unranked Home directions are available at:
@@ -102,4 +102,25 @@ Review set:
 
 Recovery is a required first-class recurring section in the future Weekly visual contract. It remains absent from the current production Weekly projection, strategically ineligible and uncoupled from Goal Confidence. Recovery values in this review set are explicitly synthetic fixture-only examples for layout evaluation; no Recovery activation is implied.
 
-No Weekly composition is accepted. No shipping Native source, Server behavior, production projection, Recovery strategy, palette migration, build or TestFlight state changed. The next gate is Founder review of the six complete Weekly renders.
+The three prior Weekly compositions are **REJECTED by the Founder**. They changed the tuned Weekly content/structure and did not preserve the production graph contract. They remain historical artifacts only and must not be used as design baselines.
+
+## Weekly Briefing faithful-restyle corrective pass
+
+Status: **Ready for Founder review**
+
+The corrective pass uses the actual Build 85 Weekly implementation as an immutable wireframe and produces one faithful structure in two visual appearances:
+
+- dark;
+- mineral light.
+
+Review set:
+
+- `agent-handoffs/artifacts/weekly-ui-faithful-restyle-20261004/README.md`
+- `agent-handoffs/artifacts/weekly-ui-faithful-restyle-20261004/screens/faithful-dark-light-full-pair.png`
+- `agent-handoffs/artifacts/weekly-ui-faithful-restyle-20261004/STRUCTURAL-INVENTORY.md`
+- `agent-handoffs/artifacts/weekly-ui-faithful-restyle-20261004/GRAPH-INVENTORY.md`
+- `agent-handoffs/artifacts/weekly-ui-faithful-restyle-20261004/PARITY-PROOF.md`
+
+The same production content, copy, section/card order, parentage, metrics, narratives, Confidence anchor, Energy graph, Coach's Take, Into Next Week, revision provenance, navigation and fixture-driven conditional visibility are preserved. Recovery is the sole additive section, inserted after Training, clearly fixture-only, still ungraduated and uncoupled from Confidence.
+
+Home remains locked. Log remains locked to Compact Command Center. No Weekly direction is accepted yet. No shipping Native source, Server behavior, production projection, Recovery policy, build or TestFlight state changed. The next gate is Founder review of the faithful dark/mineral-light pair and parity proof.

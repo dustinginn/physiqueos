@@ -1,0 +1,1092 @@
+{
+  "authority": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+  "fixtureId": "weekly_briefing_2026-08-23_2026-08-29",
+  "renderer": "single shared production-structure renderer; theme class is the only dark/light difference",
+  "target": {
+    "widthPoints": 402,
+    "scale": 3,
+    "safeAreaTopPoints": 51
+  },
+  "expectedSemanticFieldCount": 85,
+  "productionSequence": [
+    "W01",
+    "W02",
+    "W03",
+    "W04",
+    "W05",
+    "W06",
+    "W07",
+    "W08",
+    "W09",
+    "W10",
+    "W13",
+    "W14",
+    "W15",
+    "W16",
+    "W17",
+    "W18",
+    "W19",
+    "W20",
+    "W21",
+    "W23",
+    "W24",
+    "W25",
+    "W26",
+    "W27",
+    "W28",
+    "W29",
+    "W33",
+    "W34",
+    "W35",
+    "W36",
+    "W37"
+  ],
+  "conditionals": {
+    "W11": {
+      "name": "Energy comparison narrative",
+      "present": false,
+      "reason": "comparisonNarrative absent"
+    },
+    "W12": {
+      "name": "Energy daily semantic rows",
+      "present": false,
+      "reason": "showsDailySemanticRows defaults false"
+    },
+    "W22": {
+      "name": "View Photo Briefing link",
+      "present": false,
+      "reason": "photoEventDestination null"
+    },
+    "W30": {
+      "name": "Training watch",
+      "present": false,
+      "reason": "watch absent"
+    },
+    "W31": {
+      "name": "Body Composition",
+      "present": false,
+      "reason": "bodyComposition null"
+    },
+    "W32": {
+      "name": "Still Unresolved",
+      "present": false,
+      "reason": "uncertainty absent"
+    }
+  },
+  "graphInventory": [
+    {
+      "id": "W15",
+      "component": "WeeklyEnergyCard.chart",
+      "section": "Energy",
+      "type": "grouped-bar",
+      "series": [
+        "Intake",
+        "Estimated expenditure"
+      ],
+      "labels": [
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29"
+      ],
+      "pointCount": 7,
+      "markCount": 14,
+      "conditional": "showsChart && dailyBalances non-empty"
+    }
+  ],
+  "renders": {
+    "baseline": {
+      "widthPoints": 402,
+      "heightPoints": 4128,
+      "semanticFieldCount": 85,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "conflicts": [],
+      "sequence": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "productionOnly": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "parentage": [
+        {
+          "id": "W01",
+          "parent": "BriefingDetailView",
+          "component": "BriefingDetailPreHeroNavigation"
+        },
+        {
+          "id": "W02",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingLeadCard"
+        },
+        {
+          "id": "W03",
+          "parent": "W02",
+          "component": "LeadHeader"
+        },
+        {
+          "id": "W04",
+          "parent": "W02",
+          "component": "ConfidenceAnchor"
+        },
+        {
+          "id": "W05",
+          "parent": "W02",
+          "component": "LeadHeadline"
+        },
+        {
+          "id": "W06",
+          "parent": "W02",
+          "component": "LeadNarrative"
+        },
+        {
+          "id": "W07",
+          "parent": "W02",
+          "component": "LeadFooter"
+        },
+        {
+          "id": "W08",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyEnergyCard"
+        },
+        {
+          "id": "W09",
+          "parent": "W08",
+          "component": "EnergyHeader"
+        },
+        {
+          "id": "W10",
+          "parent": "W08",
+          "component": "EnergyLegacyNarrative"
+        },
+        {
+          "id": "W13",
+          "parent": "W08",
+          "component": "EnergyMetrics"
+        },
+        {
+          "id": "W14",
+          "parent": "W08",
+          "component": "EnergyChartTitle"
+        },
+        {
+          "id": "W15",
+          "parent": "W08",
+          "component": "WeeklyEnergyChart"
+        },
+        {
+          "id": "W16",
+          "parent": "W08",
+          "component": "EnergySeriesLegend"
+        },
+        {
+          "id": "W17",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyWeightCard"
+        },
+        {
+          "id": "W18",
+          "parent": "W17",
+          "component": "WeightMetrics"
+        },
+        {
+          "id": "W19",
+          "parent": "W17",
+          "component": "WeightNarrative"
+        },
+        {
+          "id": "W20",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyPhotosCard"
+        },
+        {
+          "id": "W21",
+          "parent": "W20",
+          "component": "PhotosNarrative"
+        },
+        {
+          "id": "W23",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingTrainingResponseCard"
+        },
+        {
+          "id": "W24",
+          "parent": "W23",
+          "component": "TrainingHeader"
+        },
+        {
+          "id": "W25",
+          "parent": "W23",
+          "component": "TrainingHeadline"
+        },
+        {
+          "id": "W26",
+          "parent": "W23",
+          "component": "TrainingNarrative"
+        },
+        {
+          "id": "W27",
+          "parent": "W23",
+          "component": "TrainingCoverage"
+        },
+        {
+          "id": "W28",
+          "parent": "W23",
+          "component": "TrainingHighlights"
+        },
+        {
+          "id": "W29",
+          "parent": "W23",
+          "component": "TrainingPriorityGroups"
+        },
+        {
+          "id": "W33",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingCoachFinale"
+        },
+        {
+          "id": "W34",
+          "parent": "W33",
+          "component": "FinaleTakeaway"
+        },
+        {
+          "id": "W35",
+          "parent": "W33",
+          "component": "FinaleRecommendation"
+        },
+        {
+          "id": "W36",
+          "parent": "W33",
+          "component": "FinaleActions"
+        },
+        {
+          "id": "W37",
+          "parent": "BriefingDetailView",
+          "component": "BriefingRevisionBanner"
+        }
+      ],
+      "hiddenConditionals": [],
+      "recoveryCount": 0,
+      "recoveryPositionValid": true,
+      "recoveryFixtureBoundaryVisible": true,
+      "recoveryConfidenceCouplingAbsent": true,
+      "chart": {
+        "type": "grouped-bar",
+        "series": [
+          "Intake",
+          "Estimated expenditure"
+        ],
+        "title": "Daily intake vs estimated expenditure",
+        "pointCount": 7,
+        "bars": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-29"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "date": "2026-08-29"
+          }
+        ]
+      },
+      "navigation": [
+        "Home",
+        "Briefing History"
+      ],
+      "chartExact": true,
+      "sequenceExact": true,
+      "pass": true
+    },
+    "dark": {
+      "widthPoints": 402,
+      "heightPoints": 4446,
+      "semanticFieldCount": 85,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "conflicts": [],
+      "sequence": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "R-FUTURE",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "productionOnly": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "parentage": [
+        {
+          "id": "W01",
+          "parent": "BriefingDetailView",
+          "component": "BriefingDetailPreHeroNavigation"
+        },
+        {
+          "id": "W02",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingLeadCard"
+        },
+        {
+          "id": "W03",
+          "parent": "W02",
+          "component": "LeadHeader"
+        },
+        {
+          "id": "W04",
+          "parent": "W02",
+          "component": "ConfidenceAnchor"
+        },
+        {
+          "id": "W05",
+          "parent": "W02",
+          "component": "LeadHeadline"
+        },
+        {
+          "id": "W06",
+          "parent": "W02",
+          "component": "LeadNarrative"
+        },
+        {
+          "id": "W07",
+          "parent": "W02",
+          "component": "LeadFooter"
+        },
+        {
+          "id": "W08",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyEnergyCard"
+        },
+        {
+          "id": "W09",
+          "parent": "W08",
+          "component": "EnergyHeader"
+        },
+        {
+          "id": "W10",
+          "parent": "W08",
+          "component": "EnergyLegacyNarrative"
+        },
+        {
+          "id": "W13",
+          "parent": "W08",
+          "component": "EnergyMetrics"
+        },
+        {
+          "id": "W14",
+          "parent": "W08",
+          "component": "EnergyChartTitle"
+        },
+        {
+          "id": "W15",
+          "parent": "W08",
+          "component": "WeeklyEnergyChart"
+        },
+        {
+          "id": "W16",
+          "parent": "W08",
+          "component": "EnergySeriesLegend"
+        },
+        {
+          "id": "W17",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyWeightCard"
+        },
+        {
+          "id": "W18",
+          "parent": "W17",
+          "component": "WeightMetrics"
+        },
+        {
+          "id": "W19",
+          "parent": "W17",
+          "component": "WeightNarrative"
+        },
+        {
+          "id": "W20",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyPhotosCard"
+        },
+        {
+          "id": "W21",
+          "parent": "W20",
+          "component": "PhotosNarrative"
+        },
+        {
+          "id": "W23",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingTrainingResponseCard"
+        },
+        {
+          "id": "W24",
+          "parent": "W23",
+          "component": "TrainingHeader"
+        },
+        {
+          "id": "W25",
+          "parent": "W23",
+          "component": "TrainingHeadline"
+        },
+        {
+          "id": "W26",
+          "parent": "W23",
+          "component": "TrainingNarrative"
+        },
+        {
+          "id": "W27",
+          "parent": "W23",
+          "component": "TrainingCoverage"
+        },
+        {
+          "id": "W28",
+          "parent": "W23",
+          "component": "TrainingHighlights"
+        },
+        {
+          "id": "W29",
+          "parent": "W23",
+          "component": "TrainingPriorityGroups"
+        },
+        {
+          "id": "R-FUTURE",
+          "parent": "WeeklyBriefingSections",
+          "component": "RecoveryBriefingFutureFixture"
+        },
+        {
+          "id": "W33",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingCoachFinale"
+        },
+        {
+          "id": "W34",
+          "parent": "W33",
+          "component": "FinaleTakeaway"
+        },
+        {
+          "id": "W35",
+          "parent": "W33",
+          "component": "FinaleRecommendation"
+        },
+        {
+          "id": "W36",
+          "parent": "W33",
+          "component": "FinaleActions"
+        },
+        {
+          "id": "W37",
+          "parent": "BriefingDetailView",
+          "component": "BriefingRevisionBanner"
+        }
+      ],
+      "hiddenConditionals": [],
+      "recoveryCount": 1,
+      "recoveryPositionValid": true,
+      "recoveryFixtureBoundaryVisible": true,
+      "recoveryConfidenceCouplingAbsent": true,
+      "chart": {
+        "type": "grouped-bar",
+        "series": [
+          "Intake",
+          "Estimated expenditure"
+        ],
+        "title": "Daily intake vs estimated expenditure",
+        "pointCount": 7,
+        "bars": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-29"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "date": "2026-08-29"
+          }
+        ]
+      },
+      "navigation": [
+        "Home",
+        "Briefing History"
+      ],
+      "chartExact": true,
+      "sequenceExact": true,
+      "pass": true,
+      "parentageExact": true
+    },
+    "light": {
+      "widthPoints": 402,
+      "heightPoints": 4446,
+      "semanticFieldCount": 85,
+      "missing": [],
+      "mismatches": [],
+      "extra": [],
+      "conflicts": [],
+      "sequence": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "R-FUTURE",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "productionOnly": [
+        "W01",
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07",
+        "W08",
+        "W09",
+        "W10",
+        "W13",
+        "W14",
+        "W15",
+        "W16",
+        "W17",
+        "W18",
+        "W19",
+        "W20",
+        "W21",
+        "W23",
+        "W24",
+        "W25",
+        "W26",
+        "W27",
+        "W28",
+        "W29",
+        "W33",
+        "W34",
+        "W35",
+        "W36",
+        "W37"
+      ],
+      "parentage": [
+        {
+          "id": "W01",
+          "parent": "BriefingDetailView",
+          "component": "BriefingDetailPreHeroNavigation"
+        },
+        {
+          "id": "W02",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingLeadCard"
+        },
+        {
+          "id": "W03",
+          "parent": "W02",
+          "component": "LeadHeader"
+        },
+        {
+          "id": "W04",
+          "parent": "W02",
+          "component": "ConfidenceAnchor"
+        },
+        {
+          "id": "W05",
+          "parent": "W02",
+          "component": "LeadHeadline"
+        },
+        {
+          "id": "W06",
+          "parent": "W02",
+          "component": "LeadNarrative"
+        },
+        {
+          "id": "W07",
+          "parent": "W02",
+          "component": "LeadFooter"
+        },
+        {
+          "id": "W08",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyEnergyCard"
+        },
+        {
+          "id": "W09",
+          "parent": "W08",
+          "component": "EnergyHeader"
+        },
+        {
+          "id": "W10",
+          "parent": "W08",
+          "component": "EnergyLegacyNarrative"
+        },
+        {
+          "id": "W13",
+          "parent": "W08",
+          "component": "EnergyMetrics"
+        },
+        {
+          "id": "W14",
+          "parent": "W08",
+          "component": "EnergyChartTitle"
+        },
+        {
+          "id": "W15",
+          "parent": "W08",
+          "component": "WeeklyEnergyChart"
+        },
+        {
+          "id": "W16",
+          "parent": "W08",
+          "component": "EnergySeriesLegend"
+        },
+        {
+          "id": "W17",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyWeightCard"
+        },
+        {
+          "id": "W18",
+          "parent": "W17",
+          "component": "WeightMetrics"
+        },
+        {
+          "id": "W19",
+          "parent": "W17",
+          "component": "WeightNarrative"
+        },
+        {
+          "id": "W20",
+          "parent": "WeeklyBriefingSections",
+          "component": "WeeklyPhotosCard"
+        },
+        {
+          "id": "W21",
+          "parent": "W20",
+          "component": "PhotosNarrative"
+        },
+        {
+          "id": "W23",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingTrainingResponseCard"
+        },
+        {
+          "id": "W24",
+          "parent": "W23",
+          "component": "TrainingHeader"
+        },
+        {
+          "id": "W25",
+          "parent": "W23",
+          "component": "TrainingHeadline"
+        },
+        {
+          "id": "W26",
+          "parent": "W23",
+          "component": "TrainingNarrative"
+        },
+        {
+          "id": "W27",
+          "parent": "W23",
+          "component": "TrainingCoverage"
+        },
+        {
+          "id": "W28",
+          "parent": "W23",
+          "component": "TrainingHighlights"
+        },
+        {
+          "id": "W29",
+          "parent": "W23",
+          "component": "TrainingPriorityGroups"
+        },
+        {
+          "id": "R-FUTURE",
+          "parent": "WeeklyBriefingSections",
+          "component": "RecoveryBriefingFutureFixture"
+        },
+        {
+          "id": "W33",
+          "parent": "WeeklyBriefingSections",
+          "component": "BriefingCoachFinale"
+        },
+        {
+          "id": "W34",
+          "parent": "W33",
+          "component": "FinaleTakeaway"
+        },
+        {
+          "id": "W35",
+          "parent": "W33",
+          "component": "FinaleRecommendation"
+        },
+        {
+          "id": "W36",
+          "parent": "W33",
+          "component": "FinaleActions"
+        },
+        {
+          "id": "W37",
+          "parent": "BriefingDetailView",
+          "component": "BriefingRevisionBanner"
+        }
+      ],
+      "hiddenConditionals": [],
+      "recoveryCount": 1,
+      "recoveryPositionValid": true,
+      "recoveryFixtureBoundaryVisible": true,
+      "recoveryConfidenceCouplingAbsent": true,
+      "chart": {
+        "type": "grouped-bar",
+        "series": [
+          "Intake",
+          "Estimated expenditure"
+        ],
+        "title": "Daily intake vs estimated expenditure",
+        "pointCount": 7,
+        "bars": [
+          {
+            "series": "Intake",
+            "value": 2800,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2420,
+            "date": "2026-08-23"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2460,
+            "date": "2026-08-24"
+          },
+          {
+            "series": "Intake",
+            "value": 2820,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2450,
+            "date": "2026-08-25"
+          },
+          {
+            "series": "Intake",
+            "value": 2770,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2410,
+            "date": "2026-08-26"
+          },
+          {
+            "series": "Intake",
+            "value": 2830,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2470,
+            "date": "2026-08-27"
+          },
+          {
+            "series": "Intake",
+            "value": 2790,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2430,
+            "date": "2026-08-28"
+          },
+          {
+            "series": "Intake",
+            "value": 2760,
+            "date": "2026-08-29"
+          },
+          {
+            "series": "Estimated expenditure",
+            "value": 2440,
+            "date": "2026-08-29"
+          }
+        ]
+      },
+      "navigation": [
+        "Home",
+        "Briefing History"
+      ],
+      "chartExact": true,
+      "sequenceExact": true,
+      "pass": true,
+      "parentageExact": true
+    }
+  },
+  "pass": true
+}
