@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-10-04T20:47:13Z",
+  "status": "passed_ready_for_founder_review",
+  "scope": "foam_rolling_priority_detail_only",
+  "authority": {
+    "prompt_commit": "b29fd2a39da7d15836c0a0f4b808d63e9b95954d",
+    "native_base_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
+    "native_build": 85,
+    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "locked_design_branch": "codex/priority-detail-ui-style-translation",
+    "locked_design_commit": "1ff803ac",
+    "implementation_commit": "b65deb00098713d824f14064e0362726997b5991"
+  },
+  "simulator": {
+    "device": "iPhone 17 Pro",
+    "os": "iOS 26.5",
+    "point_geometry": "402x874",
+    "dark_capture": "screens/foam-rolling-simulator-dark.png",
+    "mineral_light_capture": "screens/foam-rolling-simulator-light.png",
+    "capture_source": "XCUIScreen.main.screenshot"
+  },
+  "validation": [
+    {
+      "name": "focused_unit_tests",
+      "status": "passed",
+      "tests": 41,
+      "failures": 0,
+      "coverage": [
+        "PriorityReadModelTests",
+        "FounderServerAPITests.testFoamRollingSetupRequiredPreservesTheCanonicalReviewSupportRoute",
+        "CompletionFeedbackAndNotificationCapabilityTests"
+      ]
+    },
+    {
+      "name": "foam_rolling_ui_tests",
+      "status": "passed",
+      "tests": 2,
+      "failures": 0,
+      "coverage": [
+        "real Dark screen",
+        "real Mineral Light screen",
+        "locked content and ordering",
+        "52-point primary action",
+        "44-point secondary action",
+        "skip confirmation safety",
+        "tab bar absent"
+      ]
+    },
+    {
+      "name": "release_simulator_compile",
+      "status": "passed",
+      "configuration": "Release",
+      "destination": "generic/platform=iOS Simulator",
+      "code_signing_allowed": false,
+      "result": "BUILD SUCCEEDED"
+    },
+    {
+      "name": "source_cleanliness",
+      "status": "passed",
+      "result": "git diff --check produced no errors before implementation commit"
+    }
+  ],
+  "parity": {
+    "visual": "passed",
+    "content_data": "passed",
+    "behavior": "passed",
+    "unresolved_product_surface_mismatches": []
+  },
+  "release": {
+    "testflight_uploaded": false,
+    "production_mutated": false,
+    "other_priority_pages_migrated": false
+  }
+}
