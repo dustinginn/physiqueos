@@ -1,6 +1,6 @@
 # PhysiqueOS Training Evidence — Founder review
 
-Status: **exploration ready for Founder review; implementation not started**
+Status: **accepted and locked; implementation not started**
 
 This disposable design harness translates the complete Build 85 Training Evidence hierarchy into the locked PhysiqueOS visual language. It is a styling proposal, not an information-architecture or data redesign. Every key product screen is rendered in dark and mineral-light with identical content and geometry.
 
@@ -9,6 +9,8 @@ This disposable design harness translates the complete Build 85 Training Evidenc
 - [Review index](comparison-board.html)
 - [Coverage board — dark](screens/training-evidence-coverage-board.png)
 - [Coverage board — mineral light](screens/training-evidence-coverage-board-light.png)
+- [Focused Training Areas — all 10, dark](screens/training-areas-all-10.png)
+- [Focused Training Areas — all 10, mineral light](screens/training-areas-all-10-light.png)
 - `training-evidence-board.html` and `training-evidence-board.html?theme=light` for inspectable full-resolution boards
 
 ## Review documents
@@ -50,3 +52,7 @@ Dark files use the listed name; mineral-light adds `-light` before `.png`.
 - Shipping Native UI, Server behavior, evidence contracts, HealthKit semantics, canonical exercise identity, record semantics, navigation, and historical data: unchanged
 
 Watch, Live Activity / Dynamic Island, and Logger remain locked. This package does not reopen or modify those families.
+
+## Founder lock clarification
+
+Training Areas preserves the exact current-production list, order, identities, and counts: Chest (7), Back (4), Shoulders (8), Biceps (3), Triceps (3), Core (3), Quads (18), Hamstrings (4), Glutes (3), Calves (1). The compact two-column treatment never buckets, merges, prioritizes, paginates, or hides any area.

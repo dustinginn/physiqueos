@@ -14,7 +14,7 @@ Legend: **Direct** = its own rendered mock; **Template** = explicitly maps to a 
 | Latest day collapsed | `latestTrainingDayCard` | Day label, summary, View Training Day | Root → Day | Selective contained section | T1 | Yes |
 | Latest day expanded | `latestTrainingDayCard` | Session previews with value/detail/date | Root → Session | Same section, divided read-only rows | Template T1 | Yes |
 | Latest day empty | `latestTrainingDayCard` | Upload/enter workout guidance | Root | Open empty copy, no invented CTA | Template T12 | Yes |
-| Training Areas grid | `trainingAreasCard` | 10 canonical areas, exercise counts | Root → area / library root | Compact 2-column analytical rows | T1 | Yes |
+| Training Areas grid | `trainingAreasCard` | All 10 canonical areas in exact live order/counts: Chest 7, Back 4, Shoulders 8, Biceps 3, Triceps 3, Core 3, Quads 18, Hamstrings 4, Glutes 3, Calves 1 | Root → area / library root | Compact 2-column analytical rows; no bucketing, merging, prioritization, pagination, or hidden areas | T1 + focused dark/light proof | Yes |
 | Reporting collapsed/expanded | `reportingCard` | Six current route labels/details | Root → report | One disclosure with open divided links | Template T1 | Yes |
 | Recent History preview | `recentHistoryCard` | Most recent day + summary | Root → Day / sheet | Open date row, strong date hierarchy | T1 | Yes |
 | Recent History Show All sheet | `TrainingHistorySheet` | All chronological days newest-first | Sheet → Day | Mixed Strength/Cardio open list | T2 | Yes |

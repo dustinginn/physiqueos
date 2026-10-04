@@ -1,7 +1,7 @@
 # Training Evidence UI style translation — complete
 
 Date: 2026-10-04 15:40 UTC
-Status: **review artifacts ready; Training Evidence remains exploration; implementation not started**
+Status: **accepted and locked with the all-10 Training Areas clarification; implementation not started**
 
 ## Authority
 
@@ -23,6 +23,8 @@ The translation is intentionally conservative:
 - HealthKit provenance and confirmed/candidate reconciliation language remain explicit;
 - Session Volume and Reps-at-Load retain normalized current-record semantics and canonical exercise identity;
 - no chart was invented. Build 85 Training Evidence currently renders no chart; four reporting routes intentionally remain the shared Foundation placeholder.
+
+Founder lock clarification: the Training Areas section renders all 10 live-app areas in exact order and count — Chest 7, Back 4, Shoulders 8, Biceps 3, Triceps 3, Core 3, Quads 18, Hamstrings 4, Glutes 3, Calves 1. The focused dark/mineral-light proof is `screens/training-areas-all-10.png` and `screens/training-areas-all-10-light.png`. No area is bucketed, merged, prioritized, paginated, or hidden.
 
 ## Complete current hierarchy audited
 

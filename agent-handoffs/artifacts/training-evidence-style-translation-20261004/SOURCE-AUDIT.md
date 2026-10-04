@@ -18,7 +18,7 @@ Order is fixed: Evidence Report header → scope selector → Latest Training Da
 
 - Scope options are goal/phase-aware and re-fetch data. Default is `All Training` / `Complete history`.
 - Latest day has an inline disclosure and separate `View Training Day →` navigation action.
-- Training Areas are the 10 canonical muscle groups, with counts.
+- Training Areas are all 10 canonical muscle groups in this exact production order with exact fixture counts: Chest (7), Back (4), Shoulders (8), Biceps (3), Triceps (3), Core (3), Quads (18), Hamstrings (4), Glutes (3), Calves (1). Founder lock forbids bucketing, merging, prioritizing, paginating, or hiding any of them.
 - Reporting has exactly six routes: resistance, cardio, volume, frequency, consistency, history.
 - Recent History shows one day and a Show All sheet; rows are newest-first.
 - Current Protocol is an inline disclosure.

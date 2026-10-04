@@ -29,6 +29,7 @@ const validation = {
 };
 
 const phoneTextByTheme = {};
+const areaLabelsByTheme = {};
 for (const theme of ['dark', 'light']) {
   const suffix = theme === 'light' ? '-light' : '';
   const page = await browser.newPage({ viewport: { width: 1560, height: 1100 }, deviceScaleFactor: 1 });
@@ -47,10 +48,16 @@ for (const theme of ['dark', 'light']) {
         phoneOverflow: phone.scrollWidth > phone.clientWidth + 1,
         hasPhone: Boolean(phone),
         text: phone?.innerText.replace(/\s+/g, ' ').trim() ?? '',
+        areaLabels: node.dataset.screen === 'T1'
+          ? [...node.querySelectorAll('.tile-grid .tile-label')].map(label => label.textContent.trim())
+          : node.dataset.screen === 'T16'
+            ? [...node.querySelectorAll('.section.open .row-label')].slice(0, 10).map(label => label.textContent.trim())
+            : [],
       };
     }),
   }));
   phoneTextByTheme[theme] = Object.fromEntries(state.cards.map(card => [card.id, card.text]));
+  areaLabelsByTheme[theme] = Object.fromEntries(state.cards.map(card => [card.id, card.areaLabels]));
   const missing = expected.filter(id => !state.ids.includes(id));
   const extra = state.ids.filter(id => !expected.includes(id));
   const overflow = state.cards.filter(card => card.stageOverflow || card.phoneOverflow).map(card => card.id);
@@ -76,7 +83,9 @@ for (const theme of ['dark', 'light']) {
     await detail.evaluate(screenId => {
       for (const node of document.querySelectorAll('[data-screen]')) node.hidden = node.dataset.screen !== screenId;
     }, id);
-    await detail.locator(`[data-screen="${id}"] .phone`).screenshot({ path: path.join(screensDir, `training-evidence-${id.toLowerCase()}${suffix}.png`) });
+    const phone = detail.locator(`[data-screen="${id}"] .phone`);
+    await phone.screenshot({ path: path.join(screensDir, `training-evidence-${id.toLowerCase()}${suffix}.png`) });
+    if (id === 'T1') await phone.screenshot({ path: path.join(screensDir, `training-areas-all-10${suffix}.png`) });
   }
   await detail.close();
 }
@@ -84,6 +93,18 @@ for (const theme of ['dark', 'light']) {
 const parityMismatches = expected.filter(id => phoneTextByTheme.dark[id] !== phoneTextByTheme.light[id]);
 validation.parity = { checkedScreens: expected.length, textMismatches: parityMismatches, pass: parityMismatches.length === 0 };
 if (!validation.parity.pass) throw new Error(`dark/light text parity failed: ${parityMismatches.join(', ')}`);
+
+const canonicalAreas = ['Chest','Back','Shoulders','Biceps','Triceps','Core','Quads','Hamstrings','Glutes','Calves'];
+validation.trainingAreas = {
+  canonicalOrder: canonicalAreas,
+  darkLanding: areaLabelsByTheme.dark.T1,
+  lightLanding: areaLabelsByTheme.light.T1,
+  darkLibrary: areaLabelsByTheme.dark.T16,
+  lightLibrary: areaLabelsByTheme.light.T16,
+};
+validation.trainingAreas.pass = ['darkLanding','lightLanding','darkLibrary','lightLibrary']
+  .every(key => JSON.stringify(validation.trainingAreas[key]) === JSON.stringify(canonicalAreas));
+if (!validation.trainingAreas.pass) throw new Error(`Training Areas coverage failed: ${JSON.stringify(validation.trainingAreas)}`);
 
 for (const suffix of ['', '-light']) {
   const input = path.join(screensDir, `training-evidence-coverage-board${suffix}.png`);
@@ -100,7 +121,7 @@ await index.evaluate(() => document.fonts.ready);
 await index.screenshot({ path: path.join(screensDir, 'review-index.png'), fullPage: true });
 await index.close();
 
-validation.pass = Object.values(validation.boards).every(item => item.pass) && validation.parity.pass && Object.values(validation.semanticRules).every(value => value === false);
+validation.pass = Object.values(validation.boards).every(item => item.pass) && validation.parity.pass && validation.trainingAreas.pass && Object.values(validation.semanticRules).every(value => value === false);
 await fs.writeFile(path.join(root, 'validation.json'), JSON.stringify(validation, null, 2) + '\n');
 await browser.close();
 console.log(JSON.stringify(validation, null, 2));

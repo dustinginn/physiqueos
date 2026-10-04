@@ -4,7 +4,7 @@
     "native": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
     "build": 85
   },
-  "generatedAt": "2026-10-04T15:39:34.928Z",
+  "generatedAt": "2026-10-04T16:18:56.893Z",
   "boards": {
     "dark": {
       "expectedScreens": 16,
@@ -39,6 +39,69 @@
     "cooldownStyledOrCountedAsCardio": false,
     "performanceRecordSemanticsChanged": false,
     "healthKitProvenanceContractChanged": false
+  },
+  "trainingAreas": {
+    "canonicalOrder": [
+      "Chest",
+      "Back",
+      "Shoulders",
+      "Biceps",
+      "Triceps",
+      "Core",
+      "Quads",
+      "Hamstrings",
+      "Glutes",
+      "Calves"
+    ],
+    "darkLanding": [
+      "Chest",
+      "Back",
+      "Shoulders",
+      "Biceps",
+      "Triceps",
+      "Core",
+      "Quads",
+      "Hamstrings",
+      "Glutes",
+      "Calves"
+    ],
+    "lightLanding": [
+      "Chest",
+      "Back",
+      "Shoulders",
+      "Biceps",
+      "Triceps",
+      "Core",
+      "Quads",
+      "Hamstrings",
+      "Glutes",
+      "Calves"
+    ],
+    "darkLibrary": [
+      "Chest",
+      "Back",
+      "Shoulders",
+      "Biceps",
+      "Triceps",
+      "Core",
+      "Quads",
+      "Hamstrings",
+      "Glutes",
+      "Calves"
+    ],
+    "lightLibrary": [
+      "Chest",
+      "Back",
+      "Shoulders",
+      "Biceps",
+      "Triceps",
+      "Core",
+      "Quads",
+      "Hamstrings",
+      "Glutes",
+      "Calves"
+    ],
+    "pass": true
   },
   "pass": true
 }
