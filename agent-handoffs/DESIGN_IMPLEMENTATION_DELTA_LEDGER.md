@@ -185,6 +185,49 @@ Start/restore a workout containing a timed set. Watch receives and displays the 
 
 Status: OPEN; reverify against implementation authority before patching.
 
+### Apple Watch Workout — phone-started session never records HealthKit / false HEALTH ON
+
+Classification: LIKELY SHIPPING DEFECT + FOUNDER DECISION
+
+Discovery:
+Live workout HealthKit/Watch audit against Build 85 Native `b8ee8690b194cb90086b62816b9a2c8c400dc026`.
+Report: `agent-handoffs/reports/20261004T202256Z-live-workout-healthkit-watch-audit.md`
+
+Current Build 85 behavior:
+The Watch starts its `HKWorkoutSession` only after a Watch `startPreparedWorkout` command on a phone Ready-for-Watch plan is acknowledged (`WatchWorkoutStore.swift:706-718`). A live session started on iPhone reaches the Watch as `.active`. The Watch shows the full workout UI and accepts Complete Set, but never starts HealthKit, and Ready for Watch disappears after the first completed set. Workout Metrics then shows TIME (phone anchors) with Active/Total Calories and Heart Rate as "—". The phone stamps `watchHealthSaveState = nil` because `watchStartedAt == nil`. The Watch header says `IPHONE UNAVAILABLE · HEALTH ON` and the idle text says "Health may continue" without consulting `health.lifecycle`.
+
+Target:
+The locked Watch Metrics design shows real HealthKit metrics and truthful Health status. The original Watch plan required an already-active session to offer Resume Workout on Watch.
+
+Implementation implication:
+For an active/paused session with no live, stored or saved Watch workout, offer "Record with Apple Health" (or auto-start, per Founder decision) and add one idempotent Watch→phone command that stamps `watchStartedAt`, so the finish/Health-save leg runs. Derive the Health status text from the lifecycle. Late-start trusted correlation versus the 120 s policy is a separate Founder decision; do not silently widen trust.
+
+Acceptance:
+A phone-started session, then Watch Record with Apple Health, gives exactly one PhysiqueOS HealthKit workout with HR/energy populating, and finish saves and reports it once. With no session the Watch never claims HEALTH ON. A Watch-started session is unchanged. Test seam: an injectable Watch health controller.
+
+Status: OPEN; awaiting Founder decision (auto vs explicit; late-start correlation).
+
+### Apple Watch Logger — activation refresh disables Complete Set
+
+Classification: LIKELY SHIPPING DEFECT (latency)
+
+Discovery:
+Same audit and report as above.
+
+Current Build 85 behavior:
+Every Watch scene activation, reachability-true transition and activation-complete issues a read-only `refreshProjection` through the single-flight command gate (`WatchWorkoutStore.swift:245-250,458-478,1047-1066`). That sets `isMutationPending`, so Complete Set (`WatchWorkoutViews.swift:463`) is disabled until the phone replies. Phone-originated changes reach the Watch only through `updateApplicationContext`.
+
+Target:
+Complete Set is available as soon as the Watch holds a current, reachable projection. A read-only refresh never blocks set execution.
+
+Implementation implication:
+Separate refresh from the mutation gate, or exclude it from the enablement predicate, or skip redundant activation refreshes. Optionally push phone-originated projections over the message lane while reachable, after timing instrumentation.
+
+Acceptance:
+With a reachable active projection, a display activation does not disable Complete Set. A tap during a refresh is delivered once. A stale race yields one refresh and no lost tap.
+
+Status: OPEN; measure on device before choosing the variant.
+
 ### Evidence Hub — remove Health Metrics placeholder and place Timeline last
 
 Classification: REQUIRED FOR DESIGN IMPLEMENTATION
