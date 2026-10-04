@@ -1,93 +1,157 @@
 import SwiftUI
+import UIKit
 
-/// Shared presentation tokens mirroring the web app's dark theme values
-/// (`src/app/globals.css`, `.dark` block). This is deliberately still not a
-/// design system — only the tokens Home actually needs are ported. Extend
-/// this file, not ad hoc colors in a screen, as later screens need more of
-/// the web's palette.
-enum PhysiqueOSTheme {
-    static let background = Color(hex: 0x080D18)
-    static let surfaceElevated = Color(hex: 0x141F31)
-    /// Web Home's emerald-500 at 9% mixed into surface-elevated.
-    static let trajectorySurface = Color(hex: 0x142D38)
-    static let surfaceMuted = Color(hex: 0x172235)
-    /// `--surface-accent` in the web dark theme — a distinct tinted
-    /// surface for promotional/entry-point cards (e.g. Training Logger).
-    static let surfaceAccent = Color(hex: 0x20264A)
+/// The one device-local appearance choice owned by the iPhone app.
+/// `system` maps to no preferred scheme so iOS changes keep propagating.
+enum AppAppearance: String, CaseIterable, Codable, Identifiable {
+    case system
+    case dark
+    case light
 
-    static let textPrimary = Color(hex: 0xF3F6FB)
-    static let textSecondary = Color(hex: 0xCBD5E1)
-    static let textMuted = Color(hex: 0x9AA8BA)
+    var id: String { rawValue }
 
-    static let divider = Color(hex: 0x94A3B8, opacity: 0.18)
+    var title: String {
+        switch self {
+        case .system: "System"
+        case .dark: "Dark"
+        case .light: "Light"
+        }
+    }
 
-    /// `--primary` in the web dark theme.
-    static let accent = Color(hex: 0x8B8CFF)
-    /// `--confidence` in the web dark theme.
-    static let confidence = Color(hex: 0x4ADE80)
-    static let confidenceTrack = Color(hex: 0x94A3B8, opacity: 0.22)
-    static let destructive = Color(hex: 0xEF4444)
+    var detail: String {
+        switch self {
+        case .system: "Matches this iPhone and changes automatically."
+        case .dark: "Deep navy surfaces with bright semantic accents."
+        case .light: "Mineral Light surfaces with dark readable type."
+        }
+    }
 
-    /// `--chart-1` (success/green).
-    static let chartSuccess = Color(hex: 0x4ADE80)
-    /// `--chart-2` (evidence/blue).
-    static let chartEvidence = Color(hex: 0x60A5FA)
-    /// `--chart-3` (effort/amber).
-    static let chartEffort = Color(hex: 0xFBBF24)
-
-    /// Recovery / Sleep Evidence. Total sleep uses the Recovery stream teal
-    /// (`EvidenceStreamPresentation` "recovery"); stages are also told apart
-    /// by lane position and labels, never by color alone. Awake is a neutral
-    /// slate on purpose — nothing here signals good or bad.
-    static let sleepTotal = Color(hex: 0x5EEAD4)
-    static let sleepDeep = Color(hex: 0x6366F1)
-    static let sleepCore = Color(hex: 0x60A5FA)
-    static let sleepREM = Color(hex: 0xA78BFA)
-    static let sleepAwake = Color(hex: 0xCBD5E1)
-    static let sleepUnspecified = Color(hex: 0x5EEAD4, opacity: 0.7)
-    static let sleepInBed = Color(hex: 0x94A3B8, opacity: 0.16)
-
-    /// Nutrition semantics mirror the current web dark-theme tokens in
-    /// `src/app/globals.css`. Keeping these centralized preserves visual
-    /// continuity across future Native Nutrition surfaces.
-    static let macroProtein = Color(hex: 0xFB7185)
-    static let nutritionCalories = Color(hex: 0x4ADE80)
-    static let macroCarbohydrates = Color(hex: 0xFBBF24)
-    static let macroFat = Color(hex: 0x38BDF8)
-    static let mealBreakfast = Color(hex: 0xFB923C)
-    static let mealLunch = Color(hex: 0x34D399)
-    static let mealDinner = Color(hex: 0xA78BFA)
-    static let mealSnacks = Color(hex: 0xF472B6)
-
-    /// `--chart-marker` in the web dark theme — the DEXA scan marker color
-    /// on the Weight Trend chart, confirmed purple/violet (Tailwind
-    /// violet-400) during this port's chart-parity audit, distinct from
-    /// every ordinary Weight observation color so a DEXA event is never
-    /// confused with a daily weigh-in.
-    static let dexaMarker = Color(hex: 0xA78BFA)
-    /// The Weight Trend line's own fixed color — `WeightReportScreen.jsx`
-    /// passes a literal `color="#0EA5E9"` to its chart component rather
-    /// than a semantic theme token, so this stays a Weight-specific
-    /// constant here too rather than a general-purpose chart token.
-    static let weightTrendLine = Color(hex: 0x0EA5E9)
-
-    /// `--energy-intake` / `--energy-expenditure` in the web dark theme —
-    /// the two fixed series colors `EnergyOverTimeChart`/`EnergyWeeklyChart`
-    /// use (solid amber for intake, blue for estimated expenditure), kept
-    /// as their own named tokens rather than reused from `chartEffort`/
-    /// `chartEvidence` even though the hex values happen to coincide, so a
-    /// reader sees "energy" semantics here, not "effort"/"evidence" ones.
-    static let energyIntake = Color(hex: 0xFBBF24)
-    static let energyExpenditure = Color(hex: 0x60A5FA)
-    /// Monthly Briefing's dedicated Energy Evolution identity. The live
-    /// editorial treatment is cyan rather than the blue used for the
-    /// ordinary estimated-expenditure series.
-    static let monthlyEnergy = Color(hex: 0x22D3EE)
+    var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .dark: .dark
+        case .light: .light
+        }
+    }
 }
 
-/// Semantic color slots mirroring `IconBadge.jsx`'s `colors` map, so icon
-/// badges, status chips, and goal accents all draw from the same named set
-/// instead of screens picking raw colors.
+/// App-level observable preference with injectable persistence for tests.
+/// System removes the key, so fresh install and an explicit reset are equal.
+@MainActor
+@Observable
+final class AppAppearanceStore {
+    static let persistenceKey = "physiqueos.appearance.preference.v1"
+
+    private let defaults: UserDefaults
+    private let key: String
+    private let initialOverride: AppAppearance?
+    private(set) var selection: AppAppearance
+
+    init(
+        defaults: UserDefaults = .standard,
+        key: String = AppAppearanceStore.persistenceKey,
+        initialOverride: AppAppearance? = nil
+    ) {
+        self.defaults = defaults
+        self.key = key
+        self.initialOverride = initialOverride
+        if let initialOverride {
+            selection = initialOverride
+        } else if let rawValue = defaults.string(forKey: key),
+                  let stored = AppAppearance(rawValue: rawValue.lowercased()) {
+            selection = stored
+        } else {
+            selection = .system
+            if defaults.object(forKey: key) != nil {
+                defaults.removeObject(forKey: key)
+            }
+        }
+    }
+
+    var preferredColorScheme: ColorScheme? { selection.preferredColorScheme }
+
+    func select(_ appearance: AppAppearance) {
+        selection = appearance
+        guard initialOverride == nil else { return }
+        if appearance == .system {
+            defaults.removeObject(forKey: key)
+        } else {
+            defaults.set(appearance.rawValue, forKey: key)
+        }
+    }
+
+    /// Deterministic cleanup seam; shipping Settings uses `select(.system)`.
+    func resetForTesting() {
+        defaults.removeObject(forKey: key)
+        selection = initialOverride ?? .system
+    }
+}
+
+/// Shared semantic product tokens. Dark preserves the current shipping
+/// baseline; light uses the locked Mineral Light palette. Dynamic UIKit
+/// providers migrate existing token-based screens without per-screen flags.
+enum PhysiqueOSTheme {
+    static let background = dynamic(dark: 0x080D18, light: 0xF0EEE6)
+    static let surfaceElevated = dynamic(dark: 0x141F31, light: 0xFBFAF6)
+    static let trajectorySurface = dynamic(dark: 0x142D38, light: 0xDCEBE8)
+    static let surfaceMuted = dynamic(dark: 0x172235, light: 0xE5EBE7)
+    static let surfaceAccent = dynamic(dark: 0x20264A, light: 0xDDE8F1)
+
+    static let textPrimary = dynamic(dark: 0xF3F6FB, light: 0x0A1B2C)
+    static let textSecondary = dynamic(dark: 0xCBD5E1, light: 0x495E68)
+    static let textMuted = dynamic(dark: 0x9AA8BA, light: 0x65767D)
+    static let divider = dynamic(dark: 0x94A3B8, light: 0xCAD4CF, darkOpacity: 0.18)
+
+    static let accent = dynamic(dark: 0x8B8CFF, light: 0x7655DC)
+    static let confidence = dynamic(dark: 0x4ADE80, light: 0x138C60)
+    static let confidenceTrack = dynamic(dark: 0x94A3B8, light: 0xBFCBC7, darkOpacity: 0.22)
+    static let destructive = dynamic(dark: 0xEF4444, light: 0xB42345)
+
+    static let chartSuccess = dynamic(dark: 0x4ADE80, light: 0x138C60)
+    static let chartEvidence = dynamic(dark: 0x60A5FA, light: 0x167BA8)
+    static let chartEffort = dynamic(dark: 0xFBBF24, light: 0xB9780D)
+
+    static let sleepTotal = dynamic(dark: 0x5EEAD4, light: 0x0E9186)
+    static let sleepDeep = dynamic(dark: 0x6366F1, light: 0x4F46B8)
+    static let sleepCore = dynamic(dark: 0x60A5FA, light: 0x167BA8)
+    static let sleepREM = dynamic(dark: 0xA78BFA, light: 0x7655DC)
+    static let sleepAwake = dynamic(dark: 0xCBD5E1, light: 0x65767D)
+    static let sleepUnspecified = dynamic(dark: 0x5EEAD4, light: 0x0E9186, darkOpacity: 0.7, lightOpacity: 0.72)
+    static let sleepInBed = dynamic(dark: 0x94A3B8, light: 0xCAD4CF, darkOpacity: 0.16, lightOpacity: 0.72)
+
+    static let macroProtein = dynamic(dark: 0xFB7185, light: 0xB83E5B)
+    static let nutritionCalories = dynamic(dark: 0x4ADE80, light: 0x138C60)
+    static let macroCarbohydrates = dynamic(dark: 0xFBBF24, light: 0xB9780D)
+    static let macroFat = dynamic(dark: 0x38BDF8, light: 0x167BA8)
+    static let mealBreakfast = dynamic(dark: 0xFB923C, light: 0xB65E16)
+    static let mealLunch = dynamic(dark: 0x34D399, light: 0x138C60)
+    static let mealDinner = dynamic(dark: 0xA78BFA, light: 0x7655DC)
+    static let mealSnacks = dynamic(dark: 0xF472B6, light: 0xA83B78)
+
+    static let dexaMarker = dynamic(dark: 0xA78BFA, light: 0x7655DC)
+    static let weightTrendLine = dynamic(dark: 0x0EA5E9, light: 0x167BA8)
+    static let energyIntake = dynamic(dark: 0xFBBF24, light: 0xB9780D)
+    static let energyExpenditure = dynamic(dark: 0x60A5FA, light: 0x167BA8)
+    static let monthlyEnergy = dynamic(dark: 0x22D3EE, light: 0x168D9D)
+
+    /// Intentional fixed dark action surface for white-label controls in
+    /// both appearances; this is distinct from the dynamic page canvas.
+    static let actionDark = Color(hex: 0x06121D)
+
+    private static func dynamic(
+        dark: UInt32,
+        light: UInt32,
+        darkOpacity: Double = 1,
+        lightOpacity: Double = 1
+    ) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(hex: dark, opacity: darkOpacity)
+                : UIColor(hex: light, opacity: lightOpacity)
+        })
+    }
+}
+
 enum HomeColorToken: String, Codable {
     case primary, success, evidence, effort, warning, danger, muted, surface, plain
 
@@ -130,6 +194,17 @@ extension Color {
             green: Double((hex >> 8) & 0xFF) / 255,
             blue: Double(hex & 0xFF) / 255,
             opacity: opacity
+        )
+    }
+}
+
+private extension UIColor {
+    convenience init(hex: UInt32, opacity: Double = 1) {
+        self.init(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: opacity
         )
     }
 }

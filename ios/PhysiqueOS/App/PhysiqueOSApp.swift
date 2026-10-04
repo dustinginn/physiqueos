@@ -10,24 +10,23 @@ import UserNotifications
 @main
 struct PhysiqueOSApp: App {
     @State private var environment: AppEnvironment
+    @State private var appearance: AppAppearanceStore
     @State private var notificationDelegate: PriorityNotificationDelegate
     @State private var workoutLiveActivity: WorkoutLiveActivityBridge
     @State private var homeWidget: HomeWidgetBridge
     @State private var watchWorkoutConnectivity: PhoneWatchWorkoutConnectivityBridge
     @Environment(\.scenePhase) private var scenePhase
 
-    /// Shipping remains on the accepted Build 85 dark baseline. The only
-    /// light override is a DEBUG launch seam used to capture the locked
-    /// Mineral Light Foam Rolling pilot in Simulator; this is not Settings,
-    /// persistence, or an app-wide appearance implementation.
-    private var preferredRootColorScheme: ColorScheme {
+    /// Preserves the accepted Foam Rolling pilot's original DEBUG capture
+    /// seam without persisting it as the Founder's real preference.
+    private static var debugAppearanceOverride: AppAppearance? {
 #if DEBUG
-        if FoamRollingPriorityPilotLaunchConfiguration.isEnabled,
-           FoamRollingPriorityPilotLaunchConfiguration.appearance == "light" {
-            return .light
+        if FoamRollingPriorityPilotLaunchConfiguration.isEnabled {
+            return FoamRollingPriorityPilotLaunchConfiguration.appearance
+                .flatMap(AppAppearance.init(rawValue:))
         }
 #endif
-        return .dark
+        return nil
     }
 
     init() {
@@ -37,10 +36,12 @@ struct PhysiqueOSApp: App {
         // specialized command before dispatch. Establish the response path
         // before SwiftUI creates the first scene.
         let environment = AppEnvironment(healthKitFeatureGate: .n1Automatic)
+        let appearance = AppAppearanceStore(initialOverride: Self.debugAppearanceOverride)
         let notificationDelegate = PriorityNotificationDelegate(environment: environment)
         UNUserNotificationCenter.current().delegate = notificationDelegate
         PriorityNotificationCategoryRegistrar.registerCategories()
         _environment = State(initialValue: environment)
+        _appearance = State(initialValue: appearance)
         _notificationDelegate = State(initialValue: notificationDelegate)
         // The Live Activity's Complete Set intent runs in this process, and a
         // background launch to run it still constructs the App, so the
@@ -97,15 +98,11 @@ struct PhysiqueOSApp: App {
         WindowGroup {
             RootTabView()
                 .environment(environment)
-                // PhysiqueOS's accepted native visual baseline is the web
-                // app's dark theme (`.dark` in globals.css) — not merely
-                // this app's own dark colors, but the OS-level appearance
-                // system controls (DatePicker, keyboards, share sheets,
-                // alerts) also render against. Without this, those
-                // system-provided controls follow the simulator/device's
-                // own light/dark setting instead, mismatching every
-                // custom-drawn view.
-                .preferredColorScheme(preferredRootColorScheme)
+                .environment(appearance)
+                // nil for System is essential: it lets an iOS appearance
+                // change propagate live. Explicit choices also govern
+                // system controls, sheets, alerts, keyboards and forms.
+                .preferredColorScheme(appearance.preferredColorScheme)
                 .task {
                     // Idempotent defensive refresh. The action-response path
                     // is already live from init; this is not its authority.

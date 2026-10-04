@@ -300,4 +300,88 @@ final class SharedUITests: XCTestCase {
         utc.timeZone = TimeZone(identifier: "UTC")!
         XCTAssertEqual(HomeGreeting.text(for: tenPMPacific, calendar: utc), "Good morning,")
     }
+
+    // MARK: - Global appearance preference and semantic palette
+
+    @MainActor
+    func testAppearanceFreshInstallDefaultsToSystemWithoutPersistingAValue() throws {
+        let defaults = try appearanceDefaults()
+        let store = AppAppearanceStore(defaults: defaults)
+        XCTAssertEqual(store.selection, .system)
+        XCTAssertNil(store.preferredColorScheme)
+        XCTAssertNil(defaults.object(forKey: AppAppearanceStore.persistenceKey))
+    }
+
+    @MainActor
+    func testExplicitAppearancePersistsAndSystemClearsTheOverride() throws {
+        let defaults = try appearanceDefaults()
+        let store = AppAppearanceStore(defaults: defaults)
+        store.select(.dark)
+        XCTAssertEqual(AppAppearanceStore(defaults: defaults).selection, .dark)
+        XCTAssertEqual(defaults.string(forKey: AppAppearanceStore.persistenceKey), "dark")
+
+        store.select(.light)
+        XCTAssertEqual(AppAppearanceStore(defaults: defaults).selection, .light)
+        XCTAssertEqual(defaults.string(forKey: AppAppearanceStore.persistenceKey), "light")
+
+        store.select(.system)
+        XCTAssertNil(AppAppearanceStore(defaults: defaults).preferredColorScheme)
+        XCTAssertNil(defaults.object(forKey: AppAppearanceStore.persistenceKey))
+    }
+
+    @MainActor
+    func testInvalidAppearanceFallsBackSafelyAndResetIsDeterministic() throws {
+        let defaults = try appearanceDefaults()
+        defaults.set("legacy-sepia", forKey: AppAppearanceStore.persistenceKey)
+        let store = AppAppearanceStore(defaults: defaults)
+        XCTAssertEqual(store.selection, .system)
+        XCTAssertNil(defaults.object(forKey: AppAppearanceStore.persistenceKey))
+        store.select(.dark)
+        store.resetForTesting()
+        XCTAssertEqual(store.selection, .system)
+        XCTAssertNil(defaults.object(forKey: AppAppearanceStore.persistenceKey))
+    }
+
+    @MainActor
+    func testAppearanceSchemeMappingKeepsSystemUnforced() {
+        XCTAssertNil(AppAppearance.system.preferredColorScheme)
+        XCTAssertEqual(AppAppearance.dark.preferredColorScheme, .dark)
+        XCTAssertEqual(AppAppearance.light.preferredColorScheme, .light)
+    }
+
+    func testLockedDarkAndMineralLightCoreContrast() {
+        for style: UIUserInterfaceStyle in [.dark, .light] {
+            let traits = UITraitCollection(userInterfaceStyle: style)
+            let background = UIColor(PhysiqueOSTheme.background).resolvedColor(with: traits)
+            let surface = UIColor(PhysiqueOSTheme.surfaceElevated).resolvedColor(with: traits)
+            let primary = UIColor(PhysiqueOSTheme.textPrimary).resolvedColor(with: traits)
+            let secondary = UIColor(PhysiqueOSTheme.textSecondary).resolvedColor(with: traits)
+            XCTAssertGreaterThanOrEqual(Self.contrast(primary, background), 7.0)
+            XCTAssertGreaterThanOrEqual(Self.contrast(primary, surface), 7.0)
+            XCTAssertGreaterThanOrEqual(Self.contrast(secondary, background), 4.5)
+            XCTAssertNotEqual(background, surface)
+        }
+    }
+
+    private func appearanceDefaults() throws -> UserDefaults {
+        let suite = "SharedUITests.appearance.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        return defaults
+    }
+
+    private static func contrast(_ first: UIColor, _ second: UIColor) -> Double {
+        func luminance(_ color: UIColor) -> Double {
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            func channel(_ value: CGFloat) -> Double {
+                let value = Double(value)
+                return value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
+        }
+        let brighter = max(luminance(first), luminance(second))
+        let darker = min(luminance(first), luminance(second))
+        return (brighter + 0.05) / (darker + 0.05)
+    }
 }

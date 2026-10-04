@@ -35,6 +35,20 @@ struct RootTabView: View {
                     occurrenceDate: FoamRollingPriorityPilotLaunchConfiguration.occurrenceDate
                 )
             ]))
+        } else if let review = AppearanceReviewLaunchConfiguration.route {
+            _selectedTab = State(initialValue: review.tab)
+            switch review.tab {
+            case .home:
+                _homePath = State(initialValue: NavigationPath(review.destinations))
+            case .goals:
+                _goalsPath = State(initialValue: NavigationPath(review.destinations))
+            case .log:
+                _logPath = State(initialValue: NavigationPath(review.destinations))
+            case .evidence:
+                _evidencePath = State(initialValue: NavigationPath(review.destinations))
+            case .you:
+                _youPath = State(initialValue: NavigationPath(review.destinations))
+            }
         }
 #endif
     }
@@ -230,6 +244,44 @@ struct RootTabView: View {
         }
     }
 }
+
+#if DEBUG
+/// Screenshot-only navigation seam used to audit the shared appearance
+/// infrastructure against real shipping views. It changes neither content
+/// projection nor behavior and is absent from Release builds.
+private enum AppearanceReviewLaunchConfiguration {
+    struct Route {
+        let tab: AppTab
+        let destinations: [AppDestination]
+    }
+
+    static var route: Route? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-physiqueos.appearance-review.route"),
+              arguments.indices.contains(flag + 1)
+        else {
+            return nil
+        }
+        let value = arguments[flag + 1]
+        return switch value {
+        case "home": Route(tab: .home, destinations: [])
+        case "goals": Route(tab: .goals, destinations: [])
+        case "log": Route(tab: .log, destinations: [])
+        case "evidence": Route(tab: .evidence, destinations: [])
+        case "you": Route(tab: .you, destinations: [])
+        case "appearance": Route(tab: .you, destinations: [.settings, .appearance])
+        case "operating-plan": Route(tab: .you, destinations: [.operatingPlan])
+        case "training-logger": Route(tab: .log, destinations: [.trainingLogger])
+        case "manual-weight": Route(tab: .log, destinations: [.manualWeighIn])
+        case "briefing": Route(
+            tab: .home,
+            destinations: [.briefingDetail(briefingId: "weekly_briefing_2026-08-23_2026-08-29")]
+        )
+        default: nil
+        }
+    }
+}
+#endif
 
 #Preview {
     RootTabView()

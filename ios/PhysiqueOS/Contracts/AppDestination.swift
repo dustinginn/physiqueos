@@ -159,6 +159,10 @@ enum AppDestination: Hashable, Codable {
     /// Native-only controlled proof of the live Founder bearer transport.
     /// This does not claim a current web destination id.
     case founderServerConnection
+    /// Device-local presentation settings only. These narrow routes do not
+    /// claim a Server destination or the deferred account/profile contract.
+    case settings
+    case appearance
 
     /// The server's destination id string, for parity with
     /// `DestinationId` values and for the placeholder screen's display.
@@ -210,6 +214,8 @@ enum AppDestination: Hashable, Codable {
         case .operatingPlanDexaAppointment: "native.operating-plan.dexa-appointment"
         case .operatingPlanTrainingStrategyBuilder: "native.operating-plan.training.new"
         case .founderServerConnection: "native.founder-server-connection"
+        case .settings: "native.settings"
+        case .appearance: "native.settings.appearance"
         }
     }
 }

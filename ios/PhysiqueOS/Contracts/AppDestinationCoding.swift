@@ -196,6 +196,10 @@ extension AppDestination {
             self = .operatingPlanTrainingStrategyBuilder
         case "native.founder-server-connection":
             self = .founderServerConnection
+        case "native.settings":
+            self = .settings
+        case "native.settings.appearance":
+            self = .appearance
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .id, in: container,
@@ -264,6 +268,7 @@ extension AppDestination {
         case .photoUpload, .dexaUpload, .briefingList, .trainingLogger, .manualWeighIn, .evidenceIntake,
              .operatingPlan, .operatingPlanTracking, .operatingPlanSupplementNew,
              .operatingPlanDexaAppointment, .operatingPlanTrainingStrategyBuilder, .founderServerConnection,
+             .settings, .appearance,
              .goalTransition, .goalProtocolTransition, .goalTransitionReview, .goalTransitionSuccess:
             break
         }

@@ -61,7 +61,7 @@ struct PrimaryActionButton: View {
     static func backgroundColor(for tone: Tone) -> Color {
         switch tone {
         case .accent: PhysiqueOSTheme.accent
-        case .dark: PhysiqueOSTheme.background
+        case .dark: PhysiqueOSTheme.actionDark
         }
     }
 }
