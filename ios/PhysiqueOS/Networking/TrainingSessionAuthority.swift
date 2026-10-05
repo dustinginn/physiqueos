@@ -716,6 +716,9 @@ final class TrainingSessionAuthority {
         mutate(sessionId: sessionId, context: context, scope: .content) { draft in
             let (exerciseIndex, setIndex) = try Self.locate(exerciseId: exerciseId, setId: setId, in: draft)
             draft.exercises[exerciseIndex].sets[setIndex][keyPath: field.keyPath] = value
+            // A hand-entered value is the Founder's: contextual guidance
+            // (superset pair/unpair refill) never overwrites this row again.
+            if context.origin == .ui { draft.exercises[exerciseIndex].sets[setIndex].isManuallyEdited = true }
         }
     }
 

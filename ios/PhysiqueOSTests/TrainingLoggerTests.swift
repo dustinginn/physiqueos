@@ -2154,4 +2154,191 @@ final class Build87SupersetHistoryContextTests: XCTestCase {
         XCTAssertEqual(target.loadText?.contains("80"), true, "The Watch shows the superset-context previous load.")
         XCTAssertNotNil(target.supersetLabel)
     }
+
+    // MARK: 2-B contextual row refill (Founder-approved 2026-10-05)
+
+    /// Adds a third exercise with only standalone history (no superset
+    /// history with anyone) and Server contextual recommendations for Leg
+    /// Extensions with Sissy Squats and with Pendulum.
+    private func richCatalog() throws -> [TrainingLoggerCatalogExercise] {
+        var rich = try catalog()
+        let supersetMaintain = TrainingLoggerProgressionRecommendation(
+            state: .maintain, eyebrow: "Maintain current performance", message: "Superset context.",
+            prescription: "80 lb x 15", suggestedLoad: 80, suggestedLoadType: "external_load",
+            suggestedReps: 15, suggestedUnit: "lb"
+        )
+        let pendulumContext = TrainingLoggerProgressionRecommendation(
+            state: .opportunity, eyebrow: "Progression opportunity", message: "Other context.",
+            prescription: "70 lb x 12", suggestedLoad: 70, suggestedLoadType: "external_load",
+            suggestedReps: 12, suggestedUnit: "lb"
+        )
+        rich[0].contextualProgressionRecommendations = [
+            .init(relationshipType: "superset", relationshipKey: "superset|partners:sissy_squat", partnerCanonicalExerciseIds: ["sissy_squat"], recommendation: supersetMaintain),
+            .init(relationshipType: "superset", relationshipKey: "superset|partners:pendulum_squat_machine", partnerCanonicalExerciseIds: ["pendulum_squat_machine"], recommendation: pendulumContext),
+        ]
+        rich.append(TrainingLoggerCatalogExercise(
+            canonicalExerciseId: "pendulum_squat_machine", name: "Pendulum Squat Machine", areaId: "quads", equipment: nil,
+            measurement: .repsLoad, defaultLoadType: nil, previouslyPerformed: true,
+            history: [.init(sessionId: "s-0901", workoutDate: "2026-09-01", executionVariant: nil, relationship: nil,
+                            sets: [.init(setNumber: 1, reps: 11, weight: 55, weightUnit: "lb", durationSeconds: nil)])],
+            progressionRecommendation: nil
+        ))
+        return rich
+    }
+
+    func testPairingRefillsOnlyUntouchedUncompletedRowsFromSupersetHistory() throws {
+        let catalog = try richCatalog()
+        var draft = freshDraft()
+        draft.addExercise(catalog[0])
+        draft.addExercise(catalog[1])
+        draft.addSet(to: draft.exercises[0].id)
+        draft.exercises[0].sets[0].isCompleted = true
+        let completed = draft.exercises[0].sets[0]
+        draft.exercises[1].sets[0].reps = 20
+        draft.exercises[1].sets[0].isManuallyEdited = true
+        let edited = draft.exercises[1].sets[0]
+
+        draft.setSuperset(firstId: draft.exercises[0].id, secondId: draft.exercises[1].id, catalog: catalog)
+        XCTAssertEqual(draft.exercises[0].sets[0], completed, "Completed rows never change.")
+        XCTAssertEqual(draft.exercises[0].sets[1].load, 80)
+        XCTAssertEqual(draft.exercises[0].sets[1].reps, 15)
+        XCTAssertEqual(draft.exercises[0].sets[2].load, 80, "Extra rows take the last contextual set.")
+        XCTAssertEqual(draft.exercises[1].sets[0], edited, "Hand-edited rows never change.")
+        XCTAssertEqual(draft.exercises[1].sets[1].load, 50)
+        XCTAssertEqual(draft.exercises[1].sets[1].reps, 12)
+    }
+
+    func testUnpairingRefillsUntouchedRowsFromStandaloneHistory() throws {
+        let catalog = try richCatalog()
+        var draft = freshDraft()
+        draft.addExercise(catalog[0])
+        draft.addExercise(catalog[1])
+        let legExtension = draft.exercises[0].id
+        draft.setSuperset(firstId: legExtension, secondId: draft.exercises[1].id, catalog: catalog)
+        draft.exercises[0].sets[0].isCompleted = true
+        draft.removeSuperset(containing: legExtension, catalog: catalog)
+        XCTAssertEqual(draft.exercises[0].sets[0].load, 80, "The completed superset row stays as performed.")
+        XCTAssertEqual(draft.exercises[0].sets[1].load, 90)
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.workoutDate, "2026-09-28")
+        XCTAssertEqual(draft.exercises[1].sets[0].reps, 13, "Sissy returns to its standalone 08-25 history.")
+        XCTAssertEqual(draft.exercises[1].previousPerformance?.contextLabel, "Ordinary · Standalone")
+    }
+
+    func testPairingWithNoContextualHistoryKeepsCurrentValuesAndClaimsNoPrevious() throws {
+        let catalog = try richCatalog()
+        var draft = freshDraft()
+        draft.addExercise(catalog[0])
+        draft.addExercise(catalog[2])
+        let before = draft.exercises.map(\.sets)
+        draft.setSuperset(firstId: draft.exercises[0].id, secondId: draft.exercises[1].id, catalog: catalog)
+        XCTAssertEqual(draft.exercises.map(\.sets), before, "No history in the new context: values are kept, never cleared.")
+        XCTAssertNil(draft.exercises[0].previousPerformance, "Previous never borrows another context's history.")
+        XCTAssertNil(draft.exercises[1].previousPerformance)
+        XCTAssertNil(draft.exercises[0].progressionRecommendation,
+                     "Without contextual history there is no Suggested/Maintain claim (even if a recommendation exists).")
+    }
+
+    func testRePairingRecomputesEveryAffectedMemberAndLeavesNoStaleContext() throws {
+        let catalog = try richCatalog()
+        var draft = freshDraft()
+        draft.addExercise(catalog[0])
+        draft.addExercise(catalog[1])
+        draft.addExercise(catalog[2])
+        let legExtension = draft.exercises[0].id
+        let sissy = draft.exercises[1].id
+        let pendulum = draft.exercises[2].id
+        draft.setSuperset(firstId: legExtension, secondId: sissy, catalog: catalog)
+        XCTAssertEqual(draft.exercises[0].progressionRecommendation?.suggestedLoad, 80)
+
+        draft.setSuperset(firstId: legExtension, secondId: pendulum, catalog: catalog)
+        XCTAssertEqual(draft.relationshipContext(for: legExtension)?.partnerCanonicalExerciseIds, ["pendulum_squat_machine"])
+        XCTAssertNil(draft.exercises[0].previousPerformance, "No stale 09-14 Sissy-context Previous.")
+        XCTAssertNil(draft.exercises[0].progressionRecommendation, "The Sissy-context recommendation never survives re-pairing.")
+        XCTAssertEqual(draft.exercises[0].sets[0].load, 80, "No pendulum-context history: current values kept.")
+        XCTAssertNil(draft.relationshipContext(for: sissy), "The former partner is standalone again.")
+        XCTAssertEqual(draft.exercises[1].previousPerformance?.workoutDate, "2026-08-25")
+        XCTAssertEqual(draft.exercises[1].sets[0].reps, 13, "The former partner refilled from standalone history.")
+    }
+
+    func testReorderingExercisesKeepsTheSameContextAndRows() throws {
+        let catalog = try richCatalog()
+        var draft = freshDraft()
+        draft.addExercise(catalog[0])
+        draft.addExercise(catalog[1])
+        draft.setSuperset(firstId: draft.exercises[0].id, secondId: draft.exercises[1].id, catalog: catalog)
+        let before = draft.exercises
+        draft.moveExercise(id: draft.exercises[0].id, offset: 1)
+        XCTAssertEqual(draft.exercises.map(\.id), before.reversed().map(\.id))
+        XCTAssertEqual(draft.exercises.first { $0.id == before[0].id }, before[0], "Partner identity is order-free: nothing recomputes.")
+    }
+
+    // MARK: 2-C Server contextual recommendation selection
+
+    func testOnlyTheRecommendationForTheCurrentGroupingIsSelectedAndUnpairRestoresStandalone() throws {
+        let catalog = try richCatalog()
+        var draft = freshDraft()
+        draft.addExercise(catalog[0])
+        draft.addExercise(catalog[1])
+        let legExtension = draft.exercises[0].id
+        XCTAssertEqual(draft.exercises[0].progressionRecommendation?.suggestedLoad, 90, "Standalone Server recommendation.")
+        draft.setSuperset(firstId: legExtension, secondId: draft.exercises[1].id, catalog: catalog)
+        XCTAssertEqual(draft.exercises[0].progressionRecommendation?.message, "Superset context.")
+        XCTAssertEqual(draft.exercises[0].progressionChoice, .previous)
+        XCTAssertNil(draft.exercises[1].progressionRecommendation, "Sissy has no Server contextual recommendation: no claim.")
+        draft.removeSuperset(containing: legExtension, catalog: catalog)
+        XCTAssertEqual(draft.exercises[0].progressionRecommendation?.suggestedLoad, 90)
+    }
+
+    func testAManualEditThroughTheAuthorityProtectsTheRowFromContextualRefill() throws {
+        let catalog = try richCatalog()
+        var initial = freshDraft()
+        initial.id = "session-edit"
+        initial.addExercise(catalog[0])
+        initial.addExercise(catalog[1])
+        let store = Build83FinishLifecycleTests.Store([initial])
+        let authority = TrainingSessionAuthority(
+            store: store, environment: .founderProduction,
+            restPreferences: FixedTrainingRestPreferences(nil),
+            terminalLedger: MemoryTrainingSessionTerminalLedgerStore(),
+            now: { Date(timeIntervalSince1970: 1_790_000_000) }
+        )
+        let legExtension = initial.exercises[0].id
+        let firstSet = initial.exercises[0].sets[0].id
+        XCTAssertTrue(authority.setValue(sessionId: "session-edit", exerciseId: legExtension, setId: firstSet, field: .load, value: 100).isAccepted)
+        _ = authority.edit(sessionId: "session-edit") { $0.setSuperset(firstId: legExtension, secondId: initial.exercises[1].id, catalog: catalog) }
+        let draft = try XCTUnwrap(authority.draft(id: "session-edit"))
+        XCTAssertEqual(draft.exercises[0].sets[0].load, 100)
+        XCTAssertEqual(draft.exercises[0].sets[0].isManuallyEdited, true)
+        XCTAssertEqual(draft.exercises[0].sets[1].load, 80)
+    }
+
+    func testTheWatchProjectionShowsTheAppliedContextualSuggestion() throws {
+        let catalog = try richCatalog()
+        var initial = freshDraft()
+        initial.id = "session-watch-2c"
+        initial.addExercise(catalog[0])
+        initial.addExercise(catalog[1])
+        let store = Build83FinishLifecycleTests.Store([initial])
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let authority = TrainingSessionAuthority(
+            store: store, environment: .founderProduction,
+            restPreferences: FixedTrainingRestPreferences(nil),
+            terminalLedger: MemoryTrainingSessionTerminalLedgerStore(),
+            now: { now }
+        )
+        let legExtension = initial.exercises[0].id
+        _ = authority.edit(sessionId: "session-watch-2c") { $0.setSuperset(firstId: legExtension, secondId: initial.exercises[1].id, catalog: catalog) }
+        let paired = try XCTUnwrap(authority.draft(id: "session-watch-2c"))
+        let refreshed = try XCTUnwrap(WatchWorkoutProjection.make(draft: paired, authority: authority, now: now))
+        XCTAssertEqual(refreshed.rows.first { $0.isCompletionTarget }?.loadText?.contains("80"), true,
+                       "Pairing alone already refreshes the Watch through the authority revision.")
+        _ = authority.edit(sessionId: "session-watch-2c") { $0.applyProgressionSuggestion(to: legExtension) }
+        let applied = try XCTUnwrap(authority.draft(id: "session-watch-2c"))
+        XCTAssertEqual(applied.exercises[0].progressionChoice, .suggestion)
+        let projection = try XCTUnwrap(WatchWorkoutProjection.make(draft: applied, authority: authority, now: now))
+        let target = try XCTUnwrap(projection.rows.first { $0.isCompletionTarget })
+        XCTAssertEqual(target.repsText, "15")
+        XCTAssertEqual(target.loadText?.contains("80"), true)
+        XCTAssertGreaterThan(applied.currentRevision, paired.currentRevision)
+    }
 }

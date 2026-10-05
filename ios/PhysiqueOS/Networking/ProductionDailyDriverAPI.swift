@@ -1573,6 +1573,12 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                 ($0.canonicalExerciseId, $0.recommendation)
             }
         )
+        // Additive Server contract; an older Server omits it (nil -> no
+        // superset Suggested/Maintain), and a malformed entry is dropped alone.
+        let contextual = Dictionary(
+            grouping: (payload.contextualProgressionRecommendations ?? []).compactMap(\.value),
+            by: \.canonicalExerciseId
+        )
         return TrainingLoggerConfiguration(
             areas: catalog.areas.map { TrainingLoggerArea(id: $0.id, label: $0.label) },
             variants: [],
@@ -1588,7 +1594,8 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                         previouslyPerformed: payload.initialPerformedExerciseIds.contains(exercise.canonicalExerciseId),
                         inMyLibrary: payload.initialMyLibraryExerciseIds.contains(exercise.canonicalExerciseId),
                         history: Self.history(for: exercise.canonicalExerciseId, defaultLoadType: exercise.defaultLoadType, in: history),
-                        progressionRecommendation: recommendations[exercise.canonicalExerciseId]
+                        progressionRecommendation: recommendations[exercise.canonicalExerciseId],
+                        contextualProgressionRecommendations: contextual[exercise.canonicalExerciseId]?.map(\.contextual)
                     )
                 }
             },
@@ -1631,6 +1638,7 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         var initialPerformedExerciseIds: [String]
         var initialMyLibraryExerciseIds: [String]
         var initialProgressionRecommendations: [RawRecommendation]?
+        var contextualProgressionRecommendations: [FailableContextualRecommendation]?
         var initialCategorySuggestion: TrainingLoggerCategorySuggestion?
     }
 
@@ -1724,6 +1732,42 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
             )
         }
     }
+    struct RawContextualRecommendation: Decodable {
+        struct Relationship: Decodable {
+            var relationshipType: String
+            var relationshipKey: String?
+            var partnerCanonicalExerciseIds: [String]
+        }
+        var canonicalExerciseId: String
+        var relationship: Relationship
+        var state: TrainingLoggerProgressionState
+        var eyebrow: String
+        var message: String
+        var prescription: String
+        var suggestedLoad: Double?
+        var suggestedLoadType: String?
+        var suggestedReps: Double?
+        var suggestedUnit: String?
+
+        var contextual: TrainingLoggerContextualProgressionRecommendation {
+            .init(
+                relationshipType: relationship.relationshipType,
+                relationshipKey: relationship.relationshipKey,
+                partnerCanonicalExerciseIds: relationship.partnerCanonicalExerciseIds,
+                recommendation: .init(
+                    state: state, eyebrow: eyebrow, message: message, prescription: prescription,
+                    suggestedLoad: suggestedLoad, suggestedLoadType: suggestedLoadType,
+                    suggestedReps: suggestedReps, suggestedUnit: suggestedUnit
+                )
+            )
+        }
+    }
+
+    struct FailableContextualRecommendation: Decodable {
+        let value: RawContextualRecommendation?
+        init(from decoder: Decoder) throws { value = try? RawContextualRecommendation(from: decoder) }
+    }
+
     fileprivate struct RawExercise: Decodable {
         var id: String; var name: String; var equipment: String?
         var bodyRegion: String?; var primaryMuscleGroups: [String]
