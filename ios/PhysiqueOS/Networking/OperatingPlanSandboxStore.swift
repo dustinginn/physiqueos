@@ -33,6 +33,11 @@ final class OperatingPlanSandboxStore {
     private var peptideNextDueBeforePause: [String: (nextDue: String?, date: String?, time: String?)] = [:]
     private let goalOptions: [OperatingPlanGoalLinkReadModel]
     private let goalTitle: String
+    /// The device-local date key that dates peptide timeline composition
+    /// and pause/resume history. Every real call site uses the device
+    /// clock; tests pin it so fixture-relative assertions stay
+    /// deterministic as the calendar advances.
+    private let peptideToday: () -> String
 
     /// Test-only seam: the fixture always ships with an active Training
     /// strategy (matching the current Founder's real state), so this is
@@ -40,7 +45,12 @@ final class OperatingPlanSandboxStore {
     /// `/profile/operating-plan/training/new` page's own
     /// `if (context.activeProtocol) redirect(...)` guard exists for.
     /// Defaults to `false` for every real call site.
-    init(bundle: Bundle = .main, startWithoutActiveTrainingProtocol: Bool = false) {
+    init(
+        bundle: Bundle = .main,
+        startWithoutActiveTrainingProtocol: Bool = false,
+        peptideToday: @escaping () -> String = OperatingPlanSandboxStore.todayDateKey
+    ) {
+        self.peptideToday = peptideToday
         guard let url = bundle.url(forResource: "OperatingPlanFixture", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let fixture = try? JSONDecoder().decode(OperatingPlanFixtureFile.self, from: data)
@@ -358,7 +368,7 @@ final class OperatingPlanSandboxStore {
         }
         var saved = model
         let existing = peptideExecutions[model.protocolId]
-        let today = Self.todayDateKey()
+        let today = peptideToday()
         // S1 parity: phases before the strategy's start are kept, the one
         // containing it is closed the day before, and the generated phases
         // follow — the sandbox never rewrites dated history either.
@@ -404,7 +414,7 @@ final class OperatingPlanSandboxStore {
         guard var execution = peptideExecutions[protocolId] else { return }
         var lifecycle = execution.lifecycle ?? PeptideLifecycleReadModel(state: "active")
         guard lifecycle.isPaused != paused else { return }
-        let today = Self.todayDateKey()
+        let today = peptideToday()
         let at = ISO8601DateFormatter().string(from: Date())
         if paused {
             lifecycle.state = "paused"

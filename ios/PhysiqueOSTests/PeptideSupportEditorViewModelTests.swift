@@ -579,7 +579,10 @@ final class PeptideSupportEditorViewModelTests: XCTestCase {
     // MARK: - Sandbox parity
 
     func testSandboxChangeDoseKeepsHistoryAndPauseResumeWorkAgainstTheFixture() async throws {
-        let store = OperatingPlanSandboxStore()
+        // The model and the sandbox store share one pinned day; otherwise the
+        // store stamps the pause with the real date, which reads as a pause
+        // that "starts later" once the calendar passes the pinned day.
+        let store = OperatingPlanSandboxStore(peptideToday: { "2026-09-29" })
         let reconcile = ReconcileCounter()
         let model = PeptideSupportEditorViewModel(
             protocolId: "protocol_fixture_peptide_retatrutide",
