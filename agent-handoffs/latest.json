@@ -1,60 +1,45 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T14:20:39Z",
+  "generated_at_utc": "2026-10-05T15:02:27Z",
   "task": {
-    "id": "redesign-batch3-evidence-20261005",
-    "title": "Redesign Implementation Batch 3 — Evidence family",
-    "agent": "codex",
-    "status": "complete_awaiting_founder_review_and_batch2_integration"
+    "id": "redesign-batch2-finalize-20261005",
+    "title": "Redesign Batch 2 finalization: Server D1 deployed, test baseline cleaned, approved release candidate for Build 88",
+    "agent": "claude",
+    "status": "release_candidate_ready_for_build88_stopped_before_testflight"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "df2d7d504c371e4745453be22e7a37a500f3a239",
-    "implementation_base_sha": "49e48f1eab3bc6ff22ca6c4bc24b3a9955b0fcc7",
-    "build87_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "checkpoint_a_sha": "e48e7757",
-    "checkpoint_b_sha": "e7e3774c",
-    "checkpoint_c_sha": "e56c02e0",
-    "checkpoint_d_sha": "bf4551c4",
-    "checkpoint_e_sha": "d842a76b",
-    "implementation_sha": "d842a76bdb8dad023da4add7104688747d9c1872",
-    "feature_branch_head": "87d77cd7f0a7a78508d743a875d6ad77cdd1cdf4",
-    "batch2_audited_head": "7a9a7caaa582b3e9b3926cb0ed19842c773dc6b3"
+    "finalization_prompt_commit": "d72bd3f7336d1cebc26b67d502672eca6b0bf38f",
+    "founder_acceptance": "Batch 2 checkpoints 1-5 all accepted",
+    "native_base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
+    "native_base_build": 87,
+    "native_prior_integrated_sha": "49733300672c0b52a06a2b3ee5435de49b76fd15",
+    "native_release_candidate_sha": "793462b11ff522f116413c5b081db0ad97954305",
+    "native_gated_sha": "7a9a7caaa582b3e9b3926cb0ed19842c773dc6b3",
+    "recommended_build_number": 88,
+    "server_production_sha": "c7c99347a520d13fd344fe89b6b1398877cdd255",
+    "server_production_deployment": "e7ef3157-8d1f-4e34-aa56-4668681b40bf",
+    "server_previous_production_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
+    "server_d1_deployed": true
   },
   "publication": {
-    "source_work_branch": "codex/redesign-batch3-evidence-20261005",
-    "main_report_commit": "c1ce58fff0dc0c15b97cae62682533a753e6594b",
-    "report_path": "agent-handoffs/reports/20261005T142039Z-redesign-batch3-evidence.md",
-    "artifact_roots": [
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-a-20261005/",
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-b-20261005/",
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-c-20261005/",
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-d-20261005/",
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-e-20261005/"
-    ],
-    "primary_boards": [
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-a-20261005/checkpoint-a-mobile-review-board.png",
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-b-20261005/checkpoint-b-mobile-review-board.png",
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-c-20261005/checkpoint-c-mobile-review-board.png",
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-d-20261005/checkpoint-d-mobile-review-board.png",
-      "agent-handoffs/artifacts/redesign-batch3-checkpoint-e-20261005/checkpoint-e-mobile-review-board.png"
-    ]
+    "source_work_branch": "claude/redesign-batch2-log-logger-20261005",
+    "main_report_commit": "31753600739e6207ab0242f398ebddfe285bb704",
+    "report_path": "agent-handoffs/reports/20261005T150227Z-redesign-batch2-release-candidate.md"
   },
   "result": {
-    "summary": "Founder-locked Evidence family implemented through Checkpoints A-E in Dark and Mineral Light on the Home-corrected Build 87 base. Final gates: 766 relevant unit/contract tests passed, one real Evidence UI journey passed, and Release dependency-graph compile passed with app, Watch app and WidgetKit extension present.",
+    "summary": "Server D1 typed Log provenance deployed and verified (web+worker c7c99347, /ready 9/9, additive contract). Native release candidate 793462b1: Home briefing identity restored (pixel-identical), peptide fixture failure fixed (test clock), acceptance-suite isolation fixed. Unit 2014/0 failures, Watch 47/47, TrainingAcceptanceUITests 16/16, full UI target 36/37 with the 1 intermittent fixed and re-verified, Release compile OK, generator byte-stable. Build 88 unused and recommended.",
     "production_data_mutated": false,
-    "server_changed": false,
-    "deployed": false,
+    "deployed": true,
     "testflight_uploaded": false,
     "build_number_bumped": false
   },
   "decisions_required": [
-    "Founder visual review of the five checkpoint packages",
-    "Deliberate integration of Batch 2 and Batch 3 using the exact one-file conflict map in the report"
+    "Authorize Build 88 bump, archive and TestFlight upload of 793462b1"
   ],
   "blockers": [],
-  "recommended_next_step": "Founder reviews the five mobile boards. After acceptance, integrate the final approved Batch 2 authority first, apply Batch 3 A-D, then manually merge Checkpoint E's generic review shell while preserving Batch 2's complete Workout Match branch.",
-  "stop_reason": "Batch 3 implementation, simulator parity packages, validation and exact Batch 2 integration map are complete; stop for Founder review. No TestFlight.",
+  "recommended_next_step": "Founder authorizes Build 88 for Native 793462b1; Claude bumps APP_BUILD_NUMBER to 88, archives and uploads with the guarded tool.",
+  "stop_reason": "Approved Batch 2 release candidate prepared and reported; TestFlight requires separate authorization.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
