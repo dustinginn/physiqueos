@@ -1,45 +1,41 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T15:02:27Z",
+  "generated_at_utc": "2026-10-05T15:37:34Z",
   "task": {
-    "id": "redesign-batch2-finalize-20261005",
-    "title": "Redesign Batch 2 finalization: Server D1 deployed, test baseline cleaned, approved release candidate for Build 88",
+    "id": "batch3-claude-takeover-evidence-cpa-20261005",
+    "title": "Redesign Batch 3 Claude takeover: Checkpoint A Evidence Hub + Timeline reimplemented to the locked design",
     "agent": "claude",
-    "status": "release_candidate_ready_for_build88_stopped_before_testflight"
+    "status": "checkpoint_a_ready_for_founder_review_stopped"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "finalization_prompt_commit": "d72bd3f7336d1cebc26b67d502672eca6b0bf38f",
-    "founder_acceptance": "Batch 2 checkpoints 1-5 all accepted",
-    "native_base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "native_base_build": 87,
-    "native_prior_integrated_sha": "49733300672c0b52a06a2b3ee5435de49b76fd15",
-    "native_release_candidate_sha": "793462b11ff522f116413c5b081db0ad97954305",
-    "native_gated_sha": "7a9a7caaa582b3e9b3926cb0ed19842c773dc6b3",
-    "recommended_build_number": 88,
-    "server_production_sha": "c7c99347a520d13fd344fe89b6b1398877cdd255",
-    "server_production_deployment": "e7ef3157-8d1f-4e34-aa56-4668681b40bf",
-    "server_previous_production_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
-    "server_d1_deployed": true
+    "prompt_commit": "f822862ef37faa52632f81fb1886a6e84b8fa57d",
+    "native_build87_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
+    "native_base_sha": "49e48f1eab3bc6ff22ca6c4bc24b3a9955b0fcc7",
+    "native_checkpoint_a_sha": "ce5c7dd899f64386a70a6d21c25cf85bd93d6f3a",
+    "review_package_commit": "7cad090b6aab99a5e4b3603a7a8fa49d5bde53d4",
+    "locked_design_commit": "f7d72f19bdabadc6cafb53354812e0e86fca353f",
+    "rejected_codex_authority": "d842a76bdb8dad023da4add7104688747d9c1872"
   },
   "publication": {
-    "source_work_branch": "claude/redesign-batch2-log-logger-20261005",
-    "main_report_commit": "31753600739e6207ab0242f398ebddfe285bb704",
-    "report_path": "agent-handoffs/reports/20261005T150227Z-redesign-batch2-release-candidate.md"
+    "source_work_branch": "claude/redesign-batch3-evidence-takeover-20261005",
+    "report_path": "agent-handoffs/reports/20261005T153734Z-redesign-batch3-claude-checkpoint-a.md",
+    "review_package": "agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-a-20261005/ (on the work branch at 7cad090b)"
   },
   "result": {
-    "summary": "Server D1 typed Log provenance deployed and verified (web+worker c7c99347, /ready 9/9, additive contract). Native release candidate 793462b1: Home briefing identity restored (pixel-identical), peptide fixture failure fixed (test clock), acceptance-suite isolation fixed. Unit 2014/0 failures, Watch 47/47, TrainingAcceptanceUITests 16/16, full UI target 36/37 with the 1 intermittent fixed and re-verified, Release compile OK, generator byte-stable. Build 88 unused and recommended.",
+    "summary": "Evidence Hub + Timeline rebuilt to locked H1/T1/S1 in SF Pro at 402/360 scale, Dark + Mineral Light. Measured parity vs reference: all Hub/Timeline elements within +/-1.0 pt (horizontal <=0.5 pt); remaining differences are iOS chrome, truthful data, rasterization. Codex CP-A found to be a restyle with a broken Timeline rail. Focused unit 138/0 fail, new Evidence UI 3/3, regression UI 4/4, Release compile OK.",
     "production_data_mutated": false,
-    "deployed": true,
+    "deployed": false,
     "testflight_uploaded": false,
     "build_number_bumped": false
   },
   "decisions_required": [
-    "Authorize Build 88 bump, archive and TestFlight upload of 793462b1"
+    "Founder review/approval of Batch 3 Checkpoint A before Checkpoint B starts",
+    "Concurrent lane, unchanged: authorize Build 88 for Batch 2 Native 793462b1 (report 20261005T150227Z)"
   ],
   "blockers": [],
-  "recommended_next_step": "Founder authorizes Build 88 for Native 793462b1; Claude bumps APP_BUILD_NUMBER to 88, archives and uploads with the guarded tool.",
-  "stop_reason": "Approved Batch 2 release candidate prepared and reported; TestFlight requires separate authorization.",
+  "recommended_next_step": "Review the primary mobile board; on approval Claude starts Checkpoint B (Training + Activity/Cardio) on the same branch.",
+  "stop_reason": "Prompt requires a Founder review stop after Checkpoint A.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
