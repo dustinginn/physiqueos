@@ -122,6 +122,8 @@ export function overlayAcceptedProcessing(loggedToday, processingReviews, localD
         ...row,
         summary: `${processingLabel(row.id)} processing`,
         context: "Confirmation accepted · No action required",
+        // Typed-provenance rows mirror the status line in `contextDetail`.
+        ...("contextDetail" in row ? { contextDetail: "Confirmation accepted · No action required" } : {}),
         processing: true,
       });
     })),

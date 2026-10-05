@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { overlayAcceptedProcessing } from "../../application/log/LogReadService.js";
 import {
   LOGGED_TODAY_SOURCE_KINDS,
   composeLoggedTodaySummary,
@@ -136,5 +137,17 @@ describe("Logged Today typed provenance", () => {
     expect(withAppleHealthLineSource(once).provenance.sources).toEqual([LOGGER, APPLE]);
     const legacy = { id: "training:logger", kind: "logger" };
     expect(withAppleHealthLineSource(legacy)).toBe(legacy);
+  });
+
+  it("keeps the processing status visible to provenance-aware clients", () => {
+    const loggedToday = composeLoggedTodaySummary({ dateKey, canonicalObjects: [] });
+    const overlaid = overlayAcceptedProcessing(loggedToday, [{ localDate: dateKey, domain: "nutrition" }], dateKey);
+    expect(overlaid.rows[1]).toMatchObject({
+      summary: "Nutrition processing",
+      context: "Confirmation accepted · No action required",
+      contextDetail: "Confirmation accepted · No action required",
+      provenance: null,
+      processing: true,
+    });
   });
 });
