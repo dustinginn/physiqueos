@@ -274,7 +274,7 @@ Status: RESOLVED — Server `51c459c410b268f35e6388eeb17f0b6ed7eb548c` deployed 
 
 ### Workout presentation — confirmed link with a late or partial Apple workout replaces the Logger window
 
-Classification: FOUNDER DECISION (Server presentation)
+Classification: RESOLVED / OBSOLETE (was FOUNDER DECISION, Server presentation; Founder chose Option A)
 
 Discovery:
 Build 86 final integration (`agent-handoffs/reports/20261005T003623Z-build86-final-integration.md`); today's 55% match (Apple 1:28–1:48 PM vs Logger 12:31–1:47 PM).
@@ -291,7 +291,7 @@ Option A is a bounded Server presentation change (window fields from the Logger,
 Acceptance:
 After confirming today's item, Workout Detail / Training Day / Activity / Logged Today show 12:31–1:47 PM with Apple calories/HR; sets unchanged; no duplicate session.
 
-Status: OPEN — Founder decision required before today's pending review is confirmed.
+Status: RESOLVED — Option A deployed and verified: Server `27dad44a1f63d68b53f23e51152a10a5d04968e6` (deployment `99188a9e-75a7-49c6-a5c2-05a43737de5f`, web+worker source and log gitSha verified, /ready 9/9). Confirmed Strength links keep the Logger start/end/duration; Apple supplies energy/HR only; missing Logger timing is never filled from Apple. Today's review is safe to resolve with Use Logger session 1 (not resolved by this lane). Report `agent-handoffs/reports/20261005T005447Z-build86-option-a-confirmed-strength-presentation.md`.
 
 ### Evidence Hub — remove Health Metrics placeholder and place Timeline last
 
