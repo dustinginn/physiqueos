@@ -1,62 +1,47 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T00:36:23Z",
+  "generated_at_utc": "2026-10-05T00:54:47Z",
   "task": {
-    "id": "20261005-build86-final-integration",
-    "title": "Build 86 final integration — Server workout presentation + global appearance + combined gates",
+    "id": "20261005-build86-option-a-confirmed-strength-presentation",
+    "title": "Build 86 — Option A confirmed Strength presentation (Server)",
     "agent": "claude",
-    "status": "server_deployed_candidate_ready_founder_decision_pending_not_uploaded"
+    "status": "option_a_deployed_verified_safe_to_confirm_build86_ready_not_uploaded"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "f836f373d1114f4e60aa16c10e9cbc6512fa7a61",
-    "rescue_prompt_commit": "64f923717bfbe7d7b73ce856e26d102b8727c96b",
-    "server_sha": "51c459c410b268f35e6388eeb17f0b6ed7eb548c",
-    "server_previous_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
-    "server_deployment": "07714249-04c8-4d7b-9f36-09e5ead1cdee",
-    "server_build_id": "physiqueos-51c459c4-20261004",
+    "prompt_commit": "9b688e68df1b787c75786f22e5ba706eb8c68852",
+    "server_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
+    "server_previous_sha": "403ca5493297c2101990a7da59eed94153acc943",
+    "server_deployment": "99188a9e-75a7-49c6-a5c2-05a43737de5f",
+    "server_build_id": "physiqueos-27dad44a-20261005",
     "native_candidate_sha": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
     "native_candidate_build": 86,
     "last_uploaded_build": 85
   },
   "publication": {
-    "source_work_branch": "claude/build86-final-integration-20261004",
-    "source_work_commit": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
-    "server_work_branch": "claude/server-workout-presentation-20261004",
-    "native_commits": [
-      "a5646c8b build: pin Foam Rolling UI test in project generator",
-      "d43ad7cd feat(watch): record HealthKit for phone-started workouts",
-      "4f78fce6 chore(ios): Build 86 candidate",
-      "5d727b37 feat: add global appearance infrastructure (cherry-pick of 3ceb9a80)",
-      "cec8af20 fix: let recovery sheet follow app appearance (cherry-pick of d5359e33)"
-    ],
-    "main_report_commit": "634eb6ff49c831c4510f1a19dbba20db8372b244",
-    "report_path": "agent-handoffs/reports/20261005T003623Z-build86-final-integration.md",
+    "source_work_branch": "claude/server-option-a-confirmed-strength-20261005",
+    "source_work_commit": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
+    "native_branch": "claude/build86-final-integration-20261004",
+    "main_report_commit": "bd6418f4bbb5b295d41dd4a88b014181068d4c9c",
+    "report_path": "agent-handoffs/reports/20261005T005447Z-build86-option-a-confirmed-strength-presentation.md",
     "artifact_root": null
   },
   "result": {
-    "summary": "Server presentation fix deployed (only a confirmed link changes Logger presentation). Global appearance integrated into Build 86 with byte-identical regeneration. Combined gates green except two pre-existing failures. Today's 55% match should NOT be confirmed until the Founder decides the confirmed-link window rule.",
-    "todays_pending_review": {
-      "touched": false,
-      "safe_to_confirm_now": false,
-      "reason": "existing confirmed-link contract would display Apple 1:28-1:48 PM instead of Logger 12:31-1:47 PM",
-      "options": ["A_keep_logger_window_apple_energy_hr_only (recommended, then Use Logger session 1)", "B_accept_apple_window", "C_no_match"]
-    },
+    "summary": "Option A live: a confirmed Strength link keeps the Logger session start/end/duration on Workout Detail, Training Day/Activity and Logged Today; Apple supplies energy/HR only; missing Logger timing never filled from Apple. Zero introduced Server test failures. Native unchanged.",
+    "founder_instruction": "Safe to tap Use Logger session 1.",
+    "todays_pending_review_touched": false,
     "tests": {
-      "server_presentation": "39/39",
-      "server_related_118_files": "34 failed, identical to base 3c0f4aef; 0 introduced",
-      "server_full_unit": "9999 tests, 302 failed, identical to base; 0 introduced",
-      "watch_unit": "47/47",
-      "watch_ui": "6/7 (pre-existing NotYetReturns fixture failure, fails at base b65deb00)",
-      "ios_unit_full": "2003 executed, 1 failed (pre-existing Peptide), 1 skipped",
-      "foam_and_appearance_ui": "6/6 (Light) + System resolution forced Dark 1/1",
-      "release": "BUILD SUCCEEDED Release generic iOS unsigned 1.0 (86) app + Watch + Live Activity/widget"
+      "focused_presentation_and_logged_today": "61/61",
+      "related_119_files": "34 failed, identical to base 403ca549; 0 introduced",
+      "server_full_unit": "10043 tests, 302 failed, identical to base; 0 introduced"
     },
+    "production_verification": "deployment 99188a9e ACTIVE 9/9; web+worker source_commit_hash and log gitSha 27dad44a; /live and /ready physiqueos-27dad44a-20261005, 9/9 ready; no review/link resolution traffic observed",
+    "build86_ready_for_archive_authorization": true,
     "testflight_uploaded": false,
     "production_data_mutated": false
   },
-  "recommended_next_step": "Founder decides confirmed-link window (A recommended); if A, Claude implements/deploys the bounded Server change, then Founder confirms Use Logger session 1. Separately authorize Build 86 archive + guarded TestFlight upload of cec8af20.",
-  "stop_reason": "Combined Build 86 candidate ready for Founder approval; confirmed-link window is a product decision per prompt STOP condition.",
+  "recommended_next_step": "Founder taps Use Logger session 1 when convenient; authorize Build 86 archive + guarded TestFlight upload of cec8af20.",
+  "stop_reason": "Option A deployed and verified; Founder has an explicit instruction for the pending review; upload not authorized.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

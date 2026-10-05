@@ -2,33 +2,26 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Build 86 final integration — Server workout presentation + global appearance + combined gates
-- Agent: Claude (existing Remote Control session `c60b384d`, resumed after rescue; no duplicate conversation)
-- Status: Server fix deployed; combined Build 86 candidate ready; NOT uploaded; one Founder decision before confirming today's match
-- Generated (UTC): 2026-10-05T00:36:23Z
-- Prompt authority: `f836f373d1114f4e60aa16c10e9cbc6512fa7a61` (rescue `64f923717bfbe7d7b73ce856e26d102b8727c96b`)
-- Server deployed: `51c459c410b268f35e6388eeb17f0b6ed7eb548c`, deployment `07714249-04c8-4d7b-9f36-09e5ead1cdee` ACTIVE, `/ready` 9/9
-- Native combined head: `cec8af20a6121bb66ecca3ba9f667d91774a891c` on `claude/build86-final-integration-20261004`, `1.0 (86)`
-- Main report commit: `634eb6ff49c831c4510f1a19dbba20db8372b244`
-- Report: `agent-handoffs/reports/20261005T003623Z-build86-final-integration.md`
+- Task: Build 86 — Option A confirmed Strength presentation (Server)
+- Agent: Claude (existing Build 86 Remote Control session `c60b384d`; single RC worktree)
+- Status: Option A deployed and verified; **Safe to tap Use Logger session 1**; Build 86 ready for archive authorization (not uploaded)
+- Generated (UTC): 2026-10-05T00:54:47Z
+- Prompt authority: `9b688e68df1b787c75786f22e5ba706eb8c68852`
+- Server deployed: `27dad44a1f63d68b53f23e51152a10a5d04968e6` (fast-forward from `403ca549`, which includes Sleep V3), deployment `99188a9e-75a7-49c6-a5c2-05a43737de5f` ACTIVE, `/ready` 9/9
+- Native Build 86: `cec8af20a6121bb66ecca3ba9f667d91774a891c` (unchanged), `1.0 (86)`
+- Main report commit: `bd6418f4bbb5b295d41dd4a88b014181068d4c9c`
+- Report: `agent-handoffs/reports/20261005T005447Z-build86-option-a-confirmed-strength-presentation.md`
 
-An unconfirmed, possible or No-match Apple workout no longer changes how a Logger session is presented. This is live in production, and reviews, links and records are untouched.
+For a confirmed Strength link, the Workout Logger now owns the session start, end and duration on every surface, and Apple contributes energy and heart rate only. A late or truncated Apple workout never replaces the Logger window. Unconfirmed and No-match candidates still never change presentation. No record, review, link or policy changed.
 
-**Today's 55% match: do not confirm yet.** The existing confirmed-link contract would display Apple's 1:28–1:48 PM window instead of the Logger's 12:31–1:47 PM. Founder decision:
-- A (recommended): keep the Logger window and take only Apple energy/HR. Then Use Logger session 1 is safe.
-- B: accept the Apple window.
-- C: No match.
+Tests:
+- Focused: 61/61.
+- Related suites: 34 pre-existing failures.
+- Full Server suite: 302 pre-existing failures.
+- Zero introduced versus base `403ca549`.
 
-Global appearance is integrated cleanly into Build 86 (byte-identical regeneration).
+**Founder: Safe to tap Use Logger session 1.** The session stays 12:31–1:47 PM with Apple calories and heart rate; sets are unchanged and no duplicate is created.
 
-Combined gates at `cec8af20`:
-- Watch unit: 47/47.
-- Watch UI: 6/7 (1 pre-existing failure).
-- iOS unit: 2,003 with 1 pre-existing Peptide failure.
-- Foam + appearance UI: 6/6.
-- System resolution, forced Dark: 1/1.
-- Release 1.0 (86): succeeded.
-
-Next: the Founder decides A/B/C, then authorizes the Build 86 archive and guarded TestFlight upload of `cec8af20`.
+Next: authorize the Build 86 archive and guarded TestFlight upload of `cec8af20`.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
