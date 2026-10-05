@@ -589,7 +589,7 @@ Native must not parse display strings. Add a structured source per row/line to t
 Acceptance:
 Sources content comes only from typed fields. Mixed-source days (Logger Strength plus Apple Health Cardio, screenshot Nutrition) are attributed exactly. Weight shows "Source unavailable" until it has a provenance field. Tiles no longer repeat "Apple Health". Older payloads without the field degrade to no disclosure.
 
-Status: IMPLEMENTED ON BRANCHES; NOT DEPLOYED. Founder settled D1: implement exactly, with a typed Server contract. Server candidate `c7c99347` (branch `claude/log-sources-provenance-server-20261005`, on top of production `27dad44a`) adds `provenance` and `contextDetail`; Native `b540b323` (branch `claude/redesign-batch2-log-logger-20261005`) renders Sources from typed fields only, and an older Server falls back to the legacy caption with no disclosure. Awaiting Founder Checkpoint 1 acceptance and explicit Server deploy authorization. Report `agent-handoffs/reports/20261005T045352Z-redesign-batch2-cp1-log-root.md`.
+Status: NATIVE IMPLEMENTED (Checkpoint 1 ACCEPTED); SERVER NOT DEPLOYED. Founder settled D1: implement exactly, with a typed Server contract. Server candidate `c7c99347a520d13fd344fe89b6b1398877cdd255` (branch `claude/log-sources-provenance-server-20261005`, on top of production `27dad44a`) adds `provenance` and `contextDetail`; its unit suite matches the production baseline exactly (307 pre-existing failures, identical set, none new). Native renders Sources from typed fields only, accepted in Checkpoint 1 `b540b323` and carried into the integrated Batch 2 candidate `49733300672c0b52a06a2b3ee5435de49b76fd15`. An older Server falls back to the legacy caption with no disclosure, which is today's production behavior. The overnight deploy attempt was blocked by the session's production-deploy permission gate before any mutation; production remains `27dad44a` (deployment `99188a9e`, ACTIVE, /live and /ready 200, re-checked 2026-10-05T08:30:37Z). Deploying needs a direct Founder chat authorization for the exact SHA. Close after deploy plus on-device acceptance. Report `agent-handoffs/reports/20261005T083037Z-redesign-batch2-overnight-cp2-cp5.md`.
 
 ### Apple Watch Logger — Complete Set offered while the phone is in Review/Confirmation
 
@@ -657,7 +657,28 @@ A full-row `contentShape` on the label; the Appearance option cards declare thei
 Acceptance:
 `testYouAndSettingsNavigationRowsActivateAcrossTheWholeRow` taps the leading content, center whitespace and trailing chevron edge of every row in Dark and Mineral. Before and after captures are pixel-identical in row content.
 
-Status: FIXED ON BATCH 2 BRANCH `bb6a6584`. It ships with the eventual Batch 2 candidate; close after physical-device acceptance.
+Status: FIXED ON BATCH 2 BRANCH `bb6a6584` (accepted with Checkpoint 1). Integrated into Batch 2 candidate `49733300672c0b52a06a2b3ee5435de49b76fd15`; not yet in TestFlight. Close after physical-device acceptance.
+
+### Home — Batch 1 briefing strip lost the `home.latestBriefing` test identity
+
+Classification: TEST/ACCESSIBILITY-IDENTITY REGRESSION (pre-existing in Build 87; not a Batch 2 change)
+
+Discovery:
+Batch 2 final gates, 2026-10-05: isolated clean-install runs on candidate `49733300` and on Build 87 `f66c7fc6` give identical results.
+
+Current shipping behavior:
+Batch 1 renders the first briefing inside `HomeActionBriefingStrip` (`HomeJourneyFieldView.swift`), which carries no accessibility identifier. `BriefingCardView` (`home.latestBriefing`) is now used only for the second and later briefings. `TrainingAcceptanceUITests.testBriefingParityJourneys`, `testFounderCorrectionMidweekTrainingResponseJourney` and `testFounderCorrectionWeeklyAndPhotoBriefingJourney` therefore fail at their first assertion ("…Briefing was not available from Home"). They no longer exercise the Briefing journeys at all.
+
+Target:
+The Home briefing doorway keeps a stable identifier, and the three Briefing acceptance journeys run again.
+
+Implementation implication:
+Add an identifier to the strip's briefing control (or update the tests to the new identity) without any visual change.
+
+Acceptance:
+The three journeys pass on a clean install in Dark and Mineral, and Home captures stay pixel-identical.
+
+Status: OPEN; not fixed by Batch 2 (outside its scope).
 
 ## Implementation transition rule
 
