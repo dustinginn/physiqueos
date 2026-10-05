@@ -21,9 +21,9 @@ struct NutritionDayView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = NutritionDayViewModel(api: environment.nutritionAPI, dayId: dayId)
@@ -43,12 +43,12 @@ struct NutritionDayView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             Text("No nutrition evidence for this day.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let day)):
             VStack(alignment: .leading, spacing: 24) {
@@ -67,27 +67,27 @@ struct NutritionDayView: View {
                 .foregroundStyle(PhysiqueOSTheme.accent)
             Text(TrainingDayView.formatCompactDate(day.date))
                 .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Text(day.value)
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func summaryCard(_ day: NutritionDayRecord) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeading("Summary")
                 Text(day.detail)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
             }
         }
     }
 
     private func totalsCard(_ totals: NutritionMacroTotals) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Totals")
                 NutritionMacroGridView(totals: totals)
@@ -96,13 +96,13 @@ struct NutritionDayView: View {
     }
 
     private func mealsCard(_ meals: [NutritionMealRecord], totals: NutritionMacroTotals) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Meals")
                 if meals.isEmpty {
                     Text(NutritionDayView.emptyMealsCopy(totals: totals))
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 10) {
                         ForEach(meals) { meal in
@@ -156,17 +156,17 @@ private struct NutritionMealRowView: View {
                     .foregroundStyle(slotColor)
                 Text(meal.name ?? meal.slot.label)
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Spacer(minLength: 8)
                 if let calories = meal.totals.calories, calories.isFinite {
                     Text("\(Int(calories)) cal")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
             Text(completenessLabel)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             HStack(spacing: 12) {
                 macroLabel("P", meal.totals.proteinG, PhysiqueOSTheme.macroProtein)
                 macroLabel("C", meal.totals.carbsG, PhysiqueOSTheme.macroCarbohydrates)
@@ -178,17 +178,17 @@ private struct NutritionMealRowView: View {
                         HStack(spacing: 4) {
                             Text(food.name)
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                             if let brand = food.brand {
                                 Text("(\(brand))")
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             }
                             Spacer(minLength: 8)
                             if let servingSize = food.servingSize {
                                 Text(servingSize)
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             }
                         }
                     }
@@ -198,7 +198,7 @@ private struct NutritionMealRowView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
@@ -210,7 +210,7 @@ private struct NutritionMealRowView: View {
                 .foregroundStyle(color)
             Text(grams.map { $0.isFinite ? "\(Int($0))g" : "—" } ?? "—")
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
     }
 }

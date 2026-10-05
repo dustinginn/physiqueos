@@ -15,15 +15,15 @@ struct NutritionWeeklyStatRow: View {
         HStack(alignment: .top) {
             Text(range)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 Text(value)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(detail)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .padding(.vertical, 4)
@@ -38,15 +38,15 @@ struct NutritionDailyCalorieRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(TrainingDateFormatting.short(row.date))
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text("\(row.mealCount) meal\(row.mealCount == 1 ? "" : "s")")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             Spacer(minLength: 8)
             Text(row.calories.map { "\(Int($0.rounded())) cal" } ?? "Pending")
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(PhysiqueOSTheme.accent)
@@ -64,7 +64,7 @@ struct NutritionWeeklyMacroRowView: View {
         HStack(alignment: .top) {
             Text("\(TrainingDateFormatting.short(row.weekStart)) – \(TrainingDateFormatting.short(row.weekEnd))")
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Spacer(minLength: 8)
             HStack(spacing: 8) {
                 ForEach(NutritionMacroKey.allCases) { macro in
@@ -87,7 +87,7 @@ struct NutritionDailyMacroRowView: View {
         HStack(alignment: .top) {
             Text(TrainingDateFormatting.short(row.date))
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Spacer(minLength: 8)
             HStack(spacing: 8) {
                 ForEach(NutritionMacroKey.allCases) { macro in
@@ -114,11 +114,11 @@ struct NutritionRecurringMealRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(meal.name)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     .lineLimit(1)
                 Text("\(meal.slot.label) · Last \(TrainingDateFormatting.short(meal.lastEaten))")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 HStack(spacing: 6) {
                     Text("\(meal.occurrenceCount) occurrences")
                     Text("•")
@@ -136,15 +136,15 @@ struct NutritionRecurringMealRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text("\(meal.occurrenceCount)×")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(meal.averageCalories.map { "\(Int($0.rounded())) cal" } ?? "Pending")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
@@ -164,11 +164,11 @@ struct NutritionWeeklyMealRowView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("\(TrainingDateFormatting.short(row.weekStart)) – \(TrainingDateFormatting.short(row.weekEnd))")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Spacer(minLength: 8)
                 Text("\(row.mealCount) meals · \(row.loggedDayCount) days")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(row.slots) { slot in
@@ -177,7 +177,7 @@ struct NutritionWeeklyMealRowView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(slot.slot.label)
                             Text(slot.averageCalories.map { "\(slot.occurrenceCount)× · \(Int($0.rounded())) cal avg" } ?? "No entries")
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         }
                     }
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
@@ -187,7 +187,7 @@ struct NutritionWeeklyMealRowView: View {
             }
         }
         .padding(16)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
@@ -201,7 +201,7 @@ struct NutritionMealHistoryGroupRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(TrainingDateFormatting.short(group.date))
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 HStack(spacing: 4) {
                     ForEach(group.meals) { meal in
                         Text(meal.slot.glyph)
@@ -210,12 +210,12 @@ struct NutritionMealHistoryGroupRow: View {
                 }
                 Text("\(group.mealCount) meal\(group.mealCount == 1 ? "" : "s")")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             Spacer(minLength: 8)
             Text(group.dailyCalories.map { "\(Int($0.rounded())) cal" } ?? "Pending")
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(PhysiqueOSTheme.accent)
@@ -259,10 +259,10 @@ struct NutritionReportListSheet<Content: View>: View {
                 }
                 .padding(16)
             }
-            .background(PhysiqueOSTheme.background)
+            .background(PhysiqueOSTheme.redesignCanvas)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
         .presentationDetents([.medium, .large])

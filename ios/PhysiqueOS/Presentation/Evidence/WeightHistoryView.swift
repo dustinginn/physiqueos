@@ -34,11 +34,11 @@ struct WeightHistoryView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -50,7 +50,7 @@ struct WeightHistoryView: View {
                         Text("Evidence Hub")
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -79,7 +79,7 @@ struct WeightHistoryView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let report):
             VStack(alignment: .leading, spacing: 24) {
@@ -97,18 +97,18 @@ struct WeightHistoryView: View {
     }
 
     private func header(for report: WeightReportReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: .evidence, size: .lg, isCircular: true)
+        HStack(alignment: .top, spacing: 13) {
+            EvidenceGlyph(symbol: "scalemass.fill", color: PhysiqueOSTheme.redesignCyan, size: 46)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
+                Text("EVIDENCE REPORT")
                     .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .foregroundStyle(PhysiqueOSTheme.redesignCyan)
                 Text(report.title)
                     .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(report.subtitle)
                     .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -123,14 +123,14 @@ struct WeightHistoryView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(card.label)
                         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     Text(card.value)
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 }
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceElevated)
+                .background(PhysiqueOSTheme.redesignPaper)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(card.label): \(card.value)")
@@ -139,7 +139,7 @@ struct WeightHistoryView: View {
     }
 
     private func trendCard(_ chart: WeightChartData) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Weight Trend")
                 WeightTrendChartView(
@@ -156,7 +156,7 @@ struct WeightHistoryView: View {
     /// equivalent to mirror; Native only formats what the server already
     /// resolved (at most one weigh-in per intended day).
     private func rollingAveragesCard(_ averages: WeightRollingAverages) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Rolling Averages")
                 HStack(spacing: 8) {
@@ -171,30 +171,30 @@ struct WeightHistoryView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             if let value = window.value, let unit = window.unit {
                 Text(String(format: "%.1f %@", value, unit))
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
             } else {
                 Text("Pending")
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             Text("\(window.observationCount) of \(window.requestedDays) days")
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
 
     private func weeklyAveragesCard(_ weeks: [WeightWeeklyAverage]) -> some View {
         let preview = Array(weeks.prefix(Self.previewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             EvidenceDisclosureRow(isExpanded: $isWeeklyAveragesExpanded) {
                 evidenceSectionHeader(
                     title: "Weekly Averages",
@@ -205,7 +205,7 @@ struct WeightHistoryView: View {
                 if weeks.isEmpty {
                     Text("More history needed to compute weekly averages.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 6) {
                         ForEach(isWeeklyAveragesExpanded ? weeks : preview) { week in
@@ -219,14 +219,14 @@ struct WeightHistoryView: View {
 
     private func historyCard(_ history: [WeightHistoryEntry]) -> some View {
         let preview = Array(history.prefix(Self.previewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             EvidenceDisclosureRow(isExpanded: $isHistoryExpanded) {
                 evidenceSectionHeader(title: "Weight History", subtitle: nil, expanded: isHistoryExpanded)
             } expanded: {
                 if history.isEmpty {
                     Text("Weight history will appear as weigh-ins are logged or connected.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 6) {
                         ForEach(isHistoryExpanded ? history : preview) { entry in
@@ -243,17 +243,17 @@ struct WeightHistoryView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 if let subtitle {
                     Text(subtitle)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
             Spacer(minLength: 8)
             Text(expanded ? "Close" : "Show All")
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
     }
 }
@@ -309,7 +309,7 @@ private struct WeightTrendChartView: View {
         if validPoints.count < 2 {
             Text("More history needed")
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 140)
         } else {
             VStack(alignment: .leading, spacing: 10) {
@@ -339,7 +339,7 @@ private struct WeightTrendChartView: View {
                         if isSelected {
                             Circle().fill(PhysiqueOSTheme.weightTrendLine).frame(width: 10, height: 10)
                         } else {
-                            Circle().fill(PhysiqueOSTheme.surfaceElevated).frame(width: 6, height: 6)
+                            Circle().fill(PhysiqueOSTheme.redesignPaper).frame(width: 6, height: 6)
                                 .overlay(Circle().strokeBorder(PhysiqueOSTheme.weightTrendLine, lineWidth: 2))
                         }
                     }
@@ -354,7 +354,7 @@ private struct WeightTrendChartView: View {
             }
             if let selectedPoint {
                 RuleMark(x: .value("Selected", dateValue(selectedPoint.date)))
-                    .foregroundStyle(PhysiqueOSTheme.divider)
+                    .foregroundStyle(PhysiqueOSTheme.redesignRule)
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
             }
         }
@@ -374,10 +374,10 @@ private struct WeightTrendChartView: View {
             if let selectedPoint {
                 Text("\(TrainingDateFormatting.short(selectedPoint.date)) / Weight: \(selectedPoint.label)")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .background(PhysiqueOSTheme.redesignSoft)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
@@ -390,15 +390,15 @@ private struct WeightTrendChartView: View {
         HStack {
             Text(TrainingDateFormatting.short(validPoints.first!.date))
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             Spacer()
             Text(validPoints.last!.label)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Spacer()
             Text(TrainingDateFormatting.short(validPoints.last!.date))
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
     }
 
@@ -430,7 +430,7 @@ private struct WeeklyAverageRow: View {
     }
 
     private var deltaColor: Color {
-        guard let delta = week.weekOverWeek, delta < 0 else { return PhysiqueOSTheme.textMuted }
+        guard let delta = week.weekOverWeek, delta < 0 else { return PhysiqueOSTheme.redesignInkSecondary }
         return PhysiqueOSTheme.chartSuccess
     }
 
@@ -439,16 +439,16 @@ private struct WeeklyAverageRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Week of \(week.week)")
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text("\(week.entryCount) \(week.entryCount == 1 ? "entry" : "entries")")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             Spacer(minLength: 8)
             HStack(spacing: 14) {
                 Text(String(format: "%.1f lb", week.average))
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(deltaText)
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     .foregroundStyle(deltaColor)
@@ -457,7 +457,7 @@ private struct WeeklyAverageRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 18)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -470,19 +470,19 @@ private struct WeightHistoryRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(TrainingDateFormatting.short(entry.date))
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(entry.detail)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             Spacer(minLength: 8)
             Text(entry.value)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 18)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }

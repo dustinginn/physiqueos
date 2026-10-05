@@ -57,9 +57,9 @@ struct NutritionReportingView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = NutritionReportingViewModel(api: environment.nutritionAPI, reportId: reportId)
@@ -79,12 +79,12 @@ struct NutritionReportingView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             Text("This report could not be found.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let report)):
             VStack(alignment: .leading, spacing: 24) {
@@ -106,10 +106,10 @@ struct NutritionReportingView: View {
                 .foregroundStyle(PhysiqueOSTheme.accent)
             Text(report.title)
                 .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Text(report.subtitle)
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -123,10 +123,10 @@ struct NutritionReportingView: View {
                 } label: {
                     Text(range.label)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(isSelected ? .white : PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(isSelected ? .white : PhysiqueOSTheme.redesignInkSecondary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(isSelected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.surfaceMuted)
+                        .background(isSelected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.redesignSoft)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -135,14 +135,14 @@ struct NutritionReportingView: View {
     }
 
     private func periodSummaryGrid(_ items: [NutritionReportSummaryItem], targetLabel: String? = nil) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     TrainingSectionHeaderView(title: "Period Summary")
                     if let targetLabel {
                         Text(targetLabel)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                 }
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
@@ -150,14 +150,14 @@ struct NutritionReportingView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.label)
                                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             Text(item.value)
                                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         }
                         .padding(16)
                         .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-                        .background(PhysiqueOSTheme.surfaceElevated)
+                        .background(PhysiqueOSTheme.redesignPaper)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                 }
@@ -170,7 +170,7 @@ struct NutritionReportingView: View {
     private func caloriesContent(_ report: NutritionCaloriesReport) -> some View {
         Group {
             periodSummaryGrid(report.periodSummary, targetLabel: report.targetLabel)
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 12) {
                     TrainingSectionHeaderView(title: "Calories Over Time")
                     rangeSelector()
@@ -193,7 +193,7 @@ struct NutritionReportingView: View {
 
     private func dailyCaloriesCard(_ rows: [NutritionDailyCalorieRow]) -> some View {
         let preview = Array(rows.prefix(Self.previewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recent Daily Calories") {
                     if rows.count > Self.previewLimit {
@@ -203,7 +203,7 @@ struct NutritionReportingView: View {
                 if preview.isEmpty {
                     Text("No daily calorie evidence available.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(preview) { row in
@@ -225,11 +225,11 @@ struct NutritionReportingView: View {
 
     private func macrosContent(_ report: NutritionMacrosReport) -> some View {
         Group {
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Macro")
                         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     HStack(spacing: 6) {
                         ForEach(NutritionMacroKey.allCases) { macro in
                             let isSelected = macro == report.selectedMacro
@@ -238,10 +238,10 @@ struct NutritionReportingView: View {
                             } label: {
                                 Text(macro.label)
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(isSelected ? .white : PhysiqueOSTheme.textSecondary)
+                                    .foregroundStyle(isSelected ? .white : PhysiqueOSTheme.redesignInkSecondary)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
-                                    .background(isSelected ? macroColor(macro) : PhysiqueOSTheme.surfaceMuted)
+                                    .background(isSelected ? macroColor(macro) : PhysiqueOSTheme.redesignSoft)
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
@@ -250,12 +250,12 @@ struct NutritionReportingView: View {
                 }
             }
             periodSummaryGrid(report.periodSummary, targetLabel: report.targetLabel)
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 12) {
                     TrainingSectionHeaderView(title: "Macro Distribution")
                     Text("Share of macro-derived calories across the selected period.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     NutritionDonutChartView(
                         slices: report.distribution.map { donutSlice($0) },
                         centerLabel: "Macro-derived calories",
@@ -263,12 +263,12 @@ struct NutritionReportingView: View {
                     )
                 }
             }
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 12) {
                     TrainingSectionHeaderView(title: "Average Daily Macros")
                     Text("Average grams per logged Nutrition day across the selected period.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     NutritionBarChartView(
                         bars: report.averageDailyMacros.map { bar in
                             NutritionBarChartView.Bar(id: bar.id.rawValue, label: bar.id.label, value: bar.averageGrams, caption: "\(bar.loggedDayCount) days", color: macroColor(bar.id))
@@ -277,12 +277,12 @@ struct NutritionReportingView: View {
                     )
                 }
             }
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 12) {
                     TrainingSectionHeaderView(title: "Macro Trends Over Time")
                     Text("Weekly average \(report.selectedMacro.label.lowercased()) intake across the selected period.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     rangeSelector()
                     NutritionTrendChartView(
                         points: report.weeklyTrend, color: macroColor(report.selectedMacro),
@@ -303,7 +303,7 @@ struct NutritionReportingView: View {
 
     private func dailyMacrosCard(_ rows: [NutritionDailyMacroRow], selectedMacro: NutritionMacroKey) -> some View {
         let preview = Array(rows.prefix(Self.previewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recent Daily Macros") {
                     if rows.count > Self.previewLimit {
@@ -313,7 +313,7 @@ struct NutritionReportingView: View {
                 if preview.isEmpty {
                     Text("No daily macro evidence available.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(preview) { row in
@@ -336,12 +336,12 @@ struct NutritionReportingView: View {
     private func mealsContent(_ report: NutritionMealsReport) -> some View {
         Group {
             periodSummaryGrid(report.periodSummary)
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 12) {
                     TrainingSectionHeaderView(title: "Meal Distribution")
                     Text("Average calories by meal across the selected period.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     NutritionBarChartView(
                         bars: report.distribution.map { average in
                             NutritionBarChartView.Bar(id: average.id.rawValue, label: average.id.label, value: average.averageCalories ?? 0, caption: "\(average.occurrenceCount)×", color: mealSlotColor(average.id))
@@ -350,12 +350,12 @@ struct NutritionReportingView: View {
                     )
                 }
             }
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 12) {
                     TrainingSectionHeaderView(title: "Meal Macro Mix")
                     Text("Macro-derived calorie distribution for the selected meal.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     slotSelector(selected: report.selectedMacroMixSlot, includeAll: false) { slot in
                         Task { await viewModel?.selectMealMacroMixSlot(slot) }
                     }
@@ -366,12 +366,12 @@ struct NutritionReportingView: View {
                     )
                 }
             }
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 12) {
                     TrainingSectionHeaderView(title: "Meal Trends Over Time")
                     Text("One selected weekly meal metric across the selected period.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     slotSelector(selected: report.selectedTrendSlot, includeAll: true) { slot in
                         Task { await viewModel?.selectMealTrendSlot(slot) }
                     }
@@ -407,10 +407,10 @@ struct NutritionReportingView: View {
                 } label: {
                     Text(slot.label)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(isSelected ? .white : PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(isSelected ? .white : PhysiqueOSTheme.redesignInkSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(isSelected ? PhysiqueOSTheme.accent.opacity(0.85) : PhysiqueOSTheme.surfaceMuted)
+                        .background(isSelected ? PhysiqueOSTheme.accent.opacity(0.85) : PhysiqueOSTheme.redesignSoft)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -429,17 +429,17 @@ struct NutritionReportingView: View {
                 Image(systemName: "chevron.up.chevron.down")
             }
             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            .foregroundStyle(PhysiqueOSTheme.redesignInk)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(PhysiqueOSTheme.surfaceMuted)
+            .background(PhysiqueOSTheme.redesignSoft)
             .clipShape(Capsule())
         }
     }
 
     private func recurringMealsCard(_ meals: [NutritionRecurringMeal]) -> some View {
         let preview = Array(meals.prefix(Self.previewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recurring Meals") {
                     if meals.count > Self.previewLimit {
@@ -449,7 +449,7 @@ struct NutritionReportingView: View {
                 if preview.isEmpty {
                     Text("No recurring meals identified yet.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(preview) { meal in NutritionRecurringMealRow(meal: meal) }
@@ -466,7 +466,7 @@ struct NutritionReportingView: View {
 
     private func mealHistoryCard(_ groups: [NutritionMealHistoryGroup]) -> some View {
         let preview = Array(groups.prefix(Self.previewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recent Meal History") {
                     if groups.count > Self.previewLimit {
@@ -476,7 +476,7 @@ struct NutritionReportingView: View {
                 if preview.isEmpty {
                     Text("No meal history available.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(preview) { group in
@@ -508,7 +508,7 @@ struct NutritionReportingView: View {
         @ViewBuilder row: @escaping (Row) -> Content
     ) -> some View {
         let preview = Array(rows.prefix(Self.previewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: title) {
                     if rows.count > Self.previewLimit {
@@ -518,7 +518,7 @@ struct NutritionReportingView: View {
                 if preview.isEmpty {
                     Text(emptyMessage)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(preview) { item in row(item) }

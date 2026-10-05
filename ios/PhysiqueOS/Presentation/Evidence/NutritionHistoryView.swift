@@ -45,11 +45,11 @@ struct NutritionHistoryView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -61,7 +61,7 @@ struct NutritionHistoryView: View {
                         Text("Evidence Hub")
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -91,7 +91,7 @@ struct NutritionHistoryView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
             VStack(alignment: .leading, spacing: 24) {
@@ -101,32 +101,31 @@ struct NutritionHistoryView: View {
                 }
                 latestNutritionDayCard(landing.latestNutritionDay)
                 infoLinksCard(title: "Reporting", links: landing.reportingLinks)
-                infoLinksCard(title: "Nutrition Areas", links: landing.nutritionAreas)
                 recentHistoryCard(landing.nutritionHistory)
             }
         }
     }
 
     private func header(for landing: NutritionLandingReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: landing.tone, size: .lg, isCircular: true)
+        HStack(alignment: .top, spacing: 13) {
+            EvidenceGlyph(symbol: "fork.knife", color: PhysiqueOSTheme.redesignGreen, size: 46)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
+                Text("EVIDENCE REPORT")
                     .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .foregroundStyle(PhysiqueOSTheme.redesignGreen)
                 Text(landing.title)
                     .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(landing.subtitle ?? "What PhysiqueOS currently understands.")
                     .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func latestNutritionDayCard(_ day: NutritionDayRecord?) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Latest Nutrition Day")
                 if let day {
@@ -136,13 +135,13 @@ struct NutritionHistoryView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(TrainingDateFormatting.short(day.date))
                                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     Text(day.value)
                                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     Text(day.detail)
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 }
                                 Spacer(minLength: 8)
                                 Image(systemName: "chevron.right")
@@ -152,7 +151,7 @@ struct NutritionHistoryView: View {
                             NutritionMacroGridView(totals: day.totals)
                         }
                         .padding(12)
-                        .background(PhysiqueOSTheme.surfaceMuted)
+                        .background(PhysiqueOSTheme.redesignSoft)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
@@ -162,7 +161,7 @@ struct NutritionHistoryView: View {
                 } else {
                     Text("Nutrition days will appear here once meals, macros, or nutrition screenshots are uploaded.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -175,7 +174,7 @@ struct NutritionHistoryView: View {
     /// stay informational, matching `ActivityAreaSummary`'s own
     /// non-navigating treatment.
     private func infoLinksCard(title: String, links: [NutritionInfoLink]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: title)
                 VStack(spacing: 8) {
@@ -199,10 +198,10 @@ struct NutritionHistoryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(link.label)
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(link.detail)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             if link.destination != nil {
                 Spacer(minLength: 8)
@@ -213,7 +212,7 @@ struct NutritionHistoryView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(link.destination != nil ? .isButton : [])
@@ -221,7 +220,7 @@ struct NutritionHistoryView: View {
 
     private func recentHistoryCard(_ history: [NutritionDayRecord]) -> some View {
         let preview = Array(history.prefix(Self.historyPreviewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recent Nutrition History") {
                     if history.count > Self.historyPreviewLimit {
@@ -235,7 +234,7 @@ struct NutritionHistoryView: View {
                 if preview.isEmpty {
                     Text("Nutrition history will appear as meals, macros, or nutrition screenshots are uploaded.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(preview) { day in
@@ -270,10 +269,10 @@ private struct NutritionHistorySheet: View {
                 }
                 .padding(16)
             }
-            .background(PhysiqueOSTheme.background)
+            .background(PhysiqueOSTheme.redesignCanvas)
             .navigationTitle("Recent Nutrition History")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
         .presentationDetents([.medium, .large])
@@ -288,16 +287,16 @@ private struct NutritionHistoryRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(TrainingDateFormatting.short(day.date))
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(day.detail)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 Text(day.value)
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(PhysiqueOSTheme.accent)
@@ -305,7 +304,7 @@ private struct NutritionHistoryRow: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
@@ -335,7 +334,7 @@ struct NutritionMacroGridView: View {
             ("Protein", Self.formatWhole(totals.proteinG, unit: "g"), PhysiqueOSTheme.macroProtein),
             ("Carbohydrates", Self.formatWhole(totals.carbsG, unit: "g"), PhysiqueOSTheme.macroCarbohydrates),
             ("Fat", Self.formatWhole(totals.fatG, unit: "g"), PhysiqueOSTheme.macroFat),
-            ("Fiber", Self.formatWhole(totals.fiberG, unit: "g"), PhysiqueOSTheme.textPrimary),
+            ("Fiber", Self.formatWhole(totals.fiberG, unit: "g"), PhysiqueOSTheme.redesignInk),
         ]
     }
 
@@ -345,14 +344,14 @@ struct NutritionMacroGridView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tile.label)
                         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     Text(tile.value)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(tile.color)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceElevated)
+                .background(PhysiqueOSTheme.redesignPaper)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(tile.label): \(tile.value)")

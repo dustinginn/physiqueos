@@ -40,17 +40,17 @@ struct NutritionTrendChartView: View {
             if validPoints.isEmpty {
                 Text(emptyMessage)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     .frame(maxWidth: .infinity, minHeight: 100)
             } else if validPoints.count == 1, let only = validPoints.first, let value = only.value {
                 VStack(spacing: 4) {
                     Circle().fill(color).frame(width: 10, height: 10)
                     Text(valueLabel(value))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Text("More weekly history is needed to show a trend.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 100)
             } else {
@@ -98,14 +98,14 @@ struct NutritionTrendChartView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(TrainingDateFormatting.short(selectedPoint.weekStart)) – \(TrainingDateFormatting.short(selectedPoint.weekEnd))")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Text("\(valueLabel(value)) average · \(selectedPoint.loggedDayCount) logged day\(selectedPoint.loggedDayCount == 1 ? "" : "s")")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceMuted)
+                .background(PhysiqueOSTheme.redesignSoft)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
         }
@@ -132,7 +132,7 @@ struct NutritionBarChartView: View {
         if maxValue <= 0 {
             Text(emptyMessage)
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 80)
         } else {
             HStack(alignment: .bottom, spacing: 12) {
@@ -140,18 +140,18 @@ struct NutritionBarChartView: View {
                     VStack(spacing: 4) {
                         Text(bar.value > 0 ? String(Int(bar.value.rounded())) : "—")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         RoundedRectangle(cornerRadius: 4)
                             .fill(bar.color)
                             .frame(height: max(4, 84 * bar.value / maxValue))
                         Text(bar.label)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                         Text(bar.caption)
                             .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -183,7 +183,7 @@ struct NutritionDonutChartView: View {
         if slices.isEmpty || slices.allSatisfy({ $0.percentage == 0 }) {
             Text(emptyMessage)
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 100)
         } else {
             HStack(spacing: 16) {
@@ -195,7 +195,7 @@ struct NutritionDonutChartView: View {
                             Circle().fill(slice.color).frame(width: 8, height: 8)
                             Text("\(slice.label) \(slice.percentage)% · \(Int(slice.grams))g")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         }
                     }
                 }
@@ -214,7 +214,7 @@ struct NutritionDonutChartView: View {
             }
             Text(centerLabel)
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .multilineTextAlignment(.center)
                 .padding(8)
         }
