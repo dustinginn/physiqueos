@@ -356,7 +356,7 @@ Add destination cases, coding, shared router handling, screens/read models and t
 Acceptance:
 From You, Goals and Operating Plan behave unchanged. Settings opens the compact target root; each approved row reaches exactly one typed destination and returns correctly. No dead Integrations, Coming Soon, Founder device diagnostics, raw tokens or Evidence duplication appear.
 
-Status: PARTIALLY RESOLVED by Redesign Implementation Batch 1 (`c4a74ad09f4a163c80fc7ba3031bd76ef11a8c70`). You now has the locked product hierarchy and typed live routes for Goals, Operating Plan, Settings, Appearance and Founder connection. Profile, Data Sources / Apple Health detail and Sign Out remain deliberately unimplemented pending the separate contracts below; no dead tappable rows were added.
+Status: PARTIALLY RESOLVED by Redesign Implementation Batch 1 (`c4a74ad0855a0500e42a90a81d6f4a871e5cc3c5`). You now has the locked product hierarchy and typed live routes for Goals, Operating Plan, Settings, Appearance and Founder connection. Profile, Data Sources / Apple Health detail and Sign Out remain deliberately unimplemented pending the separate contracts below; no dead tappable rows were added.
 
 ### Profile — canonical read, versioned edit and durable fields
 

@@ -6,8 +6,8 @@ Machine-readable interface: `agent-handoffs/latest.json`.
 - Status: **Founder-approved implementation candidate**
 - Native base: Build 86 `cec8af20a6121bb66ecca3ba9f667d91774a891c`
 - Implementation branch: `codex/redesign-batch1-home-goals-you-20261005`
-- Exact implementation commit: `c4a74ad09f4a163c80fc7ba3031bd76ef11a8c70`
-- Main report commit: `ab173560b1ddc128d42f9eb7ddefa4b8909ba067`
+- Exact implementation commit: `c4a74ad0855a0500e42a90a81d6f4a871e5cc3c5`
+- Main report commit: `ab173560e2258cc1ae9045452efc0b1be8ad1d0f`
 - Report: `agent-handoffs/reports/20261005T024500Z-redesign-implementation-batch1-home-goals-you.md`
 - Artifacts: `agent-handoffs/artifacts/redesign-implementation-batch1-20261005/`
 

@@ -4,8 +4,8 @@
   "task": {"id": "redesign-implementation-batch1-home-goals-you-20261005", "title": "Redesign Implementation Batch 1 — Home, Goals, You / Settings", "agent": "codex", "status": "founder_approved_candidate"},
   "repository": "dustinginn/physiqueos",
   "authority": {"prompt_commit": "f4bd9c50c6a0132d700f41cb894788e5a61d8ff6", "native_base_sha": "cec8af20a6121bb66ecca3ba9f667d91774a891c", "native_build": 86, "native_version": "1.0"},
-  "publication": {"implementation_branch": "codex/redesign-batch1-home-goals-you-20261005", "implementation_commit": "c4a74ad09f4a163c80fc7ba3031bd76ef11a8c70", "main_report_commit": "ab173560b1ddc128d42f9eb7ddefa4b8909ba067", "report_path": "agent-handoffs/reports/20261005T024500Z-redesign-implementation-batch1-home-goals-you.md", "artifact_root": "agent-handoffs/artifacts/redesign-implementation-batch1-20261005"},
+  "publication": {"implementation_branch": "codex/redesign-batch1-home-goals-you-20261005", "implementation_commit": "c4a74ad0855a0500e42a90a81d6f4a871e5cc3c5", "main_report_commit": "ab173560e2258cc1ae9045452efc0b1be8ad1d0f", "report_path": "agent-handoffs/reports/20261005T024500Z-redesign-implementation-batch1-home-goals-you.md", "artifact_root": "agent-handoffs/artifacts/redesign-implementation-batch1-20261005"},
   "result": {"summary": "Founder-approved Home, Goals, and You/Settings redesign implementation candidate with final Home corrections and Dark/Mineral real-simulator review artifacts.", "focused_tests_pass": true, "full_suite_preexisting_failure_only": true, "release_compile_pass": true, "server_changed": false, "watch_healthkit_changed": false, "testflight_uploaded": false},
   "deferred": ["Profile write contract", "Data Sources projection", "Sign Out coordinator"],
-  "recommended_next_step": "Integrate c4a74ad09f4a163c80fc7ba3031bd76ef11a8c70 onto the next authorized Native head, then begin locked Log and Training Logger Batch 2."
+  "recommended_next_step": "Integrate c4a74ad0855a0500e42a90a81d6f4a871e5cc3c5 onto the next authorized Native head, then begin locked Log and Training Logger Batch 2."
 }
