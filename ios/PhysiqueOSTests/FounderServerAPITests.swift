@@ -2333,6 +2333,74 @@ final class FounderServerAPITests: XCTestCase {
     /// pending, Founder Production must show that honestly (the server's
     /// own "Nothing logged yet" / an empty review queue) rather than
     /// falling back to fixture content to fill the screen.
+    /// Batch 2 D1: typed Logged Today provenance drives the Log Sources
+    /// disclosure and the tiles' provenance-free detail; Native never parses
+    /// "Apple Health" out of the legacy `context` caption.
+    func testProductionLogDecodesTypedProvenanceForLogSources() async throws {
+        let data = #"{"localDate":"2026-10-03","loggedToday":{"rows":[{"id":"training","summary":"Strength Training · 64 min, Stair Stepper · 13 min","context":null,"contextDetail":null,"provenance":null,"recordId":null,"lines":[{"id":"training:logger","kind":"logger","summary":"Strength Training · 64 min","provenance":{"scope":"Strength Training","sources":[{"kind":"physiqueos_logger","label":"PhysiqueOS Logger"}]}},{"id":"training:cardio:stair-stepper","kind":"cardio","summary":"Stair Stepper · 13 min","provenance":{"scope":"Stair Stepper","sources":[{"kind":"apple_health","label":"Apple Health"}]}}]},{"id":"nutrition","summary":"2,516 calories","context":"215P · 161C · 111F · Apple Health","contextDetail":"215P · 161C · 111F","provenance":{"scope":"Nutrition","sources":[{"kind":"apple_health","label":"Apple Health"}]},"recordId":"nutrition-day"},{"id":"activity","summary":"771 active calories so far","context":"Apple Health","contextDetail":null,"provenance":{"scope":"Activity","sources":[{"kind":"apple_health","label":"Apple Health"}]},"recordId":"activity-day"}]},"pendingEvidenceReviews":[]}"#
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: data),
+                "weight": productionWeightForLogJSON(date: "2026-10-03", value: 176.7),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+        XCTAssertTrue(log.usesTypedProvenance)
+        XCTAssertEqual(log.sources, [
+            LoggedTodaySourceEntry(source: "Apple Health", scope: ["Stair Stepper", "Nutrition", "Activity"]),
+            LoggedTodaySourceEntry(source: "PhysiqueOS Logger", scope: ["Strength Training"]),
+            LoggedTodaySourceEntry(source: "Weight", scope: ["Source unavailable"]),
+        ])
+        // Tiles show the provenance-free detail, never the old caption.
+        XCTAssertEqual(log.loggedToday[1].displayContext(typedProvenance: true), "215P · 161C · 111F")
+        XCTAssertNil(log.loggedToday[2].displayContext(typedProvenance: true))
+        // Legacy text is still decoded verbatim for older presentation paths.
+        XCTAssertEqual(log.loggedToday[1].context, "215P · 161C · 111F · Apple Health")
+        XCTAssertEqual(log.loggedToday[0].displayLines.map(\.summary), ["Strength Training · 64 min", "Stair Stepper · 13 min"])
+    }
+
+    /// An older Server (no typed provenance keys) keeps today's behavior:
+    /// the legacy caption stays on the tile and no Sources disclosure shows.
+    func testProductionLogWithoutTypedProvenanceKeepsLegacyCaptionAndNoSources() async throws {
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["evidence-review-queue": productionLogJSON, "weight": productionWeightForLogJSON(date: "2026-09-10", value: 172.9)]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+        XCTAssertFalse(log.usesTypedProvenance)
+        XCTAssertTrue(log.sources.isEmpty)
+        for row in log.loggedToday {
+            XCTAssertEqual(row.displayContext(typedProvenance: log.usesTypedProvenance), row.context)
+        }
+    }
+
+    /// A malformed line provenance never fails the Log read or drops the line.
+    func testProductionLogToleratesMalformedLineProvenance() async throws {
+        let data = #"{"localDate":"2026-10-03","loggedToday":{"rows":[{"id":"training","summary":"Strength Training · 64 min","context":null,"contextDetail":null,"provenance":null,"recordId":"s1","lines":[{"id":"training:logger","kind":"logger","summary":"Strength Training · 64 min","provenance":{"scope":7,"sources":"nope"}}]},{"id":"nutrition","summary":"Nothing logged yet","context":null,"contextDetail":null,"provenance":{"scope":"Nutrition"},"recordId":null},{"id":"activity","summary":"Nothing logged yet","context":null,"contextDetail":null,"provenance":null,"recordId":null}]},"pendingEvidenceReviews":[]}"#
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "evidence-review-queue": productionEnvelope(resource: "evidence-review-queue", data: data),
+                "weight": productionWeightForLogJSON(date: nil, value: nil),
+            ]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let log = try await ProductionLogAPI(api: native).fetchLog()
+        XCTAssertEqual(log.loggedToday[0].summary, "Strength Training · 64 min")
+        XCTAssertNil(log.loggedToday[0].lines?.first?.provenance)
+        XCTAssertNil(log.loggedToday[1].provenance)
+        XCTAssertTrue(log.sources.isEmpty)
+    }
+
     func testProductionLogWithNothingLoggedYetShowsHonestEmptyStateNotFixtureFallback() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),

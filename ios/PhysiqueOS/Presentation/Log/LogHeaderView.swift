@@ -1,23 +1,28 @@
 import SwiftUI
 
-/// Mirrors `LogHubScreen.jsx`'s header: an eyebrow, a headline, and a
-/// subtitle. The web also renders a "Back to Home" link above this, which
-/// native intentionally omits — Log is a peer tab of Home, not a pushed
-/// page requiring its own way back (see `docs/PHYSIQUEOS_NATIVE_V1.md`).
+/// The locked Log header: eyebrow, headline and subtitle. Copy is the
+/// canonical `LogHubScreen.jsx` header; Log is a peer tab of Home, so the
+/// web's "Back to Home" link stays omitted (see `docs/PHYSIQUEOS_NATIVE_V1.md`).
 struct LogHeaderView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             Text("Log")
-                .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                .foregroundStyle(PhysiqueOSTheme.accent)
+                .logText(LogType.eyebrow)
+                .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+                .padding(.bottom, 5)
             Text("What happened?")
-                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .logText(LogType.title)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Text("Upload a screenshot, photo, PDF, or note and PhysiqueOS will organize it.")
-                .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .logText(LogType.subtitle)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 6)
         }
+        .padding(.top, 2)
+        .padding(.bottom, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 }

@@ -1,64 +1,82 @@
 import SwiftUI
 
-/// Mirrors `PendingEvidenceReviews` inside `LogHubScreen.jsx`: uploads
-/// still awaiting the Founder's review before they become canonical
-/// evidence. Tapping a review routes to `AppDestination.evidenceReview` —
-/// Evidence Review itself remains a future slice, but the entry point and
-/// its meaning (this evidence is NOT canonical yet) must be represented
-/// correctly.
+/// The locked pending review band: uploads still awaiting the Founder's
+/// review before they become canonical evidence. Each review routes to
+/// `AppDestination.evidenceReview`; a likely duplicate keeps its warning.
 struct PendingEvidenceReviewsCardView: View {
     let reviews: [PendingEvidenceReview]
     var onTap: (AppDestination) -> Void
 
     var body: some View {
-        CardContainer(padding: .sm) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    IconBadge(systemImage: "list.clipboard.fill", color: .primary, size: .sm)
-                    Text("Uploads ready to review")
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Uploads ready to review")
+                .logText(LogType.rowLabel)
+                .foregroundStyle(PhysiqueOSTheme.redesignAmberInk)
+                .accessibilityAddTraits(.isHeader)
+            Text("Finish checking these uploads before adding them to your history.")
+                .logText(LogType.meta12)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(Array(reviews.enumerated()), id: \.element.id) { index, review in
+                Button { onTap(review.destination) } label: {
+                    reviewItem(review)
                 }
-                Text("Finish checking these uploads before adding them to your history.")
-                    .physiqueOSFont(PhysiqueOSTypography.body14Regular)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                VStack(spacing: 8) {
-                    ForEach(reviews) { review in
-                        Button { onTap(review.destination) } label: {
-                            reviewRow(review)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
+                .buttonStyle(.plain)
+                .padding(.top, index == 0 ? 0 : 6)
+                .accessibilityIdentifier("log.review.\(review.id)")
             }
         }
+        .padding(.vertical, 11)
+        .padding(.horizontal, 12)
+        .padding(.leading, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LogBandBackground(tone: PhysiqueOSTheme.redesignAmberInk))
     }
 
-    private func reviewRow(_ review: PendingEvidenceReview) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private func reviewItem(_ review: PendingEvidenceReview) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             Text(review.title)
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text(review.date)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            Text(review.summary)
-                .physiqueOSFont(PhysiqueOSTypography.body14Regular)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .logText(LogType.reviewTitle)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                .padding(.top, 5)
+            Text("\(review.date) · \(review.summary)")
+                .logText(LogType.meta12)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                // CSS `margin: 4px 0`; the bottom 4 collapses into the
+                // action's 6 pt top margin.
+                .padding(.top, 4)
             if review.likelyDuplicate {
-                Text("This may be another copy of an earlier upload.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                Label("This may be another copy of an earlier upload.", systemImage: "exclamationmark.triangle.fill")
+                    .labelStyle(LogInlineWarningLabelStyle())
+                    .logText(LogType.meta12)
+                    .foregroundStyle(PhysiqueOSTheme.redesignAmberInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
             }
-            Text("Review before adding to your history")
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.accent)
+            Text("Review before adding to your history →")
+                .logText(LogType.action12)
+                .foregroundStyle(PhysiqueOSTheme.redesignAmberInk)
+                .padding(.top, 6)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .accessibilityElement(children: .combine)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([
+            review.title, review.date, review.summary,
+            review.likelyDuplicate ? "This may be another copy of an earlier upload." : nil,
+            "Review before adding to your history",
+        ].compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Icon + text so the duplicate warning is never color-only.
+private struct LogInlineWarningLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            configuration.icon.font(.system(size: 10, weight: .bold))
+            configuration.title
+        }
     }
 }

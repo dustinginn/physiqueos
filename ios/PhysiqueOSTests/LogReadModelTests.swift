@@ -155,4 +155,52 @@ final class LogReadModelTests: XCTestCase {
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(LogReadModel.self, from: data)
     }
+
+    // MARK: - Log Sources (Batch 2 D1)
+
+    private func row(_ kind: LoggedTodayRowKind, _ scope: String?, _ kinds: [(String, String)], lines: [LoggedTodayLine]? = nil) -> LoggedTodayRow {
+        LoggedTodayRow(
+            kind: kind, summary: "x", context: nil,
+            provenance: scope.map { LoggedTodayProvenance(scope: $0, sources: kinds.map { LoggedTodaySource(kind: $0.0, label: $0.1) }) },
+            destination: nil, lines: lines
+        )
+    }
+
+    func testSourcesGroupKnownSourcesInFixedOrderAndListUnattributedScopesLast() {
+        let logger = LoggedTodaySource(kind: "physiqueos_logger", label: "PhysiqueOS Logger")
+        let apple = LoggedTodaySource(kind: "apple_health", label: "Apple Health")
+        let rows = [
+            row(.training, nil, [], lines: [
+                LoggedTodayLine(id: "l", kind: "logger", summary: "S", provenance: .init(scope: "Strength Training", sources: [logger, apple])),
+                LoggedTodayLine(id: "c", kind: "cardio", summary: "C", provenance: .init(scope: "Stair Stepper", sources: [apple])),
+            ]),
+            row(.nutrition, "Nutrition", [("unavailable", "Source unavailable")]),
+            row(.activity, "Activity", [("apple_health", "Apple Health")]),
+            row(.weight, "Weight", [("unavailable", "Source unavailable")]),
+        ]
+        XCTAssertEqual(LoggedTodaySourceEntry.entries(for: rows), [
+            LoggedTodaySourceEntry(source: "Apple Health", scope: ["Strength Training", "Stair Stepper", "Activity"]),
+            LoggedTodaySourceEntry(source: "PhysiqueOS Logger", scope: ["Strength Training"]),
+            LoggedTodaySourceEntry(source: "Nutrition", scope: ["Source unavailable"]),
+            LoggedTodaySourceEntry(source: "Weight", scope: ["Source unavailable"]),
+        ])
+    }
+
+    func testSourcesKeepANewerServerSourceWithItsOwnLabel() {
+        let rows = [row(.nutrition, "Nutrition", [("future_source", "Future Source")])]
+        XCTAssertEqual(LoggedTodaySourceEntry.entries(for: rows), [LoggedTodaySourceEntry(source: "Future Source", scope: ["Nutrition"])])
+    }
+
+    func testSourcesAreOnlyPresentedForTheTypedContract() {
+        var log = LogReadModel(localDate: "2026-10-03", loggedToday: [row(.activity, "Activity", [("apple_health", "Apple Health")])], pendingEvidenceReviews: [])
+        XCTAssertTrue(log.sources.isEmpty)
+        log.typedProvenance = true
+        XCTAssertEqual(log.sources.map(\.source), ["Apple Health"])
+    }
+
+    func testTileDetailUsesContextDetailOnlyForTheTypedContract() {
+        let tile = LoggedTodayRow(kind: .nutrition, summary: "2,516 calories", context: "215P · Apple Health", contextDetail: "215P", destination: nil)
+        XCTAssertEqual(tile.displayContext(typedProvenance: true), "215P")
+        XCTAssertEqual(tile.displayContext(typedProvenance: false), "215P · Apple Health")
+    }
 }

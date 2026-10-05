@@ -855,12 +855,17 @@ struct ProductionLogAPI: LogAPI {
                 kind: row.id,
                 summary: row.summary,
                 context: row.context,
+                contextDetail: row.contextDetail,
+                provenance: row.provenance,
                 destination: Self.destination(for: row, localDate: payload.localDate),
                 processing: row.processing,
                 lines: row.lines?.values
             )
         }
         rows.append(Self.weightRow(weightPayload, localDate: payload.localDate))
+        // Typed Log Sources: only a Server that composes the provenance
+        // contract (the key is present, even when null on an empty row).
+        let typedProvenance = payload.loggedToday.rows.contains(where: \.hasTypedProvenance)
 
         // `evidence-review-queue`'s Training row is keyed entirely off a
         // Training Logger session (`LoggedTodayService.js`'s own documented,
@@ -947,7 +952,8 @@ struct ProductionLogAPI: LogAPI {
             localDate: payload.localDate,
             loggedToday: rows,
             pendingEvidenceReviews: pending,
-            processingEvidenceReviews: processing
+            processingEvidenceReviews: processing,
+            typedProvenance: typedProvenance
         )
     }
 
@@ -961,6 +967,8 @@ struct ProductionLogAPI: LogAPI {
         else { return }
         rows[index].summary = "\(kind.label) processing"
         rows[index].context = "Confirmation accepted · No action required"
+        rows[index].contextDetail = "Confirmation accepted · No action required"
+        rows[index].provenance = nil
         rows[index].processing = true
         rows[index].lines = nil
     }
@@ -995,7 +1003,13 @@ struct ProductionLogAPI: LogAPI {
         }
         let unit = current.unit ?? "lb"
         let formatted = current.value.rounded() == current.value ? String(Int(current.value)) : String(format: "%.1f", current.value)
-        return LoggedTodayRow(kind: .weight, summary: "\(formatted) \(unit)", context: nil, destination: .progressStream(streamId: "weight"))
+        // The exact-date `weight.current` read carries no source, so Log
+        // Sources names Weight as unattributed rather than guessing one.
+        return LoggedTodayRow(
+            kind: .weight, summary: "\(formatted) \(unit)", context: nil,
+            provenance: LoggedTodayProvenance(scope: LoggedTodayRowKind.weight.label, sources: [.unavailable]),
+            destination: .progressStream(streamId: "weight")
+        )
     }
 
     private struct WeightPayload: Decodable, @unchecked Sendable {
@@ -1023,9 +1037,31 @@ struct ProductionLogAPI: LogAPI {
         var id: LoggedTodayRowKind
         var summary: String
         var context: String?
+        var contextDetail: String?
+        var provenance: LoggedTodayProvenance?
         var recordId: String?
         var processing: Bool?
         var lines: LossyLines?
+        /// The typed provenance contract is present (its value may be null).
+        var hasTypedProvenance = false
+
+        private enum CodingKeys: String, CodingKey {
+            case id, summary, context, contextDetail, provenance, recordId, processing, lines
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(LoggedTodayRowKind.self, forKey: .id)
+            summary = try container.decode(String.self, forKey: .summary)
+            context = try container.decodeIfPresent(String.self, forKey: .context)
+            contextDetail = try? container.decodeIfPresent(String.self, forKey: .contextDetail)
+            // A malformed provenance never fails the whole Log read.
+            provenance = try? container.decodeIfPresent(LoggedTodayProvenance.self, forKey: .provenance)
+            recordId = try container.decodeIfPresent(String.self, forKey: .recordId)
+            processing = try container.decodeIfPresent(Bool.self, forKey: .processing)
+            lines = try container.decodeIfPresent(LossyLines.self, forKey: .lines)
+            hasTypedProvenance = container.contains(.provenance)
+        }
     }
 
     /// Decodes each line independently so one malformed line never fails the
@@ -1041,10 +1077,22 @@ struct ProductionLogAPI: LogAPI {
                 values.append(LoggedTodayLine(
                     id: element["id"]?.string ?? "line-\(values.count)",
                     kind: element["kind"]?.string ?? "",
-                    summary: summary
+                    summary: summary,
+                    provenance: Self.provenance(element["provenance"])
                 ))
             }
             self.values = values
+        }
+
+        /// Lossy typed provenance: a line with a malformed provenance keeps
+        /// its summary and simply carries no attribution.
+        private static func provenance(_ value: BriefingJSONValue?) -> LoggedTodayProvenance? {
+            guard let value, let scope = value["scope"]?.literalString, !scope.isEmpty else { return nil }
+            let sources = (value["sources"]?.array ?? []).compactMap { source -> LoggedTodaySource? in
+                guard let kind = source["kind"]?.literalString, let label = source["label"]?.literalString else { return nil }
+                return LoggedTodaySource(kind: kind, label: label)
+            }
+            return sources.isEmpty ? nil : LoggedTodayProvenance(scope: scope, sources: sources)
         }
     }
 

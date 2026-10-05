@@ -157,6 +157,14 @@ enum PhysiqueOSTheme {
     static let redesignAmberField = dynamic(dark: 0xF4BC48, light: 0xC98220)
     static let redesignCoachField = dynamic(dark: 0x122A55, light: 0xDDE8F1)
     static let redesignRule = dynamic(dark: 0xA7BCC5, light: 0x6E817F, darkOpacity: 0.18, lightOpacity: 0.22)
+    // Batch 2 additions from the locked Log Compact Command Center. Mineral
+    // Light uses deeper ink variants of amber/cyan wherever they are text or
+    // thin semantic rules, so those stay legible on paper surfaces.
+    static let redesignMuted = dynamic(dark: 0x92A5AF, light: 0x5D7279)
+    static let redesignAmberInk = dynamic(dark: 0xEFB84F, light: 0x925500)
+    static let redesignCyanInk = dynamic(dark: 0x3BC6DD, light: 0x10708A)
+    static let redesignOnAmber = dynamic(dark: 0x10202A, light: 0xFFFAF1)
+    static let redesignHairline = dynamic(dark: 0x9DB3BD, light: 0x193842, darkOpacity: 0.184, lightOpacity: 0.169)
 
     private static func dynamic(
         dark: UInt32,
