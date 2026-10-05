@@ -47,11 +47,11 @@ struct EvidenceReviewDetailView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button { dismiss() } label: {
@@ -61,7 +61,7 @@ struct EvidenceReviewDetailView: View {
                         Text("Back")
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -85,6 +85,15 @@ struct EvidenceReviewDetailView: View {
     }
 
     private func load() async {
+#if DEBUG
+        if let review = EvidenceReviewRedesignFixture.review(id: reviewId) {
+            state = .loaded(review)
+            if reviewId == EvidenceReviewRedesignFixture.dexaCorrectionID {
+                beginEditingMeasurements(review: review)
+            }
+            return
+        }
+#endif
         state = .loading
         do {
             let review = try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId)
@@ -107,12 +116,12 @@ struct EvidenceReviewDetailView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             Text("This Evidence Review could not be found.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let review)):
             VStack(alignment: .leading, spacing: 18) {
@@ -127,29 +136,38 @@ struct EvidenceReviewDetailView: View {
         }
     }
 
+    @ViewBuilder
     private func header(for review: EvidenceReviewDetailReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(review.workoutReconciliation == nil ? "Evidence Review" : "Workout Match")
-                .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                .foregroundStyle(PhysiqueOSTheme.accent)
-            Text(Self.statusLabel(review.status))
-                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            HStack(spacing: 8) {
+        if review.workoutReconciliation == nil {
+            EvidenceWorkflowHero(
+                eyebrow: "Evidence Review",
+                title: Self.statusLabel(review.status),
+                metadata: [
+                    Self.occurrenceDateLabel(for: review),
+                    review.version.map { "Version \($0)" },
+                ].compactMap { $0 }
+            )
+            .accessibilityIdentifier("evidenceReviewDetail.occurrenceDate")
+        } else {
+            // The generic redesign deliberately leaves Workout Match on its
+            // isolated presentation branch. Batch 2's locked L13 view replaces
+            // this compatibility fallback when the two authorities integrate.
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Workout Match")
+                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
+                    .foregroundStyle(PhysiqueOSTheme.accent)
+                Text(Self.statusLabel(review.status))
+                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 if let occurrence = Self.occurrenceDateLabel(for: review) {
                     Text(occurrence)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         .accessibilityIdentifier("evidenceReviewDetail.occurrenceDate")
                 }
-                if let version = review.version {
-                    Text("Version \(version)")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// The date the evidence actually occurred, read from the review's own
@@ -191,23 +209,23 @@ struct EvidenceReviewDetailView: View {
         if let reconciliation = review.workoutReconciliation {
             workoutReconciliationCard(reconciliation)
         } else {
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 10) {
                 TrainingSectionHeaderView(title: "Captured Evidence")
                 if let summary = review.summary {
                     Text(summary)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 if let excluded = review.excludedSummary {
                     Label(excluded, systemImage: "minus.circle")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 if review.items.isEmpty {
                     Text("No evidence items are attached to this review.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 6) {
                         ForEach(review.items) { item in
@@ -216,22 +234,22 @@ struct EvidenceReviewDetailView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.title ?? Self.typeLabel(item.type))
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     if let source = item.sourceLabel {
                                         Text(source)
                                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                     }
                                 }
                                 Spacer(minLength: 8)
                                 VStack(alignment: .trailing, spacing: 3) {
                                     Label(item.included ? "Included" : "Excluded", systemImage: item.included ? "checkmark.circle.fill" : "minus.circle.fill")
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(item.included ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textMuted)
+                                        .foregroundStyle(item.included ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.redesignInkSecondary)
                                     if let date = item.date {
                                         Text(Self.evidenceDateLabel(date))
                                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                     }
                                 }
                             }
@@ -244,11 +262,11 @@ struct EvidenceReviewDetailView: View {
                                                 .foregroundStyle(item.type == "nutrition" ? Self.nutritionMetricColor(metric.label) : PhysiqueOSTheme.accent)
                                             Text(metric.value)
                                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                         }
                                         .padding(10)
                                         .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(PhysiqueOSTheme.surfaceMuted)
+                                        .background(PhysiqueOSTheme.redesignSoft)
                                         .clipShape(RoundedRectangle(cornerRadius: 12))
                                     }
                                 }
@@ -257,7 +275,7 @@ struct EvidenceReviewDetailView: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(exercise.name)
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     if let occurrence = exercise.occurrenceLabel { detailText(occurrence) }
                                     if let variant = exercise.variantLabel { detailText(variant) }
                                     if !exercise.sets.isEmpty { detailText(exercise.sets.joined(separator: " · ")) }
@@ -273,7 +291,7 @@ struct EvidenceReviewDetailView: View {
                                 VStack(alignment: .leading, spacing: 5) {
                                     Text(meal.name)
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     if !meal.summary.isEmpty { detailText(meal.summary) }
                                     ForEach(meal.foods) { food in
                                         let details = [food.brand, food.serving, food.calories].compactMap { $0 }.joined(separator: " · ")
@@ -312,24 +330,24 @@ struct EvidenceReviewDetailView: View {
     }
 
     private func workoutReconciliationCard(_ reconciliation: WorkoutReconciliationDetail) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: reconciliation.title)
                 Text(reconciliation.summary)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("APPLE HEALTH WORKOUT")
                         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                         .foregroundStyle(PhysiqueOSTheme.accent)
                     Text(Self.workoutTypeLabel(reconciliation.workout.canonicalType))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Text(Self.timeRange(start: reconciliation.workout.startedAt, end: reconciliation.workout.endedAt))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
-                Divider().overlay(PhysiqueOSTheme.divider)
+                Divider().overlay(PhysiqueOSTheme.redesignRule)
                 Text("POSSIBLE LOGGER SESSIONS")
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.accent)
@@ -337,16 +355,16 @@ struct EvidenceReviewDetailView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Logger session \(index + 1)")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         Text(Self.workoutTypeLabel(candidate.activityType))
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         Text(Self.timeRange(start: candidate.startedAt, end: candidate.endedAt))
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         Text("\(candidate.confidence)% match · \(Self.matchBasisLabel(candidate.basis))")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 5)
@@ -359,7 +377,7 @@ struct EvidenceReviewDetailView: View {
     private func detailText(_ value: String) -> some View {
         Text(value)
             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
     }
 
     private func dexaMeasurementSummary(_ measurements: DEXAScanMeasurements) -> some View {
@@ -370,7 +388,7 @@ struct EvidenceReviewDetailView: View {
             if let fatMass = measurements.fatMassLb { Text("Fat mass: \(Self.formatNumber(fatMass)) lb") }
         }
         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         .padding(.leading, 4)
     }
 
@@ -385,7 +403,7 @@ struct EvidenceReviewDetailView: View {
                     .compactMap { $0 }.joined(separator: " · ")
                 Label(identity.isEmpty ? "Pose needs review" : identity, systemImage: "photo")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
             }
         }
         .padding(.top, 3)
@@ -418,7 +436,7 @@ struct EvidenceReviewDetailView: View {
                             .buttonStyle(.bordered)
                             .accessibilityIdentifier("evidenceReview.correctMeasurements")
                     }
-                    PrimaryActionButton(title: "Confirm", tone: .accent) {
+                    EvidenceWorkflowPrimaryButton(title: "Confirm") {
                         Task { await confirm(review: review) }
                     }.accessibilityIdentifier("evidenceReview.confirm")
                     if ["pending", "commit_failed"].contains(review.status) {
@@ -431,25 +449,25 @@ struct EvidenceReviewDetailView: View {
         case .editingMeasurements:
             EmptyView() // the measurement card itself carries its own Save action
         case .savingMeasurements:
-            CardContainer { VStack(alignment: .leading, spacing: 8) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 8) {
                 ProgressView().tint(PhysiqueOSTheme.accent)
                 Text("Saving corrections…")
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading) }
         case .confirming(let message):
-            CardContainer { VStack(alignment: .leading, spacing: 8) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 8) {
                 ProgressView().tint(PhysiqueOSTheme.accent)
                 Text(message)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading) }
         case .dismissing:
-            CardContainer { VStack(alignment: .leading, spacing: 8) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 8) {
                 ProgressView().tint(PhysiqueOSTheme.accent)
                 Text("Dismissing review…")
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading) }
         case .dismissed:
-            Label("Dismissed", systemImage: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.textSecondary)
+            Label("Dismissed", systemImage: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         case .accepted:
             completionActions(label: "Confirmation accepted")
         case .confirmed:
@@ -467,24 +485,24 @@ struct EvidenceReviewDetailView: View {
                 )
             }
         case .stillProcessing:
-            CardContainer { VStack(alignment: .leading, spacing: 6) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 6) {
                 Text("Still confirming").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                 Text("This is taking longer than usual. Reopen this review in a moment to check its status — confirmation continues on the server regardless of this screen.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 Button("Check Now") { Task { await load(); actionState = .idle } }
             }.frame(maxWidth: .infinity, alignment: .leading) }
         case .refreshRequired(let message):
-            CardContainer { VStack(alignment: .leading, spacing: 8) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 8) {
                 Text("Refresh required").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                 Text(message)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 Button("Refresh Review") { Task { actionState = .idle; await load() } }
             }.frame(maxWidth: .infinity, alignment: .leading) }
         case .failed(let message):
             VStack(alignment: .leading, spacing: 10) {
                 Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(PhysiqueOSTheme.destructive)
-                PrimaryActionButton(title: "Try Again", tone: .accent) { actionState = .idle }
+                EvidenceWorkflowPrimaryButton(title: "Try Again") { actionState = .idle }
             }
         }
     }
@@ -498,8 +516,8 @@ struct EvidenceReviewDetailView: View {
                 .foregroundStyle(PhysiqueOSTheme.chartSuccess)
             Text(detail)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            PrimaryActionButton(title: "Back to Log", tone: .accent) {
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+            EvidenceWorkflowPrimaryButton(title: "Back to Log") {
                 onReturnToLog()
                 dismiss()
             }
@@ -527,10 +545,10 @@ struct EvidenceReviewDetailView: View {
     }
 
     private func dexaMeasurementCard(review: EvidenceReviewDetailReadModel, item: EvidenceReviewDetailItem) -> some View {
-        CardContainer { VStack(alignment: .leading, spacing: 12) {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 12) {
             Text("Correct the interpreted scan").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
             Text("Every field is resent together — the server replaces the full measurement set, it does not merge.")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             measurementField("Measured date (YYYY-MM-DD)", key: "measuredAt")
             measurementField("Total mass (lb)", key: "totalMass")
             measurementField("Body fat (%)", key: "bodyFat")
@@ -542,7 +560,7 @@ struct EvidenceReviewDetailView: View {
             measurementField("Visceral fat volume (in³)", key: "vatVolume")
             HStack(spacing: 10) {
                 Button("Cancel") { actionState = .idle }.buttonStyle(.bordered)
-                PrimaryActionButton(title: "Save Corrections", tone: .accent) {
+                EvidenceWorkflowPrimaryButton(title: "Save Corrections") {
                     Task { await saveMeasurements(review: review, item: item) }
                 }.accessibilityIdentifier("evidenceReview.saveMeasurements")
             }
@@ -551,7 +569,7 @@ struct EvidenceReviewDetailView: View {
 
     private func measurementField(_ label: String, key: String) -> some View {
         HStack {
-            Text(label).physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            Text(label).physiqueOSFont(PhysiqueOSTypography.caption12Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             Spacer()
             NumericEditField(text: Binding(get: { measurementTexts[key] ?? "" }, set: { measurementTexts[key] = $0 }), accessibilityLabel: label)
                 .frame(width: 110, height: 36)
@@ -1080,3 +1098,87 @@ struct EvidenceReviewDetailView: View {
         return date.formatted(date: .omitted, time: .shortened)
     }
 }
+
+#if DEBUG
+/// Deterministic screenshot-only read models. They use the production view
+/// and canonical model types, but bypass external reads so pixel review never
+/// mutates Founder data or depends on network state. This code is absent from
+/// Release builds.
+private enum EvidenceReviewRedesignFixture {
+    static let mixedID = "redesign-review-mixed"
+    static let dexaCorrectionID = "redesign-review-dexa-correction"
+
+    static func review(id: String) -> EvidenceReviewDetailReadModel? {
+        switch id {
+        case mixedID:
+            EvidenceReviewDetailReadModel(
+                id: id,
+                status: "pending",
+                createdAt: nil,
+                version: 4,
+                items: [
+                    EvidenceReviewDetailItem(
+                        id: "nutrition-1",
+                        type: "nutrition",
+                        date: "2026-09-23",
+                        title: "Nutrition",
+                        sourceLabel: "Screenshot",
+                        included: true,
+                        metrics: [
+                            .init(label: "Calories", value: "2,300 cal"),
+                            .init(label: "Protein", value: "198 g"),
+                            .init(label: "Carbs", value: "244 g"),
+                            .init(label: "Fat", value: "73 g"),
+                        ],
+                        reconciliation: "Daily totals\nMeal totals match the daily total."
+                    ),
+                    EvidenceReviewDetailItem(
+                        id: "activity-1",
+                        type: "activity",
+                        date: "2026-09-23",
+                        title: "Activity",
+                        sourceLabel: "Screenshot",
+                        included: false,
+                        metrics: [
+                            .init(label: "Active Calories", value: "650 cal"),
+                            .init(label: "Exercise", value: "45 min"),
+                        ]
+                    ),
+                ],
+                summary: "1 nutrition entry and 1 activity entry",
+                excludedSummary: "1 activity entry excluded"
+            )
+        case dexaCorrectionID:
+            EvidenceReviewDetailReadModel(
+                id: id,
+                status: "pending",
+                createdAt: nil,
+                version: 4,
+                items: [
+                    EvidenceReviewDetailItem(
+                        id: "dexa-1",
+                        type: "dexa_scan",
+                        date: "2026-09-23",
+                        title: "DEXA",
+                        sourceLabel: "BodySpec PDF",
+                        dexaMeasurements: DEXAScanMeasurements(
+                            measuredAt: "2026-09-23",
+                            totalMassLb: 172.9,
+                            bodyFatPercentage: 8.1,
+                            fatMassLb: 14.0,
+                            leanMassLb: 152.3,
+                            boneMineralContentLb: 6.6,
+                            restingMetabolicRateKcal: 1774,
+                            visceralAdiposeTissueMassLb: 0.24,
+                            visceralAdiposeTissueVolumeIn3: 7.1
+                        )
+                    ),
+                ],
+                summary: "1 DEXA scan"
+            )
+        default:
+            nil
+        }
+    }
+}
+#endif

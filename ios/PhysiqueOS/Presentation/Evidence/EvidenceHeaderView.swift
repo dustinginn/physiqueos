@@ -99,3 +99,103 @@ struct EvidenceStateView: View {
         .padding(20)
     }
 }
+
+/// Visual primitives shared by the locked Add Evidence and generic Evidence
+/// Review designs. These own presentation only; all workflow state and
+/// mutations remain in their existing production views.
+enum EvidenceWorkflowPalette {
+    static let intakeField = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.047, green: 0.133, blue: 0.176, alpha: 1)
+            : UIColor(red: 0.855, green: 0.925, blue: 0.914, alpha: 1)
+    })
+
+    static let actionStart = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.086, green: 0.620, blue: 0.584, alpha: 1)
+            : UIColor(red: 0.055, green: 0.525, blue: 0.482, alpha: 1)
+    })
+
+    static let actionEnd = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.102, green: 0.310, blue: 0.515, alpha: 1)
+            : UIColor(red: 0.075, green: 0.365, blue: 0.505, alpha: 1)
+    })
+}
+
+struct EvidenceWorkflowHero: View {
+    let eyebrow: String
+    let title: String
+    let metadata: [String]
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            LinearGradient(
+                colors: [PhysiqueOSTheme.redesignFieldStart, PhysiqueOSTheme.redesignFieldEnd],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Circle()
+                .stroke(PhysiqueOSTheme.redesignGreen.opacity(0.24), lineWidth: 28)
+                .frame(width: 178, height: 178)
+                .offset(x: 52, y: 82)
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text(eyebrow.uppercased())
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .tracking(1.7)
+                    .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+                Text(title)
+                    .font(.system(size: 31, weight: .black, design: .rounded))
+                    .tracking(-0.9)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                if !metadata.isEmpty {
+                    HStack(spacing: 16) {
+                        ForEach(metadata, id: \.self) { value in
+                            Text(value)
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+        }
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+struct EvidenceWorkflowPrimaryButton: View {
+    let title: String
+    var isEnabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(isEnabled ? Color.white : PhysiqueOSTheme.redesignInkSecondary)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background {
+                    if isEnabled {
+                        LinearGradient(
+                            colors: [EvidenceWorkflowPalette.actionStart, EvidenceWorkflowPalette.actionEnd],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    } else {
+                        PhysiqueOSTheme.redesignSoft
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .accessibilityLabel(title)
+    }
+}

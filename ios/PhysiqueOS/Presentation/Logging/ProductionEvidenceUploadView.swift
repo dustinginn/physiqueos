@@ -210,7 +210,7 @@ struct ProductionEvidenceUploadView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationTitle("Add Evidence")
         .navigationBarTitleDisplayMode(.inline)
         .photosPicker(
@@ -268,10 +268,15 @@ struct ProductionEvidenceUploadView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("ADD EVIDENCE").physiqueOSFont(PhysiqueOSTypography.screenEyebrow).foregroundStyle(PhysiqueOSTheme.accent)
+            Text("ADD EVIDENCE")
+                .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
+                .foregroundStyle(PhysiqueOSTheme.redesignPurple)
             Text(fixedScenario == .dexa ? "DEXA Scan" : fixedScenario == .progressPhotos ? "Progress Photos" : "Add Evidence")
-                .physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
+                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: - Picking
@@ -282,13 +287,13 @@ struct ProductionEvidenceUploadView: View {
             domainSelectorCard
         }
         if fixedScenario == nil, let redirect = domainChoice.redirectDestination {
-            CardContainer { VStack(alignment: .leading, spacing: 10) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 10) {
                 Text("\(domainChoice.label) has its own entry point.").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                PrimaryActionButton(title: "Open \(domainChoice.label)") { onNavigate(redirect) }
+                EvidenceWorkflowPrimaryButton(title: "Open \(domainChoice.label)") { onNavigate(redirect) }
             } }
         } else if let reason = domainChoice.unavailableReason {
-            CardContainer {
-                Text(reason).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
+                Text(reason).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         } else {
             submittableContent
@@ -296,7 +301,7 @@ struct ProductionEvidenceUploadView: View {
     }
 
     private var domainSelectorCard: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
+        CardContainer(background: EvidenceWorkflowPalette.intakeField) { VStack(alignment: .leading, spacing: 4) {
             Text("What kind of evidence?").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
             ForEach(DomainChoice.allCases) { choice in
                 Button {
@@ -308,17 +313,26 @@ struct ProductionEvidenceUploadView: View {
                     HStack {
                         Text(choice.label).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                         if choice == .automatic {
-                            Text("Recommended").physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.accent)
+                            Text("Recommended").physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.redesignPurple)
                         }
                         Spacer()
-                        if domainChoice == choice { Image(systemName: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.accent) }
+                        if domainChoice == choice {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundStyle(PhysiqueOSTheme.redesignTeal)
+                        } else {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                        }
                     }
+                    .frame(minHeight: 48)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 .accessibilityIdentifier("productionEvidenceUpload.domain.\(choice.rawValue)")
-                if choice != DomainChoice.allCases.last { Divider().overlay(PhysiqueOSTheme.divider) }
+                if choice != DomainChoice.allCases.last { Divider().overlay(PhysiqueOSTheme.redesignRule) }
             }
         } }
     }
@@ -326,18 +340,18 @@ struct ProductionEvidenceUploadView: View {
     @ViewBuilder
     private var submittableContent: some View {
         if resolvedScenario == .progressPhotos { pendingStagedPhotosCard }
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 10) {
             DateField(date: $effectiveDate, maximumDate: Date(), label: "Date")
         } }
         if domainChoice != .automatic, resolvedScenario != .dexa, resolvedScenario != .progressPhotos {
-            CardContainer { VStack(alignment: .leading, spacing: 10) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 10) {
                 Picker("Entry method", selection: $captureMode) {
                     ForEach(CaptureMode.allCases) { Text($0.label).tag($0) }
                 }.pickerStyle(.segmented)
             } }
         }
         if let note = classificationNote {
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 Text(note).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.chartEffort)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -348,9 +362,8 @@ struct ProductionEvidenceUploadView: View {
             manualEntryContent
         }
         if resolvedScenario == .progressPhotos { progressPhotoDetails }
-        PrimaryActionButton(
+        EvidenceWorkflowPrimaryButton(
             title: captureMode == .manual && domainChoice != .automatic ? "Save" : "Upload",
-            tone: .accent,
             isEnabled: canSubmit
         ) {
             Task { await primarySubmit() }
@@ -358,12 +371,12 @@ struct ProductionEvidenceUploadView: View {
     }
 
     private var attachmentCard: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 12) {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 12) {
             Text(resolvedScenario == .dexa ? "BodySpec PDF" : resolvedScenario == .progressPhotos ? "Photo set" : domainChoice == .automatic ? "Screenshots or PDF" : "Screenshots")
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
             if attachments.isEmpty {
                 Text(resolvedScenario == .dexa ? "Attach one BodySpec PDF report." : resolvedScenario == .progressPhotos ? "Choose one or more original Progress Photos." : "Attach 1–4 screenshots.")
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             } else {
                 ForEach(attachments) { attachment in
                     VStack(alignment: .leading, spacing: 8) {
@@ -372,10 +385,10 @@ struct ProductionEvidenceUploadView: View {
                             Spacer()
                             if let scenario = attachmentScenarios[attachment.id] {
                                 Text(scenario.label).physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignTeal)
                             }
                             Button { attachments.removeAll { $0.id == attachment.id } } label: {
-                                Image(systemName: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.textMuted)
+                                Image(systemName: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             }
                         }
                         if resolvedScenario == .progressPhotos,
@@ -469,7 +482,7 @@ struct ProductionEvidenceUploadView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Photo \(index + 1)")
                                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 Text(identity.poseLabel).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                             }
                             Spacer()
@@ -491,7 +504,7 @@ struct ProductionEvidenceUploadView: View {
                         if let notice = poseNotices[identity.id] {
                             Text(notice)
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 .accessibilityIdentifier("productionEvidenceUpload.poseNotice.\(index + 1)")
                         }
                         Button(identity.confirmed ? "Pose confirmed" : "Confirm pose") {
@@ -503,7 +516,7 @@ struct ProductionEvidenceUploadView: View {
                     }
                 }
             }
-            CardContainer { VStack(alignment: .leading, spacing: 10) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 10) {
                 Text("Session conditions").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     ForEach(ProgressPhotoSessionDraft.conditionGrid.flatMap { $0 }) { field in
@@ -514,18 +527,18 @@ struct ProductionEvidenceUploadView: View {
                     .tint(PhysiqueOSTheme.chartSuccess)
                 Text("Every pose and condition is sent to the Server-owned Progress Photos review. Confirmation creates the canonical PhotoSession and starts the existing Photo Briefing lifecycle.")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             } }
         }
     }
 
     private var manualEntryContent: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 12) {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 12) {
             Text(resolvedScenario == .nutrition ? "Daily totals" : "Daily activity")
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
             Text("Blank fields remain unknown. Existing web-authored days require screenshot review so the server can enforce its revision fingerprint.")
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             if resolvedScenario == .nutrition {
                 manualField("Calories", text: $caloriesText)
                 manualField("Protein (g)", text: $proteinText)
@@ -540,7 +553,7 @@ struct ProductionEvidenceUploadView: View {
                 manualField("Move goal", text: $moveGoalText)
                 Text("Manual entry only. HealthKit and direct device-health sync are not enabled.")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         } }
     }
@@ -560,50 +573,50 @@ struct ProductionEvidenceUploadView: View {
     // background showing on both sides).
 
     private var classifyingContent: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
-            ProgressView().tint(PhysiqueOSTheme.accent)
-            Text("Checking what kind of evidence this is…").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 10) {
+            ProgressView().tint(PhysiqueOSTheme.redesignTeal)
+            Text("Checking what kind of evidence this is…").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }.frame(maxWidth: .infinity, alignment: .leading) }
     }
 
     private var uploadingContent: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
-            ProgressView(value: transferProgress, total: 1).tint(PhysiqueOSTheme.accent)
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 10) {
+            ProgressView(value: transferProgress, total: 1).tint(PhysiqueOSTheme.redesignTeal)
             Text(stagedTransferCopy ?? (transferProgress < 1 ? "Transferring… \(Int(transferProgress * 100))%" : "Transfer complete. Waiting for durable acceptance…"))
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }.frame(maxWidth: .infinity, alignment: .leading) }
     }
 
     private var processingContent: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
-            ProgressView().tint(PhysiqueOSTheme.accent)
-            Text("Reading what you uploaded…").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 10) {
+            ProgressView().tint(PhysiqueOSTheme.redesignTeal)
+            Text("Reading what you uploaded…").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }.frame(maxWidth: .infinity, alignment: .leading) }
     }
 
     private func acceptedContent(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            CardContainer { VStack(alignment: .leading, spacing: 8) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 8) {
                 Label("Evidence received", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                Text(message).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Text(message).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }.frame(maxWidth: .infinity, alignment: .leading) }
             ForEach(Self.automaticScenarios) { scenario in
                 if let reviewId = readyReviews[scenario] {
-                    PrimaryActionButton(title: "Review \(scenario.label)", tone: .accent) {
+                    EvidenceWorkflowPrimaryButton(title: "Review \(scenario.label)") {
                         onNavigate(.evidenceReview(reviewId: reviewId))
                     }
                 }
             }
-            PrimaryActionButton(title: "Return to Log", tone: .accent) { onReturnToLog(); dismiss() }
+            EvidenceWorkflowPrimaryButton(title: "Return to Log") { onReturnToLog(); dismiss() }
                 .accessibilityIdentifier("productionEvidenceUpload.returnToLog")
         }
     }
 
     private var confirmedContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            CardContainer { Label("Evidence saved", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess).frame(maxWidth: .infinity, alignment: .leading) }
-            PrimaryActionButton(title: "Return to Log", tone: .accent) { onReturnToLog(); dismiss() }
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { Label("Evidence saved", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess).frame(maxWidth: .infinity, alignment: .leading) }
+            EvidenceWorkflowPrimaryButton(title: "Return to Log") { onReturnToLog(); dismiss() }
         }
     }
 
@@ -615,10 +628,10 @@ struct ProductionEvidenceUploadView: View {
                 // The staged set is still durable on this device and the
                 // Server already holds every acknowledged photo; resuming
                 // sends only what is missing.
-                PrimaryActionButton(title: "Resume upload", tone: .accent) { Task { await resumeStagedPhotos() } }
+                EvidenceWorkflowPrimaryButton(title: "Resume upload") { Task { await resumeStagedPhotos() } }
                     .accessibilityIdentifier("productionEvidenceUpload.resumeStaged")
             }
-            PrimaryActionButton(title: "Try Again", tone: .accent) { phase = .picking }
+            EvidenceWorkflowPrimaryButton(title: "Try Again") { phase = .picking }
         }
     }
 
@@ -1001,17 +1014,17 @@ struct ProductionEvidenceUploadView: View {
     @ViewBuilder
     private var pendingStagedPhotosCard: some View {
         if let plan = pendingStagedPlan {
-            CardContainer { VStack(alignment: .leading, spacing: 10) {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) { VStack(alignment: .leading, spacing: 10) {
                 Label("Photo upload waiting", systemImage: "arrow.up.circle")
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                 Text(plan.rejectedArtifacts.isEmpty
                     ? "\(plan.storedOriginalCount) of \(plan.originals.count) photos from \(plan.effectiveDate) reached PhysiqueOS. Resume to send the rest, or discard the set and choose again."
                     : "PhysiqueOS did not accept this photo set (\(plan.lastErrorCode ?? "rejected")). Discard it and choose the photos again.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 HStack(spacing: 10) {
                     if plan.rejectedArtifacts.isEmpty {
-                        PrimaryActionButton(title: "Resume upload", tone: .accent) { Task { await resumeStagedPhotos() } }
+                        EvidenceWorkflowPrimaryButton(title: "Resume upload") { Task { await resumeStagedPhotos() } }
                             .accessibilityIdentifier("productionEvidenceUpload.resumeStaged")
                     }
                     Button("Discard") { Task { await discardStagedPhotos() } }
@@ -1069,7 +1082,7 @@ struct ProductionEvidenceUploadView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label.uppercased())
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             Menu {
                 ForEach(values) { value in
                     Button(value.label) { selection.wrappedValue = value }
@@ -1084,7 +1097,7 @@ struct ProductionEvidenceUploadView: View {
                 .foregroundStyle(PhysiqueOSTheme.accent)
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, minHeight: 42)
-                .background(PhysiqueOSTheme.surfaceMuted)
+                .background(PhysiqueOSTheme.redesignSoft)
                 .clipShape(Capsule())
                 .contentShape(Capsule())
             }
@@ -1100,7 +1113,7 @@ struct ProductionEvidenceUploadView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(field.label.uppercased())
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             let value = photoSession.selectedLabel(for: field)
             Menu {
                 ForEach(field.options, id: \.label) { option in
@@ -1113,10 +1126,10 @@ struct ProductionEvidenceUploadView: View {
                     Image(systemName: "chevron.up.chevron.down").font(.caption2)
                 }
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(value == field.unselectedLabel ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(value == field.unselectedLabel ? PhysiqueOSTheme.accent : PhysiqueOSTheme.redesignInk)
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, minHeight: 42)
-                .background(PhysiqueOSTheme.surfaceMuted)
+                .background(PhysiqueOSTheme.redesignSoft)
                 .clipShape(Capsule())
                 .contentShape(Capsule())
             }

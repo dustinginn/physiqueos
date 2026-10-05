@@ -291,6 +291,10 @@ private enum AppearanceReviewLaunchConfiguration {
         case "evidence-photos": Route(tab: .evidence, destinations: [.progressStream(streamId: "photos")])
         case "evidence-photo-detail": Route(tab: .evidence, destinations: [.progressStream(streamId: "photos"), .photoSetDetail(setId: "photo-set-fixture-005")])
         case "evidence-dexa": Route(tab: .evidence, destinations: [.progressStream(streamId: "dexa")])
+        case "evidence-intake": Route(tab: .log, destinations: [.evidenceIntake])
+        case "evidence-dexa-intake": Route(tab: .evidence, destinations: [.dexaUpload])
+        case "evidence-review-generic": Route(tab: .log, destinations: [.evidenceReview(reviewId: "redesign-review-mixed")])
+        case "evidence-review-dexa-correction": Route(tab: .log, destinations: [.evidenceReview(reviewId: "redesign-review-dexa-correction")])
         case "you": Route(tab: .you, destinations: [])
         case "settings": Route(tab: .you, destinations: [.settings])
         case "appearance": Route(tab: .you, destinations: [.settings, .appearance])
@@ -303,6 +307,21 @@ private enum AppearanceReviewLaunchConfiguration {
         )
         default: nil
         }
+    }
+}
+#endif
+
+#if DEBUG
+/// Screenshot-only routing flag. It lets the deterministic Sandbox shell
+/// render production intake without granting Founder Production authority or
+/// issuing a write. Release has no equivalent switch.
+enum EvidenceRedesignReviewLaunchConfiguration {
+    static var usesProductionIntake: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-physiqueos.appearance-review.route"),
+              arguments.indices.contains(index + 1)
+        else { return false }
+        return ["evidence-intake", "evidence-dexa-intake"].contains(arguments[index + 1])
     }
 }
 #endif

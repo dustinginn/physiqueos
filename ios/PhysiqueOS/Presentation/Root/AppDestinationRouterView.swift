@@ -14,6 +14,15 @@ struct AppDestinationRouterView: View {
     var onReturnToHome: () -> Void = {}
     var onNavigate: (AppDestination) -> Void = { _ in }
 
+    private var usesProductionEvidenceIntake: Bool {
+        if environment.nativeAuthority == .founderProduction { return true }
+#if DEBUG
+        return EvidenceRedesignReviewLaunchConfiguration.usesProductionIntake
+#else
+        return false
+#endif
+    }
+
     var body: some View {
         Group { routedContent }
             .onAppear {
@@ -63,19 +72,19 @@ struct AppDestinationRouterView: View {
         case .manualWeighIn:
             ManualWeighInView(onReturnToLog: onReturnToLog)
         case .evidenceIntake:
-            if environment.nativeAuthority == .founderProduction {
+            if usesProductionEvidenceIntake {
                 ProductionEvidenceUploadView(onNavigate: onNavigate, onReturnToLog: onReturnToLog)
             } else {
                 EvidenceIntakeView(onNavigate: onNavigate)
             }
         case .photoUpload:
-            if environment.nativeAuthority == .founderProduction {
+            if usesProductionEvidenceIntake {
                 ProductionEvidenceUploadView(fixedScenario: .progressPhotos, onNavigate: onNavigate, onReturnToLog: onReturnToLog)
             } else {
                 EvidenceIntakeView(initialScenario: .progressPhotos, onNavigate: onNavigate)
             }
         case .dexaUpload:
-            if environment.nativeAuthority == .founderProduction {
+            if usesProductionEvidenceIntake {
                 ProductionEvidenceUploadView(fixedScenario: .dexa, onNavigate: onNavigate, onReturnToLog: onReturnToLog)
             } else {
                 EvidenceIntakeView(initialScenario: .dexa, onNavigate: onNavigate)
