@@ -290,6 +290,7 @@ describe("provider-native core navigation reads", () => {
       initialPerformedExerciseIds: expect.any(Array),
       initialMyLibraryExerciseIds: expect.any(Array),
       initialProgressionRecommendations: expect.any(Array),
+      contextualProgressionRecommendations: expect.any(Array),
     });
     expect(morning).toMatchObject({
       today: "2026-08-29",
@@ -334,6 +335,63 @@ describe("provider-native core navigation reads", () => {
     expect(set).toMatchObject({ weight: 25, weight_unit: "lb", load_type: "external_load" });
     // Additive Server-owned set-level load semantics for Native's completion copy.
     expect(set.load_semantics).toBe("weighted_bodyweight");
+  });
+
+  it("projects additive superset-context progression recommendations from the separate superset pool", async () => {
+    const { narrow, runtime } = services();
+    const session = (canonicalId, date, exercises, groups = []) => ({
+      canonicalId,
+      quality: { status: "complete" },
+      payload: { id: canonicalId, evidence_type: "training", observed_at: date, exercises, exerciseRelationshipGroups: groups },
+    });
+    const legExtension = (id, weight, reps) => ({
+      id, canonicalExerciseId: "leg_extension", name: "Leg Extensions",
+      sets: [{ reps, weight, weight_unit: "lb", load_type: "external_load" }],
+    });
+    const sissy = (id, weight, reps) => ({
+      id, canonicalExerciseId: "sissy_squat", name: "Sissy Squats",
+      sets: [{ reps, weight, weight_unit: "lb", load_type: "external_load" }],
+    });
+    const pendulum = (id) => ({
+      id, canonicalExerciseId: "pendulum_squat_machine", name: "Pendulum Squat Machine",
+      sets: [{ reps: 11, weight: 55, weight_unit: "lb", load_type: "external_load" }],
+    });
+    runtime.canonicalEvidenceObjects.push(
+      session("standalone-1", "2026-08-01", [legExtension("le-s1", 90, 15)]),
+      session("standalone-2", "2026-08-08", [legExtension("le-s2", 90, 15)]),
+      session("superset-1", "2026-08-15", [legExtension("le-p1", 80, 15), sissy("ss-p1", 50, 12), pendulum("pe-p1")],
+        [{ id: "g1", relationshipType: "superset", memberExerciseIds: ["le-p1", "ss-p1"] }]),
+      session("superset-2", "2026-08-22", [legExtension("le-p2", 80, 15), sissy("ss-p2", 50, 12)],
+        [{ id: "g2", relationshipType: "superset", memberExerciseIds: ["le-p2", "ss-p2"] }]),
+      session("pendulum-superset-once", "2026-08-23", [pendulum("pe-p2"), legExtension("le-p3", 70, 10)],
+        [{ id: "g3", relationshipType: "superset", memberExerciseIds: ["pe-p2", "le-p3"] }]),
+    );
+
+    const logger = await narrow.getTrainingLogger();
+    // Standalone is unchanged: only the standalone pool (90 x 15).
+    expect(logger.initialProgressionRecommendations.find((item) => item.canonicalExerciseId === "leg_extension"))
+      .toMatchObject({ suggestedLoad: 90, suggestedReps: 15 });
+    expect(logger.initialProgressionRecommendations.find((item) => item.canonicalExerciseId === "leg_extension"))
+      .not.toHaveProperty("relationship");
+
+    const contextual = logger.contextualProgressionRecommendations;
+    const legWithSissy = contextual.filter((item) =>
+      item.canonicalExerciseId === "leg_extension" && item.relationship.relationshipKey === "superset|partners:sissy_squat");
+    expect(legWithSissy).toEqual([expect.objectContaining({
+      suggestedLoad: 80,
+      suggestedReps: 15,
+      relationship: { relationshipType: "superset", relationshipKey: "superset|partners:sissy_squat", partnerCanonicalExerciseIds: ["sissy_squat"] },
+    })]);
+    expect(contextual.find((item) => item.canonicalExerciseId === "sissy_squat")).toMatchObject({
+      suggestedLoad: 50,
+      suggestedReps: 12,
+      relationship: { relationshipKey: "superset|partners:leg_extension", partnerCanonicalExerciseIds: ["leg_extension"] },
+    });
+    // One comparable session in a context is insufficient: no claim at all.
+    expect(contextual.some((item) => item.relationship.relationshipKey === "superset|partners:pendulum_squat_machine")).toBe(false);
+    expect(contextual.some((item) => item.canonicalExerciseId === "pendulum_squat_machine")).toBe(false);
+    // Standalone sissy history does not exist, so no standalone recommendation leaks from the superset pool.
+    expect(logger.initialProgressionRecommendations.some((item) => item.canonicalExerciseId === "sissy_squat")).toBe(false);
   });
 
   it("classifies historical bodyweight encodings and machine zeros with one Server-owned rule", async () => {

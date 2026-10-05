@@ -33,6 +33,8 @@ import {
   createTrainingLoggerProgressionRecommendation,
   TRAINING_LOGGER_PROGRESSION_STATUS,
 } from "../../domain/services/TrainingLoggerProgressionService.js";
+import { deriveTrainingExerciseRelationshipContext } from "../../domain/models/trainingExerciseRelationship.js";
+import { getTrainingExecutionVariantKey } from "../../domain/models/trainingExecutionVariant.js";
 import { createTrainingLoggerSuggestion } from "../../domain/services/TrainingLoggerSuggestionService.js";
 import {
   buildStrategyDomainModel,
@@ -226,6 +228,16 @@ export function createCoreNavigationReadService({
             sessions: confirmedTrainingRecords,
           }))
           .filter(Boolean);
+        // Additive: Suggested/Maintain for each superset relationship context
+        // that already has its own comparable history. Same Server
+        // progression semantics, run on the separate superset pool; older
+        // clients ignore the field.
+        const contextualProgressionRecommendations = projectTrainingLoggerContextualRecommendations({
+          canonicalExerciseIds: new Set(canonicalExercises.map((exercise) => exercise.id)),
+          goalContext,
+          initialDate,
+          sessions: confirmedTrainingRecords,
+        });
         return Object.freeze({
           goalContext,
           initialCanonicalExercises: canonicalExercises.map((exercise) => ({
@@ -246,6 +258,7 @@ export function createCoreNavigationReadService({
           initialPerformedExerciseIds: performedExerciseIds,
           initialMyLibraryExerciseIds: myLibraryExerciseIds,
           initialProgressionRecommendations,
+          contextualProgressionRecommendations,
         });
       });
     },
@@ -879,6 +892,68 @@ function projectTrainingLoggerRecommendation({ exercise, goalContext, initialDat
     nowDate: initialDate,
     sessions,
   });
+  return projectTrainingLoggerRecommendationResult(result, exercise.id);
+}
+
+/**
+ * One recommendation per (canonical exercise, superset relationship) context
+ * that appears in confirmed history, computed by the same Server progression
+ * function on that context's own comparable pool (never the standalone
+ * pool). Ordinary execution only; contexts without enough comparable
+ * sessions are omitted, so absence never claims Suggested/Maintain.
+ */
+export function projectTrainingLoggerContextualRecommendations({
+  canonicalExerciseIds,
+  goalContext,
+  initialDate,
+  sessions,
+}) {
+  const ordinaryVariantKey = getTrainingExecutionVariantKey(null);
+  const contexts = new Map();
+  for (const record of sessions) {
+    const session = record?.payload ?? record;
+    for (const exercise of session?.exercises ?? []) {
+      const canonicalExerciseId = exercise.canonicalExerciseId;
+      if (!canonicalExerciseId || !canonicalExerciseIds.has(canonicalExerciseId)) continue;
+      if (getTrainingExecutionVariantKey(exercise) !== ordinaryVariantKey) continue;
+      const relationshipContext = deriveTrainingExerciseRelationshipContext({ exercise, session });
+      if (!relationshipContext) continue;
+      const key = `${canonicalExerciseId}|${relationshipContext.comparisonKey}`;
+      if (!contexts.has(key)) contexts.set(key, { canonicalExerciseId, relationshipContext });
+    }
+  }
+  return [...contexts.values()]
+    .map(({ canonicalExerciseId, relationshipContext }) => {
+      const projected = projectTrainingLoggerRecommendationResult(
+        createTrainingLoggerProgressionRecommendation({
+          canonicalExerciseId,
+          goalContext,
+          nowDate: initialDate,
+          relationshipContext,
+          sessions,
+        }),
+        canonicalExerciseId,
+      );
+      if (!projected) return null;
+      return Object.freeze({
+        ...projected,
+        relationship: Object.freeze({
+          relationshipType: relationshipContext.relationshipType,
+          relationshipKey: relationshipContext.comparisonKey,
+          partnerCanonicalExerciseIds: relationshipContext.orderedPartners
+            .map((partner) => partner.canonicalExerciseId)
+            .filter(Boolean)
+            .sort(),
+        }),
+      });
+    })
+    .filter(Boolean)
+    .sort((left, right) =>
+      left.canonicalExerciseId.localeCompare(right.canonicalExerciseId) ||
+      left.relationship.relationshipKey.localeCompare(right.relationship.relationshipKey));
+}
+
+function projectTrainingLoggerRecommendationResult(result, canonicalExerciseId) {
   if (result.status === TRAINING_LOGGER_PROGRESSION_STATUS.INSUFFICIENT) return null;
   const state = result.status === TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY
     ? "opportunity"
@@ -898,7 +973,7 @@ function projectTrainingLoggerRecommendation({ exercise, goalContext, initialDat
       ? `${result.recommendedLoad} ${result.recommendedUnit ?? "lb"}`
       : null;
   return Object.freeze({
-    canonicalExerciseId: exercise.id,
+    canonicalExerciseId,
     state,
     eyebrow,
     message: result.reason,
