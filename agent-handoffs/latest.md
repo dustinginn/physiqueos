@@ -2,29 +2,27 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Redesign Batch 3 Claude: B correction (Training icons) + B/C regression proof (`batch3-bc-founder-feedback-icons-regression-20261005`)
+- Lane: **Workout reliability lane** (separate from Redesign Batch 3 and the Batch 2 / Build 88 release gate)
+- Task: Build 87 real-session audit — Watch supersets, superset guidance, Watch-finish recap, HealthKit (`workout-watch-superset-real-session-audit-20261005`)
 - Agent: Claude (single RC worktree)
-- Status: **Ready for Founder review. STOPPED. Checkpoint D not started.**
-- Generated (UTC): 2026-10-05T19:36:26Z
+- Status: **AUDIT checkpoint published. Bounded Native fixes in progress.**
+- Generated (UTC): 2026-10-05T19:58:56Z
 
-Commits on `claude/redesign-batch3-evidence-takeover-20261005`:
+Report: `agent-handoffs/reports/20261005T195700Z-workout-watch-superset-real-session-audit.md`
 
-| Commit | SHA |
-|---|---|
-| Native | `8aa2d00b` |
-| Package | `911781e6` |
+Headline findings:
+- **Issue 3:** the Watch-finish path drops the Server PR list and keeps only the count. Today's commit returned 2 PRs.
+- **Issue 2:**
+  - The Server isolates superset context (today's Sissy PR is against the 09-14 superset baseline).
+  - The Native production history mapper drops the relationship context.
+- **Issue 1:** no Server stage. Watch gate and telemetry gaps.
+- **Issue 4:** separate root cause.
+- **Issue 5:** the trusted Watch HealthKit correlation fails on UUID case, so today's Watch workout is unlinked.
 
-Report: `agent-handoffs/reports/20261005T193626Z-redesign-batch3-claude-b-correction-bc-regression.md`
+Concurrent lanes (unchanged, not superseded by this pointer):
+- Redesign Batch 3 B/C: report `agent-handoffs/reports/20261005T193626Z-redesign-batch3-claude-b-correction-bc-regression.md`, Native candidate `8aa2d00b`, package `911781e6`. Awaiting Founder acceptance.
+- Batch 2: Build 88 authorization for Native `793462b1` (report `20261005T150227Z`).
 
-Primary board: https://github.com/dustinginn/physiqueos/blob/911781e6036edcc6bfc51de600e2eca57c9ee5ab/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-b-correction-20261005/checkpoint-b-correction-primary-mobile-board.png
-
-Gates:
-- Unit tests: 397, 0 failures.
-- UI tests: 21/21, covering B/C 11/11, Hub 3/3, Training journeys 4/4 and Recovery 3/3.
-- Release compile: passed.
-
-Not done: no TestFlight upload, no build bump, no Server change, no deploy.
-
-Still pending from the concurrent Batch 2 lane: authorize Build 88 for `793462b1` (report `20261005T150227Z`).
+Not done: no deploy, no TestFlight, no build bump, no production writes.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`

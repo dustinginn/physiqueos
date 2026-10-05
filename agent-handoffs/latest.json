@@ -1,52 +1,61 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T19:36:26Z",
+  "generated_at_utc": "2026-10-05T19:58:56Z",
   "task": {
-    "id": "batch3-bc-founder-feedback-icons-regression-20261005",
-    "title": "Redesign Batch 3 Claude: Checkpoint B Training Area icon correction + B/C drawer/route regression proof",
+    "id": "workout-watch-superset-real-session-audit-20261005",
+    "title": "Workout reliability lane: Build 87 real-session audit (Watch supersets, superset guidance, Watch-finish recap, HealthKit)",
     "agent": "claude",
-    "status": "b_correction_and_bc_regression_proof_ready_for_founder_review_stopped"
+    "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "29e2867870b17c1e615235aedbcedaffc7bd3bad",
-    "native_checkpoint_a_sha": "ce5c7dd899f64386a70a6d21c25cf85bd93d6f3a",
-    "native_checkpoint_b_sha": "7b1cd96eabec698d1cc207bb0b9254c96e47befe",
-    "native_checkpoint_c_sha": "5f6db645738897bfb49365eb0fee4ebf8265e5ce",
-    "native_candidate_sha": "8aa2d00b835a9a3cbbbc16f001d032db9e7cd7ce",
-    "review_package_commit": "911781e6036edcc6bfc51de600e2eca57c9ee5ab",
-    "locked_design_commits": {
-      "training": "33ea6491",
-      "nutrition_activity": "8e6bd94b",
-      "weight": "1f8ba1b9"
-    },
-    "native_bc_base_sha": "5c296d9e",
-    "bc_review_package_commit": "2860f0c5"
-  },
-  "publication": {
-    "source_work_branch": "claude/redesign-batch3-evidence-takeover-20261005",
-    "report_path": "agent-handoffs/reports/20261005T193626Z-redesign-batch3-claude-b-correction-bc-regression.md",
-    "review_packages": [
-      "agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-b-correction-20261005/ (work branch at 911781e6036edcc6bfc51de600e2eca57c9ee5ab)"
-    ],
-    "primary_boards": [
-      "https://github.com/dustinginn/physiqueos/blob/911781e6036edcc6bfc51de600e2eca57c9ee5ab/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-b-correction-20261005/checkpoint-b-correction-primary-mobile-board.png"
-    ]
+    "base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
+    "final_sha": null,
+    "production_server_sha": "c7c99347a520d13fd344fe89b6b1398877cdd255",
+    "production_deployment": "e7ef3157",
+    "native_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
+    "native_build": 87
   },
   "result": {
-    "summary": "Training Areas now use a coherent SF Symbols movement-figure icon system (Biceps/Triceps share dumbbell); pixel diff vs accepted B = only 10 glyph interiors. Activity lower page verified complete vs Build 87 with UI/unit proof. Nutrition/Weight drawers, routes, filters and chart gestures proven by 4 new + 3 existing UI journeys; restored informational Reporting rows. Unit 397/0 fail, UI 21/21, Release compile OK.",
-    "production_data_mutated": false,
+    "summary": "AUDIT checkpoint (workout reliability lane; Batch 3 lane untouched). Real 2026-10-05 session committed once (15 sets, 1 superset LegExt+Sissy, Watch finish). Issue 3 proven: Watch-finish path drops the Server PR list (keeps only count) and the phone fallback read is single-shot -> reduced recap. Issue 2 proven: Server tracks superset context separately (today's Sissy PR vs the 09-14 superset baseline), but Native production history mapper hard-codes relationship nil and recommendations are standalone-only. Issue 1: no server stage; Watch gate ignores context acks, unreachable taps are lost, telemetry not correlatable (device logs need root/sysdiagnose). Issue 4 separate root (Watch mapper vs live projection). Issue 5 NEW: trusted Watch HealthKit correlation failed on UUID case (lowercase id vs uppercase canonical draft id), so today's Watch workout is silently unlinked. Bounded Native fixes in progress next.",
+    "success": true,
+    "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false,
-    "build_number_bumped": false
+    "testflight_uploaded": false
+  },
+  "validation": {
+    "tests": {
+      "status": "not_run",
+      "summary": "Audit checkpoint; tests accompany the fix candidate."
+    },
+    "review": {
+      "status": "not_run",
+      "summary": "Founder review requested."
+    },
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "Six READ ONLY repeatable-read probes with SELECT-only guard and ROLLBACK; production writes 0."
+    }
   },
   "decisions_required": [
-    "Founder final acceptance of Checkpoint B (Training icons) and confirmation of C regression proof before Checkpoint D starts",
-    "Concurrent lane, unchanged: authorize Build 88 for Batch 2 Native 793462b1 (report 20261005T150227Z)"
+    "Issue 2-B: auto-refill uncompleted untouched set rows from the superset-context previous on pair/unpair? (no history: keep standalone vs clear)",
+    "Issue 2-C: approve additive Server contextualProgressionRecommendations for superset Suggested/Maintain",
+    "Issue 5: authorize deploy of Server UUID-case correlation fix (would auto-link today's Watch workout on next ingest = production data change)",
+    "Issue 1: optionally capture iPhone+Watch logs now (root log collect or sysdiagnose) while WatchLatency notices are retained",
+    "Unchanged concurrent lanes: Batch 3 B/C acceptance (report 20261005T193626Z); Build 88 authorization for Batch 2 793462b1"
   ],
   "blockers": [],
-  "recommended_next_step": "Review the B correction primary board; on approval Claude starts Checkpoint D (Progress Photos + DEXA) on the same branch.",
-  "stop_reason": "Prompt requires a Founder review stop after the narrow B/C correction and proof.",
+  "unexpected_findings": [
+    "Trusted Watch<->Logger exact correlation silently fails on UUID case (first trusted workout ever)",
+    "applyProgressionSuggestion / keepPreviousPerformance overwrite and un-complete completed sets",
+    "Leg Extension ontology shows Triceps / Elbow Extension muscle mapping in canonical evidence"
+  ],
+  "backlog": [
+    "Watch phase/row semantics derive from TrainingSessionLiveProjection (Review gating + timed sets)",
+    "Phone Watch-command route: reply before side effects, one projection build per command (after telemetry)"
+  ],
+  "recommended_next_step": "Review audit; Claude continues with bounded Native fixes (Issues 1a-c, 2-A, 3) and an undeployed Server UUID-case candidate, then publishes a candidate report.",
+  "full_report_path": "agent-handoffs/reports/20261005T195700Z-workout-watch-superset-real-session-audit.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
