@@ -1,47 +1,59 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T00:54:47Z",
+  "generated_at_utc": "2026-10-05T01:04:24Z",
   "task": {
-    "id": "20261005-build86-option-a-confirmed-strength-presentation",
-    "title": "Build 86 — Option A confirmed Strength presentation (Server)",
+    "id": "healthkit-sleep-three-night-v3-graduation-20261004",
+    "title": "Sleep/V3 lane: HealthKit Sleep three-night audit and prospective V3 graduation",
     "agent": "claude",
-    "status": "option_a_deployed_verified_safe_to_confirm_build86_ready_not_uploaded"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "9b688e68df1b787c75786f22e5ba706eb8c68852",
-    "server_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
-    "server_previous_sha": "403ca5493297c2101990a7da59eed94153acc943",
-    "server_deployment": "99188a9e-75a7-49c6-a5c2-05a43737de5f",
-    "server_build_id": "physiqueos-27dad44a-20261005",
-    "native_candidate_sha": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
-    "native_candidate_build": 86,
-    "last_uploaded_build": 85
-  },
-  "publication": {
-    "source_work_branch": "claude/server-option-a-confirmed-strength-20261005",
-    "source_work_commit": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
-    "native_branch": "claude/build86-final-integration-20261004",
-    "main_report_commit": "bd6418f4bbb5b295d41dd4a88b014181068d4c9c",
-    "report_path": "agent-handoffs/reports/20261005T005447Z-build86-option-a-confirmed-strength-presentation.md",
-    "artifact_root": null
+    "base_sha": "51c459c410b268f35e6388eeb17f0b6ed7eb548c",
+    "final_sha": "403ca5493297c2101990a7da59eed94153acc943",
+    "production_server_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
+    "production_deployment": "99188a9e-75a7-49c6-a5c2-05a43737de5f",
+    "native_sha": null,
+    "native_build": null
   },
   "result": {
-    "summary": "Option A live: a confirmed Strength link keeps the Logger session start/end/duration on Workout Detail, Training Day/Activity and Logged Today; Apple supplies energy/HR only; missing Logger timing never filled from Apple. Zero introduced Server test failures. Native unchanged.",
-    "founder_instruction": "Safe to tap Use Logger session 1.",
-    "todays_pending_review_touched": false,
-    "tests": {
-      "focused_presentation_and_logged_today": "61/61",
-      "related_119_files": "34 failed, identical to base 403ca549; 0 introduced",
-      "server_full_unit": "10043 tests, 302 failed, identical to base; 0 introduced"
-    },
-    "production_verification": "deployment 99188a9e ACTIVE 9/9; web+worker source_commit_hash and log gitSha 27dad44a; /live and /ready physiqueos-27dad44a-20261005, 9/9 ready; no review/link resolution traffic observed",
-    "build86_ready_for_archive_authorization": true,
-    "testflight_uploaded": false,
-    "production_data_mutated": false
+    "summary": "Sleep/V3 lane (separate from Build 86; Build 86 authority unchanged at report 20261004T232105Z, main 1fd9bfa4). Three completed nights (Oct 2-4) passed all 10 quality gates. Prospective Sleep->V3 graduation is LIVE: Server 403ca549 deployed (83703fd7, verified; production is now 27dad44a from another lane, a fast-forward that includes it) and graduation policy v3->v4 adds 'sleep' to evidenceEligibility only (Sleep boundary = D0 2026-10-02). Completed sensor sleep-canon-v3 nights feed only the V3 Recovery slot; silent until >=14 prior nights; never moves Confidence; no regeneration; 52/53 owner collections byte-identical post-apply.",
+    "success": true,
+    "production_mutated": true,
+    "deployed": true,
+    "testflight_uploaded": false
   },
-  "recommended_next_step": "Founder taps Use Logger session 1 when convenient; authorize Build 86 archive + guarded TestFlight upload of cec8af20.",
-  "stop_reason": "Option A deployed and verified; Founder has an explicit instruction for the pending review; upload not authorized.",
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "summary": "Full unit suite at 403ca549: 10,039 tests; 302 failures identical to untouched base 51c459c4 (pre-existing); +40 new tests, 0 new failures. Weekly/Midweek legacy artifacts byte-identical with Sleep present; V3 sweep over all synthetic scenarios keeps Confidence/recommendation unchanged."
+    },
+    "review": {
+      "status": "approved",
+      "summary": "Independent fresh-context review: no blocker; applied fixes (v3-only, activation end bound, no lead-slot promotion, sparse invariance, failure logging). Founder authorized deploy + policy in chat."
+    },
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "Read-only REPEATABLE READ probes (transaction_read_only=on, SELECT-only guard, 0 mutations, ROLLBACK) pre-deploy, post-deploy, post-apply and after Oct 4 window close; historical Sleep digest exact; strategic leak 0."
+    }
+  },
+  "decisions_required": [],
+  "blockers": [],
+  "unexpected_findings": [
+    "Another lane deployed Server 51c459c4 (deployment 07714249) mid-session; this deploy is a strict fast-forward on top of it.",
+    "Legacy Weekly 'references' list is type-blind on lastObservedAt; sleep_night objects deliberately omit it (caught by test)."
+  ],
+  "backlog": [
+    "Rollback order: remove 'sleep' from the graduation policy BEFORE any code rollback (older builds treat it as invalid and disable all HealthKit graduation).",
+    "Closed-app background Sleep delivery still unproven (canary item).",
+    "Natural acceptance: Wed Oct 7 Midweek shows no Sleep wording; first possible Sleep mention ~Weekly Oct 25.",
+    "Consider pinning a Sleep-specific strategic start in a future graduation policy revision.",
+    "Recovery/Sleep Evidence read model still reports strategicUse 'quarantined' (not displayed by Native); reconcile wording later.",
+    "Recovery Briefing V1 card (graph-driven Sleep) remains separate and unbuilt.",
+    "Backlog item 4/5 + ledger update awaiting merge: branch claude/sleep-v3-backlog-ledger-20261005 (11af55ed), docs only."
+  ],
+  "recommended_next_step": "No action needed now. After the Wed Oct 7 Midweek, confirm it carries no Sleep wording (Recovery lineage = no_personal_baseline_yet). Keep the canary's closed-app background-delivery check open.",
+  "full_report_path": "agent-handoffs/reports/20261005T010424Z-healthkit-sleep-three-night-v3-graduation.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
