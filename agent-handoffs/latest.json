@@ -1,59 +1,43 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T01:04:24Z",
+  "generated_at_utc": "2026-10-05T01:09:19Z",
   "task": {
-    "id": "healthkit-sleep-three-night-v3-graduation-20261004",
-    "title": "Sleep/V3 lane: HealthKit Sleep three-night audit and prospective V3 graduation",
+    "id": "20261005-build86-testflight-upload-valid",
+    "title": "Build 86 — archive, guarded TestFlight upload and VALID verification",
     "agent": "claude",
-    "status": "completed"
+    "status": "build86_valid_awaiting_physical_acceptance"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "51c459c410b268f35e6388eeb17f0b6ed7eb548c",
-    "final_sha": "403ca5493297c2101990a7da59eed94153acc943",
-    "production_server_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
-    "production_deployment": "99188a9e-75a7-49c6-a5c2-05a43737de5f",
-    "native_sha": null,
-    "native_build": null
+    "prompt_commit": "4ee3498b0028c299ce29012dfae9a03d868d4c3c",
+    "native_sha": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
+    "native_build": 86,
+    "native_version": "1.0",
+    "delivery_id": "e70f2604-0f97-45fb-a720-fd695d23d0c4",
+    "apple_build_status": "VALID",
+    "apple_import_status": "VALID",
+    "last_uploaded_build": 86,
+    "server_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
+    "server_deployment": "99188a9e-75a7-49c6-a5c2-05a43737de5f"
+  },
+  "publication": {
+    "source_work_branch": "claude/build86-final-integration-20261004",
+    "source_work_commit": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
+    "archive_path": "~/Library/Developer/Xcode/Archives/2026-10-04/PhysiqueOS-Build86-cec8af20.xcarchive",
+    "app_binary_sha256": "0522b66fd08cb3e824accd7af929250535b612be2cad8f729b8871ed387362b0",
+    "dsym_uuid": "47F30C3E-27B9-3AFC-A963-C251726F7BFE",
+    "main_report_commit": "7d8ddd26576c8b73413d2e7c419b3fb7507d4777",
+    "report_path": "agent-handoffs/reports/20261005T010919Z-build86-testflight-valid.md",
+    "artifact_root": null
   },
   "result": {
-    "summary": "Sleep/V3 lane (separate from Build 86; Build 86 authority unchanged at report 20261004T232105Z, main 1fd9bfa4). Three completed nights (Oct 2-4) passed all 10 quality gates. Prospective Sleep->V3 graduation is LIVE: Server 403ca549 deployed (83703fd7, verified; production is now 27dad44a from another lane, a fast-forward that includes it) and graduation policy v3->v4 adds 'sleep' to evidenceEligibility only (Sleep boundary = D0 2026-10-02). Completed sensor sleep-canon-v3 nights feed only the V3 Recovery slot; silent until >=14 prior nights; never moves Confidence; no regeneration; 52/53 owner collections byte-identical post-apply.",
-    "success": true,
-    "production_mutated": true,
-    "deployed": true,
-    "testflight_uploaded": false
+    "summary": "Build 86 (cec8af20) archived, guarded dry run WOULD UPLOAD, uploaded once, Apple VALID. Server unchanged on Option A 27dad44a. No production data mutation.",
+    "testflight_uploaded": true,
+    "production_data_mutated": false,
+    "ledger": "Watch HealthKit/status, Complete Set latency and Appearance entries remain release-gated pending physical acceptance"
   },
-  "validation": {
-    "tests": {
-      "status": "passed",
-      "summary": "Full unit suite at 403ca549: 10,039 tests; 302 failures identical to untouched base 51c459c4 (pre-existing); +40 new tests, 0 new failures. Weekly/Midweek legacy artifacts byte-identical with Sleep present; V3 sweep over all synthetic scenarios keeps Confidence/recommendation unchanged."
-    },
-    "review": {
-      "status": "approved",
-      "summary": "Independent fresh-context review: no blocker; applied fixes (v3-only, activation end bound, no lead-slot promotion, sparse invariance, failure logging). Founder authorized deploy + policy in chat."
-    },
-    "zero_write_audit": {
-      "status": "passed",
-      "summary": "Read-only REPEATABLE READ probes (transaction_read_only=on, SELECT-only guard, 0 mutations, ROLLBACK) pre-deploy, post-deploy, post-apply and after Oct 4 window close; historical Sleep digest exact; strategic leak 0."
-    }
-  },
-  "decisions_required": [],
-  "blockers": [],
-  "unexpected_findings": [
-    "Another lane deployed Server 51c459c4 (deployment 07714249) mid-session; this deploy is a strict fast-forward on top of it.",
-    "Legacy Weekly 'references' list is type-blind on lastObservedAt; sleep_night objects deliberately omit it (caught by test)."
-  ],
-  "backlog": [
-    "Rollback order: remove 'sleep' from the graduation policy BEFORE any code rollback (older builds treat it as invalid and disable all HealthKit graduation).",
-    "Closed-app background Sleep delivery still unproven (canary item).",
-    "Natural acceptance: Wed Oct 7 Midweek shows no Sleep wording; first possible Sleep mention ~Weekly Oct 25.",
-    "Consider pinning a Sleep-specific strategic start in a future graduation policy revision.",
-    "Recovery/Sleep Evidence read model still reports strategicUse 'quarantined' (not displayed by Native); reconcile wording later.",
-    "Recovery Briefing V1 card (graph-driven Sleep) remains separate and unbuilt.",
-    "Backlog item 4/5 + ledger update awaiting merge: branch claude/sleep-v3-backlog-ledger-20261005 (11af55ed), docs only."
-  ],
-  "recommended_next_step": "No action needed now. After the Wed Oct 7 Midweek, confirm it carries no Sleep wording (Recovery lineage = no_personal_baseline_yet). Keep the canary's closed-app background-delivery check open.",
-  "full_report_path": "agent-handoffs/reports/20261005T010424Z-healthkit-sleep-three-night-v3-graduation.md",
+  "recommended_next_step": "Founder installs Build 86 from TestFlight and runs the physical acceptance checklist in the report (appearance, Foam Rolling, next real strength workout with Watch HealthKit/metrics/Complete Set at 10-15 ft, widgets/Live Activity/Watch independence).",
+  "stop_reason": "Build 86 reached VALID and the report is published; awaiting Founder physical-device acceptance.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
