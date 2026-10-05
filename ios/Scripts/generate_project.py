@@ -167,6 +167,7 @@ app_files = [
     ("Presentation/Home", "HomeViewModel.swift"),
     ("Presentation/Home", "HomeHeaderView.swift"),
     ("Presentation/Home", "HomeHeroCardView.swift"),
+    ("Presentation/Home", "HomeJourneyFieldView.swift"),
     ("Presentation/Home", "ConfidenceDetailSheet.swift"),
     ("Presentation/Home", "NextBestActionView.swift"),
     ("Presentation/Home", "BriefingCardView.swift"),
@@ -275,6 +276,7 @@ app_files = [
 # built app bundle via the Resources build phase.
 resource_files = [
     ("Resources", "HomeFixture.json"),
+    ("Resources", "HomeRedesignReviewFixture.json"),
     ("Resources", "PriorityFixture.json"),
     ("Resources", "GoalsFixture.json"),
     ("Resources", "OperatingPlanFixture.json"),
@@ -637,7 +639,7 @@ WATCH_DEPLOYMENT_TARGET = "11.0"
 # One authoritative TestFlight build number. Increment this value, run this
 # generator, then build/archive. Never edit CURRENT_PROJECT_VERSION in the
 # generated project by hand.
-APP_BUILD_NUMBER = 86
+APP_BUILD_NUMBER = 87
 
 # The Founder's existing, paid Apple Developer Program team ("DUSTIN JOSEPH
 # GINN" in Xcode's Signing & Capabilities UI). Recovered from a real Xcode
