@@ -2,17 +2,18 @@
 
 Machine-readable interface: `agent-handoffs/latest.json`.
 
-- Task: Redesign Implementation Batch 1 — Home, Goals, You / Settings
-- Status: **Founder-approved implementation candidate**
+- Task: Build 87 — accepted Redesign Batch 1 physical-device build
+- Status: **Apple VALID; awaiting Founder physical-device acceptance**
 - Native base: Build 86 `cec8af20a6121bb66ecca3ba9f667d91774a891c`
-- Implementation branch: `codex/redesign-batch1-home-goals-you-20261005`
-- Exact implementation commit: `c4a74ad0855a0500e42a90a81d6f4a871e5cc3c5`
-- Main report commit: `ab173560e2258cc1ae9045452efc0b1be8ad1d0f`
-- Report: `agent-handoffs/reports/20261005T024500Z-redesign-implementation-batch1-home-goals-you.md`
-- Artifacts: `agent-handoffs/artifacts/redesign-implementation-batch1-20261005/`
+- Accepted Batch 1 authority: `c4a74ad0855a0500e42a90a81d6f4a871e5cc3c5`
+- Exact Build 87 candidate: `f66c7fc690b1b61094e620791ee2d4a40caf3799`
+- Release: `com.physiqueos.native.dev` 1.0 (87)
+- TestFlight delivery: `2129e4b4-23e8-40d7-b955-d40ab0274642` — **VALID**
+- Report: `agent-handoffs/reports/20261005T033555Z-build87-batch1-redesign-testflight-valid.md`
+- Review artifacts: `agent-handoffs/artifacts/redesign-implementation-batch1-20261005/`
 
-Home includes the Founder-approved final corrections and the explicit removal of the redundant purple briefing eyebrow. Goals and You / Settings are approved. Focused tests pass; full Native unit execution has only the same pre-existing peptide fixture failure; Release compile succeeds across app, Watch and Live Activity targets.
+Build 87 contains only the Founder-accepted Home + Goals + You/Settings Batch 1 implementation above Apple-VALID Build 86. Required focused, Watch, Training/HealthKit and Release gates passed; the full Native suite retains only the known pre-existing peptide fixture failure.
 
-No Server change. No Watch / HealthKit behavior change. No TestFlight upload.
+Server is unchanged at `27dad44a1f63d68b53f23e51152a10a5d04968e6`, ACTIVE and ready 9/9. Batch 2 was not started.
 
-Next: integrate the implementation commit onto the next authorized Native head, then proceed to locked Log + Training Logger Batch 2.
+Next: Founder physical-device acceptance of Build 87 using the checklist in the report.
