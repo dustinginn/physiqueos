@@ -47,11 +47,11 @@ struct EvidenceReviewDetailView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(isWorkoutMatch ? PhysiqueOSTheme.redesignCanvas : PhysiqueOSTheme.background)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(isWorkoutMatch ? PhysiqueOSTheme.redesignCanvas : PhysiqueOSTheme.background, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button { dismiss() } label: {
@@ -114,6 +114,10 @@ struct EvidenceReviewDetailView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
+        case .loaded(.some(let review)) where review.workoutReconciliation != nil:
+            // Batch 2 L13: the locked Workout Match. Generic Evidence Review
+            // (every other review kind) keeps its current presentation.
+            workoutMatchContent(review)
         case .loaded(.some(let review)):
             VStack(alignment: .leading, spacing: 18) {
                 header(for: review)
@@ -124,6 +128,170 @@ struct EvidenceReviewDetailView: View {
                 actionSection(for: review)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var isWorkoutMatch: Bool {
+        guard case .loaded(.some(let review)) = state else { return false }
+        return review.workoutReconciliation != nil
+    }
+
+    // MARK: - Workout Match (locked L13)
+
+    private func workoutMatchContent(_ review: EvidenceReviewDetailReadModel) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Workout Match").logText(LoggerType.eyebrow10).foregroundStyle(PhysiqueOSTheme.redesignPurple)
+                Text(Self.statusLabel(review.status))
+                    .logText(LoggerType.stepTitle28)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                    .padding(.top, 5)
+                    .padding(.bottom, 6)
+                Text([Self.occurrenceDateLabel(for: review), review.version.map { "Version \($0)" }].compactMap { $0 }.joined(separator: " · "))
+                    .logText(LoggerType.stepSubtitle13)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                    .accessibilityIdentifier("evidenceReviewDetail.occurrenceDate")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            if let reconciliation = review.workoutReconciliation {
+                workoutMatchCard(reconciliation)
+                let best = reconciliation.candidates.map(\.confidence).max()
+                ForEach(Array(reconciliation.candidates.enumerated()), id: \.element.id) { index, candidate in
+                    // Locked candidates carry an 8 pt top margin.
+                    workoutMatchCandidate(index: index, candidate: candidate, isStrongest: candidate.confidence == best)
+                        .padding(.top, 8)
+                }
+            }
+            workoutMatchActions(review)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func workoutMatchCard(_ reconciliation: WorkoutReconciliationDetail) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(reconciliation.title)
+                .logText(LoggerType.surfaceTitle16)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                .padding(.bottom, 4)
+            Text(reconciliation.summary)
+                .logText(LoggerType.body11)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Rectangle().fill(PhysiqueOSTheme.redesignHairline).frame(height: 1).padding(.vertical, 10)
+            Text("Apple Health workout").logText(LoggerType.eyebrow10).foregroundStyle(PhysiqueOSTheme.redesignPurple)
+            Text(Self.workoutTypeLabel(reconciliation.workout.canonicalType))
+                .logText(LoggerType.strutTitle13)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
+            Text(Self.timeRange(start: reconciliation.workout.startedAt, end: reconciliation.workout.endedAt))
+                .logText(LoggerType.body11)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+        }
+        .loggerSurface(tone: PhysiqueOSTheme.redesignAmber)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func workoutMatchCandidate(index: Int, candidate: WorkoutReconciliationCandidate, isStrongest: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return VStack(alignment: .leading, spacing: 0) {
+            Text("Logger session \(index + 1)")
+                .logText(LoggerType.strutTitle12)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
+            Text("\(Self.workoutTypeLabel(candidate.activityType)) · \(Self.timeRange(start: candidate.startedAt, end: candidate.endedAt))")
+                .logText(LoggerType.candidateLine10)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                .padding(.vertical, 3)
+            Text("\(candidate.confidence)% match · \(Self.matchBasisLabel(candidate.basis))")
+                .logText(LoggerType.recordLine10)
+                .foregroundStyle(isStrongest ? PhysiqueOSTheme.redesignAmberInk : PhysiqueOSTheme.redesignUtilityMuted)
+        }
+        .padding(11)
+        .padding(1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PhysiqueOSTheme.redesignSoft, in: shape)
+        .overlay(shape.strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func workoutMatchActions(_ review: EvidenceReviewDetailReadModel) -> some View {
+        switch actionState {
+        case .idle where review.status == "pending":
+            if let reconciliation = review.workoutReconciliation {
+                VStack(spacing: 12) {
+                    ForEach(Array(reconciliation.candidates.enumerated()), id: \.element.id) { index, candidate in
+                        Group {
+                            if index == 0 {
+                                LoggerExecutionButton(title: "Use Logger session \(index + 1)", minHeight: 48) {
+                                    Task { await resolveWorkoutReconciliation(review: review, loggerSessionCanonicalId: candidate.loggerSessionCanonicalId) }
+                                }
+                            } else {
+                                workoutMatchButton("Use Logger session \(index + 1)", destructive: false) {
+                                    Task { await resolveWorkoutReconciliation(review: review, loggerSessionCanonicalId: candidate.loggerSessionCanonicalId) }
+                                }
+                            }
+                        }
+                        .accessibilityIdentifier("evidenceReview.workoutReconciliation.confirm.\(index + 1)")
+                    }
+                    workoutMatchButton("No match", destructive: true) {
+                        Task { await resolveWorkoutReconciliation(review: review, loggerSessionCanonicalId: nil) }
+                    }
+                    .accessibilityIdentifier("evidenceReview.workoutReconciliation.noMatch")
+                }
+            }
+        case .workoutReconciliationResolved(let action):
+            workoutMatchResolved(
+                label: action == "no_match" ? "No match recorded" : "Match confirmed",
+                detail: action == "no_match"
+                    ? "The Apple Health workout remains unlinked. Logger detail and strategic eligibility were not changed."
+                    : "The Apple Health workout is linked to the selected Logger session. Logger detail and strategic eligibility were not changed."
+            )
+        default:
+            // Confirming, refresh-required, still-processing, failure and
+            // terminal states keep their existing canonical presentation.
+            actionSection(for: review)
+        }
+    }
+
+    private func workoutMatchButton(_ title: String, destructive: Bool, action: @escaping () -> Void) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let tone = destructive ? PhysiqueOSTheme.redesignRed : PhysiqueOSTheme.redesignInk
+        return Button(action: action) {
+            Text(title)
+                .logText(LoggerType.control14)
+                .foregroundStyle(tone)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background {
+                    if destructive { shape.fill(PhysiqueOSTheme.redesignRed.opacity(0.08)) } else { shape.fill(PhysiqueOSTheme.redesignSoft) }
+                }
+                .overlay(shape.strokeBorder(destructive ? PhysiqueOSTheme.redesignRed.opacity(0.55) : PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func workoutMatchResolved(label: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark").font(.system(size: 13, weight: .heavy)).accessibilityHidden(true)
+                    Text(label).logText(LoggerType.surfaceTitle16)
+                }
+                .foregroundStyle(PhysiqueOSTheme.redesignGreen)
+                .padding(.bottom, 4)
+                Text(detail)
+                    .logText(LoggerType.body11)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .loggerSurface(tone: PhysiqueOSTheme.redesignGreen, toneFill: 0.13, toneRule: 0.36)
+            .accessibilityElement(children: .combine)
+            LoggerExecutionButton(title: "Back to Log", minHeight: 48) {
+                onReturnToLog()
+                dismiss()
+            }
+            .accessibilityIdentifier("evidenceReview.backToLog")
         }
     }
 

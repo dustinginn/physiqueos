@@ -1880,6 +1880,10 @@ enum LoggerType {
     static let metricLabel8 = LogType(size: 8, weight: 400, lineHeight: 2.52, uppercase: true)
     // Record values are inline spans after a block title: 16 px strut line.
     static let recordLine10 = LogType(size: 10, weight: 400, lineHeight: 2.02)
+    static let candidateLine10 = LogType(size: 10, weight: 400, lineHeight: 1.26)
+    // Inline <strong> titles sit on the 16 px parent strut (20.2 pt line).
+    static let strutTitle12 = LogType(size: 12, weight: 700, lineHeight: 1.68)
+    static let strutTitle13 = LogType(size: 13, weight: 700, lineHeight: 1.55)
     static let confirmed20 = LogType(size: 20, weight: 700, lineHeight: 1.26)
     static var fieldValueFont: UIFont { PlusJakartaSans.uiFont(size: UIFontMetrics.default.scaledValue(for: 12), weight: 400) }
 }

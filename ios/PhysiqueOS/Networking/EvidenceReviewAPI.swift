@@ -45,6 +45,9 @@ struct NotAvailableEvidenceReviewAPI: EvidenceReviewAPI {
     struct NotAvailable: Error {}
 
     func fetchReview(reviewId: String) async throws -> EvidenceReviewDetailReadModel? {
+#if DEBUG
+        if let fixture = WorkoutMatchReviewFixture.review(reviewId: reviewId) { return fixture }
+#endif
         throw NotAvailable()
     }
 
@@ -53,9 +56,56 @@ struct NotAvailableEvidenceReviewAPI: EvidenceReviewAPI {
         expectedVersion: String,
         loggerSessionCanonicalId: String?
     ) async throws -> WorkoutReconciliationCommandResult {
+#if DEBUG
+        if WorkoutMatchReviewFixture.review(reviewId: reviewId) != nil {
+            return WorkoutMatchReviewFixture.result(reviewId: reviewId, loggerSessionCanonicalId: loggerSessionCanonicalId)
+        }
+#endif
         throw NotAvailable()
     }
 }
+
+#if DEBUG
+/// DEBUG-only Workout Match review for Batch 2 visual parity captures,
+/// reachable only with `-physiqueos.redesign-review`. Never in Release.
+enum WorkoutMatchReviewFixture {
+    static let reviewId = "review-workout-match-fixture"
+
+    static func review(reviewId: String) -> EvidenceReviewDetailReadModel? {
+        guard reviewId == Self.reviewId,
+              ProcessInfo.processInfo.arguments.contains("-physiqueos.redesign-review") else { return nil }
+        return EvidenceReviewDetailReadModel(
+            id: reviewId, status: "pending", createdAt: nil, version: 1, items: [],
+            workoutReconciliation: WorkoutReconciliationDetail(
+                localDate: "2026-10-03",
+                title: "Possible duplicate workout",
+                summary: "Choose whether this Apple Health workout belongs to one existing Logger session.",
+                workout: WorkoutReconciliationWorkout(family: "strength", canonicalType: "traditional_strength_training",
+                                                     startedAt: "2026-10-04T04:14:00Z", endedAt: "2026-10-04T04:51:00Z"),
+                candidates: [
+                    WorkoutReconciliationCandidate(loggerSessionCanonicalId: "logger-session-1", confidence: 95,
+                                                   basis: "logger_session_window", activityType: "strength",
+                                                   startedAt: "2026-10-04T04:13:00Z", endedAt: "2026-10-04T04:50:00Z"),
+                    WorkoutReconciliationCandidate(loggerSessionCanonicalId: "logger-session-2", confidence: 62,
+                                                   basis: "temporal_and_telemetry", activityType: "strength",
+                                                   startedAt: "2026-10-04T02:05:00Z", endedAt: "2026-10-04T02:44:00Z"),
+                ]
+            )
+        )
+    }
+
+    static func result(reviewId: String, loggerSessionCanonicalId: String?) -> WorkoutReconciliationCommandResult {
+        let noMatch = loggerSessionCanonicalId == nil
+        return WorkoutReconciliationCommandResult(
+            status: noMatch ? "resolved_no_match" : "resolved_confirmed",
+            reviewId: reviewId, revision: 2,
+            resolution: .init(action: noMatch ? "no_match" : "confirm",
+                              selectedLoggerSessionCanonicalId: loggerSessionCanonicalId,
+                              linkId: noMatch ? nil : "review-link")
+        )
+    }
+}
+#endif
 
 /// Volatile production review state and concurrency identity. Confirmation
 /// and disposition use separate canonical commands; no sandbox state is used.

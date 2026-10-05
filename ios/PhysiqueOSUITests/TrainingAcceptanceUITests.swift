@@ -958,6 +958,35 @@ final class LoggerParityCaptureUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Review your workout"].waitForExistence(timeout: 3))
     }
 
+    func testCheckpoint5WorkoutMatchDark() { checkpoint5(appearance: "dark") }
+    func testCheckpoint5WorkoutMatchMineralLight() { checkpoint5(appearance: "light") }
+
+    private func checkpoint5(appearance: String) {
+        for outcome in ["confirm", "no-match"] {
+            launch(appearance: appearance, route: "log",
+                   extra: ["-physiqueos.redesign-review", "-physiqueos.log-review.state", "workout-match"])
+            let entry = app.buttons["log.review.review-workout-match-fixture"]
+            XCTAssertTrue(entry.waitForExistence(timeout: 8))
+            if outcome == "confirm" { capture("cp5-log-entry-\(appearance)") }
+            entry.tap()
+            let confirm = app.buttons["evidenceReview.workoutReconciliation.confirm.1"]
+            XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["evidenceReview.workoutReconciliation.confirm.2"].exists)
+            XCTAssertTrue(app.buttons["evidenceReview.workoutReconciliation.noMatch"].exists)
+            if outcome == "confirm" {
+                capture("cp5-match-\(appearance)")
+                confirm.tap()
+                XCTAssertTrue(app.staticTexts["Match confirmed"].waitForExistence(timeout: 5))
+                capture("cp5-confirmed-\(appearance)")
+            } else {
+                app.buttons["evidenceReview.workoutReconciliation.noMatch"].tap()
+                XCTAssertTrue(app.staticTexts["No match recorded"].waitForExistence(timeout: 5))
+                capture("cp5-no-match-\(appearance)")
+            }
+            XCTAssertTrue(app.buttons["evidenceReview.backToLog"].exists)
+        }
+    }
+
     private func discardSavedDrafts() {
         let start = app.buttons["trainingLogger.start"]
         XCTAssertTrue(start.waitForExistence(timeout: 10))

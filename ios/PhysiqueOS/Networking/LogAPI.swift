@@ -67,6 +67,15 @@ enum LogRedesignReviewFixture {
                 review(id: "review-nutrition-2026-10-03", title: "Nutrition ready to review", summary: "1 meal", duplicate: false),
             ]
             return log
+        case "workout-match":
+            var log = loaded
+            log.pendingEvidenceReviews = [
+                PendingEvidenceReview(id: "review-workout-match-fixture", title: "Possible duplicate workout",
+                                      date: "Saturday, October 3", summary: "2 possible Logger sessions",
+                                      likelyDuplicate: false, destination: .evidenceReview(reviewId: "review-workout-match-fixture"),
+                                      kind: "healthkit_workout_reconciliation"),
+            ]
+            return log
         case "processing":
             var log = loaded
             log.pendingEvidenceReviews = []
