@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T21:21:36Z",
+  "generated_at_utc": "2026-10-05T21:32:36Z",
   "task": {
     "id": "workout-reliability-founder-decisions-complete-20261005",
     "title": "Workout reliability lane: 2-B/2-C implemented, UUID-case Server fix deployed (b5de242f); 2-C Server b7eb1e39 awaiting deploy approval",
@@ -17,7 +17,7 @@
     "native_build": 87
   },
   "result": {
-    "summary": "Workout reliability lane (Batch 3 untouched). Server b5de242f DEPLOYED (ea89c93e ACTIVE; web+worker source hash, /live, /ready, log gitSha verified; no errors; 0 writes since deploy). Today's Watch workout link: PENDING - no HealthKit ingest has arrived since deploy (last phone sync 19:02Z); next normal sync should link it via reassessment (tested path); nothing manually mutated. 2-C Server contract b7eb1e39 (additive contextualProgressionRecommendations, no migration) NOT deployed - awaiting Founder deploy approval. Native candidate e9f8a957 (incl. cd06bfea): 2-B untouched/uncompleted row refill on pair/unpair/re-pair with no-history keep; 2-C exact-grouping Server recommendation selection. Integration preview on Batch 2 70ebf753: unit 2034/0, Watch 49/49, Release compile OK.",
+    "summary": "Workout reliability lane (Batch 3 untouched). Server b5de242f DEPLOYED (ea89c93e ACTIVE; web+worker source hash, /live, /ready, log gitSha verified; no errors; 0 writes since deploy). Today's Watch workout LINKED at 21:29:05Z by the first normal post-deploy ingest (trusted, confirmed, exact stored session id; 0 reviews; 0 Evidence writes). 2-C Server contract b7eb1e39 (additive contextualProgressionRecommendations, no migration) NOT deployed - awaiting Founder deploy approval. Native candidate e9f8a957 (incl. cd06bfea): 2-B untouched/uncompleted row refill on pair/unpair/re-pair with no-history keep; 2-C exact-grouping Server recommendation selection. Integration preview on Batch 2 70ebf753: unit 2034/0, Watch 49/49, Release compile OK.",
     "success": true,
     "production_mutated": false,
     "deployed": true,
@@ -39,20 +39,17 @@
   },
   "decisions_required": [
     "Authorize production deploy of 2-C Server candidate b7eb1e39 (additive training-logger contextualProgressionRecommendations; no migration/data rewrite)",
-    "Open PhysiqueOS on iPhone so a normal HealthKit sync runs reassessment; Claude reports the link read-only",
     "Integrate Native e9f8a957 into the next-build authority per the map (preview 70ebf753)",
     "Unchanged concurrent lanes: Batch 3 B/C acceptance; Build 88 authorization for Batch 2 793462b1"
   ],
-  "blockers": [
-    "Today's Watch workout link verification waits on the next normal HealthKit ingest (none since deploy)"
-  ],
+  "blockers": [],
   "unexpected_findings": [],
   "backlog": [
     "Watch Review/Confirmation Complete Set gating + timed-set projection (shared Watch mapper root)",
     "Phone reply-before-side-effects / one projection build per command after next workout's correlatable logs"
   ],
   "recommended_next_step": "Founder approves b7eb1e39 deploy; Claude deploys via the guarded path and re-verifies; Watch link confirmed after the next sync.",
-  "full_report_path": "agent-handoffs/reports/20261005T212016Z-workout-reliability-founder-decisions-complete.md",
+  "full_report_path": "agent-handoffs/reports/20261005T213236Z-workout-reliability-watch-link-verified.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

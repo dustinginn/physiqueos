@@ -21,9 +21,9 @@ Gates:
 - **Release compile:** OK.
 - **Server:** UUID fix 208/208; 2-C core tests 51/51.
 
-Today's Watch workout link: **pending**. No HealthKit ingest has arrived since the deploy. The next normal sync should link it.
+Today's Watch workout: **LINKED** at 21:29:05Z through normal reassessment. It is a trusted, confirmed link to the exact session, with 0 reviews and 0 Evidence writes.
 
-Report: `agent-handoffs/reports/20261005T212016Z-workout-reliability-founder-decisions-complete.md`
+Report: `agent-handoffs/reports/20261005T213236Z-workout-reliability-watch-link-verified.md` (addendum to `20261005T212016Z-workout-reliability-founder-decisions-complete.md``
 
 Concurrent lanes (unchanged):
 - Batch 3 B/C acceptance: report `20261005T193626Z`.
