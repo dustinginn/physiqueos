@@ -1,41 +1,48 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T15:37:34Z",
+  "generated_at_utc": "2026-10-05T17:38:16Z",
   "task": {
-    "id": "batch3-claude-takeover-evidence-cpa-20261005",
-    "title": "Redesign Batch 3 Claude takeover: Checkpoint A Evidence Hub + Timeline reimplemented to the locked design",
+    "id": "batch3-cpa-accepted-implement-bc-20261005",
+    "title": "Redesign Batch 3 Claude: Checkpoints B (Training + Activity/Cardio) and C (Nutrition + Weight) Evidence to the locked designs",
     "agent": "claude",
-    "status": "checkpoint_a_ready_for_founder_review_stopped"
+    "status": "checkpoints_b_c_ready_for_founder_review_stopped"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "f822862ef37faa52632f81fb1886a6e84b8fa57d",
-    "native_build87_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "native_base_sha": "49e48f1eab3bc6ff22ca6c4bc24b3a9955b0fcc7",
+    "prompt_commit": "fe4a29b5a20361d6701b6f36b84e07da5d0feddc",
     "native_checkpoint_a_sha": "ce5c7dd899f64386a70a6d21c25cf85bd93d6f3a",
-    "review_package_commit": "7cad090b6aab99a5e4b3603a7a8fa49d5bde53d4",
-    "locked_design_commit": "f7d72f19bdabadc6cafb53354812e0e86fca353f",
-    "rejected_codex_authority": "d842a76bdb8dad023da4add7104688747d9c1872"
+    "native_checkpoint_b_sha": "7b1cd96eabec698d1cc207bb0b9254c96e47befe",
+    "native_checkpoint_c_sha": "5f6db645738897bfb49365eb0fee4ebf8265e5ce",
+    "native_candidate_sha": "5c296d9e0abd7ceda9b52ef7a3b99194b195d500",
+    "review_package_commit": "2860f0c50fa393f6c7c4cb3a8f5c34743a291210",
+    "locked_design_commits": {"training": "33ea6491", "nutrition_activity": "8e6bd94b", "weight": "1f8ba1b9"}
   },
   "publication": {
     "source_work_branch": "claude/redesign-batch3-evidence-takeover-20261005",
-    "report_path": "agent-handoffs/reports/20261005T153734Z-redesign-batch3-claude-checkpoint-a.md",
-    "review_package": "agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-a-20261005/ (on the work branch at 7cad090b)"
+    "report_path": "agent-handoffs/reports/20261005T173816Z-redesign-batch3-claude-checkpoints-b-c.md",
+    "review_packages": [
+      "agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-b-20261005/ (work branch at 2860f0c50fa393f6c7c4cb3a8f5c34743a291210)",
+      "agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-c-20261005/ (work branch at 2860f0c50fa393f6c7c4cb3a8f5c34743a291210)"
+    ],
+    "primary_boards": [
+      "https://github.com/dustinginn/physiqueos/blob/2860f0c50fa393f6c7c4cb3a8f5c34743a291210/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-b-20261005/checkpoint-b-primary-mobile-review-board.png",
+      "https://github.com/dustinginn/physiqueos/blob/2860f0c50fa393f6c7c4cb3a8f5c34743a291210/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-c-20261005/checkpoint-c-primary-mobile-review-board.png"
+    ]
   },
   "result": {
-    "summary": "Evidence Hub + Timeline rebuilt to locked H1/T1/S1 in SF Pro at 402/360 scale, Dark + Mineral Light. Measured parity vs reference: all Hub/Timeline elements within +/-1.0 pt (horizontal <=0.5 pt); remaining differences are iOS chrome, truthful data, rasterization. Codex CP-A found to be a restyle with a broken Timeline rail. Focused unit 138/0 fail, new Evidence UI 3/3, regression UI 4/4, Release compile OK.",
+    "summary": "Training, Activity/Cardio, Nutrition and Weight Evidence rebuilt to locked T/A/N/W harnesses (per-family palette, Jakarta/SF at harness scale), Dark + Mineral Light. Page heads within <=2.0 pt everywhere (T1 +/-0.7); lower-section residuals are truthful Sandbox content. Fixed chart vertical-scroll trap on Weight/Nutrition (shared overlay defect remains on DEXA/Energy/Briefings, reported). Focused unit 426/0 fail, new UI 6/6, Hub 3/3, Training journeys 4/4, Recovery 3/3, Release compile OK.",
     "production_data_mutated": false,
     "deployed": false,
     "testflight_uploaded": false,
     "build_number_bumped": false
   },
   "decisions_required": [
-    "Founder review/approval of Batch 3 Checkpoint A before Checkpoint B starts",
+    "Founder review/approval of Batch 3 Checkpoints B and C before Checkpoint D (Progress Photos + DEXA) starts",
     "Concurrent lane, unchanged: authorize Build 88 for Batch 2 Native 793462b1 (report 20261005T150227Z)"
   ],
   "blockers": [],
-  "recommended_next_step": "Review the primary mobile board; on approval Claude starts Checkpoint B (Training + Activity/Cardio) on the same branch.",
-  "stop_reason": "Prompt requires a Founder review stop after Checkpoint A.",
+  "recommended_next_step": "Review both primary mobile boards; on approval Claude starts Checkpoint D on the same branch.",
+  "stop_reason": "Prompt requires a Founder review stop after Checkpoints B + C.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
