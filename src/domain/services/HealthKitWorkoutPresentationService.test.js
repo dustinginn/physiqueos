@@ -12,6 +12,7 @@ import { createSep23StrengthPresentationFixture } from "../../fixtures/healthKit
 import { createSep24StrengthPresentationFixture } from "../../fixtures/healthKitSep24StrengthPresentationFixture.js";
 import { createCardioWholeDayAttributionFixture } from "../../fixtures/healthKitCardioWholeDayAttributionFixture.js";
 import { createTrainingNavigationReadService } from "../../application/training/TrainingNavigationReadService.js";
+import { composeLoggedTodaySummary } from "./LoggedTodayService.js";
 import {
   HealthKitStrengthMatchOutcome,
   assessHealthKitStrengthLinkCandidates,
@@ -38,7 +39,12 @@ describe("confirmed HealthKit workout presentation", () => {
         contentAuthority: { trainingContent: "workout_logger", telemetry: "healthkit" },
       },
       source: { application: "Apple Health", sourceName: "Apple Watch" },
-      session: { activeCalories: 410, durationSeconds: 3600, averageHeartRate: 122 },
+      // Option A: the Logger owns the window (this legacy fixture is
+      // start-only, so end/duration stay missing -- never Apple's 17:00-18:00).
+      session: {
+        startedAt: "2026-09-23T17:01:00.000Z", endedAt: null, durationSeconds: null,
+        activeCalories: 410, averageHeartRate: 122,
+      },
     });
     expect(fixture.canonicalEvidenceObjects).toEqual(before);
     expect(JSON.stringify(attachments)).not.toContain("externalId");
@@ -397,7 +403,7 @@ describe("confirmed HealthKit workout presentation", () => {
     expect(session.healthKitAttachment).toMatchObject({
       relationship: { status: "confirmed" },
       source: { application: "Apple Health", sourceName: "Apple Watch" },
-      session: { activeCalories: 410, durationSeconds: 3600 },
+      session: { startedAt: "2026-09-23T17:01:00.000Z", durationSeconds: null, activeCalories: 410 },
     });
     expect(session.sourceEvidence).toEqual(["Workout Logger", "Apple Health"]);
     expect(logger.payload.exercises).toEqual(exercisesBefore);
@@ -527,19 +533,132 @@ describe("Logger presentation changes only for a CONFIRMED link (2026-10-04 corr
     const session = await workoutDetailService(fixture, logger).getSession({ sessionId: fixture.ids.session });
     expect(session.healthKitAttachment).toMatchObject({
       relationship: { status: "confirmed" },
-      session: { activeCalories: 410, durationSeconds: 3600, averageHeartRate: 122 },
+      // Option A: confirmed Apple telemetry (energy/HR), Logger-owned window.
+      session: { startedAt: "2026-09-23T17:01:00.000Z", activeCalories: 410, averageHeartRate: 122 },
     });
-    // The existing confirmed-link contract presents the Apple workout's own
-    // window (here 17:00-18:00Z vs the Logger's 17:01Z start) as the session
-    // telemetry; sets/exercises stay the Logger's. Recorded so a late-started
-    // Apple workout's window is a visible product decision, not an accident.
-    expect(session.telemetry).toMatchObject({
-      startTime: "2026-09-23T17:00:00.000Z",
-      endTime: "2026-09-23T18:00:00.000Z",
-      durationSeconds: 3600,
-    });
+    expect(session.telemetry).toMatchObject({ startTime: "2026-09-23T17:01:00.000Z", activeCalories: 410, averageHeartRate: 122 });
+    expect(session.telemetry.startTime).not.toBe("2026-09-23T17:00:00.000Z");
+    expect(session.telemetry.durationSeconds).not.toBe(3600);
     expect(session.exercises).toEqual(logger.payload.exercises);
     expect(snapshot(fixture)).toEqual(before);
+  });
+});
+
+describe("Option A: a confirmed Strength link keeps the Logger window (2026-10-05)", () => {
+  // Today's shape: Logger 12:31-1:47 PM (76 min) vs a hand-started Apple
+  // Traditional Strength workout 1:28-1:48 PM (20 min), then confirmed.
+  function confirmedFixture({ appleStart, appleEnd, appleSeconds }) {
+    const fixture = createSep23StrengthPresentationFixture();
+    const logger = fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session);
+    Object.assign(logger.payload.metadata, {
+      start_time: "2026-09-23T12:31:00-07:00",
+      end_time: "2026-09-23T13:47:00-07:00",
+      duration_seconds: 4560,
+    });
+    const workout = fixture.canonicalWorkouts.find((item) => item.id === fixture.ids.workout);
+    workout.current.startedAt = appleStart;
+    workout.current.endedAt = appleEnd;
+    workout.current.telemetry.durationSeconds = appleSeconds;
+    return { fixture, logger };
+  }
+
+  async function workoutDetail(fixture, logger) {
+    return createTrainingNavigationReadService({
+      readCanonicalExerciseRegistry: async () => [],
+      store: {
+        run: (_name, callback) => callback(),
+        getCanonicalEvidenceObject: async (id) => id === logger.canonicalId ? logger : null,
+        listHealthKitCanonicalWorkouts: async () => fixture.canonicalWorkouts,
+        listHealthKitWorkoutLinks: async () => fixture.workoutLinks,
+        listHealthKitWorkoutLinkClaims: async () => fixture.workoutLinkClaims,
+      },
+    }).getSession({ sessionId: logger.canonicalId });
+  }
+
+  for (const [label, apple] of [
+    ["full-window", { appleStart: "2026-09-23T19:31:00.000Z", appleEnd: "2026-09-23T20:47:00.000Z", appleSeconds: 4560 }],
+    ["late/truncated", { appleStart: "2026-09-23T20:28:00.000Z", appleEnd: "2026-09-23T20:48:00.000Z", appleSeconds: 1200 }],
+  ]) {
+    it(`a ${label} confirmed Apple workout keeps the Logger window on every surface, with Apple energy/HR`, async () => {
+      const { fixture, logger } = confirmedFixture(apple);
+      const exercisesBefore = structuredClone(logger.payload.exercises);
+      const before = structuredClone({
+        canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
+        canonicalWorkouts: fixture.canonicalWorkouts,
+        workoutLinks: fixture.workoutLinks,
+        workoutLinkClaims: fixture.workoutLinkClaims,
+      });
+      const loggerWindow = {
+        startedAt: "2026-09-23T19:31:00.000Z",
+        endedAt: "2026-09-23T20:47:00.000Z",
+        durationSeconds: 4560,
+      };
+
+      // Shared projection.
+      const attachment = projectHealthKitStrengthWorkoutPresentationBySession(fixture).get(fixture.ids.session);
+      expect(attachment).toMatchObject({
+        relationship: { status: "confirmed", contentAuthority: { trainingContent: "workout_logger", telemetry: "healthkit" } },
+        source: { application: "Apple Health" },
+        session: { ...loggerWindow, activeCalories: 410, averageHeartRate: 122 },
+      });
+
+      // Workout Detail.
+      const detail = await workoutDetail(fixture, logger);
+      expect(detail.healthKitAttachment.session).toMatchObject(loggerWindow);
+      expect(detail.telemetry).toMatchObject({
+        startTime: loggerWindow.startedAt, endTime: loggerWindow.endedAt, durationSeconds: 4560,
+        activeCalories: 410, averageHeartRate: 122,
+      });
+      expect(detail.exercises).toEqual(exercisesBefore);
+      if (apple.appleStart !== loggerWindow.startedAt) expect(JSON.stringify(detail)).not.toContain(apple.appleStart);
+
+      // Training Day / Activity linked-training context, and accounting.
+      const report = createProviderActivityEvidenceReport(fixture);
+      const entry = report.linkedTrainingContext.find((item) => item.id === fixture.ids.session);
+      expect(entry).toMatchObject({
+        value: "410 active cal",
+        sourceEvidence: ["Workout Logger", "Apple Health"],
+        healthKitPresentation: { status: "confirmed" },
+      });
+      expect(entry.detail).toContain(`${loggerWindow.startedAt}-${loggerWindow.endedAt}`);
+      expect(entry.detail).toContain("1h 16m");
+      if (apple.appleStart !== loggerWindow.startedAt) expect(entry.detail).not.toContain(apple.appleStart);
+      const day = report.latestActivityDay;
+      expect(day.workoutEnergyAttribution.confirmedHealthKitWorkoutCount).toBe(1);
+
+      // Logged Today.
+      const loggedToday = composeLoggedTodaySummary({
+        canonicalObjects: fixture.canonicalEvidenceObjects,
+        dateKey: "2026-09-23",
+        healthKitStrengthPresentationBySession: projectHealthKitStrengthWorkoutPresentationBySession(fixture),
+      });
+      expect(loggedToday.rows[0].lines[0]).toMatchObject({ kind: "logger", summary: "Strength Training · 76 min" });
+
+      // Nothing was written; one Logger-owned session, no duplicate.
+      expect({
+        canonicalEvidenceObjects: fixture.canonicalEvidenceObjects,
+        canonicalWorkouts: fixture.canonicalWorkouts,
+        workoutLinks: fixture.workoutLinks,
+        workoutLinkClaims: fixture.workoutLinkClaims,
+      }).toEqual(before);
+      expect(fixture.canonicalEvidenceObjects.filter((record) => (record.payload ?? record).evidence_type === "training")).toHaveLength(1);
+    });
+  }
+
+  it("never fills a missing Logger end or duration from the Apple workout", () => {
+    const fixture = createSep23StrengthPresentationFixture();
+    const attachment = projectHealthKitStrengthWorkoutPresentationBySession(fixture).get(fixture.ids.session);
+    expect(attachment.session).toMatchObject({ startedAt: "2026-09-23T17:01:00.000Z", endedAt: null, durationSeconds: null });
+  });
+
+  it("derives the Logger end from its own start + duration when only those are stored", () => {
+    const fixture = createSep23StrengthPresentationFixture();
+    const logger = fixture.canonicalEvidenceObjects.find((record) => record.canonicalId === fixture.ids.session);
+    logger.payload.metadata.duration_seconds = 4560;
+    const attachment = projectHealthKitStrengthWorkoutPresentationBySession(fixture).get(fixture.ids.session);
+    expect(attachment.session).toMatchObject({
+      startedAt: "2026-09-23T17:01:00.000Z", endedAt: "2026-09-23T18:17:00.000Z", durationSeconds: 4560,
+    });
   });
 });
 

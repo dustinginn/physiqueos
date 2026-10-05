@@ -244,24 +244,24 @@ async function strengthDetail(fixture) {
 const ATTACHMENT_KEYS = ["canonicalType", "canonicalWorkoutId", "family", "loggerSessionCanonicalId", "relationship", "session", "source"];
 const SESSION_KEYS = ["activeCalories", "averageHeartRate", "distance", "distanceUnit", "durationSeconds", "endedAt", "startedAt", "totalCalories"];
 
-describe("Item 12: the Sep 23 confirmed Strength detail is healthy and unchanged from production", () => {
-  it("serves the confirmed Apple telemetry on the Logger-owned detail, byte-identical to production 01d1900b", async () => {
+describe("Item 12: the Sep 23 confirmed Strength detail (Option A: Logger window, Apple telemetry)", () => {
+  // Option A (Founder, 2026-10-05) supersedes the 01d1900b byte digests: the
+  // wire shape (keys) is unchanged; the window values are now the Logger's.
+  it("serves confirmed Apple energy/HR with the Logger-owned window, same wire keys", async () => {
     const fixture = createSep23StrengthPresentationFixture();
     const detail = await strengthDetail(fixture);
-    const wire = JSON.stringify(detail);
-    // Digests captured on the production commit and on this candidate: identical.
-    expect(wire.length).toBe(3060);
-    expect(sha256(wire)).toBe("e0530c8f96c07899fd8013eca6199da131dee397b554a2cc3d8d6dba036d0967");
-    expect(sha256([...projectHealthKitStrengthWorkoutPresentationBySession(fixture).entries()]))
-      .toBe("614493eae8b140c35ce52b855dc97719c48916e10fe82068ea45acd5d50fb18f");
     expect(Object.keys(detail.healthKitAttachment).sort()).toEqual(ATTACHMENT_KEYS);
     expect(Object.keys(detail.healthKitAttachment.session).sort()).toEqual(SESSION_KEYS);
     expect(detail.healthKitAttachment).toMatchObject({
       family: "strength", canonicalType: "traditional_strength_training",
       relationship: { status: "confirmed", contentAuthority: { trainingContent: "workout_logger", telemetry: "healthkit" } },
-      session: { durationSeconds: 3600, activeCalories: 410, averageHeartRate: 122 },
+      // This legacy Logger fixture is start-only: no Apple end/duration is borrowed.
+      session: { startedAt: "2026-09-23T17:01:00.000Z", endedAt: null, durationSeconds: null, activeCalories: 410, averageHeartRate: 122 },
     });
-    expect(detail.telemetry).toMatchObject({ durationSeconds: 3600, activeCalories: 410, averageHeartRate: 122 });
+    expect(detail.telemetry).toMatchObject({ startTime: "2026-09-23T17:01:00.000Z", activeCalories: 410, averageHeartRate: 122 });
+    expect(JSON.stringify(detail)).not.toContain("2026-09-23T17:00:00.000Z");
+    expect([...projectHealthKitStrengthWorkoutPresentationBySession(fixture).values()].map((item) => item.session.startedAt))
+      .toEqual(["2026-09-23T17:01:00.000Z"]);
   });
 
   it("is JSON-safe on the wire (round-trips exactly) and leaks no raw HealthKit identity or internal state", async () => {

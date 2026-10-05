@@ -54,6 +54,10 @@ export function projectConfirmedHealthKitWorkoutAttachments({
     const loggerSession = activeTrainingById.get(String(link.loggerSessionCanonicalId));
     if (!workout || !loggerSession || !isPresentableConfirmedStrengthLink({ link, workout, loggerSession })) continue;
     const current = workout.current;
+    // Option A (Founder, 2026-10-05): the structured Logger session owns the
+    // session window; the confirmed Apple workout contributes telemetry only.
+    // A late-started or truncated Apple workout never replaces it.
+    const window = loggerSessionWindow(loggerSession);
     output.push(Object.freeze({
       canonicalWorkoutId: workout.id,
       loggerSessionCanonicalId: link.loggerSessionCanonicalId,
@@ -73,9 +77,9 @@ export function projectConfirmedHealthKitWorkoutAttachments({
         productType: current.source?.productType ?? null,
       }),
       session: Object.freeze({
-        startedAt: current.startedAt ?? null,
-        endedAt: current.endedAt ?? null,
-        durationSeconds: finiteOrNull(current.telemetry?.durationSeconds),
+        startedAt: window.startedAt,
+        endedAt: window.endedAt,
+        durationSeconds: window.durationSeconds,
         activeCalories: finiteOrNull(current.telemetry?.activeCalories),
         totalCalories: finiteOrNull(current.telemetry?.totalCalories),
         distance: finiteOrNull(current.telemetry?.distance),
@@ -86,6 +90,31 @@ export function projectConfirmedHealthKitWorkoutAttachments({
   }
   return Object.freeze(output.sort((left, right) =>
     left.loggerSessionCanonicalId.localeCompare(right.loggerSessionCanonicalId)));
+}
+
+// The structured Logger session's own window, normalized to the same ISO form
+// the attachment always carried. Missing Logger timing stays missing: it is
+// never filled from the Apple workout.
+function loggerSessionWindow(loggerSession) {
+  const metadata = (loggerSession.payload ?? loggerSession).metadata ?? {};
+  const start = instantOrNull(metadata.start_time ?? metadata.started_at ?? metadata.start);
+  const end = instantOrNull(metadata.end_time ?? metadata.ended_at ?? metadata.end);
+  const declared = finiteOrNull(metadata.duration_seconds);
+  const durationSeconds = declared ?? (start !== null && end !== null && end >= start
+    ? Math.round((end - start) / 1000)
+    : null);
+  const endMillis = end ?? (start !== null && declared !== null ? start + declared * 1000 : null);
+  return {
+    startedAt: start === null ? null : new Date(start).toISOString(),
+    endedAt: endMillis === null ? null : new Date(endMillis).toISOString(),
+    durationSeconds,
+  };
+}
+
+function instantOrNull(value) {
+  if (typeof value !== "string" || value.length === 0) return null;
+  const millis = Date.parse(value);
+  return Number.isFinite(millis) ? millis : null;
 }
 
 export function indexConfirmedHealthKitWorkoutAttachments(input = {}) {
