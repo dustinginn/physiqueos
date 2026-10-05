@@ -20,10 +20,10 @@ struct TrainingReportingView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = TrainingReportingViewModel(api: environment.trainingAPI, reportId: reportId)
@@ -49,12 +49,12 @@ struct TrainingReportingView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             Text("This report could not be found.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let report)):
             VStack(alignment: .leading, spacing: 24) {
@@ -100,14 +100,14 @@ struct TrainingReportingView: View {
     // MARK: - Cardio / Volume / Frequency / Consistency
 
     private func foundationCard(_ body: String) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Foundation")
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(body)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
     }
@@ -151,7 +151,7 @@ struct TrainingReportingView: View {
     }
 
     private func resistanceSummaryCard(_ groups: [TrainingResistanceStatusGroup]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Resistance Summary")
                 LazyVGrid(
@@ -207,13 +207,13 @@ struct TrainingReportingView: View {
         viewAllLabel: String = "View all →"
     ) -> some View {
         let visibleRows = previewLimit.map { Array(rows.prefix($0)) } ?? rows
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: title)
                 if rows.isEmpty {
                     Text(emptyText)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 0) {
                         ForEach(visibleRows) { row in
@@ -248,13 +248,13 @@ struct TrainingReportingView: View {
         CardContainer(padding: .sm) {
             VStack(alignment: .leading, spacing: 10) {
                 TrainingSectionHeaderView(title: "Details")
-                Divider().overlay(PhysiqueOSTheme.divider)
+                Divider().overlay(PhysiqueOSTheme.redesignRule)
                 HStack {
                     Text("Source")
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     Spacer(minLength: 8)
                     Text("Training sessions")
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
             }
@@ -266,13 +266,13 @@ struct TrainingReportingView: View {
     /// Current web `TrainingDayHistoryCard`: up to 20 day rows, each a
     /// direct link to Training Day. Session drill-down happens from there.
     private func historyCard(_ days: [TrainingDayReadModel]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recent Training History")
                 if days.isEmpty {
                     Text("Training days will appear here.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 0) {
                         ForEach(days.prefix(20), id: \.date) { day in
@@ -295,13 +295,13 @@ struct TrainingReportingView: View {
     /// straight into the rich `training-day` detail screen, which fetches
     /// its own complete data independently.
     private func productionHistoryCard(_ days: [TrainingReportingHistoryDay]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recent Training History")
                 if days.isEmpty {
                     Text("Training days will appear here.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 0) {
                         ForEach(days.prefix(20)) { day in
@@ -338,7 +338,7 @@ private struct TrainingReportingAnalysisSheetView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(sheet.description)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     VStack(spacing: 0) {
                         ForEach(sheet.rows) { row in
                             NavigationLink(value: row.destination) {
@@ -350,10 +350,10 @@ private struct TrainingReportingAnalysisSheetView: View {
                 }
                 .padding(16)
             }
-            .background(PhysiqueOSTheme.background)
+            .background(PhysiqueOSTheme.redesignCanvas)
             .navigationTitle(sheet.title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
         .presentationDetents([.medium, .large])
@@ -369,11 +369,11 @@ private struct TrainingResistanceStatusSheet: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("\(group.label) exercises from current resistance-training analysis.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     if group.items.isEmpty {
                         Text("No exercises in this group.")
                             .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     } else {
                         VStack(spacing: 0) {
                             ForEach(group.items) { item in
@@ -387,10 +387,10 @@ private struct TrainingResistanceStatusSheet: View {
                 }
                 .padding(16)
             }
-            .background(PhysiqueOSTheme.background)
+            .background(PhysiqueOSTheme.redesignCanvas)
             .navigationTitle(group.label)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
         .presentationDetents([.medium, .large])

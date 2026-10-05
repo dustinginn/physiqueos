@@ -24,10 +24,10 @@ struct TrainingLibraryRootView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = TrainingLibraryRootViewModel(api: environment.trainingAPI)
@@ -54,7 +54,7 @@ struct TrainingLibraryRootView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
             VStack(alignment: .leading, spacing: 24) {
@@ -88,11 +88,11 @@ struct TrainingLibraryRootView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(area.label)
                                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     if area.exerciseCount > 0 {
                                         Text("\(area.exerciseCount) exercise\(area.exerciseCount == 1 ? "" : "s")")
                                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                     }
                                 }
                                 Spacer(minLength: 8)
@@ -104,13 +104,13 @@ struct TrainingLibraryRootView: View {
                             .padding(.vertical, 8)
                             .frame(minHeight: 44)
                             .frame(maxWidth: .infinity)
-                            .background(PhysiqueOSTheme.surfaceMuted)
+                            .background(PhysiqueOSTheme.redesignSoft)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
 
                         if area.id != areas.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
+                            Divider().overlay(PhysiqueOSTheme.redesignRule)
                         }
                     }
                 }

@@ -28,9 +28,9 @@ struct ActivityDayView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = ActivityDayViewModel(api: environment.activityAPI, date: date)
@@ -65,12 +65,12 @@ struct ActivityDayView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             Text("No activity evidence for this day.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let day)):
             VStack(alignment: .leading, spacing: 24) {
@@ -92,30 +92,30 @@ struct ActivityDayView: View {
             // to avoid, and this codebase has already gotten right once.
             Text(TrainingDayView.formatCompactDate(day.date))
                 .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 .accessibilityLabel(TrainingDayView.formatCompactDate(day.date))
             Text(day.value)
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             Text(day.detail)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             Text(day.protocolStatus)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func metricsCard(_ day: ActivityDayRecord) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Activity Metrics")
                 ActivityMetricGridView(day: day)
                 if let warning = day.energyAnomalyMessage {
                     Label(warning, systemImage: day.energyAnomalyIsProvisional ? "clock.arrow.circlepath" : "exclamationmark.triangle.fill")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(day.energyAnomalyIsProvisional ? PhysiqueOSTheme.textSecondary : PhysiqueOSTheme.chartEffort)
+                        .foregroundStyle(day.energyAnomalyIsProvisional ? PhysiqueOSTheme.redesignInkSecondary : PhysiqueOSTheme.chartEffort)
                 }
             }
         }

@@ -28,21 +28,21 @@ struct TrainingLibraryHeaderView: View {
                     .foregroundStyle(PhysiqueOSTheme.accent)
                 Text(title)
                     .physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
             }
             HStack(spacing: 8) {
                 ForEach(breadcrumbs) { crumb in
                     NavigationLink(value: crumb.destination) {
                         Text(crumb.label)
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             .padding(.horizontal, 14)
                             .frame(minHeight: 44)
-                            .background(PhysiqueOSTheme.surfaceMuted)
+                            .background(PhysiqueOSTheme.redesignSoft)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
+                                    .strokeBorder(PhysiqueOSTheme.redesignRule, lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
@@ -51,7 +51,7 @@ struct TrainingLibraryHeaderView: View {
             if let summary {
                 Text(summary)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

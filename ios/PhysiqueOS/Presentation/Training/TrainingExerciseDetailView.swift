@@ -43,10 +43,10 @@ struct TrainingExerciseDetailView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = TrainingExerciseDetailViewModel(api: environment.trainingAPI, exerciseId: exerciseId)
@@ -66,12 +66,12 @@ struct TrainingExerciseDetailView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             Text("This exercise could not be found.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let exercise)):
             VStack(alignment: .leading, spacing: 24) {
@@ -101,7 +101,7 @@ struct TrainingExerciseDetailView: View {
                         .foregroundStyle(PhysiqueOSTheme.chartEvidence)
                     Text("Current Benchmark")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 }
                 if let benchmark {
                     HStack(spacing: 8) {
@@ -126,7 +126,7 @@ struct TrainingExerciseDetailView: View {
                 } else {
                     Text("No matching history yet.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -151,7 +151,7 @@ struct TrainingExerciseDetailView: View {
     @ViewBuilder
     private func performanceRecordsCard(_ model: TrainingPerformanceRecordsReadModel?) -> some View {
         if let model {
-            CardContainer {
+            CardContainer(background: PhysiqueOSTheme.redesignPaper) {
                 VStack(alignment: .leading, spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Durable Achievements")
@@ -159,7 +159,7 @@ struct TrainingExerciseDetailView: View {
                             .foregroundStyle(PhysiqueOSTheme.chartSuccess)
                         Text(model.heading)
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     }
                     VStack(spacing: 0) {
                         ForEach(model.records) { record in
@@ -168,7 +168,7 @@ struct TrainingExerciseDetailView: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(record.title)
                                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                         if let variant = record.executionVariant {
                                             Text("Variant: \(variant.label)")
                                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
@@ -181,25 +181,25 @@ struct TrainingExerciseDetailView: View {
                                     Spacer(minLength: 8)
                                     Text(TrainingDateFormatting.short(record.workoutDate))
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 }
                                 if let detail = record.detail {
                                     Text(detail)
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 }
                             }
                             .padding(.vertical, 8)
 
                             if record.id != model.records.last?.id {
-                                Divider().overlay(PhysiqueOSTheme.divider)
+                                Divider().overlay(PhysiqueOSTheme.redesignRule)
                             }
                         }
                     }
                     if let countLabel = model.countLabel {
                         Text(countLabel)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                 }
             }
@@ -210,7 +210,7 @@ struct TrainingExerciseDetailView: View {
 
     /// `LastExerciseSessionCard` (`TrainingKnowledgeScreen.jsx:1374-1400`).
     private func lastSessionCard(_ occurrence: TrainingExerciseHistoryOccurrence?) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 10) {
                 TrainingSectionHeaderView(title: "Last Session")
                 if let occurrence {
@@ -228,7 +228,7 @@ struct TrainingExerciseDetailView: View {
                 } else {
                     Text("No matching history yet.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -258,13 +258,13 @@ struct TrainingExerciseDetailView: View {
     /// to 10 occurrences, newest first, each an inline-expand row — not a
     /// navigation link (see this file's top doc comment).
     private func historyCard(_ occurrences: [TrainingExerciseHistoryOccurrence]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recent History")
                 if occurrences.isEmpty {
                     Text("Future sets will appear here.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(occurrences) { occurrence in
@@ -298,18 +298,18 @@ private struct TrainingExerciseMetricTile: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .physiqueOSFont(PhysiqueOSTypography.metricLabel)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Text(value)
                 .physiqueOSFont(PhysiqueOSTypography.metricValue)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceElevated)
+        .background(PhysiqueOSTheme.redesignPaper)
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
@@ -321,10 +321,10 @@ private struct TrainingSessionBadgeView: View {
     var body: some View {
         Text(TrainingExerciseHistoryCalculator.sessionBadge(for: date))
             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(PhysiqueOSTheme.surfaceMuted)
+            .background(PhysiqueOSTheme.redesignSoft)
             .clipShape(Capsule())
     }
 }
@@ -340,7 +340,7 @@ private struct TrainingExerciseSetTableView: View {
         if sets.isEmpty {
             Text("Details pending.")
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         } else {
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
                 GridRow {
@@ -349,7 +349,7 @@ private struct TrainingExerciseSetTableView: View {
                     Text("Load").gridColumnAlignment(.trailing)
                 }
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
 
                 ForEach(sets) { set in
                     GridRow {
@@ -358,7 +358,7 @@ private struct TrainingExerciseSetTableView: View {
                         Text(set.formattedLoad).gridColumnAlignment(.trailing)
                     }
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 }
             }
         }
@@ -396,7 +396,7 @@ private struct TrainingExerciseHistoryRowView: View {
                         }
                         Text(TrainingExerciseHistoryCalculator.historyMeta(for: occurrence.exercise.sets))
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 8)
@@ -414,14 +414,14 @@ private struct TrainingExerciseHistoryRowView: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 8) {
-                    Divider().overlay(PhysiqueOSTheme.divider)
+                    Divider().overlay(PhysiqueOSTheme.redesignRule)
                     TrainingExerciseSetTableView(sets: occurrence.exercise.sets)
                 }
                 .padding(.top, 10)
             }
         }
         .padding(12)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }

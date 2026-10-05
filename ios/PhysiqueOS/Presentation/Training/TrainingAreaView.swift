@@ -46,10 +46,10 @@ struct TrainingAreaView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId, browseAll: browseAll)
@@ -69,12 +69,12 @@ struct TrainingAreaView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             Text("This training area could not be found.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let area)):
             VStack(alignment: .leading, spacing: 24) {
@@ -106,11 +106,11 @@ struct TrainingAreaView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(exercise.label)
                                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     if let detail = exercise.detail {
                                         Text(detail)
                                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                     }
                                 }
                                 Spacer(minLength: 8)
@@ -122,13 +122,13 @@ struct TrainingAreaView: View {
                             .padding(.vertical, 8)
                             .frame(minHeight: 44)
                             .frame(maxWidth: .infinity)
-                            .background(PhysiqueOSTheme.surfaceMuted)
+                            .background(PhysiqueOSTheme.redesignSoft)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
 
                         if exercise.id != exercises.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
+                            Divider().overlay(PhysiqueOSTheme.redesignRule)
                         }
                     }
                 }

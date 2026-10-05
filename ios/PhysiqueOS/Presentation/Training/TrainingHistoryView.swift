@@ -34,11 +34,11 @@ struct TrainingHistoryView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -55,7 +55,7 @@ struct TrainingHistoryView: View {
                         Text("Evidence Hub")
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -80,7 +80,7 @@ struct TrainingHistoryView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
             VStack(alignment: .leading, spacing: 24) {
@@ -101,18 +101,18 @@ struct TrainingHistoryView: View {
     // MARK: - Header ("Evidence Report" eyebrow, IconBadge, title, subtitle)
 
     private func header(for landing: TrainingLandingReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: landing.tone, size: .lg, isCircular: true)
+        HStack(alignment: .top, spacing: 13) {
+            EvidenceGlyph(symbol: "bolt.horizontal.fill", color: PhysiqueOSTheme.redesignPurple, size: 46)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
+                Text("EVIDENCE REPORT")
                     .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .foregroundStyle(PhysiqueOSTheme.redesignPurple)
                 Text(landing.title)
                     .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(landing.subtitle ?? "What PhysiqueOS currently understands.")
                     .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -133,7 +133,7 @@ struct TrainingHistoryView: View {
     /// Training Day link already uses (`.trainingDay(date:)`) — no second
     /// route model, no duplicated day data.
     private func latestTrainingDayCard(_ day: TrainingLandingDay?) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Latest Training Day")
                 if let day {
@@ -144,11 +144,11 @@ struct TrainingHistoryView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(day.label)
                                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                 if let daySummary = day.daySummary {
                                     Text(daySummary)
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -187,12 +187,12 @@ struct TrainingHistoryView: View {
                         }
                     }
                     .padding(12)
-                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .background(PhysiqueOSTheme.redesignSoft)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     Text("Upload or enter a workout to begin building your training history.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -201,7 +201,7 @@ struct TrainingHistoryView: View {
     // MARK: - Training Areas
 
     private func trainingAreasCard(_ areas: [TrainingAreaSummary]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Training Areas") {
                     NavigationLink(value: AppDestination.progressStream(streamId: "training/library")) {
@@ -223,7 +223,7 @@ struct TrainingHistoryView: View {
     // MARK: - Reporting (compact expandable summary of all six reporting links)
 
     private func reportingCard(_ links: [TrainingReportingLink]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Reporting")
                 PhysiqueOSDisclosureRow(isExpanded: $isReportingExpanded) {
@@ -231,10 +231,10 @@ struct TrainingHistoryView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Review trends and summaries")
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                             Text("Resistance, cardio, volume, frequency, consistency, and history.")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         }
                         Spacer(minLength: 8)
                         // `ReportingLinks`'s compact `&lt;summary&gt;` carries
@@ -263,7 +263,7 @@ struct TrainingHistoryView: View {
     // MARK: - Recent Training History (single preview row + "Show All" sheet)
 
     private func recentHistoryCard(_ landing: TrainingLandingReadModel) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recent Training History") {
                     Button {
@@ -278,12 +278,12 @@ struct TrainingHistoryView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(mostRecent.label)
                                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     .lineLimit(1)
                                 if let summary = mostRecent.summary {
                                     Text(summary)
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 }
                             }
                             Spacer(minLength: 8)
@@ -294,14 +294,14 @@ struct TrainingHistoryView: View {
                         .padding(.horizontal, 12)
                         .frame(minHeight: 48)
                         .frame(maxWidth: .infinity)
-                        .background(PhysiqueOSTheme.surfaceMuted)
+                        .background(PhysiqueOSTheme.redesignSoft)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
                 } else {
                     Text("Training days will appear as workouts are uploaded or connected.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -313,7 +313,7 @@ struct TrainingHistoryView: View {
     // MARK: - Current Protocol
 
     private func currentProtocolCard(_ protocolSummary: TrainingProtocolSummary) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Current Protocol")
                 PhysiqueOSDisclosureRow(isExpanded: $isProtocolExpanded) {
@@ -321,10 +321,10 @@ struct TrainingHistoryView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(protocolSummary.sourceOfTruth)
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                             Text(protocolSummary.goal)
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         }
                         Spacer(minLength: 8)
                         Text("View protocol details")
@@ -360,11 +360,11 @@ private struct TrainingHistorySheet: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(day.label)
                                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     if let summary = day.summary {
                                         Text(summary)
                                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                     }
                                 }
                                 Spacer(minLength: 8)
@@ -378,16 +378,16 @@ private struct TrainingHistorySheet: View {
                         }
                         .buttonStyle(.plain)
                         if day.id != days.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
+                            Divider().overlay(PhysiqueOSTheme.redesignRule)
                         }
                     }
                 }
                 .padding(16)
             }
-            .background(PhysiqueOSTheme.background)
+            .background(PhysiqueOSTheme.redesignCanvas)
             .navigationTitle("Recent Training History")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
         .presentationDetents([.medium, .large])
@@ -413,7 +413,7 @@ struct TrainingSectionHeaderView<Action: View>: View {
         HStack(alignment: .center) {
             Text(title)
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Spacer(minLength: 8)
             action
         }
@@ -457,25 +457,25 @@ private struct TrainingRecordPreviewRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label)
                         .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Text(detail)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(value)
                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Text(TrainingDateFormatting.short(date))
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceElevated)
+        .background(PhysiqueOSTheme.redesignPaper)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -487,23 +487,23 @@ private struct TrainingAreaRow: View {
         HStack(spacing: 8) {
             ZStack {
                 Circle()
-                    .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
-                    .background(Circle().fill(PhysiqueOSTheme.surfaceElevated))
+                    .strokeBorder(PhysiqueOSTheme.redesignRule, lineWidth: 1)
+                    .background(Circle().fill(PhysiqueOSTheme.redesignPaper))
                 Image(systemName: TrainingAreaIcon.systemImage(for: area.id))
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(area.label)
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     .lineLimit(1)
                 if area.exerciseCount > 0 {
                     Text("\(area.exerciseCount) exercise\(area.exerciseCount == 1 ? "" : "s")")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         .lineLimit(1)
                 }
             }
@@ -515,7 +515,7 @@ private struct TrainingAreaRow: View {
         .padding(.horizontal, 10)
         .frame(minHeight: 56)
         .frame(maxWidth: .infinity)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -570,11 +570,11 @@ struct TrainingLinkRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 if let detail {
                     Text(detail)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
             Spacer(minLength: 8)
@@ -584,7 +584,7 @@ struct TrainingLinkRow: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity)
-        .background(PhysiqueOSTheme.surfaceElevated)
+        .background(PhysiqueOSTheme.redesignPaper)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -597,14 +597,14 @@ private struct TrainingProtocolRow: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             Text(value)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceElevated)
+        .background(PhysiqueOSTheme.redesignPaper)
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
@@ -642,7 +642,7 @@ struct TrainingScopeSelectorView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Viewing")
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             HStack(spacing: 6) {
                 ForEach(scope.options) { option in
                     pill(for: option, style: .primary)
@@ -662,15 +662,15 @@ struct TrainingScopeSelectorView: View {
             }
             Text(scope.dateRangeLabel)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceElevated)
+        .background(PhysiqueOSTheme.redesignPaper)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
+                .strokeBorder(PhysiqueOSTheme.redesignRule, lineWidth: 1)
         )
     }
 
@@ -681,10 +681,10 @@ struct TrainingScopeSelectorView: View {
         let selectedBackground = style == .primary ? PhysiqueOSTheme.accent : PhysiqueOSTheme.accent.opacity(0.7)
         let label = Text(option.label)
             .physiqueOSFont(style == .primary ? PhysiqueOSTypography.caption12Semibold : PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(option.selected ? .white : PhysiqueOSTheme.textSecondary)
+            .foregroundStyle(option.selected ? .white : PhysiqueOSTheme.redesignInkSecondary)
             .padding(.horizontal, style == .primary ? 10 : 8)
             .padding(.vertical, style == .primary ? 6 : 4)
-            .background(option.selected ? selectedBackground : PhysiqueOSTheme.surfaceMuted)
+            .background(option.selected ? selectedBackground : PhysiqueOSTheme.redesignSoft)
             .clipShape(Capsule())
 
         if let onSelect {
@@ -712,7 +712,7 @@ private struct RelatedGoalsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Related Goals")
                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     FlowLayout(spacing: 8) {
                         ForEach(goals) { goal in
                             NavigationLink(value: goal.destination) {

@@ -27,10 +27,10 @@ struct TrainingDayView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .task {
             if viewModel == nil { viewModel = TrainingDayViewModel(api: environment.trainingAPI, date: date) }
             await viewModel?.load()
@@ -47,12 +47,12 @@ struct TrainingDayView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             Text("No training evidence for this day.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let day)):
             VStack(alignment: .leading, spacing: 24) {
@@ -69,10 +69,10 @@ struct TrainingDayView: View {
                 .foregroundStyle(PhysiqueOSTheme.accent)
             Text(Self.formatCompactDate(day.date))
                 .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Text(Self.formatSummary(day.summary))
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -84,7 +84,7 @@ struct TrainingDayView: View {
     /// divided-rows convention `TrainingAreaView`'s "Browse" card and
     /// `TrainingSessionDetailView`'s "Exercises" card already establish.
     private func sessionsCard(_ sessions: [TrainingDaySessionSummary]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Sessions")
                 VStack(spacing: 0) {
@@ -95,7 +95,7 @@ struct TrainingDayView: View {
                         .buttonStyle(.plain)
 
                         if session.id != sessions.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
+                            Divider().overlay(PhysiqueOSTheme.redesignRule)
                         }
                     }
                 }
@@ -150,10 +150,10 @@ private struct TrainingDaySessionRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.title)
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(session.detail)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             Spacer(minLength: 8)
             Image(systemName: "chevron.right")
@@ -164,7 +164,7 @@ private struct TrainingDaySessionRowView: View {
         .padding(.vertical, 10)
         .frame(minHeight: 44)
         .frame(maxWidth: .infinity)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)

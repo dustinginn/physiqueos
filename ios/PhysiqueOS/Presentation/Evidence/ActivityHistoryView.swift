@@ -57,11 +57,11 @@ struct ActivityHistoryView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -73,7 +73,7 @@ struct ActivityHistoryView: View {
                         Text("Evidence Hub")
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -103,7 +103,7 @@ struct ActivityHistoryView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
             VStack(alignment: .leading, spacing: 24) {
@@ -122,18 +122,18 @@ struct ActivityHistoryView: View {
     // MARK: - Header ("Evidence Report" eyebrow, IconBadge, title, subtitle)
 
     private func header(for landing: ActivityLandingReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: landing.tone, size: .lg, isCircular: true)
+        HStack(alignment: .top, spacing: 13) {
+            EvidenceGlyph(symbol: "figure.walk", color: PhysiqueOSTheme.redesignTeal, size: 46)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
+                Text("EVIDENCE REPORT")
                     .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .foregroundStyle(PhysiqueOSTheme.redesignTeal)
                 Text(landing.title)
                     .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(landing.subtitle)
                     .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -142,7 +142,7 @@ struct ActivityHistoryView: View {
     // MARK: - Latest Activity Day (always expanded on web; tap navigates to detail)
 
     private func latestActivityDayCard(_ day: ActivityDayRecord?) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: day?.isToday == true ? "Today's Activity" : "Latest Activity Day")
                 if let day {
@@ -152,17 +152,17 @@ struct ActivityHistoryView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(TrainingDateFormatting.short(day.date))
                                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     Text(day.value)
                                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     Text(day.detail)
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                     if day.isInProgress {
                                         Text("Still updating from Apple Health")
                                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                     }
                                 }
                                 Spacer(minLength: 8)
@@ -174,11 +174,11 @@ struct ActivityHistoryView: View {
                             if let warning = day.energyAnomalyMessage {
                                 Label(warning, systemImage: day.energyAnomalyIsProvisional ? "clock.arrow.circlepath" : "exclamationmark.triangle.fill")
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(day.energyAnomalyIsProvisional ? PhysiqueOSTheme.textSecondary : PhysiqueOSTheme.chartEffort)
+                                    .foregroundStyle(day.energyAnomalyIsProvisional ? PhysiqueOSTheme.redesignInkSecondary : PhysiqueOSTheme.chartEffort)
                             }
                         }
                         .padding(12)
-                        .background(PhysiqueOSTheme.surfaceMuted)
+                        .background(PhysiqueOSTheme.redesignSoft)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
@@ -188,7 +188,7 @@ struct ActivityHistoryView: View {
                 } else {
                     Text("Activity days will appear here once daily movement evidence is uploaded or connected.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -197,7 +197,7 @@ struct ActivityHistoryView: View {
     // MARK: - Activity Areas (informational: the web's own tap targets 404, see the type-level doc comment)
 
     private func activityAreasCard(_ areas: [ActivityAreaSummary]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Activity Areas")
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
@@ -205,15 +205,15 @@ struct ActivityHistoryView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(area.label)
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 .lineLimit(1)
                             Text(area.value)
                                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         }
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(PhysiqueOSTheme.surfaceMuted)
+                        .background(PhysiqueOSTheme.redesignSoft)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("\(area.label): \(area.value)")
@@ -226,13 +226,13 @@ struct ActivityHistoryView: View {
     // MARK: - Linked Training Context (non-clickable preview, matching web)
 
     private func linkedTrainingContextCard(_ entries: [ActivityTrainingContextEntry]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Linked Training Context")
                 if entries.isEmpty {
                     Text("No linked workouts are available for this activity day.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(entries) { entry in
@@ -248,7 +248,7 @@ struct ActivityHistoryView: View {
 
     private func recentHistoryCard(_ history: [ActivityDayRecord]) -> some View {
         let preview = Array(history.prefix(Self.historyPreviewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 TrainingSectionHeaderView(title: "Recent Activity History") {
                     if history.count > Self.historyPreviewLimit {
@@ -262,7 +262,7 @@ struct ActivityHistoryView: View {
                 if preview.isEmpty {
                     Text("Activity history will appear as daily movement evidence is uploaded or connected.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(preview) { day in
@@ -296,15 +296,15 @@ private struct ActivityHistorySheet: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(TrainingDateFormatting.short(day.date))
                                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                                     Text(day.protocolStatus)
                                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 }
                                 Spacer(minLength: 8)
                                 Text(day.value)
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 13, weight: .black))
                                     .foregroundStyle(PhysiqueOSTheme.accent)
@@ -317,16 +317,16 @@ private struct ActivityHistorySheet: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) activity: \(day.value). \(day.protocolStatus)")
                         if day.id != days.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
+                            Divider().overlay(PhysiqueOSTheme.redesignRule)
                         }
                     }
                 }
                 .padding(16)
             }
-            .background(PhysiqueOSTheme.background)
+            .background(PhysiqueOSTheme.redesignCanvas)
             .navigationTitle("Recent Activity History")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
         .presentationDetents([.medium, .large])
@@ -346,16 +346,16 @@ private struct ActivityHistoryRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(TrainingDateFormatting.short(day.date))
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(day.protocolStatus)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
                 Text(day.value)
                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(PhysiqueOSTheme.accent)
@@ -363,7 +363,7 @@ private struct ActivityHistoryRow: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
@@ -383,27 +383,27 @@ private struct ActivityTrainingContextRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(entry.label)
                         .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Text(entry.detail)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(entry.value)
                         .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     if let date = entry.date {
                         Text(TrainingDateFormatting.short(date))
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                 }
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceElevated)
+        .background(PhysiqueOSTheme.redesignPaper)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
@@ -423,14 +423,14 @@ struct ActivityMetricGridView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(tile.label)
                         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     Text(tile.value)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceElevated)
+                .background(PhysiqueOSTheme.redesignPaper)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(tile.label): \(tile.value)")

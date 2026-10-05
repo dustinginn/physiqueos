@@ -36,10 +36,10 @@ struct TrainingSessionDetailView: View {
         }
         .scrollDismissesKeyboard(.immediately)
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -66,12 +66,12 @@ struct TrainingSessionDetailView: View {
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             Text("This session could not be found.")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.some(let session)):
             VStack(alignment: .leading, spacing: 24) {
@@ -100,7 +100,7 @@ struct TrainingSessionDetailView: View {
     /// list. Each field renders only when present, since an Apple-only
     /// telemetry source may not carry all of them.
     private func telemetryCard(_ telemetry: TrainingSessionTelemetryReadModel) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeading("Workout Summary")
                 if let timeRange = Self.formatTimeRange(start: telemetry.startTime, end: telemetry.endTime) {
@@ -120,7 +120,7 @@ struct TrainingSessionDetailView: View {
     }
 
     private func appleHealthAttachmentCard(_ attachment: HealthKitWorkoutAttachmentReadModel) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeading("Apple Health")
                 HStack(spacing: 8) {
@@ -129,10 +129,10 @@ struct TrainingSessionDetailView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(attachment.source.sourceName)
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         Text(Self.relationshipLabel(for: attachment.relationship))
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                 }
                 if let timeRange = Self.formatTimeRange(
@@ -160,11 +160,11 @@ struct TrainingSessionDetailView: View {
     private func telemetryRow(_ text: String) -> some View {
         Text(text)
             .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            .foregroundStyle(PhysiqueOSTheme.redesignInk)
     }
 
     private func supportingMediaCard(_ media: [TrainingSessionSupportingMedia]) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeading("Supporting Screenshots")
                 ForEach(media) { item in
@@ -181,21 +181,21 @@ struct TrainingSessionDetailView: View {
                 .foregroundStyle(PhysiqueOSTheme.accent)
             Text(session.label)
                 .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Text(session.showsWorkoutValueInHeader ? "\(session.value) · \(Self.formatDate(session.date))" : Self.formatDate(session.date))
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func summaryCard(for session: TrainingSessionDetailReadModel) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeading("Session Details")
                 Text(session.detail)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
             }
         }
     }
@@ -235,23 +235,23 @@ struct TrainingSessionDetailView: View {
     /// button — same copy, same single-field shape, same "leaving the
     /// original evidence attached" framing as the real correction flow.
     private func correctionCard(for session: TrainingSessionDetailReadModel) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeading("Add / Correct Workout Details")
                 Text("Add missing exercises, sets, reps, or loads for this workout. The original source stays attached while this detail improves the workout record.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
 
                 if environment.nativeAuthority == .founderProduction {
                     Text("Workout corrections aren't available here yet. Your saved workout is unchanged.")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                 ZStack(alignment: .topLeading) {
                     if correctionDraftText.isEmpty {
                         Text("Shoulder Press Machine\n15 x #120\n12 x #130\n10 x #140\n8 x #150")
                             .physiqueOSFont(PhysiqueOSTypography.body14Regular)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 12)
                             .allowsHitTesting(false)
@@ -259,21 +259,21 @@ struct TrainingSessionDetailView: View {
                     TextEditor(text: $correctionDraftText)
                         .focused($isCorrectionEditorFocused)
                         .physiqueOSFont(PhysiqueOSTypography.body14Regular)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         .scrollContentBackground(.hidden)
                         .padding(6)
                 }
                 .frame(minHeight: 120)
-                .background(PhysiqueOSTheme.surfaceElevated)
+                .background(PhysiqueOSTheme.redesignPaper)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 if let correctionStatusMessage {
                     Text(correctionStatusMessage)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(PhysiqueOSTheme.surfaceMuted)
+                        .background(PhysiqueOSTheme.redesignSoft)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
@@ -285,14 +285,14 @@ struct TrainingSessionDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Local draft corrections (not sent to PhysiqueOS)")
                             .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         ForEach(Array(localDraftCorrections.enumerated()), id: \.offset) { _, text in
                             Text(text)
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 .padding(10)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(PhysiqueOSTheme.surfaceMuted)
+                                .background(PhysiqueOSTheme.redesignSoft)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
@@ -303,7 +303,7 @@ struct TrainingSessionDetailView: View {
     }
 
     private func exercisesCard(for session: TrainingSessionDetailReadModel) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeading("Exercises")
                 ForEach(TrainingSessionExerciseGrouping.renderItems(for: session)) { item in
@@ -395,7 +395,7 @@ private struct TrainingSupportingMediaImage: View {
             case .unavailable:
                 Text("Screenshot unavailable")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .task(id: mediaId) { await environment.founderProductionPhotoMediaStore.loadImage(mediaId: mediaId) }
@@ -409,11 +409,11 @@ private struct TrainingExerciseOccurrenceView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(exercise.occurrenceLabel)
                 .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             ForEach(exercise.sets) { set in
                 Text("Set \(set.setNumber): \(set.formattedDetail)")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
     }
