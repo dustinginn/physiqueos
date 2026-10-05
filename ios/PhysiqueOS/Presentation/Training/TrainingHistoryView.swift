@@ -627,14 +627,23 @@ private struct TrainingProtocolRow: View {
 /// shared mechanism backing the web's own re-fetch-on-select behavior.
 struct TrainingScopeSelectorView: View {
     let scope: TrainingScopeContext
+    var selectionTint: Color
+    var outlinedSelection: Bool
     /// Called with the tapped option's raw `TrainingScopeOption.id` (a
     /// `EvidenceScopeSelection.pillID` string) — from either the primary
     /// Goal row or the contextual Phase row below it. The caller parses it
     /// via `EvidenceScopeSelection(pillID:)`.
     var onSelect: ((String) -> Void)?
 
-    init(scope: TrainingScopeContext, onSelect: ((String) -> Void)? = nil) {
+    init(
+        scope: TrainingScopeContext,
+        selectionTint: Color = PhysiqueOSTheme.accent,
+        outlinedSelection: Bool = false,
+        onSelect: ((String) -> Void)? = nil
+    ) {
         self.scope = scope
+        self.selectionTint = selectionTint
+        self.outlinedSelection = outlinedSelection
         self.onSelect = onSelect
     }
 
@@ -678,14 +687,19 @@ struct TrainingScopeSelectorView: View {
 
     @ViewBuilder
     private func pill(for option: TrainingScopeOption, style: PillStyle) -> some View {
-        let selectedBackground = style == .primary ? PhysiqueOSTheme.accent : PhysiqueOSTheme.accent.opacity(0.7)
+        let selectedBackground = style == .primary ? selectionTint : selectionTint.opacity(0.7)
         let label = Text(option.label)
             .physiqueOSFont(style == .primary ? PhysiqueOSTypography.caption12Semibold : PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(option.selected ? .white : PhysiqueOSTheme.redesignInkSecondary)
+            .foregroundStyle(option.selected ? (outlinedSelection ? selectionTint : .white) : PhysiqueOSTheme.redesignInkSecondary)
             .padding(.horizontal, style == .primary ? 10 : 8)
             .padding(.vertical, style == .primary ? 6 : 4)
-            .background(option.selected ? selectedBackground : PhysiqueOSTheme.redesignSoft)
+            .background(option.selected && !outlinedSelection ? selectedBackground : PhysiqueOSTheme.redesignSoft)
             .clipShape(Capsule())
+            .overlay {
+                if option.selected && outlinedSelection {
+                    Capsule().strokeBorder(selectionTint.opacity(style == .primary ? 1 : 0.7), lineWidth: 1)
+                }
+            }
 
         if let onSelect {
             Button {

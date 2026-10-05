@@ -23,18 +23,18 @@ struct DEXATrendChartView: View {
             if validPoints.count < 2 {
                 Text("More scan history is needed to show a trend.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     .frame(maxWidth: .infinity, minHeight: 100)
             } else {
                 chart
                 if let selectedPoint, let value = selectedPoint.value {
                     Text("\(TrainingDateFormatting.short(selectedPoint.date))  /  \(series.title): \(formatted(value))")
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 9)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(PhysiqueOSTheme.surfaceMuted)
+                        .background(PhysiqueOSTheme.redesignSoft)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 HStack {
@@ -45,7 +45,7 @@ struct DEXATrendChartView: View {
                     Text(TrainingDateFormatting.short(validPoints.last!.date))
                 }
                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
     }

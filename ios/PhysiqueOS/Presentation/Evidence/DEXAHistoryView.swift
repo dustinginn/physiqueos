@@ -56,11 +56,11 @@ struct DEXAHistoryView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -72,7 +72,7 @@ struct DEXAHistoryView: View {
                         Text("Evidence Hub")
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -96,17 +96,21 @@ struct DEXAHistoryView: View {
         switch viewModel?.state {
         case .none, .loading:
             ProgressView()
-                .tint(PhysiqueOSTheme.accent)
+                .tint(EvidenceRedesignPalette.lime)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let report):
             VStack(alignment: .leading, spacing: 26) {
                 header(for: report)
-                TrainingScopeSelectorView(scope: report.scope) { pillID in
+                TrainingScopeSelectorView(
+                    scope: report.scope,
+                    selectionTint: EvidenceRedesignPalette.lime,
+                    outlinedSelection: true
+                ) { pillID in
                     Task { await viewModel?.selectScope(pillID: pillID) }
                 }
                 latestScanCard(report.latestScan)
@@ -126,18 +130,18 @@ struct DEXAHistoryView: View {
 
     private var dexaWritebackStatus: some View {
         let coordinator = environment.dexaHealthKitWritebackCoordinator
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             HStack(spacing: 10) {
                 let completed = coordinator.state == .current || coordinator.state == .deleted
                 Image(systemName: completed ? "checkmark.icloud.fill" : "heart.text.square")
-                    .foregroundStyle(completed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(completed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.redesignInkSecondary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("DEXA → Apple Health")
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Text(coordinator.state.label)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 Spacer()
                 if coordinator.isEnabled && coordinator.state != .reconciling {
@@ -149,36 +153,42 @@ struct DEXAHistoryView: View {
     }
 
     private func header(for report: DEXAReportReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: .success, size: .lg, isCircular: true)
+        HStack(alignment: .top, spacing: 13) {
+            Text("D")
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(EvidenceRedesignPalette.lime)
+                .frame(width: 46, height: 46)
+                .background(EvidenceRedesignPalette.lime.opacity(0.13))
+                .clipShape(Circle())
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
+                Text("EVIDENCE REPORT")
                     .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .foregroundStyle(EvidenceRedesignPalette.lime)
                 Text(report.title)
                     .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(report.subtitle)
                     .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func latestScanCard(_ scan: DEXALatestScan?) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 8) {
                 TrainingSectionHeaderView(title: "Latest Scan")
                 if let scan {
                     HStack {
                         Text(TrainingDateFormatting.short(scan.date))
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         Spacer(minLength: 8)
                         Text(scan.sourceLabel)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                     if let mediaId = scan.sourceMediaId {
                         sourceMediaButton(mediaId: mediaId)
@@ -186,12 +196,12 @@ struct DEXAHistoryView: View {
                     if let sourceMediaMessage {
                         Text(sourceMediaMessage)
                             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                 } else {
                     Text("No DEXA scans in this period.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -203,14 +213,14 @@ struct DEXAHistoryView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.label)
                         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     Text(item.value)
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 }
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceElevated)
+                .background(PhysiqueOSTheme.redesignPaper)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(item.label): \(item.value)")
@@ -221,14 +231,14 @@ struct DEXAHistoryView: View {
     /// "Since prior scan" — the inline delta, part of `/progress/dexa`
     /// itself (not the separate DEXA Event Briefing comparison story).
     private func deltaRow(_ delta: DEXADelta) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 14) {
                 TrainingSectionHeaderView(title: "Since Prior Scan")
                 HStack(spacing: 0) {
                     deltaItem("Body Fat", delta.bodyFatPercentagePoints, color: PhysiqueOSTheme.chartSuccess)
-                    Divider().overlay(PhysiqueOSTheme.divider).frame(height: 48)
+                    Divider().overlay(PhysiqueOSTheme.redesignRule).frame(height: 48)
                     deltaItem("Fat Mass", delta.fatMassPounds, color: PhysiqueOSTheme.chartEffort)
-                    Divider().overlay(PhysiqueOSTheme.divider).frame(height: 48)
+                    Divider().overlay(PhysiqueOSTheme.redesignRule).frame(height: 48)
                     deltaItem("Lean Mass", delta.leanMassPounds, color: PhysiqueOSTheme.chartEvidence)
                 }
             }
@@ -239,10 +249,10 @@ struct DEXAHistoryView: View {
         VStack(alignment: .center, spacing: 5) {
             Text(label)
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             Text(value)
                 .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                .foregroundStyle(value == "0.0 lb" || value == "0.0 pts" ? PhysiqueOSTheme.textMuted : color)
+                .foregroundStyle(value == "0.0 lb" || value == "0.0 pts" ? PhysiqueOSTheme.redesignInkSecondary : color)
         }
         .frame(maxWidth: .infinity, alignment: .center)
         .accessibilityElement(children: .combine)
@@ -250,13 +260,13 @@ struct DEXAHistoryView: View {
     }
 
     private func coreTrendsCard(_ report: DEXAReportReadModel) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
                     TrainingSectionHeaderView(title: "Core Trends")
                     Text("Primary BodySpec trend lines for the selected timeline.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 chartCard(
                     report.bodyFatTrend,
@@ -278,7 +288,7 @@ struct DEXAHistoryView: View {
 
     private func supplementalCard(_ report: DEXAReportReadModel) -> some View {
         let preview = Array(report.supplementalDetails.prefix(Self.supplementalPreviewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             DEXADisclosureRow(isExpanded: $isSupplementalExpanded) {
                 drawerHeader(title: "Supplemental Metrics", subtitle: "Secondary calibration metrics from BodySpec.", expanded: isSupplementalExpanded)
             } expanded: {
@@ -288,15 +298,15 @@ struct DEXAHistoryView: View {
                             HStack {
                                 Text(row.label)
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 Spacer(minLength: 8)
                                 Text(row.value)
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 11)
-                            .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
+                            .background(PhysiqueOSTheme.redesignSoft.opacity(0.55))
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -319,7 +329,7 @@ struct DEXAHistoryView: View {
 
     private func regionalCard(title: String, series: [DEXAMetricSeries], namespace: String, isExpanded: Binding<Bool>) -> some View {
         let preview = Array(series.prefix(Self.regionalPreviewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             DEXADisclosureRow(isExpanded: isExpanded) {
                 drawerHeader(title: title, subtitle: title.contains("Lean") ? "Regional lean tissue in pounds." : "Regional fat tissue in pounds.", expanded: isExpanded.wrappedValue)
             } expanded: {
@@ -329,15 +339,15 @@ struct DEXAHistoryView: View {
                             HStack {
                                 Text(item.title)
                                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 Spacer(minLength: 8)
                                 Text(latestValue(item))
                                     .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 11)
-                            .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
+                            .background(PhysiqueOSTheme.redesignSoft.opacity(0.55))
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -364,10 +374,10 @@ struct DEXAHistoryView: View {
         return VStack(alignment: .leading, spacing: 6) {
             Text(series.title)
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Text(description)
                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             DEXATrendChartView(
                 series: series, color: color,
                 selectedPointID: Binding(
@@ -377,8 +387,8 @@ struct DEXAHistoryView: View {
             )
         }
         .padding(16)
-        .background(PhysiqueOSTheme.surfaceElevated)
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(PhysiqueOSTheme.divider, lineWidth: 1))
+        .background(PhysiqueOSTheme.redesignPaper)
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(PhysiqueOSTheme.redesignRule, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
@@ -392,30 +402,30 @@ struct DEXAHistoryView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 if let subtitle {
                     Text(subtitle)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
             Spacer(minLength: 8)
             Text(expanded ? "Close" : "Show All")
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
     }
 
     private func historyCard(_ rows: [DEXAScanHistoryRow]) -> some View {
         let preview = Array(rows.prefix(Self.historyPreviewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             DEXADisclosureRow(isExpanded: $isHistoryExpanded) {
                 drawerHeader(title: "Scan History", subtitle: nil, expanded: isHistoryExpanded)
             } expanded: {
                 if rows.isEmpty {
                     Text("No DEXA scans in this period.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 6) {
                         ForEach(isHistoryExpanded ? rows : preview) { row in
@@ -436,17 +446,17 @@ struct DEXAHistoryView: View {
         } label: {
             HStack(spacing: 8) {
                 if loadingSourceMediaID == mediaId {
-                    ProgressView().tint(PhysiqueOSTheme.textPrimary)
+                    ProgressView().tint(PhysiqueOSTheme.redesignInk)
                 } else {
                     Image(systemName: "doc.richtext.fill")
                 }
                 Text("View BodySpec PDF")
             }
             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            .foregroundStyle(PhysiqueOSTheme.redesignInk)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 11)
-            .background(PhysiqueOSTheme.surfaceElevated)
+            .background(PhysiqueOSTheme.redesignPaper)
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
@@ -488,10 +498,10 @@ private struct DEXAScanHistoryRowView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(TrainingDateFormatting.short(row.date))
                         .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Text(row.sourceLabel)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 Spacer(minLength: 8)
                 Text(row.bodyFatPercentage)
@@ -506,14 +516,14 @@ private struct DEXAScanHistoryRowView: View {
             if row.sourceMediaId != nil {
                 Button("View BodySpec PDF", action: onOpenSource)
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .foregroundStyle(EvidenceRedesignPalette.lime)
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("dexa.history.\(row.id).viewPDF")
             }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
@@ -521,7 +531,7 @@ private struct DEXAScanHistoryRowView: View {
     private func historyMetric(_ value: String, suffix: String) -> some View {
         Text("\(value)\(suffix)")
             .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
     }
 }
 
@@ -538,7 +548,7 @@ private struct DEXAPDFSheet: View {
     var body: some View {
         NavigationStack {
             DEXAPDFView(data: presentation.data)
-                .background(PhysiqueOSTheme.background)
+                .background(PhysiqueOSTheme.redesignCanvas)
                 .navigationTitle("BodySpec Report")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -558,7 +568,7 @@ private struct DEXAPDFView: UIViewRepresentable {
         view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
-        view.backgroundColor = UIColor(PhysiqueOSTheme.background)
+        view.backgroundColor = UIColor(PhysiqueOSTheme.redesignCanvas)
         view.document = PDFDocument(data: data)
         return view
     }

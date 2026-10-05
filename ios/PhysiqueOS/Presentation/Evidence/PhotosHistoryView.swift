@@ -30,11 +30,11 @@ struct PhotosHistoryView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -46,7 +46,7 @@ struct PhotosHistoryView: View {
                         Text("Evidence Hub")
                             .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
                     }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -81,12 +81,12 @@ struct PhotosHistoryView: View {
         switch viewModel?.state {
         case .none, .loading:
             ProgressView()
-                .tint(PhysiqueOSTheme.accent)
+                .tint(EvidenceRedesignPalette.lime)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let landing):
             let displayed = environment.nativeAuthority == .sandbox
@@ -97,7 +97,11 @@ struct PhotosHistoryView: View {
                 : landing
             VStack(alignment: .leading, spacing: 24) {
                 header(for: displayed)
-                TrainingScopeSelectorView(scope: displayed.scope) { pillID in
+                TrainingScopeSelectorView(
+                    scope: displayed.scope,
+                    selectionTint: EvidenceRedesignPalette.lime,
+                    outlinedSelection: true
+                ) { pillID in
                     Task { await viewModel?.selectScope(pillID: pillID) }
                 }
                 latestSetCard(displayed.latestSet)
@@ -110,25 +114,31 @@ struct PhotosHistoryView: View {
     }
 
     private func header(for landing: PhotosLandingReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: landing.tone, size: .lg, isCircular: true)
+        HStack(alignment: .top, spacing: 13) {
+            Text("P")
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .foregroundStyle(EvidenceRedesignPalette.lime)
+                .frame(width: 46, height: 46)
+                .background(EvidenceRedesignPalette.lime.opacity(0.13))
+                .clipShape(Circle())
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
+                Text("EVIDENCE REPORT")
                     .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .foregroundStyle(EvidenceRedesignPalette.lime)
                 Text(landing.title)
                     .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(landing.subtitle ?? "What PhysiqueOS currently understands.")
                     .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func latestSetCard(_ set: PhotoSetRecord?) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 if let set {
                     // Not a Button: a photo tile's own Retry is a Button, and a Button
@@ -146,24 +156,24 @@ struct PhotosHistoryView: View {
                             HStack {
                                 Text("LATEST PHOTO SET")
                                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
+                                    .foregroundStyle(EvidenceRedesignPalette.lime)
                                 Spacer(minLength: 4)
                                 StatusChip(text: "\(set.views.count) views", color: .primary)
                             }
                             Text(TrainingDateFormatting.short(set.date))
                                 .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                             if let weightLabel = set.weightLabel {
                                 Text(weightLabel)
                                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             }
                             Text("Compared against: \(set.comparisonAvailability)")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             Text("Open gallery →")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.accent)
+                                .foregroundStyle(EvidenceRedesignPalette.lime)
                         }
                     }
                     .contentShape(Rectangle())
@@ -174,7 +184,7 @@ struct PhotosHistoryView: View {
                 } else {
                     Text("Photo sets will appear here once matching photos are uploaded.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -182,27 +192,27 @@ struct PhotosHistoryView: View {
 
     private func historyCard(_ history: [PhotoSetRecord]) -> some View {
         let preview = Array(history.prefix(Self.historyPreviewLimit))
-        return CardContainer {
+        return CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             PhotosDisclosureRow(isExpanded: $isHistoryExpanded) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Uploaded Photos")
                             .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         Text("Tap any record to inspect the original image and comparison context.")
                             .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                     Spacer(minLength: 8)
                     Text(isHistoryExpanded ? "Close" : "Show All")
                         .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             } expanded: {
                 if history.isEmpty {
                     Text("No photo sets available for this period.")
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 } else {
                     VStack(spacing: 8) {
                         ForEach(isHistoryExpanded ? history : preview) { set in
@@ -228,16 +238,16 @@ struct PhotosHistoryView: View {
             case .published(let artifactId):
                 readPhotoBriefingLink(briefingID: artifactId)
             case .pending:
-                CardContainer(padding: .sm) {
+                CardContainer(padding: .sm, background: PhysiqueOSTheme.redesignPaper) {
                     HStack(alignment: .top, spacing: 10) {
-                        ProgressView().tint(PhysiqueOSTheme.accent)
+                        ProgressView().tint(EvidenceRedesignPalette.lime)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Photo Briefing is being prepared")
                                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                             Text("Your photos were received. The briefing will appear here when it is ready. No action needed.")
                                 .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -257,7 +267,7 @@ struct PhotosHistoryView: View {
                 .physiqueOSFont(PhysiqueOSTypography.primaryActionLabel)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .background(PhysiqueOSTheme.accent)
+                .background(EvidenceRedesignPalette.lime)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .accessibilityIdentifier("photos.briefing.read")
@@ -293,24 +303,24 @@ private struct PhotoSetHistoryRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(TrainingDateFormatting.short(set.date))
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 if let weightLabel = set.weightLabel {
                     Text(weightLabel)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 Text("\(set.views.count) views · Compared against: \(set.comparisonAvailability)")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
             Spacer(minLength: 8)
             Text("View")
                 .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
@@ -327,7 +337,7 @@ private struct PhotoEvidenceDetailSheet: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Close") { dismiss() }
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                 }
         }

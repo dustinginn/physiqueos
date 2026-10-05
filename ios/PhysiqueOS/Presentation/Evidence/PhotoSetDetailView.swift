@@ -33,10 +33,10 @@ struct PhotoSetDetailView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .photoInspection($inspection)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = PhotoSetDetailViewModel(api: environment.photosAPI, setId: setId)
@@ -54,12 +54,12 @@ struct PhotoSetDetailView: View {
         switch viewModel?.state {
         case .none, .loading:
             ProgressView()
-                .tint(PhysiqueOSTheme.accent)
+                .tint(EvidenceRedesignPalette.lime)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .failed(let message):
             Text(message)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(.none):
             if environment.nativeAuthority == .sandbox,
@@ -68,7 +68,7 @@ struct PhotoSetDetailView: View {
             } else {
                 Text("No photo set found for this date.")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     .frame(maxWidth: .infinity, minHeight: 300)
             }
         case .loaded(.some(let set)):
@@ -81,7 +81,7 @@ struct PhotoSetDetailView: View {
             if set.views.isEmpty {
                 Text("No confirmed views are available for this photo set.")
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             } else {
                 let clampedIndex = min(selectedViewIndex, set.views.count - 1)
                 let view = set.views[clampedIndex]
@@ -109,13 +109,13 @@ struct PhotoSetDetailView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("PROGRESS PHOTO EVIDENCE")
                 .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                .foregroundStyle(PhysiqueOSTheme.accent)
+                .foregroundStyle(EvidenceRedesignPalette.lime)
             Text(view.poseId.label)
                 .physiqueOSFont(PhysiqueOSTypography.editorialSection)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Text(TrainingDateFormatting.short(set.date))
                 .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -130,11 +130,11 @@ struct PhotoSetDetailView: View {
                 Text("Previous")
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     .frame(maxWidth: .infinity, minHeight: 58)
-                    .background(PhysiqueOSTheme.surfaceElevated)
+                    .background(PhysiqueOSTheme.redesignPaper)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .disabled(currentIndex == 0)
-            .foregroundStyle(currentIndex == 0 ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.textPrimary)
+            .foregroundStyle(currentIndex == 0 ? PhysiqueOSTheme.redesignInkSecondary : PhysiqueOSTheme.redesignInk)
 
             Button {
                 selectedViewIndex = min(set.views.count - 1, currentIndex + 1)
@@ -142,11 +142,11 @@ struct PhotoSetDetailView: View {
                 Text("Next")
                     .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
                     .frame(maxWidth: .infinity, minHeight: 58)
-                    .background(PhysiqueOSTheme.surfaceElevated)
+                    .background(PhysiqueOSTheme.redesignPaper)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .disabled(currentIndex == set.views.count - 1)
-            .foregroundStyle(currentIndex == set.views.count - 1 ? PhysiqueOSTheme.textMuted : PhysiqueOSTheme.textPrimary)
+            .foregroundStyle(currentIndex == set.views.count - 1 ? PhysiqueOSTheme.redesignInkSecondary : PhysiqueOSTheme.redesignInk)
         }
     }
 
@@ -158,7 +158,7 @@ struct PhotoSetDetailView: View {
     /// pose comes from the destination's stable pose identity when a
     /// Briefing preview opened this page, never from the preview's index.
     private func comparisonCard(_ view: PhotoViewRecord) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 10) {
                 let group = Self.inspectionItems(
                     for: view,
@@ -193,7 +193,7 @@ struct PhotoSetDetailView: View {
                     )
                     Text(view.comparedAgainst)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
@@ -236,10 +236,10 @@ struct PhotoSetDetailView: View {
                 .inspectsPhoto(group, tapped: id, presenting: $inspection)
             Text(date)
                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
             Text(role.uppercased())
                 .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -248,22 +248,22 @@ struct PhotoSetDetailView: View {
     /// recomputed locally (see `PhotosReadModel.swift`'s doc comment on
     /// `PhotoViewRecord`).
     private func interpretationCard(_ view: PhotoViewRecord) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeading("Interpretation")
                 if let interpretationSummary = view.interpretationSummary {
                     Text(interpretationSummary)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 }
                 if let bullets = view.comparisonBullets, !bullets.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(bullets, id: \.self) { bullet in
                             HStack(alignment: .top, spacing: 6) {
-                                Text("•").foregroundStyle(PhysiqueOSTheme.textMuted)
+                                Text("•").foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 Text(bullet)
                                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             }
                         }
                     }
@@ -273,20 +273,20 @@ struct PhotoSetDetailView: View {
     }
 
     private func conditionsCard(_ view: PhotoViewRecord) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeading("Capture Conditions")
                 if let conditionSummary = view.conditionSummary {
                     Text(conditionSummary)
                         .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         }
     }
 
     private func sourceHistoryCard(_ view: PhotoViewRecord) -> some View {
-        CardContainer {
+        CardContainer(background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 0) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { isSourceHistoryExpanded.toggle() }
@@ -296,7 +296,7 @@ struct PhotoSetDetailView: View {
                         Spacer(minLength: 8)
                         Image(systemName: isSourceHistoryExpanded ? "chevron.up" : "chevron.down")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                     .contentShape(Rectangle())
                 }
@@ -305,7 +305,7 @@ struct PhotoSetDetailView: View {
                 if isSourceHistoryExpanded, let sourceHistory = view.sourceHistory {
                     Text(sourceHistory)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         .padding(.top, 8)
                 }
             }
