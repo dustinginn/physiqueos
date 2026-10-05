@@ -1,43 +1,59 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T01:09:19Z",
+  "generated_at_utc": "2026-10-05T01:46:04Z",
   "task": {
-    "id": "20261005-build86-testflight-upload-valid",
-    "title": "Build 86 — archive, guarded TestFlight upload and VALID verification",
+    "id": "redesign-batch2-log-training-prep-20261005",
+    "title": "Redesign Implementation Batch 2 prep: Log + Training Logger (PREP ONLY; separate from Codex A Batch 1)",
     "agent": "claude",
-    "status": "build86_valid_awaiting_physical_acceptance"
+    "status": "prep_complete_awaiting_batch1_acceptance"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "4ee3498b0028c299ce29012dfae9a03d868d4c3c",
+    "prompt_commit": "97563259728caff262abb4b58eb2ab966ddd8345",
     "native_sha": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
     "native_build": 86,
     "native_version": "1.0",
-    "delivery_id": "e70f2604-0f97-45fb-a720-fd695d23d0c4",
-    "apple_build_status": "VALID",
-    "apple_import_status": "VALID",
-    "last_uploaded_build": 86,
+    "batch1_prompt_commit": "f4bd9c50c6a0132d700f41cb894788e5a61d8ff6",
     "server_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
-    "server_deployment": "99188a9e-75a7-49c6-a5c2-05a43737de5f"
+    "log_design_authority": [
+      "ec425a96",
+      "97807d50",
+      "6029bbfa"
+    ],
+    "logger_design_authority": {
+      "package": "29d2fe1f",
+      "done_control_correction": "5b47063b",
+      "branch": "origin/codex/utility-surfaces-design",
+      "branch_head": "ca088e80e851c83d0d3e168d88f918232f5338d6"
+    }
   },
   "publication": {
-    "source_work_branch": "claude/build86-final-integration-20261004",
+    "source_work_branch": "claude/redesign-batch2-log-training-prep-20261005 (no commits; prep only)",
     "source_work_commit": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
-    "archive_path": "~/Library/Developer/Xcode/Archives/2026-10-04/PhysiqueOS-Build86-cec8af20.xcarchive",
-    "app_binary_sha256": "0522b66fd08cb3e824accd7af929250535b612be2cad8f729b8871ed387362b0",
-    "dsym_uuid": "47F30C3E-27B9-3AFC-A963-C251726F7BFE",
-    "main_report_commit": "7d8ddd26576c8b73413d2e7c419b3fb7507d4777",
-    "report_path": "agent-handoffs/reports/20261005T010919Z-build86-testflight-valid.md",
-    "artifact_root": null
+    "main_report_commit": "8e3730aeccda865adf752230f3e8f7ad6b52e3a3",
+    "report_path": "agent-handoffs/reports/20261005T014604Z-redesign-batch2-log-training-prep.md",
+    "artifact_root": null,
+    "method": "git plumbing from the single RC worktree; no secondary worktree"
   },
   "result": {
-    "summary": "Build 86 (cec8af20) archived, guarded dry run WOULD UPLOAD, uploaded once, Apple VALID. Server unchanged on Option A 27dad44a. No production data mutation.",
-    "testflight_uploaded": true,
+    "summary": "Batch 2 (Log + Training Logger) is implementation-ready: exhaustive state inventory, ownership map, Batch 1 dependency map, Build 86 Watch/HealthKit risk map, parity matrix, coding sequence, test plan and visual matrix. No shipping code changed.",
+    "native_changed": false,
+    "server_changed": false,
     "production_data_mutated": false,
-    "ledger": "Watch HealthKit/status, Complete Set latency and Appearance entries remain release-gated pending physical acceptance"
+    "testflight_uploaded": false,
+    "ledger": "3 entries appended: Log Sources provenance (D1), Watch Complete Set during phone review (likely defect), Logger unrendered error copy (likely defect); timed-set gap re-verified OPEN"
   },
-  "recommended_next_step": "Founder installs Build 86 from TestFlight and runs the physical acceptance checklist in the report (appearance, Foam Rolling, next real strength workout with Watch HealthKit/metrics/Complete Set at 10-15 ft, widgets/Live Activity/Watch independence).",
-  "stop_reason": "Build 86 reached VALID and the report is published; awaiting Founder physical-device acceptance.",
+  "decisions_required": [
+    "D1 Log Sources: structured provenance contract vs ship without Sources",
+    "D2 Finish-leg rows bound to source state vs omit",
+    "D3 keep shipping Logger copy (default) vs adopt harness copy",
+    "D4 L13 Workout Match in Batch 2 (recommended) vs Evidence batch"
+  ],
+  "blockers": [
+    "Batch 1 Founder acceptance + integration head (tokens/primitives in PhysiqueOSTheme)"
+  ],
+  "recommended_next_step": "After Founder accepts Batch 1, start Batch 2 at step 0 of the report's coding sequence on the Batch 1 integration head; answer D1-D4 in parallel.",
+  "stop_reason": "Batch 2 is implementation-ready pending only Batch 1 Founder acceptance/integration authority (plus D1-D4).",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
