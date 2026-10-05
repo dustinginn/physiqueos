@@ -1,62 +1,60 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T08:30:37Z",
+  "generated_at_utc": "2026-10-05T14:20:39Z",
   "task": {
-    "id": "redesign-batch2-implementation-20261005",
-    "title": "Redesign Batch 2 overnight: Checkpoints 2-5 (Logger active workout, entry/selection, review/finish/complete, Workout Match L13) + final integration",
-    "agent": "claude",
-    "status": "checkpoints2to5_awaiting_founder_morning_review"
+    "id": "redesign-batch3-evidence-20261005",
+    "title": "Redesign Implementation Batch 3 — Evidence family",
+    "agent": "codex",
+    "status": "complete_awaiting_founder_review_and_batch2_integration"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "overnight_override_commit": "a7c997ae511e46fb9611b4a86b96516768313556",
-    "prompt_commit": "841190297b1dfd430c3489d7c8341037b201e851",
-    "checkpoint1_acceptance_commit": "4926912d",
-    "native_base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "native_base_build": 87,
-    "native_checkpoint1_sha": "b540b323f4af4a79b20a9b61e2f7b03d46532ae3",
-    "native_tapfix_sha": "bb6a6584274be62b95d74bb273ff1af3585b4fa0",
-    "native_checkpoint2_sha": "0d59b45e63071ad1e0ac825eb45bf82fed3a3d90",
-    "native_checkpoint3_sha": "6d79f057385e9cf9a8258c6bb1868c9968d04fba",
-    "native_checkpoint4_sha": "7a422a98782db58cf77ffdac8fcd420da554fba3",
-    "native_checkpoint5_sha": "79a1a33d9113e05522e3369999f887a61361abf8",
-    "home_correction_source_sha": "49e48f1eab3bc6ff22ca6c4bc24b3a9955b0fcc7",
-    "native_final_candidate_sha": "49733300672c0b52a06a2b3ee5435de49b76fd15",
-    "server_production_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
-    "server_production_deployment": "99188a9e-75a7-49c6-a5c2-05a43737de5f",
-    "server_d1_candidate_sha": "c7c99347a520d13fd344fe89b6b1398877cdd255",
-    "server_d1_deployed": false
+    "prompt_commit": "df2d7d504c371e4745453be22e7a37a500f3a239",
+    "implementation_base_sha": "49e48f1eab3bc6ff22ca6c4bc24b3a9955b0fcc7",
+    "build87_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
+    "checkpoint_a_sha": "e48e7757",
+    "checkpoint_b_sha": "e7e3774c",
+    "checkpoint_c_sha": "e56c02e0",
+    "checkpoint_d_sha": "bf4551c4",
+    "checkpoint_e_sha": "d842a76b",
+    "implementation_sha": "d842a76bdb8dad023da4add7104688747d9c1872",
+    "feature_branch_head": "87d77cd7",
+    "batch2_audited_head": "7a9a7caaa582b3e9b3926cb0ed19842c773dc6b3"
   },
   "publication": {
-    "source_work_branch": "claude/redesign-batch2-log-logger-20261005",
-    "server_work_branch": "claude/log-sources-provenance-server-20261005",
-    "main_report_commit": "36f07a82d74541e9809331069ec6e0cb8d8126fe",
-    "report_path": "agent-handoffs/reports/20261005T083037Z-redesign-batch2-overnight-cp2-cp5.md",
+    "source_work_branch": "codex/redesign-batch3-evidence-20261005",
+    "main_report_commit": "c1ce58ff61a25d79d09554cad3f16da12211fe13",
+    "report_path": "agent-handoffs/reports/20261005T142039Z-redesign-batch3-evidence.md",
     "artifact_roots": [
-      "agent-handoffs/artifacts/redesign-batch2-cp2-active-workout-20261005/",
-      "agent-handoffs/artifacts/redesign-batch2-cp3-entry-selection-20261005/",
-      "agent-handoffs/artifacts/redesign-batch2-cp4-review-finish-20261005/",
-      "agent-handoffs/artifacts/redesign-batch2-cp5-workout-match-20261005/"
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-a-20261005/",
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-b-20261005/",
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-c-20261005/",
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-d-20261005/",
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-e-20261005/"
     ],
-    "primary_board": "agent-handoffs/artifacts/redesign-batch2-cp2-active-workout-20261005/primary-mobile-review-board.png"
+    "primary_boards": [
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-a-20261005/checkpoint-a-mobile-review-board.png",
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-b-20261005/checkpoint-b-mobile-review-board.png",
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-c-20261005/checkpoint-c-mobile-review-board.png",
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-d-20261005/checkpoint-d-mobile-review-board.png",
+      "agent-handoffs/artifacts/redesign-batch3-checkpoint-e-20261005/checkpoint-e-mobile-review-board.png"
+    ]
   },
   "result": {
-    "summary": "Checkpoints 2-5 implemented to the locked utility designs with real Dark/Mineral simulator parity (box geometry within 0.7 pt except two explained deltas) and four distinct review packages. Final candidate 49733300 integrates CP1, the You/Settings tap fix and the accepted Home correction. Gates: unit 2014 (1 pre-existing peptide failure), Watch 47/0, Release compile OK, parity 8/8, appearance 9/9, acceptance failures identical to Build 87. Server D1 NOT deployed (permission gate); production unchanged 27dad44a.",
+    "summary": "Founder-locked Evidence family implemented through Checkpoints A-E in Dark and Mineral Light on the Home-corrected Build 87 base. Final gates: 766 relevant unit/contract tests passed, one real Evidence UI journey passed, and Release dependency-graph compile passed with app, Watch app and WidgetKit extension present.",
     "production_data_mutated": false,
+    "server_changed": false,
     "deployed": false,
     "testflight_uploaded": false,
     "build_number_bumped": false
   },
   "decisions_required": [
-    "Founder visual review of Checkpoints 2, 3, 4 and 5 (four packages)",
-    "Direct Founder chat authorization to deploy Server c7c99347 (D1 typed provenance) on top of production 27dad44a",
-    "Separate authorization for build-number bump + TestFlight of the integrated candidate"
+    "Founder visual review of the five checkpoint packages",
+    "Deliberate integration of Batch 2 and Batch 3 using the exact one-file conflict map in the report"
   ],
-  "blockers": [
-    "Server D1 deploy blocked by the session production-deploy permission gate; needs direct Founder authorization of the exact SHA"
-  ],
-  "recommended_next_step": "Founder reviews the four primary-mobile-review-board.png packages from the overnight index; approve or list corrections per checkpoint; authorize the D1 Server deploy.",
-  "stop_reason": "Overnight override complete: Checkpoints 2-5 published with the final integration gates; stop for morning review. No TestFlight.",
+  "blockers": [],
+  "recommended_next_step": "Founder reviews the five mobile boards. After acceptance, integrate the final approved Batch 2 authority first, apply Batch 3 A-D, then manually merge Checkpoint E's generic review shell while preserving Batch 2's complete Workout Match branch.",
+  "stop_reason": "Batch 3 implementation, simulator parity packages, validation and exact Batch 2 integration map are complete; stop for Founder review. No TestFlight.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
