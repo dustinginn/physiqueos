@@ -3,6 +3,7 @@ import SwiftUI
 /// Mirrors `LatestAnalysisCard.jsx` as used inside `HomeBriefingCardStack`.
 struct BriefingCardView: View {
     let card: HomeBriefingCard
+    var accessibilityIdentifier = HomeBriefingAccessibility.latestIdentifier
     var onTap: (AppDestination) -> Void
 
     var body: some View {
@@ -48,7 +49,7 @@ struct BriefingCardView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("home.latestBriefing")
+        .accessibilityIdentifier(accessibilityIdentifier)
         .accessibilityAddTraits(card.destination != nil ? .isButton : [])
     }
 

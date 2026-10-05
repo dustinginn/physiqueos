@@ -240,7 +240,11 @@ struct HomeView: View {
 
                 if home.briefingCards.count > 1 {
                     ForEach(Array(home.briefingCards.dropFirst())) { card in
-                        BriefingCardView(card: card, onTap: onNavigate)
+                        BriefingCardView(
+                            card: card,
+                            accessibilityIdentifier: HomeBriefingAccessibility.olderIdentifier(for: card),
+                            onTap: onNavigate
+                        )
                     }
                 }
 

@@ -302,6 +302,14 @@ enum HomeJourneyTimingPresentation {
     }
 }
 
+enum HomeBriefingAccessibility {
+    static let latestIdentifier = "home.latestBriefing"
+
+    static func olderIdentifier(for card: HomeBriefingCard) -> String {
+        "home.briefing.\(card.id)"
+    }
+}
+
 enum HomeBriefingTileLayout {
     static let showsSectionEyebrow = false
     static let titleLineLimit = 3
@@ -357,6 +365,11 @@ struct HomeActionBriefingStrip: View {
             } else { briefingLabel(card) }
         }
         .frame(maxWidth: .infinity)
+        // The newest briefing renders here, so this tile owns the stable
+        // `home.latestBriefing` identity; later cards use per-briefing ids.
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(HomeBriefingAccessibility.latestIdentifier)
+        .accessibilityAddTraits(card.destination != nil ? .isButton : [])
     }
 
     private func briefingLabel(_ card: HomeBriefingCard) -> some View {
