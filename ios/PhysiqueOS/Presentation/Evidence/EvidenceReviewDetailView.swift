@@ -1249,7 +1249,7 @@ extension EvidenceReviewDetailView {
                         Text(source).evidenceText(WorkflowText.secondary).foregroundStyle(WorkflowColor.muted)
                     }
                 }
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 VStack(alignment: .trailing, spacing: 5) {
                     WorkflowTag(text: item.included ? "✓ Included" : "− Excluded", tone: item.included ? .green : .muted)
                     if let date = item.date {

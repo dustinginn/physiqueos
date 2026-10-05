@@ -464,7 +464,7 @@ struct ProductionEvidenceUploadView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    Spacer(minLength: 0)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     if !attachments.isEmpty {
                         WorkflowTag(text: resolvedScenario == .dexa ? "Ready" : resolvedScenario == .progressPhotos ? "\(attachments.count) photo\(attachments.count == 1 ? "" : "s")" : "\(attachments.count) file\(attachments.count == 1 ? "" : "s")")
                     }
@@ -518,7 +518,7 @@ struct ProductionEvidenceUploadView: View {
                         .evidenceText(WorkflowText.secondary)
                         .foregroundStyle(WorkflowColor.muted)
                 }
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 if let scenario = attachmentScenarios[attachment.id] {
                     WorkflowTag(text: scenario.label)
                 }
@@ -596,7 +596,7 @@ struct ProductionEvidenceUploadView: View {
                         .evidenceText(WorkflowText.h2)
                         .foregroundStyle(WorkflowColor.text)
                 }
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 WorkflowTag(text: identity.confirmed ? "Confirmed" : "Review", tone: identity.confirmed ? .green : .amber)
             }
             .padding(.bottom, 11)
