@@ -589,7 +589,7 @@ Native must not parse display strings. Add a structured source per row/line to t
 Acceptance:
 Sources content comes only from typed fields. Mixed-source days (Logger Strength plus Apple Health Cardio, screenshot Nutrition) are attributed exactly. Weight shows "Source unavailable" until it has a provenance field. Tiles no longer repeat "Apple Health". Older payloads without the field degrade to no disclosure.
 
-Status: OPEN; Founder decision D1 in the Batch 2 prep report.
+Status: IMPLEMENTED ON BRANCHES; NOT DEPLOYED. Founder settled D1: implement exactly, with a typed Server contract. Server candidate `c7c99347` (branch `claude/log-sources-provenance-server-20261005`, on top of production `27dad44a`) adds `provenance` and `contextDetail`; Native `b540b323` (branch `claude/redesign-batch2-log-logger-20261005`) renders Sources from typed fields only, and an older Server falls back to the legacy caption with no disclosure. Awaiting Founder Checkpoint 1 acceptance and explicit Server deploy authorization. Report `agent-handoffs/reports/20261005T045352Z-redesign-batch2-cp1-log-root.md`.
 
 ### Apple Watch Logger — Complete Set offered while the phone is in Review/Confirmation
 
@@ -637,6 +637,27 @@ Acceptance:
 Each listed condition shows its existing copy in the visible step. No new mutation is emitted, and the UI tests keep their identifiers.
 
 Status: OPEN; not fixed by the Batch 2 prep audit.
+
+### You / Settings — full-row navigation tap targets
+
+Classification: LIKELY SHIPPING DEFECT (interaction parity; accepted Batch 1)
+
+Discovery:
+Founder physical-device finding on Build 87; Batch 2 addendum `86210001`.
+
+Current shipping behavior:
+`YouNavigationRow` is a plain-style Button whose paper background sits outside its label, so only the drawn glyphs register taps. This affects You → Goals, Operating Plan, Settings and Founder device connection, plus Settings → Appearance.
+
+Target:
+The whole visible row is one control, with no visual change.
+
+Implementation implication:
+A full-row `contentShape` on the label; the Appearance option cards declare their card shape.
+
+Acceptance:
+`testYouAndSettingsNavigationRowsActivateAcrossTheWholeRow` taps the leading content, center whitespace and trailing chevron edge of every row in Dark and Mineral. Before and after captures are pixel-identical in row content.
+
+Status: FIXED ON BATCH 2 BRANCH `bb6a6584`. It ships with the eventual Batch 2 candidate; close after physical-device acceptance.
 
 ## Implementation transition rule
 
