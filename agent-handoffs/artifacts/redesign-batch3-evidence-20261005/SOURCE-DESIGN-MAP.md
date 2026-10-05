@@ -44,7 +44,9 @@ Branch: `codex/redesign-batch3-evidence-20261005`
 
 ## Shared design components
 
-- `EvidenceDesignSystem.swift`: section eyebrow/title treatment, page hero, flat navigation/record rows, semantic badges, dividers, field labels, loading/error/empty states.
+- `EvidenceHeaderView.swift`: shared Evidence page hero, workflow hero, semantic intake field and primary-action treatment.
+- `EvidenceStreamRowView.swift`: flat navigation/record rows, semantic badges and dividers.
+- Existing domain views retain their own chart, metric, field-label and loading/error/empty-state components so their canonical behavior remains local to the owning vertical.
 - Existing global `PhysiqueOSTheme` and `AppAppearanceStore` remain the only appearance authority. Batch 3 adds no local theme.
 - Existing chart/read-model components remain data authorities; styling changes only their presentation.
 
