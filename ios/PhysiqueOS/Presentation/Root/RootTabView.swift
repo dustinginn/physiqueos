@@ -274,7 +274,7 @@ private enum AppearanceReviewLaunchConfiguration {
         guard let flag = arguments.firstIndex(of: "-physiqueos.evidence-review.trail"),
               arguments.indices.contains(flag + 1)
         else { return nil }
-        return arguments[flag + 1].components(separatedBy: "/")
+        return arguments[flag + 1].components(separatedBy: "/").filter { !$0.isEmpty }
     }
 
     static var route: Route? {

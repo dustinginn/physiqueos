@@ -179,7 +179,6 @@ struct NutritionBarChartView: View {
                             .evidenceText(.normal(8, 800))
                             .foregroundStyle(m.c.muted)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
                             .padding(.top, m.pt(5))
                         Text(bar.value > 0 ? "\(bar.valueText ?? String(Int(bar.value.rounded()))) · \(bar.caption)" : "—")
                             .evidenceText(.normal(8, 850, digits: true))
