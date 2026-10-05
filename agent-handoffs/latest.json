@@ -1,56 +1,62 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-04T23:21:05Z",
+  "generated_at_utc": "2026-10-05T00:36:23Z",
   "task": {
-    "id": "20261004-build86-watch-healthkit-candidate",
-    "title": "Build 86 candidate — Watch HealthKit for phone-started workouts, Watch latency, Foam Rolling pilot",
+    "id": "20261005-build86-final-integration",
+    "title": "Build 86 final integration — Server workout presentation + global appearance + combined gates",
     "agent": "claude",
-    "status": "candidate_ready_for_review_not_uploaded"
+    "status": "server_deployed_candidate_ready_founder_decision_pending_not_uploaded"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "80c5fd558ff83f91eafad568616388909067cdcf",
-    "native_base_sha": "b65deb00098713d824f14064e0362726997b5991",
-    "native_build85_sha": "b8ee8690b194cb90086b62816b9a2c8c400dc026",
-    "native_candidate_sha": "4f78fce663fb16c3cc6930b3b8e576a328defcbe",
+    "prompt_commit": "f836f373d1114f4e60aa16c10e9cbc6512fa7a61",
+    "rescue_prompt_commit": "64f923717bfbe7d7b73ce856e26d102b8727c96b",
+    "server_sha": "51c459c410b268f35e6388eeb17f0b6ed7eb548c",
+    "server_previous_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
+    "server_deployment": "07714249-04c8-4d7b-9f36-09e5ead1cdee",
+    "server_build_id": "physiqueos-51c459c4-20261004",
+    "native_candidate_sha": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
     "native_candidate_build": 86,
-    "server_sha": "3c0f4aefddbb9a6886f6ad012443978303d47024",
     "last_uploaded_build": 85
   },
   "publication": {
-    "source_work_branch": "claude/native-watch-healthkit-build86-20261004",
-    "source_work_commit": "4f78fce663fb16c3cc6930b3b8e576a328defcbe",
+    "source_work_branch": "claude/build86-final-integration-20261004",
+    "source_work_commit": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
+    "server_work_branch": "claude/server-workout-presentation-20261004",
     "native_commits": [
       "a5646c8b build: pin Foam Rolling UI test in project generator",
-      "d43ad7cd feat(watch): record HealthKit for phone-started workouts; truthful Health status; non-blocking refresh",
-      "4f78fce6 chore(ios): Build 86 candidate"
+      "d43ad7cd feat(watch): record HealthKit for phone-started workouts",
+      "4f78fce6 chore(ios): Build 86 candidate",
+      "5d727b37 feat: add global appearance infrastructure (cherry-pick of 3ceb9a80)",
+      "cec8af20 fix: let recovery sheet follow app appearance (cherry-pick of d5359e33)"
     ],
-    "main_report_commit": "1fd9bfa4aaed1eb64ca1211871e1f96e38ab39d8",
-    "report_path": "agent-handoffs/reports/20261004T232105Z-build86-watch-healthkit-candidate.md",
+    "main_report_commit": "634eb6ff49c831c4510f1a19dbba20db8372b244",
+    "report_path": "agent-handoffs/reports/20261005T003623Z-build86-final-integration.md",
     "artifact_root": null
   },
   "result": {
-    "summary": "Phone-started structured workouts now auto-establish exactly one Watch HealthKit workout (reported to the phone; finish saves once; trust boundary unchanged). Truthful Health status; read-only refresh no longer disables Complete Set; latency trace added; immediate push deferred. Foam Rolling pilot integrated.",
-    "healthkit_auto_start": true,
-    "trusted_correlation_widened": false,
-    "immediate_phone_to_watch_push": "deferred_pending_device_measurement",
-    "foam_rolling_pilot_integrated": true,
-    "global_appearance_integrated": false,
-    "tests": {
-      "watch_unit": "47 passed / 0 failed",
-      "ios_unit_full": "1998 executed / 1 failed (pre-existing at base: PeptideSupportEditorViewModelTests) / 1 skipped",
-      "ios_focused_at_build86_head": "495 passed / 0 failed",
-      "foam_rolling_ui": "2 passed / 0 failed",
-      "watch_ui": "6 passed / 1 failed (pre-existing at base: testFinalSetFinishShowsConfirmationOnThePrimarySurfaceAndNotYetReturns)"
+    "summary": "Server presentation fix deployed (only a confirmed link changes Logger presentation). Global appearance integrated into Build 86 with byte-identical regeneration. Combined gates green except two pre-existing failures. Today's 55% match should NOT be confirmed until the Founder decides the confirmed-link window rule.",
+    "todays_pending_review": {
+      "touched": false,
+      "safe_to_confirm_now": false,
+      "reason": "existing confirmed-link contract would display Apple 1:28-1:48 PM instead of Logger 12:31-1:47 PM",
+      "options": ["A_keep_logger_window_apple_energy_hr_only (recommended, then Use Logger session 1)", "B_accept_apple_window", "C_no_match"]
     },
-    "release_build": "BUILD SUCCEEDED (Release, generic iOS, unsigned) 1.0 (86) app + Watch + Live Activity",
-    "todays_reconciliation": "Late Apple strength workout surfaced as 55% Pending Workout Match vs Logger session 1, as predicted; Stair Steppers independent; no auto-link or duplicate",
-    "ledger": "2 Watch entries FIXED IN BUILD 86 CANDIDATE (close after physical acceptance); 1 new Server presentation defect OPEN",
+    "tests": {
+      "server_presentation": "39/39",
+      "server_related_118_files": "34 failed, identical to base 3c0f4aef; 0 introduced",
+      "server_full_unit": "9999 tests, 302 failed, identical to base; 0 introduced",
+      "watch_unit": "47/47",
+      "watch_ui": "6/7 (pre-existing NotYetReturns fixture failure, fails at base b65deb00)",
+      "ios_unit_full": "2003 executed, 1 failed (pre-existing Peptide), 1 skipped",
+      "foam_and_appearance_ui": "6/6 (Light) + System resolution forced Dark 1/1",
+      "release": "BUILD SUCCEEDED Release generic iOS unsigned 1.0 (86) app + Watch + Live Activity/widget"
+    },
     "testflight_uploaded": false,
-    "production_mutated": false
+    "production_data_mutated": false
   },
-  "recommended_next_step": "Founder/ChatGPT review; decide whether to integrate codex/global-appearance-infrastructure-20261004 (d5359e33) before upload; then authorize the guarded Build 86 upload and run the physical-device acceptance list in the report.",
-  "stop_reason": "Next-build candidate implemented, tested, compiled and documented per prompt; upload not authorized.",
+  "recommended_next_step": "Founder decides confirmed-link window (A recommended); if A, Claude implements/deploys the bounded Server change, then Founder confirms Use Logger session 1. Separately authorize Build 86 archive + guarded TestFlight upload of cec8af20.",
+  "stop_reason": "Combined Build 86 candidate ready for Founder approval; confirmed-link window is a product decision per prompt STOP condition.",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
