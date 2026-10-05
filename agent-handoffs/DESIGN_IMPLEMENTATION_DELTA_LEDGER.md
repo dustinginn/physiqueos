@@ -448,6 +448,23 @@ Status: OPEN.
 
 ## Architectural context / do not automatically patch
 
+### Recovery / Sleep Evidence — read-model `strategicUse` after V3 graduation
+
+Classification: ARCHITECTURAL CONTEXT
+
+Discovery:
+Prospective Sleep -> V3 graduation (Server `403ca549`, graduation policy v4, 2026-10-05).
+Report: `agent-handoffs/reports/20261005T010424Z-healthkit-sleep-three-night-v3-graduation.md`
+
+Current behavior:
+The Recovery/Sleep Evidence read models (`recovery-sleep-evidence-v1`, `-trends-v1`, `-night-v1`) still return `strategicUse: "quarantined"` and `strategicEligible: false`. That describes the stored records, which really are still quarantined. V3 eligibility is now decided at read time by the graduation policy plus the completed-window rule, so a completed prospective night can feed V3 Recovery context while the read model still says "quarantined". Native (Build 86 source) decodes these fields but does not display them; its tests pin the "quarantined" fixture.
+
+Implication:
+Do not surface these fields in UI as "not used in coaching". If a future Evidence surface wants to say whether a night informs briefings, add an explicit read-time field in a reviewed contract revision (Server + Native together) instead of reusing `strategicUse`.
+
+Status: OPEN (no change needed until a surface displays it).
+
+
 ### You / Settings — controlled-beta account boundary
 
 Classification: ARCHITECTURAL CONTEXT

@@ -97,7 +97,8 @@ Acceptance:
 - notification clears/updates appropriately.
 
 4. HealthKit Sleep — prospective canary acceptance
-Status: HOLD (not PASS) since 2026-10-02 22:00Z. sleep-canon-v3 ACTIVE for ordinary prospective Sleep (effective 2026-10-02; policy healthkit_sleep_canonical_algorithm_policy). P2 Oura copy splice resolved prospectively: Oct 2 corrected v2 rev2 -> v3 rev3 (asleep ~455, deep ~98.5, REM ~117.5, core ~239, awake ~25 min, 73 segments; one coherent revision, 0 ambiguity). Activation changed exactly 2 of 52 collections (config + Oct 2 day); historical mutation 0; strategic mutation 0. Founder accepted the rare out-of-order Oura revision ambiguity as a known residual (visible via ambiguousContinuationCount). D0 2026-10-02 validation_only. Strategic Sleep OFF.
+Update 2026-10-05 (Sleep/V3 lane): three-night audit PASSED (Oct 2/3/4, all 10 quality gates) and prospective Sleep -> V3 graduation is LIVE. Server `403ca549` (deployment `83703fd7`; production now `27dad44a`, which includes it) + HealthKit graduation policy v4 (`sleep` added to evidenceEligibility only; Sleep boundary = D0 2026-10-02). Completed, sensor, sleep-canon-v3 nights feed only the V3 Recovery slot; silent until >=14 prior nights and a consistent shortfall vs the person's own usual; never moves Confidence; no regeneration. Natural gates 1 and 3 are satisfied (Oct 4 Weekly: no Sleep evidence). Gate 2 (closed-app background delivery) remains OPEN. Next natural checks: Wed Oct 7 Midweek has no Sleep wording (Recovery lineage `no_personal_baseline_yet`); first possible Sleep mention is the ~Oct 25 Weekly. ROLLBACK ORDER: remove `sleep` from the graduation policy BEFORE any code rollback (older builds treat it as invalid and disable all HealthKit graduation). Report: agent-handoffs/reports/20261005T010424Z-healthkit-sleep-three-night-v3-graduation.md
+Prior status: HOLD (not PASS) since 2026-10-02 22:00Z. sleep-canon-v3 ACTIVE for ordinary prospective Sleep (effective 2026-10-02; policy healthkit_sleep_canonical_algorithm_policy). P2 Oura copy splice resolved prospectively: Oct 2 corrected v2 rev2 -> v3 rev3 (asleep ~455, deep ~98.5, REM ~117.5, core ~239, awake ~25 min, 73 segments; one coherent revision, 0 ambiguity). Activation changed exactly 2 of 52 collections (config + Oct 2 day); historical mutation 0; strategic mutation 0. Founder accepted the rare out-of-order Oura revision ambiguity as a known residual (visible via ambiguousContinuationCount). D0 2026-10-02 validation_only. Strategic Sleep OFF.
 Authority:
 - Server `89fe0a0340adee22d15b92a1f074a0bbd348ac77` (deployment `28678d4a-e3cc-4b2b-a479-1851ab7093bf`) carries Sleep v3 unchanged; Native Build 83 `3e61dd215e8474c52bd54230d2d9dfb2f3a93534` (TestFlight delivery `507b409f-a29f-48a0-93b4-49ab46b5ad6d`, VALID) remains v2+v3 stage-capable.
 - activation report agent-handoffs/reports/20261002T220000Z-healthkit-sleep-canon-v3-prospective-activation.md
@@ -134,7 +135,7 @@ Next:
 - run shadow calibration;
 - only later consider additive recoveryAssessment on NEW Weekly/Midweek/Monthly artifacts;
 - historical Briefings remain unchanged;
-- strategic Sleep/V3 graduation remains a separate Founder decision.
+- strategic Sleep/V3 graduation: DONE 2026-10-05 (narrative evidence only; this Recovery card remains separate and unbuilt).
 
 FUTURE MAJOR PROJECTS (roadmap only — NOT started; do not implement without a separate Founder-authorized prompt)
 
