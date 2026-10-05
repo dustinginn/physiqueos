@@ -18,6 +18,9 @@ const ALLOWED = new Set([
   // Graduation: read-time overlay of accepted canonical days (policy-controlled).
   "domain/services/HealthKitGraduation.js",
   "platform/database/HealthKitGraduationReader.js",
+  // Prospective Sleep graduation: per-night eligibility + read-time sleep_night
+  // projection (policy-controlled; the reader above does the bounded load).
+  "domain/services/HealthKitSleepGraduation.js",
   "domain/services/HealthKitObservationService.js",
   "domain/services/HealthKitWorkoutLinkService.js",
   "domain/services/HealthKitWorkoutPresentationService.js",

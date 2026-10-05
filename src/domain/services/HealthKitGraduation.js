@@ -46,7 +46,12 @@ export const HealthKitGraduationPurpose = Object.freeze({
   EVIDENCE: "evidence",
 });
 
-const SUPPORTED_DOMAINS = Object.freeze(["activity", "nutrition", "cardio_training"]);
+const SUPPORTED_DOMAINS = Object.freeze(["activity", "nutrition", "cardio_training", "sleep"]);
+// Sleep is strategic-evidence only. It has its own Recovery/Sleep Evidence
+// read model, so a projection scope naming it is invalid (fail closed). Its
+// evidence overlay lives in the Sleep graduation module, gated additionally by the
+// Founder-approved Sleep start boundary and a completed sleep-day window.
+const PROJECTION_DOMAINS = Object.freeze(["activity", "nutrition", "cardio_training"]);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const HEALTHKIT_SOURCE = Object.freeze({ application: "Apple Health", integration: "HealthKit", modality: "direct" });
@@ -74,8 +79,8 @@ export function resolveHealthKitGraduationPolicy(record) {
     if (record.historicalBriefingRegeneration !== undefined && record.historicalBriefingRegeneration !== false) {
       return off("invalid_configuration_fail_closed", "historical_briefing_regeneration_not_permitted");
     }
-    const projection = resolveScope(record.projection);
-    const evidenceEligibility = resolveScope(record.evidenceEligibility);
+    const projection = resolveScope(record.projection, PROJECTION_DOMAINS);
+    const evidenceEligibility = resolveScope(record.evidenceEligibility, SUPPORTED_DOMAINS);
     if (projection === null || evidenceEligibility === null) return off("invalid_configuration_fail_closed", "scope_invalid");
     return Object.freeze({ valid: true, source: "server_owned_configuration", invalidReason: null, projection, evidenceEligibility });
   } catch {
@@ -83,12 +88,12 @@ export function resolveHealthKitGraduationPolicy(record) {
   }
 }
 
-function resolveScope(raw) {
+function resolveScope(raw, supported) {
   if (raw === undefined || raw === null) return disabledScope;
   if (typeof raw !== "object" || typeof raw.enabled !== "boolean") return null;
   if (!raw.enabled) return disabledScope;
   const domains = Array.isArray(raw.domains) ? [...new Set(raw.domains)].sort() : [];
-  if (domains.length === 0 || domains.some((domain) => !SUPPORTED_DOMAINS.includes(domain))) return null;
+  if (domains.length === 0 || domains.some((domain) => !supported.includes(domain))) return null;
   if (!DATE.test(String(raw.startLocalDate ?? "")) || Number.isNaN(Date.parse(`${raw.startLocalDate}T00:00:00.000Z`))) return null;
   const end = raw.endLocalDate ?? null;
   if (end !== null && (!DATE.test(String(end)) || String(end) < raw.startLocalDate)) return null;

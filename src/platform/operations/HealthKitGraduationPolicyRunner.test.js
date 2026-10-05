@@ -102,6 +102,61 @@ describe("HealthKit graduation policy operation", () => {
     expect(after.healthKitConfiguration.find((row) => row.kind === "healthkit_graduation_audit")).toMatchObject({ authorizationReference: authorization.authorizationReference });
   });
 
+  it("simulates the prospective Sleep graduation (identity/revision/decision only) and proves Sleep storage untouched on apply", async () => {
+    const sleepNight = (sleepDay, revision = 2) => {
+      const next = new Date(`${sleepDay}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
+      return { id: `healthkit_sleep_day_${sleepDay}`, version: revision, userId: OWNER, sleepDay, occurrenceDate: sleepDay, revision,
+        algorithmVersion: "sleep-canon-v3", status: "asleep_recorded", ingestionPurpose: "validation_only", timeZone: "America/Los_Angeles",
+        windowClosesAt: `${next.toISOString().slice(0, 10)}T01:00:00.000Z`, computedAt: `${sleepDay}T15:00:00.000Z`, mainEpisodeIndex: 0,
+        mainSleep: { asleepSeconds: 27000, awakeSeconds: 1800, inBedSeconds: 30000, coreSeconds: 15000, deepSeconds: 6000, remSeconds: 6000, unspecifiedSeconds: 0 },
+        episodes: [{ kind: "main", start: "a", end: "b", primarySource: { sourceFamily: "oura" }, completeness: { asleepData: "present", stageDetail: "staged", sourceBasis: "sensor" } }] };
+    };
+    const records = createInMemoryCanonicalRecordStore({
+      healthKitObservations: [], healthKitCanonicalDays: [hkDay("activity")], healthKitCanonicalWorkouts: [], healthKitWorkoutLinks: [], healthKitWorkoutLinkClaims: [],
+      healthKitConfiguration: [
+        { id: POLICY_ID, version: 3, schemaVersion: "healthkit-canonical-graduation-policy-v1", historicalBriefingRegeneration: false,
+          projection: { enabled: true, domains: ["activity", "nutrition"], startLocalDate: "2026-09-22", endLocalDate: null },
+          evidenceEligibility: { enabled: true, domains: ["activity", "cardio_training", "nutrition"], startLocalDate: "2026-09-22", endLocalDate: null } },
+        { id: "healthkit_sleep_canonical_activation_policy", version: 1, status: "enabled", schemaVersion: "healthkit-sleep-activation-policy-v1",
+          mode: "validation_only", effectiveSleepDay: "2026-10-02", timeZone: "America/Los_Angeles", openEnded: true,
+          strategicEvidenceEligibility: "quarantined", historicalBackfill: false },
+      ],
+      healthKitSleepDays: ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"].map((day) => sleepNight(day)),
+      healthKitSleepSamples: [{ id: "healthkit_sleep_sample_x", version: 1 }],
+      canonicalEvidenceObjects: [], dailyBriefings: [{ id: "briefing-1", version: 1 }],
+    });
+    const desired = { evidenceEligibility: { enabled: true, domains: ["activity", "cardio_training", "nutrition", "sleep"], startLocalDate: "2026-09-22", endLocalDate: null } };
+    const now = () => new Date("2026-10-05T02:00:00.000Z");
+    const dry = await runHealthKitGraduationPolicy({ records, authorization, desired, now });
+    expect(dry.outcome).toBe("dry_run");
+    expect(dry.policy.projection).toMatchObject({ domains: ["activity", "nutrition"] });
+    expect(dry.simulation.sleep).toMatchObject({
+      strategicPolicy: { enabled: true, strategicEffectiveAt: "2026-10-02" },
+      eligibleNightsBefore: [],
+      eligibleNightsAfter: [{ sleepDay: "2026-10-02", revision: 2 }, { sleepDay: "2026-10-03", revision: 2 }, { sleepDay: "2026-10-04", revision: 2 }],
+      historicalNightsConsidered: 0,
+    });
+    expect(dry.simulation.sleep.decisions[0]).toMatchObject({ sleepDay: "2026-10-01", eligible: false, reason: "before_strategic_effective_boundary" });
+    expect(JSON.stringify(dry.simulation.sleep)).not.toMatch(/27000|asleep/);
+    expect(dry.unchangedByDesign).toMatchObject({ healthKitSleepDays: 4, healthKitSleepSamples: 1 });
+    // Sleep in a projection scope is refused outright.
+    await expect(runHealthKitGraduationPolicy({ records, authorization, desired: { ...desired, projection: { enabled: true, domains: ["sleep"], startLocalDate: "2026-10-02" } }, now }))
+      .resolves.toMatchObject({ outcome: "refused" });
+    const before = records.snapshot();
+    const applied = await runHealthKitGraduationPolicy({ records, authorization, desired, apply: true, expected: dry.facts, now });
+    expect(applied.outcome).toBe("applied");
+    expect(applied.policyVersion).toBe(4);
+    expect(applied.invariants).toMatchObject({ sleepActivationPolicyUntouched: true, sleepDaysUnchanged: true, sleepSamplesUnchanged: true, noHistoricalBriefingRegeneration: true });
+    const after = records.snapshot();
+    for (const collection of ["healthKitSleepDays", "healthKitSleepSamples", "dailyBriefings", "canonicalEvidenceObjects", "healthKitCanonicalDays"]) {
+      expect(after[collection]).toEqual(before[collection]);
+    }
+    // A Sleep night that changes between the dry run and the apply is drift.
+    await records.put({ ownerUserId: OWNER, collection: "healthKitSleepDays", recordId: "healthkit_sleep_day_2026-10-04", expectedVersion: 2, payload: sleepNight("2026-10-04", 3) });
+    const again = await runHealthKitGraduationPolicy({ records, authorization: { ...authorization, authorizationReference: "second" }, desired: { evidenceEligibility: { enabled: false } }, apply: true, expected: dry.facts, now });
+    expect(again).toMatchObject({ outcome: "drifted", drift: expect.arrayContaining(["sleepDaysDigest"]) });
+  });
+
   it("switches projection and evidence eligibility independently and keeps the omitted scope", async () => {
     const records = store();
     let dry = await runHealthKitGraduationPolicy({ records, authorization, desired: { projection: both.projection } });

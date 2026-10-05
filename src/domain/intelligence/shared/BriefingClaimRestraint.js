@@ -43,6 +43,8 @@ const SCOPE_BY_KIND = Object.freeze({
   activity_change: ClaimScope.EXECUTION,
   activity_on_plan: ClaimScope.EXECUTION,
   nutrition_unclear: ClaimScope.OBSERVABILITY,
+  // Recovery context: what the nights were, never what caused anything.
+  sleep_below_usual: ClaimScope.EXECUTION,
 });
 
 export function claimScopeOf(item) {

@@ -11,6 +11,14 @@ import {
   resolveHealthKitGraduationPolicy,
 } from "../../domain/services/HealthKitGraduation.js";
 import { HEALTHKIT_CANONICAL_WORKOUT_COLLECTION_NAME } from "../../domain/services/HealthKitEvidenceEligibilityPolicy.js";
+import { HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION, HEALTHKIT_SLEEP_DAY_COLLECTION } from "../../domain/services/HealthKitSleepContract.js";
+import { HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID, resolveHealthKitSleepActivationPolicy } from "../../domain/services/HealthKitSleepPolicies.js";
+import { overlayGraduatedHealthKitSleepNights } from "../../domain/services/HealthKitSleepGraduation.js";
+
+// The longest lookback any V3 briefing reads (Monthly: 28-day window plus a
+// 56-day baseline), with margin. Sleep nights are read by sleep day only
+// within this bounded range and never before the strategic boundary.
+const SLEEP_EVIDENCE_LOOKBACK_DAYS = 120;
 
 // The read-side seam for graduated HealthKit Activity and Nutrition days.
 //
@@ -153,6 +161,38 @@ export function createHealthKitGraduationReader({ records, query, ownerUserId, o
       }
     },
     /**
+     * Prospective Sleep strategic graduation. EVIDENCE purpose only (Sleep's
+     * own Recovery/Sleep Evidence read model is its presentation), separate
+     * from `overlay()` and from settlement: Sleep is supporting recovery
+     * evidence, never a readiness domain, so a missing night never holds a
+     * briefing. A night joins only once its sleep-day window has closed at
+     * `asOf`. A fresh, bounded read every call; any failure fails closed to
+     * the evidence it was given.
+     */
+    async overlaySleepNights(canonicalObjects, { purpose = HealthKitGraduationPurpose.PROJECTION, asOf = new Date(), policyRecord } = {}) {
+      try {
+        if (purpose !== HealthKitGraduationPurpose.EVIDENCE) return canonicalObjects;
+        const policy = resolveHealthKitGraduationPolicy(policyRecord === undefined ? await lookup() : policyRecord);
+        if (!policy.evidenceEligibility.enabled || !policy.evidenceEligibility.domains.includes("sleep")) return canonicalObjects;
+        const activationPolicy = resolveHealthKitSleepActivationPolicy(await store.get({
+          ownerUserId, collection: HEALTHKIT_SLEEP_CONFIGURATION_COLLECTION, recordId: HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID,
+        }));
+        if (!activationPolicy.enabled) return canonicalObjects;
+        const at = asOf instanceof Date ? asOf : new Date(asOf);
+        const endDate = shiftDay(at.toISOString().slice(0, 10), 1);
+        const lookback = shiftDay(endDate, -SLEEP_EVIDENCE_LOOKBACK_DAYS);
+        const startDate = [lookback, activationPolicy.effectiveSleepDay, policy.evidenceEligibility.startLocalDate].sort().at(-1);
+        if (startDate > endDate) return canonicalObjects;
+        const sleepDays = await store.listByOccurrenceDateRange({ ownerUserId, collection: HEALTHKIT_SLEEP_DAY_COLLECTION, startDate, endDate });
+        return overlayGraduatedHealthKitSleepNights({
+          canonicalObjects, sleepDays, graduationPolicy: policy, activationPolicy, asOf: at, ownerUserId,
+        }).objects;
+      } catch (error) {
+        onError?.(error);
+        return canonicalObjects;
+      }
+    },
+    /**
      * Coverage-only read for the Briefing Evidence Settlement gate: whether a
      * domain's final local evidence day has settled as `complete_day` in
      * HealthKit, restricted to whichever of `domains` are actually in
@@ -252,4 +292,10 @@ function insertInDateOrder(original, overlaid) {
     result.splice(at === -1 ? result.length : at, 0, object);
   }
   return result;
+}
+
+function shiftDay(date, days) {
+  const value = new Date(`${date}T12:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
 }

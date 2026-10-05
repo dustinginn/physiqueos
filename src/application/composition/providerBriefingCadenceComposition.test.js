@@ -85,10 +85,17 @@ const day = (domain, coverage = "complete_day") => ({
   provenance: { sourceObservationIds: ["healthkit_observation_x"] },
 });
 
-async function run({ policyRecord = null, days = [], workouts = [] } = {}) {
+async function run({ policyRecord = null, days = [], workouts = [], sleepActivation = null, sleepDays = [], asOf = "2026-09-22T10:00:00.000Z" } = {}) {
   const runtime = { user: { id: OWNER, timeZone: "America/Los_Angeles" }, canonicalEvidenceObjects: [] };
+  sleepQueries.length = 0;
   const pool = { query: vi.fn(async (text, values = []) => {
+    if (/record_id=\$3/.test(text) && values[2] === SLEEP_ACTIVATION_ID) return { rows: sleepActivation ? [{ payload: sleepActivation, version: 1 }] : [] };
     if (/record_id=\$3/.test(text)) return { rows: policyRecord ? [{ payload: policyRecord, version: 1 }] : [] };
+    if (values[1] === "healthKitSleepDays") {
+      sleepQueries.push({ text, values });
+      const [, , startDate, endDate] = values;
+      return { rows: sleepDays.filter((night) => night.sleepDay >= startDate && night.sleepDay <= endDate).map((payload) => ({ payload, version: 1 })) };
+    }
     if (values[1] === "healthKitCanonicalDays") return { rows: days.map((payload) => ({ payload, version: 1 })) };
     if (values[1] === "healthKitCanonicalWorkouts") return { rows: workouts.map((payload) => ({ payload, version: 1 })) };
     return { rows: [] };
@@ -102,7 +109,7 @@ async function run({ policyRecord = null, days = [], workouts = [] } = {}) {
     loadCanonicalRuntime: async () => runtime,
     loadCanonicalCommitBindings: async () => ({ mutateCanonicalRuntime: async () => ({}) }),
   });
-  await runner.execute({ asOf: new Date("2026-09-22T10:00:00.000Z") });
+  await runner.execute({ asOf: new Date(asOf) });
   const seen = await captured.repositories.canonicalEvidence.listCanonicalEvidenceObjects(OWNER);
   return { runtime, seen };
 }
@@ -205,6 +212,57 @@ describe("provider briefing cadence: graduated HealthKit evidence", () => {
     // tick's overlay, not only the runner's first tick.
     expect(tickTwoOverlayIndex).toBeGreaterThan(0);
     expect(readerCallOrder.slice(0, tickTwoOverlayIndex)).toContain("beginRun");
+  });
+});
+
+const SLEEP_ACTIVATION_ID = "healthkit_sleep_canonical_activation_policy";
+const sleepQueries = [];
+const sleepActivation = { id: SLEEP_ACTIVATION_ID, status: "enabled", schemaVersion: "healthkit-sleep-activation-policy-v1", mode: "validation_only",
+  effectiveSleepDay: "2026-10-02", timeZone: "America/Los_Angeles", openEnded: true, strategicEvidenceEligibility: "quarantined", historicalBackfill: false };
+const sleepNight = (sleepDay) => {
+  const next = new Date(`${sleepDay}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
+  return { id: `healthkit_sleep_day_${sleepDay}`, sleepDay, occurrenceDate: sleepDay, revision: 2, algorithmVersion: "sleep-canon-v3",
+    status: "asleep_recorded", ingestionPurpose: "validation_only", timeZone: "America/Los_Angeles",
+    windowClosesAt: `${next.toISOString().slice(0, 10)}T01:00:00.000Z`, computedAt: `${sleepDay}T15:00:00.000Z`, mainEpisodeIndex: 0,
+    mainSleep: { asleepSeconds: 27000, awakeSeconds: 1800, inBedSeconds: 30000, coreSeconds: 15000, deepSeconds: 6000, remSeconds: 6000, unspecifiedSeconds: 0 },
+    episodes: [{ kind: "main", start: "x", end: "y", timeZone: "America/Los_Angeles", primarySource: { sourceFamily: "oura" },
+      completeness: { asleepData: "present", stageDetail: "staged", sourceBasis: "sensor" } }] };
+};
+const nights = ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04"].map(sleepNight);
+const withSleep = { enabled: true, domains: ["activity", "cardio_training", "nutrition", "sleep"], startLocalDate: "2026-09-22", endLocalDate: null };
+
+describe("provider briefing cadence: prospective Sleep graduation", () => {
+  it("adds nothing (and reads no Sleep) while the evidence scope does not name sleep", async () => {
+    const { seen } = await run({ policyRecord: policy({ ...withSleep, domains: ["activity", "cardio_training", "nutrition"] }), sleepActivation, sleepDays: nights, asOf: "2026-10-05T10:00:00.000Z" });
+    expect(seen).toEqual([]);
+    expect(sleepQueries).toEqual([]);
+  });
+
+  it("gives every generator only the completed nights on/after the Founder-approved D0, read in one bounded range", async () => {
+    // 03:00 PDT Oct 5: Oct 4's 18:00 window closed at 01:00Z; Oct 5's has not.
+    const { seen, runtime } = await run({ policyRecord: policy(withSleep), sleepActivation, sleepDays: [...nights, sleepNight("2026-10-05")], asOf: "2026-10-05T10:00:00.000Z" });
+    expect(seen.map((object) => [object.evidence_type, object.payload.sleep_day])).toEqual([
+      ["sleep_night", "2026-10-02"], ["sleep_night", "2026-10-03"], ["sleep_night", "2026-10-04"],
+    ]);
+    expect(sleepQueries).toHaveLength(1);
+    expect(sleepQueries[0].values.slice(2)).toEqual(["2026-10-02", "2026-10-06"]);
+    // Confidence and publication keep the raw runtime: no Sleep there.
+    expect(runtime.canonicalEvidenceObjects).toEqual([]);
+    expect(await captured.weekly.confidenceStoreResolver()).toBe(runtime);
+    expect(captured.midweek.repositories).toBe(captured.repositories);
+    expect(captured.monthly.repositories).toBe(captured.repositories);
+  });
+
+  it("keeps the still-updating night out until its window closes", async () => {
+    const before = await run({ policyRecord: policy(withSleep), sleepActivation, sleepDays: nights, asOf: "2026-10-05T00:59:00.000Z" });
+    expect(before.seen.map((object) => object.payload.sleep_day)).toEqual(["2026-10-02", "2026-10-03"]);
+    const after = await run({ policyRecord: policy(withSleep), sleepActivation, sleepDays: nights, asOf: "2026-10-05T01:00:00.000Z" });
+    expect(after.seen.map((object) => object.payload.sleep_day)).toEqual(["2026-10-02", "2026-10-03", "2026-10-04"]);
+  });
+
+  it("fails closed when Sleep ingestion is not enabled", async () => {
+    const { seen } = await run({ policyRecord: policy(withSleep), sleepActivation: { ...sleepActivation, status: "disabled" }, sleepDays: nights, asOf: "2026-10-05T10:00:00.000Z" });
+    expect(seen).toEqual([]);
   });
 });
 

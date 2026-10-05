@@ -437,12 +437,74 @@ function describeShift(shift, byId, window) {
       .map((item) => ({ domain: item.domain, dates: item.dates })) };
 }
 
-// Recovery/Sleep: a declared slot. It reports what it has and fabricates
-// nothing; when Sleep evidence exists it enters here.
-function assessRecovery({ days }) {
-  const nights = days.filter((day) => Number.isFinite(day?.recovery?.sleepHours));
-  if (!nights.length) return unavailable(D.RECOVERY, "no_recovery_evidence_yet");
-  return insufficient(D.RECOVERY, "recovery_assessment_not_yet_defined", { nights: nights.length });
+// Recovery/Sleep: supporting recovery context from completed, eligible
+// canonical sleep nights — never a goal of its own, never a diagnosis and never
+// a generic sleep target. Total sleep is judged only against the person's own
+// usual, and only once enough prior nights establish that usual; until then the
+// domain reports what it has, with the short history as its uncertainty, and
+// offers nothing to say. A finding needs a consistent shortfall across most of
+// the period's nights (one short night is never a story), carries modest
+// strength so it cannot outrank body-composition, energy or training evidence,
+// and names no cause. Stage detail is described, never judged.
+export const RECOVERY_SLEEP_POLICY = Object.freeze({
+  // Nights a period needs before anything about it can be said.
+  minWindowNights: 3,
+  minWindowCoverage: 0.5,
+  // Prior nights (before the period) that establish a personal usual.
+  baselineMinNights: 14,
+  // A night this far below the personal usual counts as short.
+  shortfallMinutes: 45,
+  // Share of the period's nights that must be short for a finding.
+  consistentShare: 2 / 3,
+  maxStrength: 1.8,
+});
+
+function assessRecovery({ days, windowDays, window }) {
+  const P = RECOVERY_SLEEP_POLICY;
+  const minutes = (day) => Math.round(day.recovery.sleep?.asleepSeconds != null
+    ? day.recovery.sleep.asleepSeconds / 60 : day.recovery.sleepHours * 60);
+  const hasNight = (day) => Number.isFinite(day?.recovery?.sleepHours);
+  const nights = windowDays.filter(hasNight);
+  const prior = window ? days.filter((day) => day.date < window.startDate && hasNight(day)) : [];
+  if (!nights.length && !prior.length) return unavailable(D.RECOVERY, "no_recovery_evidence_yet");
+  const values = nights.map(minutes);
+  const baselineEstablished = prior.length >= P.baselineMinNights;
+  const usual = baselineEstablished ? median(prior.map(minutes)) : null;
+  const facts = {
+    windowNights: nights.length,
+    windowDays: windowDays.length,
+    priorNights: prior.length,
+    meanAsleepMinutes: values.length ? Math.round(mean(values)) : null,
+    shortestAsleepMinutes: values.length ? Math.min(...values) : null,
+    longestAsleepMinutes: values.length ? Math.max(...values) : null,
+    stagedNights: nights.filter((day) => day.recovery.sleep?.stageDetail === "staged").length,
+    baselineEstablished,
+    usualAsleepMinutes: usual,
+    // Plain statement of what this evidence cannot yet support.
+    uncertainty: baselineEstablished ? null : "short_history_no_personal_baseline",
+  };
+  const coverage = windowDays.length ? nights.length / windowDays.length : 0;
+  if (nights.length < P.minWindowNights || coverage < P.minWindowCoverage) {
+    return insufficient(D.RECOVERY, "too_few_nights", facts);
+  }
+  if (!baselineEstablished) return insufficient(D.RECOVERY, "no_personal_baseline_yet", facts);
+  const short = nights.filter((day) => minutes(day) <= usual - P.shortfallMinutes);
+  if (short.length < Math.ceil(P.consistentShare * nights.length)) {
+    return assessed(D.RECOVERY, "within_personal_usual", "neutral", facts, []);
+  }
+  const affectedDates = short.map((day) => day.date);
+  const trainingDays = windowDays.filter((day) => Number(day?.training?.sessions ?? 0) > 0).length;
+  const shortfall = { ...facts, shortNights: short.length, affectedDates, extentDays: short.length,
+    meanShortfallMinutes: Math.round(mean(short.map((day) => usual - minutes(day)))),
+    trainingDaysInWindow: trainingDays };
+  const strength = Math.min(P.maxStrength,
+    1 + 0.8 * (short.length / nights.length) * Math.min(1, nights.length / 7));
+  return assessed(D.RECOVERY, "below_personal_usual", "concern", shortfall, [
+    // Execution-scoped recovery context: what happened, never why, and never a
+    // step of its own. A partial window cannot conclude it.
+    insight(D.RECOVERY, "sleep_below_usual", InsightRole.EXECUTION, "concern", strength, shortfall,
+      { requiresCompleteWindow: true }),
+  ]);
 }
 
 // Visual change from progress photos: its own evidence, scaled by how much

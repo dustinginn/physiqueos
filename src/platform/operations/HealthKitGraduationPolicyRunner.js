@@ -20,6 +20,9 @@ import { selectActiveCanonicalNutritionDays } from "../../domain/services/Canoni
 import { resolveNutritionDayAuthority } from "../../domain/models/nutritionDayAuthority.js";
 import { reconcileEnergyDays } from "../../domain/services/EnergyDailyReconciliationService.js";
 import { composeLoggedTodaySummary } from "../../domain/services/LoggedTodayService.js";
+import { HEALTHKIT_SLEEP_DAY_COLLECTION, HEALTHKIT_SLEEP_SAMPLE_COLLECTION } from "../../domain/services/HealthKitSleepContract.js";
+import { HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID, resolveHealthKitSleepActivationPolicy } from "../../domain/services/HealthKitSleepPolicies.js";
+import { overlayGraduatedHealthKitSleepNights } from "../../domain/services/HealthKitSleepGraduation.js";
 
 export const HEALTHKIT_GRADUATION_AUDIT_RECORD_PREFIX = "healthkit_graduation_audit_";
 const OBSERVATION_COLLECTION = "healthKitObservations";
@@ -72,7 +75,18 @@ export async function runHealthKitGraduationPolicy({
     list(HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION),
     list(EVIDENCE_COLLECTION),
   ]);
-  const facts = collectFacts({ policyRecord, dailyPolicy, workoutPolicy, observations, canonicalDays, workouts, links, claims, evidence });
+  // Sleep: the activation policy (Founder-approved D0) and the ordinary
+  // canonical nights the `sleep` evidence scope would graduate. Read only;
+  // the apply proves they are untouched.
+  const [sleepActivationRecord, sleepDays, sleepSamples] = await Promise.all([
+    getConfiguration(HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID),
+    list(HEALTHKIT_SLEEP_DAY_COLLECTION),
+    list(HEALTHKIT_SLEEP_SAMPLE_COLLECTION),
+  ]);
+  const facts = {
+    ...collectFacts({ policyRecord, dailyPolicy, workoutPolicy, observations, canonicalDays, workouts, links, claims, evidence }),
+    ...collectSleepFacts({ sleepActivationRecord, sleepDays, sleepSamples }),
+  };
   const current = resolveHealthKitGraduationPolicy(policyRecord);
 
   const planned = planPolicy({ policyRecord, current, desired, authorization });
@@ -85,6 +99,9 @@ export async function runHealthKitGraduationPolicy({
     current,
     candidate: planned.resolved,
     includeValues,
+  });
+  simulation.sleep = simulateSleepGraduation({
+    sleepDays, sleepActivationRecord, current, candidate: planned.resolved, asOf: now(),
   });
   const summary = {
     action: "set",
@@ -106,6 +123,9 @@ export async function runHealthKitGraduationPolicy({
       healthKitWorkoutLinks: facts.linkCount,
       canonicalizationPolicy: facts.dailyPolicyDigest ?? "absent",
       workoutPolicy: facts.workoutPolicyDigest ?? "absent",
+      healthKitSleepDays: facts.sleepDayCount,
+      healthKitSleepSamples: facts.sleepSampleCount,
+      sleepActivationPolicy: facts.sleepActivationPolicyDigest ?? "absent",
     },
     historicalBriefingRegeneration: false,
     trainingAndWorkoutChanges: "none",
@@ -155,6 +175,11 @@ export async function runHealthKitGraduationPolicy({
     })).record;
 
   // In-transaction verification. Any failure throws and the caller rolls back.
+  const [afterSleepActivation, afterSleepDays, afterSleepSamples] = await Promise.all([
+    getConfiguration(HEALTHKIT_SLEEP_ACTIVATION_POLICY_RECORD_ID),
+    list(HEALTHKIT_SLEEP_DAY_COLLECTION),
+    list(HEALTHKIT_SLEEP_SAMPLE_COLLECTION),
+  ]);
   const [afterPolicy, afterDaily, afterWorkoutPolicy, afterObservations, afterDays, afterWorkouts, afterLinks, afterClaims, afterEvidence] = await Promise.all([
     getConfiguration(HEALTHKIT_GRADUATION_POLICY_RECORD_ID),
     getConfiguration(HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID),
@@ -181,6 +206,9 @@ export async function runHealthKitGraduationPolicy({
     linksUnchanged: afterLinks.length === facts.linkCount && listDigest(afterLinks) === facts.linksDigest,
     claimsUnchanged: afterClaims.length === facts.claimCount && listDigest(afterClaims) === facts.claimsDigest,
     evidenceUnchanged: afterEvidence.length === facts.evidenceCount && listDigest(afterEvidence) === facts.evidenceDigest,
+    sleepActivationPolicyUntouched: (afterSleepActivation ? digest(stable(afterSleepActivation)) : null) === facts.sleepActivationPolicyDigest,
+    sleepDaysUnchanged: afterSleepDays.length === facts.sleepDayCount && listDigest(afterSleepDays) === facts.sleepDaysDigest,
+    sleepSamplesUnchanged: afterSleepSamples.length === facts.sleepSampleCount && listDigest(afterSleepSamples) === facts.sleepSamplesDigest,
   };
   if (Object.values(invariants).some((ok) => ok !== true)) {
     throw Object.assign(new Error("Post-write invariants failed."), { code: "POST_WRITE_INVARIANT_FAILED", invariants });
@@ -210,7 +238,7 @@ function planPolicy({ policyRecord, current, desired, authorization }) {
   };
   const resolved = resolveHealthKitGraduationPolicy(record);
   if (!resolved.valid) {
-    return { refusal: `The requested graduation policy is not valid (${resolved.invalidReason}): domains must be activity, nutrition, and/or cardio_training, with an exact start date and an optional end date on or after it.` };
+    return { refusal: `The requested graduation policy is not valid (${resolved.invalidReason}): domains must be activity, nutrition, and/or cardio_training (evidence eligibility may also name sleep), with an exact start date and an optional end date on or after it.` };
   }
   const before = stable({ projection: describeScope(current.projection), evidenceEligibility: describeScope(current.evidenceEligibility) });
   const after = stable({ projection: describeScope(resolved.projection), evidenceEligibility: describeScope(resolved.evidenceEligibility) });
@@ -318,6 +346,36 @@ function collectFacts({ policyRecord, dailyPolicy, workoutPolicy, observations, 
     claimsDigest: listDigest(claims),
     evidenceCount: evidence.length,
     evidenceDigest: listDigest(evidence),
+  };
+}
+
+function collectSleepFacts({ sleepActivationRecord, sleepDays, sleepSamples }) {
+  return {
+    sleepActivationPolicyDigest: sleepActivationRecord ? digest(stable(sleepActivationRecord)) : null,
+    sleepDayCount: sleepDays.length,
+    sleepDaysDigest: listDigest(sleepDays),
+    sleepSampleCount: sleepSamples.length,
+    sleepSamplesDigest: listDigest(sleepSamples),
+  };
+}
+
+// The Sleep part of the dry run: the same overlay the cadence reader runs, at
+// the operation's own clock, before and after the candidate policy. Identity,
+// revision and decision only — never a sleep value.
+function simulateSleepGraduation({ sleepDays, sleepActivationRecord, current, candidate, asOf }) {
+  const activationPolicy = resolveHealthKitSleepActivationPolicy(sleepActivationRecord);
+  const run = (graduationPolicy) => overlayGraduatedHealthKitSleepNights({ canonicalObjects: [], sleepDays, graduationPolicy, activationPolicy, asOf });
+  const before = run(current);
+  const after = run(candidate);
+  return {
+    asOf: asOf.toISOString(),
+    strategicPolicy: { enabled: after.strategicPolicy.enabled, strategicEffectiveAt: after.strategicPolicy.strategicEffectiveAt,
+      endSleepDay: after.strategicPolicy.endSleepDay, reason: after.strategicPolicy.reason },
+    eligibleNightsBefore: before.applied.map((entry) => entry.localDate),
+    eligibleNightsAfter: after.applied.map((entry) => ({ sleepDay: entry.localDate, revision: entry.revision })),
+    decisions: after.decisions.map((entry) => ({ sleepDay: entry.sleepDay, revision: entry.revision, eligible: entry.eligible, reason: entry.reason })),
+    historicalNightsConsidered: 0,
+    confidenceInputs: "none; sleep_night objects feed only the V3 Recovery evidence slot",
   };
 }
 

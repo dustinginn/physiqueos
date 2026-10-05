@@ -34,8 +34,10 @@ export const HEALTHKIT_CANONICAL_WORKOUT_COLLECTION_NAME = "healthKitCanonicalWo
 export const HEALTHKIT_WORKOUT_LINK_COLLECTION_NAME = "healthKitWorkoutLinks";
 export const HEALTHKIT_WORKOUT_RECORD_ID_PREFIXES = Object.freeze(["healthkit_canonical_workout_", "healthkit_workout_link_", "healthkit_link_claim_"]);
 // HealthKit Sleep samples and canonical sleep days (healthKitSleepSamples,
-// healthKitSleepDays). Quarantined like every other HealthKit record; there is
-// no Sleep graduation scope at all.
+// healthKitSleepDays). Quarantined like every other stored HealthKit record.
+// Their only strategic path is the read-time Sleep graduation overlay under the
+// evidence-only `sleep` scope; a projected night keeps this lineage, so the
+// write guard below still refuses to persist it.
 export const HEALTHKIT_SLEEP_RECORD_ID_PREFIXES = Object.freeze([
   "healthkit_sleep_sample_", "healthkit_sleep_day_", "healthkit_sleep_validation_sample_",
 ]);

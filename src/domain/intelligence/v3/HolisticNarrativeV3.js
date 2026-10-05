@@ -124,11 +124,14 @@ function rankMilestone(item) {
 // ---------------------------------------------------------------- briefings
 
 // The insight kinds these realizers can phrase. Synthesis keeps any other
-// kind (a future Sleep finding) out of the selection with a reason until a
-// phrase for it exists here.
+// kind out of the selection with a reason until a phrase for it exists here.
+// Sleep (`sleep_below_usual`) is phrased only as recovery context in the recap
+// or the coaching: it has no headline phrase, no priority and no step of its
+// own, so it never leads a briefing or becomes a recommendation.
 export const BRIEFING_REALIZABLE_KINDS = Object.freeze(new Set(["training_progress", "weight_trend", "routine_break",
   "composition_result", "guardrail_status", "intake_vs_plan", "activity_change", "training_frequency",
-  "activity_on_plan", "routine_steady", "nutrition_unclear", "visual_change", "visual_comparison"]));
+  "activity_on_plan", "routine_steady", "nutrition_unclear", "visual_change", "visual_comparison",
+  "sleep_below_usual"]));
 export const WEEKLY_REALIZABLE_KINDS = BRIEFING_REALIZABLE_KINDS;
 
 // How each briefing type speaks about its own horizon. The intelligence and
@@ -460,6 +463,8 @@ function prioritiesPhrase(item) {
     case "intake_vs_plan": return `the food side is the lever ${P.leverWhen}`;
     case "activity_change": return f.direction === "below" ? "activity is worth bringing back up" : null;
     case "visual_change": return "the photos need more time to show change";
+    // Recovery context, never a step: noticed, not acted on by itself.
+    case "sleep_below_usual": return "the shorter nights are worth keeping an eye on, but they are not a reason on their own to change the plan";
     default: return null;
   }
 }
@@ -484,7 +489,7 @@ function takeawaySentence({ lead, synthesis, steps }) {
   // Priorities come only from real concerns; a neutral finding is not a problem.
   // In an event's lead-up, execution is context: priorities come only from
   // the outcome, the guardrail or a weight risk.
-  const contextOnly = new Set(["routine_break", "activity_change", "training_frequency", "intake_vs_plan"]);
+  const contextOnly = new Set(["routine_break", "activity_change", "training_frequency", "intake_vs_plan", "sleep_below_usual"]);
   const priorities = [...new Set(lead.map((item) => (item.polarity === "concern" && !(P.context && contextOnly.has(item.kind))
     ? priority(item) : null)).filter(Boolean))];
   // An event: the result, then where the lead-up sits — context for the
@@ -542,9 +547,22 @@ function clauseFor(item, facts) {
       return "activity stayed where it usually is";
     case "routine_steady":
       return "the routine held";
+    case "sleep_below_usual":
+      return sleepClause(f);
     default:
       return null;
   }
+}
+
+// Sleep as recovery context: what the nights were against the person's own
+// usual — never a cause, a diagnosis or a generic target. A usual built on only
+// a few weeks of nights says so.
+function sleepClause(f) {
+  if (!Number.isFinite(f.shortNights) || !Number.isFinite(f.windowNights)) return null;
+  const nights = f.shortNights === f.windowNights ? `on all ${numberWord(f.windowNights)} recorded nights`
+    : `on ${numberWord(f.shortNights)} of ${numberWord(f.windowNights)} recorded nights`;
+  const young = Number(f.priorNights) < 28 ? ", against a usual that is still only a few weeks old" : "";
+  return `sleep ran shorter than your recent usual ${nights}${young}`;
 }
 
 // Goal-relative meaning: the standing outcome picture, what the scale can and

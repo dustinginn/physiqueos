@@ -341,13 +341,18 @@ describe("sleep-canon-v3 coherent copy selection", () => {
     expect(clean).toMatchObject({ duplicateCopies: false, v2CrossCopySplice: false, coherentChainCount: 1 });
   });
 
-  it("strategic isolation: a v3 prospective day stays quarantined and strategically ineligible", () => {
+  it("strategic isolation: a stored v3 prospective day stays quarantined; only an explicit Sleep policy admits it", () => {
     const { a, b } = productionShape();
     const day = { ...v3([...a, ...b]), id: getHealthKitSleepDayRecordId(DAY), ingestionPurpose: "validation_only", origin: "validation_only", strategicEligible: false };
     expect(assessHealthKitStrategicEvidenceEligibility(day)).toMatchObject({ applicable: true, eligible: false, state: "quarantined" });
     expect(() => assertNotQuarantinedHealthKitEvidence(day)).toThrow(expect.objectContaining({ code: "HEALTHKIT_STRATEGIC_EVIDENCE_QUARANTINED" }));
     expect(assessHealthKitSleepStrategicEligibility(day)).toMatchObject({ eligible: false, reason: "prospective_validation_only_quarantined" });
+    // Ingestion purpose is provenance: the eligibility decision belongs to the
+    // explicit policy boundary (the stored record itself is still refused by
+    // the strategic write guard above).
     expect(assessHealthKitSleepStrategicEligibility(day, { schemaVersion: "healthkit-sleep-strategic-eligibility-v1", enabled: true, strategicEffectiveAt: "2026-01-01" }))
-      .toMatchObject({ eligible: false });
+      .toMatchObject({ eligible: true });
+    expect(assessHealthKitSleepStrategicEligibility(day, { schemaVersion: "healthkit-sleep-strategic-eligibility-v1", enabled: true, strategicEffectiveAt: "2099-01-01" }))
+      .toMatchObject({ eligible: false, reason: "before_strategic_effective_boundary" });
   });
 });

@@ -13,10 +13,13 @@ import { createHealthKitSleepTombstoneRecord } from "./HealthKitSleepContract.js
 import { redactStructuredValue } from "../../platform/observability/structuredLogger.js";
 import { OWNER, stored, uuid } from "../../testSupport/healthKitSleepSynthetic.js";
 
-// Phase A strategic quarantine for HealthKit Sleep, made structural. Canonical
-// Sleep may later be READ by an Evidence presentation, but nothing may make it
-// strategic (V3 Confidence/Narrative, briefings/readiness, Goal or Strategy
-// confidence, recommendations, Home) without a reviewed code change here.
+// Strategic quarantine for HealthKit Sleep, made structural. Stored Sleep is
+// always quarantined. Its ONLY strategic path is the reviewed, prospective
+// Sleep graduation (HealthKitSleepGraduation.js via the graduation reader): a
+// read-time `sleep_night` projection under the evidence-only `sleep` scope.
+// No strategic reader (V3, briefings/readiness, Goal or Strategy confidence,
+// recommendations, Home) may read Sleep storage itself; widening this list is a
+// reviewed code change here.
 
 const ROOT = path.resolve(new URL("../../..", import.meta.url).pathname, "src");
 const SLEEP_NEEDLES = [
@@ -52,6 +55,12 @@ const SLEEP_ALLOWED = new Set([
   "platform/operations/HealthKitSleepAudit.js",
   // Bounded prospective-only sleep-canon-v3 activation (guarded operation).
   "platform/operations/HealthKitSleepCanonV3Activation.js",
+  // Prospective Sleep -> V3 graduation: eligibility + read-time projection, the
+  // one reader seam that loads canonical nights for it, and the guarded
+  // graduation-policy operation that simulates it.
+  "domain/services/HealthKitSleepGraduation.js",
+  "platform/database/HealthKitGraduationReader.js",
+  "platform/operations/HealthKitGraduationPolicyRunner.js",
 ]);
 const STRATEGIC_DIRECTORIES = ["domain/intelligence", "app/briefings", "app/confidence", "application/core", "application/progress", "application/read-models"];
 
@@ -92,19 +101,18 @@ describe("HealthKit Sleep strategic quarantine", () => {
     expect(selectStrategicallyEligibleRecords([sample, day, { id: "manual-check-in" }])).toEqual([{ id: "manual-check-in" }]);
   });
 
-  it("Sleep has no graduation domain: a policy naming sleep disables every scope", () => {
+  it("Sleep is an evidence-eligibility domain only: a projection scope naming sleep disables every scope", () => {
     const scope = { enabled: true, domains: ["sleep"], startLocalDate: "2026-09-10" };
-    for (const record of [
-      { schemaVersion: HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION, evidenceEligibility: scope },
-      { schemaVersion: HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION, projection: scope },
-    ]) {
-      const resolved = resolveHealthKitGraduationPolicy(record);
-      expect(resolved).toMatchObject({ valid: false, invalidReason: "scope_invalid" });
-      expect(resolved.evidenceEligibility.enabled).toBe(false);
-    }
+    const evidence = resolveHealthKitGraduationPolicy({ schemaVersion: HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION, evidenceEligibility: scope });
+    expect(evidence).toMatchObject({ valid: true });
+    expect(evidence.evidenceEligibility.domains).toEqual(["sleep"]);
+    expect(evidence.projection.enabled).toBe(false);
+    const projection = resolveHealthKitGraduationPolicy({ schemaVersion: HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION, projection: scope, evidenceEligibility: scope });
+    expect(projection).toMatchObject({ valid: false, invalidReason: "scope_invalid" });
+    expect(projection.evidenceEligibility.enabled).toBe(false);
   });
 
-  it("Sleep is not a briefing readiness domain", () => {
+  it("Sleep is not a briefing readiness domain (supporting evidence never holds a briefing)", () => {
     expect(DEFAULT_SETTLEMENT_POLICY.readinessDomains).not.toContain("sleep");
     expect(DEFAULT_SETTLEMENT_POLICY.readinessDomains).toEqual(["activity", "nutrition"]);
   });

@@ -88,14 +88,24 @@ export function createProviderBriefingCadenceRunner({
       // after the day-level overlay, never merged into it (workouts have no
       // "complete day" state and need no settlement-gate participation; see
       // `overlayGraduatedHealthKitCardioWorkouts`'s doc comment).
+      //
+      // Completed canonical HealthKit Sleep nights (prospective Sleep strategic
+      // graduation) join last, as `sleep_night` objects, only under the
+      // `sleep` evidence-eligibility scope and only once a night's sleep-day
+      // window has closed at this tick's `asOf`. They feed the V3 Recovery
+      // evidence slot; no Confidence, Energy, Training or legacy recovery
+      // reader consumes that type.
       const evidenceRuntime = {
         ...canonicalRuntime,
-        canonicalEvidenceObjects: await healthKitGraduation.overlayCardioWorkouts(
-          await healthKitGraduation.overlay(
-            canonicalRuntime.canonicalEvidenceObjects ?? [],
+        canonicalEvidenceObjects: await healthKitGraduation.overlaySleepNights(
+          await healthKitGraduation.overlayCardioWorkouts(
+            await healthKitGraduation.overlay(
+              canonicalRuntime.canonicalEvidenceObjects ?? [],
+              { purpose: HealthKitGraduationPurpose.EVIDENCE },
+            ),
             { purpose: HealthKitGraduationPurpose.EVIDENCE },
           ),
-          { purpose: HealthKitGraduationPurpose.EVIDENCE },
+          { purpose: HealthKitGraduationPurpose.EVIDENCE, asOf },
         ),
       };
       const repositories = createSeedRepositories(evidenceRuntime, {

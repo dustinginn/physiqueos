@@ -71,6 +71,20 @@ export function buildBriefingPeriodDays({
     sessionsByDate.set(date, ids);
   }
 
+  // Recovery/Sleep: one completed, strategically eligible night per day,
+  // named by its wake date. Only `sleep_night` evidence (a graduated canonical
+  // night) fills it; the wrapper already decided eligibility upstream.
+  const sleepByDate = new Map();
+  for (const item of active) {
+    const payload = payloadOf(item);
+    if ((item.evidence_type ?? payload.evidence_type) !== "sleep_night") continue;
+    const date = payload.sleep_day ?? payload.observed_at;
+    const night = sleepNightOf(payload);
+    if (!inRange(date) || !night) continue;
+    const previous = sleepByDate.get(date);
+    if (!previous || night.revision > previous.revision) sleepByDate.set(date, night);
+  }
+
   // Latest weigh-in per local day, in pounds.
   const weightByDate = new Map();
   for (const entry of weightEntries) {
@@ -104,10 +118,30 @@ export function buildBriefingPeriodDays({
       activity: activeKcal == null ? null : { activeKcal, exerciseMinutes: minutesByDate.get(date) ?? null },
       training: { sessions: sessionsByDate.get(date)?.size ?? 0 },
       body: { weighIn: weightByDate.has(date), weight: weightByDate.get(date)?.pounds ?? null },
-      // Recovery/Sleep slot: filled when Sleep evidence is admitted.
-      recovery: null,
+      // Recovery/Sleep slot: null on a day without an eligible night.
+      recovery: sleepByDate.has(date) ? { sleepHours: sleepByDate.get(date).asleepHours, sleep: sleepByDate.get(date) } : null,
     };
   });
+}
+
+function sleepNightOf(payload) {
+  const main = payload?.main_sleep ?? {};
+  const asleepSeconds = finite(main.asleep_seconds);
+  if (asleepSeconds == null || asleepSeconds <= 0) return null;
+  const stages = main.stage_detail === "staged" && main.stages ? {
+    coreSeconds: finite(main.stages.core_seconds), deepSeconds: finite(main.stages.deep_seconds),
+    remSeconds: finite(main.stages.rem_seconds), unspecifiedSeconds: finite(main.stages.unspecified_seconds),
+  } : null;
+  return {
+    asleepSeconds,
+    asleepHours: Math.round((asleepSeconds / 3600) * 100) / 100,
+    awakeSeconds: finite(main.awake_seconds),
+    inBedSeconds: finite(main.in_bed_seconds),
+    stageDetail: main.stage_detail ?? "stage_detail_absent",
+    stages,
+    revision: finite(payload.canonical?.revision) ?? 1,
+    canonicalId: payload.canonical?.sleep_day_id ?? payload.id ?? null,
+  };
 }
 
 function nutritionEvidenceOf(item) {
