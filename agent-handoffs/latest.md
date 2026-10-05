@@ -2,34 +2,39 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Redesign Batch 3 Claude, Checkpoint D: Progress Photos + DEXA (`batch3-bc-accepted-checkpoint-d-20261005`)
-- Agent: Claude (single RC worktree)
-- Status: **Checkpoint D ready for Founder review. STOPPED. Checkpoint E not started.**
-- Generated (UTC): 2026-10-05T21:45:20Z
+- Lane: **Workout reliability lane — CLOSED** (separate from Redesign Batch 3 and the Batch 2 / Build 88 release gate)
+- Task: Deploy the 2-C Server change and close the lane (`workout-reliability-deploy-2c-closeout-20261005`)
+- Agent: Claude (same single RC worktree)
+- Status: **Completed. STOPPED.**
+- Generated (UTC): 2026-10-05T22:00:15Z
 
-Commits on `claude/redesign-batch3-evidence-takeover-20261005`:
-
-| Commit | SHA |
-|---|---|
-| Native | `9d2d0e06` |
-| Package | `759d0dc9` |
-
-Report: `agent-handoffs/reports/20261005T214520Z-redesign-batch3-claude-checkpoint-d.md`
-
-Primary board: https://github.com/dustinginn/physiqueos/blob/759d0dc947419647dbc85963de8eb0d9d19a4906/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-d-20261005/checkpoint-d-primary-mobile-review-board.png
-
-Real Founder photos were **not** validated: this needs a Sandbox pairing credential, and the Founder said not to block. The image path was validated with synthetic media.
+| Item | SHA | State |
+|---|---|---|
+| Production Server | `b7eb1e39` (deployment `6fa4e887`; includes UUID fix `b5de242f`) | **LIVE + verified** |
+| Native workout candidate | `e9f8a957` on `claude/build87-workout-reliability-audit-20261005` | ready for next build |
+| Batch 2 integration preview | `70ebf753` on `claude/workout-reliability-on-batch2-preview-20261005` | preview only |
 
 Gates:
-- Unit tests: 573, 0 failures.
-- D UI: 3/3. B/C: 11/11. Hub: 3/3. Recovery: 3/3.
-- Release compile: passed.
-- Pre-existing, not from D: `testBriefingParityJourneys` fails on base `8aa2d00b` too.
+- **Preview, unit tests:** 2034 run, 0 failures.
+- **Preview, Watch:** 49/49.
+- **Preview, Release compile:** OK.
+- **Server:** focused tests 133/133.
 
-Not done: no TestFlight upload, no build bump, no Server change, no deploy.
+Contract (read-only proof):
+- Today: no superset recommendation yet; only 09-14 counts before today.
+- From 2026-10-06: the Leg Extension + Sissy Squat superset gets its own Suggested/Maintain.
+- Standalone recommendations are unchanged.
 
-Concurrent lanes:
-- Workout reliability closeout (prompt `b19faf1e`).
+Report: `agent-handoffs/reports/20261005T215919Z-workout-reliability-closeout.md`
+
+Remaining Watch follow-ups:
+1. Review/Confirmation gating, plus timed sets.
+2. Reply before side effects / one projection build per command (needs the next workout's latency logs).
+
+Concurrent lanes (unchanged):
+- Batch 3 acceptance.
 - Build 88 authorization for Batch 2 `793462b1`.
+
+No TestFlight upload, no build bump, no release merge.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`

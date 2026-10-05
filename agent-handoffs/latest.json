@@ -1,75 +1,62 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T21:45:20Z",
+  "generated_at_utc": "2026-10-05T22:00:15Z",
   "task": {
-    "id": "batch3-bc-accepted-checkpoint-d-20261005",
-    "title": "Redesign Batch 3 Claude: Checkpoint D Progress Photos + DEXA Evidence to the locked designs",
+    "id": "workout-reliability-deploy-2c-closeout-20261005",
+    "title": "Workout reliability lane CLOSEOUT: 2-C Server b7eb1e39 live; Native e9f8a957 + Batch 2 preview 70ebf753 ready for next build",
     "agent": "claude",
-    "status": "checkpoint_d_ready_for_founder_review_stopped"
+    "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "28cbb4dd6471b94c6920c3a60b85f1993c708c8f",
-    "native_accepted_abc_sha": "8aa2d00b835a9a3cbbbc16f001d032db9e7cd7ce",
-    "native_checkpoint_d_sha": "9d2d0e06c84dca7de3f0fe4dc80574c2115ceff5",
-    "review_package_commit": "759d0dc947419647dbc85963de8eb0d9d19a4906",
-    "locked_design_commits": {
-      "photos_dexa": "47ed6d1a",
-      "since_prior_scan_correction": "f208007c"
-    }
+    "base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
+    "final_sha": "e9f8a957be419d89a10b316c57b90afeb08d2f17",
+    "production_server_sha": "b7eb1e397f0238df9ae904fd182ddbb51602e8d8",
+    "production_deployment": "6fa4e887",
+    "native_sha": "e9f8a957be419d89a10b316c57b90afeb08d2f17",
+    "native_build": 87
   },
   "result": {
-    "summary": "Progress Photos (P1-P6) and DEXA (D1-D10 + final Since Prior Scan correction) rebuilt on an EvidenceKit record family; residuals headers +/-0.3, Latest Photo Set <=0.4, Photo Set <=1.4, DEXA metrics <=0.5, Scan History <=1.3 pt, Dark = Light. DEXA chart scroll trap fixed (UI-proved). Real Founder photos NOT validated (needs Sandbox pairing credential; Founder said do not block); real image path validated with synthetic media. Unit 573/0 fail, D UI 3/3, B/C 11/11, Hub 3/3, Recovery 3/3, Release OK; testBriefingParityJourneys fails identically on base 8aa2d00b (pre-existing).",
-    "production_data_mutated": false,
-    "deployed": false,
-    "testflight_uploaded": false,
-    "build_number_bumped": false
+    "summary": "Workout reliability lane CLOSED (Batch 3 untouched). Server b7eb1e39 (2-C additive contextualProgressionRecommendations, includes UUID fix b5de242f) DEPLOYED: 6fa4e887 ACTIVE, web+worker source, /live, /ready, log gitSha verified, 0 errors. Read-only contract proof with the exact deployed functions over 245 sessions: field compiled in; today 0 entries (only 09-14 counts before today); from 2026-10-06 Leg Extension+Sissy superset entries 80x15 / 50x12 (recover, load-first rule); standalone unchanged. UUID link verified earlier (21:29:05Z). Native e9f8a957 unchanged (shape matches); preview 70ebf753: unit 2034/0, Watch 49/49, Release OK. No TestFlight, bump or release merge.",
+    "success": true,
+    "production_mutated": false,
+    "deployed": true,
+    "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Native e9f8a957: targeted 472/0; full 2025 with only the Build 87 Peptide baseline failure; Watch 49/49; Release OK. Preview 70ebf753 (Batch 2): full 2034/0, Watch 49/49, Release OK. Server: UUID 208/208; 2-C 51/51 core, 23 reds identical at base."
+      "summary": "Server focused 133/133, wider 23 reds identical at base; preview 70ebf753 full 2034/0, Watch 49/49, Release compile OK; known Watch UI NotYetReturns case pre-existing (not a gate)."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder review requested; no independent code review run."
+      "summary": "Founder review of closeout requested."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Read-only production probes (REPEATABLE READ READ ONLY + ROLLBACK); zero canonical writes 20:32Z-21:19Z after deploy."
+      "summary": "Read-only production contract probe (REPEATABLE READ READ ONLY, SELECT-only, ROLLBACK, fs/net writes denied); 2-C change is read-time projection only."
     }
   },
   "decisions_required": [
-    "Founder review/approval of Batch 3 Checkpoint D before Checkpoint E starts",
-    "Optional: provide a Sandbox pairing credential to finish real Founder photo validation (~5 min)",
-    "Concurrent lane (workout-reliability-founder-decisions-complete-20261005): workout reliability deploy/closeout per prompt b19faf1e; see its report",
-    "Concurrent lane, unchanged: Build 88 authorization for Batch 2 Native 793462b1 (report 20261005T150227Z)"
+    "Include Native e9f8a957 (preview 70ebf753) in the next authorized build",
+    "Optional product decision: should lower-load/higher-rep sessions count as regression (Server compares load first)?",
+    "Unchanged concurrent lanes: Batch 3 acceptance; Build 88 authorization for Batch 2 793462b1"
   ],
   "blockers": [],
-  "unexpected_findings": [],
+  "unexpected_findings": [
+    "Server progression compares load first, so today's 40x30 Leg Extensions read as below 09-14's 80x15 -> superset context recommends 'recover 80x15' from 2026-10-06 (pre-existing semantics, unchanged)"
+  ],
   "backlog": [
     "Watch Review/Confirmation Complete Set gating + timed-set projection (shared Watch mapper root)",
-    "Phone reply-before-side-effects / one projection build per command after next workout's correlatable logs"
+    "Phone reply-before-side-effects / one projection build per command, pending next real-workout latency evidence"
   ],
-  "recommended_next_step": "Review the Checkpoint D primary board; on approval Claude starts Checkpoint E (Add Evidence + generic Evidence Review) on the same branch.",
-  "full_report_path": "agent-handoffs/reports/20261005T213236Z-workout-reliability-watch-link-verified.md",
+  "recommended_next_step": "Integrate e9f8a957 via preview 70ebf753 into the next build authority when Build 88/89 is authorized.",
+  "full_report_path": "agent-handoffs/reports/20261005T215919Z-workout-reliability-closeout.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_chatgpt_retrieval": true
-  },
-  "publication": {
-    "source_work_branch": "claude/redesign-batch3-evidence-takeover-20261005",
-    "report_path": "agent-handoffs/reports/20261005T214520Z-redesign-batch3-claude-checkpoint-d.md",
-    "review_packages": [
-      "agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-d-20261005/ (work branch at 759d0dc947419647dbc85963de8eb0d9d19a4906)"
-    ],
-    "primary_boards": [
-      "https://github.com/dustinginn/physiqueos/blob/759d0dc947419647dbc85963de8eb0d9d19a4906/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-d-20261005/checkpoint-d-primary-mobile-review-board.png",
-      "https://github.com/dustinginn/physiqueos/blob/759d0dc947419647dbc85963de8eb0d9d19a4906/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-d-20261005/checkpoint-d-primary-mobile-review-board-light.png"
-    ]
-  },
-  "stop_reason": "Prompt requires a Founder review stop after Checkpoint D."
+  }
 }
