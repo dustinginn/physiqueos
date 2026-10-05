@@ -158,6 +158,10 @@ struct EvidenceHeaderView: View {
     let eyebrow: String
     let title: String
     let subtitle: String
+    /// Record pages (Photos, DEXA) keep the eyebrow, title and subtitle as
+    /// separate readable texts (`EVIDENCE REPORT`, `DEXA`); the Hub and
+    /// Timeline read the header as one combined element.
+    var exposesTexts = false
 
     private typealias S = EvidenceLockedStyle
 
@@ -171,7 +175,7 @@ struct EvidenceHeaderView: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(eyebrow)
+                Text(exposesTexts ? eyebrow.uppercased() : eyebrow)
                     .evidenceLockedText(S.eyebrow)
                     .foregroundStyle(S.accent)
                 Text(title)
@@ -191,7 +195,7 @@ struct EvidenceHeaderView: View {
         }
         .padding(.top, S.pt(3))
         .padding(.bottom, S.pt(17))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: exposesTexts ? .contain : .combine)
         .accessibilityIdentifier("evidence.header.\(title.lowercased())")
     }
 }

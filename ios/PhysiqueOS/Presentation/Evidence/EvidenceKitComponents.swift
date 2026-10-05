@@ -41,7 +41,7 @@ struct EvidencePageChrome: ViewModifier {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: {
                         Text("\(arrowBack ? "←" : "‹") \(backLabel)")
-                            .evidenceText(family == .training ? .normal(13, 750) : .normal(12, 750, jakarta: family.usesJakarta))
+                            .evidenceText(family == .training ? .normal(13, 750) : .normal(12, family == .record ? 700 : 750, jakarta: family.usesJakarta))
                             .foregroundStyle(m.c.muted)
                             .fixedSize()
                             .padding(.leading, m.pt(family == .training ? 1 : 3))
@@ -64,7 +64,8 @@ struct EvidencePageChrome: ViewModifier {
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 if family != .training {
-                    Rectangle().fill(m.c.line).frame(height: m.pt(1)).accessibilityHidden(true)
+                    // `.nav` border: the record harness mixes `--line` at 74%.
+                    Rectangle().fill(m.c.line.opacity(family == .record ? 0.74 : 1)).frame(height: m.pt(1)).accessibilityHidden(true)
                 }
             }
             .onAppear {
@@ -218,7 +219,26 @@ struct EvidenceScopePicker: View {
 
     var body: some View {
         let m = EvidenceMetrics(family: family)
-        if family == .training {
+        if family == .record {
+            // `.scope`: "Viewing Goal" and flat 9-px-radius pills; the
+            // selected pill is `surface2` with an inset 34% accent ring.
+            VStack(alignment: .leading, spacing: 0) {
+                Text("VIEWING GOAL")
+                    .evidenceText(.normal(9, 800, jakarta: false, tracking: 0.72, uppercase: true))
+                    .foregroundStyle(m.c.quiet)
+                    .padding(.bottom, m.pt(7))
+                VStack(alignment: .leading, spacing: m.pt(5)) {
+                    HStack(spacing: m.pt(5)) { ForEach(scope.options) { pill($0, m) } }
+                    if !scope.phaseOptions.isEmpty {
+                        HStack(spacing: m.pt(5)) { ForEach(scope.phaseOptions) { pill($0, m) } }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, m.pt(17))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("evidence.scope")
+        } else if family == .training {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Viewing")
                     .evidenceText(.normal(9, 800, tracking: 1.08, uppercase: true))
@@ -267,7 +287,7 @@ struct EvidenceScopePicker: View {
     @ViewBuilder
     private func pill(_ option: TrainingScopeOption, _ m: EvidenceMetrics) -> some View {
         let t = family == .training
-        let label = Text(option.label)
+        let label = family == .record ? AnyView(recordPill(option, m)) : AnyView(Text(option.label)
             .evidenceText(EvidenceTextStyle(size: 9, weight: t ? 750 : 800, lineHeight: 9))
             .foregroundStyle(option.selected ? m.c.page : m.c.muted)
             .padding(.horizontal, m.pt(9 + (t ? 0 : 1)))
@@ -276,7 +296,7 @@ struct EvidenceScopePicker: View {
             .overlay {
                 if !t { Capsule().strokeBorder(option.selected ? m.c.ink : m.c.line, lineWidth: m.pt(1)) }
             }
-            .evidenceHitTarget(visualHeight: m.pt(23))
+            .evidenceHitTarget(visualHeight: m.pt(23)))
         if let onSelect {
             Button { onSelect(option.id) } label: { label }
                 .buttonStyle(.plain)
@@ -285,6 +305,23 @@ struct EvidenceScopePicker: View {
         } else {
             label.accessibilityAddTraits(option.selected ? .isSelected : [])
         }
+    }
+
+    private func recordPill(_ option: TrainingScopeOption, _ m: EvidenceMetrics) -> some View {
+        Text(option.label)
+            .evidenceText(.normal(9, 780, jakarta: false))
+            .foregroundStyle(option.selected ? m.c.accent : m.c.quiet)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, m.pt(8))
+            .padding(.vertical, m.pt(7))
+            .background(option.selected ? m.c.surface2 : m.c.surface, in: RoundedRectangle(cornerRadius: m.pt(9)))
+            .overlay {
+                if option.selected {
+                    RoundedRectangle(cornerRadius: m.pt(9)).strokeBorder(m.c.accent.opacity(0.34), lineWidth: m.pt(1))
+                }
+            }
+            .evidenceHitTarget(visualHeight: m.pt(25))
     }
 }
 

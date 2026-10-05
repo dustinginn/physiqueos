@@ -691,3 +691,181 @@ final class EvidenceTrainingNutritionWeightUITests: XCTestCase {
     }
 }
 
+
+/// Batch 3 Checkpoint D: Progress Photos + DEXA journeys on the locked
+/// record surfaces. Synthetic review media (generated mannequin renders,
+/// Debug only) gives the inspector real pixels without Founder photos.
+@MainActor
+final class EvidencePhotosDEXAUITests: XCTestCase {
+    private let app = XCUIApplication()
+
+    override func setUp() async throws {
+        continueAfterFailure = false
+        app.launchArguments += [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.evidence-review.synthetic-photos",
+        ]
+        app.launch()
+        app.buttons["Evidence"].tap()
+        XCTAssertTrue(element("evidence.hub.all").waitForExistence(timeout: 10))
+    }
+
+    private func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    private func reveal(_ target: XCUIElement, maxSwipes: Int = 14) {
+        for _ in 0..<maxSwipes where !(target.exists && target.isHittable) {
+            app.swipeUp(velocity: .slow)
+        }
+        for _ in 0..<maxSwipes where !(target.exists && target.isHittable) {
+            app.swipeDown(velocity: .slow)
+        }
+        XCTAssertTrue(target.exists && target.isHittable, "Could not reveal \(target)")
+    }
+
+    private func open(stream id: String) {
+        let row = element("evidence.stream.\(id)")
+        reveal(row)
+        row.tap()
+    }
+
+    private func waitForValue(_ identifier: String, _ value: String, timeout: TimeInterval = 5) {
+        expectation(for: NSPredicate(format: "value == %@", value), evaluatedWith: element(identifier))
+        waitForExpectations(timeout: timeout)
+    }
+
+    func testPhotosRootDetailPagerSourceHistoryAndInspector() {
+        open(stream: "photos")
+        XCTAssertTrue(app.staticTexts["Progress Photos"].waitForExistence(timeout: 10))
+        XCTAssertTrue(element("evidence.back").exists)
+        XCTAssertEqual(element("evidence.back").label, "Evidence Hub")
+        XCTAssertTrue(element("photos.latestSet").exists)
+        XCTAssertTrue(element("photos.briefing.read").exists)
+        XCTAssertGreaterThanOrEqual(element("photos.briefing.read").frame.height, 44)
+
+        // Uploaded Photos expands and closes in place.
+        let toggle = element("photos.history.toggle")
+        reveal(toggle)
+        XCTAssertEqual(toggle.value as? String, "Collapsed")
+        toggle.tap()
+        waitForValue("photos.history.toggle", "Expanded")
+        element("photos.history.toggle").tap()
+        waitForValue("photos.history.toggle", "Collapsed")
+
+        // Latest Photo Set opens the large Photo Set sheet on the first pose.
+        let latest = element("photos.latestSet")
+        reveal(latest)
+        latest.tap()
+        XCTAssertTrue(element("photos.detail").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["PROGRESS PHOTO EVIDENCE"].exists)
+        XCTAssertTrue(app.staticTexts["Front Relaxed"].exists)
+        XCTAssertTrue(element("photos.detail.previous").exists, "Previous and Current are shown together")
+        XCTAssertTrue(element("photos.detail.current").exists)
+        XCTAssertFalse(element("photos.detail.previousPose").isEnabled, "First pose disables Previous")
+
+        // Source History expands in place.
+        let source = element("photos.detail.sourceHistory")
+        reveal(source)
+        XCTAssertEqual(source.value as? String, "Collapsed")
+        source.tap()
+        waitForValue("photos.detail.sourceHistory", "Expanded")
+
+        // Tapping Current opens the shared inspector at Current; Close dismisses it.
+        let current = element("photos.detail.current")
+        reveal(current)
+        current.tap()
+        let close = element("photoInspection.close")
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(close.frame.height, 44)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Front Relaxed · Current")).firstMatch.exists)
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 5))
+
+        // Next steps to the next canonical pose.
+        let next = element("photos.detail.nextPose")
+        reveal(next)
+        next.tap()
+        XCTAssertTrue(app.staticTexts["Back Relaxed"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("photos.detail.previousPose").isEnabled)
+
+        element("photos.detail.close").tap()
+        XCTAssertTrue(element("photos.detail").waitForNonExistence(timeout: 5))
+        XCTAssertTrue(element("photos.latestSet").exists)
+    }
+
+    func testDEXAOrderAndEveryIndependentDisclosure() {
+        open(stream: "dexa")
+        XCTAssertTrue(app.staticTexts["DEXA"].waitForExistence(timeout: 10))
+        let order = ["dexa.latestScan", "dexa.summary", "dexa.sincePriorScan", "dexa.coreTrends", "dexa.supplemental", "dexa.regionalLean", "dexa.regionalFat", "dexa.history"]
+        // Every locked section exists, and adjacent sections keep the locked
+        // order (compared while both are on screen).
+        for (upper, lower) in zip(order, order.dropFirst()) {
+            reveal(element(lower))
+            if element(upper).isHittable {
+                XCTAssertLessThan(element(upper).frame.minY, element(lower).frame.minY, "\(upper) before \(lower)")
+            }
+        }
+        // Core Trends is always open with five charts.
+        for title in ["Body Fat %", "Fat Mass", "Lean Mass", "Total Mass", "RMR"] {
+            let chart = element("dexa.chart.\(title)")
+            reveal(chart)
+            XCTAssertTrue(chart.exists, title)
+        }
+        for (toggleID, chartID) in [
+            ("dexa.supplemental.toggle", "dexa.supplemental.charts"),
+            ("dexa.regionalLean.toggle", "dexa.regionalLean.charts"),
+            ("dexa.regionalFat.toggle", "dexa.regionalFat.charts"),
+            ("dexa.history.toggle", nil as String?),
+        ] {
+            let toggle = element(toggleID)
+            reveal(toggle)
+            XCTAssertEqual(toggle.value as? String, "Collapsed", toggleID)
+            if let chartID { XCTAssertFalse(element(chartID).exists, "\(chartID) hidden while collapsed") }
+            toggle.tap()
+            waitForValue(toggleID, "Expanded")
+            if let chartID { XCTAssertTrue(element(chartID).waitForExistence(timeout: 5), chartID) }
+            reveal(element(toggleID))
+            element(toggleID).tap()
+            waitForValue(toggleID, "Collapsed")
+        }
+    }
+
+    /// The DEXA chart must never trap page scrolling: a tap selects, a
+    /// horizontal pan scrubs, and a vertical swipe that starts on the chart
+    /// scrolls the page.
+    func testDEXAChartTapScrubAndVerticalScroll() {
+        open(stream: "dexa")
+        let chart = element("dexa.chart.Body Fat %")
+        reveal(chart)
+        // Bring the chart to mid-screen so both drags start on it.
+        for _ in 0..<4 where chart.frame.midY > app.frame.height * 0.55 { app.swipeUp(velocity: .slow) }
+        let initial = chart.value as? String ?? ""
+        XCTAssertFalse(initial.isEmpty)
+        attach("1-default-latest-scan")
+
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)).tap()
+        let afterTap = chart.value as? String ?? ""
+        XCTAssertNotEqual(afterTap, initial, "Tap did not select another scan")
+        attach("2-after-tap")
+
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
+            .press(forDuration: 0, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)), withVelocity: .slow, thenHoldForDuration: 0.1)
+        XCTAssertNotEqual(chart.value as? String ?? "", afterTap, "Horizontal scrub did not change the selection")
+        attach("3-after-horizontal-scrub")
+
+        let section = element("dexa.coreTrends")
+        let top = section.frame.minY
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -2.5)), withVelocity: .fast, thenHoldForDuration: 0)
+        XCTAssertLessThan(section.frame.minY, top - 100, "A vertical swipe starting on the DEXA chart did not scroll the page")
+        attach("4-after-vertical-swipe-on-chart")
+    }
+
+    private func attach(_ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "dexa-chart-\(name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}

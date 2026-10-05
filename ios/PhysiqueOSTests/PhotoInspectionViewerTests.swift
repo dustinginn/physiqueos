@@ -67,7 +67,7 @@ final class PhotoInspectionViewerTests: XCTestCase {
         }
         for surface in ["Presentation/Briefings/PhotoBriefingSections.swift", "Presentation/Evidence/PhotoSetDetailView.swift"] {
             let source = try read(surface)
-            XCTAssertTrue(source.contains(".photoInspection($inspection)"), surface)
+            XCTAssertTrue(source.contains(".photoInspection($inspection"), surface)
             XCTAssertTrue(source.contains(".inspectsPhoto("), surface)
         }
         let viewer = try read("SharedUI/PhotoInspectionViewer.swift")

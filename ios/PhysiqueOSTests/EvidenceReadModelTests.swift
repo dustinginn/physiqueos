@@ -167,4 +167,37 @@ final class EvidenceReadModelTests: XCTestCase {
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(EvidenceHubReadModel.self, from: data)
     }
+
+    // MARK: - Batch 3 Checkpoint D record family
+
+    func testRecordFamilyIsTheSFPro360HarnessWithItsOwnPalette() {
+        XCTAssertEqual(EvidenceFamily.record.harnessWidth, 360)
+        XCTAssertFalse(EvidenceFamily.record.usesJakarta)
+        XCTAssertEqual(EvidenceFamily.record.pt(360), 402, accuracy: 0.001)
+        XCTAssertTrue(EvidenceFamily.training.usesJakarta)
+        XCTAssertTrue(EvidenceFamily.daily.usesJakarta)
+        XCTAssertFalse(EvidenceFamily.weight.usesJakarta)
+    }
+
+    func testRecordDatesUseTheLongFormAndNeverInventALabel() {
+        XCTAssertEqual(RecordDate.long("2026-08-30"), "Aug 30, 2026")
+        XCTAssertEqual(RecordDate.long(shortLabel: "Aug 16", before: "2026-08-30"), "Aug 16, 2026")
+        // A prior capture later in the calendar than the current one is the
+        // previous year's.
+        XCTAssertEqual(RecordDate.long(shortLabel: "Dec 28", before: "2027-01-04"), "Dec 28, 2026")
+        XCTAssertEqual(RecordDate.long(shortLabel: "No prior matching pose", before: "2026-08-30"), "No prior matching pose")
+        XCTAssertEqual(RecordDate.long(shortLabel: "Prior image unavailable", before: "2026-08-30"), "Prior image unavailable")
+    }
+
+    func testRecordMinContentWidthIsTheLongestWord() {
+        let show = RecordText.minContentWidth("Show All", RecordText.action)
+        let showOnly = RecordText.minContentWidth("Show", RecordText.action)
+        XCTAssertEqual(show, showOnly, accuracy: 0.5)
+        XCTAssertGreaterThan(RecordText.minContentWidth("Close", RecordText.action), 0)
+    }
+
+    func testDEXASincePriorScanKeepsTheCanonicalColumnOrder() {
+        XCTAssertEqual(DEXAHistoryView.sincePriorScanColumnLabels, ["Body Fat", "Fat Mass", "Lean Mass"])
+    }
 }
+

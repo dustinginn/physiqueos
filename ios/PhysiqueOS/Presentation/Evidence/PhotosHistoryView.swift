@@ -14,42 +14,30 @@ import SwiftUI
 /// remains an honest labeled placeholder fallback.
 struct PhotosHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: PhotosHistoryViewModel?
     @State private var viewModelAuthority: NativeAPIEnvironment?
-    @State private var isHistoryExpanded = false
+    @State private var isHistoryExpanded = Self.reviewHistoryExpanded
     @State private var selectedPhotoSet: PhotoSetRecord?
+    @State private var didOpenReviewDetail = false
+    @ScaledMetric(relativeTo: .caption) private var tagScale: CGFloat = 1
 
     static let historyPreviewLimit = 3
+    private let m = EvidenceMetrics(family: .record)
 
     var body: some View {
         ScrollView {
-            content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+            VStack(alignment: .leading, spacing: 0) {
+                content
+            }
+            .padding(.horizontal, m.pt(15))
+            .padding(.top, m.pt(14))
+            .padding(.bottom, m.pt(42))
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Evidence Hub")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .defaultScrollAnchor(Self.reviewScrollAnchor)
+        .evidencePageChrome("Progress Photos")
+        .evidenceFamily(.record)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = PhotosHistoryViewModel(
@@ -80,14 +68,9 @@ struct PhotosHistoryView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStateCard(kind: .loading("Loading Progress Photos…"), identifier: "photos.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "photos.failure")
         case .loaded(let landing):
             let displayed = environment.nativeAuthority == .sandbox
                 ? (environment.founderPhotoMediaStore.projectedLanding(
@@ -95,127 +78,132 @@ struct PhotosHistoryView: View {
                     scope: viewModel?.scope ?? PhotosScopeDefault.selection
                 ) ?? landing)
                 : landing
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: displayed)
-                TrainingScopeSelectorView(scope: displayed.scope) { pillID in
-                    Task { await viewModel?.selectScope(pillID: pillID) }
-                }
+            EvidenceHeaderView(
+                symbol: "P",
+                eyebrow: "Evidence Report",
+                title: displayed.title,
+                subtitle: displayed.subtitle ?? "What PhysiqueOS currently understands.",
+                exposesTexts: true
+            )
+            EvidenceScopePicker(scope: displayed.scope) { pillID in
+                Task { await viewModel?.selectScope(pillID: pillID) }
+            }
+            if !Self.reviewHidesLatest {
                 latestSetCard(displayed.latestSet)
                 if let set = displayed.latestSet {
                     photoBriefingEntry(for: set)
                 }
-                historyCard(displayed.history)
             }
+            historyCard(displayed.history)
+                .onAppear { openReviewDetailIfRequested(displayed) }
         }
     }
 
-    private func header(for landing: PhotosLandingReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: landing.tone, size: .lg, isCircular: true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text(landing.title)
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(landing.subtitle ?? "What PhysiqueOS currently understands.")
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
+    /// `Latest Photo Set`: the first canonical pose as a 92 × 118 thumbnail
+    /// beside the set date, view count, comparison availability and Open
+    /// gallery. The whole module opens the set.
     private func latestSetCard(_ set: PhotoSetRecord?) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                if let set {
-                    // Not a Button: a photo tile's own Retry is a Button, and a Button
-                    // nested in another Button's label never receives its tap.
-                    HStack(alignment: .top, spacing: 14) {
-                        if let first = set.views.sorted(by: { $0.poseId.order < $1.poseId.order }).first {
-                            ProgressPhotoTile(
-                                roleLabel: first.poseId.label,
-                                source: environment.photoMediaSource(for: first),
-                                showsRoleLabel: false
-                            )
-                            .frame(width: 92, height: 118)
-                        }
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("LATEST PHOTO SET")
-                                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
-                                Spacer(minLength: 4)
-                                StatusChip(text: "\(set.views.count) views", color: .primary)
-                            }
-                            Text(TrainingDateFormatting.short(set.date))
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            if let weightLabel = set.weightLabel {
-                                Text(weightLabel)
-                                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            }
-                            Text("Compared against: \(set.comparisonAvailability)")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            Text("Open gallery →")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.accent)
-                        }
+        RecordCard {
+            if let set {
+                // Not a Button: a photo tile's own Retry is a Button, and a Button
+                // nested in another Button's label never receives its tap.
+                HStack(alignment: .top, spacing: m.pt(14)) {
+                    if let first = set.views.sorted(by: { $0.poseId.order < $1.poseId.order }).first {
+                        ProgressPhotoTile(
+                            roleLabel: first.poseId.label,
+                            source: environment.photoMediaSource(for: first),
+                            showsRoleLabel: false,
+                            style: .record,
+                            cornerRadius: m.pt(10)
+                        )
+                        .frame(width: m.pt(92), height: m.pt(118))
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture { selectedPhotoSet = set }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(TrainingDateFormatting.short(set.date)) photo set. \(set.weightLabel ?? ""). Compared against \(set.comparisonAvailability).")
-                    .accessibilityAddTraits(.isButton)
-                } else {
-                    Text("Photo sets will appear here once matching photos are uploaded.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    VStack(alignment: .leading, spacing: 0) {
+                        RecordShrinkRow(spacing: m.pt(8), minimumWidths: [
+                            RecordText.minContentWidth("Latest Photo Set", RecordText.eyebrow, scale: tagScale) + m.pt(1.43),
+                            RecordText.minContentWidth("\(set.views.count) views", RecordText.tag, scale: tagScale) + m.pt(16),
+                        ]) {
+                            RecordGreedyText(text: "LATEST PHOTO SET", style: RecordText.eyebrow, color: m.c.accent)
+                                // CSS letter-spacing also follows the last glyph.
+                                .padding(.trailing, m.pt(1.43))
+                            RecordTag(text: "\(set.views.count) views")
+                        }
+                        .padding(.bottom, m.pt(9))
+                        Text(RecordDate.long(set.date))
+                            .evidenceText(.normal(20, 800, jakarta: false, tracking: -0.3, relativeTo: .title3))
+                            .foregroundStyle(m.c.ink)
+                        if let weightLabel = set.weightLabel {
+                            Text(weightLabel)
+                                .evidenceText(RecordText.rowCopy)
+                                .foregroundStyle(m.c.muted)
+                                .padding(.top, m.pt(4))
+                        }
+                        Text("Compared against: \(set.comparisonAvailability)")
+                            .evidenceText(RecordText.rowCopy)
+                            .foregroundStyle(m.c.quiet)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, m.pt(7))
+                        Text("Open gallery →")
+                            .evidenceText(RecordText.action)
+                            .foregroundStyle(m.c.accent)
+                            .padding(.top, m.pt(13))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { selectedPhotoSet = set }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Latest photo set, \(RecordDate.long(set.date)). \(set.views.count) views. \(set.weightLabel.map { "\($0). " } ?? "")Compared against \(set.comparisonAvailability).")
+                .accessibilityHint("Opens the gallery.")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("photos.latestSet")
+            } else {
+                Text("Photo sets will appear here once matching photos are uploaded.")
+                    .evidenceText(RecordText.body)
+                    .foregroundStyle(m.c.muted)
             }
         }
+        .padding(.bottom, m.pt(17))
     }
 
+    /// `Uploaded Photos`: one independent Show All / Close disclosure over
+    /// thumbnail records (preview 3, newest first).
     private func historyCard(_ history: [PhotoSetRecord]) -> some View {
         let preview = Array(history.prefix(Self.historyPreviewLimit))
-        return CardContainer {
-            PhotosDisclosureRow(isExpanded: $isHistoryExpanded) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Uploaded Photos")
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text("Tap any record to inspect the original image and comparison context.")
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                    Spacer(minLength: 8)
-                    Text(isHistoryExpanded ? "Close" : "Show All")
-                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+        return RecordCard {
+            VStack(alignment: .leading, spacing: 0) {
+                RecordDisclosureHead(
+                    title: "Uploaded Photos",
+                    subtitle: "Tap any record to inspect the original image and comparison context.",
+                    isExpanded: isHistoryExpanded,
+                    identifier: "photos.history.toggle"
+                ) {
+                    withAnimation(.easeInOut(duration: 0.2)) { isHistoryExpanded.toggle() }
                 }
-            } expanded: {
                 if history.isEmpty {
                     Text("No photo sets available for this period.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .evidenceText(RecordText.body)
+                        .foregroundStyle(m.c.muted)
+                        .padding(.top, m.pt(12))
                 } else {
-                    VStack(spacing: 8) {
+                    VStack(spacing: m.pt(8)) {
                         ForEach(isHistoryExpanded ? history : preview) { set in
                             // Not a Button: the row's thumbnail carries its own Retry.
                             PhotoSetHistoryRow(set: set)
                                 .contentShape(Rectangle())
                                 .onTapGesture { selectedPhotoSet = set }
                                 .accessibilityAddTraits(.isButton)
+                                .accessibilityIdentifier("photos.history.\(set.id)")
                         }
                     }
+                    .padding(.top, m.pt(12))
+                    .padding(.bottom, m.pt(8))
                 }
             }
         }
+        .padding(.bottom, m.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("photos.history")
     }
 
     /// Production shows the actionable destination only once the Server reports the
@@ -228,20 +216,22 @@ struct PhotosHistoryView: View {
             case .published(let artifactId):
                 readPhotoBriefingLink(briefingID: artifactId)
             case .pending:
-                CardContainer(padding: .sm) {
-                    HStack(alignment: .top, spacing: 10) {
-                        ProgressView().tint(PhysiqueOSTheme.accent)
-                        VStack(alignment: .leading, spacing: 4) {
+                RecordCard {
+                    HStack(alignment: .top, spacing: m.pt(10)) {
+                        RecordSpinner()
+                        VStack(alignment: .leading, spacing: m.pt(3)) {
                             Text("Photo Briefing is being prepared")
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .evidenceText(RecordText.rowLabel)
+                                .foregroundStyle(m.c.ink)
                             Text("Your photos were received. The briefing will appear here when it is ready. No action needed.")
-                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .evidenceText(RecordText.rowCopy)
+                                .foregroundStyle(m.c.quiet)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .padding(.bottom, m.pt(17))
+                .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("photos.briefing.pending")
             case .unknown:
                 EmptyView()
@@ -251,15 +241,18 @@ struct PhotosHistoryView: View {
         }
     }
 
+    /// `.primary-action`: full-width 52-px accent action.
     private func readPhotoBriefingLink(briefingID: String) -> some View {
         NavigationLink(value: AppDestination.briefingDetail(briefingId: briefingID)) {
             Text("Read Photo Briefing")
-                .physiqueOSFont(PhysiqueOSTypography.primaryActionLabel)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .background(PhysiqueOSTheme.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .evidenceText(.normal(13, 850, jakarta: false, relativeTo: .headline))
+                .foregroundStyle(Color(red: 0x14 / 255, green: 0x20 / 255, blue: 0x0F / 255))
+                .frame(maxWidth: .infinity, minHeight: m.pt(52))
+                .background(m.c.accent, in: RoundedRectangle(cornerRadius: m.pt(14)))
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .padding(.bottom, m.pt(17))
         .accessibilityIdentifier("photos.briefing.read")
     }
 
@@ -274,63 +267,133 @@ struct PhotosHistoryView: View {
         // stable pose identity.
         return photoBriefings.max(by: { ($0.photo?.eventDate ?? "") < ($1.photo?.eventDate ?? "") })?.id
     }
+
+    private func openReviewDetailIfRequested(_ landing: PhotosLandingReadModel) {
+        #if DEBUG
+        guard !didOpenReviewDetail, ProcessInfo.processInfo.arguments.contains("-physiqueos.evidence-review.photo-detail") else { return }
+        didOpenReviewDetail = true
+        selectedPhotoSet = landing.latestSet
+        #endif
+    }
 }
 
+private extension PhotosHistoryView {
+    static var reviewScrollAnchor: UnitPoint? {
+        #if DEBUG
+        EvidenceRedesignReview.scrollsToBottom ? .bottom : nil
+        #else
+        nil
+        #endif
+    }
+
+    /// Review-only: P2 shows the expanded Uploaded Photos directly under the
+    /// scope selector.
+    static var reviewHistoryExpanded: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-physiqueos.evidence-review.photos-expanded")
+        #else
+        false
+        #endif
+    }
+
+    static var reviewHidesLatest: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-physiqueos.evidence-review.photos-expanded")
+        #else
+        false
+        #endif
+    }
+}
+
+/// `.history-row`: 68 × 82 first-pose thumbnail, date, view count,
+/// comparison availability and `View`, on `surface2`.
 private struct PhotoSetHistoryRow: View {
     @Environment(AppEnvironment.self) private var environment
     let set: PhotoSetRecord
+    private let m = EvidenceMetrics(family: .record)
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: m.pt(10)) {
             if let representative = set.views.sorted(by: { $0.poseId.order < $1.poseId.order }).first {
                 ProgressPhotoTile(
                     roleLabel: representative.poseId.label,
                     source: environment.photoMediaSource(for: representative),
-                    showsRoleLabel: false
+                    showsRoleLabel: false,
+                    style: .record,
+                    cornerRadius: m.pt(10)
                 )
-                .frame(width: 68, height: 82)
+                .frame(width: m.pt(68), height: m.pt(82))
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(TrainingDateFormatting.short(set.date))
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(RecordDate.long(set.date))
+                    .evidenceText(RecordText.rowLabel)
+                    .foregroundStyle(m.c.ink)
                 if let weightLabel = set.weightLabel {
                     Text(weightLabel)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .evidenceText(RecordText.rowCopy)
+                        .foregroundStyle(m.c.quiet)
+                        .padding(.top, m.pt(3))
                 }
-                Text("\(set.views.count) views · Compared against: \(set.comparisonAvailability)")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                Text("\(set.views.count) views")
+                    .evidenceText(RecordText.rowCopy)
+                    .foregroundStyle(m.c.quiet)
+                    .padding(.top, m.pt(3))
+                Text(set.comparisonAvailability)
+                    .evidenceText(RecordText.rowCopy)
+                    .foregroundStyle(m.c.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, m.pt(3))
             }
-            Spacer(minLength: 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
             Text("View")
-                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .evidenceText(RecordText.rowLabel)
+                .foregroundStyle(m.c.ink)
         }
-        .padding(14)
+        .padding(m.pt(10))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(12)))
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(RecordDate.long(set.date)) photo set. \(set.views.count) views. \(set.comparisonAvailability).")
     }
 }
 
 private struct PhotoEvidenceDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     let set: PhotoSetRecord
+    private let m = EvidenceMetrics(family: .record)
 
     var body: some View {
         NavigationStack {
             PhotoSetDetailView(setId: set.id)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(m.c.page, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Close") { dismiss() }
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    ToolbarItem(placement: .principal) {
+                        Text("Photo Set")
+                            .evidenceText(.normal(12, 800, jakarta: false))
+                            .foregroundStyle(m.c.ink)
+                            .accessibilityAddTraits(.isHeader)
                     }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { dismiss() } label: {
+                            Text("Close")
+                                .evidenceText(.normal(12, 800, jakarta: false))
+                                .foregroundStyle(m.c.accent)
+                                .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("photos.detail.close")
+                    }
+                    .evidenceFlatToolbarItem()
+                }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    Rectangle().fill(m.c.line.opacity(0.74)).frame(height: m.pt(1)).accessibilityHidden(true)
                 }
         }
+        .environment(\.evidenceBackTrail, nil)
+        .evidenceFamily(.record)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }

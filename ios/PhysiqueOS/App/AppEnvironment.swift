@@ -875,6 +875,11 @@ final class AppEnvironment {
     @MainActor
     func photoMediaSource(for view: PhotoViewRecord) -> PhotoMediaSource {
         if let mediaId = view.mediaId { return .authenticatedProduction(mediaId: mediaId) }
+        #if DEBUG
+        if SyntheticProgressPhoto.isEnabled {
+            return .assetName(SyntheticProgressPhoto.name(poseId: view.poseId, date: view.captureDate))
+        }
+        #endif
         return founderPhotoMediaStore.source(viewIdentity: view.id)
     }
 }

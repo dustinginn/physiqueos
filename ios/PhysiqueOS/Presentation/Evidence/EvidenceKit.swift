@@ -23,16 +23,20 @@ enum EvidenceFamily {
     case training
     case daily
     case weight
+    /// Progress Photos + DEXA (`photos-dexa-evidence-founder-parity-correction`):
+    /// the 360-px SF Pro record harness shared with the Hub and Timeline.
+    case record
 
     var harnessWidth: CGFloat {
         switch self {
         case .training: 390
         case .daily: 379
         case .weight: 372
+        case .record: 360
         }
     }
 
-    var usesJakarta: Bool { self != .weight }
+    var usesJakarta: Bool { self == .training || self == .daily }
 
     /// CSS px → pt for this family's harness.
     func pt(_ px: CGFloat) -> CGFloat { px * 402 / harnessWidth }
@@ -42,6 +46,7 @@ enum EvidenceFamily {
         case .training: .training
         case .daily: .daily
         case .weight: .weight
+        case .record: .record
         }
     }
 }
@@ -177,6 +182,39 @@ struct EvidencePalette {
         amberSoft: d(0xF4B860, 0xAD641C, 0.14, 0.12),
         red: d(0xFF8177, 0xB94A42),
         redSoft: d(0xFF8177, 0xB94A42, 0.14, 0.12),
+        blue: d(0x6BB7FF, 0x246FAD),
+        protein: d(0xFB7185, 0xB83C57),
+        carbs: d(0xFBBF24, 0x9D6808),
+        fat: d(0x38BDF8, 0x14769F),
+        breakfast: d(0xF7CF7B, 0x9D6709),
+        lunch: d(0x7BD7C8, 0x19756B),
+        dinner: d(0xB69CF3, 0x684DA0),
+        snacks: d(0xFB9C8C, 0xA84B3E)
+    )
+
+    /// `.record` — Photos + DEXA (`source/evidence.css`). `muted` is the
+    /// harness `--sub`, `quiet` its `--muted`; `purple` is `--violet`.
+    static let record = EvidencePalette(
+        page: d(0x0A141E, 0xF7F3E9),
+        surface: d(0x101E2A, 0xEEE9DE),
+        surface2: d(0x172733, 0xE4DED2),
+        surface3: d(0x1D303E, 0xDAD3C6),
+        line: d(0x263947, 0xC7C0B3),
+        ink: d(0xF4F1E9, 0x162028),
+        muted: d(0xBDC6C9, 0x46535B),
+        quiet: d(0x87969D, 0x69767C),
+        accent: d(0xB9E467, 0x467221),
+        accentSoft: d(0xB9E467, 0x467221, 0.14, 0.14),
+        teal: d(0x68D391, 0x28744A),
+        tealSoft: d(0x68D391, 0x28744A, 0.14, 0.14),
+        purple: d(0xB68CFF, 0x7350AF),
+        purpleSoft: d(0xB68CFF, 0x7350AF, 0.14, 0.14),
+        green: d(0x68D391, 0x28744A),
+        greenSoft: d(0x68D391, 0x28744A, 0.14, 0.14),
+        amber: d(0xF4B860, 0xA75F18),
+        amberSoft: d(0xF4B860, 0xA75F18, 0.14, 0.14),
+        red: d(0xFF8177, 0xB94A42),
+        redSoft: d(0xFF8177, 0xB94A42, 0.14, 0.14),
         blue: d(0x6BB7FF, 0x246FAD),
         protein: d(0xFB7185, 0xB83C57),
         carbs: d(0xFBBF24, 0x9D6808),
