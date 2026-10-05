@@ -126,13 +126,14 @@ struct NutritionReportingView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("nutrition.report.range.\(range.id)")
             }
         }
         .padding(.bottom, m.pt(9))
     }
 
     /// Bare bordered pill row (macro / meal-slot selectors).
-    private func pillRow<Option: Identifiable>(_ options: [Option], selected: Option.ID, label: @escaping (Option) -> String, onSelect: @escaping (Option) -> Void) -> some View {
+    private func pillRow<Option: Identifiable>(_ options: [Option], selected: Option.ID, identifier: String, label: @escaping (Option) -> String, onSelect: @escaping (Option) -> Void) -> some View {
         HStack(spacing: m.pt(6)) {
             ForEach(options) { option in
                 let isSelected = option.id == selected
@@ -148,6 +149,7 @@ struct NutritionReportingView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("\(identifier).\(label(option))")
             }
         }
     }
@@ -219,6 +221,7 @@ struct NutritionReportingView: View {
             row: { row in
                 NavigationLink(value: AppDestination.nutritionDay(dayId: row.id)) { NutritionDailyCalorieRowView(row: row) }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("nutrition.report.day.\(row.id)")
             }
         )
     }
@@ -227,10 +230,11 @@ struct NutritionReportingView: View {
 
     @ViewBuilder
     private func macrosContent(_ report: NutritionMacrosReport) -> some View {
-        pillRow(NutritionMacroKey.allCases, selected: report.selectedMacro.id, label: { $0.label }) { macro in
+        pillRow(NutritionMacroKey.allCases, selected: report.selectedMacro.id, identifier: "nutrition.report.macro", label: { $0.label }) { macro in
             Task { await viewModel?.selectMacro(macro) }
         }
         .padding(.bottom, m.pt(14 - 16))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("nutrition.report.macroSelector")
         periodSummarySection(report.periodSummary, targetLabel: report.targetLabel)
         EvidenceSection(title: "Macro Distribution", style: .containedDeep, identifier: "nutrition.report.macroDistribution") {
@@ -277,6 +281,7 @@ struct NutritionReportingView: View {
             row: { row in
                 NavigationLink(value: AppDestination.nutritionDay(dayId: row.id)) { NutritionDailyMacroRowView(row: row, selectedMacro: report.selectedMacro) }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("nutrition.report.day.\(row.id)")
             }
         )
     }
@@ -299,7 +304,7 @@ struct NutritionReportingView: View {
         }
         EvidenceSection(title: "Meal Macro Mix", style: .containedDeep, identifier: "nutrition.report.mealMacroMix") {
             VStack(alignment: .leading, spacing: 0) {
-                pillRow(NutritionMealSlotFilter.allCases.filter { $0 != .all }, selected: report.selectedMacroMixSlot.id, label: { $0.label }) { slot in
+                pillRow(NutritionMealSlotFilter.allCases.filter { $0 != .all }, selected: report.selectedMacroMixSlot.id, identifier: "nutrition.report.mixSlot", label: { $0.label }) { slot in
                     Task { await viewModel?.selectMealMacroMixSlot(slot) }
                 }
                 .padding(.bottom, m.pt(10))
@@ -313,7 +318,7 @@ struct NutritionReportingView: View {
         EvidenceSection(title: "Meal Trends Over Time", style: .containedDeep, identifier: "nutrition.report.mealTrend") {
             VStack(alignment: .leading, spacing: 0) {
                 sectionNote("One selected weekly meal metric across the selected period.")
-                pillRow(NutritionMealSlotFilter.allCases, selected: report.selectedTrendSlot.id, label: { $0.label }) { slot in
+                pillRow(NutritionMealSlotFilter.allCases, selected: report.selectedTrendSlot.id, identifier: "nutrition.report.trendSlot", label: { $0.label }) { slot in
                     Task { await viewModel?.selectMealTrendSlot(slot) }
                 }
                 .padding(.bottom, m.pt(9))
@@ -346,6 +351,7 @@ struct NutritionReportingView: View {
             row: { group in
                 NavigationLink(value: AppDestination.nutritionDay(dayId: group.dayId)) { NutritionMealHistoryGroupRow(group: group) }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("nutrition.report.day.\(group.dayId)")
             }
         )
     }
@@ -368,9 +374,15 @@ struct NutritionReportingView: View {
             .evidenceHitTarget(visualHeight: m.pt(25))
         }
         .accessibilityLabel("Metric: \(selected.label)")
+        .accessibilityIdentifier("nutrition.report.metricSelector")
     }
 
     // MARK: - Shared open-list section (3-row preview + Show All sheet)
+
+    /// `nutrition.report.rows.recent-daily-calories` etc.
+    static func rowsIdentifier(_ title: String) -> String {
+        "nutrition.report.rows." + title.lowercased().split(separator: " ").joined(separator: "-")
+    }
 
     private func rowsSection<Row: Identifiable, Content: View>(
         title: String, rows: [Row], isPresented: Binding<Bool>, emptyMessage: String,
@@ -382,6 +394,7 @@ struct NutritionReportingView: View {
                 if rows.count > Self.previewLimit {
                     Button { isPresented.wrappedValue = true } label: { EvidenceSectionAction(label: "Show All >") }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("\(Self.rowsIdentifier(title)).showAll")
                 }
             }
             if preview.isEmpty {
@@ -392,6 +405,8 @@ struct NutritionReportingView: View {
                 EvidenceDailyOpenList(data: preview) { item in row(item) }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(Self.rowsIdentifier(title))
         .sheet(isPresented: isPresented) {
             NutritionReportListSheet(title: title) {
                 EvidenceDailyOpenList(data: rows) { item in row(item) }

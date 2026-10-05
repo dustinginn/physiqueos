@@ -357,8 +357,11 @@ private struct TrainingAreaTile: View {
 
     var body: some View {
         HStack(spacing: m.pt(8)) {
-            Text(TrainingAreaIcon.glyph(for: area.id))
-                .evidenceText(.normal(10, 400))
+            Image(systemName: TrainingAreaIcon.systemImage(for: area.id))
+                .resizable()
+                .fontWeight(.medium)
+                .scaledToFit()
+                .frame(width: m.pt(TrainingAreaIcon.glyphBox), height: m.pt(TrainingAreaIcon.glyphBox))
                 .foregroundStyle(m.c.muted)
                 .frame(width: m.pt(22), height: m.pt(22))
                 .overlay(Circle().strokeBorder(m.c.line, lineWidth: m.pt(1)))
@@ -477,16 +480,12 @@ struct TrainingCompactActionLabel: View {
     }
 }
 
-/// `getTrainingAreaIcon` (`ProgressPlaceholderScreen.jsx:1041-1056`) —
-/// verified against the exact lucide icon per area, then mapped to the
-/// closest faithful SF Symbol equivalent (not a generic fitness-icon
-/// guess). `Dumbbell`→`dumbbell.fill`, `Activity`→`waveform.path.ecg`,
-/// `Shield`→`shield.fill`, `Flame`→`flame.fill`, and `Zap`→`bolt.fill` are
-/// all direct concept matches. `CircleDot` (Chest) is a ring with a small
-/// filled center dot — `smallcircle.filled.circle` is SF Symbols' own
-/// literal equivalent of that exact shape; the previously-shipped
-/// `circle.circle.fill` (concentric filled circles) was a mismatch,
-/// corrected here.
+/// The Training Area icon system. SF Symbols has no muscle-anatomy
+/// glyphs, so every area uses one consistent metaphor: the native SF
+/// fitness figure (or equipment) for a movement that primarily trains that
+/// area. Biceps and Triceps deliberately share the arm-oriented dumbbell.
+/// The icon sits in the locked T1 22-pt ring tile mark; only the glyph
+/// content changed from the harness's abstract marks (◉ ⌁ ◌ …).
 enum TrainingAreaIcon {
     /// The 10 canonical muscle-group Training Area ids, in
     /// `TRAINING_AREA_NAV_GROUPS` order. Also doubles as the set
@@ -501,30 +500,22 @@ enum TrainingAreaIcon {
         "core", "quads", "hamstrings", "glutes", "calves",
     ]
 
-    /// The locked T1 tile marks (Training harness glyphs).
-    static func glyph(for areaId: String) -> String {
-        switch areaId {
-        case "chest": "◉"
-        case "back", "shoulders": "⌁"
-        case "biceps", "triceps": "◌"
-        case "core": "◇"
-        case "quads": "⚡"
-        case "hamstrings": "⌇"
-        case "glutes": "◒"
-        case "calves": "∿"
-        default: "◌"
-        }
-    }
+    /// Every glyph is fitted into this square inside the 22-pt ring
+    /// (before harness scaling), so wide figures (Core, the dumbbell) keep
+    /// the same clearance from the ring as the upright ones.
+    static let glyphBox: CGFloat = 12
 
     static func systemImage(for areaId: String) -> String {
         switch areaId {
-        case "chest": "smallcircle.filled.circle" // CircleDot
-        case "back", "biceps", "triceps": "dumbbell.fill" // Dumbbell
-        case "shoulders", "hamstrings": "waveform.path.ecg" // Activity
-        case "core": "shield.fill" // Shield
-        case "glutes": "flame.fill" // Flame
-        case "quads": "bolt.fill" // Zap
-        case "calves": "waveform.path.ecg" // Activity
+        case "chest": "figure.strengthtraining.traditional" // barbell press
+        case "back": "figure.rower" // row / pull
+        case "shoulders": "figure.mixed.cardio" // arms overhead
+        case "biceps", "triceps": "dumbbell.fill" // arm work
+        case "core": "figure.core.training" // floor core work
+        case "quads": "figure.strengthtraining.functional" // loaded lunge
+        case "hamstrings": "figure.flexibility" // hinge / hamstring reach
+        case "glutes": "figure.step.training" // step-up / hip extension
+        case "calves": "figure.run" // ankle push-off
         default: "dumbbell.fill"
         }
     }

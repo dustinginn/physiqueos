@@ -363,4 +363,39 @@ final class ActivityReadModelTests: XCTestCase {
         XCTAssertEqual(landing.activityHistory.first { $0.date == "2026-08-05" }?.attributedScope?.phaseName, "Establish Maintenance")
         XCTAssertEqual(landing.activityHistory.first { $0.date == "2026-08-30" }?.attributedScope?.phaseName, "Lean Mass Build")
     }
+
+    // MARK: - Batch 3 lower-page completeness and state behavior
+
+    /// Every lower Activity section the redesigned page renders has real
+    /// canonical content in the shipping fixture: areas, linked training,
+    /// and more than the 3-row preview of history (so Show All exists).
+    func testLandingCarriesEveryLowerPageSectionTheRedesignRenders() async throws {
+        let landing = try await api.fetchActivityLanding(scope: .all)
+        XCTAssertNotNil(landing.latestActivityDay)
+        XCTAssertFalse(landing.activityAreas.isEmpty)
+        XCTAssertFalse(landing.linkedTrainingContext.isEmpty)
+        XCTAssertGreaterThan(landing.activityHistory.count, ActivityHistoryView.historyPreviewLimit)
+    }
+
+    @MainActor
+    func testActivityViewModelsStartLoadingAndReportFailureOrEmptyHonestly() async {
+        let root = ActivityHistoryViewModel(api: FailingActivityAPI())
+        XCTAssertEqual(root.state, .loading)
+        await root.load()
+        XCTAssertEqual(root.state, .failed("Activity could not be loaded."))
+
+        let failedDay = ActivityDayViewModel(api: FailingActivityAPI(), date: "2026-08-30")
+        await failedDay.load()
+        XCTAssertEqual(failedDay.state, .failed("This activity day could not be loaded."))
+
+        let emptyDay = ActivityDayViewModel(api: api, date: "1999-01-01")
+        await emptyDay.load()
+        XCTAssertEqual(emptyDay.state, .loaded(nil))
+    }
+}
+
+private struct FailingActivityAPI: ActivityAPI {
+    struct Failure: Error {}
+    func fetchActivityLanding(scope: EvidenceScopeSelection) async throws -> ActivityLandingReadModel { throw Failure() }
+    func fetchActivityDay(date: String) async throws -> ActivityDayRecord? { throw Failure() }
 }

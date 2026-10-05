@@ -261,6 +261,7 @@ private struct ActivityHistorySheet: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("evidence.sheet.done")
                 }
                 .evidenceFlatToolbarItem()
                 ToolbarItem(placement: .principal) {
@@ -291,6 +292,7 @@ private struct ActivityHistoryRow: View {
         )
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) activity: \(day.value). \(day.protocolStatus)")
+        .accessibilityIdentifier("activity.history.day.\(day.date)")
     }
 }
 

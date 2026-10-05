@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 @testable import PhysiqueOS
 
@@ -371,16 +372,27 @@ final class TrainingReadModelTests: XCTestCase {
 
     // MARK: - Training icon mappings are centrally stable (Objective 2)
 
-    func testTrainingAreaIconMappingMatchesTheVerifiedWebIconVocabulary() {
-        // CircleDot (Chest) is a ring with a small filled center dot;
-        // smallcircle.filled.circle is SF Symbols' literal match — guards
-        // against the previous circle.circle.fill mismatch silently
-        // returning.
-        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "chest"), "smallcircle.filled.circle")
-        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "back"), "dumbbell.fill")
-        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "core"), "shield.fill")
-        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "glutes"), "flame.fill")
-        XCTAssertEqual(TrainingAreaIcon.systemImage(for: "quads"), "bolt.fill")
+    func testEveryCanonicalTrainingAreaHasAMeaningfulMovementIcon() {
+        let expected: [String: String] = [
+            "chest": "figure.strengthtraining.traditional",
+            "back": "figure.rower",
+            "shoulders": "figure.mixed.cardio",
+            "biceps": "dumbbell.fill",
+            "triceps": "dumbbell.fill",
+            "core": "figure.core.training",
+            "quads": "figure.strengthtraining.functional",
+            "hamstrings": "figure.flexibility",
+            "glutes": "figure.step.training",
+            "calves": "figure.run",
+        ]
+        XCTAssertEqual(Set(expected.keys), TrainingAreaIcon.canonicalAreaIds)
+        for (area, symbol) in expected {
+            XCTAssertEqual(TrainingAreaIcon.systemImage(for: area), symbol, area)
+            XCTAssertNotNil(UIImage(systemName: TrainingAreaIcon.systemImage(for: area)), "\(area) symbol must exist")
+        }
+        // Only the anatomically paired arm areas share an icon.
+        let symbols = TrainingAreaIcon.canonicalAreaIds.map { TrainingAreaIcon.systemImage(for: $0) }
+        XCTAssertEqual(Set(symbols).count, TrainingAreaIcon.canonicalAreaIds.count - 1)
     }
 
     func testTrainingAreaIconMappingFailsSafeToDumbbellForAnUnknownArea() {

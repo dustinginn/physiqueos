@@ -465,5 +465,229 @@ final class EvidenceTrainingNutritionWeightUITests: XCTestCase {
         XCTAssertEqual(element("weight.weeklyAverages.toggle").label, "Close")
         XCTAssertTrue(element("evidence.page.header").exists, "Show All expands in place")
     }
+
+    // MARK: - B/C regression proof: every drawer, route and filter
+
+    private func first(prefix: String, in container: XCUIElement? = nil) -> XCUIElement {
+        (container ?? app).descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
+    }
+
+    private func count(prefix: String, in container: XCUIElement? = nil) -> Int {
+        (container ?? app).descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).count
+    }
+
+    /// Taps the first row with `prefix` that is inside the open sheet
+    /// (below its Done bar), never a row of the page behind it.
+    private func tapSheetRow(prefix: String) {
+        let doneBottom = element("evidence.sheet.done").frame.maxY
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+        let row = (0..<rows.count).map { rows.element(boundBy: $0) }.first { $0.isHittable && $0.frame.minY > doneBottom }
+        XCTAssertNotNil(row, "No \(prefix) row in the sheet")
+        row?.tap()
+    }
+
+    private func sheetRowCount(prefix: String) -> Int {
+        let doneBottom = element("evidence.sheet.done").frame.maxY
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+        return (0..<rows.count).map { rows.element(boundBy: $0) }.filter { $0.frame.minY > doneBottom }.count
+    }
+
+    private func tapSheetDone() {
+        let done = element("evidence.sheet.done")
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        // iOS 26 draws a medium-detent sheet inset at 386/402 scale, so
+        // the 44-pt Done target measures 44 x 386/402 on screen.
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44 * 386 / 402 - 0.5)
+        done.tap()
+        XCTAssertTrue(done.waitForNonExistence(timeout: 5), "Sheet did not dismiss")
+    }
+
+    /// Selecting a different scope pill re-reads the canonical scope.
+    private func assertScopeSwitches() {
+        let scope = element("evidence.scope")
+        reveal(scope)
+        let pills = scope.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "evidence.scope."))
+        XCTAssertGreaterThanOrEqual(pills.count, 2)
+        let target = (0..<pills.count).map { pills.element(boundBy: $0) }.first { !$0.isSelected }!
+        let id = target.identifier
+        target.tap()
+        expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: element(id))
+        waitForExpectations(timeout: 10)
+    }
+
+    private func horizontalPan(across target: XCUIElement, atY y: CGFloat) {
+        let ny = y / app.frame.height
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: ny))
+            .press(forDuration: 0, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: ny)), withVelocity: .slow, thenHoldForDuration: 0.1)
+    }
+
+    func testActivityLowerPageIsCompleteAndEveryRouteWorks() {
+        open(stream: "activity")
+        for id in ["activity.latestDay", "activity.areas", "activity.linkedTraining", "activity.history"] {
+            reveal(element(id))
+        }
+        let history = element("activity.history")
+        XCTAssertEqual(count(prefix: "activity.history.day.", in: history), 3, "3-row preview")
+        // Preview row -> Activity Day -> back.
+        first(prefix: "activity.history.day.", in: history).tap()
+        XCTAssertTrue(element("activity.day.metrics").waitForExistence(timeout: 10))
+        assertBack("Activity")
+        element("evidence.back").tap()
+        XCTAssertTrue(element("activity.history").waitForExistence(timeout: 5))
+        // Show All -> full history sheet -> row -> Activity Day -> back -> Done.
+        let showAll = element("activity.history.showAll")
+        reveal(showAll)
+        showAll.tap()
+        XCTAssertTrue(element("evidence.sheet.done").waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(sheetRowCount(prefix: "activity.history.day."), 3, "Show All lists the full history")
+        tapSheetRow(prefix: "activity.history.day.")
+        XCTAssertTrue(element("activity.day.metrics").waitForExistence(timeout: 10))
+        element("evidence.back").tap()
+        tapSheetDone()
+        // Goal/phase scope still re-reads the page.
+        assertScopeSwitches()
+        XCTAssertTrue(element("activity.areas").exists)
+    }
+
+    func testNutritionRootHistoryDrawerAndScope() {
+        open(stream: "nutrition")
+        let history = element("nutrition.history")
+        reveal(history)
+        XCTAssertEqual(count(prefix: "nutrition.history.day.", in: history), 3)
+        first(prefix: "nutrition.history.day.", in: history).tap()
+        XCTAssertTrue(element("nutrition.day.meals").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("nutrition.day.summary").exists)
+        element("evidence.back").tap()
+        let showAll = element("nutrition.history.showAll")
+        reveal(showAll)
+        showAll.tap()
+        XCTAssertTrue(element("evidence.sheet.done").waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(sheetRowCount(prefix: "nutrition.history.day."), 3)
+        tapSheetRow(prefix: "nutrition.history.day.")
+        XCTAssertTrue(element("nutrition.day.meals").waitForExistence(timeout: 10))
+        element("evidence.back").tap()
+        tapSheetDone()
+        assertScopeSwitches()
+        XCTAssertTrue(element("nutrition.reporting").exists)
+    }
+
+    func testNutritionCaloriesRangeScrubAndDailyDrawer() {
+        open(stream: "nutrition")
+        let calories = element("nutrition.report.calories")
+        reveal(calories)
+        calories.tap()
+        XCTAssertTrue(element("nutrition.report.caloriesTrend").waitForExistence(timeout: 10))
+        // Range filter.
+        let all = element("nutrition.report.range.all")
+        reveal(all)
+        all.tap()
+        expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: element("nutrition.report.range.all"))
+        waitForExpectations(timeout: 10)
+        // Horizontal scrub changes the selected week; page still scrolls.
+        let selection = element("nutrition.report.trend.selection")
+        XCTAssertTrue(selection.waitForExistence(timeout: 5))
+        let before = selection.label
+        horizontalPan(across: element("nutrition.report.caloriesTrend"), atY: selection.frame.minY - 70)
+        XCTAssertNotEqual(selection.label, before, "Horizontal scrub did not change the selected week")
+        // Weekly + daily drawers.
+        for rows in ["nutrition.report.rows.weekly-averages", "nutrition.report.rows.recent-daily-calories"] {
+            reveal(element(rows))
+        }
+        let dailyShowAll = element("nutrition.report.rows.recent-daily-calories.showAll")
+        reveal(dailyShowAll)
+        dailyShowAll.tap()
+        let done = element("evidence.sheet.done")
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        tapSheetRow(prefix: "nutrition.report.day.")
+        XCTAssertTrue(element("nutrition.day.meals").waitForExistence(timeout: 10), "Daily row opens Nutrition Day from the drawer")
+        element("evidence.back").tap()
+        tapSheetDone()
+        let weeklyShowAll = element("nutrition.report.rows.weekly-averages.showAll")
+        if weeklyShowAll.exists {
+            reveal(weeklyShowAll)
+            weeklyShowAll.tap()
+            tapSheetDone()
+        }
+    }
+
+    func testNutritionMacroSwitchingAndMealsDrawers() {
+        open(stream: "nutrition")
+        let macros = element("nutrition.report.macros")
+        reveal(macros)
+        macros.tap()
+        XCTAssertTrue(element("nutrition.report.macroDistribution").waitForExistence(timeout: 10))
+        let carbs = element("nutrition.report.macro.Carbohydrates")
+        XCTAssertTrue(carbs.waitForExistence(timeout: 5))
+        carbs.tap()
+        expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: element("nutrition.report.macro.Carbohydrates"))
+        waitForExpectations(timeout: 10)
+        let macroDaily = element("nutrition.report.rows.recent-daily-macros.showAll")
+        reveal(macroDaily)
+        macroDaily.tap()
+        tapSheetDone()
+        element("evidence.back").tap()
+
+        let meals = element("nutrition.report.meals")
+        reveal(meals)
+        meals.tap()
+        XCTAssertTrue(element("nutrition.report.mealDistribution").waitForExistence(timeout: 10))
+        // Meal-trend metric menu.
+        let metric = element("nutrition.report.metricSelector")
+        reveal(metric)
+        let beforeMetric = metric.label
+        metric.tap()
+        app.buttons["Protein"].firstMatch.tap()
+        expectation(for: NSPredicate(format: "label != %@", beforeMetric), evaluatedWith: element("nutrition.report.metricSelector"))
+        waitForExpectations(timeout: 10)
+        // Slot filter.
+        let slot = first(prefix: "nutrition.report.trendSlot.Dinner")
+        reveal(slot)
+        slot.tap()
+        expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: first(prefix: "nutrition.report.trendSlot.Dinner"))
+        waitForExpectations(timeout: 10)
+        // Every meals drawer that has more than three rows opens and closes;
+        // meal history rows open Nutrition Day.
+        for rows in ["weekly-meal-summary", "recurring-meals"] {
+            let showAll = element("nutrition.report.rows.\(rows).showAll")
+            if showAll.exists {
+                reveal(showAll)
+                showAll.tap()
+                tapSheetDone()
+            }
+        }
+        let historyShowAll = element("nutrition.report.rows.recent-meal-history.showAll")
+        reveal(historyShowAll)
+        historyShowAll.tap()
+        XCTAssertTrue(element("evidence.sheet.done").waitForExistence(timeout: 5))
+        tapSheetRow(prefix: "nutrition.report.day.")
+        XCTAssertTrue(element("nutrition.day.meals").waitForExistence(timeout: 10))
+        element("evidence.back").tap()
+        tapSheetDone()
+    }
+
+    func testWeightScopeTapSelectionAndBothInlineDisclosures() {
+        open(stream: "weight")
+        // Tap selects a point without scrolling the page.
+        let selection = element("weight.trend.selection")
+        XCTAssertTrue(selection.waitForExistence(timeout: 5))
+        let before = selection.label
+        let y = (element("weight.trend").frame.minY + 140) / app.frame.height
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: y)).tap()
+        XCTAssertNotEqual(selection.label, before, "Tap did not select a different entry")
+        // Weekly averages and history expand in place and close again.
+        for section in ["weight.weeklyAverages", "weight.history"] {
+            let toggle = element("\(section).toggle")
+            reveal(toggle)
+            let rowsBefore = element(section).staticTexts.count
+            XCTAssertEqual(toggle.label, "Show All")
+            toggle.tap()
+            XCTAssertEqual(element("\(section).toggle").label, "Close")
+            XCTAssertGreaterThan(element(section).staticTexts.count, rowsBefore, "\(section) expands")
+            element("\(section).toggle").tap()
+            XCTAssertEqual(element("\(section).toggle").label, "Show All")
+        }
+        assertScopeSwitches()
+        XCTAssertTrue(element("weight.summary").waitForExistence(timeout: 10))
+    }
 }
 

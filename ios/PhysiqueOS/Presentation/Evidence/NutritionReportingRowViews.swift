@@ -263,6 +263,7 @@ struct NutritionReportListSheet<Content: View>: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("evidence.sheet.done")
                 }
                 .evidenceFlatToolbarItem()
                 ToolbarItem(placement: .principal) {

@@ -136,6 +136,7 @@ struct NutritionTrendChartView: View {
             }
             .padding(.top, m.pt(7))
             .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("nutrition.report.trend.selection")
         }
     }
 }

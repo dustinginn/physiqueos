@@ -131,13 +131,21 @@ struct NutritionHistoryView: View {
     private func reportingSection(_ links: [NutritionInfoLink]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             EvidenceDailySectionHead(title: "Reporting") { EmptyView() }
-            EvidenceDailyOpenList(data: links.filter { $0.destination != nil }) { link in
-                NavigationLink(value: link.destination!) {
-                    EvidenceDailyRow(label: link.label, copy: link.detail, chevron: .center)
+            EvidenceDailyOpenList(data: links) { link in
+                if let destination = link.destination {
+                    NavigationLink(value: destination) {
+                        EvidenceDailyRow(label: link.label, copy: link.detail, chevron: .center)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier("nutrition.report.\(link.id)")
+                } else {
+                    // A Reporting row without a canonical destination stays
+                    // informational, exactly as before — never dropped.
+                    EvidenceDailyRow(label: link.label, copy: link.detail, showsChevron: false)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("nutrition.report.\(link.id)")
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(.isButton)
-                .accessibilityIdentifier("nutrition.report.\(link.id)")
             }
         }
         .accessibilityElement(children: .contain)
@@ -217,6 +225,7 @@ private struct NutritionHistorySheet: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Close")
+                    .accessibilityIdentifier("evidence.sheet.done")
                 }
                 .evidenceFlatToolbarItem()
                 ToolbarItem(placement: .principal) {
@@ -246,6 +255,7 @@ private struct NutritionHistoryRow: View {
         )
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) nutrition: \(day.value). \(day.detail)")
+        .accessibilityIdentifier("nutrition.history.day.\(day.date)")
     }
 }
 
