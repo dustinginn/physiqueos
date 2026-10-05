@@ -1,44 +1,54 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T03:35:55Z",
+  "generated_at_utc": "2026-10-05T04:53:52Z",
   "task": {
-    "id": "build87-batch1-redesign-testflight-20261005",
-    "title": "Build 87 — accepted Redesign Batch 1 physical-device build",
-    "agent": "codex",
-    "status": "apple_valid_awaiting_founder_physical_acceptance"
+    "id": "redesign-batch2-implementation-20261005",
+    "title": "Redesign Batch 2 Checkpoint 1: Log root (Compact Command Center) + You/Settings full-row tap targets",
+    "agent": "claude",
+    "status": "checkpoint1_awaiting_founder_review"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "prompt_commit": "d966abc54e5bf8b4d3a1e5a13f926e5aeacafa2b",
-    "native_base_sha": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
-    "accepted_batch1_sha": "c4a74ad0855a0500e42a90a81d6f4a871e5cc3c5",
-    "native_candidate_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "native_version": "1.0",
-    "native_build": 87,
-    "server_sha_observed": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
-    "server_deployment_observed": "99188a9e-75a7-49c6-a5c2-05a43737de5f"
+    "prompt_commit": "841190297b1dfd430c3489d7c8341037b201e851",
+    "addendum_commit": "86210001cfc9d83a21db6d0df0e662dab3052975",
+    "native_base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
+    "native_base_build": 87,
+    "native_checkpoint1_sha": "b540b323f4af4a79b20a9b61e2f7b03d46532ae3",
+    "native_addendum_sha": "bb6a6584274be62b95d74bb273ff1af3585b4fa0",
+    "server_production_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
+    "server_production_deployment": "99188a9e-75a7-49c6-a5c2-05a43737de5f",
+    "server_d1_candidate_sha": "c7c99347a520d13fd344fe89b6b1398877cdd255",
+    "server_d1_deployed": false
   },
   "publication": {
-    "candidate_branch": "codex/redesign-batch1-home-goals-you-20261005",
-    "report_path": "agent-handoffs/reports/20261005T033555Z-build87-batch1-redesign-testflight-valid.md",
-    "artifact_root": "agent-handoffs/artifacts/redesign-implementation-batch1-20261005"
-  },
-  "testflight": {
-    "bundle_id": "com.physiqueos.native.dev",
-    "delivery_id": "2129e4b4-23e8-40d7-b955-d40ab0274642",
-    "processing_state": "VALID"
+    "source_work_branch": "claude/redesign-batch2-log-logger-20261005",
+    "server_work_branch": "claude/log-sources-provenance-server-20261005",
+    "main_report_commit": "909fb7cc20d1a2fa74eb4feb3e8b9f4c40883a5f",
+    "report_path": "agent-handoffs/reports/20261005T045352Z-redesign-batch2-cp1-log-root.md",
+    "artifact_root": "agent-handoffs/artifacts/redesign-batch2-cp1-log-root-20261005/",
+    "primary_board": "agent-handoffs/artifacts/redesign-batch2-cp1-log-root-20261005/primary-mobile-review-board.png"
   },
   "result": {
-    "summary": "Founder-accepted Home, Goals, and You/Settings Batch 1 implementation shipped as Build 87 for physical-device validation.",
-    "focused_tests_pass": true,
-    "watch_units_pass": true,
-    "training_healthkit_regressions_pass": true,
-    "full_suite_preexisting_failure_only": true,
-    "release_compile_pass": true,
-    "archive_pass": true,
-    "apple_valid": true,
-    "server_changed": false,
-    "batch2_started": false
+    "summary": "Locked Log Compact Command Center implemented on Build 87 with typed Sources (D1); geometry within 0.7 pt and colors exact in Dark and Mineral; remaining differences explained. You/Settings full-row tap targets fixed, pixel-identical. Server D1 candidate tested (no new failures) but NOT deployed.",
+    "production_data_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
   },
-  "recommended_next_step": "Founder physical-device acceptance of Build 87 using the report checklist; do not begin Batch 2 until separately authorized."
+  "decisions_required": [
+    "Founder visual review of Checkpoint 1 (Log root)",
+    "Explicit authorization to deploy Server c7c99347 (D1 typed provenance) on top of production 27dad44a",
+    "Optional: accept iOS orphan-prevention line wraps (recommended) or force browser-style wrap"
+  ],
+  "blockers": [
+    "Checkpoint 2 must not start before explicit Checkpoint 1 approval"
+  ],
+  "recommended_next_step": "Founder reviews primary-mobile-review-board.png; approve Checkpoint 1 and authorize the Server D1 deploy, then Claude begins Checkpoint 2 (Logger active workout).",
+  "stop_reason": "Checkpoint 1 published; pixel-parity protocol requires Founder approval before Checkpoint 2; Server deploy needs explicit authorization.",
+  "safety": {
+    "contains_secrets": false,
+    "contains_credentials": false,
+    "contains_production_exports": false,
+    "contains_founder_evidence": false,
+    "safe_for_chatgpt_retrieval": true
+  }
 }
