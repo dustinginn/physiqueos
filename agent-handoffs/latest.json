@@ -1,32 +1,32 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T20:20:54Z",
+  "generated_at_utc": "2026-10-05T21:21:36Z",
   "task": {
-    "id": "workout-watch-superset-real-session-audit-20261005",
-    "title": "Workout reliability lane: Build 87 Watch/superset audit + bounded fix candidate (Native cd06bfea, Server b5de242f undeployed)",
+    "id": "workout-reliability-founder-decisions-complete-20261005",
+    "title": "Workout reliability lane: 2-B/2-C implemented, UUID-case Server fix deployed (b5de242f); 2-C Server b7eb1e39 awaiting deploy approval",
     "agent": "claude",
     "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "final_sha": "cd06bfea931b229276776fa155556327414b0fe7",
-    "production_server_sha": "c7c99347a520d13fd344fe89b6b1398877cdd255",
-    "production_deployment": "e7ef3157",
-    "native_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
+    "final_sha": "e9f8a957be419d89a10b316c57b90afeb08d2f17",
+    "production_server_sha": "b5de242f29acc7e213ffbcfc849b4796eda6353f",
+    "production_deployment": "ea89c93e",
+    "native_sha": "e9f8a957be419d89a10b316c57b90afeb08d2f17",
     "native_build": 87
   },
   "result": {
-    "summary": "Workout reliability lane (Batch 3 untouched). Native candidate cd06bfea (base Build 87 f66c7fc6): Watch-finish now keeps the Server PR list so the phone recap/PRs/confetti match a phone finish; superset context wired into production Logger history (pairing shows superset Previous; standalone excludes supersets); completed sets immune to Use suggestion/Keep previous; Watch Complete Set settles from the phone context ack, unsent taps never show Set pending, correlatable latency logs. Server candidate b5de242f (NOT deployed) fixes the UUID-case trusted Watch correlation that left today's Watch workout unlinked. iOS 2015 tests / 1 known Peptide baseline failure; Watch 49/49; Server 82/82 focused, 4 pre-existing reds identical at base. No build bump, TestFlight, deploy or production write.",
+    "summary": "Workout reliability lane (Batch 3 untouched). Server b5de242f DEPLOYED (ea89c93e ACTIVE; web+worker source hash, /live, /ready, log gitSha verified; no errors; 0 writes since deploy). Today's Watch workout link: PENDING - no HealthKit ingest has arrived since deploy (last phone sync 19:02Z); next normal sync should link it via reassessment (tested path); nothing manually mutated. 2-C Server contract b7eb1e39 (additive contextualProgressionRecommendations, no migration) NOT deployed - awaiting Founder deploy approval. Native candidate e9f8a957 (incl. cd06bfea): 2-B untouched/uncompleted row refill on pair/unpair/re-pair with no-history keep; 2-C exact-grouping Server recommendation selection. Integration preview on Batch 2 70ebf753: unit 2034/0, Watch 49/49, Release compile OK.",
     "success": true,
     "production_mutated": false,
-    "deployed": false,
+    "deployed": true,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "iOS full suite 2015 tests, 1 failure = known Peptide baseline (line 616); Watch 49/49; Server focused 82/82; HealthKit Server files 902 pass, 4 reds identical at production base c7c99347."
+      "summary": "Native e9f8a957: targeted 472/0; full 2025 with only the Build 87 Peptide baseline failure; Watch 49/49; Release OK. Preview 70ebf753 (Batch 2): full 2034/0, Watch 49/49, Release OK. Server: UUID 208/208; 2-C 51/51 core, 23 reds identical at base."
     },
     "review": {
       "status": "not_run",
@@ -34,28 +34,25 @@
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Six READ ONLY production probes; production writes 0; nothing deployed."
+      "summary": "Read-only production probes (REPEATABLE READ READ ONLY + ROLLBACK); zero canonical writes 20:32Z-21:19Z after deploy."
     }
   },
   "decisions_required": [
-    "Issue 2-B: auto-refill uncompleted untouched rows on superset pair/unpair (no history: keep standalone vs clear)?",
-    "Issue 2-C: approve additive Server contextualProgressionRecommendations for superset Suggested/Maintain",
-    "Issue 5: authorize deploy of Server b5de242f (next ingest auto-links today's Watch workout = production data change)",
-    "Approve integrating Native cd06bfea into the next-build authority (after Batch 2 / Build 88 decision)",
-    "Unchanged concurrent lanes: Batch 3 B/C acceptance (report 20261005T193626Z); Build 88 authorization for Batch 2 793462b1"
+    "Authorize production deploy of 2-C Server candidate b7eb1e39 (additive training-logger contextualProgressionRecommendations; no migration/data rewrite)",
+    "Open PhysiqueOS on iPhone so a normal HealthKit sync runs reassessment; Claude reports the link read-only",
+    "Integrate Native e9f8a957 into the next-build authority per the map (preview 70ebf753)",
+    "Unchanged concurrent lanes: Batch 3 B/C acceptance; Build 88 authorization for Batch 2 793462b1"
   ],
-  "blockers": [],
-  "unexpected_findings": [
-    "Trusted Watch<->Logger exact correlation silently fails on UUID case (first trusted workout ever)",
-    "applyProgressionSuggestion / keepPreviousPerformance overwrite and un-complete completed sets",
-    "Leg Extension ontology shows Triceps / Elbow Extension muscle mapping in canonical evidence"
+  "blockers": [
+    "Today's Watch workout link verification waits on the next normal HealthKit ingest (none since deploy)"
   ],
+  "unexpected_findings": [],
   "backlog": [
-    "Watch phase/row semantics derive from TrainingSessionLiveProjection (Review gating + timed sets)",
-    "Phone Watch-command route: reply before side effects, one projection build per command (after telemetry)"
+    "Watch Review/Confirmation Complete Set gating + timed-set projection (shared Watch mapper root)",
+    "Phone reply-before-side-effects / one projection build per command after next workout's correlatable logs"
   ],
-  "recommended_next_step": "Founder reviews the candidate report; decide 2-B/2-C and the Server deploy; then cherry-pick cd06bfea into the next-build authority.",
-  "full_report_path": "agent-handoffs/reports/20261005T202019Z-workout-watch-superset-fix-candidate.md",
+  "recommended_next_step": "Founder approves b7eb1e39 deploy; Claude deploys via the guarded path and re-verifies; Watch link confirmed after the next sync.",
+  "full_report_path": "agent-handoffs/reports/20261005T212016Z-workout-reliability-founder-decisions-complete.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,

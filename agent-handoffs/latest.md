@@ -3,35 +3,32 @@
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
 - Lane: **Workout reliability lane** (separate from Redesign Batch 3 and the Batch 2 / Build 88 release gate)
-- Task: Build 87 Watch/superset audit + bounded fix candidate (`workout-watch-superset-real-session-audit-20261005`)
-- Agent: Claude (single RC worktree)
-- Status: **Candidate ready for Founder review. STOPPED.**
-- Generated (UTC): 2026-10-05T20:20:54Z
+- Task: Founder decisions complete — 2-B, 2-C, UUID-case Server deploy (`workout-reliability-founder-decisions-complete-20261005`)
+- Agent: Claude (same single RC worktree)
+- Status: **STOPPED for 2-C Server deploy approval.** Everything else is complete.
+- Generated (UTC): 2026-10-05T21:21:36Z
 
-| Item | SHA |
-|---|---|
-| Native candidate | `cd06bfea` on `claude/build87-workout-reliability-audit-20261005` (base Build 87 `f66c7fc6`) |
-| Server candidate | `b5de242f` on `claude/server-trusted-watch-uuid-case-20261005` (base prod `c7c99347`), **NOT deployed** |
-
-Reports:
-- Candidate: `agent-handoffs/reports/20261005T202019Z-workout-watch-superset-fix-candidate.md`
-- Audit: `agent-handoffs/reports/20261005T195700Z-workout-watch-superset-real-session-audit.md`
+| Item | SHA | State |
+|---|---|---|
+| Production Server | `b5de242f` (deployment `ea89c93e`) | **DEPLOYED + verified** |
+| 2-C Server candidate | `b7eb1e39` on `claude/server-contextual-progression-20261005` | **awaiting deploy approval** |
+| Native workout candidate | `e9f8a957` on `claude/build87-workout-reliability-audit-20261005` | unreleased |
+| Integration preview on Batch 2 | `70ebf753` on `claude/workout-reliability-on-batch2-preview-20261005` | preview only |
 
 Gates:
-- iOS: 2015 tests, 1 failure (the known Peptide baseline).
-- Watch: 49/49.
-- Server: focused 82/82. Four other HealthKit Server tests fail, and they fail the same way on the production base.
+- **Native:** full unit suite on the candidate has 1 failure (the Build 87 Peptide baseline). On the Batch 2 preview: 2034 tests, 0 failures.
+- **Watch:** 49/49.
+- **Release compile:** OK.
+- **Server:** UUID fix 208/208; 2-C core tests 51/51.
 
-Decisions:
-- **2-B:** auto-refill rows on pair/unpair?
-- **2-C:** additive Server superset recommendations?
-- **Server deploy:** `b5de242f` (this would auto-link today's Watch workout).
-- **Integration:** where `cd06bfea` lands in the next build.
+Today's Watch workout link: **pending**. No HealthKit ingest has arrived since the deploy. The next normal sync should link it.
+
+Report: `agent-handoffs/reports/20261005T212016Z-workout-reliability-founder-decisions-complete.md`
 
 Concurrent lanes (unchanged):
-- Redesign Batch 3 B/C: report `agent-handoffs/reports/20261005T193626Z-redesign-batch3-claude-b-correction-bc-regression.md`, Native `8aa2d00b`, package `911781e6`. Awaiting acceptance.
-- Batch 2: Build 88 authorization for Native `793462b1` (report `20261005T150227Z`).
+- Batch 3 B/C acceptance: report `20261005T193626Z`.
+- Build 88 authorization for Batch 2 `793462b1`.
 
-Not done: no deploy, no TestFlight, no build bump, no production writes.
+No TestFlight upload, no build bump, no merge into the release branch.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
