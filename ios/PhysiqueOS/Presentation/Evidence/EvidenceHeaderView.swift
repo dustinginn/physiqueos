@@ -204,6 +204,9 @@ struct EvidenceSectionTitle: View {
         Text(title)
             .evidenceLockedText(EvidenceLockedStyle.sectionTitle)
             .foregroundStyle(EvidenceLockedStyle.ink)
+            // CoreText seats SF Pro 1 pt higher than Chrome in the 18-px
+            // section line box (measured); draw-only, layout unchanged.
+            .offset(y: 1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, EvidenceLockedStyle.pt(9))
             .accessibilityAddTraits(.isHeader)
