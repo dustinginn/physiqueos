@@ -53,6 +53,15 @@ export function createProviderBriefingCadenceRunner({
   const healthKitGraduation = createHealthKitGraduationReader({
     query: (text, values) => pool.query(text, values),
     ownerUserId,
+    // A failed graduation read fails closed to ordinary evidence; this only
+    // makes it visible. Error class/code only, never a message or value.
+    onError: (error) => {
+      const target = logger?.warn ?? logger?.info;
+      target?.call(logger, "healthkit_graduation_read_failed", {
+        errorName: String(error?.name ?? "Error").slice(0, 60),
+        errorCode: /^[A-Za-z0-9_]{1,60}$/.test(String(error?.code ?? "")) ? String(error.code) : null,
+      });
+    },
   });
   const settlementGate = createBriefingCadenceSettlementGate({
     healthKitGraduationReader: healthKitGraduation,

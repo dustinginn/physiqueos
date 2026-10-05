@@ -134,7 +134,7 @@ describe("HealthKit graduation policy operation", () => {
       strategicPolicy: { enabled: true, strategicEffectiveAt: "2026-10-02" },
       eligibleNightsBefore: [],
       eligibleNightsAfter: [{ sleepDay: "2026-10-02", revision: 2 }, { sleepDay: "2026-10-03", revision: 2 }, { sleepDay: "2026-10-04", revision: 2 }],
-      historicalNightsConsidered: 0,
+      historicalCollectionRead: false,
     });
     expect(dry.simulation.sleep.decisions[0]).toMatchObject({ sleepDay: "2026-10-01", eligible: false, reason: "before_strategic_effective_boundary" });
     expect(JSON.stringify(dry.simulation.sleep)).not.toMatch(/27000|asleep/);

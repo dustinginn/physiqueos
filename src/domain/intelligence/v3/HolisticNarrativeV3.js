@@ -126,8 +126,9 @@ function rankMilestone(item) {
 // The insight kinds these realizers can phrase. Synthesis keeps any other
 // kind out of the selection with a reason until a phrase for it exists here.
 // Sleep (`sleep_below_usual`) is phrased only as recovery context in the recap
-// or the coaching: it has no headline phrase, no priority and no step of its
-// own, so it never leads a briefing or becomes a recommendation.
+// or the coaching, plus a takeaway line saying it is not by itself a reason to
+// change anything: it has no headline phrase and no step of its own, so it
+// never leads a briefing or becomes a recommendation.
 export const BRIEFING_REALIZABLE_KINDS = Object.freeze(new Set(["training_progress", "weight_trend", "routine_break",
   "composition_result", "guardrail_status", "intake_vs_plan", "activity_change", "training_frequency",
   "activity_on_plan", "routine_steady", "nutrition_unclear", "visual_change", "visual_comparison",
@@ -218,7 +219,10 @@ function realize({ cadence, synthesis, picture, goalLabel, goalPolicy, goalProgr
   if (reviewContract && bounds?.monthName) P = { ...P, this: `in ${bounds.monthName}`, inThis: `in ${bounds.monthName}` };
   const has = (role) => contract.sections.includes(role);
   const facts = { ...pictureFacts(picture), direction: goalPolicy?.weightExpectation?.direction ?? null,
-    sparse: (picture?.domains ?? []).filter((item) => ["insufficient", "unavailable"].includes(item.status)).length >= 4,
+    // Recovery counts as it always did (not assessed): Sleep is supporting
+    // context and never changes how sparse the logged picture reads.
+    sparse: (picture?.domains ?? []).filter((item) => item.domain === "recovery" ||
+      ["insufficient", "unavailable"].includes(item.status)).length >= 4,
     goalProgress, event: Boolean(contract.leadDomain), leadDomain: contract.leadDomain ?? null,
     period: periodBounds(picture?.window),
     trainingDomain: picture?.domains?.find((item) => item.domain === "training")?.facts ?? null,

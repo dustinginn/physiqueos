@@ -290,8 +290,11 @@ export function leadInsights(synthesis, contract, count = contract?.recap?.maxIn
   const lead = contract?.leadDomain ? selected.find((item) => item.domain === contract.leadDomain) : null;
   const supportive = selected.filter((item) => item.polarity === "supportive" && item !== lead);
   // A real concern outranks a merely neutral finding for the second slot.
-  const concern = [...selected.filter((item) => item.polarity === "concern" && item !== lead),
-    ...selected.filter((item) => !["supportive", "concern"].includes(item.polarity) && item !== lead)];
+  // Supporting context (Sleep) is never promoted; it can only fill a slot
+  // nothing else claims.
+  const promotable = (item) => item !== lead && item.supportingContext !== true;
+  const concern = [...selected.filter((item) => item.polarity === "concern" && promotable(item)),
+    ...selected.filter((item) => !["supportive", "concern"].includes(item.polarity) && promotable(item))];
   const picked = [lead, supportive[0], concern[0]].filter(Boolean);
   for (const item of selected) if (picked.length < count && !picked.includes(item)) picked.push(item);
   return picked.slice(0, count);

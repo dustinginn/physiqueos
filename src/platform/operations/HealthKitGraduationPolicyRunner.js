@@ -374,7 +374,9 @@ function simulateSleepGraduation({ sleepDays, sleepActivationRecord, current, ca
     eligibleNightsBefore: before.applied.map((entry) => entry.localDate),
     eligibleNightsAfter: after.applied.map((entry) => ({ sleepDay: entry.localDate, revision: entry.revision })),
     decisions: after.decisions.map((entry) => ({ sleepDay: entry.sleepDay, revision: entry.revision, eligible: entry.eligible, reason: entry.reason })),
-    historicalNightsConsidered: 0,
+    // Only the ordinary (prospective) collection is read; historical import
+    // lives in its own collection and is never considered.
+    historicalCollectionRead: false,
     confidenceInputs: "none; sleep_night objects feed only the V3 Recovery evidence slot",
   };
 }

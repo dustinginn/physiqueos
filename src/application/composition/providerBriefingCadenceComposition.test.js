@@ -260,6 +260,29 @@ describe("provider briefing cadence: prospective Sleep graduation", () => {
     expect(after.seen.map((object) => object.payload.sleep_day)).toEqual(["2026-10-02", "2026-10-03", "2026-10-04"]);
   });
 
+  it("a failing Sleep read fails closed: the tick still gives generators the other graduated evidence, and the failure is logged without detail", async () => {
+    const warn = vi.fn();
+    const runtime = { user: { id: OWNER, timeZone: "America/Los_Angeles" }, canonicalEvidenceObjects: [] };
+    const pool = { query: vi.fn(async (text, values = []) => {
+      if (/record_id=\$3/.test(text) && values[2] === SLEEP_ACTIVATION_ID) return { rows: [{ payload: sleepActivation, version: 1 }] };
+      if (/record_id=\$3/.test(text)) return { rows: [{ payload: policy({ ...withSleep, startLocalDate: DATE }), version: 1 }] };
+      if (values[1] === "healthKitCanonicalDays") return { rows: [day("activity"), day("nutrition")].map((payload) => ({ payload, version: 1 })) };
+      if (values[1] === "healthKitSleepDays") throw Object.assign(new Error("secret detail"), { code: "ECONNRESET" });
+      return { rows: [] };
+    }) };
+    const authorityStore = { read: async () => ({ state: {
+      authority: "provider-authoritative", workerAuthority: "provider", publicRuntimeAuthority: "provider", canonicalStoreEpoch: "postgres-canonical",
+      firstProviderCanonicalWriteAt: "2026-09-01T00:00:00.000Z", firstProviderCommandId: "cmd",
+    } }) };
+    const runner = createProviderBriefingCadenceRunner({ pool, ownerUserId: OWNER, authorityStore, logger: { warn, info: vi.fn() },
+      loadCanonicalRuntime: async () => runtime, loadCanonicalCommitBindings: async () => ({ mutateCanonicalRuntime: async () => ({}) }) });
+    await expect(runner.execute({ asOf: new Date("2026-10-05T10:00:00.000Z") })).resolves.toBeTruthy();
+    const seen = await captured.repositories.canonicalEvidence.listCanonicalEvidenceObjects(OWNER);
+    expect(seen.map((object) => object.payload.evidence_type).sort()).toEqual(["activity_day", "nutrition"]);
+    expect(warn).toHaveBeenCalledWith("healthkit_graduation_read_failed", { errorName: "Error", errorCode: "ECONNRESET" });
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/secret detail/);
+  });
+
   it("fails closed when Sleep ingestion is not enabled", async () => {
     const { seen } = await run({ policyRecord: policy(withSleep), sleepActivation: { ...sleepActivation, status: "disabled" }, sleepDays: nights, asOf: "2026-10-05T10:00:00.000Z" });
     expect(seen).toEqual([]);

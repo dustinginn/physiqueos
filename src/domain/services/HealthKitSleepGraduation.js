@@ -24,7 +24,9 @@ import {
 //     Founder-approved D0 (`effectiveSleepDay`) — the boundary is read from
 //     current authority, never inferred or widened;
 //   * it is an ordinary prospective day (historical import is permanently
-//     display-only) computed by a stage-trustworthy algorithm (v2/v3);
+//     display-only) computed by sleep-canon-v3 (v2 has the known Oura
+//     copy-splice defect, and the algorithm policy falls back to v2 when v3 is
+//     disabled, so a v2 night is never strategic);
 //   * a main sleep episode was recorded from a sensor source (manual Health
 //     entries stay display-only);
 //   * the night's 18:00 sleep-day window has CLOSED at the generator's `asOf`,
@@ -35,7 +37,7 @@ import {
 export const HEALTHKIT_SLEEP_NIGHT_EVIDENCE_TYPE = "sleep_night";
 export const HEALTHKIT_SLEEP_NIGHT_EVIDENCE_SCHEMA_VERSION = "healthkit-sleep-strategic-night-v1";
 export const HEALTHKIT_SLEEP_GRADUATION_DOMAIN = "sleep";
-const STRATEGIC_ALGORITHMS = Object.freeze(["sleep-canon-v2", "sleep-canon-v3"]);
+const STRATEGIC_ALGORITHMS = Object.freeze(["sleep-canon-v3"]);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -57,11 +59,13 @@ export function resolveHealthKitSleepStrategicPolicy({ graduationPolicy = null, 
   }
   if (!DATE.test(String(scope.startLocalDate ?? ""))) return off("evidence_scope_invalid");
   const strategicEffectiveAt = [scope.startLocalDate, activationPolicy.effectiveSleepDay].sort().at(-1);
+  // Either bound may end the window; neither may extend it.
+  const ends = [scope.endLocalDate, activationPolicy.endSleepDay].filter((value) => DATE.test(String(value ?? ""))).sort();
   return Object.freeze({
     schemaVersion: HEALTHKIT_SLEEP_STRATEGIC_POLICY_SCHEMA_VERSION,
     enabled: true,
     strategicEffectiveAt,
-    endSleepDay: scope.endLocalDate ?? null,
+    endSleepDay: ends[0] ?? null,
     reason: "sleep_in_evidence_scope",
   });
 }

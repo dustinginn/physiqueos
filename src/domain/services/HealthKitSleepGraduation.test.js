@@ -90,6 +90,9 @@ describe("Sleep strategic policy resolution", () => {
       .toMatchObject({ enabled: true, strategicEffectiveAt: D0, endSleepDay: null });
     expect(resolveHealthKitSleepStrategicPolicy({ graduationPolicy: graduation(["sleep"], "2026-10-09"), activationPolicy: ACTIVE }))
       .toMatchObject({ enabled: true, strategicEffectiveAt: "2026-10-09" });
+    // A bounded Sleep activation ends the strategic window too; neither bound extends it.
+    expect(resolveHealthKitSleepStrategicPolicy({ graduationPolicy: V4_POLICY, activationPolicy: activation({ openEnded: false, endSleepDay: "2026-10-05" }) }))
+      .toMatchObject({ enabled: true, strategicEffectiveAt: D0, endSleepDay: "2026-10-05" });
   });
 });
 
@@ -184,16 +187,17 @@ describe("Sleep -> V3 evidence eligibility (prospective)", () => {
     expect(incoherent).toMatchObject({ asleep_seconds: 27000, stage_detail: "withheld_incoherent", stages: null });
   });
 
-  it("refuses manual-only, in-bed-only, invalid or non-stage-trustworthy nights", () => {
+  it("refuses manual-only, in-bed-only, invalid, and non-v3 (splice-prone v2 or v1) nights", () => {
     const result = overlay([
       night("2026-10-02", { sourceBasis: "manual_only" }),
       night("2026-10-03", { status: "in_bed_only" }),
       night("2026-10-04", { algorithmVersion: "sleep-canon-v1" }),
       { ...night("2026-10-05"), mainSleep: { ...night("2026-10-05").mainSleep, awakeSeconds: -60 } },
-    ], { asOf: new Date("2026-10-07T00:00:00.000Z") });
+      night("2026-10-06", { algorithmVersion: "sleep-canon-v2" }),
+    ], { asOf: new Date("2026-10-08T00:00:00.000Z") });
     expect(result.objects).toEqual([]);
     expect(result.decisions.map((entry) => entry.reason)).toEqual([
-      "manual_only_not_strategic", "no_main_sleep", "algorithm_not_strategic", "invalid_durations",
+      "manual_only_not_strategic", "no_main_sleep", "algorithm_not_strategic", "invalid_durations", "algorithm_not_strategic",
     ]);
   });
 });

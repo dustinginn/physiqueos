@@ -274,6 +274,38 @@ describe("Holistic realization of a Sleep finding", () => {
     expect(all).not.toMatch(/insomnia|apnea|disorder|caus/iu);
   });
 
+  it("supporting context never takes a lead slot from goal evidence, even a neutral finding", async () => {
+    const { leadInsights } = await import("./BriefingSectionContracts.js");
+    const synthesis = { selected: [
+      { id: "training|training_progress", kind: "training_progress", polarity: "supportive" },
+      { id: "recovery|sleep_below_usual", kind: "sleep_below_usual", polarity: "concern", supportingContext: true },
+      { id: "body_trajectory|weight_trend", kind: "weight_trend", polarity: "neutral" },
+    ] };
+    expect(leadInsights(synthesis, { recap: { maxInsights: 2 } }).map((item) => item.id))
+      .toEqual(["training|training_progress", "body_trajectory|weight_trend"]);
+    // Nothing else to tell: it may still fill a slot.
+    expect(leadInsights({ selected: synthesis.selected.slice(0, 2) }, { recap: { maxInsights: 2 } }).map((item) => item.id))
+      .toEqual(["training|training_progress", "recovery|sleep_below_usual"]);
+  });
+
+  it("irrelevant Sleep never changes how sparse the picture reads (coaching wording unchanged)", () => {
+    const thin = (recovery) => ({ schemaVersion: "briefing_evidence_picture_v1", goalType: "build_lean_mass", window: WINDOW, outlook: null, strategy: null,
+      domains: [
+        { domain: "routine", weight: 0.8, status: "assessed", state: "steady", polarity: "supportive", facts: {},
+          insights: [{ id: "routine|routine_steady", domain: "routine", kind: "routine_steady", role: "execution", polarity: "supportive", strength: 2, facts: {} }] },
+        ...["nutrition", "activity", "body_trajectory"].map((domain) => ({ domain, weight: 0.6, status: "insufficient", state: "thin", polarity: "neutral", facts: {}, insights: [] })),
+        recovery,
+      ] });
+    const run = (recovery) => {
+      const picture = thin(recovery);
+      const synthesis = synthesizeBriefing({ picture, budget: { purpose: "recap", maxInsights: 3, maxLimitations: 1, floor: 0.9, heroInsights: 2 }, realizableKinds: BRIEFING_REALIZABLE_KINDS });
+      return realizeHolisticBriefingV3({ cadence: "weekly", synthesis, picture, goalPolicy: { goalType: "build_lean_mass", domains: {} }, goalLabel: "the goal" });
+    };
+    const before = run({ domain: "recovery", weight: 0.6, status: "unavailable", state: "no_recovery_evidence_yet", polarity: "neutral", facts: {}, insights: [] });
+    const after = run({ domain: "recovery", weight: 0.6, status: "assessed", state: "within_personal_usual", polarity: "neutral", facts: {}, insights: [] });
+    expect(after).toEqual(before);
+  });
+
   it("cannot be concluded from a partial window", () => {
     const synthesis = synthesizeBriefing({ picture: picture(40),
       budget: { purpose: "so_far", maxInsights: 2, maxLimitations: 1, floor: 0.5, partialWindow: true }, realizableKinds: BRIEFING_REALIZABLE_KINDS });

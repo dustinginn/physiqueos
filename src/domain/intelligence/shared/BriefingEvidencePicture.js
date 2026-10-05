@@ -493,17 +493,16 @@ function assessRecovery({ days, windowDays, window }) {
     return assessed(D.RECOVERY, "within_personal_usual", "neutral", facts, []);
   }
   const affectedDates = short.map((day) => day.date);
-  const trainingDays = windowDays.filter((day) => Number(day?.training?.sessions ?? 0) > 0).length;
   const shortfall = { ...facts, shortNights: short.length, affectedDates, extentDays: short.length,
-    meanShortfallMinutes: Math.round(mean(short.map((day) => usual - minutes(day)))),
-    trainingDaysInWindow: trainingDays };
+    meanShortfallMinutes: Math.round(mean(short.map((day) => usual - minutes(day)))) };
   const strength = Math.min(P.maxStrength,
     1 + 0.8 * (short.length / nights.length) * Math.min(1, nights.length / 7));
   return assessed(D.RECOVERY, "below_personal_usual", "concern", shortfall, [
     // Execution-scoped recovery context: what happened, never why, and never a
     // step of its own. A partial window cannot conclude it.
+    // `supportingContext`: it never takes a lead slot ahead of goal evidence.
     insight(D.RECOVERY, "sleep_below_usual", InsightRole.EXECUTION, "concern", strength, shortfall,
-      { requiresCompleteWindow: true }),
+      { requiresCompleteWindow: true, supportingContext: true }),
   ]);
 }
 
