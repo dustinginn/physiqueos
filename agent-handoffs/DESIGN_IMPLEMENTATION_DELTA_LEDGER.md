@@ -589,7 +589,7 @@ Native must not parse display strings. Add a structured source per row/line to t
 Acceptance:
 Sources content comes only from typed fields. Mixed-source days (Logger Strength plus Apple Health Cardio, screenshot Nutrition) are attributed exactly. Weight shows "Source unavailable" until it has a provenance field. Tiles no longer repeat "Apple Health". Older payloads without the field degrade to no disclosure.
 
-Status: NATIVE IMPLEMENTED (Checkpoint 1 ACCEPTED); SERVER NOT DEPLOYED. Founder settled D1: implement exactly, with a typed Server contract. Server candidate `c7c99347a520d13fd344fe89b6b1398877cdd255` (branch `claude/log-sources-provenance-server-20261005`, on top of production `27dad44a`) adds `provenance` and `contextDetail`; its unit suite matches the production baseline exactly (307 pre-existing failures, identical set, none new). Native renders Sources from typed fields only, accepted in Checkpoint 1 `b540b323` and carried into the integrated Batch 2 candidate `49733300672c0b52a06a2b3ee5435de49b76fd15`. An older Server falls back to the legacy caption with no disclosure, which is today's production behavior. The overnight deploy attempt was blocked by the session's production-deploy permission gate before any mutation; production remains `27dad44a` (deployment `99188a9e`, ACTIVE, /live and /ready 200, re-checked 2026-10-05T08:30:37Z). Deploying needs a direct Founder chat authorization for the exact SHA. Close after deploy plus on-device acceptance. Report `agent-handoffs/reports/20261005T083037Z-redesign-batch2-overnight-cp2-cp5.md`.
+Status: RESOLVED IN PRODUCTION; NATIVE RELEASE-GATED. Founder approved all five Batch 2 checkpoints and explicitly authorized D1. Server `c7c99347a520d13fd344fe89b6b1398877cdd255` is deployed: deployment `e7ef3157-8d1f-4e34-aa56-4668681b40bf` ACTIVE (2026-10-05T13:23:47Z), web and worker `source_commit_hash` and log-envelope `gitSha` both `c7c99347`, `/live` and `/ready` 200, ready 9/9. The change is additive: `context` is unchanged for Build 87 and older clients, which ignore the new `provenance` and `contextDetail` keys. Native typed Sources ships in Batch 2 release candidate `793462b11ff522f116413c5b081db0ad97954305`. Close after Build 88 device acceptance. Report `agent-handoffs/reports/20261005T150227Z-redesign-batch2-release-candidate.md`.
 
 ### Apple Watch Logger — Complete Set offered while the phone is in Review/Confirmation
 
@@ -657,7 +657,7 @@ A full-row `contentShape` on the label; the Appearance option cards declare thei
 Acceptance:
 `testYouAndSettingsNavigationRowsActivateAcrossTheWholeRow` taps the leading content, center whitespace and trailing chevron edge of every row in Dark and Mineral. Before and after captures are pixel-identical in row content.
 
-Status: FIXED ON BATCH 2 BRANCH `bb6a6584` (accepted with Checkpoint 1). Integrated into Batch 2 candidate `49733300672c0b52a06a2b3ee5435de49b76fd15`; not yet in TestFlight. Close after physical-device acceptance.
+Status: FIXED; FOUNDER-ACCEPTED (Checkpoint 1). Carried unchanged into Batch 2 release candidate `793462b11ff522f116413c5b081db0ad97954305`. Close after Build 88 physical-device acceptance.
 
 ### Home — Batch 1 briefing strip lost the `home.latestBriefing` test identity
 
@@ -678,7 +678,7 @@ Add an identifier to the strip's briefing control (or update the tests to the ne
 Acceptance:
 The three journeys pass on a clean install in Dark and Mineral, and Home captures stay pixel-identical.
 
-Status: OPEN; not fixed by Batch 2 (outside its scope).
+Status: FIXED in Batch 2 release candidate `793462b11ff522f116413c5b081db0ad97954305` (commit `b1488c2e`). The strip's newest-briefing tile owns `home.latestBriefing`; older cards use `home.briefing.<id>`, so no identifier is duplicated. Dark and Mineral Home captures are pixel-identical before and after (zero differing pixels). The three Briefing journeys pass on a clean install. Report `agent-handoffs/reports/20261005T150227Z-redesign-batch2-release-candidate.md`.
 
 ## Implementation transition rule
 
