@@ -832,15 +832,95 @@ final class LoggerParityCaptureUITests: XCTestCase {
         app.alerts["Cancel this workout?"].buttons["Cancel Workout"].tap()
     }
 
+    func testCheckpoint3EntrySelectionDark() { checkpoint3(appearance: "dark") }
+    func testCheckpoint3EntrySelectionMineralLight() { checkpoint3(appearance: "light") }
+
+    private func checkpoint3(appearance: String) {
+        // One deterministic saved draft for the entry state.
+        launch(appearance: appearance, route: "training-logger", extra: ["-physiqueos.logger-review.candidate"])
+        discardSavedDrafts()
+        startWorkout(areas: ["chest"], exercises: ["Bench Press"])
+        app.buttons["trainingLogger.inlineSaveAndLeave"].tap()
+
+        launch(appearance: appearance, route: "training-logger", extra: ["-physiqueos.logger-review.candidate"])
+        XCTAssertTrue(app.buttons["trainingLogger.start"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Resume"].firstMatch.waitForExistence(timeout: 5))
+        capture("cp3-entry-\(appearance)")
+
+        app.buttons["trainingLogger.start"].tap()
+        for area in ["chest", "back"] {
+            let button = app.buttons["trainingLogger.area.\(area)"]
+            XCTAssertTrue(button.waitForExistence(timeout: 5))
+            button.tap()
+        }
+        capture("cp3-areas-\(appearance)")
+
+        app.buttons["Choose exercises"].tap()
+        for name in ["Bench Press", "Cable Fly"] {
+            let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(name),")).firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            row.tap()
+        }
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == %@", "Bench Press, selected")).firstMatch.exists)
+        capture("cp3-picker-\(appearance)")
+
+        let search = app.textFields["trainingLogger.exerciseSearch"]
+        XCTAssertTrue(search.waitForExistence(timeout: 3))
+        search.tap()
+        search.typeText("cable")
+        capture("cp3-search-\(appearance)")
+        if let typed = search.value as? String {
+            search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: typed.count))
+        }
+        search.typeText("\n")
+
+        app.buttons["trainingLogger.browseAll"].tap()
+        XCTAssertTrue(app.staticTexts["All Exercises · the full exercise catalog"].waitForExistence(timeout: 3))
+        capture("cp3-browse-all-\(appearance)")
+        app.buttons["trainingLogger.browseAll"].tap()
+
+        let create = app.buttons["trainingLogger.createNewExercise"]
+        for _ in 0..<6 where !create.isHittable { app.swipeUp() }
+        create.tap()
+        XCTAssertTrue(app.buttons["trainingLogger.submitNewExercise"].waitForExistence(timeout: 3))
+        for _ in 0..<3 { app.swipeUp() }
+        capture("cp3-create-\(appearance)")
+        for _ in 0..<8 { app.swipeDown() }
+        create.tap()
+
+        app.buttons["trainingLogger.startLogging"].tap()
+        let addExercise = app.buttons["trainingLogger.addExercise"]
+        XCTAssertTrue(addExercise.waitForExistence(timeout: 5))
+        addExercise.tap()
+        XCTAssertTrue(app.staticTexts["Add exercises"].waitForExistence(timeout: 3))
+        for _ in 0..<6 { app.swipeDown() }
+        capture("cp3-add-exercise-\(appearance)")
+        app.buttons["trainingLogger.startLogging"].tap()
+
+        app.buttons["trainingLogger.cancelWorkout"].tap()
+        XCTAssertTrue(app.alerts["Cancel this workout?"].waitForExistence(timeout: 3))
+        app.alerts["Cancel this workout?"].buttons["Cancel Workout"].tap()
+        discardSavedDrafts()
+    }
+
+    private func discardSavedDrafts() {
+        let start = app.buttons["trainingLogger.start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        let discard = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "trainingLogger.discard.")).firstMatch
+        for _ in 0..<12 where discard.exists {
+            discard.tap()
+        }
+    }
+
     // MARK: Journey helpers
 
-    private func launch(appearance: String, route: String) {
+    private func launch(appearance: String, route: String, extra: [String] = []) {
         app.terminate()
         app.launchArguments = [
             "-physiqueos.native.authority-selection.v1", "sandbox",
             "-physiqueos.appearance.preference.v1", appearance,
             "-physiqueos.appearance-review.route", route,
-        ]
+        ] + extra
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     }

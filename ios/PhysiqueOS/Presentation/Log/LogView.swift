@@ -228,7 +228,6 @@ private struct LogTextModifier: ViewModifier {
         _size = ScaledMetric(wrappedValue: style.size)
     }
 
-    @ViewBuilder
     func body(content: Content) -> some View {
         let font = PlusJakartaSans.uiFont(size: size, weight: style.weight)
         let lineBox = size * style.lineHeight
@@ -237,18 +236,12 @@ private struct LogTextModifier: ViewModifier {
             .font(Font(font))
             .tracking(size * style.trackingEm)
             .textCase(style.uppercase ? .uppercase : nil)
-        if leading < -0.01 {
-            // A line-height tighter than the font's content area (single-line
-            // display and label roles): CSS centers the content area in the
-            // shorter line box, which is exactly a centered fixed-height frame.
-            styled
-                .lineLimit(1)
-                .frame(height: lineBox)
-        } else {
-            styled
-                .lineSpacing(leading)
-                .padding(.vertical, leading / 2)
-        }
+        // CSS half-leading: each line box is `lineBox` tall with the content
+        // area centered in it. Tighter-than-natural roles (display titles,
+        // labels) use negative leading, which also wraps correctly.
+        styled
+            .lineSpacing(leading)
+            .padding(.vertical, leading / 2)
     }
 }
 

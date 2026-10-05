@@ -171,6 +171,9 @@ enum PhysiqueOSTheme {
     static let redesignOnExecution = Color(hex: 0x10202A)
     static let redesignUtilityField = dynamic(dark: 0x087B70, light: 0xD5ECE6)
     static let redesignUtilityNavy = dynamic(dark: 0x132751, light: 0xB8CFDF)
+    /// Suggested Today eyebrow on the teal field (#E9FFFF on dark field;
+    /// deep teal ink on the light field so it stays legible).
+    static let redesignSuggestionInk = dynamic(dark: 0xE9FFFF, light: 0x087E78)
 
     private static func dynamic(
         dark: UInt32,
