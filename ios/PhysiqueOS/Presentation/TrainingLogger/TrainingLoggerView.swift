@@ -60,9 +60,9 @@ struct TrainingLoggerView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(PhysiqueOSTheme.background.ignoresSafeArea())
+        .background(PhysiqueOSTheme.redesignCanvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             if let viewModel, let draft = viewModel.draft, draft.step != .complete, draft.step != .workout,
                !viewModel.isFinishConfirmed {
@@ -222,7 +222,7 @@ struct TrainingLoggerView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 12)
+            .padding(.top, 10)
         }
         .scrollDismissesKeyboard(.interactively)
         .physiqueOSScrollBottomClearance()
@@ -250,7 +250,7 @@ struct TrainingLoggerView: View {
             if NumericEditingContract.finishActionVisible(step: viewModel.draft?.step, keyboardVisible: isNumericKeyboardVisible) {
                 let presentation = viewModel.workoutPresentation
                 persistentActionBar {
-                    PrimaryActionButton(title: "Finish Workout", isEnabled: presentation?.canFinish == true) {
+                    LoggerExecutionButton(title: "Finish Workout", isEnabled: presentation?.canFinish == true) {
                         viewModel.reviewWorkout()
                     }
                     .accessibilityIdentifier("trainingLogger.finishWorkout")
@@ -261,13 +261,20 @@ struct TrainingLoggerView: View {
         }
     }
 
+    /// Locked sticky action bar: 92% canvas over a blur, hairline top rule.
     private func persistentActionBar<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(.horizontal, 16)
             .padding(.top, 8)
-            .padding(.bottom, 6)
-            .background(.ultraThinMaterial)
-            .overlay(alignment: .top) { Divider().overlay(PhysiqueOSTheme.divider) }
+            .padding(.bottom, 11)
+            .background {
+                ZStack {
+                    Rectangle().fill(.ultraThinMaterial)
+                    Rectangle().fill(PhysiqueOSTheme.redesignCanvas.opacity(0.92))
+                }
+                .ignoresSafeArea(edges: .bottom)
+            }
+            .overlay(alignment: .top) { Rectangle().fill(PhysiqueOSTheme.redesignHairline).frame(height: 1) }
     }
 
     private func entry(_ viewModel: TrainingLoggerViewModel) -> some View {
@@ -595,23 +602,12 @@ struct TrainingLoggerView: View {
     }
 
     private func workout(_ viewModel: TrainingLoggerViewModel) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             if let draft = viewModel.draft, let presentation = viewModel.workoutPresentation {
                 workoutIdentity(draft: draft, presentation: presentation)
 
                 if draft.completedSetCount == 0, !draft.exercises.isEmpty {
-                    Button {
-                        viewModel.setReadyForWatch(draft.readyForWatchAt == nil)
-                    } label: {
-                        Label(
-                            draft.readyForWatchAt == nil ? "Ready for Watch" : "Ready on Watch",
-                            systemImage: draft.readyForWatchAt == nil ? "applewatch" : "checkmark.circle.fill"
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 38)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(PhysiqueOSTheme.accent)
-                    .accessibilityIdentifier("trainingLogger.readyForWatch")
+                    readyForWatchField(draft: draft, viewModel: viewModel)
                 }
 
                 HStack(spacing: 8) {
@@ -619,36 +615,32 @@ struct TrainingLoggerView: View {
                         viewModel.saveAndLeave()
                         dismiss()
                     } label: {
-                        Label("Save & Leave", systemImage: "arrow.left")
-                            .frame(maxWidth: .infinity)
+                        loggerControlLabel("Save & Leave", systemImage: "arrow.left", tone: .secondary)
                     }
+                    .buttonStyle(.plain)
                     .accessibilityIdentifier("trainingLogger.inlineSaveAndLeave")
 
-                    Button(role: .destructive) {
+                    Button {
                         showingCancelWorkoutConfirmation = true
                     } label: {
-                        Label("Cancel Workout", systemImage: "trash")
-                            .frame(maxWidth: .infinity)
+                        loggerControlLabel("Cancel Workout", systemImage: "delete.left", tone: .destructive)
                     }
-                    .tint(PhysiqueOSTheme.destructive)
+                    .buttonStyle(.plain)
                     .accessibilityIdentifier("trainingLogger.cancelWorkout")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
 
+                // Rest preference is a shipping control the locked active
+                // screen does not draw; it is retained in the same quiet
+                // secondary-control grammar (canonical behavior wins).
                 TrainingRestPreferenceMenu(preferences: environment.trainingRestPreferences)
 
                 Button {
                     focusedNumericFieldID = nil
                     viewModel.beginAddingExercises()
                 } label: {
-                    Label("Add Exercise", systemImage: "plus.circle.fill")
-                        .frame(maxWidth: .infinity, minHeight: 38)
+                    loggerControlLabel("Add Exercise", systemImage: "plus", tone: .primaryRow)
                 }
-                .buttonStyle(.bordered)
-                .tint(PhysiqueOSTheme.accent)
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("trainingLogger.addExercise")
 
                 ForEach(draft.exercises) { exercise in
@@ -670,100 +662,189 @@ struct TrainingLoggerView: View {
         }
     }
 
+    private enum LoggerControlTone { case secondary, destructive, primaryRow }
+
+    /// Locked utility controls: 14 pt radius secondary (soft surface + rule),
+    /// destructive (red rule + 8% tint) and the full-width Add Exercise row.
+    private func loggerControlLabel(_ title: String, systemImage: String, tone: LoggerControlTone) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let isRow = tone == .primaryRow
+        let ink = tone == .destructive ? PhysiqueOSTheme.redesignRed : PhysiqueOSTheme.redesignInk
+        return HStack(spacing: isRow ? 6 : 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: isRow ? 14 : 10, weight: .bold))
+                .accessibilityHidden(true)
+            Text(title)
+                .logText(isRow ? LoggerType.control14 : LoggerType.control11)
+        }
+        .foregroundStyle(ink)
+        .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, minHeight: isRow ? 48 : 42)
+        .background {
+            switch tone {
+            case .destructive: shape.fill(PhysiqueOSTheme.redesignRed.opacity(0.08))
+            default: shape.fill(PhysiqueOSTheme.redesignSoft)
+            }
+        }
+        .overlay {
+            shape.strokeBorder(tone == .destructive ? PhysiqueOSTheme.redesignRed.opacity(0.55) : PhysiqueOSTheme.redesignHairline, lineWidth: 1)
+        }
+        .contentShape(shape)
+    }
+
+    /// L5B: the Watch preparation field shows only before the first
+    /// completed set (unchanged predicate) and toggles the same authority
+    /// call; ready and not-ready keep their canonical labels.
+    private func readyForWatchField(draft: TrainingLoggerDraft, viewModel: TrainingLoggerViewModel) -> some View {
+        let ready = draft.readyForWatchAt != nil
+        return Button {
+            viewModel.setReadyForWatch(!ready)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: ready ? "checkmark.circle.fill" : "applewatch")
+                    .font(.system(size: 12, weight: .bold))
+                    .accessibilityHidden(true)
+                Text(ready ? "Ready on Watch" : "Ready for Watch")
+                    .logText(LoggerType.fieldTitle12)
+                Spacer(minLength: 6)
+                Text("before first set only")
+                    .logText(LoggerType.fieldCaption9)
+            }
+            .foregroundStyle(PhysiqueOSTheme.redesignInk)
+            .padding(.vertical, 9)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(
+                LinearGradient(colors: [PhysiqueOSTheme.redesignUtilityField, PhysiqueOSTheme.redesignUtilityNavy],
+                               startPoint: .topLeading, endPoint: .bottomTrailing),
+                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ready ? "Ready on Watch" : "Ready for Watch")
+        .accessibilityHint("Available before the first completed set")
+        .accessibilityIdentifier("trainingLogger.readyForWatch")
+    }
+
     private func workoutIdentity(
         draft: TrainingLoggerDraft,
         presentation: TrainingLoggerWorkoutPresentation
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 7) {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 4) {
                         Circle()
-                            .fill(draft.mode == .live ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.chartEffort)
-                            .frame(width: 8, height: 8)
-                        Text(presentation.eyebrow.uppercased())
-                            .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                            .foregroundStyle(PhysiqueOSTheme.accent)
+                            .fill(draft.mode == .live ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignAmber)
+                            .frame(width: 6.5, height: 6.5)
+                        Text(presentation.eyebrow)
+                            .logText(LoggerType.eyebrow10)
+                            .foregroundStyle(PhysiqueOSTheme.redesignPurple)
                     }
                     Text("Training Logger")
-                        .physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .logText(LoggerType.workoutTitle23)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                        .padding(.top, 3)
+                        .padding(.bottom, 2)
                     Text(presentation.context)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .logText(LoggerType.meta11)
+                        .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
                 }
                 Spacer(minLength: 8)
                 Text(presentation.progress)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .clipShape(Capsule())
+                    .logText(LoggerType.pill10)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(PhysiqueOSTheme.redesignSoft, in: Capsule())
             }
-            ProgressView(value: Double(presentation.completedSetCount), total: Double(max(1, presentation.totalSetCount)))
-                .tint(PhysiqueOSTheme.chartSuccess)
+            GeometryReader { proxy in
+                let fraction = Double(presentation.completedSetCount) / Double(max(1, presentation.totalSetCount))
+                ZStack(alignment: .leading) {
+                    Capsule().fill(PhysiqueOSTheme.redesignSoft)
+                    Capsule().fill(PhysiqueOSTheme.redesignGreen)
+                        .frame(width: proxy.size.width * min(1, max(0, fraction)))
+                }
+            }
+            .frame(height: 5)
         }
         .accessibilityElement(children: .combine)
+        .accessibilityValue("\(presentation.completedSetCount) of \(presentation.totalSetCount) sets complete")
         .accessibilityIdentifier("trainingLogger.workoutIdentity")
     }
 
     private func exerciseCard(_ exercise: TrainingLoggerDraftExercise, viewModel: TrainingLoggerViewModel) -> some View {
-        CardContainer(padding: .none) {
+        let shape = RoundedRectangle(cornerRadius: 15, style: .continuous)
+        return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(exercise.name)
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text(exerciseContext(exercise, draft: viewModel.draft))
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.chartEffort)
-                    }
-                    Spacer()
-                    exerciseMenu(exercise, viewModel: viewModel)
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+                Text(exercise.name)
+                    .logText(LoggerType.cardTitle15)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                    .padding(.trailing, 44)
+                exerciseContextText(exercise, draft: viewModel.draft)
+                    .logText(LoggerType.context10)
+                    .foregroundStyle(PhysiqueOSTheme.redesignAmber)
+                    .padding(.top, 3)
+                    .padding(.trailing, 44)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.top, 11)
+            .padding(.bottom, 8)
+            // The 44 pt menu target overlays the header so it never adds height.
+            .overlay(alignment: .topTrailing) {
+                // Dots sit on the first header line (CSS flex-start), 12 pt
+                // from the trailing edge; the 44 pt target centers on them.
+                exerciseMenu(exercise, viewModel: viewModel)
+                    .padding(.top, -2)
+                    .padding(.trailing, 2)
+            }
 
+            Group {
                 if let previous = exercise.previousPerformance {
-                    Text(previous.compactLine)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        .lineLimit(1)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 7)
+                    Text(previous.compactLine).lineLimit(1)
                 } else {
                     Text("No comparable prior performance for this variant and relationship context.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 7)
                 }
-
-                if let recommendation = exercise.progressionRecommendation {
-                    progressionGuidance(recommendation, exercise: exercise, viewModel: viewModel)
-                }
-
-                setColumnHeader(for: exercise.measurement)
-                ForEach(exercise.sets) { set in
-                    setRow(exercise: exercise, set: set, viewModel: viewModel)
-                }
-                Button {
-                    viewModel.update { $0.addSet(to: exercise.id) }
-                } label: {
-                    Label("Add set", systemImage: "plus")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .frame(maxWidth: .infinity, minHeight: 34)
-                }
-                .foregroundStyle(PhysiqueOSTheme.accent)
-                .accessibilityIdentifier("trainingLogger.addSet.\(exercise.id)")
             }
+            .logText(LoggerType.context10)
+            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+
+            if let recommendation = exercise.progressionRecommendation {
+                progressionGuidance(recommendation, exercise: exercise, viewModel: viewModel)
+            }
+
+            setColumnHeader(for: exercise.measurement)
+            ForEach(exercise.sets) { set in
+                setRow(exercise: exercise, set: set, viewModel: viewModel)
+            }
+            Button {
+                viewModel.update { $0.addSet(to: exercise.id) }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus").font(.system(size: 10, weight: .bold)).accessibilityHidden(true)
+                    Text("Add set").logText(LoggerType.addSet11)
+                }
+                .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .frame(height: 36)
+            .accessibilityIdentifier("trainingLogger.addSet.\(exercise.id)")
         }
+        .background(PhysiqueOSTheme.redesignPaper, in: shape)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("trainingLogger.exerciseCard.\(exercise.name)")
     }
 
+    /// Progression guidance is a shipping control the locked card does not
+    /// draw; it stays inside the card in the soft utility band.
     private func progressionGuidance(
         _ recommendation: TrainingLoggerProgressionRecommendation,
         exercise: TrainingLoggerDraftExercise,
@@ -771,32 +852,44 @@ struct TrainingLoggerView: View {
     ) -> some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(recommendation.eyebrow.uppercased())
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+                Text(recommendation.eyebrow)
+                    .logText(LoggerType.eyebrow8)
+                    .foregroundStyle(PhysiqueOSTheme.redesignPurple)
                 Text(recommendation.prescription)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .logText(LoggerType.control11)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
             }
             Spacer(minLength: 4)
-            Button("Use suggestion") {
+            progressionChoice("Use suggestion", selected: exercise.progressionChoice == .suggestion, enabled: recommendation.hasExplicitTarget) {
                 viewModel.update { $0.applyProgressionSuggestion(to: exercise.id) }
             }
-            .disabled(!recommendation.hasExplicitTarget)
-            .buttonStyle(.borderedProminent)
-            .tint(exercise.progressionChoice == .suggestion ? PhysiqueOSTheme.accent : PhysiqueOSTheme.surfaceMuted)
-            Button("Keep previous") {
+            progressionChoice("Keep previous", selected: exercise.progressionChoice == .previous, enabled: true) {
                 viewModel.update { $0.keepPreviousPerformance(for: exercise.id) }
             }
-            .buttonStyle(.bordered)
-            .tint(exercise.progressionChoice == .previous ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textSecondary)
         }
-        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-        .controlSize(.small)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(PhysiqueOSTheme.surfaceAccent.opacity(0.7))
+        .background(PhysiqueOSTheme.redesignSoft)
         .accessibilityIdentifier("trainingLogger.progression.\(exercise.id)")
+    }
+
+    private func progressionChoice(_ title: String, selected: Bool, enabled: Bool, action: @escaping () -> Void) -> some View {
+        let shape = Capsule()
+        return Button(action: action) {
+            Text(title)
+                .logText(LoggerType.pill10Strong)
+                .foregroundStyle(selected ? PhysiqueOSTheme.redesignPurple : PhysiqueOSTheme.redesignInk)
+                .padding(.horizontal, 9)
+                .frame(minHeight: 30)
+                .background(shape.fill(selected ? PhysiqueOSTheme.redesignPurple.opacity(0.14) : PhysiqueOSTheme.redesignPaper))
+                .overlay(shape.strokeBorder(selected ? PhysiqueOSTheme.redesignPurple : PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.45)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func exerciseMenu(_ exercise: TrainingLoggerDraftExercise, viewModel: TrainingLoggerViewModel) -> some View {
@@ -830,36 +923,64 @@ struct TrainingLoggerView: View {
             Button("Move later") { viewModel.update { $0.moveExercise(id: exercise.id, offset: 1) } }
             Button("Remove exercise", role: .destructive) { viewModel.update { $0.removeExercise(id: exercise.id) } }
         } label: {
-            Image(systemName: "ellipsis.circle")
-                .font(.system(size: 22))
-                .foregroundStyle(PhysiqueOSTheme.accent)
+            Text("•••")
+                .logText(LoggerType.menuDots)
+                .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .accessibilityLabel("Actions for \(exercise.name)")
         .accessibilityIdentifier("trainingLogger.exerciseActions.\(exercise.name)")
     }
 
-    private func setColumnHeader(for measurement: TrainingLoggerMeasurement) -> some View {
-        HStack(spacing: 8) {
-            Text("Set").frame(width: 30)
-            Text(measurement == .duration ? "Seconds" : "Reps").frame(maxWidth: .infinity)
-            Text("Load (lb)").frame(maxWidth: .infinity)
-            Text("Done").frame(width: 42)
-            Color.clear.frame(width: 24)
+    /// Locked set grid: SET 28 · primary · load · DONE 48 · remove 36, gap 6,
+    /// 8 pt horizontal inset.
+    private func setGrid<A: View, B: View, C: View, D: View, E: View>(
+        @ViewBuilder _ number: () -> A,
+        @ViewBuilder _ primary: () -> B,
+        @ViewBuilder _ load: () -> C,
+        @ViewBuilder _ done: () -> D,
+        @ViewBuilder _ remove: () -> E
+    ) -> some View {
+        HStack(spacing: 6) {
+            number().frame(width: 28)
+            primary().frame(maxWidth: .infinity)
+            load().frame(maxWidth: .infinity)
+            // CSS grid places the fixed-width Done (44) and Remove (32)
+            // buttons at the start of their 48 / 36 tracks.
+            done().frame(width: 48, alignment: .leading)
+            remove().frame(width: 36, alignment: .leading)
         }
-        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-        .foregroundStyle(PhysiqueOSTheme.textMuted)
+        .padding(.horizontal, 8)
+    }
+
+    private func setColumnHeader(for measurement: TrainingLoggerMeasurement) -> some View {
+        setGrid {
+            Text("Set")
+        } _: {
+            Text(measurement == .duration ? "Seconds" : "Reps")
+        } _: {
+            Text("Load (lb)")
+        } _: {
+            Text("Done").frame(maxWidth: .infinity)
+        } _: {
+            Color.clear
+        }
+        .logText(LoggerType.columnHeader8)
+        .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
         .frame(height: 28)
-        .padding(.horizontal, 10)
-        .background(PhysiqueOSTheme.surfaceMuted.opacity(0.7))
+        .background { Rectangle().fill(PhysiqueOSTheme.redesignSoft) }
     }
 
     private func setRow(exercise: TrainingLoggerDraftExercise, set: TrainingLoggerDraftSet, viewModel: TrainingLoggerViewModel) -> some View {
         let primaryKind: TrainingLoggerNumericFieldKind = exercise.measurement == .duration ? .duration : .reps
         let primaryID = TrainingLoggerNumericFieldTarget(exerciseId: exercise.id, setId: set.id, kind: primaryKind).id
-        return HStack(spacing: 8) {
+        let loadID = TrainingLoggerNumericFieldTarget(exerciseId: exercise.id, setId: set.id, kind: .load).id
+        return setGrid {
             Text("\(set.setNumber)")
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .frame(width: 30)
+                .logText(LoggerType.setNumber12)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
+        } _: {
             NumericEditField(
                 text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: exercise.measurement == .duration ? .durationSeconds : .reps),
                 accessibilityLabel: exercise.measurement == .duration ? "Set \(set.setNumber) seconds" : "Set \(set.setNumber) reps",
@@ -867,45 +988,70 @@ struct TrainingLoggerView: View {
                 focusedFieldID: $focusedNumericFieldID,
                 previousFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.previous(before: primaryID, in: $0) },
                 nextFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.next(after: primaryID, in: $0) },
-                onEditingChanged: numericEditingChanged
+                onEditingChanged: numericEditingChanged,
+                fieldBackground: PhysiqueOSTheme.redesignSoft,
+                font: LoggerType.fieldValueFont,
+                textColor: PhysiqueOSTheme.redesignInk,
+                placeholderColor: PhysiqueOSTheme.redesignUtilityMuted
             )
-                .frame(height: 34)
-            let loadID = TrainingLoggerNumericFieldTarget(exerciseId: exercise.id, setId: set.id, kind: .load).id
+            .frame(height: 36)
+            .modifier(LoggerFieldFocus(isFocused: focusedNumericFieldID == primaryID))
+        } _: {
             NumericEditField(
                 text: numericBinding(viewModel, exerciseId: exercise.id, setId: set.id, field: .load),
                 accessibilityLabel: "Set \(set.setNumber) optional external load",
+                placeholder: exercise.measurement == .bodyweightReps ? "BW" : nil,
                 fieldID: loadID,
                 focusedFieldID: $focusedNumericFieldID,
                 previousFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.previous(before: loadID, in: $0) },
                 nextFieldID: viewModel.draft.flatMap { TrainingLoggerNumericFocusOrder.next(after: loadID, in: $0) },
-                onEditingChanged: numericEditingChanged
+                onEditingChanged: numericEditingChanged,
+                fieldBackground: PhysiqueOSTheme.redesignSoft,
+                font: LoggerType.fieldValueFont,
+                textColor: PhysiqueOSTheme.redesignInk,
+                placeholderColor: PhysiqueOSTheme.redesignInkSecondary
             )
-                .frame(height: 34)
+            .frame(height: 36)
+            .modifier(LoggerFieldFocus(isFocused: focusedNumericFieldID == loadID))
+        } _: {
             Button {
                 viewModel.setCompletion(exerciseId: exercise.id, setId: set.id, completed: !set.isCompleted)
             } label: {
+                // Founder-corrected Done control: production circle /
+                // checkmark.circle.fill identity at a 28 pt visible circle in
+                // a 44 × 44 target; explicit end state, never a blind toggle.
                 Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 21))
-                    .foregroundStyle(set.isCompleted ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textMuted)
-                    .frame(width: 42, height: 40)
+                    .font(.system(size: 32, weight: .regular))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(
+                        set.isCompleted ? PhysiqueOSTheme.redesignCanvas : PhysiqueOSTheme.redesignUtilityMuted,
+                        set.isCompleted ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignUtilityMuted
+                    )
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel(set.isCompleted ? "Mark set incomplete" : "Mark set complete")
+        } _: {
             Button {
                 viewModel.update { $0.removeSet(exerciseId: exercise.id, setId: set.id) }
             } label: {
-                Image(systemName: "trash")
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    .frame(width: 24, height: 40)
+                Image(systemName: "delete.left")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
+                    .frame(width: 32, height: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .disabled(exercise.sets.count <= 1)
             .opacity(exercise.sets.count <= 1 ? 0.35 : 1)
+            .accessibilityLabel("Remove set \(set.setNumber)")
         }
-        .physiqueOSFont(PhysiqueOSTypography.body14Regular)
-        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-        .frame(height: 42)
-        .padding(.horizontal, 10)
-        .background(set.isCompleted ? PhysiqueOSTheme.chartSuccess.opacity(0.08) : Color.clear)
-        .overlay(alignment: .bottom) { Divider().overlay(PhysiqueOSTheme.divider) }
+        .frame(minHeight: 52)
+        .background { Rectangle().fill(set.isCompleted ? PhysiqueOSTheme.redesignGreen.opacity(0.09) : Color.clear) }
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(PhysiqueOSTheme.redesignHairline).frame(height: 1)
+        }
     }
 
     private func summary(_ viewModel: TrainingLoggerViewModel) -> some View {
@@ -1372,6 +1518,19 @@ struct TrainingLoggerView: View {
             .padding()
     }
 
+    /// Card context line. A superset member leads with its locked group
+    /// label ("SUPERSET A"), derived from relationship order without
+    /// reordering anything; other cards keep the canonical context copy.
+    private func exerciseContextText(_ exercise: TrainingLoggerDraftExercise, draft: TrainingLoggerDraft?) -> Text {
+        guard let draft, let letter = LoggerSupersetLabel.letter(for: exercise.id, in: draft) else {
+            return Text(exerciseContext(exercise, draft: draft))
+        }
+        var parts: [String] = [exercise.executionVariant?.label ?? "Ordinary"]
+        if exercise.isProvisional { parts.append("Provisional") }
+        return Text("SUPERSET \(letter)").fontWeight(.bold).tracking(0.6)
+            + Text(" · " + parts.joined(separator: " · "))
+    }
+
     private func exerciseContext(_ exercise: TrainingLoggerDraftExercise, draft: TrainingLoggerDraft?) -> String {
         var parts: [String] = []
         if let variant = exercise.executionVariant { parts.append(variant.label) }
@@ -1447,3 +1606,88 @@ struct TrainingLoggerView: View {
         }
     }
 }
+
+// MARK: - Locked utility presentation (Batch 2)
+
+/// Text roles from the locked Training Logger utility package, expressed as
+/// CSS-faithful `LogType`s (the harness uses the font's natural line height
+/// unless a role sets one).
+enum LoggerType {
+    static let eyebrow10 = LogType(size: 10, weight: 760, lineHeight: 1.26, trackingEm: 0.12, uppercase: true)
+    static let eyebrow8 = LogType(size: 8, weight: 760, lineHeight: 1.26, trackingEm: 0.06, uppercase: true)
+    static let workoutTitle23 = LogType(size: 23, weight: 700, lineHeight: 1.26)
+    static let meta11 = LogType(size: 11, weight: 400, lineHeight: 1.26)
+    static let pill10 = LogType(size: 10, weight: 400, lineHeight: 1.26)
+    static let pill10Strong = LogType(size: 10, weight: 700, lineHeight: 1.26)
+    static let control11 = LogType(size: 11, weight: 760, lineHeight: 1.26)
+    static let control14 = LogType(size: 14, weight: 760, lineHeight: 1.26)
+    static let fieldTitle12 = LogType(size: 12, weight: 700, lineHeight: 1.26)
+    static let fieldCaption9 = LogType(size: 9, weight: 400, lineHeight: 1.26)
+    static let cardTitle15 = LogType(size: 15, weight: 700, lineHeight: 1.26)
+    static let context10 = LogType(size: 10, weight: 400, lineHeight: 1.26)
+    static let columnHeader8 = LogType(size: 8, weight: 760, lineHeight: 1.26, uppercase: true)
+    static let setNumber12 = LogType(size: 12, weight: 700, lineHeight: 1.26)
+    static let addSet11 = LogType(size: 11, weight: 760, lineHeight: 1.26)
+    static let menuDots = LogType(size: 15, weight: 700, lineHeight: 1.26)
+    static let execution14 = LogType(size: 14, weight: 760, lineHeight: 1.26)
+    static var fieldValueFont: UIFont { PlusJakartaSans.uiFont(size: UIFontMetrics.default.scaledValue(for: 12), weight: 400) }
+}
+
+/// Superset group letters in the order groups first appear in the workout.
+/// Presentation only: it never reorders exercises or relationships.
+enum LoggerSupersetLabel {
+    static func letter(for exerciseId: String, in draft: TrainingLoggerDraft) -> String? {
+        let groups = draft.relationships.filter { $0.relationshipType == "superset" }
+        guard let group = groups.first(where: { $0.memberExerciseIds.contains(exerciseId) }) else { return nil }
+        func firstPosition(_ g: TrainingLoggerDraftRelationship) -> Int {
+            g.memberExerciseIds.compactMap { id in draft.exercises.firstIndex(where: { $0.id == id }) }.min() ?? Int.max
+        }
+        let ordered = groups.sorted { firstPosition($0) < firstPosition($1) }
+        guard let index = ordered.firstIndex(where: { $0.id == group.id }) else { return nil }
+        let scalars = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        return index < scalars.count ? String(scalars[index]) : "\(index + 1)"
+    }
+}
+
+/// Locked focused numeric field: teal border plus a 2 pt 22% teal halo.
+struct LoggerFieldFocus: ViewModifier {
+    let isFocused: Bool
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if isFocused {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(PhysiqueOSTheme.redesignTeal, lineWidth: 1)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(PhysiqueOSTheme.redesignTeal.opacity(0.22), lineWidth: 2)
+                            .padding(-1)
+                    )
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+}
+
+/// Locked amber execution action (Finish): 52 pt, 14 pt radius, dark ink in
+/// both appearances; disabled keeps the label legible at reduced opacity.
+struct LoggerExecutionButton: View {
+    let title: String
+    var isEnabled: Bool = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .logText(LoggerType.execution14)
+                .foregroundStyle(PhysiqueOSTheme.redesignOnExecution)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(PhysiqueOSTheme.redesignAmber, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.5)
+    }
+}
+

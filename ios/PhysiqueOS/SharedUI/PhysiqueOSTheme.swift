@@ -165,6 +165,12 @@ enum PhysiqueOSTheme {
     static let redesignCyanInk = dynamic(dark: 0x3BC6DD, light: 0x10708A)
     static let redesignOnAmber = dynamic(dark: 0x10202A, light: 0xFFFAF1)
     static let redesignHairline = dynamic(dark: 0x9DB3BD, light: 0x193842, darkOpacity: 0.184, lightOpacity: 0.169)
+    // Batch 2 Training Logger utility roles (locked utility package).
+    static let redesignUtilityMuted = dynamic(dark: 0x92A5AF, light: 0x6B7E85)
+    static let redesignRed = dynamic(dark: 0xFF697A, light: 0xB83D4B)
+    static let redesignOnExecution = Color(hex: 0x10202A)
+    static let redesignUtilityField = dynamic(dark: 0x087B70, light: 0xD5ECE6)
+    static let redesignUtilityNavy = dynamic(dark: 0x132751, light: 0xB8CFDF)
 
     private static func dynamic(
         dark: UInt32,

@@ -237,7 +237,7 @@ private struct LogTextModifier: ViewModifier {
             .font(Font(font))
             .tracking(size * style.trackingEm)
             .textCase(style.uppercase ? .uppercase : nil)
-        if leading < 0 {
+        if leading < -0.01 {
             // A line-height tighter than the font's content area (single-line
             // display and label roles): CSS centers the content area in the
             // shorter line box, which is exactly a centered fixed-height frame.

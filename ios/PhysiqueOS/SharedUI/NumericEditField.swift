@@ -13,6 +13,11 @@ struct NumericEditField: UIViewRepresentable {
     var previousFieldID: String? = nil
     var nextFieldID: String? = nil
     var onEditingChanged: (Bool) -> Void = { _ in }
+    /// Optional surface styling for redesigned hosts; nil keeps the legacy look.
+    var fieldBackground: Color? = nil
+    var font: UIFont? = nil
+    var textColor: Color? = nil
+    var placeholderColor: Color? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -22,11 +27,13 @@ struct NumericEditField: UIViewRepresentable {
         field.keyboardType = .decimalPad
         field.textAlignment = .center
         field.borderStyle = .none
-        field.backgroundColor = UIColor(PhysiqueOSTheme.surfaceMuted)
+        field.backgroundColor = UIColor(fieldBackground ?? PhysiqueOSTheme.surfaceMuted)
+        if let font { field.font = font }
+        if let textColor { field.textColor = UIColor(textColor) }
         field.layer.cornerRadius = 8
         field.clipsToBounds = true
         field.accessibilityLabel = accessibilityLabel
-        field.placeholder = placeholder
+        applyPlaceholder(to: field)
         field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
 
         let toolbar = UIToolbar()
@@ -40,7 +47,7 @@ struct NumericEditField: UIViewRepresentable {
         context.coordinator.parent = self
         if field.text != text { field.text = text }
         field.accessibilityLabel = accessibilityLabel
-        field.placeholder = placeholder
+        applyPlaceholder(to: field)
         if let fieldID, let focusedFieldID {
             if focusedFieldID.wrappedValue == fieldID, !field.isFirstResponder {
                 field.becomeFirstResponder()
@@ -51,6 +58,16 @@ struct NumericEditField: UIViewRepresentable {
         if let toolbar = field.inputAccessoryView as? UIToolbar {
             context.coordinator.refreshToolbar(toolbar)
         }
+    }
+
+    private func applyPlaceholder(to field: UITextField) {
+        guard let placeholder, let placeholderColor else {
+            field.placeholder = placeholder
+            return
+        }
+        var attributes: [NSAttributedString.Key: Any] = [.foregroundColor: UIColor(placeholderColor)]
+        if let font { attributes[.font] = font }
+        field.attributedPlaceholder = NSAttributedString(string: placeholder, attributes: attributes)
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {

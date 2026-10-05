@@ -755,3 +755,136 @@ final class TrainingAcceptanceUITests: XCTestCase {
 
     private func attachScreenshot(_: String) {}
 }
+
+/// Batch 2 locked-design parity captures. Drives the real sandbox Logger
+/// (no state seams) and writes full-screen PNGs only when
+/// `LOGGER_PARITY_DIR` is set; otherwise the journeys still run as
+/// interaction regression coverage for the redesigned surfaces.
+@MainActor
+final class LoggerParityCaptureUITests: XCTestCase {
+    private let app = XCUIApplication()
+
+    override func setUp() async throws {
+        continueAfterFailure = false
+    }
+
+    func testCheckpoint2ActiveWorkoutDark() { checkpoint2(appearance: "dark") }
+    func testCheckpoint2ActiveWorkoutMineralLight() { checkpoint2(appearance: "light") }
+
+    private func checkpoint2(appearance: String) {
+        launch(appearance: appearance, route: "training-logger")
+        startWorkout(areas: ["chest", "core"], exercises: ["Bench Press", "Cable Fly", "Push-ups", "Planks"])
+
+        // Pre-first-set state: Ready for Watch offered, Finish disabled.
+        XCTAssertTrue(app.buttons["trainingLogger.readyForWatch"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["trainingLogger.finishWorkout"].isEnabled)
+        capture("cp2-ready-\(appearance)")
+        app.buttons["trainingLogger.readyForWatch"].tap()
+        XCTAssertTrue(app.buttons["Ready on Watch"].waitForExistence(timeout: 3))
+        capture("cp2-ready-on-\(appearance)")
+        app.buttons["trainingLogger.readyForWatch"].tap()
+
+        // Complete two sets: Done states, progress, success tint; Ready hides.
+        let complete = app.buttons["Mark set complete"].firstMatch
+        XCTAssertTrue(complete.waitForExistence(timeout: 3))
+        complete.tap()
+        app.buttons["Mark set complete"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Mark set incomplete"].firstMatch.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["trainingLogger.readyForWatch"].exists)
+        XCTAssertTrue(app.buttons["trainingLogger.finishWorkout"].isEnabled)
+        XCTAssertGreaterThanOrEqual(app.buttons["Mark set incomplete"].firstMatch.frame.width, 43.9)
+        XCTAssertGreaterThanOrEqual(app.buttons["Mark set incomplete"].firstMatch.frame.height, 43.9)
+        capture("cp2-active-\(appearance)")
+
+        // Bodyweight and timed rows further down the same workout.
+        app.swipeUp()
+        app.swipeUp()
+        capture("cp2-set-types-\(appearance)")
+        app.swipeDown()
+        app.swipeDown()
+
+        // Numeric focus with the system decimal keyboard (Finish hides).
+        let load = app.textFields["Set 1 optional external load"].firstMatch
+        XCTAssertTrue(load.waitForExistence(timeout: 3))
+        load.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["trainingLogger.finishWorkout"].exists)
+        capture("cp2-keyboard-\(appearance)")
+        app.buttons["Done"].firstMatch.tap()
+
+        // Exercise relationship menu, then a superset pair.
+        let actions = app.buttons["trainingLogger.exerciseActions.Bench Press"]
+        XCTAssertTrue(actions.waitForExistence(timeout: 3))
+        actions.tap()
+        XCTAssertTrue(app.buttons["Superset"].waitForExistence(timeout: 3))
+        capture("cp2-menu-\(appearance)")
+        app.buttons["Superset"].tap()
+        let pair = app.buttons["Pair with Cable Fly"]
+        XCTAssertTrue(pair.waitForExistence(timeout: 3))
+        pair.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "SUPERSET A")).firstMatch.waitForExistence(timeout: 3))
+        capture("cp2-superset-\(appearance)")
+
+        // Cancel safety: confirmation first, then the explicit discard.
+        app.buttons["trainingLogger.cancelWorkout"].tap()
+        XCTAssertTrue(app.alerts["Cancel this workout?"].waitForExistence(timeout: 3))
+        capture("cp2-cancel-\(appearance)")
+        app.alerts["Cancel this workout?"].buttons["Cancel Workout"].tap()
+    }
+
+    // MARK: Journey helpers
+
+    private func launch(appearance: String, route: String) {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance.preference.v1", appearance,
+            "-physiqueos.appearance-review.route", route,
+        ]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+    }
+
+    private func startWorkout(areas: [String], exercises: [String]) {
+        let start = app.buttons["trainingLogger.start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
+        for area in areas {
+            let button = app.buttons["trainingLogger.area.\(area)"]
+            XCTAssertTrue(button.waitForExistence(timeout: 5))
+            button.tap()
+        }
+        let choose = app.buttons["Choose exercises"]
+        XCTAssertTrue(choose.waitForExistence(timeout: 5))
+        choose.tap()
+        for name in exercises {
+            var row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(name),")).firstMatch
+            for _ in 0..<6 where !(row.exists && row.isHittable) { app.swipeUp() }
+            if !row.exists {
+                // Not in My Library: use the full catalog, as a person would.
+                for _ in 0..<8 { app.swipeDown() }
+                let browse = app.buttons["trainingLogger.browseAll"]
+                if browse.waitForExistence(timeout: 2) { browse.tap() }
+                row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(name),")).firstMatch
+                for _ in 0..<10 where !(row.exists && row.isHittable) { app.swipeUp() }
+            }
+            XCTAssertTrue(row.exists, "Exercise \(name) not found")
+            row.tap()
+        }
+        let startLogging = app.buttons["trainingLogger.startLogging"]
+        XCTAssertTrue(startLogging.waitForExistence(timeout: 5))
+        startLogging.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["trainingLogger.workoutIdentity"].waitForExistence(timeout: 5))
+    }
+
+    private func capture(_ name: String) {
+        Thread.sleep(forTimeInterval: 0.9)
+        let screenshot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let directory = ProcessInfo.processInfo.environment["LOGGER_PARITY_DIR"] else { return }
+        try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
+    }
+}

@@ -35,12 +35,22 @@ struct TrainingRestPreferenceMenu: View {
             }
             Text("Applies from your next completed set.")
         } label: {
-            Label("Rest · \(preferences.summary)", systemImage: symbol)
-                .frame(maxWidth: .infinity, minHeight: 34)
+            // Same quiet secondary-control grammar as Save & Leave.
+            HStack(spacing: 4) {
+                Image(systemName: symbol)
+                    .font(.system(size: 10, weight: .bold))
+                    .accessibilityHidden(true)
+                Text("Rest · \(preferences.summary)")
+                    .logText(LoggerType.control11)
+            }
+            .foregroundStyle(PhysiqueOSTheme.redesignInk)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 42)
+            .background(PhysiqueOSTheme.redesignSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .buttonStyle(.bordered)
-        .tint(PhysiqueOSTheme.accent)
-        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+        .accessibilityLabel("Rest · \(preferences.summary)")
         .accessibilityIdentifier("trainingLogger.restPreference")
     }
 
