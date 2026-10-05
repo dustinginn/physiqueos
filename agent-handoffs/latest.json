@@ -18,12 +18,12 @@
     "checkpoint_d_sha": "bf4551c4",
     "checkpoint_e_sha": "d842a76b",
     "implementation_sha": "d842a76bdb8dad023da4add7104688747d9c1872",
-    "feature_branch_head": "87d77cd7",
+    "feature_branch_head": "87d77cd7f0a7a78508d743a875d6ad77cdd1cdf4",
     "batch2_audited_head": "7a9a7caaa582b3e9b3926cb0ed19842c773dc6b3"
   },
   "publication": {
     "source_work_branch": "codex/redesign-batch3-evidence-20261005",
-    "main_report_commit": "c1ce58ff61a25d79d09554cad3f16da12211fe13",
+    "main_report_commit": "c1ce58fff0dc0c15b97cae62682533a753e6594b",
     "report_path": "agent-handoffs/reports/20261005T142039Z-redesign-batch3-evidence.md",
     "artifact_roots": [
       "agent-handoffs/artifacts/redesign-batch3-checkpoint-a-20261005/",

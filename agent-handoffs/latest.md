@@ -9,8 +9,8 @@ Machine-readable interface: `agent-handoffs/latest.json`.
 - Prompt authority: `df2d7d504c371e4745453be22e7a37a500f3a239`
 - Implementation branch: `codex/redesign-batch3-evidence-20261005`
 - Implementation authority: `d842a76bdb8dad023da4add7104688747d9c1872`
-- Feature-branch closeout head: `87d77cd7`
-- Main report commit: `c1ce58ff61a25d79d09554cad3f16da12211fe13`
+- Feature-branch closeout head: `87d77cd7f0a7a78508d743a875d6ad77cdd1cdf4`
+- Main report commit: `c1ce58fff0dc0c15b97cae62682533a753e6594b`
 - Report: `agent-handoffs/reports/20261005T142039Z-redesign-batch3-evidence.md`
 
 Review packages:
