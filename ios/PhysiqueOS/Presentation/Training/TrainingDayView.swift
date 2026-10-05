@@ -20,17 +20,14 @@ struct TrainingDayView: View {
     @State private var viewModel: TrainingDayViewModel?
     let date: String
 
+    private let m = EvidenceMetrics(family: .training)
+
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .evidencePageChrome(TrainingDateFormatting.short(date))
+        .evidenceFamily(.training)
         .task {
             if viewModel == nil { viewModel = TrainingDayViewModel(api: environment.trainingAPI, date: date) }
             await viewModel?.load()
@@ -41,64 +38,33 @@ struct TrainingDayView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Training Evidence"), identifier: "training.day.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "training.day.failure")
         case .loaded(.none):
-            Text("No training evidence for this day.")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .empty("No training evidence for this day.", nil), identifier: "training.day.empty")
         case .loaded(.some(let day)):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: day)
-                sessionsCard(day.sessions)
-            }
+            EvidencePageHeader(
+                eyebrow: "Training Day",
+                title: Self.formatCompactDate(day.date),
+                subtitle: Self.formatSummary(day.summary)
+            )
+            sessionsSection(day.sessions)
         }
     }
 
-    private func header(for day: TrainingDayReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Training Day")
-                .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
-                .foregroundStyle(PhysiqueOSTheme.accent)
-            Text(Self.formatCompactDate(day.date))
-                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text(Self.formatSummary(day.summary))
-                .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// A single grouped container for every session row — replaces a prior
-    /// revision's bare `VStack` of independently bordered/elevated rows
-    /// (which read as unrelated floating cards rather than one day's
-    /// sessions) with the same `CardContainer` + `SectionHeading` +
-    /// divided-rows convention `TrainingAreaView`'s "Browse" card and
-    /// `TrainingSessionDetailView`'s "Exercises" card already establish.
-    private func sessionsCard(_ sessions: [TrainingDaySessionSummary]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeading("Sessions")
-                VStack(spacing: 0) {
-                    ForEach(sessions) { session in
-                        NavigationLink(value: session.destination) {
-                            TrainingDaySessionRowView(session: session)
-                        }
-                        .buttonStyle(.plain)
-
-                        if session.id != sessions.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
-                        }
-                    }
+    /// One open "Sessions" list of read-only rail rows in the Server's
+    /// session order (Strength purple; Walking/Cardio teal; other neutral).
+    private func sessionsSection(_ sessions: [TrainingDaySessionSummary]) -> some View {
+        EvidenceSection(title: "Sessions", style: .open, identifier: "training.day.sessions") {
+            EvidenceSmallNote(text: "\(sessions.count) session\(sessions.count == 1 ? "" : "s")")
+        } content: {
+            EvidenceDividedList(data: sessions) { session in
+                NavigationLink(value: session.destination) {
+                    TrainingDaySessionRowView(session: session)
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("training.day.session.\(session.id)")
             }
         }
     }
@@ -137,36 +103,24 @@ struct TrainingDayView: View {
     }
 }
 
-/// A grouped row inside the "Sessions" card — matches `TrainingAreaView`'s
-/// "Browse" row weight/density (`surfaceMuted` fill, accent chevron, no
-/// independent border/elevation) rather than the prior revision's
-/// individually bordered `surfaceElevated` card, which read as unrelated
-/// floating cards instead of rows within one Sessions section.
+/// A session in the locked rail-row language. The type line comes from the
+/// canonical `kind` (and the canonical activity type for `other`, e.g.
+/// historical Cooldown), never from a guessed source.
 private struct TrainingDaySessionRowView: View {
     let session: TrainingDaySessionSummary
 
-    var body: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.title)
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(session.detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-            Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.accent)
+    private var typeAndTone: (String, EvidenceRailTone) {
+        switch session.kind {
+        case .strength: ("Strength", .strength)
+        case .walking: ("Walking", .walking)
+        case .cardio: ("Cardio", .cardio)
+        case .other: (session.activityType, .cooldown)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 10)
-        .frame(minHeight: 44)
-        .frame(maxWidth: .infinity)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
+    }
+
+    var body: some View {
+        EvidenceRailRow(type: typeAndTone.0, label: session.title, detail: session.detail, tone: typeAndTone.1)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
     }
 }

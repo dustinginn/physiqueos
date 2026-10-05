@@ -28,18 +28,15 @@ struct TrainingSessionDetailView: View {
     @State private var localDraftCorrections: [String] = []
     @FocusState private var isCorrectionEditorFocused: Bool
 
+    private let m = EvidenceMetrics(family: .training)
+
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
         .scrollDismissesKeyboard(.immediately)
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .evidencePageChrome(viewModel?.loadedSession?.label ?? "Workout")
+        .evidenceFamily(.training)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -60,113 +57,82 @@ struct TrainingSessionDetailView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Training Evidence"), identifier: "training.session.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "training.session.failure")
         case .loaded(.none):
-            Text("This session could not be found.")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .empty("This session could not be found.", nil), identifier: "training.session.notFound")
         case .loaded(.some(let session)):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: session)
-                if let attachment = session.healthKitAttachment {
-                    appleHealthAttachmentCard(attachment)
-                } else if let telemetry = session.telemetry {
-                    telemetryCard(telemetry)
-                }
+            let cardio = session.showsGeneratedSummaryInsteadOfStructuredExercises ? TrainingSessionDetailSummary(detail: session.detail) : nil
+            header(for: session, metricsShown: cardio?.hasMetrics == true)
+            if let attachment = session.healthKitAttachment {
+                appleHealthAttachmentSection(attachment)
+            } else {
                 if session.showsGeneratedSummaryInsteadOfStructuredExercises {
-                    summaryCard(for: session)
-                } else if !session.exercises.isEmpty {
-                    exercisesCard(for: session)
-                }
-                if let media = session.supportingMedia, !media.isEmpty {
-                    supportingMediaCard(media)
-                }
-                correctionCard(for: session)
-            }
-        }
-    }
-
-    /// Workout-level telemetry rendered once, structurally, instead of as
-    /// part of `session.detail`'s generated one-line string — the fix for
-    /// the Founder-observed duplicate summary above the structured exercise
-    /// list. Each field renders only when present, since an Apple-only
-    /// telemetry source may not carry all of them.
-    private func telemetryCard(_ telemetry: TrainingSessionTelemetryReadModel) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Workout Summary")
-                if let timeRange = Self.formatTimeRange(start: telemetry.startTime, end: telemetry.endTime) {
-                    telemetryRow(timeRange)
-                }
-                if let duration = telemetry.durationSeconds, let label = Self.formatDuration(duration) {
-                    telemetryRow(label)
-                }
-                if let calories = telemetry.activeCalories {
-                    telemetryRow("\(Int(calories)) active cal")
-                }
-                if let heartRate = telemetry.averageHeartRate {
-                    telemetryRow("\(Int(heartRate)) bpm avg HR")
-                }
-            }
-        }
-    }
-
-    private func appleHealthAttachmentCard(_ attachment: HealthKitWorkoutAttachmentReadModel) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Apple Health")
-                HStack(spacing: 8) {
-                    Image(systemName: "applewatch")
-                        .foregroundStyle(PhysiqueOSTheme.accent)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(attachment.source.sourceName)
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text(Self.relationshipLabel(for: attachment.relationship))
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    ForEach(session.sourceEvidence, id: \.self) { source in
+                        EvidenceProvenance(title: source, detail: "Source evidence for this workout")
                     }
                 }
-                if let timeRange = Self.formatTimeRange(
-                    start: attachment.session.startedAt,
-                    end: attachment.session.endedAt
-                ) { telemetryRow(timeRange) }
-                if let duration = attachment.session.durationSeconds,
-                   let label = Self.formatDuration(duration) { telemetryRow(label) }
-                if let calories = attachment.session.activeCalories {
-                    telemetryRow("\(Int(calories.rounded())) active cal")
+                if let telemetry = session.telemetry {
+                    telemetrySection(telemetry)
                 }
-                if let calories = attachment.session.totalCalories {
-                    telemetryRow("\(Int(calories.rounded())) total cal")
-                }
-                if let heartRate = attachment.session.averageHeartRate {
-                    telemetryRow("\(Int(heartRate.rounded())) bpm avg HR")
-                }
-                if let distance = attachment.session.distance {
-                    telemetryRow("\(distance.formatted(.number.precision(.fractionLength(0...2)))) \(attachment.session.distanceUnit ?? "")".trimmingCharacters(in: .whitespaces))
+            }
+            if session.showsGeneratedSummaryInsteadOfStructuredExercises {
+                summarySection(for: session, parsed: cardio)
+            } else if !session.exercises.isEmpty {
+                exercisesSection(for: session)
+            }
+            if let media = session.supportingMedia, !media.isEmpty {
+                supportingMediaSection(media)
+            }
+            correctionSection(for: session)
+        }
+    }
+
+    /// Workout-level telemetry rendered once (never duplicating the
+    /// structured exercise list); each field only when present.
+    private func telemetrySection(_ telemetry: TrainingSessionTelemetryReadModel) -> some View {
+        var rows: [(key: String, value: String)] = []
+        if let timeRange = Self.formatTimeRange(start: telemetry.startTime, end: telemetry.endTime) { rows.append(("Time", timeRange)) }
+        if let duration = telemetry.durationSeconds, let label = Self.formatDuration(duration) { rows.append(("Duration", label)) }
+        if let calories = telemetry.activeCalories { rows.append(("Active energy", "\(Int(calories)) active cal")) }
+        if let heartRate = telemetry.averageHeartRate { rows.append(("Average heart rate", "\(Int(heartRate)) bpm avg HR")) }
+        return EvidenceSection(title: "Workout Summary", identifier: "training.session.summary") {
+            EvidenceDefinitionList(rows: rows)
+        }
+    }
+
+    /// Confirmed attachments read as a teal source field; a candidate match
+    /// is amber and says so literally — never "Confirmed".
+    private func appleHealthAttachmentSection(_ attachment: HealthKitWorkoutAttachmentReadModel) -> some View {
+        var rows: [(key: String, value: String)] = []
+        if let timeRange = Self.formatTimeRange(start: attachment.session.startedAt, end: attachment.session.endedAt) { rows.append(("Time", timeRange)) }
+        if let duration = attachment.session.durationSeconds, let label = Self.formatDuration(duration) { rows.append(("Duration", label)) }
+        if let calories = attachment.session.activeCalories { rows.append(("Active energy", "\(Int(calories.rounded())) active cal")) }
+        if let calories = attachment.session.totalCalories { rows.append(("Total energy", "\(Int(calories.rounded())) total cal")) }
+        if let heartRate = attachment.session.averageHeartRate { rows.append(("Average heart rate", "\(Int(heartRate.rounded())) bpm avg HR")) }
+        if let distance = attachment.session.distance {
+            rows.append(("Distance", "\(distance.formatted(.number.precision(.fractionLength(0...2)))) \(attachment.session.distanceUnit ?? "")".trimmingCharacters(in: .whitespaces)))
+        }
+        let confirmed = attachment.relationship.status == "confirmed"
+        return VStack(alignment: .leading, spacing: m.pt(16)) {
+            EvidenceProvenance(
+                title: attachment.source.sourceName,
+                detail: Self.relationshipLabel(for: attachment.relationship),
+                tint: confirmed ? nil : m.c.amber
+            )
+            .accessibilityIdentifier("training.session.appleHealth")
+            if !rows.isEmpty {
+                EvidenceSection(title: "Workout Summary", identifier: "training.session.summary") {
+                    EvidenceDefinitionList(rows: rows)
                 }
             }
         }
     }
 
-    private func telemetryRow(_ text: String) -> some View {
-        Text(text)
-            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-    }
-
-    private func supportingMediaCard(_ media: [TrainingSessionSupportingMedia]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Supporting Screenshots")
+    private func supportingMediaSection(_ media: [TrainingSessionSupportingMedia]) -> some View {
+        EvidenceSection(title: "Supporting Screenshots", identifier: "training.session.media") {
+            VStack(spacing: m.pt(10)) {
                 ForEach(media) { item in
                     TrainingSupportingMediaImage(mediaId: item.media.mediaId)
                 }
@@ -174,28 +140,29 @@ struct TrainingSessionDetailView: View {
         }
     }
 
-    private func header(for session: TrainingSessionDetailReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Workout Detail")
-                .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
-                .foregroundStyle(PhysiqueOSTheme.accent)
-            Text(session.label)
-                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text(session.showsWorkoutValueInHeader ? "\(session.value) · \(Self.formatDate(session.date))" : Self.formatDate(session.date))
-                .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func header(for session: TrainingSessionDetailReadModel, metricsShown: Bool) -> some View {
+        let date = Self.formatDate(session.date)
+        let subtitle = session.showsWorkoutValueInHeader && !metricsShown ? "\(session.value) · \(date)" : date
+        return EvidencePageHeader(eyebrow: "Workout Detail", title: session.label, subtitle: subtitle)
     }
 
-    private func summaryCard(for session: TrainingSessionDetailReadModel) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Session Details")
+    /// Apple-only workouts with no structured exercises: the Server's own
+    /// detail tokens shown as labeled cells (only when every token is
+    /// recognized), otherwise the detail line verbatim.
+    private func summarySection(for session: TrainingSessionDetailReadModel, parsed: TrainingSessionDetailSummary?) -> some View {
+        EvidenceSection(title: "Session Details", style: .analytical, identifier: "training.session.details") {
+            if let parsed, parsed.hasMetrics {
+                EvidenceMetricGrid(items: parsed.metrics.map { .init(label: $0.label, value: $0.value) })
+                if let timeRange = parsed.timeRange {
+                    Text(timeRange)
+                        .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+                        .foregroundStyle(m.c.muted)
+                        .padding(.top, m.pt(8))
+                }
+            } else {
                 Text(session.detail)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+                    .foregroundStyle(m.c.ink)
             }
         }
     }
@@ -229,89 +196,89 @@ struct TrainingSessionDetailView: View {
         correctionStatusMessage = "Saved to this device only. Your original workout is unchanged."
     }
 
-    /// Mirrors `TrainingSessionCorrectionCard`
-    /// (`TrainingKnowledgeScreen.jsx:855-894`): title, body copy, a
-    /// free-text field with the same placeholder example, and a submit
-    /// button — same copy, same single-field shape, same "leaving the
-    /// original evidence attached" framing as the real correction flow.
-    private func correctionCard(for session: TrainingSessionDetailReadModel) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Add / Correct Workout Details")
-                Text("Add missing exercises, sets, reps, or loads for this workout. The original source stays attached while this detail improves the workout record.")
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-
-                if environment.nativeAuthority == .founderProduction {
-                    Text("Workout corrections aren't available here yet. Your saved workout is unchanged.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                ZStack(alignment: .topLeading) {
-                    if correctionDraftText.isEmpty {
-                        Text("Shoulder Press Machine\n15 x #120\n12 x #130\n10 x #140\n8 x #150")
-                            .physiqueOSFont(PhysiqueOSTypography.body14Regular)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 12)
-                            .allowsHitTesting(false)
+    /// Mirrors `TrainingSessionCorrectionCard`: Founder Production states
+    /// honestly that corrections are not available here; Sandbox keeps the
+    /// local-only draft editor (never claims a server save).
+    private func correctionSection(for session: TrainingSessionDetailReadModel) -> some View {
+        EvidenceSection(title: "Add / Correct Workout Details", identifier: "training.session.correction") {
+            if environment.nativeAuthority == .founderProduction {
+                Text("Workout corrections aren't available here yet. Your saved workout is unchanged.")
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 13.05))
+                    .foregroundStyle(m.c.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(alignment: .leading, spacing: m.pt(10)) {
+                    Text("Add missing exercises, sets, reps, or loads for this workout. The original source stays attached while this detail improves the workout record.")
+                        .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 13.05))
+                        .foregroundStyle(m.c.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ZStack(alignment: .topLeading) {
+                        if correctionDraftText.isEmpty {
+                            Text("Shoulder Press Machine\n15 x #120\n12 x #130\n10 x #140\n8 x #150")
+                                .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+                                .foregroundStyle(m.c.quiet)
+                                .padding(.horizontal, m.pt(10))
+                                .padding(.vertical, m.pt(10))
+                                .allowsHitTesting(false)
+                        }
+                        TextEditor(text: $correctionDraftText)
+                            .focused($isCorrectionEditorFocused)
+                            .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+                            .foregroundStyle(m.c.ink)
+                            .scrollContentBackground(.hidden)
+                            .padding(m.pt(5))
                     }
-                    TextEditor(text: $correctionDraftText)
-                        .focused($isCorrectionEditorFocused)
-                        .physiqueOSFont(PhysiqueOSTypography.body14Regular)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        .scrollContentBackground(.hidden)
-                        .padding(6)
-                }
-                .frame(minHeight: 120)
-                .background(PhysiqueOSTheme.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(minHeight: 120)
+                    .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(11)))
 
-                if let correctionStatusMessage {
-                    Text(correctionStatusMessage)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+                    if let correctionStatusMessage {
+                        EvidenceCallout(text: correctionStatusMessage, tone: .neutral)
+                    }
 
-                PrimaryActionButton(title: "Save workout details", tone: .accent) {
-                    submitCorrection()
-                }
+                    Button {
+                        submitCorrection()
+                    } label: {
+                        Text("Save workout details")
+                            .evidenceText(.normal(12, 800))
+                            .foregroundStyle(m.c.page)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(m.c.purple, in: RoundedRectangle(cornerRadius: m.pt(11)))
+                    }
+                    .buttonStyle(.plain)
 
-                if !localDraftCorrections.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Local draft corrections (not sent to PhysiqueOS)")
-                            .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        ForEach(Array(localDraftCorrections.enumerated()), id: \.offset) { _, text in
-                            Text(text)
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                .padding(10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(PhysiqueOSTheme.surfaceMuted)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                    if !localDraftCorrections.isEmpty {
+                        VStack(alignment: .leading, spacing: m.pt(8)) {
+                            Text("Local draft corrections (not sent to PhysiqueOS)")
+                                .evidenceText(.normal(8, 850, tracking: 0.8, uppercase: true))
+                                .foregroundStyle(m.c.quiet)
+                            ForEach(Array(localDraftCorrections.enumerated()), id: \.offset) { _, text in
+                                EvidenceCallout(text: text, tone: .neutral)
+                            }
                         }
                     }
-                }
                 }
             }
         }
     }
 
-    private func exercisesCard(for session: TrainingSessionDetailReadModel) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 14) {
-                SectionHeading("Exercises")
-                ForEach(TrainingSessionExerciseGrouping.renderItems(for: session)) { item in
-                    switch item {
-                    case .exercise(let exercise):
-                        TrainingExerciseOccurrenceView(exercise: exercise)
-                    case .relationship(let group, let exercises):
-                        TrainingSupersetGroupView(group: group, exercises: exercises)
+    private func exercisesSection(for session: TrainingSessionDetailReadModel) -> some View {
+        EvidenceSection(title: "Exercises", style: .open, identifier: "training.session.exercises") {
+            EvidenceSmallNote(text: "read-only history")
+        } content: {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(TrainingSessionExerciseGrouping.renderItems(for: session).enumerated()), id: \.element.id) { index, item in
+                    Group {
+                        switch item {
+                        case .exercise(let exercise):
+                            TrainingExerciseOccurrenceView(exercise: exercise)
+                        case .relationship(let group, let exercises):
+                            TrainingSupersetGroupView(group: group, exercises: exercises)
+                        }
+                    }
+                    .overlay(alignment: .top) {
+                        if index > 0, case .exercise = item {
+                            Rectangle().fill(m.c.line).frame(height: m.pt(1))
+                        }
                     }
                 }
             }
@@ -402,45 +369,97 @@ private struct TrainingSupportingMediaImage: View {
     }
 }
 
+/// One read-only exercise: name (+ variant suffix) over a set table of
+/// canonical reps/duration and load (`Timed`, `BW`, or weight + unit).
 private struct TrainingExerciseOccurrenceView: View {
     let exercise: TrainingExerciseOccurrence
+    private let m = EvidenceMetrics(family: .training)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(exercise.occurrenceLabel)
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        VStack(alignment: .leading, spacing: 0) {
+            (Text(exercise.name)
+                .foregroundStyle(m.c.ink)
+             + Text(exercise.executionVariant.map { "  · \($0.label)" } ?? "")
+                .font(Font(PlusJakartaSans.uiFont(size: m.pt(9), weight: 750)))
+                .foregroundStyle(m.c.purple))
+                .evidenceText(.normal(12, 800))
             ForEach(exercise.sets) { set in
-                Text("Set \(set.setNumber): \(set.formattedDetail)")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                EvidenceSetRow(
+                    first: "Set \(set.setNumber)",
+                    second: set.durationSeconds != nil ? set.repsColumnText : "\(set.repsColumnText) reps",
+                    third: set.formattedLoad
+                )
             }
         }
+        .padding(.vertical, m.pt(10))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(exercise.occurrenceLabel). " + exercise.sets.map { "Set \($0.setNumber): \($0.formattedDetail) \($0.formattedLoad)" }.joined(separator: ", "))
     }
 }
 
-/// Mirrors the session-detail screen's superset presentation: an
-/// indigo-tinted section labeled "Superset" containing each member's
-/// exercise block, rendered together once (`TrainingKnowledgeScreen.jsx:780-789`).
+/// `SUPERSET`: one purple relationship field holding every member in order.
 private struct TrainingSupersetGroupView: View {
     let group: TrainingExerciseRelationshipGroup
     let exercises: [TrainingExerciseOccurrence]
+    private let m = EvidenceMetrics(family: .training)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("SUPERSET")
-                .physiqueOSFont(PhysiqueOSTypography.rowEyebrow)
-                .foregroundStyle(PhysiqueOSTheme.accent)
-            ForEach(exercises) { exercise in
-                TrainingExerciseOccurrenceView(exercise: exercise)
+        EvidenceRelationshipGroup(label: "Superset") {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(exercises.enumerated()), id: \.element.id) { index, exercise in
+                    TrainingExerciseOccurrenceView(exercise: exercise)
+                        .overlay(alignment: .top) {
+                            if index > 0 { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
+                        }
+                }
             }
         }
-        .padding(12)
-        .background(PhysiqueOSTheme.accent.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(PhysiqueOSTheme.accent.opacity(0.24), lineWidth: 1)
-        )
+        .accessibilityIdentifier("training.session.superset.\(group.id)")
+    }
+}
+
+/// The Server's generated Apple-workout detail line split into its own
+/// labeled tokens. Every token must be recognized; otherwise the caller
+/// shows the line verbatim.
+struct TrainingSessionDetailSummary: Equatable {
+    struct Metric: Equatable {
+        let label: String
+        let value: String
+    }
+
+    let timeRange: String?
+    let metrics: [Metric]
+
+    var hasMetrics: Bool { !metrics.isEmpty }
+
+    init(detail: String) {
+        var timeRange: String?
+        var metrics: [Metric] = []
+        var recognized = true
+        for token in detail.components(separatedBy: " · ").map({ $0.trimmingCharacters(in: .whitespaces) }) where !token.isEmpty {
+            if token.contains("–"), token.range(of: #"\d{1,2}:\d{2}"#, options: .regularExpression) != nil {
+                timeRange = token
+            } else if token.hasSuffix(" min") || token.range(of: #"^\d+h( \d+m)?$"#, options: .regularExpression) != nil {
+                metrics.append(.init(label: "Duration", value: token))
+            } else if token.hasSuffix(" mi") || token.hasSuffix(" km") {
+                metrics.append(.init(label: "Distance", value: token))
+            } else if token.hasSuffix(" active cal") {
+                metrics.append(.init(label: "Active energy", value: token.replacingOccurrences(of: " active cal", with: " cal")))
+            } else if token.hasSuffix(" bpm avg HR") {
+                metrics.append(.init(label: "Avg heart rate", value: token.replacingOccurrences(of: " avg HR", with: "")))
+            } else {
+                recognized = false
+            }
+        }
+        self.timeRange = recognized ? timeRange : nil
+        self.metrics = recognized ? metrics : []
+    }
+}
+
+extension TrainingSessionDetailViewModel {
+    var loadedSession: TrainingSessionDetailReadModel? {
+        if case .loaded(let session) = state { return session }
+        return nil
     }
 }
