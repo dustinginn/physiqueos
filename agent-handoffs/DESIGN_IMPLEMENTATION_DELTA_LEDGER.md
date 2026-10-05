@@ -569,6 +569,75 @@ Build 85 audit result:
 
 Status: RESOLVED; do not re-add unless a new exact-authority regression is reproduced.
 
+### Log — Sources disclosure needs structured per-row provenance
+
+Classification: REQUIRED FOR DESIGN IMPLEMENTATION + FOUNDER DECISION
+
+Discovery:
+Redesign Batch 2 prep audit against Native Build 86 `cec8af20` and Server `27dad44a`.
+Report: `agent-handoffs/reports/20261005T014604Z-redesign-batch2-log-training-prep.md`
+
+Current shipping behavior:
+`LoggedTodayService` names the source only through the literal "Apple Health" suffix inside each row's display `context` string, for example "215P · 161C · 111F · Apple Health". Training lines carry only `kind` (`logger` / `cardio` / `other`). Native `LoggedTodayRow` / `LoggedTodayLine` have no source field, and the Native Weight row has no provenance.
+
+Accepted/required target:
+The locked Log Compact Command Center removes "Apple Health" from the tiles and centralizes provenance in a collapsed bottom Sources disclosure. Example expanded content: Apple Health → Stair Stepper, Nutrition, Activity; PhysiqueOS Logger → Strength Training; Weight → Source unavailable.
+
+Implementation implication:
+Native must not parse display strings. Add a structured source per row/line to the Log read model (Server projection plus Native decoder), or the Founder accepts shipping the Command Center without Sources and with the Server context verbatim in the tiles until the contract exists.
+
+Acceptance:
+Sources content comes only from typed fields. Mixed-source days (Logger Strength plus Apple Health Cardio, screenshot Nutrition) are attributed exactly. Weight shows "Source unavailable" until it has a provenance field. Tiles no longer repeat "Apple Health". Older payloads without the field degrade to no disclosure.
+
+Status: OPEN; Founder decision D1 in the Batch 2 prep report.
+
+### Apple Watch Logger — Complete Set offered while the phone is in Review/Confirmation
+
+Classification: LIKELY SHIPPING DEFECT (code-derived; not verified on device)
+
+Discovery:
+Same Batch 2 prep audit (Build 86 `cec8af20`).
+
+Current shipping behavior:
+`WatchWorkoutProjection.phase(of:)` (`WatchWorkoutProjectionMapper.swift:81-88`) ignores `step`. A live session at `.summary` / `.review` still projects `.active` with a current set, and `liveActivitySubject` includes those steps. However, `TrainingSessionInvariants.acceptsExternalContentMutation` (`TrainingSessionState.swift:408-417`) refuses non-UI content mutations outside `.workout` / adding exercises. The Watch can therefore offer Complete Set and receive `sessionNotMutable`. The Live Activity correctly hides the action (`.reviewing`).
+
+Target:
+The Watch never offers an action that the phone authority will refuse.
+
+Implementation implication:
+Either project a non-executing phase for review steps, or disable Complete Set on the Watch when the phone is reviewing. This is not part of the Batch 2 presentation work; the redesign must not change step semantics.
+
+Acceptance:
+With the phone on Workout Review or Final Confirmation, the Watch shows no actionable Complete Set (or a truthful reviewing state). Returning to set entry restores it. Build 86 Watch HealthKit and finish tests stay green.
+
+Status: OPEN; verify on device before patching.
+
+### Training Logger — error copy set but never rendered
+
+Classification: LIKELY SHIPPING DEFECT (minor UX)
+
+Discovery:
+Same Batch 2 prep audit (Build 86 `cec8af20`).
+
+Current shipping behavior:
+The view model sets messages that the current view never displays:
+- start failure "This workout couldn't be saved on this device. Try again." (the entry step has no validation slot);
+- discard refused "This workout is being saved and can't be discarded right now.";
+- the `reviewWorkout` reasons (Finish is disabled with no stated reason);
+- paused-session edit rejection (`.sessionPaused` is not surfaced; edits silently do nothing);
+- the configuration load failure, which has no retry control.
+
+Target:
+Every user-blocking refusal states its reason where the action was attempted, without inventing new workflow.
+
+Implementation implication:
+A small presentation fix that can ride on the Batch 2 Logger redesign only if the Founder authorizes it. It needs no view-model or authority change, except surfacing `.sessionPaused`, which needs copy decided with the Watch-status work.
+
+Acceptance:
+Each listed condition shows its existing copy in the visible step. No new mutation is emitted, and the UI tests keep their identifiers.
+
+Status: OPEN; not fixed by the Batch 2 prep audit.
+
 ## Implementation transition rule
 
 Before beginning the eventual shipping UI implementation phase:
