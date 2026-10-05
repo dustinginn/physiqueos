@@ -281,6 +281,10 @@ struct HomeGoalPhase: Codable, Equatable, Identifiable {
     var startDate: String? = nil
     var calculatedPlannedReviewDate: String? = nil
     var timelineProgressState: String? = nil
+    /// Server-composed countdown copy from `HomeGoalTrajectoryService`
+    /// (for example "4 weeks remaining"). Native may normalize this for a
+    /// compact metric label, but never recomputes it from the device clock.
+    var friendlyTimeline: String? = nil
 }
 
 struct HomeGoal: Codable, Equatable, Identifiable {

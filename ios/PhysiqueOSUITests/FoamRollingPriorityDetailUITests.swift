@@ -70,6 +70,18 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         capture("system-resolved-home")
     }
 
+    func testHomePhysicalParityDark() {
+        launchHomeParity(appearance: "dark")
+        assertCorrectedHomeParity()
+        capture("home-physical-parity-dark")
+    }
+
+    func testHomePhysicalParityMineralLight() {
+        launchHomeParity(appearance: "light")
+        assertCorrectedHomeParity()
+        capture("home-physical-parity-light")
+    }
+
     private func launch(appearance: String) {
         app.launchArguments += [
             "-physiqueos.native.authority-selection.v1", "sandbox",
@@ -121,6 +133,29 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         app.launch()
         XCTAssertEqual(app.state, .runningForeground)
         Thread.sleep(forTimeInterval: 1.2)
+    }
+
+    private func launchHomeParity(appearance: String) {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance-review.value", appearance,
+            "-physiqueos.appearance-review.route", "home",
+            "-physiqueos.redesign-review",
+        ]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["4 weeks"].waitForExistence(timeout: 8))
+    }
+
+    private func assertCorrectedHomeParity() {
+        for value in [
+            "TARGET DATE", "Oct 31", "REMAINING", "4 weeks", "PROGRESS", "58%",
+            "DESTINATION", "+10 lb lean", "PHASE2 · ACTIVE", "Lean Mass Build",
+            "Aug 15 – Oct 31 · about 4 weeks remaining", "+5.8 of 10 lb",
+        ] {
+            XCTAssertTrue(app.staticTexts[value].firstMatch.exists, "Missing corrected Home copy: \(value)")
+        }
+        XCTAssertFalse(app.staticTexts["LATEST BRIEFING"].exists)
     }
 
     private func capture(_ name: String) {

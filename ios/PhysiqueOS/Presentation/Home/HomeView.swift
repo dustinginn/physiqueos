@@ -43,7 +43,7 @@ struct HomeView: View {
                     priorityStore: environment.loggingSandboxStore,
                     goalsSandboxStore: environment.goalsSandboxStore,
                     briefingStore: environment.briefingSandboxStore,
-                    appliesSandboxProjections: environment.nativeAuthority == .sandbox
+                    appliesSandboxProjections: appliesSandboxProjections
                 )
                 viewModelAuthority = environment.nativeAuthority
             }
@@ -100,6 +100,17 @@ struct HomeView: View {
         )) { presentation in
             ConfidenceDetailSheet(confidence: presentation.confidence, detail: presentation.detail)
         }
+    }
+
+    /// The review fixture is a source-shaped snapshot of the accepted Home
+    /// state. Keeping sandbox overlays off for this DEBUG-only launch mode
+    /// lets parity captures exercise realistic long production briefing copy
+    /// instead of replacing it with the shorter sandbox History title.
+    private var appliesSandboxProjections: Bool {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-physiqueos.redesign-review") { return false }
+#endif
+        return environment.nativeAuthority == .sandbox
     }
 
     /// Reconciles locally-scheduled priority notifications against the

@@ -249,7 +249,8 @@ struct ProductionHomeAPI: HomeAPI {
                         progressStatus: phase.progress?.status,
                         startDate: phase.startDate,
                         calculatedPlannedReviewDate: phase.calculatedPlannedReviewDate,
-                        timelineProgressState: phase.timelineProgressState
+                        timelineProgressState: phase.timelineProgressState,
+                        friendlyTimeline: phase.friendlyTimeline
                     )
                 }
                 return HomeGoal(
@@ -310,6 +311,7 @@ struct ProductionHomeAPI: HomeAPI {
         var startDate: String?
         var calculatedPlannedReviewDate: String?
         var timelineProgressState: String?
+        var friendlyTimeline: String?
     }
     private struct ServerProgress: Decodable {
         var baselineValue: Double?

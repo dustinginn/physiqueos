@@ -73,6 +73,69 @@ final class HomeReadModelTests: XCTestCase {
         }
         XCTAssertEqual(trajectory.phases.map(\.status), ["completed", "active"])
         XCTAssertNotNil(trajectory.guardrail)
+        XCTAssertEqual(
+            HomeJourneyTimingPresentation.remainingPeriod(hero: model.hero, trajectory: trajectory),
+            "4 weeks"
+        )
+        let activePhase = try XCTUnwrap(trajectory.phases.first(where: { $0.status == "active" }))
+        XCTAssertEqual(
+            HomeJourneyTimingPresentation.phaseDetail(for: activePhase, remainingPeriod: "4 weeks"),
+            "Aug 15 – Oct 31 · about 4 weeks remaining"
+        )
+    }
+
+    func testPhaseFriendlyTimelineRestoresRemainingWhenLegacyHeroValueIsAbsent() {
+        let hero = HomeHero(
+            mode: .phaseTrajectory,
+            goalLabel: "Build Lean Mass",
+            headline: "Lean Mass Build",
+            supportLine: "Execution is aligned with the current plan.",
+            confidence: 79,
+            confidenceDetail: nil,
+            projectedFinish: nil,
+            daysRemaining: nil
+        )
+        let active = HomeGoalPhase(
+            id: "phase-lean-mass",
+            order: 1,
+            phaseName: "Lean Mass Build",
+            status: "active",
+            presentationTone: "green",
+            progressType: "outcome",
+            clampedProgressPercentage: 58,
+            presentationLabel: "+5.8 of 10 lb",
+            progressStatus: "measured",
+            startDate: "2026-08-15",
+            calculatedPlannedReviewDate: "2026-10-31",
+            timelineProgressState: "active",
+            friendlyTimeline: "4 weeks remaining"
+        )
+        let trajectory = HomePhaseTrajectory(
+            targetDescription: "+10 lb lean",
+            overallTargetDate: "2026-10-31",
+            guardrail: nil,
+            phases: [active]
+        )
+
+        let remaining = HomeJourneyTimingPresentation.remainingPeriod(hero: hero, trajectory: trajectory)
+        XCTAssertEqual(remaining, "4 weeks")
+        XCTAssertNotEqual(remaining, "—")
+        XCTAssertEqual(
+            HomeJourneyTimingPresentation.phaseDetail(for: active, remainingPeriod: remaining),
+            "Aug 15 – Oct 31 · about 4 weeks remaining"
+        )
+    }
+
+    func testBriefingTileUsesFreedEyebrowSpaceForRealCadenceTitles() {
+        XCTAssertFalse(HomeBriefingTileLayout.showsSectionEyebrow)
+        XCTAssertEqual(HomeBriefingTileLayout.titleLineLimit, 3)
+        for title in ["Weekly Briefing Ready", "Midweek Briefing Ready"] {
+            XCTAssertLessThanOrEqual(
+                title.split(separator: " ").count,
+                HomeBriefingTileLayout.titleLineLimit,
+                "Each canonical word can occupy a full line in the narrow locked tile without truncation."
+            )
+        }
     }
 
     // MARK: - Confidence is supplied, never recomputed
