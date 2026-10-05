@@ -831,6 +831,48 @@ final class EvidencePhotosDEXAUITests: XCTestCase {
         }
     }
 
+    private func count(prefix: String) -> Int {
+        app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).count
+    }
+
+    /// Founder's D acceptance condition: every DEXA disclosure keeps all of
+    /// its canonical rows and graphs (3 → 9 supplemental rows + 2 graphs,
+    /// 3 → 5 lean and fat regions + 5 graphs each, 3 → all scans), and Core
+    /// Trends keeps its five graphs.
+    func testDEXARegressionInventoryEveryDisclosureKeepsAllRowsAndGraphs() {
+        open(stream: "dexa")
+        XCTAssertTrue(app.staticTexts["DEXA"].waitForExistence(timeout: 10))
+        for title in ["Body Fat %", "Fat Mass", "Lean Mass", "Total Mass", "RMR"] {
+            XCTAssertTrue(element("dexa.chart.\(title)").exists, title)
+        }
+        for (section, collapsed, expanded, graphs) in [
+            ("dexa.supplemental", 3, 9, 2),
+            ("dexa.regionalLean", 3, 5, 5),
+            ("dexa.regionalFat", 3, 5, 5),
+        ] {
+            let toggle = element("\(section).toggle")
+            reveal(toggle)
+            XCTAssertEqual(count(prefix: "\(section).row."), collapsed, "\(section) collapsed rows")
+            toggle.tap()
+            waitForValue("\(section).toggle", "Expanded")
+            XCTAssertEqual(count(prefix: "\(section).row."), expanded, "\(section) expanded rows")
+            let charts = element("\(section).charts")
+            XCTAssertTrue(charts.waitForExistence(timeout: 5))
+            XCTAssertEqual(charts.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier != %@", "dexa.chart.", "dexa.chart.selection")).count, graphs, "\(section) graphs")
+            reveal(element("\(section).toggle"))
+            element("\(section).toggle").tap()
+            waitForValue("\(section).toggle", "Collapsed")
+        }
+        let history = element("dexa.history.toggle")
+        reveal(history)
+        let scanPredicate = NSPredicate(format: "identifier MATCHES %@ AND identifier != %@", "dexa\\.history\\.[^.]+", "dexa.history.toggle")
+        let before = app.descendants(matching: .any).matching(scanPredicate).count
+        XCTAssertEqual(before, 3, "Scan History preview")
+        history.tap()
+        waitForValue("dexa.history.toggle", "Expanded")
+        XCTAssertGreaterThan(app.descendants(matching: .any).matching(scanPredicate).count, 3, "Scan History expands to every scoped scan")
+    }
+
     /// The DEXA chart must never trap page scrolling: a tap selects, a
     /// horizontal pan scrubs, and a vertical swipe that starts on the chart
     /// scrolls the page.
@@ -867,5 +909,164 @@ final class EvidencePhotosDEXAUITests: XCTestCase {
         attachment.name = "dexa-chart-\(name)"
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+}
+
+/// Batch 3 Checkpoint E: the locked Evidence Intake + generic Evidence
+/// Review on the real production views (Debug route seam; nothing submits
+/// without a paired Production session), and the generic vs Workout Match
+/// routing distinction.
+@MainActor
+final class EvidenceIntakeReviewUITests: XCTestCase {
+    private let app = XCUIApplication()
+
+    private func launch(_ route: String, _ extra: [String] = []) {
+        continueAfterFailure = false
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance-review.route", route,
+            "-physiqueos.evidence-review.production-intake",
+        ] + extra
+        app.launch()
+    }
+
+    private func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    private func reveal(_ target: XCUIElement, maxSwipes: Int = 10) {
+        for _ in 0..<maxSwipes where !(target.exists && target.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(target.exists && target.isHittable, "Could not reveal \(target)")
+    }
+
+    func testGenericIntakeChooserManualEntryAndHandoffs() {
+        launch("evidence:intake=generic")
+        XCTAssertTrue(element("productionEvidenceUpload.domains").waitForExistence(timeout: 10))
+        for domain in ["automatic", "nutrition", "activity", "dexa", "training", "weight", "progressPhotos", "other"] {
+            XCTAssertTrue(element("productionEvidenceUpload.domain.\(domain)").exists, domain)
+        }
+        XCTAssertTrue(element("productionEvidenceUpload.domain.automatic").isSelected)
+        let upload = element("productionEvidenceUpload.submit")
+        reveal(upload)
+        XCTAssertFalse(upload.isEnabled, "Upload is gated until an asset is attached")
+
+        // Explicit Nutrition collapses the chooser; Manual shows the five
+        // fields in canonical order and gates Save on a value.
+        app.swipeDown(velocity: .fast)
+        element("productionEvidenceUpload.domain.nutrition").tap()
+        XCTAssertTrue(element("productionEvidenceUpload.domainSummary").waitForExistence(timeout: 5))
+        element("evidenceWorkflow.segment.Manual").tap()
+        XCTAssertTrue(element("productionEvidenceUpload.manual").waitForExistence(timeout: 5))
+        for field in ["Calories", "Protein (g)", "Carbs (g)", "Fat (g)", "Fiber (g)"] {
+            XCTAssertTrue(app.textFields[field].exists, field)
+        }
+        let save = element("productionEvidenceUpload.submit")
+        reveal(save)
+        XCTAssertEqual(save.label, "Save")
+        XCTAssertFalse(save.isEnabled)
+        app.textFields["Calories"].tap()
+        app.textFields["Calories"].typeText("2300")
+        XCTAssertTrue(save.isEnabled, "Save enables once one field has a value")
+
+        // Reopen the chooser and pick Training: a handoff, never a fake intake.
+        app.swipeDown(velocity: .fast)
+        element("productionEvidenceUpload.domainSummary").tap()
+        element("productionEvidenceUpload.domain.training").tap()
+        XCTAssertTrue(element("productionEvidenceUpload.handoff").waitForExistence(timeout: 5))
+        XCTAssertEqual(element("productionEvidenceUpload.handoff").label, "Open Training")
+        XCTAssertFalse(element("productionEvidenceUpload.submit").exists, "Handoffs never submit")
+
+        element("productionEvidenceUpload.domainSummary").tap()
+        element("productionEvidenceUpload.domain.other").tap()
+        XCTAssertTrue(element("productionEvidenceUpload.handoffCard").waitForExistence(timeout: 5))
+        XCTAssertFalse(element("productionEvidenceUpload.handoff").exists, "Other / General is unavailable, not a handoff")
+        XCTAssertTrue(element("evidenceWorkflow.back").exists)
+    }
+
+    func testDEXAAndProgressPhotosIntakeGates() {
+        launch("evidence:intake=dexa")
+        XCTAssertTrue(app.staticTexts["DEXA Scan"].waitForExistence(timeout: 10))
+        XCTAssertTrue(element("productionEvidenceUpload.choosePDF").exists)
+        XCTAssertFalse(element("productionEvidenceUpload.choosePhotos").exists, "DEXA accepts exactly one PDF")
+        XCTAssertFalse(element("productionEvidenceUpload.submit").isEnabled)
+        app.terminate()
+
+        launch("evidence:intake=photos", ["-physiqueos.evidence-review.intake", "photos-review"])
+        XCTAssertTrue(app.staticTexts["Progress Photos"].waitForExistence(timeout: 10))
+        XCTAssertTrue(element("productionEvidenceUpload.photo.1").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Pose not confirmed"].exists)
+        XCTAssertTrue(element("productionEvidenceUpload.poseNotice.1").exists, "Dependent pose notice")
+        let upload = element("productionEvidenceUpload.submit")
+        reveal(upload)
+        XCTAssertFalse(upload.isEnabled, "Upload is gated until the pose and session are confirmed")
+    }
+
+    func testGenericReviewPresentationActionsAndCorrection() {
+        launch("evidence:review=fixture-dexa")
+        XCTAssertTrue(element("evidenceReview.generic.hero").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Pending Review"].exists)
+        XCTAssertTrue(element("evidenceReview.item.dexa_scan").exists)
+        let correct = element("evidenceReview.correctMeasurements")
+        reveal(correct)
+        XCTAssertTrue(element("evidenceReview.confirm").exists)
+        XCTAssertTrue(element("evidenceReview.dismiss").exists)
+        correct.tap()
+        XCTAssertTrue(element("evidenceReview.correction").waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textFields["Total mass (lb)"].value as? String, "172.9")
+        XCTAssertFalse(element("evidenceReview.confirm").exists, "Confirm waits while correcting")
+        let cancel = element("evidenceReview.cancelCorrection")
+        reveal(cancel)
+        cancel.tap()
+        XCTAssertTrue(element("evidenceReview.confirm").waitForExistence(timeout: 5))
+        let dismiss = element("evidenceReview.dismiss")
+        reveal(dismiss)
+        dismiss.tap()
+        let alert = app.alerts["Dismiss this Evidence Review?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5), "Dismiss uses the system confirmation")
+        alert.buttons["Cancel"].tap()
+    }
+
+    /// Generic reviews use the Checkpoint E presentation; Workout Match keeps
+    /// its own branch (the Founder-approved Batch 2 L13 owns it on
+    /// integration), with its resolve actions intact.
+    func testWorkoutMatchKeepsItsOwnBranchWhileGenericUsesTheWorkflow() {
+        launch("evidence:review=fixture-mixed")
+        XCTAssertTrue(element("evidenceReview.generic.hero").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("evidenceWorkflow.back").exists)
+        app.terminate()
+
+        launch("evidence:review=fixture-workout")
+        XCTAssertTrue(element("evidenceReview.workoutReconciliation.confirm.1").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("evidenceReview.workoutReconciliation.noMatch").exists)
+        XCTAssertFalse(element("evidenceReview.generic.hero").exists, "Workout Match never renders the generic review")
+        XCTAssertFalse(element("evidenceWorkflow.back").exists)
+    }
+
+    func testReviewReadAndLifecycleStates() {
+        for (fixture, identifier) in [
+            ("loading", "evidenceReview.loading"),
+            ("failed", "evidenceReview.loadFailed"),
+            ("notfound", "evidenceReview.notFound"),
+            ("state-still", "evidenceReview.checkNow"),
+            ("state-refresh", "evidenceReview.refresh"),
+            ("state-failed", "evidenceReview.tryAgain"),
+            ("state-accepted", "evidenceReview.backToLog"),
+        ] {
+            launch("evidence:review=fixture-\(fixture)")
+            XCTAssertTrue(element(identifier).waitForExistence(timeout: 10), fixture)
+            if fixture == "loading" || fixture == "failed" || fixture == "notfound" {
+                XCTAssertFalse(element("evidenceReview.confirm").exists, "\(fixture) has no action")
+            }
+            app.terminate()
+        }
+        // Server status semantics: partially committed confirms but never
+        // dismisses; committing shows Server-owned processing only.
+        launch("evidence:review=fixture-status-partially_committed")
+        XCTAssertTrue(element("evidenceReview.confirm").waitForExistence(timeout: 10))
+        XCTAssertFalse(element("evidenceReview.dismiss").exists)
+        app.terminate()
+        launch("evidence:review=fixture-status-committing")
+        XCTAssertTrue(element("evidenceReview.lifecycle").waitForExistence(timeout: 10))
+        XCTAssertFalse(element("evidenceReview.confirm").exists)
     }
 }

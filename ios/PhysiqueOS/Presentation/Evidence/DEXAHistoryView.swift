@@ -376,7 +376,7 @@ struct DEXAHistoryView: View {
 
     // MARK: - Disclosures (independent Show All / Close)
 
-    private func metricList(_ rows: [(String, String)]) -> some View {
+    private func metricList(_ rows: [(String, String)], identifier: String) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                 HStack(spacing: m.pt(10)) {
@@ -394,6 +394,7 @@ struct DEXAHistoryView: View {
                     if index < rows.count - 1 { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
                 }
                 .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("\(identifier).row.\(row.0)")
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: m.pt(11)))
@@ -412,7 +413,7 @@ struct DEXAHistoryView: View {
                     isExpanded: isSupplementalExpanded,
                     identifier: "dexa.supplemental.toggle"
                 ) { withAnimation(.easeInOut(duration: 0.2)) { isSupplementalExpanded.toggle() } }
-                metricList(rows.map { ($0.label, $0.value) })
+                metricList(rows.map { ($0.label, $0.value) }, identifier: "dexa.supplemental")
                     .padding(.top, m.pt(10))
             }
         }
@@ -436,7 +437,7 @@ struct DEXAHistoryView: View {
                     isExpanded: isExpanded.wrappedValue,
                     identifier: "\(identifier).toggle"
                 ) { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.wrappedValue.toggle() } }
-                metricList(rows.map { ($0.title, latestValue($0)) })
+                metricList(rows.map { ($0.title, latestValue($0)) }, identifier: identifier)
                     .padding(.top, m.pt(10))
             }
         }

@@ -528,6 +528,7 @@ batch3_evidence_app_files = [
     ("Presentation/Evidence", "EvidenceKit.swift"),
     ("Presentation/Evidence", "EvidenceKitComponents.swift"),
     ("Presentation/Evidence", "EvidenceRecordComponents.swift"),
+    ("Presentation/Evidence", "EvidenceWorkflowKit.swift"),
 ]
 BATCH3_EVIDENCE_BLOCK = 0x1CFF
 

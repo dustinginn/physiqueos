@@ -324,6 +324,8 @@ private enum AppearanceReviewLaunchConfiguration {
             case "trainingArea": return .trainingLibraryArea(areaId: parts[1], browseAll: false)
             case "activityDay": return .activityDay(date: parts[1])
             case "nutritionDay": return .nutritionDay(dayId: parts[1])
+            case "intake": return parts[1] == "photos" ? .photoUpload : parts[1] == "dexa" ? .dexaUpload : .evidenceIntake
+            case "review": return .evidenceReview(reviewId: parts[1])
             default: return nil
             }
         }

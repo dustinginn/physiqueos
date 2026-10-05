@@ -26,6 +26,9 @@ enum EvidenceFamily {
     /// Progress Photos + DEXA (`photos-dexa-evidence-founder-parity-correction`):
     /// the 360-px SF Pro record harness shared with the Hub and Timeline.
     case record
+    /// Evidence Intake + Review (`85ef2a6c`): the 402-px SF Pro workflow
+    /// harness, so CSS px are points.
+    case workflow
 
     var harnessWidth: CGFloat {
         switch self {
@@ -33,6 +36,7 @@ enum EvidenceFamily {
         case .daily: 379
         case .weight: 372
         case .record: 360
+        case .workflow: 402
         }
     }
 
@@ -47,6 +51,7 @@ enum EvidenceFamily {
         case .daily: .daily
         case .weight: .weight
         case .record: .record
+        case .workflow: .workflow
         }
     }
 }
@@ -216,6 +221,39 @@ struct EvidencePalette {
         red: d(0xFF8177, 0xB94A42),
         redSoft: d(0xFF8177, 0xB94A42, 0.14, 0.14),
         blue: d(0x6BB7FF, 0x246FAD),
+        protein: d(0xFB7185, 0xB83C57),
+        carbs: d(0xFBBF24, 0x9D6808),
+        fat: d(0x38BDF8, 0x14769F),
+        breakfast: d(0xF7CF7B, 0x9D6709),
+        lunch: d(0x7BD7C8, 0x19756B),
+        dinner: d(0xB69CF3, 0x684DA0),
+        snacks: d(0xFB9C8C, 0xA84B3E)
+    )
+
+    /// `.workflow` — the Evidence Intake + Review harness tokens (the
+    /// complete set lives in `WorkflowColor`).
+    static let workflow = EvidencePalette(
+        page: d(0x06131E, 0xEFEEE7),
+        surface: d(0x0E2230, 0xFBFAF6),
+        surface2: d(0x142C39, 0xDCEBE7),
+        surface3: d(0x091A27, 0xE5EAE4),
+        line: d(0x203640, 0xCBD5D0),
+        ink: d(0xF6F8F7, 0x0A1C2D),
+        muted: d(0x91A4AD, 0x62737B),
+        quiet: d(0x91A4AD, 0x62737B),
+        accent: d(0x2CCDC0, 0x0C8F84),
+        accentSoft: d(0x2CCDC0, 0x0C8F84, 0.094, 0.094),
+        teal: d(0x2CCDC0, 0x0C8F84),
+        tealSoft: d(0x2CCDC0, 0x0C8F84, 0.094, 0.094),
+        purple: d(0xA28AFF, 0x7255D7),
+        purpleSoft: d(0xA28AFF, 0x7255D7, 0.094, 0.094),
+        green: d(0x53DDA0, 0x13895E),
+        greenSoft: d(0x53DDA0, 0x13895E, 0.094, 0.094),
+        amber: d(0xF2BD54, 0xB6750A),
+        amberSoft: d(0xF2BD54, 0xB6750A, 0.094, 0.094),
+        red: d(0xED7182, 0xC34F64),
+        redSoft: d(0xED7182, 0xC34F64, 0.094, 0.094),
+        blue: d(0x49C8DC, 0x168B9C),
         protein: d(0xFB7185, 0xB83C57),
         carbs: d(0xFBBF24, 0x9D6808),
         fat: d(0x38BDF8, 0x14769F),

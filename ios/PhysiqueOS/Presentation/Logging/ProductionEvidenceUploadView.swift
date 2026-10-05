@@ -191,28 +191,25 @@ struct ProductionEvidenceUploadView: View {
 
     private var effectiveScenario: Scenario? { fixedScenario ?? resolvedScenario }
 
+    /// Locked Evidence Intake (`85ef2a6c`): the explicit domain choice
+    /// collapses to a summary row; tapping it reopens the full list.
+    @State private var isChoosingDomain = false
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                switch phase {
-                case .picking: pickingContent
-                case .classifying: classifyingContent
-                case .uploading: uploadingContent
-                case .processing: processingContent
-                case .accepted(let message): acceptedContent(message)
-                case .confirmed: confirmedContent
-                case .failed(let message): failedContent(message)
-                }
+        WorkflowPage {
+            WorkflowHeader(eyebrow: "Add Evidence", title: fixedScenario == .dexa ? "DEXA Scan" : fixedScenario == .progressPhotos ? "Progress Photos" : "Add Evidence")
+            switch phase {
+            case .picking: pickingContent
+            case .classifying: classifyingContent
+            case .uploading: uploadingContent
+            case .processing: processingContent
+            case .accepted(let message): acceptedContent(message)
+            case .confirmed: confirmedContent
+            case .failed(let message): failedContent(message)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
         }
-        .scrollDismissesKeyboard(.interactively)
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationTitle("Add Evidence")
-        .navigationBarTitleDisplayMode(.inline)
+        .workflowChrome(back: "Add Evidence")
         .photosPicker(
             isPresented: $isPhotosPickerPresented,
             selection: $photoItems,
@@ -261,16 +258,10 @@ struct ProductionEvidenceUploadView: View {
                 }
                 resolvedScenario = fixedScenario
             }
+            #if DEBUG
+            applyReviewSeed()
+            #endif
             Task { await refreshPendingStagedPlan() }
-        }
-    }
-
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("ADD EVIDENCE").physiqueOSFont(PhysiqueOSTypography.screenEyebrow).foregroundStyle(PhysiqueOSTheme.accent)
-            Text(fixedScenario == .dexa ? "DEXA Scan" : fixedScenario == .progressPhotos ? "Progress Photos" : "Add Evidence")
-                .physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
         }
     }
 
@@ -278,145 +269,287 @@ struct ProductionEvidenceUploadView: View {
 
     @ViewBuilder
     private var pickingContent: some View {
-        if fixedScenario == nil {
-            domainSelectorCard
-        }
-        if fixedScenario == nil, let redirect = domainChoice.redirectDestination {
-            CardContainer { VStack(alignment: .leading, spacing: 10) {
-                Text("\(domainChoice.label) has its own entry point.").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                PrimaryActionButton(title: "Open \(domainChoice.label)") { onNavigate(redirect) }
-            } }
-        } else if let reason = domainChoice.unavailableReason {
-            CardContainer {
-                Text(reason).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
+        if fixedScenario == nil, !(domainChoice == .automatic && hasAutomaticResult) {
+            if domainChoice == .automatic || isChoosingDomain {
+                domainSelectorCard
+            } else if domainChoice.scenario == nil {
+                domainSummaryCard(includesDate: false)
             }
+        }
+        if fixedScenario == nil, domainChoice.redirectDestination != nil || domainChoice.unavailableReason != nil, domainChoice.scenario == nil || domainChoice == .progressPhotos {
+            handoffCard
         } else {
             submittableContent
         }
     }
 
+    private var hasAutomaticResult: Bool {
+        !attachmentScenarios.isEmpty || !unresolvedAttachmentIDs.isEmpty
+    }
+
+    /// `What kind of evidence?` — every canonical domain in order.
     private var domainSelectorCard: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
-            Text("What kind of evidence?").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-            ForEach(DomainChoice.allCases) { choice in
-                Button {
-                    domainChoice = choice
-                    resolvedScenario = choice.scenario
-                    classificationNote = nil
-                    automaticClassificationUnresolved = false
-                } label: {
-                    HStack {
-                        Text(choice.label).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        if choice == .automatic {
-                            Text("Recommended").physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.accent)
+        WorkflowSurface(tone: .rich) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("What kind of evidence?")
+                    .evidenceText(WorkflowText.h2)
+                    .foregroundStyle(WorkflowColor.text)
+                    .padding(.bottom, 11)
+                ForEach(DomainChoice.allCases) { choice in
+                    Button {
+                        domainChoice = choice
+                        resolvedScenario = choice.scenario
+                        classificationNote = nil
+                        automaticClassificationUnresolved = false
+                        isChoosingDomain = false
+                    } label: {
+                        WorkflowRow(isLast: choice == DomainChoice.allCases.last) {
+                            HStack(spacing: 10) {
+                                HStack(spacing: 6) {
+                                    Text(choice.label).evidenceText(WorkflowText.label).foregroundStyle(WorkflowColor.text)
+                                    if choice == .automatic {
+                                        Text("Recommended").evidenceText(WorkflowText.recommend).foregroundStyle(WorkflowColor.purple)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                                if domainChoice == choice {
+                                    WorkflowCheck()
+                                } else {
+                                    Text("›").evidenceText(WorkflowText.secondary).foregroundStyle(WorkflowColor.muted)
+                                }
+                            }
                         }
-                        Spacer()
-                        if domainChoice == choice { Image(systemName: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.accent) }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(domainChoice == choice ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityIdentifier("productionEvidenceUpload.domain.\(choice.rawValue)")
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("productionEvidenceUpload.domains")
+    }
+
+    /// The collapsed explicit choice: `What kind of evidence?` with the
+    /// chosen type tag (and the Date row when the type submits here).
+    private func domainSummaryCard(includesDate: Bool) -> some View {
+        WorkflowSurface(tone: .rich) {
+            VStack(alignment: .leading, spacing: 0) {
+                Button { isChoosingDomain = true } label: {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text("What kind of evidence?").evidenceText(WorkflowText.h2).foregroundStyle(WorkflowColor.text)
+                        Spacer(minLength: 0)
+                        WorkflowTag(text: domainChoice.label)
+                    }
+                    .frame(minHeight: 22)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                .accessibilityIdentifier("productionEvidenceUpload.domain.\(choice.rawValue)")
-                if choice != DomainChoice.allCases.last { Divider().overlay(PhysiqueOSTheme.divider) }
+                .accessibilityLabel("What kind of evidence? \(domainChoice.label)")
+                .accessibilityHint("Choose a different type")
+                .accessibilityIdentifier("productionEvidenceUpload.domainSummary")
+                if includesDate {
+                    WorkflowDateRow(date: $effectiveDate)
+                        .padding(.top, 11)
+                }
             }
-        } }
+        }
+    }
+
+    /// Training, Weight and Progress Photos open their own canonical entry
+    /// points; Other / General has no canonical intake type.
+    private var handoffCard: some View {
+        WorkflowSurface(tone: .rich) {
+            VStack(alignment: .leading, spacing: 0) {
+                if let redirect = domainChoice.redirectDestination {
+                    Text("\(domainChoice.label) has its own entry point.")
+                        .evidenceText(WorkflowText.h2)
+                        .foregroundStyle(WorkflowColor.text)
+                    if let owner = Self.handoffOwner(domainChoice) {
+                        Text(owner)
+                            .evidenceText(WorkflowText.small)
+                            .foregroundStyle(WorkflowColor.muted)
+                            .padding(.top, 5)
+                    }
+                    WorkflowActions {
+                        WorkflowButton(title: "Open \(domainChoice.label)", identifier: "productionEvidenceUpload.handoff") { onNavigate(redirect) }
+                    }
+                } else if let reason = domainChoice.unavailableReason {
+                    Text(domainChoice.label)
+                        .evidenceText(WorkflowText.h2)
+                        .foregroundStyle(WorkflowColor.text)
+                    Text(reason)
+                        .evidenceText(WorkflowText.small)
+                        .foregroundStyle(WorkflowColor.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 5)
+                }
+            }
+            .padding(.vertical, 13)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("productionEvidenceUpload.handoffCard")
+    }
+
+    private static func handoffOwner(_ choice: DomainChoice) -> String? {
+        switch choice {
+        case .training: "Workout Logger owns canonical Training entry."
+        case .weight: "Log Weight owns canonical backdated Weight entry."
+        case .progressPhotos: "Progress Photos owns the staged original-photo upload."
+        default: nil
+        }
     }
 
     @ViewBuilder
     private var submittableContent: some View {
         if resolvedScenario == .progressPhotos { pendingStagedPhotosCard }
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
-            DateField(date: $effectiveDate, maximumDate: Date(), label: "Date")
-        } }
-        if domainChoice != .automatic, resolvedScenario != .dexa, resolvedScenario != .progressPhotos {
-            CardContainer { VStack(alignment: .leading, spacing: 10) {
-                Picker("Entry method", selection: $captureMode) {
-                    ForEach(CaptureMode.allCases) { Text($0.label).tag($0) }
-                }.pickerStyle(.segmented)
-            } }
-        }
-        if let note = classificationNote {
-            CardContainer {
-                Text(note).physiqueOSFont(PhysiqueOSTypography.caption12Semibold).foregroundStyle(PhysiqueOSTheme.chartEffort)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        let explicitScreenshotDomain = domainChoice != .automatic && resolvedScenario != .dexa && resolvedScenario != .progressPhotos
+        if fixedScenario == nil, explicitScreenshotDomain {
+            domainSummaryCard(includesDate: true)
+            WorkflowSegmented(options: CaptureMode.allCases.map { ($0, $0.label) }, selection: $captureMode)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("productionEvidenceUpload.captureMode")
+        } else {
+            if let note = classificationNote {
+                WorkflowNote {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(note).evidenceText(WorkflowText.label).foregroundStyle(WorkflowColor.text)
+                        if !unresolvedAttachmentIDs.isEmpty {
+                            Text("Choose a type only for the attachment that could not be classified unambiguously.")
+                                .evidenceText(WorkflowText.small)
+                                .foregroundStyle(WorkflowColor.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+                .accessibilityIdentifier("productionEvidenceUpload.classificationNote")
             }
+            WorkflowSurface { WorkflowDateRow(date: $effectiveDate) }
         }
         if resolvedScenario == .dexa || domainChoice == .automatic || captureMode == .screenshot {
             attachmentCard
         } else {
             manualEntryContent
         }
-        if resolvedScenario == .progressPhotos { progressPhotoDetails }
-        PrimaryActionButton(
-            title: captureMode == .manual && domainChoice != .automatic ? "Save" : "Upload",
-            tone: .accent,
-            isEnabled: canSubmit
+        if resolvedScenario == .progressPhotos { sessionConditionsCard }
+        WorkflowPrimaryButton(
+            title: captureMode == .manual && domainChoice != .automatic && resolvedScenario != .dexa && resolvedScenario != .progressPhotos ? "Save" : "Upload",
+            isEnabled: canSubmit,
+            identifier: "productionEvidenceUpload.submit"
         ) {
             Task { await primarySubmit() }
-        }.accessibilityIdentifier("productionEvidenceUpload.submit")
+        }
     }
 
+    private var attachmentTitle: String {
+        resolvedScenario == .dexa ? "BodySpec PDF" : resolvedScenario == .progressPhotos ? "Photo set" : domainChoice == .automatic ? "Screenshots or PDF" : "Screenshots"
+    }
+
+    private var attachmentEmptyCopy: String {
+        resolvedScenario == .dexa ? "Attach one BodySpec PDF report." : resolvedScenario == .progressPhotos ? "Choose one or more original Progress Photos." : domainChoice == .automatic ? "Attach 1–4 screenshots or one PDF." : "Attach 1–4 screenshots."
+    }
+
+    @ViewBuilder
     private var attachmentCard: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 12) {
-            Text(resolvedScenario == .dexa ? "BodySpec PDF" : resolvedScenario == .progressPhotos ? "Photo set" : domainChoice == .automatic ? "Screenshots or PDF" : "Screenshots")
-                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-            if attachments.isEmpty {
-                Text(resolvedScenario == .dexa ? "Attach one BodySpec PDF report." : resolvedScenario == .progressPhotos ? "Choose one or more original Progress Photos." : "Attach 1–4 screenshots.")
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-            } else {
-                ForEach(attachments) { attachment in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(attachment.displayName).physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            Spacer()
-                            if let scenario = attachmentScenarios[attachment.id] {
-                                Text(scenario.label).physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
-                            }
-                            Button { attachments.removeAll { $0.id == attachment.id } } label: {
-                                Image(systemName: "xmark.circle.fill").foregroundStyle(PhysiqueOSTheme.textMuted)
-                            }
+        WorkflowSurface(tone: attachments.isEmpty && resolvedScenario != .progressPhotos && resolvedScenario != .dexa ? .plain : .rich) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(attachmentTitle).evidenceText(WorkflowText.h2).foregroundStyle(WorkflowColor.text)
+                        if attachments.isEmpty || resolvedScenario == .dexa || resolvedScenario == .progressPhotos {
+                            Text(resolvedScenario == .dexa && !attachments.isEmpty ? "One PDF · \(Self.byteLabel(attachments.first))" : attachmentEmptyCopy)
+                                .evidenceText(WorkflowText.small)
+                                .foregroundStyle(WorkflowColor.muted)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        if resolvedScenario == .progressPhotos,
-                           let data = attachment.data,
-                           let image = EvidenceAttachmentLoader.previewImage(data: data) {
-                            Image(uiImage: image)
-                                .resizable().scaledToFit()
-                                .frame(maxWidth: .infinity, maxHeight: 320)
-                                .background(Color.black.opacity(0.12))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
+                    }
+                    Spacer(minLength: 0)
+                    if !attachments.isEmpty {
+                        WorkflowTag(text: resolvedScenario == .dexa ? "Ready" : resolvedScenario == .progressPhotos ? "\(attachments.count) photo\(attachments.count == 1 ? "" : "s")" : "\(attachments.count) file\(attachments.count == 1 ? "" : "s")")
+                    }
+                }
+                .padding(.bottom, 11)
+                if resolvedScenario == .progressPhotos {
+                    ForEach(Array(photoIdentities.enumerated()), id: \.element.id) { index, identity in
+                        photoIdentityBlock(index: index, identity: identity)
+                    }
+                } else {
+                    ForEach(Array(attachments.enumerated()), id: \.element.id) { index, attachment in
+                        // `.file-row` keeps its rule: the type picker or the
+                        // buttons always follow it in the locked composition.
+                        fileRow(attachment, isLast: false)
                         if domainChoice == .automatic, unresolvedAttachmentIDs.contains(attachment.id) {
-                            Picker("Choose type for \(attachment.displayName)", selection: Binding(
-                                get: { attachmentScenarios[attachment.id] },
-                                set: { selected in
-                                    if let selected {
-                                        attachmentScenarios[attachment.id] = selected
-                                        unresolvedAttachmentIDs.remove(attachment.id)
-                                        automaticClassificationUnresolved = !unresolvedAttachmentIDs.isEmpty
-                                    }
-                                }
-                            )) {
-                                Text("Choose type").tag(Scenario?.none)
-                                ForEach(Self.automaticScenarios) { scenario in
-                                    Text(scenario.label).tag(Optional(scenario))
-                                }
-                            }
+                            typePicker(for: attachment)
+                                .padding(.top, 10)
                         }
                     }
                 }
+                HStack(spacing: 9) {
+                    if resolvedScenario == .dexa, !attachments.isEmpty {
+                        WorkflowButton(title: "Remove", destructive: true, identifier: "productionEvidenceUpload.removePDF") { attachments.removeAll() }
+                    }
+                    if resolvedScenario != .dexa {
+                        WorkflowButton(title: "Choose Photos", identifier: "productionEvidenceUpload.choosePhotos") { isPhotosPickerPresented = true }
+                    }
+                    if resolvedScenario == .dexa || domainChoice == .automatic {
+                        WorkflowButton(title: "Choose PDF", identifier: "productionEvidenceUpload.choosePDF") { isFilePickerPresented = true }
+                    }
+                    if isLoadingAttachments { WorkflowSpinner() }
+                }
+                .padding(.top, attachments.isEmpty ? 0 : 12)
             }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("productionEvidenceUpload.attachments")
+    }
+
+    /// `.file-row`: icon, name, kind · size and the resolved type tag. The
+    /// row keeps the existing remove capability as an accessibility action
+    /// and context menu.
+    private func fileRow(_ attachment: SandboxAttachment, isLast: Bool) -> some View {
+        WorkflowRow(isLast: isLast) {
             HStack(spacing: 10) {
-                if resolvedScenario != .dexa {
-                    Button("Choose Photos") { isPhotosPickerPresented = true }.buttonStyle(.bordered)
+                WorkflowFileIcon()
+                    .frame(width: 42, alignment: .leading)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(attachment.displayName).evidenceText(WorkflowText.label).foregroundStyle(WorkflowColor.text).lineLimit(1)
+                    Text("\(attachment.isPDF ? "PDF document" : "Screenshot") · \(Self.byteLabel(attachment))")
+                        .evidenceText(WorkflowText.secondary)
+                        .foregroundStyle(WorkflowColor.muted)
                 }
-                if resolvedScenario == .dexa || domainChoice == .automatic {
-                    Button("Choose PDF") { isFilePickerPresented = true }.buttonStyle(.bordered)
+                Spacer(minLength: 0)
+                if let scenario = attachmentScenarios[attachment.id] {
+                    WorkflowTag(text: scenario.label)
                 }
             }
-            if isLoadingAttachments { ProgressView() }
-        } }
+        }
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Remove", role: .destructive) { attachments.removeAll { $0.id == attachment.id } }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAction(named: "Remove") { attachments.removeAll { $0.id == attachment.id } }
+        .accessibilityIdentifier("productionEvidenceUpload.file.\(attachment.displayName)")
+    }
+
+    private func typePicker(for attachment: SandboxAttachment) -> some View {
+        WorkflowSelectField(label: "Choose type for \(attachment.displayName)", value: attachmentScenarios[attachment.id]?.label ?? "Choose type") {
+            ForEach(Self.automaticScenarios) { scenario in
+                Button(scenario.label) {
+                    attachmentScenarios[attachment.id] = scenario
+                    unresolvedAttachmentIDs.remove(attachment.id)
+                    automaticClassificationUnresolved = !unresolvedAttachmentIDs.isEmpty
+                }
+            }
+        }
+        .accessibilityIdentifier("productionEvidenceUpload.typePicker")
+    }
+
+    static func byteLabel(_ attachment: SandboxAttachment?) -> String {
+        guard let count = attachment?.data?.count else { return "Ready" }
+        if count >= 1_000_000 { return String(format: "%.1f MB", Double(count) / 1_000_000) }
+        return "\(max(1, count / 1_000)) KB"
     }
 
     private var canSubmit: Bool {
@@ -440,185 +573,228 @@ struct ProductionEvidenceUploadView: View {
         }
     }
 
-    private var progressPhotoDetails: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ForEach(Array(photoIdentities.enumerated()), id: \.element.id) { index, identity in
-                // Card tint carries the same pre-upload identity state the
-                // approved sandbox card used: yellow until the Founder
-                // explicitly confirms this photo, green afterwards. This is
-                // local identity-confirmation state only — never a claim
-                // about Server-side Evidence Review completion.
-                CardContainer(background: (identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent).opacity(0.10)) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        // The actual photo being classified, shown with the
-                        // controls rather than in a separate list above, so
-                        // the Founder never has to correlate the two. This is
-                        // a display-only downsample: `previewImage` does not
-                        // touch the bytes this screen uploads.
-                        if let attachment = attachments.first(where: { $0.id == identity.attachmentId }),
-                           let data = attachment.data,
-                           let image = EvidenceAttachmentLoader.previewImage(data: data) {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxWidth: .infinity, maxHeight: 360)
-                                .background(Color.black.opacity(0.14))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Photo \(index + 1)")
-                                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                                Text(identity.poseLabel).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            }
-                            Spacer()
-                            Text(identity.confirmed ? "Confirmed" : "Review")
-                                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                .padding(.horizontal, 8).padding(.vertical, 4)
-                                .foregroundStyle(identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent)
-                                .background((identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent).opacity(0.16))
-                                .clipShape(Capsule())
-                        }
-                        // Orientation, contraction, and pose are not independent: the
-                        // choices offered, and the adjustment when one is changed, come
-                        // from the Server's canonical pose contract.
-                        HStack(spacing: 8) {
-                            photoPicker("Orientation", selection: poseBinding(identity, \.orientation) { .orientation($0) }, values: ProgressPhotoPoseContract.selectableOrientations)
-                            photoPicker("Contraction", selection: poseBinding(identity, \.contraction) { .contraction($0) }, values: ProgressPhotoPoseContract.selectableContractions(for: identity.orientation))
-                        }
-                        photoPicker("Pose", selection: poseBinding(identity, \.poseVariant) { .variant($0) }, values: ProgressPhotoPoseContract.selectableVariants(for: identity.orientation))
-                        if let notice = poseNotices[identity.id] {
-                            Text(notice)
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                .accessibilityIdentifier("productionEvidenceUpload.poseNotice.\(index + 1)")
-                        }
-                        Button(identity.confirmed ? "Pose confirmed" : "Confirm pose") {
-                            updatePhoto(identity.id) { draft in draft.confirmed = draft.isCanonicalPose }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(identity.confirmed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.accent)
-                        .disabled(!identity.isCanonicalPose)
-                    }
-                }
+    /// One photo: the original image, its canonical pose identity and the
+    /// local per-photo confirmation (never a claim about Server review).
+    private func photoIdentityBlock(index: Int, identity: ProgressPhotoIdentityDraft) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // The actual photo being classified, shown with the controls, so
+            // the Founder never has to correlate the two. Display-only
+            // downsample: `previewImage` does not touch the uploaded bytes.
+            if let attachment = attachments.first(where: { $0.id == identity.attachmentId }),
+               let image = Self.previewImage(for: attachment) {
+                Color(red: 7 / 255, green: 17 / 255, blue: 27 / 255)
+                    .frame(height: 308)
+                    .overlay { Image(uiImage: image).resizable().scaledToFill() }
+                    .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
+                    .accessibilityLabel("Photo \(index + 1)")
+                    .padding(.bottom, 12)
             }
-            CardContainer { VStack(alignment: .leading, spacing: 10) {
-                Text("Session conditions").physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    ForEach(ProgressPhotoSessionDraft.conditionGrid.flatMap { $0 }) { field in
-                        sessionConditionMenu(field)
-                    }
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("PHOTO \(index + 1)").evidenceText(WorkflowText.micro).foregroundStyle(WorkflowColor.muted)
+                    Text(identity.confirmed ? identity.poseLabel : "Pose not confirmed")
+                        .evidenceText(WorkflowText.h2)
+                        .foregroundStyle(WorkflowColor.text)
                 }
-                Toggle("These are original, unedited photos.", isOn: $photoSession.originalUnedited)
-                    .tint(PhysiqueOSTheme.chartSuccess)
-                Text("Every pose and condition is sent to the Server-owned Progress Photos review. Confirmation creates the canonical PhotoSession and starts the existing Photo Briefing lifecycle.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            } }
+                Spacer(minLength: 0)
+                WorkflowTag(text: identity.confirmed ? "Confirmed" : "Review", tone: identity.confirmed ? .green : .amber)
+            }
+            .padding(.bottom, 11)
+            // Orientation, contraction, and pose are not independent: the
+            // choices offered, and the adjustment when one is changed, come
+            // from the Server's canonical pose contract.
+            HStack(spacing: 8) {
+                photoPicker("Orientation", selection: poseBinding(identity, \.orientation) { .orientation($0) }, values: ProgressPhotoPoseContract.selectableOrientations)
+                photoPicker("Contraction", selection: poseBinding(identity, \.contraction) { .contraction($0) }, values: ProgressPhotoPoseContract.selectableContractions(for: identity.orientation))
+            }
+            photoPicker("Pose", selection: poseBinding(identity, \.poseVariant) { .variant($0) }, values: ProgressPhotoPoseContract.selectableVariants(for: identity.orientation))
+                .padding(.top, 8)
+            if let notice = poseNotices[identity.id] {
+                Text(notice)
+                    .evidenceText(WorkflowText.small)
+                    .foregroundStyle(WorkflowColor.amber)
+                    .padding(.top, 8)
+                    .accessibilityIdentifier("productionEvidenceUpload.poseNotice.\(index + 1)")
+            }
+            Button {
+                updatePhoto(identity.id) { draft in draft.confirmed = draft.isCanonicalPose }
+            } label: {
+                Text(identity.confirmed ? "✓ Pose confirmed" : "Confirm pose")
+                    .evidenceText(WorkflowText.primary.with(lineHeight: 18))
+                    .foregroundStyle(identity.confirmed ? WorkflowColor.green : WorkflowColor.teal)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(identity.confirmed ? WorkflowColor.confirmDone : WorkflowColor.confirm, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(!identity.isCanonicalPose)
+            .padding(.top, 10)
+            .accessibilityIdentifier("productionEvidenceUpload.confirmPose.\(index + 1)")
         }
+        .padding(.bottom, index == photoIdentities.count - 1 ? 0 : 16)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("productionEvidenceUpload.photo.\(index + 1)")
+    }
+
+    static func previewImage(for attachment: SandboxAttachment) -> UIImage? {
+        if let data = attachment.data, let image = EvidenceAttachmentLoader.previewImage(data: data) { return image }
+        #if DEBUG
+        return SyntheticProgressPhoto.image(named: attachment.displayName)
+        #else
+        return nil
+        #endif
+    }
+
+    /// `Session conditions`: Time of day, Fasted, Post-workout, Pump; the
+    /// original/unedited confirmation; the Server-owned lifecycle note.
+    private var sessionConditionsCard: some View {
+        WorkflowSurface {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Session conditions")
+                    .evidenceText(WorkflowText.h2)
+                    .foregroundStyle(WorkflowColor.text)
+                    .padding(.bottom, 11)
+                WorkflowGrid(items: ProgressPhotoSessionDraft.conditionGrid.flatMap { $0 }) { field in
+                    sessionConditionMenu(field)
+                }
+                WorkflowToggleRow(title: "These are original, unedited photos.", isOn: $photoSession.originalUnedited)
+                Text("Every pose and condition is sent to the Server-owned Progress Photos review. Confirmation creates the canonical PhotoSession and starts the existing Photo Briefing lifecycle.")
+                    .evidenceText(WorkflowText.small)
+                    .foregroundStyle(WorkflowColor.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("productionEvidenceUpload.sessionConditions")
     }
 
     private var manualEntryContent: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 12) {
-            Text(resolvedScenario == .nutrition ? "Daily totals" : "Daily activity")
-                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-            Text("Blank fields remain unknown. Existing web-authored days require screenshot review so the server can enforce its revision fingerprint.")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            if resolvedScenario == .nutrition {
-                manualField("Calories", text: $caloriesText)
-                manualField("Protein (g)", text: $proteinText)
-                manualField("Carbs (g)", text: $carbsText)
-                manualField("Fat (g)", text: $fatText)
-                manualField("Fiber (g)", text: $fiberText)
-            } else {
-                manualField("Active calories", text: $activeCaloriesText)
-                manualField("Total calories", text: $totalCaloriesText)
-                manualField("Exercise minutes", text: $exerciseMinutesText)
-                manualField("Stand hours", text: $standHoursText)
-                manualField("Move goal", text: $moveGoalText)
-                Text("Manual entry only. HealthKit and direct device-health sync are not enabled.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+        WorkflowSurface {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(resolvedScenario == .nutrition ? "Daily totals" : "Daily activity")
+                    .evidenceText(WorkflowText.h2)
+                    .foregroundStyle(WorkflowColor.text)
+                Text("Blank fields remain unknown. Existing web-authored days require screenshot review so the server can enforce its revision fingerprint.")
+                    .evidenceText(WorkflowText.small)
+                    .foregroundStyle(WorkflowColor.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 11)
+                if resolvedScenario == .nutrition {
+                    manualField("Calories", text: $caloriesText)
+                    manualField("Protein (g)", text: $proteinText)
+                    manualField("Carbs (g)", text: $carbsText)
+                    manualField("Fat (g)", text: $fatText)
+                    manualField("Fiber (g)", text: $fiberText, isLast: true)
+                } else {
+                    manualField("Active calories", text: $activeCaloriesText)
+                    manualField("Total calories", text: $totalCaloriesText)
+                    manualField("Exercise minutes", text: $exerciseMinutesText)
+                    manualField("Stand hours", text: $standHoursText)
+                    manualField("Move goal", text: $moveGoalText, isLast: true)
+                    Text("Manual entry only. HealthKit and direct device-health sync are not enabled.")
+                        .evidenceText(WorkflowText.small)
+                        .foregroundStyle(WorkflowColor.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 11)
+                }
             }
-        } }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("productionEvidenceUpload.manual")
     }
 
-    private func manualField(_ label: String, text: Binding<String>) -> some View {
-        HStack {
-            Text(label).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-            Spacer()
-            NumericEditField(text: text, accessibilityLabel: label).frame(width: 120, height: 38)
+    private func manualField(_ label: String, text: Binding<String>, isLast: Bool = false) -> some View {
+        WorkflowRow(isLast: isLast) {
+            HStack(spacing: 12) {
+                Text(label).evidenceText(WorkflowText.label).foregroundStyle(WorkflowColor.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                WorkflowNumericField(label: label, text: text)
+            }
         }
     }
 
-    // MARK: - Progress / result phases (each forced full-width — Build 20's
-    // sparse single-card progress screen had no full-width element at all,
-    // which let the ScrollView/VStack collapse to its content's intrinsic
-    // width and rendered as a narrow centered column with the page
-    // background showing on both sides).
+    // MARK: - Progress / result phases (`Transaction states`)
 
     private var classifyingContent: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
-            ProgressView().tint(PhysiqueOSTheme.accent)
-            Text("Checking what kind of evidence this is…").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }.frame(maxWidth: .infinity, alignment: .leading) }
+        WorkflowSurface(tone: .rich) {
+            WorkflowStateRow(lead: .spinner, title: "Checking what kind of evidence this is…", isLast: true, identifier: "productionEvidenceUpload.classifying")
+                .padding(.vertical, -13)
+        }
     }
 
     private var uploadingContent: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
-            ProgressView(value: transferProgress, total: 1).tint(PhysiqueOSTheme.accent)
-            Text(stagedTransferCopy ?? (transferProgress < 1 ? "Transferring… \(Int(transferProgress * 100))%" : "Transfer complete. Waiting for durable acceptance…"))
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }.frame(maxWidth: .infinity, alignment: .leading) }
+        WorkflowSurface(tone: .rich) {
+            WorkflowStateRow(
+                lead: .spinner,
+                title: stagedTransferCopy ?? (transferProgress < 1 ? "Transferring… \(Int(transferProgress * 100))%" : "Transfer complete. Waiting for durable acceptance…"),
+                progress: transferProgress,
+                isLast: true,
+                identifier: "productionEvidenceUpload.uploading"
+            )
+            .padding(.vertical, -13)
+        }
     }
 
     private var processingContent: some View {
-        CardContainer { VStack(alignment: .leading, spacing: 10) {
-            ProgressView().tint(PhysiqueOSTheme.accent)
-            Text("Reading what you uploaded…").physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }.frame(maxWidth: .infinity, alignment: .leading) }
+        WorkflowSurface(tone: .rich) {
+            WorkflowStateRow(lead: .spinner, title: "Reading what you uploaded…", isLast: true, identifier: "productionEvidenceUpload.processing")
+                .padding(.vertical, -13)
+        }
     }
 
     private func acceptedContent(_ message: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CardContainer { VStack(alignment: .leading, spacing: 8) {
-                Label("Evidence received", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                Text(message).physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }.frame(maxWidth: .infinity, alignment: .leading) }
-            ForEach(Self.automaticScenarios) { scenario in
-                if let reviewId = readyReviews[scenario] {
-                    PrimaryActionButton(title: "Review \(scenario.label)", tone: .accent) {
-                        onNavigate(.evidenceReview(reviewId: reviewId))
+        WorkflowSurface(tone: .rich) {
+            WorkflowStateRow(lead: .icon(.ok), title: "Evidence received", copy: message, isLast: true, identifier: "productionEvidenceUpload.accepted") {
+                WorkflowActions {
+                    ForEach(Self.automaticScenarios) { scenario in
+                        if let reviewId = readyReviews[scenario] {
+                            WorkflowButton(title: "Review \(scenario.label)", identifier: "productionEvidenceUpload.review.\(scenario.rawValue)") {
+                                onNavigate(.evidenceReview(reviewId: reviewId))
+                            }
+                        }
                     }
+                    WorkflowButton(title: "Return to Log", identifier: "productionEvidenceUpload.returnToLog") { onReturnToLog(); dismiss() }
                 }
             }
-            PrimaryActionButton(title: "Return to Log", tone: .accent) { onReturnToLog(); dismiss() }
-                .accessibilityIdentifier("productionEvidenceUpload.returnToLog")
+            .padding(.vertical, -13)
         }
     }
 
     private var confirmedContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CardContainer { Label("Evidence saved", systemImage: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess).frame(maxWidth: .infinity, alignment: .leading) }
-            PrimaryActionButton(title: "Return to Log", tone: .accent) { onReturnToLog(); dismiss() }
+        WorkflowSurface(tone: .rich) {
+            WorkflowStateRow(lead: .icon(.ok), title: "Evidence saved", isLast: true, identifier: "productionEvidenceUpload.confirmed") {
+                WorkflowActions {
+                    WorkflowButton(title: "Return to Log", identifier: "productionEvidenceUpload.returnToLog") { onReturnToLog(); dismiss() }
+                }
+            }
+            .padding(.vertical, -13)
         }
     }
 
+    @ViewBuilder
     private func failedContent(_ message: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(message).physiqueOSFont(PhysiqueOSTypography.calloutStrong).foregroundStyle(PhysiqueOSTheme.destructive)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if let plan = pendingStagedPlan, plan.rejectedArtifacts.isEmpty {
-                // The staged set is still durable on this device and the
-                // Server already holds every acknowledged photo; resuming
-                // sends only what is missing.
-                PrimaryActionButton(title: "Resume upload", tone: .accent) { Task { await resumeStagedPhotos() } }
-                    .accessibilityIdentifier("productionEvidenceUpload.resumeStaged")
+        if fixedScenario == .dexa {
+            // DEXA Scan: the Server's validation message as a red note, then
+            // Try Again back to picking.
+            WorkflowNote(tone: .red) {
+                Text(message).evidenceText(WorkflowText.h2).foregroundStyle(WorkflowColor.text).fixedSize(horizontal: false, vertical: true)
             }
-            PrimaryActionButton(title: "Try Again", tone: .accent) { phase = .picking }
+            .accessibilityIdentifier("productionEvidenceUpload.failed")
+            WorkflowPrimaryButton(title: "Try Again", identifier: "productionEvidenceUpload.tryAgain") { phase = .picking }
+        } else {
+            WorkflowSurface(tone: .rich) {
+                WorkflowStateRow(lead: .icon(.error), title: message, isLast: true, identifier: "productionEvidenceUpload.failed") {
+                    WorkflowActions {
+                        if let plan = pendingStagedPlan, plan.rejectedArtifacts.isEmpty {
+                            // The staged set is still durable on this device and the
+                            // Server already holds every acknowledged photo; resuming
+                            // sends only what is missing.
+                            WorkflowButton(title: "Resume upload", identifier: "productionEvidenceUpload.resumeStaged") { Task { await resumeStagedPhotos() } }
+                        }
+                        WorkflowButton(title: "Try Again", identifier: "productionEvidenceUpload.tryAgain") { phase = .picking }
+                    }
+                }
+                .padding(.vertical, -13)
+            }
         }
     }
 
@@ -998,27 +1174,59 @@ struct ProductionEvidenceUploadView: View {
         return "Uploading photo \(current) of \(progress.totalOriginals)… \(Int(progress.fraction * 100))%"
     }
 
+    /// A durable staged plan left by a lost response, suspension or
+    /// relaunch: resume the missing originals, or discard. A rejected plan
+    /// exposes Discard only.
     @ViewBuilder
     private var pendingStagedPhotosCard: some View {
         if let plan = pendingStagedPlan {
-            CardContainer { VStack(alignment: .leading, spacing: 10) {
-                Label("Photo upload waiting", systemImage: "arrow.up.circle")
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                Text(plan.rejectedArtifacts.isEmpty
-                    ? "\(plan.storedOriginalCount) of \(plan.originals.count) photos from \(plan.effectiveDate) reached PhysiqueOS. Resume to send the rest, or discard the set and choose again."
-                    : "PhysiqueOS did not accept this photo set (\(plan.lastErrorCode ?? "rejected")). Discard it and choose the photos again.")
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                HStack(spacing: 10) {
-                    if plan.rejectedArtifacts.isEmpty {
-                        PrimaryActionButton(title: "Resume upload", tone: .accent) { Task { await resumeStagedPhotos() } }
-                            .accessibilityIdentifier("productionEvidenceUpload.resumeStaged")
+            if plan.rejectedArtifacts.isEmpty {
+                WorkflowSurface(tone: .rich) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(alignment: .top, spacing: 9) {
+                            WorkflowFileIcon(glyph: "↑")
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text("Photo upload waiting").evidenceText(WorkflowText.h2).foregroundStyle(WorkflowColor.text)
+                                Text("\(plan.storedOriginalCount) of \(plan.originals.count) photos from \(plan.effectiveDate) reached PhysiqueOS. Resume to send the rest, or discard the set and choose again.")
+                                    .evidenceText(WorkflowText.small)
+                                    .foregroundStyle(WorkflowColor.muted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .padding(.bottom, 5)
+                        WorkflowProgress(fraction: plan.originals.isEmpty ? 0 : Double(plan.storedOriginalCount) / Double(plan.originals.count))
+                        HStack(spacing: 9) {
+                            WorkflowButton(title: "Resume upload", identifier: "productionEvidenceUpload.resumeStaged") { Task { await resumeStagedPhotos() } }
+                            WorkflowButton(title: "Discard", destructive: true, identifier: "productionEvidenceUpload.discardStaged") { Task { await discardStagedPhotos() } }
+                        }
+                        .padding(.top, 4)
                     }
-                    Button("Discard") { Task { await discardStagedPhotos() } }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("productionEvidenceUpload.discardStaged")
                 }
-            } }
+                WorkflowNote(tone: .amber) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Durable staged upload").evidenceText(WorkflowText.label).foregroundStyle(WorkflowColor.text)
+                        Text("Resume sends only the missing originals. Discard removes the staged set from this iPhone.")
+                            .evidenceText(WorkflowText.small)
+                            .foregroundStyle(WorkflowColor.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } else {
+                WorkflowSurface(tone: .rich) {
+                    WorkflowStateRow(
+                        lead: .icon(.error),
+                        title: "Photo set not accepted",
+                        copy: "PhysiqueOS did not accept this photo set (\(plan.lastErrorCode ?? "rejected")). Discard it and choose the photos again.",
+                        isLast: true,
+                        identifier: "productionEvidenceUpload.stagedRejected"
+                    ) {
+                        WorkflowActions {
+                            WorkflowButton(title: "Discard", destructive: true, identifier: "productionEvidenceUpload.discardStaged") { Task { await discardStagedPhotos() } }
+                        }
+                    }
+                    .padding(.vertical, -13)
+                }
+            }
         }
     }
 
@@ -1059,70 +1267,29 @@ struct ProductionEvidenceUploadView: View {
         )
     }
 
-    /// Pose identity control matching the approved sandbox presentation: a
-    /// visible label above the value. A bare `Picker` renders no label
-    /// outside a Form/List, which is what left Build 42's pose controls
-    /// unreadable without opening each one.
+    /// Pose identity control: a labelled `.select` field whose menu offers
+    /// only the contract's selectable values.
     private func photoPicker<Value: Hashable & Identifiable & EvidenceLabeledChoice>(
         _ label: String, selection: Binding<Value>, values: [Value]
     ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(label.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Menu {
-                ForEach(values) { value in
-                    Button(value.label) { selection.wrappedValue = value }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(selection.wrappedValue.label).lineLimit(1)
-                    Spacer(minLength: 4)
-                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                }
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.accent)
-                .padding(.horizontal, 10)
-                .frame(maxWidth: .infinity, minHeight: 42)
-                .background(PhysiqueOSTheme.surfaceMuted)
-                .clipShape(Capsule())
-                .contentShape(Capsule())
+        WorkflowSelectField(label: label, value: selection.wrappedValue.label) {
+            ForEach(values) { value in
+                Button(value.label) { selection.wrappedValue = value }
             }
-            .accessibilityLabel(label)
-            .accessibilityValue(selection.wrappedValue.label)
         }
+        .accessibilityIdentifier("productionEvidenceUpload.pose.\(label)")
     }
 
-    /// Session Conditions control matching the approved presentation: the
-    /// label stays visible beside its value, so all four conditions are
-    /// readable without opening a single picker.
+    /// Session condition: the label stays visible beside its value, so all
+    /// four conditions are readable without opening a single menu.
     private func sessionConditionMenu(_ field: ProgressPhotoConditionField) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(field.label.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            let value = photoSession.selectedLabel(for: field)
-            Menu {
-                ForEach(field.options, id: \.label) { option in
-                    Button(option.label) { photoSession.apply(option, to: field) }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(value)
-                    Spacer(minLength: 4)
-                    Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                }
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(value == field.unselectedLabel ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textPrimary)
-                .padding(.horizontal, 10)
-                .frame(maxWidth: .infinity, minHeight: 42)
-                .background(PhysiqueOSTheme.surfaceMuted)
-                .clipShape(Capsule())
-                .contentShape(Capsule())
+        let value = photoSession.selectedLabel(for: field)
+        return WorkflowSelectField(label: field.label, value: value) {
+            ForEach(field.options, id: \.label) { option in
+                Button(option.label) { photoSession.apply(option, to: field) }
             }
-            .accessibilityLabel(field.label)
-            .accessibilityValue(value)
         }
+        .accessibilityIdentifier("productionEvidenceUpload.condition.\(field.label)")
     }
 
     private struct PhotoIdentityPayload: Encodable {
@@ -1195,3 +1362,103 @@ struct ProductionEvidenceUploadView: View {
         return "This evidence could not be uploaded."
     }
 }
+
+#if DEBUG
+/// Review-only seeds for the locked Evidence Intake parity captures
+/// (`-physiqueos.evidence-review.intake <state>`). They set presentation
+/// state only; nothing is submitted. Absent from Release.
+extension ProductionEvidenceUploadView {
+    static var reviewIntakeState: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-physiqueos.evidence-review.intake"),
+              arguments.indices.contains(flag + 1) else { return nil }
+        return arguments[flag + 1]
+    }
+
+    static var reviewProductionIntake: Bool {
+        ProcessInfo.processInfo.arguments.contains("-physiqueos.evidence-review.production-intake")
+    }
+
+    private static func reviewFile(_ name: String, bytes: Int, pdf: Bool = false) -> SandboxAttachment {
+        SandboxAttachment(id: "review-\(name)", displayName: name, source: pdf ? .files : .photos, contentType: pdf ? "application/pdf" : "image/png", data: Data(count: bytes))
+    }
+
+    fileprivate func applyReviewSeed() {
+        guard let state = Self.reviewIntakeState else { return }
+        var components = DateComponents(); components.year = 2026; components.month = 9; components.day = 23
+        effectiveDate = Calendar.current.date(from: components) ?? effectiveDate
+        switch state {
+        case "auto-review":
+            attachments = [
+                Self.reviewFile("MyFitnessPal-Sep-23.PNG", bytes: 1_400_000),
+                Self.reviewFile("Fitness-Rings-Sep-23.PNG", bytes: 892_000),
+                Self.reviewFile("IMG_4921.PNG", bytes: 1_100_000),
+            ]
+            DispatchQueue.main.async {
+                attachmentScenarios = ["review-MyFitnessPal-Sep-23.PNG": .nutrition, "review-Fitness-Rings-Sep-23.PNG": .activity]
+                unresolvedAttachmentIDs = ["review-IMG_4921.PNG"]
+                automaticClassificationUnresolved = true
+                classificationNote = "Grouped: Nutrition 1 · Activity 1."
+            }
+        case "training", "weight", "other":
+            domainChoice = state == "training" ? .training : state == "weight" ? .weight : .other
+            resolvedScenario = nil
+        case "nutrition-manual":
+            domainChoice = .nutrition; resolvedScenario = .nutrition; captureMode = .manual
+            caloriesText = "2300"; proteinText = "198"; carbsText = "244"; fatText = "73"; fiberText = "31"
+        case "activity-manual":
+            domainChoice = .activity; resolvedScenario = .activity; captureMode = .manual
+            activeCaloriesText = "650"; totalCaloriesText = "2740"; exerciseMinutesText = "45"; standHoursText = "12"; moveGoalText = "650"
+        case "classifying": phase = .classifying
+        case "uploading": transferProgress = 0.64; phase = .uploading
+        case "processing": phase = .processing
+        case "accepted":
+            readyReviews = [.nutrition: "review-nutrition"]
+            phase = .accepted("Your evidence is ready to review.")
+        case "confirmed": phase = .confirmed
+        case "failed": phase = .failed("This evidence could not be uploaded.")
+        case "dexa-selected":
+            attachments = [Self.reviewFile("BodySpec_DXA_2026-09-23.pdf", bytes: 2_800_000, pdf: true)]
+        case "dexa-error": phase = .failed("DEXA intake requires exactly one BodySpec PDF.")
+        case "photos-review", "photos-ready":
+            let ready = state == "photos-ready"
+            attachments = [SandboxAttachment(id: "review-photo-1", displayName: "synthetic:back-relaxed:2026-09-23", source: .photos, contentType: "image/png", data: nil)]
+            DispatchQueue.main.async {
+                guard var identity = photoIdentities.first else { return }
+                identity.orientation = .rear
+                identity.contraction = ready ? .relaxed : .flexed
+                identity.poseVariant = ready ? .standard : .doubleBiceps
+                identity.confirmed = ready
+                photoIdentities = [identity]
+                if !ready { poseNotices[identity.id] = "Double Biceps uses Flexed." }
+                if ready {
+                    photoSession.timeOfDay = .afternoon
+                    photoSession.fasted = false
+                    photoSession.postWorkout = false
+                    photoSession.pump = false
+                    photoSession.originalUnedited = true
+                }
+            }
+        case "photos-resume", "photos-rejected":
+            let rejected = state == "photos-rejected"
+            func artifact(_ ordinal: Int, stored: Bool) -> StagedPhotoArtifactPlan {
+                StagedPhotoArtifactPlan(artifactId: "artifact_review_\(ordinal)", ordinal: ordinal, role: .original, derivativeOf: nil, fileName: "IMG_\(ordinal).HEIC", mimeType: "image/heic", byteLength: 4_000_000, sha256: "review", sourceAttachmentId: "review-\(ordinal)", state: rejected && ordinal == 1 ? .rejected(code: "media_rejected") : stored ? .stored(at: Date()) : .pending)
+            }
+            pendingStagedPlan = StagedPhotoIntakePlan(
+                submissionIdentity: "review", scope: "review", signature: "review", effectiveDate: "2026-09-23",
+                session: StagedPhotoSessionDeclaration(originalUnedited: true, timeOfDay: "afternoon", fasted: nil, postWorkout: nil, pump: nil, photoIdentitiesJSON: "[]"),
+                artifacts: [artifact(1, stored: true), artifact(2, stored: false), artifact(3, stored: false)],
+                intakeId: nil, replacementForSubmissionIdentity: nil, createdAt: Date(),
+                lastErrorCode: rejected ? "media_rejected" : nil
+            )
+        case "photos-uploading", "photos-received":
+            let received = state == "photos-received"
+            stagedProgress = StagedPhotoIntakeProgress(transferredArtifacts: received ? 6 : 2, totalArtifacts: 6, transferredOriginals: received ? 3 : 1, totalOriginals: 3, currentArtifactFraction: received ? 0 : 0.82, mediaComplete: received)
+            transferProgress = received ? 1 : 0.47
+            phase = .uploading
+        default:
+            break
+        }
+    }
+}
+#endif

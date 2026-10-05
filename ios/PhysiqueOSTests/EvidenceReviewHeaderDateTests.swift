@@ -108,4 +108,64 @@ final class EvidenceReviewHeaderDateTests: XCTestCase {
         XCTAssertEqual(TrainingDateFormatting.short("2026-09-12"), "Sep 12")
         XCTAssertEqual(TrainingDateFormatting.short("2026-09-13T02:11:47.000Z"), "Sep 13")
     }
+
+    // MARK: - Batch 3 Checkpoint E
+
+    /// The locked generic header keeps the occurrence-date rules (never
+    /// `createdAt`) and shows the long form.
+    func testGenericHeaderUsesTheOccurrenceDateInLongForm() {
+        let model = review(createdAt: "2026-09-13T02:11:00Z", items: [
+            EvidenceReviewDetailItem(id: "d", type: "dexa_scan", date: "2026-09-12", included: true),
+        ])
+        XCTAssertEqual(EvidenceReviewDetailView.genericOccurrenceDate(for: model), "Sep 12, 2026")
+        let mixed = review(createdAt: nil, items: [
+            EvidenceReviewDetailItem(id: "a", type: "nutrition", date: "2026-09-12", included: true),
+            EvidenceReviewDetailItem(id: "b", type: "activity", date: "2026-09-13", included: true),
+        ])
+        XCTAssertEqual(EvidenceReviewDetailView.genericOccurrenceDate(for: mixed), "2 dates")
+        XCTAssertEqual(EvidenceReviewDetailView.longEvidenceDate("Sep 12, 2026"), "Sep 12, 2026")
+    }
+
+    /// Every non-Workout-Match review uses the generic Checkpoint E
+    /// presentation; only `workoutReconciliation` keeps its specialised
+    /// (Batch 2 L13) branch.
+    func testOnlyWorkoutReconciliationRoutesAwayFromTheGenericReview() {
+        for type in ["nutrition", "activity_day", "dexa_scan", "photo_session", "training", "typed"] {
+            let model = review(createdAt: nil, items: [EvidenceReviewDetailItem(id: type, type: type, date: "2026-09-12")])
+            XCTAssertEqual(EvidenceReviewPresentationRoute(review: model), .generic, type)
+        }
+        var workout = review(createdAt: nil, items: [])
+        workout.workoutReconciliation = WorkoutReconciliationDetail(
+            localDate: "2026-09-12", title: "Workout", summary: "",
+            workout: WorkoutReconciliationWorkout(family: "strength", canonicalType: "traditional_strength_training", startedAt: "2026-09-12T17:00:00Z", endedAt: nil),
+            candidates: []
+        )
+        XCTAssertEqual(EvidenceReviewPresentationRoute(review: workout), .workoutMatch)
+        XCTAssertEqual(EvidenceReviewPresentationRoute(state: .loaded(workout)), .workoutMatch)
+        XCTAssertEqual(EvidenceReviewPresentationRoute(state: .loading), .generic)
+        XCTAssertEqual(EvidenceReviewPresentationRoute(state: .loaded(nil)), .generic)
+    }
+
+    /// The DEXA correction form keeps the exact `dexa-review.measurements.v1`
+    /// field order and units.
+    func testCorrectionFieldsKeepTheCanonicalOrderAndUnits() {
+        XCTAssertEqual(EvidenceReviewDetailView.correctionFields.map(\.1), ["measuredAt", "totalMass", "bodyFat", "fatMass", "leanMass", "boneMineral", "rmr", "vatMass", "vatVolume"])
+        XCTAssertEqual(EvidenceReviewDetailView.correctionFields.last?.0, "Visceral fat volume (in³)")
+    }
+
+    func testIntakeFileSizeLabels() {
+        XCTAssertEqual(ProductionEvidenceUploadView.byteLabel(SandboxAttachment(id: "a", displayName: "a.png", source: .photos, data: Data(count: 1_400_000))), "1.4 MB")
+        XCTAssertEqual(ProductionEvidenceUploadView.byteLabel(SandboxAttachment(id: "b", displayName: "b.png", source: .photos, data: Data(count: 892_000))), "892 KB")
+    }
+
+    /// Correction pre-fill keeps the interpreted precision (full replacement
+    /// must never round untouched fields).
+    func testCorrectionPrefillKeepsExactInterpretedValues() {
+        XCTAssertEqual(EvidenceReviewDetailView.editableNumber(0.24), "0.24")
+        XCTAssertEqual(EvidenceReviewDetailView.editableNumber(1.209), "1.209")
+        XCTAssertEqual(EvidenceReviewDetailView.editableNumber(14.0), "14")
+        XCTAssertEqual(EvidenceReviewDetailView.editableNumber(172.9), "172.9")
+        XCTAssertEqual(EvidenceReviewDetailView.editableNumber(1774), "1774")
+    }
 }
+
