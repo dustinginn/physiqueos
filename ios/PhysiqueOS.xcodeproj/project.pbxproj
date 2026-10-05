@@ -148,6 +148,7 @@
 		000000000000000000001116 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001115 /* HomeViewModel.swift */; };
 		000000000000000000001118 /* HomeHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001117 /* HomeHeaderView.swift */; };
 		00000000000000000000111A /* HomeHeroCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001119 /* HomeHeroCardView.swift */; };
+		B10000000000000000000002 /* HomeJourneyFieldView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* HomeJourneyFieldView.swift */; };
 		00000000000000000000111C /* ConfidenceDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111B /* ConfidenceDetailSheet.swift */; };
 		00000000000000000000111E /* NextBestActionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111D /* NextBestActionView.swift */; };
 		000000000000000000001120 /* BriefingCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000111F /* BriefingCardView.swift */; };
@@ -251,6 +252,7 @@
 		0000000000000000000011E4 /* ProductionEvidenceUploadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011E3 /* ProductionEvidenceUploadView.swift */; };
 		0000000000000000000011E6 /* LocalEvidenceReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011E5 /* LocalEvidenceReviewView.swift */; };
 		0000000000000000000011E8 /* HomeFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011E7 /* HomeFixture.json */; };
+		B10000000000000000000004 /* HomeRedesignReviewFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* HomeRedesignReviewFixture.json */; };
 		0000000000000000000011EA /* PriorityFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011E9 /* PriorityFixture.json */; };
 		0000000000000000000011EC /* GoalsFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011EB /* GoalsFixture.json */; };
 		0000000000000000000011EE /* OperatingPlanFixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000011ED /* OperatingPlanFixture.json */; };
@@ -654,6 +656,7 @@
 		000000000000000000001115 /* HomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeViewModel.swift"; sourceTree = "<group>"; };
 		000000000000000000001117 /* HomeHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeaderView.swift"; sourceTree = "<group>"; };
 		000000000000000000001119 /* HomeHeroCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeHeroCardView.swift"; sourceTree = "<group>"; };
+		B10000000000000000000001 /* HomeJourneyFieldView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeJourneyFieldView.swift"; sourceTree = "<group>"; };
 		00000000000000000000111B /* ConfidenceDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ConfidenceDetailSheet.swift"; sourceTree = "<group>"; };
 		00000000000000000000111D /* NextBestActionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NextBestActionView.swift"; sourceTree = "<group>"; };
 		00000000000000000000111F /* BriefingCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingCardView.swift"; sourceTree = "<group>"; };
@@ -815,6 +818,7 @@
 		000000000000000000001A04 /* NetworkDiagnosticsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkDiagnosticsSection.swift"; sourceTree = "<group>"; };
 		000000000000000000001B00 /* DEXAHealthKitWriteback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHealthKitWriteback.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E7 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
+		B10000000000000000000003 /* HomeRedesignReviewFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeRedesignReviewFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* GoalsFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "GoalsFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011ED /* OperatingPlanFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "OperatingPlanFixture.json"; sourceTree = "<group>"; };
@@ -1224,6 +1228,7 @@
 			children = (
 				00000000000000000000127F /* Fonts */,
 				0000000000000000000011E7 /* HomeFixture.json */,
+				B10000000000000000000003 /* HomeRedesignReviewFixture.json */,
 				0000000000000000000011E9 /* PriorityFixture.json */,
 				0000000000000000000011EB /* GoalsFixture.json */,
 				0000000000000000000011ED /* OperatingPlanFixture.json */,
@@ -1372,6 +1377,7 @@
 				000000000000000000001115 /* HomeViewModel.swift */,
 				000000000000000000001117 /* HomeHeaderView.swift */,
 				000000000000000000001119 /* HomeHeroCardView.swift */,
+				B10000000000000000000001 /* HomeJourneyFieldView.swift */,
 				00000000000000000000111B /* ConfidenceDetailSheet.swift */,
 				00000000000000000000111D /* NextBestActionView.swift */,
 				00000000000000000000111F /* BriefingCardView.swift */,
@@ -1863,6 +1869,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0000000000000000000011E8 /* HomeFixture.json in Resources */,
+				B10000000000000000000004 /* HomeRedesignReviewFixture.json in Resources */,
 				0000000000000000000011EA /* PriorityFixture.json in Resources */,
 				0000000000000000000011EC /* GoalsFixture.json in Resources */,
 				0000000000000000000011EE /* OperatingPlanFixture.json in Resources */,
@@ -2076,6 +2083,7 @@
 				000000000000000000001116 /* HomeViewModel.swift in Sources */,
 				000000000000000000001118 /* HomeHeaderView.swift in Sources */,
 				00000000000000000000111A /* HomeHeroCardView.swift in Sources */,
+				B10000000000000000000002 /* HomeJourneyFieldView.swift in Sources */,
 				00000000000000000000111C /* ConfidenceDetailSheet.swift in Sources */,
 				00000000000000000000111E /* NextBestActionView.swift in Sources */,
 				000000000000000000001120 /* BriefingCardView.swift in Sources */,

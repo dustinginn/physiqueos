@@ -88,7 +88,7 @@ struct CompletedGoalDetailContent: View {
 
     private var photos: some View {
         GoalSection(eyebrow: "The transformation", title: "Beginning → Completion") {
-            VStack(spacing: 12) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(goal.photos) { photo in
                     VStack(alignment: .leading, spacing: 8) {
                         // The real canonical Founder progress photo, via the
@@ -144,7 +144,7 @@ struct CompletedGoalDetailContent: View {
                 }
         }
         .padding(20)
-        .background(Color.black.opacity(0.34))
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(.vertical, 12)
     }
@@ -162,7 +162,7 @@ struct CompletedGoalDetailContent: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(16)
-                    .background(PhysiqueOSTheme.surfaceMuted)
+                    .background(PhysiqueOSTheme.redesignSoft)
                     .clipShape(RoundedRectangle(cornerRadius: 13))
                 }
             }
@@ -171,7 +171,7 @@ struct CompletedGoalDetailContent: View {
 
     private func unlockedCard(_ unlocked: CompletedGoalUnlockReadModel) -> some View {
         GoalAtmosphericCard(tone: .guardrail, padding: 20, cornerRadius: 28) {
-            VStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
                 Label("What This Unlocked", systemImage: "sparkles")
                     .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
                     .foregroundStyle(PhysiqueOSTheme.accent)
@@ -186,7 +186,7 @@ struct CompletedGoalDetailContent: View {
                 Text(unlocked.body)
                     .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
                     .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(.leading)
                 PrimaryActionButton(title: "View Current Goal") {
                     onNavigate(unlocked.destination)
                 }

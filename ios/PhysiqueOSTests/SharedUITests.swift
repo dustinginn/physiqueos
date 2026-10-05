@@ -363,6 +363,19 @@ final class SharedUITests: XCTestCase {
         }
     }
 
+    func testRedesignSemanticInkMaintainsAccessibleContrast() {
+        for style: UIUserInterfaceStyle in [.dark, .light] {
+            let traits = UITraitCollection(userInterfaceStyle: style)
+            let canvas = UIColor(PhysiqueOSTheme.redesignCanvas).resolvedColor(with: traits)
+            let paper = UIColor(PhysiqueOSTheme.redesignPaper).resolvedColor(with: traits)
+            let ink = UIColor(PhysiqueOSTheme.redesignInk).resolvedColor(with: traits)
+            let secondary = UIColor(PhysiqueOSTheme.redesignInkSecondary).resolvedColor(with: traits)
+            XCTAssertGreaterThanOrEqual(Self.contrast(ink, canvas), 7.0)
+            XCTAssertGreaterThanOrEqual(Self.contrast(ink, paper), 7.0)
+            XCTAssertGreaterThanOrEqual(Self.contrast(secondary, canvas), 4.5)
+        }
+    }
+
     private func appearanceDefaults() throws -> UserDefaults {
         let suite = "SharedUITests.appearance.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))

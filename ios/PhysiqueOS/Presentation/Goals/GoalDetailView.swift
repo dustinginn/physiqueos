@@ -16,11 +16,11 @@ struct GoalDetailView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button { dismiss() } label: {
@@ -902,7 +902,7 @@ struct GoalSection<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 26)
+        .padding(.vertical, 22)
         .overlay(alignment: .bottom) {
             Divider().overlay(PhysiqueOSTheme.divider)
         }
@@ -1124,25 +1124,26 @@ enum GoalVisualTone {
 
     var accent: Color {
         switch self {
-        case .activeGoal, .guardrail: PhysiqueOSTheme.accent
-        case .completed: PhysiqueOSTheme.chartEffort
-        case .activePhase: PhysiqueOSTheme.chartSuccess
-        case .neutral: PhysiqueOSTheme.textMuted
+        case .activeGoal: PhysiqueOSTheme.redesignTeal
+        case .guardrail: PhysiqueOSTheme.redesignCyan
+        case .completed: PhysiqueOSTheme.redesignAmber
+        case .activePhase: PhysiqueOSTheme.redesignGreen
+        case .neutral: PhysiqueOSTheme.redesignInkSecondary
         }
     }
 
     var gradient: LinearGradient {
         let colors: [Color] = switch self {
         case .activeGoal:
-            [PhysiqueOSTheme.accent.opacity(0.17), PhysiqueOSTheme.surfaceElevated, PhysiqueOSTheme.chartSuccess.opacity(0.055)]
+            [PhysiqueOSTheme.redesignFieldStart, PhysiqueOSTheme.redesignFieldEnd]
         case .completed:
-            [PhysiqueOSTheme.chartEffort.opacity(0.15), PhysiqueOSTheme.surfaceElevated, PhysiqueOSTheme.chartSuccess.opacity(0.045)]
+            [PhysiqueOSTheme.redesignAmber.opacity(0.22), PhysiqueOSTheme.redesignPaper, PhysiqueOSTheme.redesignGreen.opacity(0.06)]
         case .activePhase:
-            [PhysiqueOSTheme.chartSuccess.opacity(0.12), PhysiqueOSTheme.surfaceElevated, PhysiqueOSTheme.chartSuccess.opacity(0.045)]
+            [PhysiqueOSTheme.redesignGreen.opacity(0.15), PhysiqueOSTheme.redesignPaper]
         case .guardrail:
-            [PhysiqueOSTheme.accent.opacity(0.11), PhysiqueOSTheme.surfaceElevated, PhysiqueOSTheme.accent.opacity(0.035)]
+            [PhysiqueOSTheme.redesignCyan.opacity(0.17), PhysiqueOSTheme.redesignPaper]
         case .neutral:
-            [PhysiqueOSTheme.surfaceMuted, PhysiqueOSTheme.surfaceElevated]
+            [PhysiqueOSTheme.redesignSoft, PhysiqueOSTheme.redesignPaper]
         }
         return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }

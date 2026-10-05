@@ -21,6 +21,12 @@ struct PhysiqueOSApp: App {
     /// seam without persisting it as the Founder's real preference.
     private static var debugAppearanceOverride: AppAppearance? {
 #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let flagIndex = arguments.firstIndex(of: "-physiqueos.appearance-review.value"),
+           arguments.indices.contains(flagIndex + 1),
+           let reviewAppearance = AppAppearance(rawValue: arguments[flagIndex + 1]) {
+            return reviewAppearance
+        }
         if FoamRollingPriorityPilotLaunchConfiguration.isEnabled {
             return FoamRollingPriorityPilotLaunchConfiguration.appearance
                 .flatMap(AppAppearance.init(rawValue:))

@@ -18,9 +18,17 @@ struct TodaysFocusCardView: View {
     }
 
     var body: some View {
-        CardContainer(padding: .sm) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("TODAY'S PRIORITIES")
+                    .font(.system(size: 11, weight: .bold)).tracking(0.9)
+                    .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+                Spacer()
+                Text("\(items.count) OPEN")
+                    .font(.system(size: 11, weight: .bold)).tracking(0.4)
+                    .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+            }
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeading("Today's Priorities")
                 if useSingleColumn {
                     VStack(spacing: 8) {
                         ForEach(items) { item in
@@ -43,6 +51,10 @@ struct TodaysFocusCardView: View {
                 }
             }
         }
+        .padding(14)
+        .background(PhysiqueOSTheme.redesignPaper)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(PhysiqueOSTheme.redesignRule))
     }
 }
 

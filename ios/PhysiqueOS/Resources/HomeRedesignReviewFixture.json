@@ -1,0 +1,90 @@
+{
+  "header": { "greeting": "Good afternoon,", "name": "Dustin" },
+  "hero": {
+    "mode": "phase_trajectory",
+    "goalLabel": "Build Lean Mass",
+    "headline": "Lean Mass Build",
+    "supportLine": "Execution is aligned with the current plan.",
+    "confidence": 79,
+    "confidenceDetail": {
+      "qualitativeLevel": "Moderate",
+      "supportingFactors": ["Training and execution remain consistent."],
+      "limitingFactors": ["The next DEXA will confirm measured progress."],
+      "clarifyingFactors": ["Four weeks remain in the current phase."],
+      "uncertaintyStatement": "Confidence reflects the current evidence, not a guaranteed outcome."
+    },
+    "primaryTimeline": "On track",
+    "projectedFinish": "Oct 31",
+    "daysRemaining": "4 weeks",
+    "actionLabel": null,
+    "actionDestination": null
+  },
+  "nextBestAction": {
+    "title": "Log Morning Weight",
+    "icon": "scale",
+    "destination": { "id": "check-in", "parameters": { "checkInType": "morning" } }
+  },
+  "briefingCards": [{
+    "id": "briefing-midweek-review",
+    "sectionLabel": "Latest Briefing",
+    "title": "Midweek Briefing",
+    "prompt": "Keep executing consistently. Keep the current setup in place.",
+    "createdAt": "2026-09-23T14:00:00.000Z",
+    "destination": { "id": "briefing.detail", "parameters": { "briefingId": "briefing-midweek-review" } }
+  }],
+  "goals": [{
+    "id": "goal_fixture_build_lean_mass",
+    "title": "Build Lean Mass",
+    "current": "5.8",
+    "target": "+10",
+    "unit": "lb lean",
+    "icon": "target",
+    "color": "success",
+    "presentationMode": "phaseTrajectory",
+    "phaseTrajectory": {
+      "targetDescription": "+10 lb lean",
+      "overallTargetDate": "2026-10-31",
+      "guardrail": "Keep body fat at 8–9% · Latest DEXA: 8.1% · within range",
+      "phases": [{
+        "id": "phase_fixture_maintenance",
+        "order": 0,
+        "phaseName": "Establish Maintenance",
+        "status": "completed",
+        "presentationTone": "gold",
+        "progressType": "planned_time",
+        "clampedProgressPercentage": 100,
+        "presentationLabel": "Completed Aug 14",
+        "progressStatus": "completed",
+        "startDate": "2026-07-18",
+        "calculatedPlannedReviewDate": "2026-08-14"
+      }, {
+        "id": "phase_fixture_lean_mass_build",
+        "order": 1,
+        "phaseName": "Lean Mass Build",
+        "status": "active",
+        "presentationTone": "green",
+        "progressType": "outcome",
+        "clampedProgressPercentage": 58,
+        "presentationLabel": "+5.8 of 10 lb",
+        "progressStatus": "in_progress",
+        "startDate": "2026-08-15",
+        "calculatedPlannedReviewDate": "2026-10-31"
+      }]
+    },
+    "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_fixture_build_lean_mass" } }
+  }],
+  "todaysFocus": [{
+    "id": "review-morning-weight", "executionItemId": "execution_morning_weigh_in", "date": "2026-10-04",
+    "title": "Morning Weigh-In", "subtitle": "Before food or fluids", "icon": "scale", "color": "evidence",
+    "urgency": "available", "completed": false, "completable": false
+  }, {
+    "id": "review-foam", "executionItemId": "execution_foam_roll", "date": "2026-10-04",
+    "title": "Foam Rolling", "subtitle": "7:15 PM", "icon": "activity", "color": "effort",
+    "urgency": "upcoming", "completed": false, "completable": true
+  }, {
+    "id": "review-tesamorelin", "executionItemId": "execution_tesamorelin", "date": "2026-10-04",
+    "title": "Tesamorelin", "subtitle": "10:29 PM · 0.5 mg", "icon": "syringe", "color": "primary",
+    "urgency": "upcoming", "completed": false, "completable": true,
+    "completionContext": { "occurrenceDate": "2026-10-04", "dose": "0.5 mg", "protocolId": "tesamorelin" }
+  }]
+}

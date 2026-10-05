@@ -92,7 +92,13 @@ struct RootTabView: View {
             .tag(AppTab.evidence)
 
             NavigationStack(path: $youPath) {
-                YouPlaceholderView(onNavigate: { noteNavigation($0); youPath.append($0) })
+                YouPlaceholderView(
+                    onNavigate: { noteNavigation($0); youPath.append($0) },
+                    onSelectGoals: {
+                        selectedTab = .goals
+                        goalsPath = NavigationPath()
+                    }
+                )
                     .navigationDestination(for: AppDestination.self) {
                         AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { noteNavigation($0); youPath.append($0) })
                     }
@@ -266,9 +272,14 @@ private enum AppearanceReviewLaunchConfiguration {
         return switch value {
         case "home": Route(tab: .home, destinations: [])
         case "goals": Route(tab: .goals, destinations: [])
+        case "goal-active": Route(tab: .goals, destinations: [.goalDetail(goalId: "goal_fixture_build_lean_mass")])
+        case "goal-completed": Route(tab: .goals, destinations: [.goalDetail(goalId: "goal_visible_abs_at_rest")])
+        case "goal-phase-active": Route(tab: .goals, destinations: [.goalPhase(goalId: "goal_fixture_build_lean_mass", phaseId: "phase_fixture_lean_mass_build")])
+        case "goal-phase-completed": Route(tab: .goals, destinations: [.goalPhase(goalId: "goal_fixture_build_lean_mass", phaseId: "phase_fixture_maintenance")])
         case "log": Route(tab: .log, destinations: [])
         case "evidence": Route(tab: .evidence, destinations: [])
         case "you": Route(tab: .you, destinations: [])
+        case "settings": Route(tab: .you, destinations: [.settings])
         case "appearance": Route(tab: .you, destinations: [.settings, .appearance])
         case "operating-plan": Route(tab: .you, destinations: [.operatingPlan])
         case "training-logger": Route(tab: .log, destinations: [.trainingLogger])

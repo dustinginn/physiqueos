@@ -72,7 +72,7 @@ struct FocusTileView: View {
     var isCompleting: Bool = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Button { onTap(item.destination) } label: { rowBody }
                 .buttonStyle(.plain)
             if item.completable, !item.completed, !isCompleting {
@@ -89,8 +89,8 @@ struct FocusTileView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .frame(minHeight: 68)
-        .background(PhysiqueOSTheme.surfaceElevated)
+        .frame(minHeight: 62)
+        .background(item.color.background.opacity(0.72))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
@@ -102,13 +102,7 @@ struct FocusTileView: View {
     }
 
     private var rowBody: some View {
-        HStack(spacing: 10) {
-            IconBadge(
-                systemImage: HomeFocusIconPresentation.systemImage(for: item.icon),
-                color: item.color,
-                size: .xs,
-                isCircular: true
-            )
+        HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .physiqueOSFont(PhysiqueOSTypography.focusLabel)
@@ -170,13 +164,9 @@ struct FocusTileView: View {
 
     private var completeButton: some View {
         Circle()
-            .fill(PhysiqueOSTheme.surfaceElevated)
-            .overlay(Circle().stroke(PhysiqueOSTheme.divider, lineWidth: 1))
-            .overlay(
-                Image(systemName: "checkmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            )
-            .frame(width: 22, height: 22)
+            .fill(.clear)
+            .overlay(Circle().stroke(item.color.foreground, lineWidth: 1.2))
+            .frame(width: 28, height: 28)
+            .frame(minWidth: 44, minHeight: 44)
     }
 }

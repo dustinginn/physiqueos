@@ -138,6 +138,26 @@ enum PhysiqueOSTheme {
     /// both appearances; this is distinct from the dynamic page canvas.
     static let actionDark = Color(hex: 0x06121D)
 
+    // Founder-locked redesign vocabulary. These are shared semantic tokens,
+    // deliberately separate from the legacy baseline above so Batch 1 can
+    // land Home, Goals and You without silently restyling out-of-scope
+    // screens. Later implementation batches can migrate onto the same set.
+    static let redesignCanvas = dynamic(dark: 0x061019, light: 0xE8ECE5)
+    static let redesignPaper = dynamic(dark: 0x0F1C2A, light: 0xFBFAF4)
+    static let redesignSoft = dynamic(dark: 0x132334, light: 0xEEF2ED)
+    static let redesignInk = dynamic(dark: 0xF3F8FA, light: 0x102431)
+    static let redesignInkSecondary = dynamic(dark: 0xC3D2D9, light: 0x526970)
+    static let redesignPurple = dynamic(dark: 0xAA98FF, light: 0x5C3FD2)
+    static let redesignGreen = dynamic(dark: 0x55E39A, light: 0x16875F)
+    static let redesignAmber = dynamic(dark: 0xEFB84F, light: 0xC88228)
+    static let redesignTeal = dynamic(dark: 0x3BD2CA, light: 0x087E78)
+    static let redesignCyan = dynamic(dark: 0x3BC6DD, light: 0x107F99)
+    static let redesignFieldStart = dynamic(dark: 0x087B70, light: 0xCBE6E2)
+    static let redesignFieldEnd = dynamic(dark: 0x132751, light: 0xB9D5DD)
+    static let redesignAmberField = dynamic(dark: 0xF4BC48, light: 0xC98220)
+    static let redesignCoachField = dynamic(dark: 0x122A55, light: 0xDDE8F1)
+    static let redesignRule = dynamic(dark: 0xA7BCC5, light: 0x6E817F, darkOpacity: 0.18, lightOpacity: 0.22)
+
     private static func dynamic(
         dark: UInt32,
         light: UInt32,

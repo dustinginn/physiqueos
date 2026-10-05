@@ -35,7 +35,15 @@ struct FixtureHomeAPI: HomeAPI {
     }
 
     func fetchHome() async throws -> HomeReadModel {
-        guard let url = Bundle.main.url(forResource: "HomeFixture", withExtension: "json") else {
+        let resourceName: String
+#if DEBUG
+        resourceName = ProcessInfo.processInfo.arguments.contains("-physiqueos.redesign-review")
+            ? "HomeRedesignReviewFixture"
+            : "HomeFixture"
+#else
+        resourceName = "HomeFixture"
+#endif
+        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "json") else {
             throw FixtureError.resourceNotFound
         }
         let data = try Data(contentsOf: url)

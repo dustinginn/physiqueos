@@ -62,6 +62,19 @@ final class HomeReadModelTests: XCTestCase {
         XCTAssertTrue(hasSupporting, "Fixture should exercise the supporting-objective presentation.")
     }
 
+    func testRedesignReviewFixturePreservesLockedHomeInformationContract() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "HomeRedesignReviewFixture", withExtension: "json"))
+        let model = try JSONDecoder().decode(HomeReadModel.self, from: Data(contentsOf: url))
+        XCTAssertEqual(model.hero.confidence, 79)
+        XCTAssertEqual(model.briefingCards.count, 1)
+        XCTAssertEqual(model.todaysFocus.count, 3)
+        guard case .phaseTrajectory(let trajectory) = try XCTUnwrap(model.goals.first).presentation else {
+            return XCTFail("The locked Home review state must exercise the two-phase trajectory.")
+        }
+        XCTAssertEqual(trajectory.phases.map(\.status), ["completed", "active"])
+        XCTAssertNotNil(trajectory.guardrail)
+    }
+
     // MARK: - Confidence is supplied, never recomputed
 
     /// Decodes two fixtures that differ only in their confidence value and

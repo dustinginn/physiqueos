@@ -11,12 +11,12 @@ struct HomeHeaderView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(HomeGreeting.text())
                 .physiqueOSFont(PhysiqueOSTypography.greeting)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             (
-                Text(header.name).foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    + Text(".").foregroundStyle(PhysiqueOSTheme.accent)
+                Text(header.name).foregroundStyle(PhysiqueOSTheme.redesignInk)
+                    + Text(".").foregroundStyle(PhysiqueOSTheme.redesignPurple)
             )
-            .physiqueOSFont(PhysiqueOSTypography.displayName)
+            .physiqueOSFont(.init(size: 30, weight: .bold))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

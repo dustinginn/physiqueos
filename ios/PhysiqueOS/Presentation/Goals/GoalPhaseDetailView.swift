@@ -16,11 +16,11 @@ struct GoalPhaseDetailView: View {
                 .padding(.top, 12)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button { dismiss() } label: {

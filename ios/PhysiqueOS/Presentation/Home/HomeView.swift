@@ -30,11 +30,11 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+                .padding(.horizontal, 18)
+                .padding(.top, 10)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .background(PhysiqueOSTheme.redesignCanvas)
         .toolbar(.hidden, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
@@ -196,7 +196,7 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let home):
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HomeHeaderView(header: home.header)
 
                 if let viewModel, viewModel.isShowingLastKnown {
@@ -206,23 +206,36 @@ struct HomeView: View {
                     )
                 }
 
-                HomeHeroCardView(hero: home.hero) {
-                    if let confidence = home.hero.confidence, let detail = home.hero.confidenceDetail {
-                        confidenceDetailPresentation = (confidence, detail)
-                    }
-                }
-
-                NextBestActionView(action: home.nextBestAction, onTap: onNavigate)
-
-                if home.hasBriefingCards {
-                    VStack(spacing: 10) {
-                        ForEach(home.briefingCards) { card in
-                            BriefingCardView(card: card, onTap: onNavigate)
+                if let primaryGoal = home.goals.first {
+                    HomeJourneyFieldView(hero: home.hero, goal: primaryGoal, onOpenConfidenceDetail: {
+                        if let confidence = home.hero.confidence, let detail = home.hero.confidenceDetail {
+                            confidenceDetailPresentation = (confidence, detail)
+                        }
+                    }, onOpenGoal: onNavigate)
+                    .padding(.horizontal, -18)
+                } else {
+                    HomeHeroCardView(hero: home.hero) {
+                        if let confidence = home.hero.confidence, let detail = home.hero.confidenceDetail {
+                            confidenceDetailPresentation = (confidence, detail)
                         }
                     }
                 }
 
-                GoalsCardView(goals: home.goals, onTap: onNavigate)
+                HomeActionBriefingStrip(
+                    action: home.nextBestAction,
+                    briefing: home.briefingCards.first,
+                    onNavigate: onNavigate
+                )
+
+                if home.briefingCards.count > 1 {
+                    ForEach(Array(home.briefingCards.dropFirst())) { card in
+                        BriefingCardView(card: card, onTap: onNavigate)
+                    }
+                }
+
+                if home.goals.count > 1 {
+                    GoalsCardView(goals: Array(home.goals.dropFirst()), onTap: onNavigate)
+                }
 
                 if home.hasTodaysFocus {
                     if environment.notificationAuthorizationStatus == .denied,
