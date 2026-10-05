@@ -22,6 +22,9 @@ import SwiftUI
 /// single centered dot + caption for exactly one point, and an empty
 /// message for zero — mirroring `buildNutritionCalorieSeriesPaths`'s own
 /// gap-preserving, no-fabricated-line behavior.
+/// Locked `.chart`: teal-tinted field, 32 px grid, area + 3 px line,
+/// ringed points, the selected week's value at top right, and the
+/// selected-week detail line below. Scrubbing selects the nearest week.
 struct NutritionTrendChartView: View {
     let points: [NutritionTrendPoint]
     let color: Color
@@ -29,6 +32,7 @@ struct NutritionTrendChartView: View {
     let emptyMessage: String
     @Binding var selectedWeekID: String?
 
+    private let m = EvidenceMetrics(family: .daily)
     private var validPoints: [NutritionTrendPoint] { points.filter { $0.value != nil } }
 
     private var selectedPoint: NutritionTrendPoint? {
@@ -36,85 +40,108 @@ struct NutritionTrendChartView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             if validPoints.isEmpty {
                 Text(emptyMessage)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    .frame(maxWidth: .infinity, minHeight: 100)
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.6))
+                    .foregroundStyle(m.c.muted)
+                    .frame(maxWidth: .infinity, minHeight: m.pt(100))
             } else if validPoints.count == 1, let only = validPoints.first, let value = only.value {
-                VStack(spacing: 4) {
-                    Circle().fill(color).frame(width: 10, height: 10)
+                VStack(spacing: m.pt(4)) {
+                    Circle().fill(color).frame(width: m.pt(10), height: m.pt(10))
                     Text(valueLabel(value))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .evidenceText(.normal(11, 840))
+                        .foregroundStyle(m.c.ink)
                     Text("More weekly history is needed to show a trend.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.6))
+                        .foregroundStyle(m.c.muted)
                 }
-                .frame(maxWidth: .infinity, minHeight: 100)
+                .frame(maxWidth: .infinity, minHeight: m.pt(100))
             } else {
-                chart
+                chartField
                 detail
             }
         }
     }
 
-    private var chart: some View {
-        Chart {
-            ForEach(validPoints) { point in
-                LineMark(x: .value("Week", point.weekStart), y: .value("Value", point.value ?? 0))
-                    .foregroundStyle(color)
-                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+    private var chartField: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 0) {
+                ForEach(0..<4, id: \.self) { _ in
+                    Spacer(minLength: 0)
+                    Rectangle().fill(m.c.line.opacity(0.75)).frame(height: m.pt(1))
+                }
             }
-            ForEach(validPoints) { point in
-                let isSelected = point.id == selectedPoint?.id
-                PointMark(x: .value("Week", point.weekStart), y: .value("Value", point.value ?? 0))
-                    .symbolSize(isSelected ? 80 : 24)
+            .padding(m.pt(12))
+            Chart {
+                ForEach(validPoints) { point in
+                    AreaMark(x: .value("Week", point.weekStart), y: .value("Value", point.value ?? 0))
+                        .foregroundStyle(color.opacity(0.13))
+                        .interpolationMethod(.linear)
+                    LineMark(x: .value("Week", point.weekStart), y: .value("Value", point.value ?? 0))
+                        .foregroundStyle(color)
+                        .lineStyle(StrokeStyle(lineWidth: m.pt(3), lineCap: .round, lineJoin: .round))
+                }
+                ForEach(validPoints) { point in
+                    let isSelected = point.id == selectedPoint?.id
+                    PointMark(x: .value("Week", point.weekStart), y: .value("Value", point.value ?? 0))
+                        .symbol {
+                            Circle()
+                                .fill(m.c.page)
+                                .overlay(Circle().stroke(color, lineWidth: m.pt(3)))
+                                .frame(width: m.pt(isSelected ? 9.5 : 6), height: m.pt(isSelected ? 9.5 : 6))
+                        }
+                }
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .chartYScale(domain: .automatic(includesZero: false))
+            .padding(.horizontal, m.pt(12))
+            .padding(.top, m.pt(30))
+            .padding(.bottom, m.pt(12))
+            .evidenceChartScrub { location, proxy, geometry in
+                let relativeX = geometry.relativeX(in: proxy, at: location)
+                let touchedWeek: String? = proxy.value(atX: relativeX)
+                guard let nearest = ChartCategoricalSelection.nearestPoint(matching: touchedWeek, in: validPoints, keyPath: \.weekStart) else { return }
+                selectedWeekID = nearest.id
+            }
+            .accessibilityLabel("Weekly trend over \(validPoints.count) weeks")
+            if let selectedPoint, let value = selectedPoint.value {
+                Text("\(valueLabel(value)) avg")
+                    .evidenceText(.normal(10, 850, digits: true))
                     .foregroundStyle(color)
+                    .padding(.top, m.pt(10))
+                    .padding(.trailing, m.pt(12))
             }
         }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .frame(height: 120)
-        .chartScrub { location, proxy, geometry in selectNearest(at: location, proxy: proxy, geometry: geometry) }
-        .accessibilityLabel("Weekly trend over \(validPoints.count) weeks")
+        .frame(height: m.pt(145))
+        .background(
+            LinearGradient(colors: [m.c.tealSoft, .clear], startPoint: .top, endPoint: .bottom),
+            in: RoundedRectangle(cornerRadius: m.pt(12))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: m.pt(12)))
     }
 
-    private func selectNearest(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        let relativeX = geometry.relativeX(in: proxy, at: location)
-        let touchedWeek: String? = proxy.value(atX: relativeX)
-        guard let nearest = ChartCategoricalSelection.nearestPoint(matching: touchedWeek, in: validPoints, keyPath: \.weekStart) else { return }
-        selectedWeekID = nearest.id
-    }
-
-    /// The below-chart "Selected Week" detail — week range, average value,
-    /// logged days. (Per-week Lowest/Highest-day breakdown, which the web
-    /// also shows here, is not modeled in this pass's `NutritionTrendPoint`
-    /// — a disclosed simplification, see this port's final report.)
+    @ViewBuilder
     private var detail: some View {
-        Group {
-            if let selectedPoint, let value = selectedPoint.value {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(TrainingDateFormatting.short(selectedPoint.weekStart)) – \(TrainingDateFormatting.short(selectedPoint.weekEnd))")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text("\(valueLabel(value)) average · \(selectedPoint.loggedDayCount) logged day\(selectedPoint.loggedDayCount == 1 ? "" : "s")")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceMuted)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+        if let selectedPoint, let value = selectedPoint.value {
+            HStack {
+                Text("\(TrainingDateFormatting.short(selectedPoint.weekStart)) – \(TrainingDateFormatting.short(selectedPoint.weekEnd))")
+                    .evidenceText(.normal(9, 400))
+                    .foregroundStyle(m.c.muted)
+                Spacer(minLength: m.pt(8))
+                Text("\(valueLabel(value)) average · \(selectedPoint.loggedDayCount) logged day\(selectedPoint.loggedDayCount == 1 ? "" : "s")")
+                    .evidenceText(.normal(9, 700, digits: true))
+                    .foregroundStyle(m.c.ink)
             }
+            .padding(.top, m.pt(7))
+            .accessibilityElement(children: .combine)
         }
     }
 }
 
-/// A simple proportional-height vertical bar chart — "Average Daily
-/// Macros" and "Meal Distribution" both use this shape (label + value +
-/// caption per bar, colored per-bar).
+/// Locked `.bars`: 108 px tracks with colored fills (82 %), label then
+/// value under each bar.
 struct NutritionBarChartView: View {
     struct Bar: Identifiable {
         var id: String
@@ -122,50 +149,57 @@ struct NutritionBarChartView: View {
         var value: Double
         var caption: String
         var color: Color
+        var valueText: String? = nil
     }
 
     let bars: [Bar]
     let emptyMessage: String
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
         let maxValue = bars.map(\.value).max() ?? 0
         if maxValue <= 0 {
             Text(emptyMessage)
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 80)
+                .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.6))
+                .foregroundStyle(m.c.muted)
+                .frame(maxWidth: .infinity, minHeight: m.pt(80))
         } else {
-            HStack(alignment: .bottom, spacing: 12) {
+            HStack(alignment: .bottom, spacing: m.pt(10)) {
                 ForEach(bars) { bar in
-                    VStack(spacing: 4) {
-                        Text(bar.value > 0 ? String(Int(bar.value.rounded())) : "—")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(bar.color)
-                            .frame(height: max(4, 84 * bar.value / maxValue))
+                    VStack(spacing: 0) {
+                        ZStack(alignment: .bottom) {
+                            RoundedRectangle(cornerRadius: m.pt(7)).fill(m.c.surface2)
+                            Rectangle()
+                                .fill(bar.color.opacity(0.82))
+                                .frame(height: m.pt(108) * CGFloat(bar.value / maxValue))
+                        }
+                        .frame(height: m.pt(108))
+                        .clipShape(RoundedRectangle(cornerRadius: m.pt(7)))
                         Text(bar.label)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .evidenceText(.normal(8, 800))
+                            .foregroundStyle(m.c.muted)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
-                        Text(bar.caption)
-                            .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .padding(.top, m.pt(5))
+                        Text(bar.value > 0 ? "\(bar.valueText ?? String(Int(bar.value.rounded()))) · \(bar.caption)" : "—")
+                            .evidenceText(.normal(8, 850, digits: true))
+                            .foregroundStyle(m.c.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .combine)
                 }
             }
-            .frame(height: 140, alignment: .bottom)
+            .padding(.horizontal, m.pt(8))
+            .padding(.top, m.pt(12))
+            .padding(.bottom, m.pt(5))
         }
     }
 }
 
-/// A ring/donut chart built from `Circle().trim` arcs — approximates the
-/// web's CSS `conic-gradient` donut visually (segments, center label,
-/// legend rows with a color dot + "{pct}% · {grams}g"). Reused verbatim by
-/// both "Macro Distribution" and "Meal Macro Mix", matching the web's own
-/// component reuse.
+/// Locked `.donut-wrap`: 128 px ring (25 px band) with a centered label and
+/// a swatch legend (label left, percentage and grams right).
 struct NutritionDonutChartView: View {
     struct Slice: Identifiable {
         var id: String
@@ -178,46 +212,56 @@ struct NutritionDonutChartView: View {
     let slices: [Slice]
     let centerLabel: String
     let emptyMessage: String
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
         if slices.isEmpty || slices.allSatisfy({ $0.percentage == 0 }) {
             Text(emptyMessage)
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 100)
+                .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.6))
+                .foregroundStyle(m.c.muted)
+                .frame(maxWidth: .infinity, minHeight: m.pt(100))
         } else {
-            HStack(spacing: 16) {
+            HStack(spacing: m.pt(18)) {
                 ring
-                    .frame(width: 96, height: 96)
-                VStack(alignment: .leading, spacing: 6) {
+                    .frame(width: m.pt(128), height: m.pt(128))
+                VStack(alignment: .leading, spacing: m.pt(8)) {
                     ForEach(slices) { slice in
-                        HStack(spacing: 6) {
-                            Circle().fill(slice.color).frame(width: 8, height: 8)
-                            Text("\(slice.label) \(slice.percentage)% · \(Int(slice.grams))g")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        HStack(spacing: m.pt(7)) {
+                            RoundedRectangle(cornerRadius: m.pt(3)).fill(slice.color).frame(width: m.pt(8), height: m.pt(8))
+                            Text(slice.label)
+                                .evidenceText(.normal(9, 400))
+                                .foregroundStyle(m.c.muted)
+                            Spacer(minLength: m.pt(4))
+                            Text("\(slice.percentage)% · \(Int(slice.grams))g")
+                                .evidenceText(.normal(9, 700, digits: true))
+                                .foregroundStyle(m.c.ink)
                         }
+                        .accessibilityElement(children: .combine)
                     }
                 }
-                Spacer(minLength: 0)
             }
+            .padding(.vertical, m.pt(4))
+            .padding(.horizontal, m.pt(3))
         }
     }
 
     private var ring: some View {
-        ZStack {
+        let band = m.pt(25)
+        return ZStack {
             ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
                 Circle()
                     .trim(from: segment.start, to: segment.end)
-                    .stroke(segment.slice.color, style: StrokeStyle(lineWidth: 16, lineCap: .butt))
+                    .stroke(segment.slice.color, style: StrokeStyle(lineWidth: band, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
+                    .padding(band / 2)
             }
             Text(centerLabel)
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .evidenceText(EvidenceTextStyle(size: 8, weight: 800, lineHeight: 9.6))
+                .foregroundStyle(m.c.muted)
                 .multilineTextAlignment(.center)
-                .padding(8)
+                .padding(m.pt(38))
         }
+        .accessibilityHidden(true)
     }
 
     private var segments: [(slice: Slice, start: CGFloat, end: CGFloat)] {

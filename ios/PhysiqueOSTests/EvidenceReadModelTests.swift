@@ -71,6 +71,50 @@ final class EvidenceReadModelTests: XCTestCase {
         XCTAssertLessThan(EvidenceLockedStyle.uiWeight(780).rawValue, UIFont.Weight.heavy.rawValue)
     }
 
+    // MARK: - Batch 3 B/C presentation rules
+
+    /// Locked row types come only from the canonical summary tokens.
+    func testTrainingDayKindLabelUsesCanonicalSummaryTokens() {
+        XCTAssertEqual(TrainingDayKindLabel(summary: "Chest · Triceps").type, "Strength")
+        XCTAssertEqual(TrainingDayKindLabel(summary: "Chest · Triceps · Walking").type, "Strength + Walking")
+        XCTAssertEqual(TrainingDayKindLabel(summary: "Cardio").type, "Cardio")
+        XCTAssertEqual(TrainingDayKindLabel(summary: "Cardio").tone, .cardio)
+        XCTAssertEqual(TrainingDayKindLabel(summary: "Walking").tone, .walking)
+        XCTAssertEqual(TrainingDayKindLabel(summary: "Cooldown").tone, .cooldown)
+        XCTAssertNil(TrainingDayKindLabel(summary: nil).type)
+    }
+
+    /// Apple-only workout detail tokens become labeled cells only when every
+    /// token is recognized; otherwise the Server line is shown verbatim.
+    func testSessionDetailSummaryTokenizesOnlyRecognizedServerTokens() {
+        let run = TrainingSessionDetailSummary(detail: "7:00 AM–7:34 AM · 34 min · 3.4 mi · 410 active cal")
+        XCTAssertEqual(run.timeRange, "7:00 AM–7:34 AM")
+        XCTAssertEqual(run.metrics, [
+            .init(label: "Duration", value: "34 min"),
+            .init(label: "Distance", value: "3.4 mi"),
+            .init(label: "Active energy", value: "410 cal"),
+        ])
+        let unknown = TrainingSessionDetailSummary(detail: "34 min · Felt great")
+        XCTAssertFalse(unknown.hasMetrics)
+        XCTAssertNil(unknown.timeRange)
+    }
+
+    /// Chrome's `normal` line box rounds ascent and descent separately.
+    func testNormalLineBoxMatchesChromeRounding() {
+        XCTAssertEqual(EvidenceTextStyle.normal(10, 400).lineHeight, 12)
+        XCTAssertEqual(EvidenceTextStyle.normal(14, 800).lineHeight, 18)
+        XCTAssertEqual(EvidenceTextStyle.normal(9, 800).lineHeight, 11)
+        XCTAssertEqual(EvidenceTextStyle.normal(12, 790, jakarta: false).lineHeight, 15)
+    }
+
+    func testEachLockedFamilyScalesItsHarnessToIPhone17Pro() {
+        XCTAssertEqual(EvidenceFamily.training.pt(390), 402, accuracy: 0.0001)
+        XCTAssertEqual(EvidenceFamily.daily.pt(379), 402, accuracy: 0.0001)
+        XCTAssertEqual(EvidenceFamily.weight.pt(372), 402, accuracy: 0.0001)
+        XCTAssertTrue(EvidenceFamily.training.usesJakarta)
+        XCTAssertFalse(EvidenceFamily.weight.usesJakarta)
+    }
+
     private static func stream(_ id: String) -> EvidenceStreamSummary {
         EvidenceStreamSummary(
             id: id, title: id, metric: "", trend: "", lastUpdated: nil,

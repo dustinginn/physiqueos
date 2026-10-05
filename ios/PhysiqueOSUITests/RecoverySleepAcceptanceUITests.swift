@@ -310,3 +310,160 @@ final class EvidenceHubTimelineUITests: XCTestCase {
         XCTAssertTrue(element("evidence.hub.loading").waitForExistence(timeout: 10))
     }
 }
+
+/// Batch 3 Checkpoints B + C: the locked Training, Activity, Nutrition and
+/// Weight hierarchies through the real Sandbox app shell (no review seam).
+@MainActor
+final class EvidenceTrainingNutritionWeightUITests: XCTestCase {
+    private let app = XCUIApplication()
+
+    override func setUp() async throws {
+        continueAfterFailure = false
+        app.launchArguments += ["-physiqueos.native.authority-selection.v1", "sandbox"]
+        app.launch()
+        app.buttons["Evidence"].tap()
+        XCTAssertTrue(element("evidence.hub.all").waitForExistence(timeout: 10))
+    }
+
+    private func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    private func reveal(_ target: XCUIElement, maxSwipes: Int = 10) {
+        for _ in 0..<maxSwipes where !(target.exists && target.isHittable) {
+            app.swipeUp(velocity: .slow)
+        }
+        for _ in 0..<maxSwipes where !(target.exists && target.isHittable) {
+            app.swipeDown(velocity: .slow)
+        }
+        XCTAssertTrue(target.exists && target.isHittable, "Could not reveal \(target)")
+    }
+
+    private func open(stream id: String) {
+        let row = element("evidence.stream.\(id)")
+        reveal(row)
+        row.tap()
+        XCTAssertTrue(element("evidence.page.header").waitForExistence(timeout: 10), "\(id) header")
+    }
+
+    private func assertBack(_ label: String) {
+        let back = element("evidence.back")
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        XCTAssertEqual(back.label, label)
+        XCTAssertGreaterThanOrEqual(back.frame.height, 44)
+    }
+
+    func testTrainingHierarchyAndContextualBackTrail() {
+        open(stream: "training")
+        assertBack("Evidence Hub")
+        XCTAssertTrue(element("evidence.scope").exists)
+        XCTAssertTrue(element("training.latestDay").exists)
+        // All ten canonical Training Areas, in live order, each a >=44 pt target.
+        var previous = CGRect.zero
+        for (index, id) in ["chest", "back", "shoulders", "biceps", "triceps", "core", "quads", "hamstrings", "glutes", "calves"].enumerated() {
+            let tile = element("training.area.\(id)")
+            XCTAssertTrue(tile.exists, id)
+            XCTAssertGreaterThanOrEqual(tile.frame.height, 44, id)
+            if index > 0 { XCTAssertTrue(tile.frame.minY > previous.minY || tile.frame.minX > previous.minX, "\(id) order") }
+            previous = tile.frame
+        }
+        let viewDay = element("training.latestDay.view")
+        reveal(viewDay)
+        viewDay.tap()
+        XCTAssertTrue(element("training.day.sessions").waitForExistence(timeout: 10))
+        assertBack("Training")
+        let session = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "training.day.session.")).firstMatch
+        XCTAssertTrue(session.exists)
+        session.tap()
+        XCTAssertTrue(element("training.session.correction").waitForExistence(timeout: 10))
+        assertBack("Sep 1")
+        element("evidence.back").tap()
+        XCTAssertTrue(element("training.day.sessions").waitForExistence(timeout: 5))
+    }
+
+    func testTrainingReportingAndLibraryKeepRoutes() {
+        open(stream: "training")
+        let disclosure = element("training-reporting-disclosure")
+        reveal(disclosure)
+        disclosure.tap()
+        let resistance = element("training-report-resistance")
+        reveal(resistance)
+        resistance.tap()
+        XCTAssertTrue(element("training.report.resistanceSummary").waitForExistence(timeout: 10))
+        assertBack("Training")
+        XCTAssertTrue(app.staticTexts["Source"].exists || element("training.report.Recent PRs").exists)
+        element("evidence.back").tap()
+        let browse = element("training.areas.browse")
+        reveal(browse)
+        browse.tap()
+        XCTAssertTrue(element("training.library.browse").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("training.library.area.calves").exists)
+    }
+
+    func testActivityRootHierarchyAndThreeRowHistory() {
+        open(stream: "activity")
+        assertBack("Evidence Hub")
+        XCTAssertTrue(element("activity.latestDay").exists)
+        reveal(element("activity.history"))
+        XCTAssertTrue(element("activity.areas").exists)
+        XCTAssertTrue(element("activity.linkedTraining").exists)
+        XCTAssertTrue(element("activity.history.showAll").exists)
+        element("activity.latestDay").tap()
+        XCTAssertTrue(element("activity.day.metrics").waitForExistence(timeout: 10))
+        assertBack("Activity")
+    }
+
+    func testNutritionRootReportsAndDay() {
+        open(stream: "nutrition")
+        XCTAssertTrue(element("nutrition.latestDay").exists)
+        XCTAssertFalse(app.staticTexts["Nutrition Areas"].exists, "Locked correction hides the duplicate Areas block")
+        for id in ["calories", "macros", "meals"] {
+            XCTAssertTrue(element("nutrition.report.\(id)").exists, id)
+        }
+        let calories = element("nutrition.report.calories")
+        reveal(calories)
+        calories.tap()
+        XCTAssertTrue(element("nutrition.report.summary").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("nutrition.report.caloriesTrend").exists)
+        assertBack("Nutrition")
+        element("evidence.back").tap()
+        let latest = element("nutrition.latestDay")
+        reveal(latest)
+        latest.tap()
+        XCTAssertTrue(element("nutrition.day.meals").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("nutrition.day.summary").exists)
+    }
+
+    /// Chart selection must never trap the page scroll: a vertical flick
+    /// that starts on the Weight chart scrolls; a horizontal pan scrubs.
+    func testWeightChartScrubsHorizontallyAndScrollsVertically() {
+        open(stream: "weight")
+        let chart = element("weight.trend")
+        let selection = element("weight.trend.selection")
+        XCTAssertTrue(selection.waitForExistence(timeout: 5))
+        let before = selection.label
+        let y = (chart.frame.minY + 140) / app.frame.height
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: y))
+            .press(forDuration: 0, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: y)), withVelocity: .slow, thenHoldForDuration: 0.1)
+        XCTAssertNotEqual(selection.label, before, "Horizontal scrub did not change the selected entry")
+        let history = app.staticTexts["Weight History"]
+        let top = history.frame.minY
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: y))
+            .press(forDuration: 0, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)), withVelocity: .fast, thenHoldForDuration: 0)
+        XCTAssertLessThan(history.frame.minY, top - 100, "A vertical swipe starting on the chart did not scroll the page")
+    }
+
+    func testWeightInlineDisclosureNeverAddsARoute() {
+        open(stream: "weight")
+        XCTAssertTrue(element("weight.summary").exists)
+        XCTAssertTrue(element("weight.trend").exists)
+        // Weekly Averages has more than three canonical weeks in this scope.
+        let toggle = element("weight.weeklyAverages.toggle")
+        reveal(toggle)
+        XCTAssertEqual(toggle.label, "Show All")
+        toggle.tap()
+        XCTAssertEqual(element("weight.weeklyAverages.toggle").label, "Close")
+        XCTAssertTrue(element("evidence.page.header").exists, "Show All expands in place")
+    }
+}
+

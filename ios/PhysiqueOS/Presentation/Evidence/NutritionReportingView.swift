@@ -50,16 +50,14 @@ struct NutritionReportingView: View {
 
     let reportId: String
 
+    private let m = EvidenceMetrics(family: .daily)
+
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage(top: 10) {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .evidencePageChrome(viewModel?.loadedReport?.title ?? "Reporting")
+        .evidenceFamily(.daily)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = NutritionReportingViewModel(api: environment.nutritionAPI, reportId: reportId)
@@ -73,93 +71,122 @@ struct NutritionReportingView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Nutrition Evidence…"), identifier: "nutrition.report.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "nutrition.report.failure")
         case .loaded(.none):
-            Text("This report could not be found.")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .empty("This report could not be found.", nil), identifier: "nutrition.report.notFound")
         case .loaded(.some(let report)):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: report)
-                TrainingScopeSelectorView(scope: report.scope) { pillID in
-                    Task { await viewModel?.selectScope(pillID: pillID) }
-                }
-                if let calories = report.calories { caloriesContent(calories) }
-                if let macros = report.macros { macrosContent(macros) }
-                if let meals = report.meals { mealsContent(meals) }
+            header(for: report)
+            EvidenceScopePicker(scope: report.scope) { pillID in
+                Task { await viewModel?.selectScope(pillID: pillID) }
             }
+            if let calories = report.calories { caloriesContent(calories) }
+            if let macros = report.macros { macrosContent(macros) }
+            if let meals = report.meals { mealsContent(meals) }
         }
     }
 
+    /// `.report-head`: eyebrow, 25 px title, subtitle.
     private func header(for report: NutritionReportingReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(report.eyebrow)
-                .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                .foregroundStyle(PhysiqueOSTheme.accent)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(report.eyebrow.uppercased())
+                .evidenceText(.normal(9, 900, tracking: 1.44, uppercase: true))
+                .foregroundStyle(m.c.teal)
             Text(report.title)
-                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .evidenceText(EvidenceTextStyle(size: 25, weight: 820, lineHeight: 26, tracking: -0.875))
+                .foregroundStyle(m.c.ink)
+                .padding(.top, m.pt(3))
+                .accessibilityAddTraits(.isHeader)
             Text(report.subtitle)
-                .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .evidenceText(EvidenceTextStyle(size: 11, weight: 600, lineHeight: 15.62))
+                .foregroundStyle(m.c.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, m.pt(5))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// `.range`: 1M · 3M · 6M · 1Y · All.
     private func rangeSelector() -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: m.pt(5)) {
             ForEach(EvidenceChartRange.allCases) { range in
                 let isSelected = range == viewModel?.range
                 Button {
                     Task { await viewModel?.selectRange(range) }
                 } label: {
                     Text(range.label)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(isSelected ? .white : PhysiqueOSTheme.textSecondary)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(isSelected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(Capsule())
+                        .evidenceText(.normal(8, 850))
+                        .foregroundStyle(isSelected ? m.c.page : m.c.muted)
+                        .padding(.horizontal, m.pt(6))
+                        .padding(.vertical, m.pt(5))
+                        .frame(minWidth: m.pt(29))
+                        .background(isSelected ? m.c.ink : m.c.surface2, in: Capsule())
+                        .evidenceHitTarget(visualHeight: m.pt(20))
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+        .padding(.bottom, m.pt(9))
+    }
+
+    /// Bare bordered pill row (macro / meal-slot selectors).
+    private func pillRow<Option: Identifiable>(_ options: [Option], selected: Option.ID, label: @escaping (Option) -> String, onSelect: @escaping (Option) -> Void) -> some View {
+        HStack(spacing: m.pt(6)) {
+            ForEach(options) { option in
+                let isSelected = option.id == selected
+                Button { onSelect(option) } label: {
+                    Text(label(option))
+                        .evidenceText(EvidenceTextStyle(size: 9, weight: 800, lineHeight: 9))
+                        .foregroundStyle(isSelected ? m.c.page : m.c.muted)
+                        .padding(.horizontal, m.pt(9 + 1))
+                        .padding(.vertical, m.pt(7 + 1))
+                        .background(isSelected ? m.c.ink : .clear, in: Capsule())
+                        .overlay(Capsule().strokeBorder(isSelected ? m.c.ink : m.c.line, lineWidth: m.pt(1)))
+                        .evidenceHitTarget(visualHeight: m.pt(25))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }
     }
 
-    private func periodSummaryGrid(_ items: [NutritionReportSummaryItem], targetLabel: String? = nil) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    TrainingSectionHeaderView(title: "Period Summary")
-                    if let targetLabel {
-                        Text(targetLabel)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+    private func sectionNote(_ text: String) -> some View {
+        Text(text)
+            .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+            .foregroundStyle(m.c.muted)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, m.pt(-3))
+            .padding(.bottom, m.pt(10))
+    }
+
+    /// `.summary-grid`: Period Summary, target status on the right.
+    private func periodSummarySection(_ items: [NutritionReportSummaryItem], targetLabel: String? = nil) -> some View {
+        EvidenceSection(title: "Period Summary", style: .containedDeep, identifier: "nutrition.report.summary") {
+            if let targetLabel {
+                Text(targetLabel)
+                    .evidenceText(.normal(9, 800))
+                    .foregroundStyle(m.c.teal)
+            }
+        } content: {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(7), alignment: .top), GridItem(.flexible(), spacing: m.pt(7), alignment: .top)], spacing: m.pt(7)) {
+                ForEach(items) { item in
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(item.label)
+                            .evidenceText(.normal(8, 900, tracking: 0.72, uppercase: true))
+                            .foregroundStyle(m.c.quiet)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(item.value)
+                            .evidenceText(EvidenceTextStyle(size: 11, weight: 850, lineHeight: 13.75))
+                            .foregroundStyle(m.c.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, m.pt(5))
                     }
-                }
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    ForEach(items) { item in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.label)
-                                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            Text(item.value)
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-                        .background(PhysiqueOSTheme.surfaceElevated)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
+                    .padding(m.pt(10))
+                    .frame(maxWidth: .infinity, minHeight: m.pt(64), alignment: .topLeading)
+                    .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(10)))
+                    .accessibilityElement(children: .combine)
                 }
             }
         }
@@ -167,255 +194,160 @@ struct NutritionReportingView: View {
 
     // MARK: - Calories
 
+    @ViewBuilder
     private func caloriesContent(_ report: NutritionCaloriesReport) -> some View {
-        Group {
-            periodSummaryGrid(report.periodSummary, targetLabel: report.targetLabel)
-            CardContainer {
-                VStack(alignment: .leading, spacing: 12) {
-                    TrainingSectionHeaderView(title: "Calories Over Time")
-                    rangeSelector()
-                    NutritionTrendChartView(
-                        points: report.weeklyTrend, color: PhysiqueOSTheme.nutritionCalories,
-                        valueLabel: { "\(Int($0.rounded())) cal" },
-                        emptyMessage: "No calorie evidence available in this period",
-                        selectedWeekID: $selectedCaloriesWeek
-                    )
-                }
-            }
-            weeklyRowsCard(
-                title: "Weekly Averages", rows: report.weeklyRows, isPresented: $isCaloriesWeeklySheetPresented,
-                emptyMessage: "No weekly calorie evidence available.",
-                row: { row in NutritionWeeklyStatRow(range: "\(TrainingDateFormatting.short(row.weekStart)) – \(TrainingDateFormatting.short(row.weekEnd))", value: row.averageCalories.map { "\(Int($0.rounded())) cal" } ?? "Pending", detail: "\(row.loggedDayCount) logged") }
-            )
-            dailyCaloriesCard(report.dailyRows)
-        }
-    }
-
-    private func dailyCaloriesCard(_ rows: [NutritionDailyCalorieRow]) -> some View {
-        let preview = Array(rows.prefix(Self.previewLimit))
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Recent Daily Calories") {
-                    if rows.count > Self.previewLimit {
-                        Button { isCaloriesDailySheetPresented = true } label: { TrainingCompactActionLabel(label: "Show All") }
-                    }
-                }
-                if preview.isEmpty {
-                    Text("No daily calorie evidence available.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(preview) { row in
-                            NavigationLink(value: AppDestination.nutritionDay(dayId: row.id)) {
-                                NutritionDailyCalorieRowView(row: row)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
+        periodSummarySection(report.periodSummary, targetLabel: report.targetLabel)
+        EvidenceSection(title: "Calories Over Time", style: .containedDeep, identifier: "nutrition.report.caloriesTrend") {
+            VStack(alignment: .leading, spacing: 0) {
+                rangeSelector()
+                NutritionTrendChartView(
+                    points: report.weeklyTrend, color: m.c.teal,
+                    valueLabel: { "\(Int($0.rounded())) cal" },
+                    emptyMessage: "No calorie evidence available in this period",
+                    selectedWeekID: $selectedCaloriesWeek
+                )
             }
         }
-        .sheet(isPresented: $isCaloriesDailySheetPresented) {
-            NutritionReportDailyCaloriesSheet(rows: rows)
-        }
+        rowsSection(
+            title: "Weekly Averages", rows: report.weeklyRows, isPresented: $isCaloriesWeeklySheetPresented,
+            emptyMessage: "No weekly calorie evidence available.",
+            row: { row in NutritionWeeklyStatRow(range: "\(TrainingDateFormatting.short(row.weekStart)) – \(TrainingDateFormatting.short(row.weekEnd))", value: row.averageCalories.map { "\(Int($0.rounded())) cal" } ?? "Pending", detail: "\(row.loggedDayCount) logged") }
+        )
+        rowsSection(
+            title: "Recent Daily Calories", rows: report.dailyRows, isPresented: $isCaloriesDailySheetPresented,
+            emptyMessage: "No daily calorie evidence available.",
+            row: { row in
+                NavigationLink(value: AppDestination.nutritionDay(dayId: row.id)) { NutritionDailyCalorieRowView(row: row) }
+                    .buttonStyle(.plain)
+            }
+        )
     }
 
     // MARK: - Macros
 
+    @ViewBuilder
     private func macrosContent(_ report: NutritionMacrosReport) -> some View {
-        Group {
-            CardContainer {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Macro")
-                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    HStack(spacing: 6) {
-                        ForEach(NutritionMacroKey.allCases) { macro in
-                            let isSelected = macro == report.selectedMacro
-                            Button {
-                                Task { await viewModel?.selectMacro(macro) }
-                            } label: {
-                                Text(macro.label)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(isSelected ? .white : PhysiqueOSTheme.textSecondary)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(isSelected ? macroColor(macro) : PhysiqueOSTheme.surfaceMuted)
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-            periodSummaryGrid(report.periodSummary, targetLabel: report.targetLabel)
-            CardContainer {
-                VStack(alignment: .leading, spacing: 12) {
-                    TrainingSectionHeaderView(title: "Macro Distribution")
-                    Text("Share of macro-derived calories across the selected period.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    NutritionDonutChartView(
-                        slices: report.distribution.map { donutSlice($0) },
-                        centerLabel: "Macro-derived calories",
-                        emptyMessage: "Macro distribution is not available for this period."
-                    )
-                }
-            }
-            CardContainer {
-                VStack(alignment: .leading, spacing: 12) {
-                    TrainingSectionHeaderView(title: "Average Daily Macros")
-                    Text("Average grams per logged Nutrition day across the selected period.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    NutritionBarChartView(
-                        bars: report.averageDailyMacros.map { bar in
-                            NutritionBarChartView.Bar(id: bar.id.rawValue, label: bar.id.label, value: bar.averageGrams, caption: "\(bar.loggedDayCount) days", color: macroColor(bar.id))
-                        },
-                        emptyMessage: "Average macro values are not available for this period."
-                    )
-                }
-            }
-            CardContainer {
-                VStack(alignment: .leading, spacing: 12) {
-                    TrainingSectionHeaderView(title: "Macro Trends Over Time")
-                    Text("Weekly average \(report.selectedMacro.label.lowercased()) intake across the selected period.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    rangeSelector()
-                    NutritionTrendChartView(
-                        points: report.weeklyTrend, color: macroColor(report.selectedMacro),
-                        valueLabel: { "\(Int($0.rounded()))g" },
-                        emptyMessage: "No \(report.selectedMacro.label.lowercased()) evidence available in this period",
-                        selectedWeekID: $selectedMacrosWeek
-                    )
-                }
-            }
-            weeklyRowsCard(
-                title: "Weekly Averages", rows: report.weeklyRows, isPresented: $isMacrosWeeklySheetPresented,
-                emptyMessage: "No weekly macro evidence available.",
-                row: { row in NutritionWeeklyMacroRowView(row: row, selectedMacro: report.selectedMacro) }
-            )
-            dailyMacrosCard(report.dailyRows, selectedMacro: report.selectedMacro)
+        pillRow(NutritionMacroKey.allCases, selected: report.selectedMacro.id, label: { $0.label }) { macro in
+            Task { await viewModel?.selectMacro(macro) }
         }
-    }
-
-    private func dailyMacrosCard(_ rows: [NutritionDailyMacroRow], selectedMacro: NutritionMacroKey) -> some View {
-        let preview = Array(rows.prefix(Self.previewLimit))
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Recent Daily Macros") {
-                    if rows.count > Self.previewLimit {
-                        Button { isMacrosDailySheetPresented = true } label: { TrainingCompactActionLabel(label: "Show All") }
-                    }
-                }
-                if preview.isEmpty {
-                    Text("No daily macro evidence available.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(preview) { row in
-                            NavigationLink(value: AppDestination.nutritionDay(dayId: row.id)) {
-                                NutritionDailyMacroRowView(row: row, selectedMacro: selectedMacro)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
+        .padding(.bottom, m.pt(14 - 16))
+        .accessibilityIdentifier("nutrition.report.macroSelector")
+        periodSummarySection(report.periodSummary, targetLabel: report.targetLabel)
+        EvidenceSection(title: "Macro Distribution", style: .containedDeep, identifier: "nutrition.report.macroDistribution") {
+            VStack(alignment: .leading, spacing: 0) {
+                sectionNote("Share of macro-derived calories across the selected period.")
+                NutritionDonutChartView(
+                    slices: report.distribution.map { donutSlice($0) },
+                    centerLabel: "Macro-derived calories",
+                    emptyMessage: "Macro distribution is not available for this period."
+                )
             }
         }
-        .sheet(isPresented: $isMacrosDailySheetPresented) {
-            NutritionReportDailyMacrosSheet(rows: rows, selectedMacro: selectedMacro)
+        EvidenceSection(title: "Average Daily Macros", style: .containedDeep, identifier: "nutrition.report.averageMacros") {
+            VStack(alignment: .leading, spacing: 0) {
+                sectionNote("Average grams per logged Nutrition day across the selected period.")
+                NutritionBarChartView(
+                    bars: report.averageDailyMacros.map { bar in
+                        NutritionBarChartView.Bar(id: bar.id.rawValue, label: bar.id.label, value: bar.averageGrams, caption: "\(bar.loggedDayCount) days", color: macroColor(bar.id), valueText: "\(Int(bar.averageGrams.rounded()))g")
+                    },
+                    emptyMessage: "Average macro values are not available for this period."
+                )
+            }
         }
+        EvidenceSection(title: "Macro Trends Over Time", style: .containedDeep, identifier: "nutrition.report.macroTrend") {
+            VStack(alignment: .leading, spacing: 0) {
+                sectionNote("Weekly average \(report.selectedMacro.label.lowercased()) intake across the selected period.")
+                rangeSelector()
+                NutritionTrendChartView(
+                    points: report.weeklyTrend, color: macroColor(report.selectedMacro),
+                    valueLabel: { "\(Int($0.rounded()))g" },
+                    emptyMessage: "No \(report.selectedMacro.label.lowercased()) evidence available in this period",
+                    selectedWeekID: $selectedMacrosWeek
+                )
+            }
+        }
+        rowsSection(
+            title: "Weekly Averages", rows: report.weeklyRows, isPresented: $isMacrosWeeklySheetPresented,
+            emptyMessage: "No weekly macro evidence available.",
+            row: { row in NutritionWeeklyMacroRowView(row: row, selectedMacro: report.selectedMacro) }
+        )
+        rowsSection(
+            title: "Recent Daily Macros", rows: report.dailyRows, isPresented: $isMacrosDailySheetPresented,
+            emptyMessage: "No daily macro evidence available.",
+            row: { row in
+                NavigationLink(value: AppDestination.nutritionDay(dayId: row.id)) { NutritionDailyMacroRowView(row: row, selectedMacro: report.selectedMacro) }
+                    .buttonStyle(.plain)
+            }
+        )
     }
 
     // MARK: - Meals
 
+    @ViewBuilder
     private func mealsContent(_ report: NutritionMealsReport) -> some View {
-        Group {
-            periodSummaryGrid(report.periodSummary)
-            CardContainer {
-                VStack(alignment: .leading, spacing: 12) {
-                    TrainingSectionHeaderView(title: "Meal Distribution")
-                    Text("Average calories by meal across the selected period.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    NutritionBarChartView(
-                        bars: report.distribution.map { average in
-                            NutritionBarChartView.Bar(id: average.id.rawValue, label: average.id.label, value: average.averageCalories ?? 0, caption: "\(average.occurrenceCount)×", color: mealSlotColor(average.id))
-                        },
-                        emptyMessage: "No meal evidence available for this period."
-                    )
-                }
-            }
-            CardContainer {
-                VStack(alignment: .leading, spacing: 12) {
-                    TrainingSectionHeaderView(title: "Meal Macro Mix")
-                    Text("Macro-derived calorie distribution for the selected meal.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    slotSelector(selected: report.selectedMacroMixSlot, includeAll: false) { slot in
-                        Task { await viewModel?.selectMealMacroMixSlot(slot) }
-                    }
-                    NutritionDonutChartView(
-                        slices: report.macroMix.map { donutSlice($0) },
-                        centerLabel: report.selectedMacroMixSlot.label,
-                        emptyMessage: "Macro distribution is not available for this period."
-                    )
-                }
-            }
-            CardContainer {
-                VStack(alignment: .leading, spacing: 12) {
-                    TrainingSectionHeaderView(title: "Meal Trends Over Time")
-                    Text("One selected weekly meal metric across the selected period.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    slotSelector(selected: report.selectedTrendSlot, includeAll: true) { slot in
-                        Task { await viewModel?.selectMealTrendSlot(slot) }
-                    }
-                    metricSelector(selected: report.selectedTrendMetric) { metric in
-                        Task { await viewModel?.selectMealTrendMetric(metric) }
-                    }
-                    rangeSelector()
-                    NutritionTrendChartView(
-                        points: report.weeklyTrend, color: PhysiqueOSTheme.accent,
-                        valueLabel: { "\(Int($0.rounded()))\(report.selectedTrendMetric.unit)" },
-                        emptyMessage: "No contributing meal evidence.",
-                        selectedWeekID: $selectedMealsWeek
-                    )
-                }
-            }
-            weeklyRowsCard(
-                title: "Weekly Meal Summary", rows: report.weeklyRows, isPresented: $isMealsWeeklySheetPresented,
-                emptyMessage: "No weekly meal evidence available.",
-                row: { row in NutritionWeeklyMealRowView(row: row) }
-            )
-            recurringMealsCard(report.recurringMeals)
-            mealHistoryCard(report.historyGroups)
-        }
-    }
-
-    private func slotSelector(selected: NutritionMealSlotFilter, includeAll: Bool, onSelect: @escaping (NutritionMealSlotFilter) -> Void) -> some View {
-        let options = includeAll ? NutritionMealSlotFilter.allCases : NutritionMealSlotFilter.allCases.filter { $0 != .all }
-        return HStack(spacing: 6) {
-            ForEach(options) { slot in
-                let isSelected = slot == selected
-                Button {
-                    onSelect(slot)
-                } label: {
-                    Text(slot.label)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(isSelected ? .white : PhysiqueOSTheme.textSecondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(isSelected ? PhysiqueOSTheme.accent.opacity(0.85) : PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
+        periodSummarySection(report.periodSummary)
+        EvidenceSection(title: "Meal Distribution", style: .containedDeep, identifier: "nutrition.report.mealDistribution") {
+            VStack(alignment: .leading, spacing: 0) {
+                sectionNote("Average calories by meal across the selected period.")
+                NutritionBarChartView(
+                    bars: report.distribution.map { average in
+                        NutritionBarChartView.Bar(id: average.id.rawValue, label: average.id.label, value: average.averageCalories ?? 0, caption: "\(average.occurrenceCount)×", color: mealSlotColor(average.id), valueText: average.averageCalories.map { "\(Int($0.rounded())) cal" } ?? "—")
+                    },
+                    emptyMessage: "No meal evidence available for this period."
+                )
             }
         }
+        EvidenceSection(title: "Meal Macro Mix", style: .containedDeep, identifier: "nutrition.report.mealMacroMix") {
+            VStack(alignment: .leading, spacing: 0) {
+                pillRow(NutritionMealSlotFilter.allCases.filter { $0 != .all }, selected: report.selectedMacroMixSlot.id, label: { $0.label }) { slot in
+                    Task { await viewModel?.selectMealMacroMixSlot(slot) }
+                }
+                .padding(.bottom, m.pt(10))
+                NutritionDonutChartView(
+                    slices: report.macroMix.map { donutSlice($0) },
+                    centerLabel: report.selectedMacroMixSlot.label,
+                    emptyMessage: "Macro distribution is not available for this period."
+                )
+            }
+        }
+        EvidenceSection(title: "Meal Trends Over Time", style: .containedDeep, identifier: "nutrition.report.mealTrend") {
+            VStack(alignment: .leading, spacing: 0) {
+                sectionNote("One selected weekly meal metric across the selected period.")
+                pillRow(NutritionMealSlotFilter.allCases, selected: report.selectedTrendSlot.id, label: { $0.label }) { slot in
+                    Task { await viewModel?.selectMealTrendSlot(slot) }
+                }
+                .padding(.bottom, m.pt(9))
+                metricSelector(selected: report.selectedTrendMetric) { metric in
+                    Task { await viewModel?.selectMealTrendMetric(metric) }
+                }
+                .padding(.bottom, m.pt(9))
+                rangeSelector()
+                NutritionTrendChartView(
+                    points: report.weeklyTrend, color: m.c.teal,
+                    valueLabel: { "\(Int($0.rounded()))\(report.selectedTrendMetric.unit)" },
+                    emptyMessage: "No contributing meal evidence.",
+                    selectedWeekID: $selectedMealsWeek
+                )
+            }
+        }
+        rowsSection(
+            title: "Weekly Meal Summary", rows: report.weeklyRows, isPresented: $isMealsWeeklySheetPresented,
+            emptyMessage: "No weekly meal evidence available.",
+            row: { row in NutritionWeeklyMealRowView(row: row) }
+        )
+        rowsSection(
+            title: "Recurring Meals", rows: report.recurringMeals, isPresented: $isRecurringMealsSheetPresented,
+            emptyMessage: "No recurring meals identified yet.",
+            row: { meal in NutritionRecurringMealRow(meal: meal) }
+        )
+        rowsSection(
+            title: "Recent Meal History", rows: report.historyGroups, isPresented: $isMealHistorySheetPresented,
+            emptyMessage: "No meal history available.",
+            row: { group in
+                NavigationLink(value: AppDestination.nutritionDay(dayId: group.dayId)) { NutritionMealHistoryGroupRow(group: group) }
+                    .buttonStyle(.plain)
+            }
+        )
     }
 
     private func metricSelector(selected: NutritionMealTrendMetric, onSelect: @escaping (NutritionMealTrendMetric) -> Void) -> some View {
@@ -424,113 +356,54 @@ struct NutritionReportingView: View {
                 Button(metric.label) { onSelect(metric) }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: m.pt(4)) {
                 Text(selected.label)
-                Image(systemName: "chevron.up.chevron.down")
+                Text("⌄")
             }
-            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(PhysiqueOSTheme.surfaceMuted)
-            .clipShape(Capsule())
+            .evidenceText(EvidenceTextStyle(size: 9, weight: 800, lineHeight: 9))
+            .foregroundStyle(m.c.ink)
+            .padding(.horizontal, m.pt(9 + 1))
+            .padding(.vertical, m.pt(7 + 1))
+            .overlay(Capsule().strokeBorder(m.c.line, lineWidth: m.pt(1)))
+            .evidenceHitTarget(visualHeight: m.pt(25))
         }
+        .accessibilityLabel("Metric: \(selected.label)")
     }
 
-    private func recurringMealsCard(_ meals: [NutritionRecurringMeal]) -> some View {
-        let preview = Array(meals.prefix(Self.previewLimit))
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Recurring Meals") {
-                    if meals.count > Self.previewLimit {
-                        Button { isRecurringMealsSheetPresented = true } label: { TrainingCompactActionLabel(label: "Show All") }
-                    }
-                }
-                if preview.isEmpty {
-                    Text("No recurring meals identified yet.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(preview) { meal in NutritionRecurringMealRow(meal: meal) }
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $isRecurringMealsSheetPresented) {
-            NutritionReportListSheet(title: "Recurring Meals") {
-                ForEach(meals) { meal in NutritionRecurringMealRow(meal: meal) }
-            }
-        }
-    }
+    // MARK: - Shared open-list section (3-row preview + Show All sheet)
 
-    private func mealHistoryCard(_ groups: [NutritionMealHistoryGroup]) -> some View {
-        let preview = Array(groups.prefix(Self.previewLimit))
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Recent Meal History") {
-                    if groups.count > Self.previewLimit {
-                        Button { isMealHistorySheetPresented = true } label: { TrainingCompactActionLabel(label: "Show All") }
-                    }
-                }
-                if preview.isEmpty {
-                    Text("No meal history available.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(preview) { group in
-                            NavigationLink(value: AppDestination.nutritionDay(dayId: group.dayId)) {
-                                NutritionMealHistoryGroupRow(group: group)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $isMealHistorySheetPresented) {
-            NutritionReportListSheet(title: "Recent Meal History") {
-                ForEach(groups) { group in
-                    NavigationLink(value: AppDestination.nutritionDay(dayId: group.dayId)) {
-                        NutritionMealHistoryGroupRow(group: group)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    // MARK: - Shared weekly-rows card (preview 3 + Show All sheet)
-
-    private func weeklyRowsCard<Row: Identifiable, Content: View>(
+    private func rowsSection<Row: Identifiable, Content: View>(
         title: String, rows: [Row], isPresented: Binding<Bool>, emptyMessage: String,
         @ViewBuilder row: @escaping (Row) -> Content
     ) -> some View {
         let preview = Array(rows.prefix(Self.previewLimit))
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: title) {
-                    if rows.count > Self.previewLimit {
-                        Button { isPresented.wrappedValue = true } label: { TrainingCompactActionLabel(label: "Show All") }
-                    }
+        return VStack(alignment: .leading, spacing: 0) {
+            EvidenceDailySectionHead(title: title) {
+                if rows.count > Self.previewLimit {
+                    Button { isPresented.wrappedValue = true } label: { EvidenceSectionAction(label: "Show All >") }
+                        .buttonStyle(.plain)
                 }
-                if preview.isEmpty {
-                    Text(emptyMessage)
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(preview) { item in row(item) }
-                    }
-                }
+            }
+            if preview.isEmpty {
+                Text(emptyMessage)
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                    .foregroundStyle(m.c.muted)
+            } else {
+                EvidenceDailyOpenList(data: preview) { item in row(item) }
             }
         }
         .sheet(isPresented: isPresented) {
             NutritionReportListSheet(title: title) {
-                ForEach(rows) { item in row(item) }
+                EvidenceDailyOpenList(data: rows) { item in row(item) }
             }
         }
+    }
+}
+
+extension NutritionReportingViewModel {
+    var loadedReport: NutritionReportingReadModel? {
+        if case .loaded(let report) = state { return report }
+        return nil
     }
 }
 
@@ -538,18 +411,18 @@ struct NutritionReportingView: View {
 
 private func macroColor(_ macro: NutritionMacroKey) -> Color {
     switch macro {
-    case .protein: PhysiqueOSTheme.macroProtein
-    case .carbohydrates: PhysiqueOSTheme.macroCarbohydrates
-    case .fat: PhysiqueOSTheme.macroFat
+    case .protein: EvidencePalette.daily.protein
+    case .carbohydrates: EvidencePalette.daily.carbs
+    case .fat: EvidencePalette.daily.fat
     }
 }
 
 private func mealSlotColor(_ slot: NutritionMealSlot) -> Color {
     switch slot {
-    case .breakfast: PhysiqueOSTheme.mealBreakfast
-    case .lunch: PhysiqueOSTheme.mealLunch
-    case .dinner: PhysiqueOSTheme.mealDinner
-    case .snacks: PhysiqueOSTheme.mealSnacks
+    case .breakfast: EvidencePalette.daily.breakfast
+    case .lunch: EvidencePalette.daily.lunch
+    case .dinner: EvidencePalette.daily.dinner
+    case .snacks: EvidencePalette.daily.snacks
     }
 }
 
