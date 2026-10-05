@@ -326,6 +326,12 @@ final class TrainingAcceptanceUITests: XCTestCase {
             app.descendants(matching: .any)["trainingLogger.workoutIdentity"].waitForExistence(timeout: 3),
             "Dismissing the alert did not preserve the in-progress workout."
         )
+
+        // The kept workout is the active session and would route every later
+        // journey's Log tap straight into the Logger. Leave it saved, as the
+        // other Logger journeys do.
+        tapButton(identifier: "trainingLogger.inlineSaveAndLeave")
+        XCTAssertTrue(app.tabBars.buttons["Log"].waitForExistence(timeout: 3), "Save & Leave did not return to Log.")
     }
 
     /// Build 21 item 2 acceptance: Save & Leave must persist the complete
