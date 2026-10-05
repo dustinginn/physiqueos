@@ -1,6 +1,7 @@
 import Foundation
 import HealthKit
 import OSLog
+import UIKit
 import WatchConnectivity
 
 private final class WatchWorkoutReplyBox: @unchecked Sendable {
@@ -113,18 +114,28 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
     /// outcome and main-actor routing time only (category `WatchBridge`).
     private static let latencyLog = Logger(subsystem: "com.physiqueos.native.dev", category: "WatchBridge")
 
-    private func route(_ data: Data) -> Data? {
+    private func route(_ data: Data, receivedAt: ContinuousClock.Instant = .now) -> Data? {
         guard let command = try? WatchWorkoutWireCodec.decode(WatchWorkoutCommand.self, from: data) else { return nil }
         let started = ContinuousClock.now
         let acknowledgement = router().route(command)
+        let routed = ContinuousClock.now
         publishCurrentProjection()
         finishCoordinator.reconcile()
-        let elapsed = started.duration(to: .now)
-        let milliseconds = Int((Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15).rounded())
+        let finished = ContinuousClock.now
+        // queue = WatchConnectivity delivery -> main actor; mutate = router +
+        // authority persist + synchronous observers; publish = context +
+        // finish reconcile. Mutation prefix pairs with the Watch line.
+        let state = UIApplication.shared.applicationState == .active ? "active"
+            : UIApplication.shared.applicationState == .background ? "background" : "inactive"
         Self.latencyLog.notice(
-            "route \(command.kind.rawValue, privacy: .public) -> \(acknowledgement.status.rawValue, privacy: .public) \(milliseconds, privacy: .public)ms"
+            "route \(command.kind.rawValue, privacy: .public) -> \(acknowledgement.status.rawValue, privacy: .public) \(Self.milliseconds(started, finished), privacy: .public)ms m=\(String(command.mutationId.prefix(8)), privacy: .public) queue=\(Self.milliseconds(receivedAt, started), privacy: .public)ms mutate=\(Self.milliseconds(started, routed), privacy: .public)ms publish=\(Self.milliseconds(routed, finished), privacy: .public)ms app=\(state, privacy: .public)"
         )
         return try? WatchWorkoutWireCodec.encode(acknowledgement)
+    }
+
+    private static func milliseconds(_ from: ContinuousClock.Instant, _ to: ContinuousClock.Instant) -> Int {
+        let elapsed = from.duration(to: to)
+        return Int((Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15).rounded())
     }
 
     nonisolated func session(
@@ -147,8 +158,9 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
         replyHandler: @escaping (Data) -> Void
     ) {
         let reply = WatchWorkoutReplyBox(replyHandler)
+        let receivedAt = ContinuousClock.now
         Task { @MainActor [weak self] in
-            guard let data = self?.route(messageData) else { return }
+            guard let data = self?.route(messageData, receivedAt: receivedAt) else { return }
             reply.send(data)
         }
     }

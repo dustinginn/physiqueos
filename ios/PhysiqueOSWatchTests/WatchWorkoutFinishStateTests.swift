@@ -1034,3 +1034,70 @@ extension WatchWorkoutFinishStateTests {
         XCTAssertEqual(trace.entries.count, WatchWorkoutLatencyTrace.capacity, "Bounded.")
     }
 }
+
+// MARK: Build 87 workout reliability — Complete Set acknowledgement
+
+extension WatchWorkoutFinishStateTests {
+    @MainActor
+    func testAContextNamingThePendingCompleteSetSettlesItWithoutWaitingForTheReply() throws {
+        let (store, log, _) = healthStore("b87.context.ack")
+        var active = try fixture("normal")
+        active.watchHealthStartedAt = now
+        store.apply(active)
+        store.completeSet()
+        let sent = try XCTUnwrap(log.commands.last)
+        XCTAssertEqual(sent.kind, .completeSet)
+        XCTAssertTrue(store.isMutationPending)
+
+        var advanced = active
+        advanced.revision += 1
+        advanced.completedSets += 1
+        advanced.lastAcknowledgedMutationId = sent.mutationId
+        store.receiveApplicationContext([
+            WatchWorkoutContract.applicationContextProjectionKey: try WatchWorkoutWireCodec.encode(advanced),
+        ])
+        XCTAssertFalse(store.isMutationPending, "The phone's context already proves the tap was applied.")
+        XCTAssertNil(store.notice)
+        XCTAssertEqual(store.projection?.completedSets, advanced.completedSets)
+        XCTAssertTrue(store.latencyTrace.entries.contains { $0.event == .commandAcknowledgedByContext })
+
+        // The late reply is harmless: nothing settles twice or re-sends.
+        try acknowledge(store, sent, projection: advanced)
+        XCTAssertFalse(store.isMutationPending)
+        XCTAssertEqual(log.commands.filter { $0.kind == .completeSet }.count, 1)
+
+        // A context naming a different mutation never settles a pending tap.
+        store.completeSet()
+        XCTAssertTrue(store.isMutationPending)
+        var unrelated = advanced
+        unrelated.revision += 1
+        unrelated.lastAcknowledgedMutationId = "another-mutation"
+        store.receiveApplicationContext([
+            WatchWorkoutContract.applicationContextProjectionKey: try WatchWorkoutWireCodec.encode(unrelated),
+        ])
+        XCTAssertTrue(store.isMutationPending)
+        XCTAssertEqual(store.notice, .setPending)
+    }
+
+    @MainActor
+    func testACompleteSetTapThatCannotBeSentNeverClaimsSetPending() throws {
+        let (store, _) = makeStore("b87.unsent")
+        store.apply(try fixture("normal"))
+        store.completeSet()
+        XCTAssertEqual(store.connectionState, .phoneUnavailable)
+        XCTAssertFalse(store.isMutationPending)
+        XCTAssertNotEqual(store.notice, .setPending, "Nothing was sent, so nothing is pending.")
+        XCTAssertTrue(store.latencyTrace.entries.contains { $0.event == .commandNotSent })
+
+        // A tap while another command is in flight is likewise not claimed.
+        let (busy, log, _) = healthStore("b87.unsent.busy")
+        var active = try fixture("normal")
+        active.watchHealthStartedAt = now
+        busy.apply(active)
+        busy.pauseOrResume()
+        XCTAssertEqual(log.commands.map(\.kind), [.pause])
+        busy.completeSet()
+        XCTAssertEqual(log.commands.map(\.kind), [.pause])
+        XCTAssertNotEqual(busy.notice, .setPending)
+    }
+}

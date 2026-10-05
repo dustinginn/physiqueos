@@ -448,7 +448,7 @@ struct TrainingLoggerView: View {
                 }
                 ForEach(viewModel.draft?.exercises.filter(\.isProvisional) ?? []) { exercise in
                     Button {
-                        viewModel.update { $0.removeExercise(id: exercise.id) }
+                        viewModel.update { $0.removeExercise(id: exercise.id, catalog: viewModel.configuration?.exercises ?? []) }
                     } label: {
                         exerciseSelectionLabel(
                             name: exercise.name,
@@ -828,7 +828,7 @@ struct TrainingLoggerView: View {
             }
             Button("Move earlier") { viewModel.update { $0.moveExercise(id: exercise.id, offset: -1) } }
             Button("Move later") { viewModel.update { $0.moveExercise(id: exercise.id, offset: 1) } }
-            Button("Remove exercise", role: .destructive) { viewModel.update { $0.removeExercise(id: exercise.id) } }
+            Button("Remove exercise", role: .destructive) { viewModel.update { $0.removeExercise(id: exercise.id, catalog: viewModel.configuration?.exercises ?? []) } }
         } label: {
             Image(systemName: "ellipsis.circle")
                 .font(.system(size: 22))
@@ -1118,6 +1118,12 @@ struct TrainingLoggerView: View {
                 viewModel.acknowledgeCompletion()
                 dismiss()
             }
+        }
+        // A Watch Finish can complete while the phone is suspended; records
+        // still unknown are re-read from the Server once the screen is back.
+        .onAppear { viewModel.refreshCompletedPerformanceRecordsIfUnknown() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { viewModel.refreshCompletedPerformanceRecordsIfUnknown() }
         }
     }
 

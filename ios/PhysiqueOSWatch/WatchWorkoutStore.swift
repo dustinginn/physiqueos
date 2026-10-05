@@ -165,6 +165,11 @@ struct WatchWorkoutLatencyTrace: Equatable {
         case refreshIssued, refreshAcknowledged, refreshFailed
         case contextApplied, acknowledgementApplied
         case commandIssued, commandAcknowledged
+        /// The phone's application context proved the pending command was
+        /// applied before (or instead of) its `sendMessage` reply.
+        case commandAcknowledgedByContext
+        /// A tap the phone could not be reached for: nothing was sent.
+        case commandNotSent
         case completeSetEnabled, completeSetDisabled
         case healthStartRequested, healthStarted, healthStartFailed
     }
@@ -365,13 +370,26 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         trace(available ? .completeSetEnabled : .completeSetDisabled)
     }
 
-    private func trace(_ event: WatchWorkoutLatencyTrace.Event) {
+    private func trace(_ event: WatchWorkoutLatencyTrace.Event, detail: String? = nil) {
         let entry = latencyTrace.record(event, at: now())
+        let suffix = detail.map { " " + $0 } ?? ""
         if let since = entry.sinceActivation {
-            Self.latencyLog.notice("\(event.rawValue, privacy: .public) +\(Int((since * 1000).rounded()), privacy: .public)ms since activation")
+            Self.latencyLog.notice("\(event.rawValue, privacy: .public) +\(Int((since * 1000).rounded()), privacy: .public)ms since activation\(suffix, privacy: .public)")
         } else {
-            Self.latencyLog.notice("\(event.rawValue, privacy: .public)")
+            Self.latencyLog.notice("\(event.rawValue, privacy: .public)\(suffix, privacy: .public)")
         }
+    }
+
+    /// Correlatable, privacy-safe command detail for the latency log: kind,
+    /// an 8-character mutation prefix (the phone's `WatchBridge` line logs the
+    /// same prefix), send attempts, and the issued -> now round trip.
+    private func commandDetail(_ command: WatchWorkoutCommand?, roundTrip: Bool = false) -> String? {
+        guard let command else { return nil }
+        var parts = ["kind=\(command.kind.rawValue)", "m=\(command.mutationId.prefix(8))", "attempts=\(sendAttempts)"]
+        if roundTrip, let issued = pendingIssuedAt {
+            parts.append("rtt=\(Int((now().timeIntervalSince(issued) * 1000).rounded()))ms")
+        }
+        return parts.joined(separator: " ")
     }
     var currentRow: WatchWorkoutProjection.Row? {
         projection?.rows.first(where: \.isCompletionTarget)
@@ -598,8 +616,15 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 
     func completeSet() {
         guard presentedPhase == .active, projection?.canCompleteSet == true, let row = currentRow else { return }
+        let previousNotice = notice
         notice = .setPending
-        issue(.completeSet, exerciseId: row.exerciseId, setId: row.setId)
+        // A tap that could not be sent (phone unreachable at that instant, or
+        // a command already in flight) must not leave "Set pending" claiming
+        // it is on its way.
+        if !issue(.completeSet, exerciseId: row.exerciseId, setId: row.setId) {
+            notice = previousNotice
+            trace(.commandNotSent, detail: "kind=completeSet")
+        }
     }
 
     func pauseOrResume() {
@@ -747,7 +772,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         guard gate.begin(command) else { return false }
         pendingIssuedAt = now()
         sendAttempts = 0
-        trace(.commandIssued)
+        trace(.commandIssued, detail: commandDetail(command))
         send(command)
         return true
     }
@@ -833,6 +858,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         guard let acknowledgement = try? WatchWorkoutWireCodec.decode(
             WatchWorkoutAcknowledgement.self, from: data
         ) else { return }
+        receive(acknowledgement)
+    }
+
+    private func receive(_ acknowledgement: WatchWorkoutAcknowledgement, viaContext: Bool = false) {
         if let refresh = refreshInFlight, refresh.commandId == acknowledgement.commandId {
             refreshInFlight = nil
             refreshWatchdogTask?.cancel()
@@ -855,7 +884,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             // ended): either way the phone has answered; never re-send.
             pendingHealthStartReport = nil
         }
-        if matched { trace(.commandAcknowledged) }
+        if matched {
+            trace(viaContext ? .commandAcknowledgedByContext : .commandAcknowledged,
+                  detail: commandDetail(command, roundTrip: true))
+        }
         if matched {
             retryTask?.cancel()
             pendingIssuedAt = nil
@@ -1285,7 +1317,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         dailyTotals = totals
     }
 
-    private func receiveApplicationContext(
+    func receiveApplicationContext(
         _ context: [String: Any],
         recordsAuthoritativeContact: Bool = true
     ) {
@@ -1299,7 +1331,26 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         }
         if let data = context[WatchWorkoutContract.applicationContextProjectionKey] as? Data,
            let incoming = try? WatchWorkoutWireCodec.decode(WatchWorkoutProjection.self, from: data) {
-            apply(incoming, recordsAuthoritativeContact: recordsAuthoritativeContact)
+            // The phone publishes its context before the reply is encoded,
+            // and the context can outrun a slow (or lost) reply. When it
+            // names the pending Complete Set as the last applied mutation,
+            // that IS the acknowledgement: settle it now instead of keeping
+            // the button disabled until the reply or the 12 s watchdog.
+            if let pending = gate.pending, pending.kind == .completeSet,
+               pending.sessionId == incoming.sessionId,
+               incoming.lastAcknowledgedMutationId == pending.mutationId {
+                receive(.init(
+                    schemaVersion: WatchWorkoutContract.schemaVersion,
+                    commandId: pending.commandId,
+                    mutationId: pending.mutationId,
+                    status: .applied,
+                    reason: nil,
+                    acknowledgedRevision: incoming.revision,
+                    projection: incoming
+                ), viaContext: true)
+            } else {
+                apply(incoming, recordsAuthoritativeContact: recordsAuthoritativeContact)
+            }
             trace(.contextApplied)
             resumeSavedHealthReportIfNeeded()
         }

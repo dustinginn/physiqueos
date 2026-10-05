@@ -1607,7 +1607,7 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                     sessionId: session.id,
                     workoutDate: String(session.observedAt.prefix(10)),
                     executionVariant: exercise.executionVariant,
-                    relationship: nil,
+                    relationship: relationship(of: exercise, in: session),
                     sets: exercise.sets.enumerated().map { index, set in
                         TrainingSet(
                             setNumber: index + 1,
@@ -1643,13 +1643,43 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
     /// with each set reduced to `{reps, weight, weight_unit}`. Reusing
     /// `TrainingSessionDetailReadModel` here was a Native-side type
     /// mismatch, not a server contract gap.
+    /// The Server's superset context for one historical exercise: its
+    /// session's relationship group, partners in group order (Server
+    /// `deriveTrainingExerciseRelationshipContext`). Without this every
+    /// superset session read as standalone history, so a superset's
+    /// previous performance never matched and standalone history absorbed
+    /// superset sessions.
+    static func relationship(of exercise: HistoryExercise, in session: HistorySession) -> TrainingLoggerHistoryRelationship? {
+        guard let exerciseId = exercise.id,
+              let group = (session.exerciseRelationshipGroups ?? []).first(where: { $0.memberExerciseIds.contains(exerciseId) })
+        else { return nil }
+        let partners = group.memberExerciseIds
+            .filter { $0 != exerciseId }
+            .compactMap { id in session.exercises.first { $0.id == id } }
+        return TrainingLoggerHistoryRelationship(
+            relationshipType: group.relationshipType,
+            partnerNames: partners.compactMap(\.name),
+            partnerCanonicalExerciseIds: partners.compactMap(\.canonicalExerciseId)
+        )
+    }
+
     struct HistorySession: Decodable {
         var id: String
         var observedAt: String
         var exercises: [HistoryExercise]
+        /// Optional: older Servers and fixtures omit it (standalone history).
+        var exerciseRelationshipGroups: [HistoryRelationshipGroup]?
+    }
+
+    struct HistoryRelationshipGroup: Decodable {
+        var relationshipType: String
+        var memberExerciseIds: [String]
     }
 
     struct HistoryExercise: Decodable {
+        /// The occurrence id that `exerciseRelationshipGroups` members name.
+        var id: String?
+        var name: String?
         var canonicalExerciseId: String?
         var executionVariant: TrainingExecutionVariant?
         var sets: [HistorySet]

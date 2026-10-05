@@ -194,6 +194,11 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     var watchHealthSaveState: WatchWorkoutFinishComponentState? = nil
     var watchServerCommitState: WatchWorkoutFinishComponentState? = nil
     var watchAuthoritativePRCount: Int? = nil
+    /// The Server-authoritative performance records a Watch-finished commit
+    /// returned (or read back). Retained on the pending Workout Complete
+    /// presentation so the phone recap matches a phone-finished one without
+    /// depending on a second network read. Never computed locally.
+    var watchAuthoritativePerformanceRecords: [TrainingPerformanceRecord]? = nil
     /// Session-level rest override. `nil` defers to the rest preference
     /// provider (exercise, then global), and finally to Off.
     var restConfiguration: TrainingRestConfiguration? = nil
@@ -669,8 +674,19 @@ extension TrainingLoggerDraft {
     }
 
     mutating func removeExercise(id: String) {
+        removeExercise(id: id, catalog: nil)
+    }
+
+    /// Removing a superset member returns its surviving partner to its
+    /// standalone context, refreshed like an explicit unpair.
+    mutating func removeExercise(id: String, catalog: [TrainingLoggerCatalogExercise]?) {
+        let partners = relationships.first(where: { $0.memberExerciseIds.contains(id) })?.memberExerciseIds.filter { $0 != id } ?? []
         exercises.removeAll { $0.id == id }
         relationships.removeAll { $0.memberExerciseIds.contains(id) }
+        guard let catalog else { return }
+        for partner in partners {
+            if let index = exercises.firstIndex(where: { $0.id == partner }) { refreshPreviousPerformance(at: index, catalog: catalog) }
+        }
     }
 
     mutating func moveExercise(id: String, offset: Int) {
@@ -709,7 +725,8 @@ extension TrainingLoggerDraft {
               recommendation.hasExplicitTarget,
               let suggestedReps = recommendation.suggestedReps else { return }
         exercises[index].progressionChoice = .suggestion
-        for setIndex in exercises[index].sets.indices {
+        // Completed sets are performed history: guidance only fills the rest.
+        for setIndex in exercises[index].sets.indices where !exercises[index].sets[setIndex].isCompleted {
             exercises[index].sets[setIndex].reps = suggestedReps
             let suggestedSemantics = TrainingSetLoadSemantics.classify(
                 weight: recommendation.suggestedLoad, loadType: recommendation.suggestedLoadType,
@@ -726,7 +743,7 @@ extension TrainingLoggerDraft {
               let previous = exercises[index].previousPerformance,
               !previous.sets.isEmpty else { return }
         exercises[index].progressionChoice = .previous
-        for setIndex in exercises[index].sets.indices {
+        for setIndex in exercises[index].sets.indices where !exercises[index].sets[setIndex].isCompleted {
             let source = previous.sets[min(setIndex, previous.sets.count - 1)]
             exercises[index].sets[setIndex].reps = source.reps
             (exercises[index].sets[setIndex].load, exercises[index].sets[setIndex].loadType) = TrainingLoggerDraftSet.prepopulatedLoad(from: source)
@@ -815,6 +832,8 @@ extension TrainingLoggerDraft {
         guard let canonicalId = exercises[index].canonicalExerciseId,
               let item = catalog.first(where: { $0.canonicalExerciseId == canonicalId }) else {
             exercises[index].previousPerformance = nil
+            exercises[index].progressionRecommendation = nil
+            exercises[index].progressionChoice = nil
             return
         }
         exercises[index].previousPerformance = comparablePerformance(

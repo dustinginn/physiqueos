@@ -2005,3 +2005,153 @@ extension TrainingLoggerTests {
                        "Haptics go through the feedback client only.")
     }
 }
+
+/// Build 87 workout reliability lane: the production `training-logger`
+/// history keeps the Server's superset context, so pairing exercises shows
+/// superset-context history (and standalone history excludes supersets),
+/// and guidance never rewrites a completed set.
+@MainActor
+final class Build87SupersetHistoryContextTests: XCTestCase {
+    /// Production-shaped `initialHistorySessions`: 09-14 is a Leg Extension +
+    /// Sissy Squat superset, 09-28 a standalone Leg Extension session.
+    private static let historyJSON = #"""
+    [
+      {"id":"s-0928","evidence_type":"training","observed_at":"2026-09-28","exercises":[
+        {"id":"E-LE-0928","canonicalExerciseId":"leg_extension","name":"Leg Extensions","sets":[{"reps":15,"weight":90,"weight_unit":"lb"},{"reps":15,"weight":90,"weight_unit":"lb"}]}
+      ],"exerciseRelationshipGroups":[]},
+      {"id":"s-0914","evidence_type":"training","observed_at":"2026-09-14","exercises":[
+        {"id":"E-LE-0914","canonicalExerciseId":"leg_extension","name":"Leg Extensions","sets":[{"reps":15,"weight":80,"weight_unit":"lb"},{"reps":15,"weight":80,"weight_unit":"lb"}]},
+        {"id":"E-SS-0914","canonicalExerciseId":"sissy_squat","name":"Sissy Squats","sets":[{"reps":12,"weight":50,"weight_unit":"lb"},{"reps":12,"weight":50,"weight_unit":"lb"}]}
+      ],"exerciseRelationshipGroups":[{"id":"g-0914","relationshipType":"superset","memberExerciseIds":["E-LE-0914","E-SS-0914"]}]},
+      {"id":"s-0825","evidence_type":"training","observed_at":"2026-08-25","exercises":[
+        {"id":"E-SS-0825","canonicalExerciseId":"sissy_squat","name":"Sissy Squats","sets":[{"reps":13,"weight":45,"weight_unit":"lb"},{"reps":13,"weight":45,"weight_unit":"lb"}]}
+      ]}
+    ]
+    """#
+
+    private func sessions() throws -> [ProductionTrainingLoggerAPI.HistorySession] {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try decoder.decode([ProductionTrainingLoggerAPI.HistorySession].self, from: Data(Self.historyJSON.utf8))
+    }
+
+    private func catalog() throws -> [TrainingLoggerCatalogExercise] {
+        let sessions = try sessions()
+        let standalone = TrainingLoggerProgressionRecommendation(
+            state: .maintain, eyebrow: "Maintain current performance", message: "Canonical recommendation.",
+            prescription: "90 lb x 15", suggestedLoad: 90, suggestedLoadType: "external_load",
+            suggestedReps: 15, suggestedUnit: "lb"
+        )
+        return [("leg_extension", "Leg Extensions"), ("sissy_squat", "Sissy Squats")].map { id, name in
+            TrainingLoggerCatalogExercise(
+                canonicalExerciseId: id, name: name, areaId: "quads", equipment: nil,
+                measurement: .repsLoad, defaultLoadType: nil, previouslyPerformed: true,
+                history: ProductionTrainingLoggerAPI.history(for: id, in: sessions),
+                progressionRecommendation: id == "leg_extension" ? standalone : nil
+            )
+        }
+    }
+
+    private func freshDraft() -> TrainingLoggerDraft {
+        var draft = TrainingLoggerDraft.fresh(mode: .live, workoutDate: "2026-10-05", startedAt: "2026-10-05T15:07:18Z")
+        draft.selectedAreaIds = ["quads"]
+        draft.step = .workout
+        return draft
+    }
+
+    func testProductionHistoryKeepsTheServerSupersetContextAndStandaloneSessionsStayStandalone() throws {
+        let history = ProductionTrainingLoggerAPI.history(for: "leg_extension", in: try sessions())
+        XCTAssertEqual(history.map(\.workoutDate), ["2026-09-28", "2026-09-14"])
+        XCTAssertNil(history[0].relationship, "A session without groups is standalone.")
+        XCTAssertEqual(history[1].relationship, TrainingLoggerHistoryRelationship(
+            relationshipType: "superset", partnerNames: ["Sissy Squats"], partnerCanonicalExerciseIds: ["sissy_squat"]
+        ))
+        let sissy = ProductionTrainingLoggerAPI.history(for: "sissy_squat", in: try sessions())
+        XCTAssertEqual(sissy.first?.relationship?.partnerCanonicalExerciseIds, ["leg_extension"])
+        XCTAssertNil(sissy.last?.relationship, "Missing exerciseRelationshipGroups (older payloads) stays standalone.")
+    }
+
+    func testPairingShowsSupersetContextHistoryAndUnpairingReturnsToStandalone() throws {
+        let catalog = try catalog()
+        var draft = freshDraft()
+        draft.addExercise(catalog[0])
+        draft.addExercise(catalog[1])
+        let legExtension = draft.exercises[0].id
+        let sissy = draft.exercises[1].id
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.workoutDate, "2026-09-28")
+        XCTAssertEqual(draft.exercises[1].previousPerformance?.workoutDate, "2026-08-25",
+                       "Standalone Sissy history no longer absorbs the 09-14 superset session.")
+
+        draft.setSuperset(firstId: legExtension, secondId: sissy, catalog: catalog)
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.workoutDate, "2026-09-14")
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.sets.first?.weight, 80)
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.contextLabel, "Superset with Sissy Squats")
+        XCTAssertEqual(draft.exercises[1].previousPerformance?.workoutDate, "2026-09-14")
+        XCTAssertEqual(draft.exercises[1].previousPerformance?.sets.first?.reps, 12)
+        XCTAssertNil(draft.exercises[0].progressionRecommendation,
+                     "Standalone Suggested/Maintain is withheld in superset context (existing design).")
+
+        draft.removeSuperset(containing: legExtension, catalog: catalog)
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.workoutDate, "2026-09-28")
+        XCTAssertNotNil(draft.exercises[0].progressionRecommendation)
+        XCTAssertEqual(draft.exercises[1].previousPerformance?.workoutDate, "2026-08-25")
+    }
+
+    func testRemovingASupersetPartnerReturnsTheSurvivorToStandalone() throws {
+        let catalog = try catalog()
+        var draft = freshDraft()
+        draft.addExercise(catalog[0])
+        draft.addExercise(catalog[1])
+        draft.setSuperset(firstId: draft.exercises[0].id, secondId: draft.exercises[1].id, catalog: catalog)
+        draft.removeExercise(id: draft.exercises[1].id, catalog: catalog)
+        XCTAssertTrue(draft.relationships.isEmpty)
+        XCTAssertNil(draft.relationshipContext(for: draft.exercises[0].id))
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.workoutDate, "2026-09-28")
+        XCTAssertNotNil(draft.exercises[0].progressionRecommendation)
+    }
+
+    func testGuidanceNeverRewritesOrUncompletesACompletedSet() throws {
+        let catalog = try catalog()
+        var draft = freshDraft()
+        draft.addExercise(catalog[0])
+        let id = draft.exercises[0].id
+        draft.exercises[0].sets[0].reps = 30
+        draft.exercises[0].sets[0].load = 40
+        draft.exercises[0].sets[0].isCompleted = true
+        let completed = draft.exercises[0].sets[0]
+
+        draft.applyProgressionSuggestion(to: id)
+        XCTAssertEqual(draft.exercises[0].sets[0], completed)
+        XCTAssertEqual(draft.exercises[0].sets[1].load, 90, "Uncompleted sets take the suggestion.")
+
+        draft.keepPreviousPerformance(for: id)
+        XCTAssertEqual(draft.exercises[0].sets[0], completed)
+        XCTAssertTrue(draft.exercises[0].sets[0].isCompleted)
+    }
+
+    func testSupersetContextValuesReachTheWatchProjectionThroughTheAuthority() throws {
+        let catalog = try catalog()
+        var initial = freshDraft()
+        initial.id = "session-b87"
+        initial.addExercise(catalog[0])
+        initial.addExercise(catalog[1])
+        let store = Build83FinishLifecycleTests.Store([initial])
+        let authority = TrainingSessionAuthority(
+            store: store, environment: .founderProduction,
+            restPreferences: FixedTrainingRestPreferences(nil),
+            terminalLedger: MemoryTrainingSessionTerminalLedgerStore(),
+            now: { Date(timeIntervalSince1970: 1_790_000_000) }
+        )
+        let legExtension = initial.exercises[0].id
+        let sissy = initial.exercises[1].id
+        _ = authority.edit(sessionId: "session-b87") { $0.setSuperset(firstId: legExtension, secondId: sissy, catalog: catalog) }
+        _ = authority.edit(sessionId: "session-b87") { $0.keepPreviousPerformance(for: legExtension) }
+        let draft = try XCTUnwrap(authority.draft(id: "session-b87"))
+        let projection = try XCTUnwrap(WatchWorkoutProjection.make(draft: draft, authority: authority, now: Date(timeIntervalSince1970: 1_790_000_000)))
+        let target = try XCTUnwrap(projection.rows.first { $0.isCompletionTarget })
+        XCTAssertEqual(target.exerciseId, legExtension)
+        XCTAssertEqual(target.repsText, "15")
+        XCTAssertEqual(target.loadText?.contains("80"), true, "The Watch shows the superset-context previous load.")
+        XCTAssertNotNil(target.supersetLabel)
+    }
+}
