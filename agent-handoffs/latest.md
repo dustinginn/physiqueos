@@ -2,33 +2,34 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Lane: **Workout reliability lane** (separate from Redesign Batch 3 and the Batch 2 / Build 88 release gate)
-- Task: Founder decisions complete — 2-B, 2-C, UUID-case Server deploy (`workout-reliability-founder-decisions-complete-20261005`)
-- Agent: Claude (same single RC worktree)
-- Status: **STOPPED for 2-C Server deploy approval.** Everything else is complete.
-- Generated (UTC): 2026-10-05T21:21:36Z
+- Task: Redesign Batch 3 Claude, Checkpoint D: Progress Photos + DEXA (`batch3-bc-accepted-checkpoint-d-20261005`)
+- Agent: Claude (single RC worktree)
+- Status: **Checkpoint D ready for Founder review. STOPPED. Checkpoint E not started.**
+- Generated (UTC): 2026-10-05T21:45:20Z
 
-| Item | SHA | State |
-|---|---|---|
-| Production Server | `b5de242f` (deployment `ea89c93e`) | **DEPLOYED + verified** |
-| 2-C Server candidate | `b7eb1e39` on `claude/server-contextual-progression-20261005` | **awaiting deploy approval** |
-| Native workout candidate | `e9f8a957` on `claude/build87-workout-reliability-audit-20261005` | unreleased |
-| Integration preview on Batch 2 | `70ebf753` on `claude/workout-reliability-on-batch2-preview-20261005` | preview only |
+Commits on `claude/redesign-batch3-evidence-takeover-20261005`:
+
+| Commit | SHA |
+|---|---|
+| Native | `9d2d0e06` |
+| Package | `759d0dc9` |
+
+Report: `agent-handoffs/reports/20261005T214520Z-redesign-batch3-claude-checkpoint-d.md`
+
+Primary board: https://github.com/dustinginn/physiqueos/blob/759d0dc947419647dbc85963de8eb0d9d19a4906/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-d-20261005/checkpoint-d-primary-mobile-review-board.png
+
+Real Founder photos were **not** validated: this needs a Sandbox pairing credential, and the Founder said not to block. The image path was validated with synthetic media.
 
 Gates:
-- **Native:** full unit suite on the candidate has 1 failure (the Build 87 Peptide baseline). On the Batch 2 preview: 2034 tests, 0 failures.
-- **Watch:** 49/49.
-- **Release compile:** OK.
-- **Server:** UUID fix 208/208; 2-C core tests 51/51.
+- Unit tests: 573, 0 failures.
+- D UI: 3/3. B/C: 11/11. Hub: 3/3. Recovery: 3/3.
+- Release compile: passed.
+- Pre-existing, not from D: `testBriefingParityJourneys` fails on base `8aa2d00b` too.
 
-Today's Watch workout: **LINKED** at 21:29:05Z through normal reassessment. It is a trusted, confirmed link to the exact session, with 0 reviews and 0 Evidence writes.
+Not done: no TestFlight upload, no build bump, no Server change, no deploy.
 
-Report: `agent-handoffs/reports/20261005T213236Z-workout-reliability-watch-link-verified.md` (addendum to `20261005T212016Z-workout-reliability-founder-decisions-complete.md``
-
-Concurrent lanes (unchanged):
-- Batch 3 B/C acceptance: report `20261005T193626Z`.
+Concurrent lanes:
+- Workout reliability closeout (prompt `b19faf1e`).
 - Build 88 authorization for Batch 2 `793462b1`.
-
-No TestFlight upload, no build bump, no merge into the release branch.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`

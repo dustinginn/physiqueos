@@ -1,27 +1,29 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T21:32:36Z",
+  "generated_at_utc": "2026-10-05T21:45:20Z",
   "task": {
-    "id": "workout-reliability-founder-decisions-complete-20261005",
-    "title": "Workout reliability lane: 2-B/2-C implemented, UUID-case Server fix deployed (b5de242f); 2-C Server b7eb1e39 awaiting deploy approval",
+    "id": "batch3-bc-accepted-checkpoint-d-20261005",
+    "title": "Redesign Batch 3 Claude: Checkpoint D Progress Photos + DEXA Evidence to the locked designs",
     "agent": "claude",
-    "status": "partial"
+    "status": "checkpoint_d_ready_for_founder_review_stopped"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "final_sha": "e9f8a957be419d89a10b316c57b90afeb08d2f17",
-    "production_server_sha": "b5de242f29acc7e213ffbcfc849b4796eda6353f",
-    "production_deployment": "ea89c93e",
-    "native_sha": "e9f8a957be419d89a10b316c57b90afeb08d2f17",
-    "native_build": 87
+    "prompt_commit": "28cbb4dd6471b94c6920c3a60b85f1993c708c8f",
+    "native_accepted_abc_sha": "8aa2d00b835a9a3cbbbc16f001d032db9e7cd7ce",
+    "native_checkpoint_d_sha": "9d2d0e06c84dca7de3f0fe4dc80574c2115ceff5",
+    "review_package_commit": "759d0dc947419647dbc85963de8eb0d9d19a4906",
+    "locked_design_commits": {
+      "photos_dexa": "47ed6d1a",
+      "since_prior_scan_correction": "f208007c"
+    }
   },
   "result": {
-    "summary": "Workout reliability lane (Batch 3 untouched). Server b5de242f DEPLOYED (ea89c93e ACTIVE; web+worker source hash, /live, /ready, log gitSha verified; no errors; 0 writes since deploy). Today's Watch workout LINKED at 21:29:05Z by the first normal post-deploy ingest (trusted, confirmed, exact stored session id; 0 reviews; 0 Evidence writes). 2-C Server contract b7eb1e39 (additive contextualProgressionRecommendations, no migration) NOT deployed - awaiting Founder deploy approval. Native candidate e9f8a957 (incl. cd06bfea): 2-B untouched/uncompleted row refill on pair/unpair/re-pair with no-history keep; 2-C exact-grouping Server recommendation selection. Integration preview on Batch 2 70ebf753: unit 2034/0, Watch 49/49, Release compile OK.",
-    "success": true,
-    "production_mutated": false,
-    "deployed": true,
-    "testflight_uploaded": false
+    "summary": "Progress Photos (P1-P6) and DEXA (D1-D10 + final Since Prior Scan correction) rebuilt on an EvidenceKit record family; residuals headers +/-0.3, Latest Photo Set <=0.4, Photo Set <=1.4, DEXA metrics <=0.5, Scan History <=1.3 pt, Dark = Light. DEXA chart scroll trap fixed (UI-proved). Real Founder photos NOT validated (needs Sandbox pairing credential; Founder said do not block); real image path validated with synthetic media. Unit 573/0 fail, D UI 3/3, B/C 11/11, Hub 3/3, Recovery 3/3, Release OK; testBriefingParityJourneys fails identically on base 8aa2d00b (pre-existing).",
+    "production_data_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false,
+    "build_number_bumped": false
   },
   "validation": {
     "tests": {
@@ -38,9 +40,10 @@
     }
   },
   "decisions_required": [
-    "Authorize production deploy of 2-C Server candidate b7eb1e39 (additive training-logger contextualProgressionRecommendations; no migration/data rewrite)",
-    "Integrate Native e9f8a957 into the next-build authority per the map (preview 70ebf753)",
-    "Unchanged concurrent lanes: Batch 3 B/C acceptance; Build 88 authorization for Batch 2 793462b1"
+    "Founder review/approval of Batch 3 Checkpoint D before Checkpoint E starts",
+    "Optional: provide a Sandbox pairing credential to finish real Founder photo validation (~5 min)",
+    "Concurrent lane (workout-reliability-founder-decisions-complete-20261005): workout reliability deploy/closeout per prompt b19faf1e; see its report",
+    "Concurrent lane, unchanged: Build 88 authorization for Batch 2 Native 793462b1 (report 20261005T150227Z)"
   ],
   "blockers": [],
   "unexpected_findings": [],
@@ -48,7 +51,7 @@
     "Watch Review/Confirmation Complete Set gating + timed-set projection (shared Watch mapper root)",
     "Phone reply-before-side-effects / one projection build per command after next workout's correlatable logs"
   ],
-  "recommended_next_step": "Founder approves b7eb1e39 deploy; Claude deploys via the guarded path and re-verifies; Watch link confirmed after the next sync.",
+  "recommended_next_step": "Review the Checkpoint D primary board; on approval Claude starts Checkpoint E (Add Evidence + generic Evidence Review) on the same branch.",
   "full_report_path": "agent-handoffs/reports/20261005T213236Z-workout-reliability-watch-link-verified.md",
   "safety": {
     "contains_secrets": false,
@@ -56,5 +59,17 @@
     "contains_production_exports": false,
     "contains_founder_evidence": false,
     "safe_for_chatgpt_retrieval": true
-  }
+  },
+  "publication": {
+    "source_work_branch": "claude/redesign-batch3-evidence-takeover-20261005",
+    "report_path": "agent-handoffs/reports/20261005T214520Z-redesign-batch3-claude-checkpoint-d.md",
+    "review_packages": [
+      "agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-d-20261005/ (work branch at 759d0dc947419647dbc85963de8eb0d9d19a4906)"
+    ],
+    "primary_boards": [
+      "https://github.com/dustinginn/physiqueos/blob/759d0dc947419647dbc85963de8eb0d9d19a4906/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-d-20261005/checkpoint-d-primary-mobile-review-board.png",
+      "https://github.com/dustinginn/physiqueos/blob/759d0dc947419647dbc85963de8eb0d9d19a4906/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-d-20261005/checkpoint-d-primary-mobile-review-board-light.png"
+    ]
+  },
+  "stop_reason": "Prompt requires a Founder review stop after Checkpoint D."
 }
