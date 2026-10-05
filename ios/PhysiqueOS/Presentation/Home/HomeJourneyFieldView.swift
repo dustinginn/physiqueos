@@ -23,6 +23,10 @@ struct HomeJourneyFieldView: View {
         }
     }
 
+    private var remainingPeriod: String? {
+        HomeJourneyTimingPresentation.remainingPeriod(hero: hero, trajectory: trajectory)
+    }
+
     private var fieldInk: Color { colorScheme == .dark ? .white : PhysiqueOSTheme.redesignInk }
     private var fieldSecondary: Color { colorScheme == .dark ? .white.opacity(0.72) : PhysiqueOSTheme.redesignInkSecondary }
 
@@ -92,7 +96,7 @@ struct HomeJourneyFieldView: View {
     private var metrics: some View {
         HStack(alignment: .top, spacing: 10) {
             fieldMetric("TARGET DATE", value: trajectory?.overallTargetDate.map(TrainingDateFormatting.short) ?? hero.projectedFinish ?? "—")
-            fieldMetric("REMAINING", value: hero.daysRemaining ?? "—")
+            fieldMetric("REMAINING", value: remainingPeriod ?? "—")
             fieldMetric("PROGRESS", value: progress.map { "\($0)%" } ?? "—")
             fieldMetric("DESTINATION", value: [goal.target, goal.unit].filter { !$0.isEmpty }.joined(separator: " "))
         }
@@ -142,7 +146,7 @@ struct HomeJourneyFieldView: View {
             if let phases = trajectory?.phases, !phases.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(phases) { phase in
-                        HomeJourneyPhaseRow(phase: phase, remaining: hero.daysRemaining)
+                        HomeJourneyPhaseRow(phase: phase, remainingPeriod: remainingPeriod)
                     }
                 }
                 .background(alignment: .topLeading) {
@@ -216,7 +220,7 @@ struct HomeJourneyFieldView: View {
 private struct HomeJourneyPhaseRow: View {
     @Environment(\.colorScheme) private var colorScheme
     let phase: HomeGoalPhase
-    let remaining: String?
+    let remainingPeriod: String?
 
     private var tint: Color {
         phase.status == "active" ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignAmber
@@ -255,16 +259,52 @@ private struct HomeJourneyPhaseRow: View {
     }
 
     private var phaseDetail: String? {
+        HomeJourneyTimingPresentation.phaseDetail(for: phase, remainingPeriod: remainingPeriod)
+    }
+}
+
+/// Presentation-only normalization for server-owned phase timing copy. The
+/// countdown itself remains owned by `HomeGoalTrajectoryService`; Native
+/// removes redundant words only so the same value can serve the compact top
+/// metric and the active-phase sentence without using the device clock.
+enum HomeJourneyTimingPresentation {
+    static func remainingPeriod(hero: HomeHero, trajectory: HomePhaseTrajectory?) -> String? {
+        let activePhase = trajectory?.phases.first(where: { $0.status == "active" })
+        return compactPeriod(from: activePhase?.friendlyTimeline)
+            ?? compactPeriod(from: hero.daysRemaining)
+    }
+
+    static func phaseDetail(for phase: HomeGoalPhase, remainingPeriod: String?) -> String? {
         guard phase.status == "active" else { return phase.presentationLabel }
         let range: String? = {
             guard let start = phase.startDate,
                   let end = phase.calculatedPlannedReviewDate else { return nil }
             return "\(TrainingDateFormatting.short(start)) – \(TrainingDateFormatting.short(end))"
         }()
-        return [range, remaining.map { "about \($0) remaining" }]
+        return [range, remainingPeriod.map { "about \($0) remaining" }]
             .compactMap { $0 }
             .joined(separator: " · ")
     }
+
+    private static func compactPeriod(from source: String?) -> String? {
+        guard var value = source?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty,
+              !["unavailable", "pending", "not time-based"].contains(value.lowercased())
+        else { return nil }
+
+        if value.lowercased().hasPrefix("about ") {
+            value.removeFirst("about ".count)
+        }
+        if value.lowercased().hasSuffix(" remaining") {
+            value.removeLast(" remaining".count)
+        }
+        return value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+enum HomeBriefingTileLayout {
+    static let showsSectionEyebrow = false
+    static let titleLineLimit = 3
 }
 
 struct HomeActionBriefingStrip: View {
@@ -330,9 +370,10 @@ struct HomeActionBriefingStrip: View {
                 Text(card.title)
                     .font(.system(size: 14, weight: .heavy))
                     .foregroundStyle(PhysiqueOSTheme.redesignInk)
-                    .lineLimit(2)
+                    .lineLimit(HomeBriefingTileLayout.titleLineLimit)
                     .minimumScaleFactor(0.82)
                     .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(1)
                 if let date = card.createdAt.flatMap({ BriefingCardView.relativeDateLabel(from: $0) }) {
                     Text(date).font(.system(size: 11, weight: .medium)).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
