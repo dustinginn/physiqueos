@@ -227,7 +227,7 @@ For an active/paused session with no live, stored or saved Watch workout, offer 
 Acceptance:
 A phone-started session, then Watch Record with Apple Health, gives exactly one PhysiqueOS HealthKit workout with HR/energy populating, and finish saves and reports it once. With no session the Watch never claims HEALTH ON. A Watch-started session is unchanged. Test seam: an injectable Watch health controller.
 
-Status: FIXED IN BUILD 86 CANDIDATE (unreleased) — Native `claude/native-watch-healthkit-build86-20261004` at `4f78fce663fb16c3cc6930b3b8e576a328defcbe`; report `agent-handoffs/reports/20261004T232105Z-build86-watch-healthkit-candidate.md`. Automatic exactly-once start (prompt-directed); trust boundary unchanged. Close only after physical-device acceptance.
+Status: FIXED IN BUILD 86 CANDIDATE (unreleased) — Native `claude/native-watch-healthkit-build86-20261004` at `4f78fce663fb16c3cc6930b3b8e576a328defcbe`; report `agent-handoffs/reports/20261004T232105Z-build86-watch-healthkit-candidate.md`. Automatic exactly-once start (prompt-directed); trust boundary unchanged. Carried unchanged into combined Build 86 head `cec8af20a6121bb66ecca3ba9f667d91774a891c` (`agent-handoffs/reports/20261005T003623Z-build86-final-integration.md`). Close only after physical-device acceptance.
 
 ### Apple Watch Logger — activation refresh disables Complete Set
 
@@ -248,11 +248,11 @@ Separate refresh from the mutation gate, or exclude it from the enablement predi
 Acceptance:
 With a reachable active projection, a display activation does not disable Complete Set. A tap during a refresh is delivered once. A stale race yields one refresh and no lost tap.
 
-Status: FIXED IN BUILD 86 CANDIDATE (unreleased; refresh has its own lane, stale Complete Set re-sent once for the same set, latency trace added) — `4f78fce6`; report `agent-handoffs/reports/20261004T232105Z-build86-watch-healthkit-candidate.md`. Immediate phone→Watch push deferred pending on-device measurement. Close only after physical-device acceptance (including 10–15 ft).
+Status: FIXED IN BUILD 86 CANDIDATE (unreleased; refresh has its own lane, stale Complete Set re-sent once for the same set, latency trace added) — `4f78fce6`; report `agent-handoffs/reports/20261004T232105Z-build86-watch-healthkit-candidate.md`. Immediate phone→Watch push deferred pending on-device measurement. Carried unchanged into combined Build 86 head `cec8af20`. Close only after physical-device acceptance (including 10–15 ft).
 
 ### Workout presentation — unconfirmed HealthKit candidate replaces the Logger session window
 
-Classification: LIKELY SHIPPING DEFECT (Server)
+Classification: RESOLVED / OBSOLETE (was LIKELY SHIPPING DEFECT, Server)
 
 Discovery:
 Build 86 Part A read-only reconciliation audit of Server `3c0f4aef` for the 2026-10-04 workout (late-started Apple Traditional Strength Training vs the PhysiqueOS Logger session; production review: 55% `possible_match`).
@@ -270,7 +270,28 @@ Server presentation reads link resolution state (confirmed only) before substitu
 Acceptance:
 A pending or rejected candidate never changes the Logger session's displayed window; a confirmed link shows the agreed presentation; no record mutation.
 
-Status: OPEN; reverify against Server authority before patching. No production record was touched.
+Status: RESOLVED — Server `51c459c410b268f35e6388eeb17f0b6ed7eb548c` deployed (deployment `07714249-04c8-4d7b-9f36-09e5ead1cdee`, ACTIVE, web+worker source and log gitSha verified, /ready 9/9). `projectHealthKitStrengthWorkoutPresentationBySession` resolves confirmed links only; pending/possible/No-match/none keep the Logger presentation. No record, link, claim or review mutated. Report `agent-handoffs/reports/20261005T003623Z-build86-final-integration.md`.
+
+### Workout presentation — confirmed link with a late or partial Apple workout replaces the Logger window
+
+Classification: FOUNDER DECISION (Server presentation)
+
+Discovery:
+Build 86 final integration (`agent-handoffs/reports/20261005T003623Z-build86-final-integration.md`); today's 55% match (Apple 1:28–1:48 PM vs Logger 12:31–1:47 PM).
+
+Current behavior:
+For a CONFIRMED Strength link, `applyHealthKitStrengthPresentationToTrainingRecord` presents the Apple workout's start/end/duration (and energy/HR) as the session telemetry. Confirming a late-started or truncated Apple workout would display its shorter window instead of the structured Logger window. Pinned by `a confirmed link is exactly the confirmed-only projection, with confirmed telemetry intact`.
+
+Target options:
+A (recommended) keep the Logger's start/end/duration canonical and take only energy/HR from Apple, optionally noting Apple coverage; B accept the Apple window; C Founder chooses No match.
+
+Implementation implication:
+Option A is a bounded Server presentation change (window fields from the Logger, telemetry fields from Apple) plus tests and a deploy; no record or policy change.
+
+Acceptance:
+After confirming today's item, Workout Detail / Training Day / Activity / Logged Today show 12:31–1:47 PM with Apple calories/HR; sets unchanged; no duplicate session.
+
+Status: OPEN — Founder decision required before today's pending review is confirmed.
 
 ### Evidence Hub — remove Health Metrics placeholder and place Timeline last
 
@@ -379,7 +400,7 @@ Add a typed device-local appearance preference/store, resolve System to a nil ro
 Acceptance:
 A fresh install follows the iPhone appearance. Choosing Dark or Light updates the whole app immediately and survives relaunch. System resumes following OS changes. Every locked key screen is readable in dark and Mineral Light, selected state is not color-only, and no screen remains fixed dark unintentionally.
 
-Status: IMPLEMENTED ON ISOLATED BRANCH; RELEASE-GATED. Source: `codex/global-appearance-infrastructure-20261004` at `d5359e33845cba20a212dade24c25e94f02aee6e`. System/Dark/Light state, local persistence, nil System override, dynamic locked token pairs, narrow Appearance route, WidgetKit-owned paired behavior and ownership audit are complete. Merge with Claude's next-build authority and physical-device extension validation remain before release.
+Status: IMPLEMENTED ON ISOLATED BRANCH; RELEASE-GATED. Source: `codex/global-appearance-infrastructure-20261004` at `d5359e33845cba20a212dade24c25e94f02aee6e`. System/Dark/Light state, local persistence, nil System override, dynamic locked token pairs, narrow Appearance route, WidgetKit-owned paired behavior and ownership audit are complete. Merge with Claude's next-build authority and physical-device extension validation remain before release. Integrated 2026-10-05 into combined Build 86 head `cec8af20a6121bb66ecca3ba9f667d91774a891c` (cherry-picks `5d727b37`, `cec8af20`; no conflicts; byte-identical regeneration; combined gates passed except two pre-existing failures) — still RELEASE-GATED on physical-device validation (`agent-handoffs/reports/20261005T003623Z-build86-final-integration.md`).
 
 ### Data Sources — user-safe Apple Health state projection
 
