@@ -1,20 +1,26 @@
 import SwiftUI
 
-/// Mirrors `EvidenceStreamCard` (`EvidenceHubIndex.jsx:90-127`): an icon
-/// badge, the stream's title, and a compact "label: value" summary line,
-/// tappable to the stream's destination.
+/// One locked Evidence Hub row (H1 `.hub-row`): a 30-px lettered record
+/// tile, the stream title over its compact summary, and an accent chevron,
+/// separated from the next row by a full-width 1-px rule. The whole row is
+/// one button; the summary families mirror `getCompactSummary`
+/// (`EvidenceHubIndex.jsx:129-150`) unchanged.
 struct EvidenceStreamRowView: View {
     let stream: EvidenceStreamSummary
     let onTap: (AppDestination) -> Void
 
-    private var presentation: EvidenceStreamPresentation.Style {
-        EvidenceStreamPresentation.style(for: stream.id)
-    }
+    private typealias S = EvidenceLockedStyle
 
     /// Mirrors `displayTitle` (`EvidenceHubIndex.jsx:152-154`): Progress
     /// Photos shows as "Photos" on the hub row.
     private var displayTitle: String {
         stream.id == "photos" ? "Photos" : stream.title
+    }
+
+    /// The locked record tile: the stream's initial; Timeline uses the
+    /// harness's `⌁` chronology mark.
+    private var tileGlyph: String {
+        stream.id == "timeline" ? "⌁" : String(displayTitle.prefix(1)).uppercased()
     }
 
     /// Mirrors `getCompactSummary` (`EvidenceHubIndex.jsx:129-150`).
@@ -35,55 +41,54 @@ struct EvidenceStreamRowView: View {
         return (stream.metric, nil)
     }
 
+    private var summaryLine: String {
+        if let value = summary.value { return "\(summary.label) · \(value)" }
+        return summary.label
+    }
+
     var body: some View {
         Button {
             onTap(stream.destination)
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: presentation.systemImage)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(presentation.color)
-                    .frame(width: 32, height: 32)
-                    .background(presentation.color.opacity(0.16))
-                    .clipShape(Circle())
-                    .accessibilityHidden(true)
+            HStack(spacing: 0) {
+                Text(tileGlyph)
+                    .evidenceLockedText(S.rowIcon)
+                    .foregroundStyle(S.accent)
+                    .frame(width: S.pt(30), height: S.pt(30))
+                    .background(S.surface2, in: RoundedRectangle(cornerRadius: S.pt(9)))
+                    .frame(width: S.pt(32), alignment: .leading)
+                    .padding(.trailing, S.pt(10))
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 0) {
                     Text(displayTitle)
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    HStack(spacing: 4) {
-                        Text(summary.label)
-                        if let value = summary.value {
-                            Text("·").foregroundStyle(PhysiqueOSTheme.textMuted)
-                            Text(value)
-                        }
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    .lineLimit(1)
+                        .evidenceLockedText(S.rowLabel)
+                        .foregroundStyle(S.ink)
+                    Text(summaryLine)
+                        .evidenceLockedText(S.rowCopy)
+                        .foregroundStyle(S.muted)
+                        .padding(.top, S.pt(3))
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, S.pt(10))
 
-                Spacer(minLength: 8)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                Text("›")
+                    .evidenceLockedText(S.chevron)
+                    .foregroundStyle(S.accent)
             }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 68)
-            .frame(maxWidth: .infinity)
-            .background(PhysiqueOSTheme.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
-            )
+            .padding(.horizontal, S.pt(1))
+            .padding(.vertical, S.pt(10))
+            .frame(minHeight: 44)
+            .padding(.bottom, S.pt(1))
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(S.line).frame(height: S.pt(1))
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(displayTitle). \(summary.label)\(summary.value.map { ": \($0)" } ?? "")")
         .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("evidence.stream.\(stream.id)")
     }
 
     private static func formatDate(_ value: String) -> String {

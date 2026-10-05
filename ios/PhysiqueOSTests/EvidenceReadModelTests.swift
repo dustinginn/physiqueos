@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import PhysiqueOS
 
 /// Regression coverage for the Evidence Hub read-model contract introduced
@@ -25,6 +26,56 @@ final class EvidenceReadModelTests: XCTestCase {
             ["training", "nutrition", "weight", "photos", "dexa", "activity", "energy", "recovery", "health-metrics"]
         )
         XCTAssertFalse(model.streams.map(\.id).contains("protocols"))
+    }
+
+    // MARK: - Locked Hub composition (Batch 3 Checkpoint A)
+
+    /// The locked Hub (design `f7d72f19`, H1) keeps every real stream in
+    /// Server order, drops the non-functional Health Metrics placeholder,
+    /// and places the Timeline doorway last, after Recovery.
+    func testLockedHubMovesTimelineAfterRecoveryAndHidesHealthMetrics() {
+        let production = ["training", "nutrition", "weight", "photos", "dexa", "activity", "energy", "timeline", "recovery", "health-metrics"]
+            .map(Self.stream)
+        let projected = EvidenceHubPresentation.lockedStreams(production)
+        XCTAssertEqual(
+            projected.map(\.id),
+            ["training", "nutrition", "weight", "photos", "dexa", "activity", "energy", "recovery", "timeline"]
+        )
+        XCTAssertEqual(projected.last?.destination, .progressStream(streamId: "timeline"))
+        XCTAssertEqual(projected.map(\.destination), projected.map { .progressStream(streamId: $0.id) })
+    }
+
+    /// Canonical availability wins: an authority without a Timeline stream
+    /// (Sandbox) gets no synthesized Timeline row.
+    func testLockedHubNeverSynthesizesATimelineRow() throws {
+        let model = try Self.loadBundledFixture()
+        let projected = EvidenceHubPresentation.lockedStreams(model.streams)
+        XCTAssertEqual(
+            projected.map(\.id),
+            ["training", "nutrition", "weight", "photos", "dexa", "activity", "energy", "recovery"]
+        )
+        XCTAssertEqual(projected, model.streams.filter { $0.id != "health-metrics" })
+    }
+
+    func testTimelineEventDatesUseTheLockedLongForm() {
+        XCTAssertEqual(TimelineDateFormatting.long("2026-09-10"), "Sep 10, 2026")
+        XCTAssertEqual(TimelineDateFormatting.long("2026-08-01T07:30:00.000Z"), "Aug 1, 2026")
+        XCTAssertEqual(TimelineDateFormatting.long("not-a-date"), "not-a-date")
+    }
+
+    func testLockedEvidenceTypeScaleMapsTheHarnessToIPhone17Pro() {
+        XCTAssertEqual(EvidenceLockedStyle.pt(360), 402, accuracy: 0.0001)
+        XCTAssertEqual(EvidenceLockedStyle.uiWeight(800).rawValue, UIFont.Weight.heavy.rawValue, accuracy: 0.0001)
+        XCTAssertEqual(EvidenceLockedStyle.uiWeight(400).rawValue, UIFont.Weight.regular.rawValue, accuracy: 0.0001)
+        XCTAssertGreaterThan(EvidenceLockedStyle.uiWeight(780).rawValue, UIFont.Weight.bold.rawValue)
+        XCTAssertLessThan(EvidenceLockedStyle.uiWeight(780).rawValue, UIFont.Weight.heavy.rawValue)
+    }
+
+    private static func stream(_ id: String) -> EvidenceStreamSummary {
+        EvidenceStreamSummary(
+            id: id, title: id, metric: "", trend: "", lastUpdated: nil,
+            status: .available, tone: .primary, destination: .progressStream(streamId: id)
+        )
     }
 
     // MARK: - Every stream resolves to the intended destination

@@ -278,6 +278,7 @@ private enum AppearanceReviewLaunchConfiguration {
         case "goal-phase-completed": Route(tab: .goals, destinations: [.goalPhase(goalId: "goal_fixture_build_lean_mass", phaseId: "phase_fixture_maintenance")])
         case "log": Route(tab: .log, destinations: [])
         case "evidence": Route(tab: .evidence, destinations: [])
+        case "evidence-timeline": Route(tab: .evidence, destinations: [.progressStream(streamId: "timeline")])
         case "you": Route(tab: .you, destinations: [])
         case "settings": Route(tab: .you, destinations: [.settings])
         case "appearance": Route(tab: .you, destinations: [.settings, .appearance])

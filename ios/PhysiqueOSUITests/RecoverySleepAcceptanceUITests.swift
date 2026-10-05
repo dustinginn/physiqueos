@@ -196,3 +196,117 @@ final class RecoverySleepAcceptanceUITests: XCTestCase {
         capture("I-unstaged-night")
     }
 }
+
+/// Batch 3 Checkpoint A: the locked Evidence Hub + Timeline through the real
+/// app shell. `-physiqueos.evidence-review` supplies the deterministic
+/// production-shaped Hub (Timeline before Recovery, Health Metrics
+/// placeholder present) and Timeline feed; it exists only in Debug.
+@MainActor
+final class EvidenceHubTimelineUITests: XCTestCase {
+    private let app = XCUIApplication()
+    private let lockedOrder = ["training", "nutrition", "weight", "photos", "dexa", "activity", "energy", "recovery", "timeline"]
+
+    override func setUp() async throws {
+        continueAfterFailure = false
+        app.launchArguments += ["-physiqueos.native.authority-selection.v1", "sandbox"]
+    }
+
+    private func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    private func streamRow(_ id: String, in section: String) -> XCUIElement {
+        element(section).descendants(matching: .any)["evidence.stream.\(id)"].firstMatch
+    }
+
+    private func reveal(_ target: XCUIElement) {
+        for _ in 0..<10 where !(target.exists && target.isHittable) {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(target.exists && target.isHittable, "Could not reveal \(target)")
+    }
+
+    func testLockedHubHierarchyRowsAndTimelineRoundTrip() {
+        app.launchArguments += ["-physiqueos.evidence-review"]
+        app.launch()
+        app.buttons["Evidence"].tap()
+
+        XCTAssertTrue(element("evidence.hub.all").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("evidence.header.evidence").exists)
+        let recentRows = element("evidence.hub.recentlyUsed").descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "evidence.stream."))
+        XCTAssertEqual(Set(recentRows.allElementsBoundByIndex.map(\.identifier)), ["evidence.stream.training", "evidence.stream.photos"])
+        XCTAssertTrue(streamRow("training", in: "evidence.hub.recentlyUsed").exists)
+        XCTAssertTrue(streamRow("photos", in: "evidence.hub.recentlyUsed").exists)
+
+        // Locked order, Health Metrics absent, every row a full-width >=44 pt button.
+        XCTAssertFalse(element("evidence.stream.health-metrics").exists)
+        var previousY = -CGFloat.infinity
+        let width = app.windows.firstMatch.frame.width
+        for id in lockedOrder {
+            let row = streamRow(id, in: "evidence.hub.all")
+            XCTAssertTrue(row.exists, "Missing \(id)")
+            XCTAssertGreaterThan(row.frame.minY, previousY, "\(id) out of locked order")
+            XCTAssertGreaterThanOrEqual(row.frame.height, 44, "\(id) tap target")
+            XCTAssertGreaterThan(row.frame.width, width * 0.88, "\(id) is not a full-row target")
+            previousY = row.frame.minY
+        }
+        XCTAssertTrue(streamRow("weight", in: "evidence.hub.all").label.hasPrefix("Weight. Latest: 179.4 lb"))
+
+        let timeline = streamRow("timeline", in: "evidence.hub.all")
+        reveal(timeline)
+        timeline.tap()
+
+        XCTAssertTrue(element("evidence.timeline.events").waitForExistence(timeout: 10))
+        let ids = ["weight-1", "briefing-1", "photo-1", "dexa-1", "workout-1", "activity-1", "upload-1", "protocol-1"]
+        var eventY = -CGFloat.infinity
+        for id in ids {
+            let event = element("evidence.timeline.event.\(id)")
+            XCTAssertTrue(event.exists, "Missing event \(id)")
+            XCTAssertGreaterThan(event.frame.minY, eventY, "\(id) out of Server order")
+            eventY = event.frame.minY
+        }
+        XCTAssertTrue(element("evidence.timeline.event.weight-1").label.hasPrefix("Weight, Sep 10, 2026. Weight logged"))
+        XCTAssertEqual(element("evidence.timeline.count").label, "Showing 8 of 124")
+        XCTAssertEqual(element("evidence.timeline.events").descendants(matching: .button).count, 0, "Timeline rows must not navigate")
+
+        let back = element("evidence.timeline.back")
+        XCTAssertTrue(back.isHittable)
+        XCTAssertGreaterThanOrEqual(back.frame.height, 44)
+        back.tap()
+        XCTAssertTrue(element("evidence.hub.all").waitForExistence(timeout: 5))
+    }
+
+    func testSandboxHubKeepsCanonicalAvailabilityWithoutATimelineRow() {
+        app.launch()
+        app.buttons["Evidence"].tap()
+        XCTAssertTrue(element("evidence.hub.all").waitForExistence(timeout: 10))
+        XCTAssertTrue(streamRow("recovery", in: "evidence.hub.all").exists)
+        XCTAssertFalse(element("evidence.stream.timeline").exists)
+        XCTAssertFalse(element("evidence.stream.health-metrics").exists)
+    }
+
+    func testLockedLoadingFailureAndEmptyStates() {
+        app.launchArguments += ["-physiqueos.evidence-review", "-physiqueos.evidence-review.state", "failed"]
+        app.launch()
+        app.buttons["Evidence"].tap()
+        XCTAssertTrue(element("evidence.hub.failure").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Evidence could not be loaded."].exists)
+        app.terminate()
+
+        app.launchArguments = ["-physiqueos.native.authority-selection.v1", "sandbox",
+                               "-physiqueos.evidence-review", "-physiqueos.evidence-review.state", "empty",
+                               "-physiqueos.appearance-review.route", "evidence-timeline"]
+        app.launch()
+        XCTAssertTrue(element("evidence.timeline.empty").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["No Timeline entries yet."].exists)
+        XCTAssertFalse(element("evidence.timeline.count").exists)
+        app.terminate()
+
+        app.launchArguments = ["-physiqueos.native.authority-selection.v1", "sandbox",
+                               "-physiqueos.evidence-review", "-physiqueos.evidence-review.state", "loading"]
+        app.launch()
+        app.buttons["Evidence"].tap()
+        XCTAssertTrue(element("evidence.hub.loading").waitForExistence(timeout: 10))
+    }
+}
