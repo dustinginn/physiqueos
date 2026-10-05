@@ -21,8 +21,10 @@ struct YouPlaceholderView: View {
                 operatingStatus
                 VStack(spacing: 0) {
                     YouNavigationRow(icon: "target", tint: PhysiqueOSTheme.redesignPurple, title: "Goals", detail: "Current journey and completed goals", action: onSelectGoals)
+                        .accessibilityIdentifier("you.goals")
                     Divider().overlay(PhysiqueOSTheme.redesignRule).padding(.leading, 60)
                     YouNavigationRow(icon: "slider.horizontal.3", tint: PhysiqueOSTheme.redesignTeal, title: "Operating Plan", detail: "Strategy and protocols across every domain") { onNavigate(.operatingPlan) }
+                        .accessibilityIdentifier("you.operatingPlan")
                     Divider().overlay(PhysiqueOSTheme.redesignRule).padding(.leading, 60)
                     YouNavigationRow(icon: "gearshape.fill", tint: PhysiqueOSTheme.redesignAmber, title: "Settings", detail: "Appearance on this iPhone") { onNavigate(.settings) }
                         .accessibilityIdentifier("you.settings")
@@ -41,6 +43,7 @@ struct YouPlaceholderView: View {
                         title: "Founder device connection",
                         detail: "Manage the live Founder Production connection"
                     ) { onNavigate(.founderServerConnection) }
+                    .accessibilityIdentifier("you.founderConnection")
                     .background(PhysiqueOSTheme.redesignPaper)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(PhysiqueOSTheme.redesignRule))
@@ -198,6 +201,9 @@ private struct YouNavigationRow: View {
             }
             .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
             .padding(.horizontal, 14)
+            // A plain-style button only hit-tests drawn content; the whole
+            // visible row (spacer and chevron side included) is the control.
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -274,6 +280,7 @@ struct AppearanceView: View {
                             .background(PhysiqueOSTheme.redesignPaper)
                             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(appearance.selection == option ? PhysiqueOSTheme.redesignPurple : PhysiqueOSTheme.redesignRule, lineWidth: appearance.selection == option ? 2 : 1))
+                            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("appearance.\(option.rawValue)")

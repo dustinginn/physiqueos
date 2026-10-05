@@ -57,6 +57,41 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         capture("appearance-control-dark")
     }
 
+    /// Build 87 Founder finding: You/Settings navigation rows must respond
+    /// across the whole visible row -- leading content, center whitespace and
+    /// the trailing chevron -- not only the label. Dark and Mineral both run
+    /// so hit behavior is shown to be appearance-independent.
+    func testYouAndSettingsNavigationRowsActivateAcrossTheWholeRow() {
+        let offsets: [CGFloat] = [0.06, 0.5, 0.96]
+        for (index, offset) in offsets.enumerated() {
+            let appearance = index.isMultiple(of: 2) ? "dark" : "light"
+
+            launchReview(route: "you", appearance: appearance)
+            tapRow("you.settings", at: offset)
+            XCTAssertTrue(app.buttons["settings.appearance"].waitForExistence(timeout: 5), "You → Settings missed at x=\(offset) (\(appearance))")
+            tapRow("settings.appearance", at: offset)
+            XCTAssertTrue(app.buttons["appearance.light"].waitForExistence(timeout: 5), "Settings → Appearance missed at x=\(offset) (\(appearance))")
+
+            launchReview(route: "you", appearance: appearance)
+            tapRow("you.operatingPlan", at: offset)
+            XCTAssertTrue(app.staticTexts["OPERATING PLAN"].waitForExistence(timeout: 5), "You → Operating Plan missed at x=\(offset) (\(appearance))")
+
+            launchReview(route: "you", appearance: appearance)
+            tapRow("you.goals", at: offset)
+            XCTAssertTrue(app.tabBars.buttons["Goals"].waitForSelection(timeout: 5), "You → Goals missed at x=\(offset) (\(appearance))")
+
+            launchReview(route: "you", appearance: appearance)
+            tapRow("you.founderConnection", at: offset)
+            XCTAssertTrue(app.segmentedControls.buttons["Founder Production"].waitForExistence(timeout: 5), "You → Founder device connection missed at x=\(offset) (\(appearance))")
+        }
+    }
+
+    private func tapRow(_ identifier: String, at horizontalOffset: CGFloat) {
+        let row = app.buttons[identifier]
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "\(identifier) is missing")
+        row.coordinate(withNormalizedOffset: CGVector(dx: horizontalOffset, dy: 0.5)).tap()
+    }
+
     func testRepresentativeShippingSurfacesDark() {
         captureRepresentativeSurfaces(appearance: "dark")
     }
@@ -138,5 +173,16 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         try? screenshot.pngRepresentation.write(
             to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png")
         )
+    }
+}
+
+private extension XCUIElement {
+    func waitForSelection(timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if isSelected { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return isSelected
     }
 }
