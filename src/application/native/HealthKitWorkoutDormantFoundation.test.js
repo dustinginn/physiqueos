@@ -1123,6 +1123,63 @@ describe("trusted PhysiqueOS Watch correlation", () => {
     expect(records.snapshot().healthKitWorkoutLinks.filter((link) => link.status === "confirmed")).toHaveLength(1);
     expect(records.snapshot().healthKitWorkoutLinkClaims.filter((claim) => claim.status === "held")).toHaveLength(2);
   });
+
+  // 2026-10-05 production shape: the Native draft id is minted uppercase and
+  // embedded as-is in the Logger session's canonical id, while the Watch
+  // reports the canonical lowercase UUID. A case-sensitive join left the
+  // first real trusted workout unlinked forever (trusted_session_not_found).
+  const upperCanonicalId = `training|authoritative|training_logger_draft_${sessionId.toUpperCase()}`;
+  const trustedWatchWorkout = (externalId) => workout({
+    externalId,
+    sourceBundleIdentifier: "com.physiqueos.native.dev",
+    isIndoorWorkout: true,
+    physiqueOSSessionId: sessionId,
+  });
+
+  it("links the Native uppercase draft session when the Watch reports the lowercase UUID", async () => {
+    const records = store({ trustedWatchPolicy: true, evidence: [liveLogger(upperCanonicalId, "10:00", "11:00", 3600)] });
+    const beforeEvidence = structuredClone(records.snapshot().canonicalEvidenceObjects);
+    const result = await ingest(records, [trustedWatchWorkout("trusted-upper")], "trusted-upper");
+    expect(result.result.observations[0].reconciliation).toMatchObject({
+      canonicalTrainingSessionId: upperCanonicalId,
+      associationAuthority: "trusted_physiqueos_session_id_v1",
+    });
+    const after = records.snapshot();
+    expect(after.healthKitWorkoutLinks).toHaveLength(1);
+    expect(after.healthKitWorkoutLinks[0]).toMatchObject({
+      status: "confirmed",
+      loggerSessionCanonicalId: upperCanonicalId,
+      associationAuthority: "trusted_physiqueos_session_id_v1",
+    });
+    expect(after.evidenceReviews ?? []).toEqual([]);
+    expect(after.canonicalEvidenceObjects).toEqual(beforeEvidence);
+  });
+
+  it("links an already-ingested lowercase-id Watch workout on the next ingestion pass", async () => {
+    const records = store({ trustedWatchPolicy: true, evidence: [] });
+    await ingest(records, [trustedWatchWorkout("trusted-upper-race")], "health-first");
+    expect(records.snapshot().healthKitWorkoutLinks).toHaveLength(0);
+    await records.putIfAbsent({
+      ownerUserId: OWNER,
+      collection: "canonicalEvidenceObjects",
+      recordId: upperCanonicalId,
+      sourceIdentity: upperCanonicalId,
+      payload: liveLogger(upperCanonicalId, "10:00", "11:00", 3600),
+    });
+    await ingest(records, [activity({ sourceRevision: 2 })], "activity-after-logger");
+    const after = records.snapshot();
+    expect(after.healthKitWorkoutLinks).toHaveLength(1);
+    expect(after.healthKitWorkoutLinks[0]).toMatchObject({ status: "confirmed", loggerSessionCanonicalId: upperCanonicalId });
+    expect(after.evidenceReviews ?? []).toEqual([]);
+  });
+
+  it("treats a case-variant of an already-claimed session as claimed", async () => {
+    const records = store({ trustedWatchPolicy: true, evidence: [liveLogger(upperCanonicalId, "10:00", "11:00", 3600)] });
+    await ingest(records, [trustedWatchWorkout("trusted-upper-first")], "first");
+    const second = await ingest(records, [trustedWatchWorkout("trusted-upper-second")], "second");
+    expect(second.result.observations[0].reconciliation.associationAuthority).toBeUndefined();
+    expect(records.snapshot().healthKitWorkoutLinks.filter((link) => link.status === "confirmed")).toHaveLength(1);
+  });
 });
 
 describe("strategic quarantine", () => {

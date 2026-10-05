@@ -411,6 +411,10 @@ export function isCompatibleHealthKitReplay(existing, incoming) {
     existing?.semanticFingerprint === incoming?.legacySemanticFingerprint;
 }
 
+function trustedSessionKey(canonicalId) {
+  return String(canonicalId ?? "").toLowerCase();
+}
+
 export function reconcileHealthKitWorkoutObservation({
   observation,
   canonicalObjects = [],
@@ -433,6 +437,12 @@ export function reconcileHealthKitWorkoutObservation({
     trustedWatchCorrelationPolicy.trustedSourceBundleIdentifiers.includes(observation.source.bundleIdentifier);
   if (exactSessionId && sourceIsTrusted) {
     const expectedCanonicalId = `training|authoritative|training_logger_draft_${exactSessionId}`;
+    // The Watch reports the canonical lowercase UUID, while a Logger
+    // session's canonical id embeds the Native draft id as Native minted it
+    // (uppercase `UUID.uuidString`). UUID identity is case-insensitive, so
+    // the exact session is found case-insensitively and the link always
+    // names the session's stored canonical id.
+    const exactKey = trustedSessionKey(expectedCanonicalId);
     const fail = (reason) => Object.freeze({
       state: HealthKitReconciliationState.TRAINING_MATCH_AMBIGUOUS,
       reason,
@@ -445,10 +455,12 @@ export function reconcileHealthKitWorkoutObservation({
     if (Date.parse(observation.occurrence.startedAt) < Date.parse(trustedWatchCorrelationPolicy.effectiveAt)) {
       return fail("trusted_session_before_prospective_activation");
     }
-    if (claimedPhysiqueOSSessionIds.includes(expectedCanonicalId)) return fail("trusted_session_already_claimed");
+    if (claimedPhysiqueOSSessionIds.some((id) => trustedSessionKey(id) === exactKey)) {
+      return fail("trusted_session_already_claimed");
+    }
     const exactSessions = canonicalObjects.filter((record) => {
       const payload = record.payload ?? record;
-      return (record.canonicalId ?? payload.id) === expectedCanonicalId &&
+      return trustedSessionKey(record.canonicalId ?? payload.id) === exactKey &&
         isActiveDetailedStrengthSession(record) &&
         payload?.metadata?.logger_origin === "training_logger" && payload?.metadata?.logger_mode === "live";
     });
@@ -456,6 +468,7 @@ export function reconcileHealthKitWorkoutObservation({
       return fail(exactSessions.length === 0 ? "trusted_session_not_found" : "trusted_session_identity_conflict");
     }
     const payload = exactSessions[0].payload ?? exactSessions[0];
+    const storedCanonicalId = exactSessions[0].canonicalId ?? payload.id;
     const sessionStart = Date.parse(payload?.metadata?.start_time);
     const sessionEnd = Date.parse(payload?.metadata?.end_time);
     const workoutStart = Date.parse(observation.occurrence.startedAt);
@@ -467,9 +480,9 @@ export function reconcileHealthKitWorkoutObservation({
     }
     return Object.freeze({
       state: HealthKitReconciliationState.TRAINING_SESSION_LINKED,
-      canonicalTrainingSessionId: expectedCanonicalId,
+      canonicalTrainingSessionId: storedCanonicalId,
       candidates: Object.freeze([{
-        canonicalId: expectedCanonicalId,
+        canonicalId: storedCanonicalId,
         outcome: "duplicate",
         confidence: 100,
         reasons: Object.freeze(["trusted_physiqueos_session_id"]),

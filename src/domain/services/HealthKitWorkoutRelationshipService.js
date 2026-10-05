@@ -168,7 +168,9 @@ export function assertHealthKitWorkoutRelationshipConfirmationAllowed({
     });
     if (!workout || workout.current?.family !== "strength" || workout.current?.canonicalType !== "traditional_strength_training" ||
       link.matchBasis !== "trusted_physiqueos_session_id" || link.confidence !== 100 ||
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(exactSessionId) ||
+      // UUID identity is case-insensitive: the session id embeds the Native
+      // draft id as minted (uppercase), the Watch reports it lowercase.
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(exactSessionId.toLowerCase()) ||
       exactProof.associationAuthority !== "trusted_physiqueos_session_id_v1" ||
       exactProof.canonicalTrainingSessionId !== link.loggerSessionCanonicalId) {
       throw new HealthKitWorkoutLinkError(
