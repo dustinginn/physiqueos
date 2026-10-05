@@ -903,6 +903,61 @@ final class LoggerParityCaptureUITests: XCTestCase {
         discardSavedDrafts()
     }
 
+    func testCheckpoint4ReviewFinishCompleteDark() { checkpoint4(appearance: "dark") }
+    func testCheckpoint4ReviewFinishCompleteMineralLight() { checkpoint4(appearance: "light") }
+
+    private func checkpoint4(appearance: String) {
+        // Review -> Final Confirmation -> Complete with Server-shaped records.
+        launch(appearance: appearance, route: "training-logger", extra: ["-physiqueos.logger-review.records"])
+        discardSavedDrafts()
+        startWorkout(areas: ["chest"], exercises: ["Bench Press", "Cable Fly"])
+        completeTwoSetsAndOpenReview()
+        capture("cp4-review-\(appearance)")
+        app.buttons["trainingLogger.finishReview"].tap()
+        XCTAssertTrue(app.staticTexts["Finish this workout?"].waitForExistence(timeout: 3))
+        capture("cp4-confirm-\(appearance)")
+        app.buttons["trainingLogger.completeLocal"].tap()
+        XCTAssertTrue(app.staticTexts["Workout logged"].waitForExistence(timeout: 5))
+        capture("cp4-complete-records-\(appearance)")
+        app.buttons["Return to Log"].tap()
+
+        // Complete without records (L14).
+        launch(appearance: appearance, route: "training-logger")
+        discardSavedDrafts()
+        startWorkout(areas: ["chest"], exercises: ["Bench Press"])
+        completeTwoSetsAndOpenReview()
+        app.buttons["trainingLogger.finishReview"].tap()
+        app.buttons["trainingLogger.completeLocal"].tap()
+        XCTAssertTrue(app.staticTexts["Workout logged"].waitForExistence(timeout: 5))
+        capture("cp4-complete-\(appearance)")
+        app.buttons["Return to Log"].tap()
+
+        // Durability states the sandbox cannot reach (DEBUG presentation seam).
+        for state in ["saving", "waiting", "retry"] {
+            launch(appearance: appearance, route: "training-logger", extra: ["-physiqueos.logger-review.finish", state])
+            discardSavedDrafts()
+            startWorkout(areas: ["chest"], exercises: ["Bench Press"])
+            completeTwoSetsAndOpenReview()
+            app.buttons["trainingLogger.finishReview"].tap()
+            XCTAssertTrue(app.staticTexts["Finish this workout?"].waitForExistence(timeout: 3))
+            capture("cp4-\(state)-\(appearance)")
+            // Leave without finishing; the saved draft is discarded next launch.
+            let saveAndLeave = app.buttons["trainingLogger.saveAndLeave"]
+            if saveAndLeave.waitForExistence(timeout: 2) { saveAndLeave.tap() }
+        }
+        launch(appearance: appearance, route: "training-logger")
+        discardSavedDrafts()
+    }
+
+    private func completeTwoSetsAndOpenReview() {
+        let complete = app.buttons["Mark set complete"].firstMatch
+        XCTAssertTrue(complete.waitForExistence(timeout: 3))
+        complete.tap()
+        app.buttons["Mark set complete"].firstMatch.tap()
+        app.buttons["trainingLogger.finishWorkout"].tap()
+        XCTAssertTrue(app.staticTexts["Review your workout"].waitForExistence(timeout: 3))
+    }
+
     private func discardSavedDrafts() {
         let start = app.buttons["trainingLogger.start"]
         XCTAssertTrue(start.waitForExistence(timeout: 10))
