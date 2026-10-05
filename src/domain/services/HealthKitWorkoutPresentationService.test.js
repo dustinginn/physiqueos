@@ -263,6 +263,35 @@ describe("confirmed HealthKit workout presentation", () => {
     fixture.workoutLinkClaims = [];
   };
 
+  it("adds Apple Health to the typed Strength line sources only after exact confirmation", () => {
+    const LOGGER = { kind: "physiqueos_logger", label: "PhysiqueOS Logger" };
+    const APPLE = { kind: "apple_health", label: "Apple Health" };
+    const logFor = (fixture) => {
+      const lines = [
+        { id: "training:logger", kind: "logger", summary: "Strength Training · 50 min", href: "/x", recordId: fixture.ids.session,
+          provenance: { scope: "Strength Training", sources: [LOGGER] } },
+        { id: "training:cardio:outdoor-walk", kind: "cardio", summary: "2 Outdoor Walks · 32 min", href: "/progress/training", recordId: null,
+          provenance: { scope: "2 Outdoor Walks", sources: [APPLE] } },
+      ];
+      return { localDate: fixture.day, loggedToday: { dateKey: fixture.day, rows: [
+        { id: "training", summary: "Strength Training · 50 min, 2 Outdoor Walks · 32 min", context: null, contextDetail: null,
+          provenance: null, recordId: null, lines },
+      ] }, pendingEvidenceReviews: [] };
+    };
+    const confirmed = createSep23StrengthPresentationFixture();
+    const row = projectConfirmedHealthKitLogProvenance(logFor(confirmed), provenanceRuntime(confirmed)).loggedToday.rows[0];
+    expect(row.lines.map((line) => line.provenance.sources)).toEqual([[LOGGER, APPLE], [APPLE]]);
+    expect(row.lines.map((line) => line.summary)).toEqual(["Strength Training · 50 min", "2 Outdoor Walks · 32 min"]);
+    expect(row.contextDetail).toBeNull();
+
+    const candidate = createSep23StrengthPresentationFixture();
+    demoteLinkToCandidate(candidate);
+    const log = logFor(candidate);
+    const untouched = projectConfirmedHealthKitLogProvenance(log, provenanceRuntime(candidate)).loggedToday.rows[0];
+    expect(untouched).toEqual(log.loggedToday.rows[0]);
+    expect(untouched.lines[0].provenance.sources).toEqual([LOGGER]);
+  });
+
   it("captions the Log Training group with Apple Health only after exact confirmation, without a duplicate row", () => {
     const fixture = createSep23StrengthPresentationFixture();
     const log = {

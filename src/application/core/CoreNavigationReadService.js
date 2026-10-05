@@ -2,6 +2,7 @@ import { classifyTrainingSetLoad, resolveExerciseDefaultLoadType } from "../../d
 import { createSeedRepositories } from "../../data/repositories/createSeedRepositories.js";
 import { FOUNDATION_SOURCE_COLLECTIONS } from "../../platform/migration/foundationSourceCollections.js";
 import { createHomeBriefingService } from "../../domain/services/HomeBriefingService.js";
+import { withAppleHealthLineSource } from "../../domain/services/LoggedTodayService.js";
 import { createGoalsHubReadService } from "../goals/GoalsHubReadService.js";
 import { createLogReadService } from "../log/LogReadService.js";
 import { createOperatingPlanReadService } from "../plan/OperatingPlanReadService.js";
@@ -1204,7 +1205,14 @@ export function projectConfirmedHealthKitLogProvenance(log, runtime = {}) {
         if (Array.isArray(row.lines) && row.lines.length > 0) {
           const logger = row.lines.find((line) => line.kind === "logger");
           if (logger && !loggerConfirmed(logger.recordId)) return row;
-          return Object.freeze({ ...row, context: joinAppleHealth(row.context) });
+          // Typed provenance (Log Sources): a confirmed link adds Apple Health
+          // to the Strength line's own sources. Lines without typed
+          // provenance (older composers) pass through unchanged.
+          return Object.freeze({
+            ...row,
+            context: joinAppleHealth(row.context),
+            lines: Object.freeze(row.lines.map((line) => line.kind === "logger" ? withAppleHealthLineSource(line) : line)),
+          });
         }
         // Legacy single-summary row (no lines): the summary is the whole group.
         if (!loggerConfirmed(row.recordId)) return row;

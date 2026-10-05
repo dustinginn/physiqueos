@@ -128,8 +128,8 @@ function composeTrainingRow(sessions, healthKitStrengthPresentationBySession = n
 
   const strength = sessions.length ? composeLoggerSessionLine(sessions, healthKitStrengthPresentationBySession) : null;
   const cardioLines = composeCardioLines(cardioWorkouts);
-  const lines = [strength, ...cardioLines].filter(Boolean).map(({ id, kind, summary, href, recordId }) =>
-    Object.freeze({ id, kind, summary, href, recordId }));
+  const lines = [strength, ...cardioLines].filter(Boolean).map(({ id, kind, summary, href, recordId, provenance }) =>
+    Object.freeze({ id, kind, summary, href, recordId, provenance }));
   // With a Logger session the row keeps that session's own record, link and
   // context (clients that render only `summary` still open the Strength
   // session); clients that render `lines` open Training Day for a
@@ -139,6 +139,11 @@ function composeTrainingRow(sessions, healthKitStrengthPresentationBySession = n
     label: "Training",
     summary: lines.map((line) => line.summary).join(", "),
     context: strength ? strength.context : APPLE_HEALTH_LABEL,
+    // Typed provenance (Log Sources): a Training row can mix sources, so its
+    // provenance lives on each line; `contextDetail` is `context` without any
+    // source caption, for clients that present provenance separately.
+    contextDetail: strength ? strength.context : null,
+    provenance: null,
     href: strength ? strength.href : "/progress/training",
     recordId: strength ? strength.recordId : null,
     lines: Object.freeze(lines),
@@ -174,6 +179,10 @@ function composeLoggerSessionLine(sessions, healthKitStrengthPresentationBySessi
     id: "training:logger",
     kind: "logger",
     summary,
+    provenance: provenance(
+      labels.length <= 2 ? labels.join(" · ") : `${sessions.length} training sessions`,
+      sessions.map(trainingSessionSource),
+    ),
     context: noMovements ? "Movements not added" : null,
     href: single ? `/progress/training/session/${encodeURIComponent(recordId)}` : "/progress/training",
     recordId,
@@ -206,6 +215,9 @@ function composeCardioLines(cardioWorkouts = []) {
         id: `training:${idFamily}:${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
         kind: isOtherHistory ? "other" : "cardio",
         summary: duration ? `${name} · ${duration}` : name,
+        // Cardio and explicit OTHER history lines are projected from
+        // canonical HealthKit workouts only.
+        provenance: provenance(name, [APPLE_HEALTH_SOURCE]),
         href: "/progress/training",
         recordId,
       };
@@ -246,6 +258,8 @@ function composeNutritionRow(days) {
       ? calories > 0 ? `${formatNumber(calories)} calories` : "Nutrition logged"
       : calories > 0 ? `${mealLabel} · ${formatNumber(calories)} calories` : `${mealLabel} logged`,
     context: deviceTotals ? formatDeviceNutritionContext(day) : deviceSourced ? APPLE_HEALTH_LABEL : null,
+    contextDetail: deviceTotals ? formatDeviceNutritionMacros(day) : null,
+    provenance: provenance("Nutrition", [deviceSourced ? APPLE_HEALTH_SOURCE : UNAVAILABLE_SOURCE]),
     href: day?.id
       ? `/progress/nutrition/day/${encodeURIComponent(day.id)}`
       : "/progress/nutrition",
@@ -272,12 +286,45 @@ function composeActivityRow(days) {
       ? `${formatTrainingLabel(linkedTrainingType)} · ${calorieSummary}`
       : calorieSummary,
     context: isAppleHealthDirect(latest) ? APPLE_HEALTH_LABEL : null,
+    contextDetail: null,
+    provenance: provenance("Activity", [isAppleHealthDirect(latest) ? APPLE_HEALTH_SOURCE : UNAVAILABLE_SOURCE]),
     href: "/progress/activity",
     recordId: latest._canonicalId ?? latest.canonicalId ?? latest.id ?? null,
   });
 }
 
 const APPLE_HEALTH_LABEL = "Apple Health";
+
+// Typed provenance for clients that present Log sources separately from the
+// tiles. Only provable sources are named: a direct Apple Health record, or a
+// session the structured Workout Logger committed. Anything else is reported
+// as unavailable rather than guessed from display text.
+export const LOGGED_TODAY_SOURCE_KINDS = Object.freeze(["apple_health", "physiqueos_logger", "unavailable"]);
+const APPLE_HEALTH_SOURCE = Object.freeze({ kind: "apple_health", label: APPLE_HEALTH_LABEL });
+const LOGGER_SOURCE = Object.freeze({ kind: "physiqueos_logger", label: "PhysiqueOS Logger" });
+const UNAVAILABLE_SOURCE = Object.freeze({ kind: "unavailable", label: "Source unavailable" });
+
+function provenance(scope, sources) {
+  const distinct = [];
+  for (const source of sources) {
+    if (!distinct.some((item) => item.kind === source.kind)) distinct.push(source);
+  }
+  return Object.freeze({ scope, sources: Object.freeze(distinct) });
+}
+
+function trainingSessionSource(session) {
+  if (session?.metadata?.logger_origin === "training_logger") return LOGGER_SOURCE;
+  if (isAppleHealthDirect(session)) return APPLE_HEALTH_SOURCE;
+  return UNAVAILABLE_SOURCE;
+}
+
+export function withAppleHealthLineSource(line) {
+  if (!line?.provenance) return line;
+  return Object.freeze({
+    ...line,
+    provenance: provenance(line.provenance.scope, [...line.provenance.sources, APPLE_HEALTH_SOURCE]),
+  });
+}
 
 // Existing source treatment only: the row's existing secondary line names the
 // source and, for a device daily total, the macros the compact row can hold.
@@ -291,10 +338,14 @@ function isDeviceDailyTotal(day) {
 }
 
 function formatDeviceNutritionContext(day) {
+  return [formatDeviceNutritionMacros(day), APPLE_HEALTH_LABEL].filter(Boolean).join(" · ");
+}
+
+function formatDeviceNutritionMacros(day) {
   const totals = day.daily_totals ?? {};
   const macro = (value, letter) => (Number.isFinite(Number(value)) && value !== null ? `${Math.round(Number(value))}${letter}` : null);
   const macros = [macro(totals.protein_g, "P"), macro(totals.carbs_g, "C"), macro(totals.fat_g, "F")].filter(Boolean);
-  return [macros.length ? macros.join(" · ") : null, APPLE_HEALTH_LABEL].filter(Boolean).join(" · ");
+  return macros.length ? macros.join(" · ") : null;
 }
 
 function emptyRow(id, label) {
@@ -303,6 +354,8 @@ function emptyRow(id, label) {
     label,
     summary: EMPTY_SUMMARY,
     context: null,
+    contextDetail: null,
+    provenance: null,
     href: null,
     recordId: null,
   });
