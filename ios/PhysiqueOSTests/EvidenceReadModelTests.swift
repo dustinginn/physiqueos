@@ -36,6 +36,17 @@ final class EvidenceReadModelTests: XCTestCase {
         }
     }
 
+    func testLockedHubProjectionRemovesPlaceholderAndAddsTimelineLast() throws {
+        let model = try Self.loadBundledFixture()
+        let projected = EvidenceHubRedesignPresentation.visibleStreams(from: model.streams)
+        XCTAssertEqual(
+            projected.map(\.id),
+            ["training", "nutrition", "weight", "photos", "dexa", "activity", "energy", "recovery", "timeline"]
+        )
+        XCTAssertFalse(projected.map(\.id).contains("health-metrics"))
+        XCTAssertEqual(projected.last?.destination, .progressStream(streamId: "timeline"))
+    }
+
     /// The Training stream's destination must resolve to the real Training
     /// history screen via `AppDestinationRouterView`, not a placeholder —
     /// this is the first complete evidence vertical, so its wire shape

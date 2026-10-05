@@ -23,12 +23,15 @@ struct EvidenceView: View {
     var body: some View {
         ScrollView {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+                .padding(.horizontal, 18)
+                .padding(.top, 20)
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .toolbar(.hidden, for: .navigationBar)
+        .background(PhysiqueOSTheme.redesignCanvas)
+        .navigationTitle("Evidence")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = EvidenceViewModel(api: environment.evidenceAPI)
@@ -43,23 +46,18 @@ struct EvidenceView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStateView(symbol: "diamond", title: "Loading Evidence", message: "Reading your canonical record.", showsProgress: true)
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStateView(symbol: "exclamationmark.triangle", title: "Evidence unavailable", message: message)
         case .loaded(let hub):
-            VStack(alignment: .leading, spacing: 16) {
-                EvidenceHeaderView(title: hub.title, subtitle: hub.subtitle)
+            VStack(alignment: .leading, spacing: 25) {
+                EvidenceHeaderView(title: "Evidence", subtitle: "What PhysiqueOS has captured.")
 
                 if !recentlyUsedStreams(in: hub).isEmpty {
                     sectionList(title: "Recently Used", streams: recentlyUsedStreams(in: hub))
                 }
 
-                sectionList(title: "All Evidence", streams: hub.streams)
+                sectionList(title: "All Evidence", streams: visibleStreams(in: hub))
             }
         }
     }
@@ -67,15 +65,17 @@ struct EvidenceView: View {
     private func recentlyUsedStreams(in hub: EvidenceHubReadModel) -> [EvidenceStreamSummary] {
         guard let viewModel else { return [] }
         let streamsById = Dictionary(uniqueKeysWithValues: hub.streams.map { ($0.id, $0) })
-        return viewModel.recentlyUsedStreamIds.compactMap { streamsById[$0] }
+        return viewModel.recentlyUsedStreamIds.compactMap { streamsById[$0] }.filter { $0.id != "health-metrics" }
+    }
+
+    private func visibleStreams(in hub: EvidenceHubReadModel) -> [EvidenceStreamSummary] {
+        EvidenceHubRedesignPresentation.visibleStreams(from: hub.streams)
     }
 
     private func sectionList(title: String, streams: [EvidenceStreamSummary]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .physiqueOSFont(PhysiqueOSTypography.sheetTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
+            EvidenceSectionTitle(title: title)
+            VStack(spacing: 0) {
                 ForEach(streams) { stream in
                     EvidenceStreamRowView(stream: stream) { destination in
                         viewModel?.recordVisit(streamId: stream.id)
@@ -84,5 +84,24 @@ struct EvidenceView: View {
                 }
             }
         }
+    }
+}
+
+enum EvidenceHubRedesignPresentation {
+    static func visibleStreams(from source: [EvidenceStreamSummary]) -> [EvidenceStreamSummary] {
+        var streams = source.filter { $0.id != "health-metrics" && $0.id != "timeline" }
+        streams.append(
+            EvidenceStreamSummary(
+                id: "timeline",
+                title: "Timeline",
+                metric: "A chronological record of what PhysiqueOS has captured",
+                trend: "",
+                lastUpdated: nil,
+                status: .available,
+                tone: .primary,
+                destination: .progressStream(streamId: "timeline")
+            )
+        )
+        return streams
     }
 }

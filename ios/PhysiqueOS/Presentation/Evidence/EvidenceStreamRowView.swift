@@ -1,20 +1,21 @@
 import SwiftUI
 
-/// Mirrors `EvidenceStreamCard` (`EvidenceHubIndex.jsx:90-127`): an icon
-/// badge, the stream's title, and a compact "label: value" summary line,
-/// tappable to the stream's destination.
+/// Founder-locked flat Evidence index row. Canonical summary copy and
+/// destination remain owned by the read model; this view only translates
+/// them into the accepted next-generation visual grammar.
 struct EvidenceStreamRowView: View {
     let stream: EvidenceStreamSummary
     let onTap: (AppDestination) -> Void
-
-    private var presentation: EvidenceStreamPresentation.Style {
-        EvidenceStreamPresentation.style(for: stream.id)
-    }
 
     /// Mirrors `displayTitle` (`EvidenceHubIndex.jsx:152-154`): Progress
     /// Photos shows as "Photos" on the hub row.
     private var displayTitle: String {
         stream.id == "photos" ? "Photos" : stream.title
+    }
+
+    private var rowLetter: String {
+        if stream.id == "timeline" { return "↝" }
+        return String(displayTitle.prefix(1)).uppercased()
     }
 
     /// Mirrors `getCompactSummary` (`EvidenceHubIndex.jsx:129-150`).
@@ -39,48 +40,47 @@ struct EvidenceStreamRowView: View {
         Button {
             onTap(stream.destination)
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: presentation.systemImage)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(presentation.color)
-                    .frame(width: 32, height: 32)
-                    .background(presentation.color.opacity(0.16))
-                    .clipShape(Circle())
+            HStack(spacing: 14) {
+                Text(rowLetter)
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(EvidenceRedesignPalette.lime)
+                    .frame(width: 38, height: 38)
+                    .background(PhysiqueOSTheme.redesignSoft)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(displayTitle)
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     HStack(spacing: 4) {
                         Text(summary.label)
                         if let value = summary.value {
-                            Text("·").foregroundStyle(PhysiqueOSTheme.textMuted)
+                            Text("·")
                             Text(value)
                         }
                     }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     .lineLimit(1)
                 }
 
                 Spacer(minLength: 8)
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(EvidenceRedesignPalette.lime)
             }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 68)
+            .padding(.horizontal, 1)
+            .frame(minHeight: 61)
             .frame(maxWidth: .infinity)
-            .background(PhysiqueOSTheme.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
-            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(PhysiqueOSTheme.redesignRule).frame(height: 1)
+        }
+        .accessibilityIdentifier("evidence.stream.\(stream.id)")
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(displayTitle). \(summary.label)\(summary.value.map { ": \($0)" } ?? "")")
         .accessibilityAddTraits(.isButton)
