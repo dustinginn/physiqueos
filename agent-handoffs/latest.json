@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T19:58:56Z",
+  "generated_at_utc": "2026-10-05T20:20:54Z",
   "task": {
     "id": "workout-watch-superset-real-session-audit-20261005",
-    "title": "Workout reliability lane: Build 87 real-session audit (Watch supersets, superset guidance, Watch-finish recap, HealthKit)",
+    "title": "Workout reliability lane: Build 87 Watch/superset audit + bounded fix candidate (Native cd06bfea, Server b5de242f undeployed)",
     "agent": "claude",
     "status": "partial"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "final_sha": null,
+    "final_sha": "cd06bfea931b229276776fa155556327414b0fe7",
     "production_server_sha": "c7c99347a520d13fd344fe89b6b1398877cdd255",
     "production_deployment": "e7ef3157",
     "native_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
     "native_build": 87
   },
   "result": {
-    "summary": "AUDIT checkpoint (workout reliability lane; Batch 3 lane untouched). Real 2026-10-05 session committed once (15 sets, 1 superset LegExt+Sissy, Watch finish). Issue 3 proven: Watch-finish path drops the Server PR list (keeps only count) and the phone fallback read is single-shot -> reduced recap. Issue 2 proven: Server tracks superset context separately (today's Sissy PR vs the 09-14 superset baseline), but Native production history mapper hard-codes relationship nil and recommendations are standalone-only. Issue 1: no server stage; Watch gate ignores context acks, unreachable taps are lost, telemetry not correlatable (device logs need root/sysdiagnose). Issue 4 separate root (Watch mapper vs live projection). Issue 5 NEW: trusted Watch HealthKit correlation failed on UUID case (lowercase id vs uppercase canonical draft id), so today's Watch workout is silently unlinked. Bounded Native fixes in progress next.",
+    "summary": "Workout reliability lane (Batch 3 untouched). Native candidate cd06bfea (base Build 87 f66c7fc6): Watch-finish now keeps the Server PR list so the phone recap/PRs/confetti match a phone finish; superset context wired into production Logger history (pairing shows superset Previous; standalone excludes supersets); completed sets immune to Use suggestion/Keep previous; Watch Complete Set settles from the phone context ack, unsent taps never show Set pending, correlatable latency logs. Server candidate b5de242f (NOT deployed) fixes the UUID-case trusted Watch correlation that left today's Watch workout unlinked. iOS 2015 tests / 1 known Peptide baseline failure; Watch 49/49; Server 82/82 focused, 4 pre-existing reds identical at base. No build bump, TestFlight, deploy or production write.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -25,23 +25,23 @@
   },
   "validation": {
     "tests": {
-      "status": "not_run",
-      "summary": "Audit checkpoint; tests accompany the fix candidate."
+      "status": "passed",
+      "summary": "iOS full suite 2015 tests, 1 failure = known Peptide baseline (line 616); Watch 49/49; Server focused 82/82; HealthKit Server files 902 pass, 4 reds identical at production base c7c99347."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder review requested."
+      "summary": "Founder review requested; no independent code review run."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Six READ ONLY repeatable-read probes with SELECT-only guard and ROLLBACK; production writes 0."
+      "summary": "Six READ ONLY production probes; production writes 0; nothing deployed."
     }
   },
   "decisions_required": [
-    "Issue 2-B: auto-refill uncompleted untouched set rows from the superset-context previous on pair/unpair? (no history: keep standalone vs clear)",
+    "Issue 2-B: auto-refill uncompleted untouched rows on superset pair/unpair (no history: keep standalone vs clear)?",
     "Issue 2-C: approve additive Server contextualProgressionRecommendations for superset Suggested/Maintain",
-    "Issue 5: authorize deploy of Server UUID-case correlation fix (would auto-link today's Watch workout on next ingest = production data change)",
-    "Issue 1: optionally capture iPhone+Watch logs now (root log collect or sysdiagnose) while WatchLatency notices are retained",
+    "Issue 5: authorize deploy of Server b5de242f (next ingest auto-links today's Watch workout = production data change)",
+    "Approve integrating Native cd06bfea into the next-build authority (after Batch 2 / Build 88 decision)",
     "Unchanged concurrent lanes: Batch 3 B/C acceptance (report 20261005T193626Z); Build 88 authorization for Batch 2 793462b1"
   ],
   "blockers": [],
@@ -54,8 +54,8 @@
     "Watch phase/row semantics derive from TrainingSessionLiveProjection (Review gating + timed sets)",
     "Phone Watch-command route: reply before side effects, one projection build per command (after telemetry)"
   ],
-  "recommended_next_step": "Review audit; Claude continues with bounded Native fixes (Issues 1a-c, 2-A, 3) and an undeployed Server UUID-case candidate, then publishes a candidate report.",
-  "full_report_path": "agent-handoffs/reports/20261005T195700Z-workout-watch-superset-real-session-audit.md",
+  "recommended_next_step": "Founder reviews the candidate report; decide 2-B/2-C and the Server deploy; then cherry-pick cd06bfea into the next-build authority.",
+  "full_report_path": "agent-handoffs/reports/20261005T202019Z-workout-watch-superset-fix-candidate.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
