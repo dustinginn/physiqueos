@@ -1,64 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T01:46:04Z",
-  "task": {
-    "id": "redesign-batch2-log-training-prep-20261005",
-    "title": "Redesign Implementation Batch 2 prep: Log + Training Logger (PREP ONLY; separate from Codex A Batch 1)",
-    "agent": "claude",
-    "status": "prep_complete_awaiting_batch1_acceptance"
-  },
+  "generated_at_utc": "2026-10-05T02:45:00Z",
+  "task": {"id": "redesign-implementation-batch1-home-goals-you-20261005", "title": "Redesign Implementation Batch 1 — Home, Goals, You / Settings", "agent": "codex", "status": "founder_approved_candidate"},
   "repository": "dustinginn/physiqueos",
-  "authority": {
-    "prompt_commit": "97563259728caff262abb4b58eb2ab966ddd8345",
-    "native_sha": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
-    "native_build": 86,
-    "native_version": "1.0",
-    "batch1_prompt_commit": "f4bd9c50c6a0132d700f41cb894788e5a61d8ff6",
-    "server_sha": "27dad44a1f63d68b53f23e51152a10a5d04968e6",
-    "log_design_authority": [
-      "ec425a96",
-      "97807d50",
-      "6029bbfa"
-    ],
-    "logger_design_authority": {
-      "package": "29d2fe1f",
-      "done_control_correction": "5b47063b",
-      "branch": "origin/codex/utility-surfaces-design",
-      "branch_head": "ca088e80e851c83d0d3e168d88f918232f5338d6"
-    }
-  },
-  "publication": {
-    "source_work_branch": "claude/redesign-batch2-log-training-prep-20261005 (no commits; prep only)",
-    "source_work_commit": "cec8af20a6121bb66ecca3ba9f667d91774a891c",
-    "main_report_commit": "8e3730aeccda865adf752230f3e8f7ad6b52e3a3",
-    "report_path": "agent-handoffs/reports/20261005T014604Z-redesign-batch2-log-training-prep.md",
-    "artifact_root": null,
-    "method": "git plumbing from the single RC worktree; no secondary worktree"
-  },
-  "result": {
-    "summary": "Batch 2 (Log + Training Logger) is implementation-ready: exhaustive state inventory, ownership map, Batch 1 dependency map, Build 86 Watch/HealthKit risk map, parity matrix, coding sequence, test plan and visual matrix. No shipping code changed.",
-    "native_changed": false,
-    "server_changed": false,
-    "production_data_mutated": false,
-    "testflight_uploaded": false,
-    "ledger": "3 entries appended: Log Sources provenance (D1), Watch Complete Set during phone review (likely defect), Logger unrendered error copy (likely defect); timed-set gap re-verified OPEN"
-  },
-  "decisions_required": [
-    "D1 Log Sources: structured provenance contract vs ship without Sources",
-    "D2 Finish-leg rows bound to source state vs omit",
-    "D3 keep shipping Logger copy (default) vs adopt harness copy",
-    "D4 L13 Workout Match in Batch 2 (recommended) vs Evidence batch"
-  ],
-  "blockers": [
-    "Batch 1 Founder acceptance + integration head (tokens/primitives in PhysiqueOSTheme)"
-  ],
-  "recommended_next_step": "After Founder accepts Batch 1, start Batch 2 at step 0 of the report's coding sequence on the Batch 1 integration head; answer D1-D4 in parallel.",
-  "stop_reason": "Batch 2 is implementation-ready pending only Batch 1 Founder acceptance/integration authority (plus D1-D4).",
-  "safety": {
-    "contains_secrets": false,
-    "contains_credentials": false,
-    "contains_production_exports": false,
-    "contains_founder_evidence": false,
-    "safe_for_chatgpt_retrieval": true
-  }
+  "authority": {"prompt_commit": "f4bd9c50c6a0132d700f41cb894788e5a61d8ff6", "native_base_sha": "cec8af20a6121bb66ecca3ba9f667d91774a891c", "native_build": 86, "native_version": "1.0"},
+  "publication": {"implementation_branch": "codex/redesign-batch1-home-goals-you-20261005", "implementation_commit": "c4a74ad09f4a163c80fc7ba3031bd76ef11a8c70", "main_report_commit": "ab173560b1ddc128d42f9eb7ddefa4b8909ba067", "report_path": "agent-handoffs/reports/20261005T024500Z-redesign-implementation-batch1-home-goals-you.md", "artifact_root": "agent-handoffs/artifacts/redesign-implementation-batch1-20261005"},
+  "result": {"summary": "Founder-approved Home, Goals, and You/Settings redesign implementation candidate with final Home corrections and Dark/Mineral real-simulator review artifacts.", "focused_tests_pass": true, "full_suite_preexisting_failure_only": true, "release_compile_pass": true, "server_changed": false, "watch_healthkit_changed": false, "testflight_uploaded": false},
+  "deferred": ["Profile write contract", "Data Sources projection", "Sign Out coordinator"],
+  "recommended_next_step": "Integrate c4a74ad09f4a163c80fc7ba3031bd76ef11a8c70 onto the next authorized Native head, then begin locked Log and Training Logger Batch 2."
 }
