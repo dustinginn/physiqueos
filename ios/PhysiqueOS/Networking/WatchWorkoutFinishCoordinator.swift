@@ -139,7 +139,7 @@ final class WatchWorkoutFinishCoordinator {
                 let records = await writeAPI.sessionPerformanceRecords(for: candidate)
                 recordServerSuccess(
                     candidate: candidate, operationId: operationId,
-                    prCount: records?.count, authority: authority, writeAPI: writeAPI
+                    records: records, authority: authority, writeAPI: writeAPI
                 )
                 return
             }
@@ -155,7 +155,7 @@ final class WatchWorkoutFinishCoordinator {
                     }
                     recordServerSuccess(
                         candidate: candidate, operationId: operationId,
-                        prCount: records?.count, authority: authority, writeAPI: writeAPI
+                        records: records, authority: authority, writeAPI: writeAPI
                     )
                     return
                 }
@@ -175,16 +175,19 @@ final class WatchWorkoutFinishCoordinator {
     private func recordServerSuccess(
         candidate: TrainingLoggerDraft,
         operationId: String,
-        prCount: Int?,
+        records: [TrainingPerformanceRecord]?,
         authority: TrainingSessionAuthority,
         writeAPI: any TrainingWriteAPI
     ) {
         _ = authority.setSubmissionState(sessionId: candidate.id, nil)
+        // The Server's own record list (not just its count) is kept on the
+        // completion, so a Watch-originated finish hydrates the same phone
+        // recap as a phone-originated one.
         _ = authority.recordWatchServerCommit(
             sessionId: candidate.id,
             finishOperationId: operationId,
             succeeded: true,
-            authoritativePRCount: prCount
+            authoritativeRecords: records
         )
         guard let current = authority.draft(id: candidate.id),
               finalizeIfReady(current, authority: authority)

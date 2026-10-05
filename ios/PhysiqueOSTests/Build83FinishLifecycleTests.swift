@@ -140,7 +140,7 @@ final class Build83FinishLifecycleTests: XCTestCase {
         WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
     }
 
-    private func coordinator(_ authority: TrainingSessionAuthority, _ writeAPI: WriteAPI) -> WatchWorkoutFinishCoordinator {
+    private func coordinator(_ authority: TrainingSessionAuthority, _ writeAPI: any TrainingWriteAPI) -> WatchWorkoutFinishCoordinator {
         WatchWorkoutFinishCoordinator(
             dependencies: .init(
                 authority: { authority }, writeAPI: { writeAPI }, isSandbox: { false }, backgroundScheduler: nil
@@ -1017,5 +1017,185 @@ final class Build83FinishLifecycleTests: XCTestCase {
         var offline = snapshot
         offline.refreshState = .offline
         XCTAssertEqual(WatchDailyTotals(snapshot: offline)?.isOffline, true)
+    }
+
+    // MARK: Build 87 workout reliability — Watch-finish recap parity
+
+    /// A commit fake whose durable result carries (or withholds) the Server's
+    /// performance records, with a separately controllable read-back.
+    actor RecordsWriteAPI: TrainingWriteAPI {
+        private let resultRecords: TrainingSessionPerformanceRecords?
+        private var readBackRecords: [TrainingPerformanceRecord]?
+        private(set) var commits = 0
+        private(set) var readBacks = 0
+        init(resultRecords: TrainingSessionPerformanceRecords?, readBackRecords: [TrainingPerformanceRecord]? = nil) {
+            self.resultRecords = resultRecords
+            self.readBackRecords = readBackRecords
+        }
+        func setReadBack(_ records: [TrainingPerformanceRecord]?) { readBackRecords = records }
+        func commit(_ draft: TrainingLoggerDraft) async throws -> TrainingCommitResult {
+            commits += 1
+            return TrainingCommitResult(status: "durable", reviewId: nil, reviewRevision: nil, sessionId: draft.id,
+                                        intendedDate: draft.workoutDate, exerciseIds: [], performanceRecords: resultRecords)
+        }
+        func sessionPerformanceRecords(for draft: TrainingLoggerDraft) async -> [TrainingPerformanceRecord]? {
+            readBacks += 1
+            return readBackRecords
+        }
+        nonisolated func localValidationError(for draft: TrainingLoggerDraft) -> TrainingWriteError? {
+            ProductionTrainingWriteAPI.validateLocally(draft)
+        }
+    }
+
+    private static func prRecord(_ id: String, exercise: String, value: Double) -> TrainingPerformanceRecord {
+        TrainingPerformanceRecord(
+            id: "training_library_record_\(id)", canonicalExerciseId: exercise, canonicalExerciseName: exercise,
+            title: "Session volume record", value: "\(Int(value)) lb", previousBaseline: "Previous: 2,400 lb",
+            improvement: nil, detail: nil, workoutDate: "2026-10-02", executionVariant: nil, relationshipContext: nil,
+            achievedValue: value, achievementType: .sessionVolumePR, sourceEventId: "training_performance_event_\(id)"
+        )
+    }
+
+    private let serverRecords = [
+        prRecord("sissy", exercise: "sissy_squat", value: 2700),
+        prRecord("lunge", exercise: "walking_lunge", value: 3600),
+    ]
+
+    private func watchFinish(
+        _ authority: TrainingSessionAuthority,
+        _ clock: Clock,
+        _ coordinator: WatchWorkoutFinishCoordinator
+    ) {
+        let router = router(authority, clock)
+        XCTAssertEqual(router.route(command(.requestFinish, authority, id: "request")).status, .applied)
+        XCTAssertEqual(router.route(command(.confirmFinish, authority, id: "op-1")).status, .applied)
+        coordinator.reconcile()
+    }
+
+    func testWatchFinishHydratesTheSameServerRecapAsAPhoneFinishWithoutAReadBack() async throws {
+        let clock = Clock(t0)
+        let store = Store([thirteenSetSession(done: true)])
+        let authority = makeAuthority(store, clock: clock)
+        let writeAPI = RecordsWriteAPI(resultRecords: .init(status: "completed", records: serverRecords))
+        let coordinator = coordinator(authority, writeAPI)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction, now: { clock.now }
+        )
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        watchFinish(authority, clock, coordinator)
+        await waitUntil("Watch-finished recap") {
+            viewModel.draft?.step == .complete && viewModel.completedPerformanceRecords == self.serverRecords
+        }
+        let commits = await writeAPI.commits
+        let readBacks = await writeAPI.readBacks
+        XCTAssertEqual(commits, 1, "Exactly one structured commit.")
+        XCTAssertEqual(readBacks, 0, "The Watch path's own Server records hydrate the phone; no fragile second read.")
+        let pending = try XCTUnwrap(authority.pendingCompletion(id: "session-1"))
+        XCTAssertEqual(pending.watchAuthoritativePerformanceRecords, serverRecords)
+        XCTAssertEqual(pending.watchAuthoritativePRCount, 2, "The Watch summary count stays derived from the same list.")
+    }
+
+    func testRelaunchAfterAWatchFinishPresentsThePersistedServerRecordsWithoutNetwork() async throws {
+        let clock = Clock(t0)
+        let store = Store([thirteenSetSession(done: true)])
+        let authority = makeAuthority(store, clock: clock)
+        let writeAPI = RecordsWriteAPI(resultRecords: .init(status: "completed", records: serverRecords))
+        let coordinator = coordinator(authority, writeAPI)
+        watchFinish(authority, clock, coordinator)
+        await waitUntil("committed") { authority.pendingCompletion(id: "session-1") != nil }
+
+        // Relaunch: a new authority over the same durable store, and a read
+        // path that is down.
+        let relaunched = makeAuthority(store, clock: clock)
+        let offline = RecordsWriteAPI(resultRecords: nil, readBackRecords: nil)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: offline, sessionAuthority: relaunched, authority: .founderProduction, now: { clock.now }
+        )
+        await viewModel.load()
+        XCTAssertEqual(viewModel.draft?.step, .complete)
+        XCTAssertEqual(viewModel.completedPerformanceRecords, serverRecords)
+        let readBacks = await offline.readBacks
+        XCTAssertEqual(readBacks, 0)
+    }
+
+    func testUnknownWatchFinishRecordsAreReReadWhenTheScreenReturnsAndNeverFabricated() async throws {
+        let clock = Clock(t0)
+        let authority = makeAuthority(Store([thirteenSetSession(done: true)]), clock: clock)
+        // Derivation deferred at commit and the fallback read fails (the
+        // phone was suspended after the Watch Finish).
+        let writeAPI = RecordsWriteAPI(resultRecords: .init(status: "deferred", records: []), readBackRecords: nil)
+        let coordinator = coordinator(authority, writeAPI)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction, now: { clock.now }
+        )
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        watchFinish(authority, clock, coordinator)
+        await waitUntil("complete") { viewModel.draft?.step == .complete }
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(viewModel.completedPerformanceRecords, [], "Unknown records are never invented locally.")
+        XCTAssertNil(authority.pendingCompletion(id: "session-1")?.watchAuthoritativePerformanceRecords)
+
+        await writeAPI.setReadBack(serverRecords)
+        viewModel.refreshCompletedPerformanceRecordsIfUnknown()
+        await waitUntil("records after refresh") { viewModel.completedPerformanceRecords == self.serverRecords }
+
+        // Known now: returning again never re-reads.
+        let readsBefore = await writeAPI.readBacks
+        viewModel.refreshCompletedPerformanceRecordsIfUnknown()
+        viewModel.resume(draftId: "session-1")
+        try await Task.sleep(for: .milliseconds(50))
+        let readsAfter = await writeAPI.readBacks
+        XCTAssertEqual(readsAfter, readsBefore)
+    }
+
+    func testAKnownEmptyWatchFinishRecordListIsAuthoritativeAndNotReRead() async throws {
+        let clock = Clock(t0)
+        let authority = makeAuthority(Store([thirteenSetSession(done: true)]), clock: clock)
+        let writeAPI = RecordsWriteAPI(resultRecords: .init(status: "completed", records: []))
+        let coordinator = coordinator(authority, writeAPI)
+        let viewModel = TrainingLoggerViewModel(
+            api: api, writeAPI: writeAPI, sessionAuthority: authority, authority: .founderProduction, now: { clock.now }
+        )
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        watchFinish(authority, clock, coordinator)
+        await waitUntil("complete") { viewModel.draft?.step == .complete }
+        viewModel.refreshCompletedPerformanceRecordsIfUnknown()
+        try await Task.sleep(for: .milliseconds(50))
+        let readBacks = await writeAPI.readBacks
+        XCTAssertEqual(readBacks, 0)
+        XCTAssertEqual(viewModel.completedPerformanceRecords, [])
+        XCTAssertEqual(authority.pendingCompletion(id: "session-1")?.watchAuthoritativePRCount, 0)
+    }
+
+    // MARK: Build 87 workout reliability — superset Complete Set progression
+
+    func testSupersetCompleteSetSequenceAlternatesRoundsThenAdvancesAndEachAckNamesItsTap() throws {
+        let clock = Clock(t0)
+        var draft = thirteenSetSession()
+        draft.exercises = [exercise("a", sets: 2), exercise("b", sets: 2), exercise("c", sets: 2)]
+        draft.relationships = [.init(id: "superset-ab", relationshipType: "superset", memberExerciseIds: ["a", "b"])]
+        let authority = makeAuthority(Store([draft]), clock: clock)
+        let router = router(authority, clock)
+        var order: [String] = []
+        for step in 0..<6 {
+            let current = try XCTUnwrap(authority.draft(id: "session-1"))
+            let projection = try XCTUnwrap(WatchWorkoutProjection.make(draft: current, authority: authority, now: clock.now))
+            let target = try XCTUnwrap(projection.rows.first(where: \.isCompletionTarget), "target at step \(step)")
+            order.append(target.exerciseId)
+            let ack = router.route(command(.completeSet, authority, id: "tap-\(step)", exerciseId: target.exerciseId, setId: target.setId))
+            XCTAssertEqual(ack.status, .applied)
+            XCTAssertEqual(ack.projection?.lastAcknowledgedMutationId, "tap-\(step)",
+                           "Every published projection names the applied tap, so the Watch can settle from the context.")
+            clock.advance(20)
+        }
+        XCTAssertEqual(order, ["a", "b", "a", "b", "c", "c"], "A1 -> B1 -> A2 -> B2 (final superset set) -> next unit.")
+        let final = try XCTUnwrap(WatchWorkoutProjection.make(
+            draft: try XCTUnwrap(authority.draft(id: "session-1")), authority: authority, now: clock.now
+        ))
+        XCTAssertFalse(final.canCompleteSet)
+        XCTAssertEqual(final.completedSets, 6)
     }
 }

@@ -1623,6 +1623,12 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                 ($0.canonicalExerciseId, $0.recommendation)
             }
         )
+        // Additive Server contract; an older Server omits it (nil -> no
+        // superset Suggested/Maintain), and a malformed entry is dropped alone.
+        let contextual = Dictionary(
+            grouping: (payload.contextualProgressionRecommendations ?? []).compactMap(\.value),
+            by: \.canonicalExerciseId
+        )
         return TrainingLoggerConfiguration(
             areas: catalog.areas.map { TrainingLoggerArea(id: $0.id, label: $0.label) },
             variants: [],
@@ -1638,7 +1644,8 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                         previouslyPerformed: payload.initialPerformedExerciseIds.contains(exercise.canonicalExerciseId),
                         inMyLibrary: payload.initialMyLibraryExerciseIds.contains(exercise.canonicalExerciseId),
                         history: Self.history(for: exercise.canonicalExerciseId, defaultLoadType: exercise.defaultLoadType, in: history),
-                        progressionRecommendation: recommendations[exercise.canonicalExerciseId]
+                        progressionRecommendation: recommendations[exercise.canonicalExerciseId],
+                        contextualProgressionRecommendations: contextual[exercise.canonicalExerciseId]?.map(\.contextual)
                     )
                 }
             },
@@ -1657,7 +1664,7 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                     sessionId: session.id,
                     workoutDate: String(session.observedAt.prefix(10)),
                     executionVariant: exercise.executionVariant,
-                    relationship: nil,
+                    relationship: relationship(of: exercise, in: session),
                     sets: exercise.sets.enumerated().map { index, set in
                         TrainingSet(
                             setNumber: index + 1,
@@ -1681,6 +1688,7 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         var initialPerformedExerciseIds: [String]
         var initialMyLibraryExerciseIds: [String]
         var initialProgressionRecommendations: [RawRecommendation]?
+        var contextualProgressionRecommendations: [FailableContextualRecommendation]?
         var initialCategorySuggestion: TrainingLoggerCategorySuggestion?
     }
 
@@ -1693,13 +1701,43 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
     /// with each set reduced to `{reps, weight, weight_unit}`. Reusing
     /// `TrainingSessionDetailReadModel` here was a Native-side type
     /// mismatch, not a server contract gap.
+    /// The Server's superset context for one historical exercise: its
+    /// session's relationship group, partners in group order (Server
+    /// `deriveTrainingExerciseRelationshipContext`). Without this every
+    /// superset session read as standalone history, so a superset's
+    /// previous performance never matched and standalone history absorbed
+    /// superset sessions.
+    static func relationship(of exercise: HistoryExercise, in session: HistorySession) -> TrainingLoggerHistoryRelationship? {
+        guard let exerciseId = exercise.id,
+              let group = (session.exerciseRelationshipGroups ?? []).first(where: { $0.memberExerciseIds.contains(exerciseId) })
+        else { return nil }
+        let partners = group.memberExerciseIds
+            .filter { $0 != exerciseId }
+            .compactMap { id in session.exercises.first { $0.id == id } }
+        return TrainingLoggerHistoryRelationship(
+            relationshipType: group.relationshipType,
+            partnerNames: partners.compactMap(\.name),
+            partnerCanonicalExerciseIds: partners.compactMap(\.canonicalExerciseId)
+        )
+    }
+
     struct HistorySession: Decodable {
         var id: String
         var observedAt: String
         var exercises: [HistoryExercise]
+        /// Optional: older Servers and fixtures omit it (standalone history).
+        var exerciseRelationshipGroups: [HistoryRelationshipGroup]?
+    }
+
+    struct HistoryRelationshipGroup: Decodable {
+        var relationshipType: String
+        var memberExerciseIds: [String]
     }
 
     struct HistoryExercise: Decodable {
+        /// The occurrence id that `exerciseRelationshipGroups` members name.
+        var id: String?
+        var name: String?
         var canonicalExerciseId: String?
         var executionVariant: TrainingExecutionVariant?
         var sets: [HistorySet]
@@ -1744,6 +1782,42 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
             )
         }
     }
+    struct RawContextualRecommendation: Decodable {
+        struct Relationship: Decodable {
+            var relationshipType: String
+            var relationshipKey: String?
+            var partnerCanonicalExerciseIds: [String]
+        }
+        var canonicalExerciseId: String
+        var relationship: Relationship
+        var state: TrainingLoggerProgressionState
+        var eyebrow: String
+        var message: String
+        var prescription: String
+        var suggestedLoad: Double?
+        var suggestedLoadType: String?
+        var suggestedReps: Double?
+        var suggestedUnit: String?
+
+        var contextual: TrainingLoggerContextualProgressionRecommendation {
+            .init(
+                relationshipType: relationship.relationshipType,
+                relationshipKey: relationship.relationshipKey,
+                partnerCanonicalExerciseIds: relationship.partnerCanonicalExerciseIds,
+                recommendation: .init(
+                    state: state, eyebrow: eyebrow, message: message, prescription: prescription,
+                    suggestedLoad: suggestedLoad, suggestedLoadType: suggestedLoadType,
+                    suggestedReps: suggestedReps, suggestedUnit: suggestedUnit
+                )
+            )
+        }
+    }
+
+    struct FailableContextualRecommendation: Decodable {
+        let value: RawContextualRecommendation?
+        init(from decoder: Decoder) throws { value = try? RawContextualRecommendation(from: decoder) }
+    }
+
     fileprivate struct RawExercise: Decodable {
         var id: String; var name: String; var equipment: String?
         var bodyRegion: String?; var primaryMuscleGroups: [String]

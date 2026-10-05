@@ -49,6 +49,16 @@ struct TrainingLoggerCategorySuggestion: Codable, Equatable, Identifiable {
     var historyReferences: [String]
 }
 
+/// One Server recommendation keyed to a relationship context. The Server's
+/// own `relationshipKey` is kept for diagnostics; matching uses the typed
+/// relationship type plus the exact partner canonical-id set.
+struct TrainingLoggerContextualProgressionRecommendation: Codable, Equatable {
+    var relationshipType: String
+    var relationshipKey: String?
+    var partnerCanonicalExerciseIds: [String]
+    var recommendation: TrainingLoggerProgressionRecommendation
+}
+
 struct TrainingLoggerCatalogExercise: Codable, Equatable, Identifiable {
     var id: String { canonicalExerciseId }
     var canonicalExerciseId: String
@@ -70,6 +80,28 @@ struct TrainingLoggerCatalogExercise: Codable, Equatable, Identifiable {
     var inMyLibrary: Bool? = nil
     var history: [TrainingLoggerHistoryRecord]
     var progressionRecommendation: TrainingLoggerProgressionRecommendation?
+    /// Server-owned Suggested/Maintain for superset relationship contexts
+    /// (`contextualProgressionRecommendations`). Optional so older payloads,
+    /// fixtures and saved configurations decode unchanged.
+    var contextualProgressionRecommendations: [TrainingLoggerContextualProgressionRecommendation]? = nil
+
+    /// The Server recommendation for exactly this execution/relationship
+    /// context, or `nil`. Native never derives progression: standalone uses
+    /// the standalone recommendation; a superset uses only a contextual
+    /// recommendation whose relationship names exactly the current partners.
+    func progressionRecommendation(
+        variant: TrainingExecutionVariant?,
+        relationship: TrainingExerciseRelationshipContext?
+    ) -> TrainingLoggerProgressionRecommendation? {
+        guard variant == nil else { return nil }
+        guard let relationship else { return progressionRecommendation }
+        let partners = relationship.partnerCanonicalExerciseIds.sorted()
+        guard !partners.isEmpty else { return nil }
+        return contextualProgressionRecommendations?.first { candidate in
+            candidate.relationshipType == relationship.relationshipType
+                && candidate.partnerCanonicalExerciseIds.sorted() == partners
+        }?.recommendation
+    }
 
     var historyOccurrences: [TrainingExerciseHistoryOccurrence] {
         history.map { record in
@@ -194,6 +226,11 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     var watchHealthSaveState: WatchWorkoutFinishComponentState? = nil
     var watchServerCommitState: WatchWorkoutFinishComponentState? = nil
     var watchAuthoritativePRCount: Int? = nil
+    /// The Server-authoritative performance records a Watch-finished commit
+    /// returned (or read back). Retained on the pending Workout Complete
+    /// presentation so the phone recap matches a phone-finished one without
+    /// depending on a second network read. Never computed locally.
+    var watchAuthoritativePerformanceRecords: [TrainingPerformanceRecord]? = nil
     /// Session-level rest override. `nil` defers to the rest preference
     /// provider (exercise, then global), and finally to Off.
     var restConfiguration: TrainingRestConfiguration? = nil
@@ -393,6 +430,10 @@ struct TrainingLoggerDraftSet: Codable, Equatable, Identifiable {
     /// `TrainingSessionAuthority`; never backfilled for older drafts and
     /// never sent in the training commit. See `TrainingSessionInvariants`.
     var completedAt: String? = nil
+    /// The Founder typed a value into this row. Contextual refills (superset
+    /// pair / unpair / re-pair) only touch rows that are neither completed
+    /// nor hand-edited. Local-only; never part of the training commit.
+    var isManuallyEdited: Bool? = nil
 
     init(
         id: String,
@@ -669,8 +710,17 @@ extension TrainingLoggerDraft {
     }
 
     mutating func removeExercise(id: String) {
+        removeExercise(id: id, catalog: nil)
+    }
+
+    /// Removing a superset member returns its surviving partner to its
+    /// standalone context, refreshed like an explicit unpair.
+    mutating func removeExercise(id: String, catalog: [TrainingLoggerCatalogExercise]?) {
+        let partners = relationships.first(where: { $0.memberExerciseIds.contains(id) })?.memberExerciseIds.filter { $0 != id } ?? []
         exercises.removeAll { $0.id == id }
         relationships.removeAll { $0.memberExerciseIds.contains(id) }
+        guard let catalog else { return }
+        refreshMembershipContext(of: partners, catalog: catalog)
     }
 
     mutating func moveExercise(id: String, offset: Int) {
@@ -709,7 +759,8 @@ extension TrainingLoggerDraft {
               recommendation.hasExplicitTarget,
               let suggestedReps = recommendation.suggestedReps else { return }
         exercises[index].progressionChoice = .suggestion
-        for setIndex in exercises[index].sets.indices {
+        // Completed sets are performed history: guidance only fills the rest.
+        for setIndex in exercises[index].sets.indices where !exercises[index].sets[setIndex].isCompleted {
             exercises[index].sets[setIndex].reps = suggestedReps
             let suggestedSemantics = TrainingSetLoadSemantics.classify(
                 weight: recommendation.suggestedLoad, loadType: recommendation.suggestedLoadType,
@@ -726,7 +777,7 @@ extension TrainingLoggerDraft {
               let previous = exercises[index].previousPerformance,
               !previous.sets.isEmpty else { return }
         exercises[index].progressionChoice = .previous
-        for setIndex in exercises[index].sets.indices {
+        for setIndex in exercises[index].sets.indices where !exercises[index].sets[setIndex].isCompleted {
             let source = previous.sets[min(setIndex, previous.sets.count - 1)]
             exercises[index].sets[setIndex].reps = source.reps
             (exercises[index].sets[setIndex].load, exercises[index].sets[setIndex].loadType) = TrainingLoggerDraftSet.prepopulatedLoad(from: source)
@@ -739,18 +790,21 @@ extension TrainingLoggerDraft {
         guard firstId != secondId,
               exercises.contains(where: { $0.id == firstId }),
               exercises.contains(where: { $0.id == secondId }) else { return }
+        // Re-pairing a member also changes the context of its former partner.
+        let formerMembers = relationships
+            .filter { $0.memberExerciseIds.contains(firstId) || $0.memberExerciseIds.contains(secondId) }
+            .flatMap(\.memberExerciseIds)
         relationships.removeAll { $0.memberExerciseIds.contains(firstId) || $0.memberExerciseIds.contains(secondId) }
         relationships.append(.init(id: UUID().uuidString, relationshipType: "superset", memberExerciseIds: [firstId, secondId]))
-        if let first = exercises.firstIndex(where: { $0.id == firstId }) { refreshPreviousPerformance(at: first, catalog: catalog) }
-        if let second = exercises.firstIndex(where: { $0.id == secondId }) { refreshPreviousPerformance(at: second, catalog: catalog) }
+        var affected = [firstId, secondId]
+        for id in formerMembers where !affected.contains(id) { affected.append(id) }
+        refreshMembershipContext(of: affected, catalog: catalog)
     }
 
     mutating func removeSuperset(containing exerciseId: String, catalog: [TrainingLoggerCatalogExercise]) {
         let affected = relationships.first(where: { $0.memberExerciseIds.contains(exerciseId) })?.memberExerciseIds ?? []
         relationships.removeAll { $0.memberExerciseIds.contains(exerciseId) }
-        for id in affected {
-            if let index = exercises.firstIndex(where: { $0.id == id }) { refreshPreviousPerformance(at: index, catalog: catalog) }
-        }
+        refreshMembershipContext(of: affected, catalog: catalog)
     }
 
     mutating func swapExercise(id: String, with replacement: TrainingLoggerCatalogExercise) {
@@ -764,8 +818,10 @@ extension TrainingLoggerDraft {
         exercises[index].defaultLoadType = replacement.defaultLoadType
         exercises[index].executionVariant = nil
         exercises[index].previousPerformance = previous
-        exercises[index].progressionRecommendation = previous == nil ? nil : replacement.progressionRecommendation
-        exercises[index].progressionChoice = previous == nil || replacement.progressionRecommendation == nil ? nil : .previous
+        let recommendation = previous == nil ? nil
+            : replacement.progressionRecommendation(variant: nil, relationship: relationshipContext(for: id))
+        exercises[index].progressionRecommendation = recommendation
+        exercises[index].progressionChoice = recommendation == nil ? nil : .previous
         exercises[index].sets = previous?.sets.enumerated().map { TrainingLoggerDraftSet(source: $0.element, number: $0.offset + 1) }
             ?? (1...3).map(TrainingLoggerDraftSet.empty)
         exercises[index].isProvisional = false
@@ -811,10 +867,33 @@ extension TrainingLoggerDraft {
         )
     }
 
+    /// Superset membership changed for these exercises: recompute each one's
+    /// contextual Previous and Server recommendation, and refill only rows
+    /// that are neither completed nor hand-edited from the new context's
+    /// previous performance. With no history in the new context the rows keep
+    /// their current values (never cleared, never filled from another
+    /// context), and Previous truthfully says there is none.
+    private mutating func refreshMembershipContext(of exerciseIds: [String], catalog: [TrainingLoggerCatalogExercise]) {
+        for id in exerciseIds {
+            guard let index = exercises.firstIndex(where: { $0.id == id }) else { continue }
+            refreshPreviousPerformance(at: index, catalog: catalog)
+            guard let previous = exercises[index].previousPerformance, !previous.sets.isEmpty else { continue }
+            for setIndex in exercises[index].sets.indices
+            where !exercises[index].sets[setIndex].isCompleted && exercises[index].sets[setIndex].isManuallyEdited != true {
+                let source = previous.sets[min(setIndex, previous.sets.count - 1)]
+                exercises[index].sets[setIndex].reps = source.reps
+                (exercises[index].sets[setIndex].load, exercises[index].sets[setIndex].loadType) = TrainingLoggerDraftSet.prepopulatedLoad(from: source)
+                exercises[index].sets[setIndex].durationSeconds = source.durationSeconds
+            }
+        }
+    }
+
     private mutating func refreshPreviousPerformance(at index: Int, catalog: [TrainingLoggerCatalogExercise]) {
         guard let canonicalId = exercises[index].canonicalExerciseId,
               let item = catalog.first(where: { $0.canonicalExerciseId == canonicalId }) else {
             exercises[index].previousPerformance = nil
+            exercises[index].progressionRecommendation = nil
+            exercises[index].progressionChoice = nil
             return
         }
         exercises[index].previousPerformance = comparablePerformance(
@@ -823,10 +902,8 @@ extension TrainingLoggerDraft {
             relationship: relationshipContext(for: exercises[index].id)
         )
         let relationship = relationshipContext(for: exercises[index].id)
-        let canRecommend = exercises[index].previousPerformance != nil
-            && exercises[index].executionVariant == nil
-            && relationship == nil
-        exercises[index].progressionRecommendation = canRecommend ? item.progressionRecommendation : nil
+        exercises[index].progressionRecommendation = exercises[index].previousPerformance == nil ? nil
+            : item.progressionRecommendation(variant: exercises[index].executionVariant, relationship: relationship)
         exercises[index].progressionChoice = exercises[index].progressionRecommendation == nil ? nil : .previous
     }
 }

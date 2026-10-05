@@ -487,14 +487,18 @@ final class TrainingSessionAuthority {
         sessionId: String,
         finishOperationId: String,
         succeeded: Bool,
-        authoritativePRCount: Int? = nil
+        authoritativePRCount: Int? = nil,
+        authoritativeRecords: [TrainingPerformanceRecord]? = nil
     ) -> TrainingSessionMutationOutcome {
         mutate(sessionId: sessionId, context: .system, scope: .lifecycle) { draft in
             guard draft.watchFinishOperationId == finishOperationId else {
                 throw TrainingSessionMutationRejection.sessionNotMutable
             }
             draft.watchServerCommitState = succeeded ? .succeeded : .failed
-            if succeeded { draft.watchAuthoritativePRCount = authoritativePRCount }
+            if succeeded {
+                draft.watchAuthoritativePRCount = authoritativeRecords?.count ?? authoritativePRCount
+                draft.watchAuthoritativePerformanceRecords = authoritativeRecords
+            }
         }
     }
 
@@ -712,6 +716,9 @@ final class TrainingSessionAuthority {
         mutate(sessionId: sessionId, context: context, scope: .content) { draft in
             let (exerciseIndex, setIndex) = try Self.locate(exerciseId: exerciseId, setId: setId, in: draft)
             draft.exercises[exerciseIndex].sets[setIndex][keyPath: field.keyPath] = value
+            // A hand-entered value is the Founder's: contextual guidance
+            // (superset pair/unpair refill) never overwrites this row again.
+            if context.origin == .ui { draft.exercises[exerciseIndex].sets[setIndex].isManuallyEdited = true }
         }
     }
 

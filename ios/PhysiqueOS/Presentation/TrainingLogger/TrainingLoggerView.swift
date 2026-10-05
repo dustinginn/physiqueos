@@ -531,7 +531,7 @@ struct TrainingLoggerView: View {
                         }
                         ForEach(provisional) { exercise in
                             Button {
-                                viewModel.update { $0.removeExercise(id: exercise.id) }
+                                viewModel.update { $0.removeExercise(id: exercise.id, catalog: viewModel.configuration?.exercises ?? []) }
                             } label: {
                                 exerciseSelectionLabel(
                                     name: exercise.name,
@@ -1051,7 +1051,7 @@ struct TrainingLoggerView: View {
             }
             Button("Move earlier") { viewModel.update { $0.moveExercise(id: exercise.id, offset: -1) } }
             Button("Move later") { viewModel.update { $0.moveExercise(id: exercise.id, offset: 1) } }
-            Button("Remove exercise", role: .destructive) { viewModel.update { $0.removeExercise(id: exercise.id) } }
+            Button("Remove exercise", role: .destructive) { viewModel.update { $0.removeExercise(id: exercise.id, catalog: viewModel.configuration?.exercises ?? []) } }
         } label: {
             Text("•••")
                 .logText(LoggerType.menuDots)
@@ -1457,6 +1457,12 @@ struct TrainingLoggerView: View {
 #if DEBUG
         .onAppear { LoggerReviewSeam.injectRecordsIfRequested(into: viewModel) }
 #endif
+        // A Watch Finish can complete while the phone is suspended; records
+        // still unknown are re-read from the Server once the screen is back.
+        .onAppear { viewModel.refreshCompletedPerformanceRecordsIfUnknown() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { viewModel.refreshCompletedPerformanceRecordsIfUnknown() }
+        }
     }
 
     /// Honest, bounded Finish progress: after `stillSavingThreshold` the

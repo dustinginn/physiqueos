@@ -57,7 +57,13 @@ final class TrainingLoggerViewModel {
     /// Canonical performance records the just-completed session established,
     /// as reported by the Server. Empty when there are none or they are not
     /// known; Native never computes them.
-    var completedPerformanceRecords: [TrainingPerformanceRecord] = []
+    var completedPerformanceRecords: [TrainingPerformanceRecord] = [] {
+        didSet { if completedPerformanceRecords.isEmpty { completedPerformanceRecordsDraftId = nil } }
+    }
+    /// The completion whose Server records are actually known (an empty list
+    /// can mean "none earned" or "not read yet"; only this tells them apart).
+    private var completedPerformanceRecordsDraftId: String?
+    private var completedPerformanceRecordsReadDraftId: String?
     /// Compatibility for older presentation/tests. New flows always select
     /// an exact draft identity from `savedDrafts`.
     var savedDraft: TrainingLoggerDraft? { savedDrafts.first }
@@ -235,7 +241,10 @@ final class TrainingLoggerViewModel {
 
     func resume(draftId: String) {
         guard canWrite else { return }
-        if completedDraft?.id == draftId { return }
+        if completedDraft?.id == draftId {
+            refreshCompletedPerformanceRecordsIfUnknown()
+            return
+        }
         completedPerformanceRecords = []
         completedDraft = nil
         guard sessionAuthority.draft(id: draftId) != nil else {
@@ -691,10 +700,38 @@ final class TrainingLoggerViewModel {
             applyCompletedPerformanceRecords(records.records, draftId: completedDraft.id)
             return
         }
-        Task { [weak self, writeAPI] in
-            guard let records = await writeAPI.sessionPerformanceRecords(for: completedDraft) else { return }
-            self?.applyCompletedPerformanceRecords(records, draftId: completedDraft.id)
+        // A Watch-originated finish already received the Server's records in
+        // its own commit (or read-back); they travel with the completion.
+        if let records = completedDraft.watchAuthoritativePerformanceRecords {
+            applyCompletedPerformanceRecords(records, draftId: completedDraft.id)
+            return
         }
+        readCompletedPerformanceRecords(for: completedDraft)
+    }
+
+    private func readCompletedPerformanceRecords(for completedDraft: TrainingLoggerDraft) {
+        guard completedPerformanceRecordsReadDraftId != completedDraft.id else { return }
+        completedPerformanceRecordsReadDraftId = completedDraft.id
+        Task { [weak self, writeAPI] in
+            let records = await writeAPI.sessionPerformanceRecords(for: completedDraft)
+            guard let self else { return }
+            if self.completedPerformanceRecordsReadDraftId == completedDraft.id {
+                self.completedPerformanceRecordsReadDraftId = nil
+            }
+            guard let records else { return }
+            self.applyCompletedPerformanceRecords(records, draftId: completedDraft.id)
+        }
+    }
+
+    /// Re-reads the Server records for the shown completion while they are
+    /// still unknown (a read that failed while the app was suspended after a
+    /// Watch Finish). Called when Workout Complete appears or the app becomes
+    /// active; a known list (including a known empty one) is never re-read.
+    func refreshCompletedPerformanceRecordsIfUnknown() {
+        guard let completedDraft, completedDraft.step == .complete,
+              completedPerformanceRecordsDraftId != completedDraft.id
+        else { return }
+        loadCompletedPerformanceRecords(for: completedDraft, commitResult: nil)
     }
 
     private func applyCompletedPerformanceRecords(
@@ -703,6 +740,7 @@ final class TrainingLoggerViewModel {
     ) {
         guard draft?.id == draftId, draft?.step == .complete else { return }
         completedPerformanceRecords = records
+        completedPerformanceRecordsDraftId = draftId
     }
 
     /// Every accepted mutation is already durable when the authority
@@ -829,7 +867,7 @@ final class TrainingLoggerViewModel {
     func toggleExerciseSelection(_ exercise: TrainingLoggerCatalogExercise) {
         guard let draft else { return }
         if let selectedExercise = draft.exercises.first(where: { $0.canonicalExerciseId == exercise.canonicalExerciseId }) {
-            update { $0.removeExercise(id: selectedExercise.id) }
+            update { [catalog = configuration?.exercises ?? []] in $0.removeExercise(id: selectedExercise.id, catalog: catalog) }
             return
         }
         update { $0.addExercise(exercise) }
