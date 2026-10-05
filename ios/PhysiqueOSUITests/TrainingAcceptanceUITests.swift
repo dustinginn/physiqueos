@@ -651,6 +651,13 @@ final class TrainingAcceptanceUITests: XCTestCase {
             NSPredicate(format: "label CONTAINS[c] %@", "Resistance Training")
         ).firstMatch
         if resistance.exists && resistance.isHittable { return }
+        // Returning to the landing can restore the expanded disclosure
+        // scrolled past its destinations; bring them back instead of
+        // swiping further away.
+        if resistance.exists {
+            for _ in 0..<6 where !resistance.isHittable { app.swipeDown() }
+            if resistance.isHittable { return }
+        }
         tapButton(identifier: "training-reporting-disclosure")
         XCTAssertTrue(resistance.waitForExistence(timeout: 3), "Reporting destinations did not expand.")
     }
