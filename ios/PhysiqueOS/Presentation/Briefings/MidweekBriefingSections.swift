@@ -34,7 +34,7 @@ struct MidweekBriefingSections: View {
                 canonicalNarrativeSection(narrative)
                 BriefingCoachFinale(takeaway: narrative.coachTake, recommendation: narrative.action, watch: narrative.watch)
             } else {
-                if let energy = content.energy { BriefingEnergySection(section: energy, showsDailySemanticRows: true) }
+                if let energy = windowedEnergy { BriefingEnergySection(section: energy, showsDailySemanticRows: true, windowLabel: windowLabel) }
                 weightModule
                 trainingModule
                 bodyCompositionModule
@@ -131,14 +131,45 @@ struct MidweekBriefingSections: View {
     private func contractModule(_ module: MidweekPresentationContract.Module) -> some View {
         switch module.id {
         case "energy":
-            if let energy = content.energy {
-                BriefingEnergySection(section: energy, showsDailySemanticRows: true, showsChart: module.chartIncluded == true)
+            if let energy = windowedEnergy {
+                BriefingEnergySection(section: energy, showsDailySemanticRows: true, showsChart: module.chartIncluded == true, windowLabel: windowLabel)
             }
         case "weight": weightModule
         case "body_composition": bodyCompositionModule
         case "training": trainingModule
         default: EmptyView()
         }
+    }
+
+    /// The canonical evidence-window weekdays ("Sun–Tue"), from the
+    /// artifact's own window. Midweek covers Sunday through Tuesday inclusive.
+    var windowLabel: String? {
+        guard let window = evidenceWindow else { return nil }
+        let start = BriefingEnergySection.shortWeekday(window.startDate)
+        let end = BriefingEnergySection.shortWeekday(window.endDate)
+        guard let start, let end else { return nil }
+        return start == end ? start : "\(start)–\(end)"
+    }
+
+    /// Energy laid over every day of the canonical window: the Server's own
+    /// points are used verbatim, and a window day it published no point for
+    /// is shown as an unpaired "No data" day (never an invented value), so
+    /// Tuesday can never silently drop out of the Sunday–Tuesday view.
+    var windowedEnergy: WeeklyEnergySection? {
+        guard var energy = content.energy else { return nil }
+        guard let window = evidenceWindow, let days = BriefingEnergySection.dateKeys(from: window.startDate, through: window.endDate), !days.isEmpty else { return energy }
+        let existing = energy.dailyBalances ?? []
+        let byDate = Dictionary(existing.map { ($0.date, $0) }, uniquingKeysWith: { first, _ in first })
+        // A filled-in day follows the published labels' own style ("Su" or "Sun").
+        let labelLength = existing.compactMap(\.label).first.map(\.count) ?? 3
+        let padded = days.map { date in
+            byDate[date] ?? BriefingDailyEnergyPoint(date: date, intakeKcal: nil, expenditureKcal: nil, hasPairedData: false, balanceKcal: nil,
+                                                     label: BriefingEnergySection.shortWeekday(date).map { String($0.prefix(max(labelLength, 2))) })
+        }
+        let extra = existing.filter { !days.contains($0.date) }
+        energy.dailyBalances = padded + extra
+        energy.eligibleDayCount = max(energy.eligibleDayCount, days.count)
+        return energy
     }
 
     @ViewBuilder

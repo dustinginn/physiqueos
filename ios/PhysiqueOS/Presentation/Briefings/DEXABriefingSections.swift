@@ -79,14 +79,13 @@ struct DEXABriefingSections: View {
 
     private var snapshotSection: some View {
         BriefingEventSection(bottomPadding: 5, identifier: "briefing.dexa.snapshot") {
-            BriefingEventSectionHead(label: "Snapshot", trailing: "Current Scan")
+            BriefingEventSectionHead(label: "Snapshot", trailing: "Measured Event")
+            // Locked compact snapshot: the scan's identity facts. The body
+            // composition values themselves live in the hero and the change rails.
             DEXASnapshotGrid(items: [
                 ("Date", BriefingDateFormatting.monthDay(content.scanDate)),
                 ("Window", "\(content.daysBetweenScans) days"),
-                ("DEXA Weight", content.snapshot.weightLb),
-                ("Body Fat", content.snapshot.bodyFatPercent),
-                ("Fat Mass", content.snapshot.fatMassLb),
-                ("Lean Tissue", content.snapshot.leanMassLb),
+                ("Scans", "\(content.progress.timeline.scans.count) \(content.progress.timeline.scans.count == 1 ? "scan" : "scans")"),
             ] + (content.snapshot.restingMetabolicRateKcal.map { [("RMR", Self.rmrText($0))] } ?? []))
             .padding(.bottom, 23)
         }
@@ -95,26 +94,32 @@ struct DEXABriefingSections: View {
     // MARK: What Measurably Changed
 
     private var changesSection: some View {
-        BriefingEventSection(bottomPadding: 5, identifier: "briefing.dexa.changes") {
+        let goal = content.semanticGoalType
+        return BriefingEventSection(bottomPadding: 5, identifier: "briefing.dexa.changes") {
             BriefingEventSectionHead(label: "What Measurably Changed", trailing: content.isBaselineScan ? "Baseline Scan" : "Since Last Scan")
-            DEXAUnitTable(
-                title: "Since Last Scan",
-                firstColumn: "Metric",
-                rows: content.progress.headline.map { .init(label: $0.label, previous: $0.previous, current: $0.current, delta: $0.delta) }
+            DEXAChangeRails(
+                rows: content.progress.headline.map { DEXAChangeRails.Row(label: $0.label, previous: $0.previous, current: $0.current, delta: $0.delta) },
+                group: .headline,
+                goalType: goal
             )
+            .padding(.top, 6)
+            .accessibilityIdentifier("briefing.dexa.sinceLastScan")
             if !content.progress.regionalFat.isEmpty {
-                DEXAUnitTable(title: "Regional Fat Change", firstColumn: "Metric", rows: content.progress.regionalFat.map { .init(label: $0.region, previous: $0.previous, current: $0.current, delta: $0.delta) })
+                DEXARegionCard(title: "Regional Fat Change", rows: content.progress.regionalFat.map { .init(label: $0.region, previous: $0.previous, current: $0.current, delta: $0.delta) },
+                               group: .regionalFat, goalType: goal, previousDate: content.priorScanDate, currentDate: content.scanDate)
                     .accessibilityIdentifier("briefing.dexa.regionalFat")
             }
             if !content.progress.regionalLean.isEmpty {
-                DEXAUnitTable(title: "Measured Lean Tissue Change", firstColumn: "Metric", rows: content.progress.regionalLean.map { .init(label: $0.region, previous: $0.previous, current: $0.current, delta: $0.delta) })
+                DEXARegionCard(title: "Measured Lean Tissue Change", rows: content.progress.regionalLean.map { .init(label: $0.region, previous: $0.previous, current: $0.current, delta: $0.delta) },
+                               group: .regionalLean, goalType: goal, previousDate: content.priorScanDate, currentDate: content.scanDate)
                     .accessibilityIdentifier("briefing.dexa.regionalLean")
             }
             if !content.progress.supplemental.isEmpty {
-                DEXAUnitTable(title: "Other Notable Changes", firstColumn: "Metric", rows: content.progress.supplemental.map { .init(label: $0.label, previous: $0.previous, current: $0.current, delta: $0.delta) })
+                DEXARegionCard(title: "Other Notable Changes", rows: content.progress.supplemental.map { .init(label: $0.label, previous: $0.previous, current: $0.current, delta: $0.delta) },
+                               group: .supplemental, goalType: goal, previousDate: content.priorScanDate, currentDate: content.scanDate, firstColumn: "Metric")
                     .accessibilityIdentifier("briefing.dexa.supplemental")
             }
-            DEXAPhaseBreakdown(timeline: content.progress.timeline, goal: Self.persistedGoalTitle(attribution), phase: attribution?.phaseName)
+            DEXAPhaseBreakdown(timeline: content.progress.timeline, goal: Self.persistedGoalTitle(attribution), phase: attribution?.phaseName, goalType: goal)
                 .padding(.bottom, 23)
         }
     }
@@ -306,85 +311,14 @@ struct DEXASnapshotGrid: View {
     }
 }
 
-/// `.table-field` + `.unit-table`: Metric / Previous / Current / Delta with
-/// every canonical unit, delta emphasized.
-struct DEXAUnitTable: View {
-    @Environment(\.colorScheme) private var colorScheme
-    struct Row: Equatable {
-        let label: String
-        let previous: String
-        let current: String
-        let delta: String
-    }
-
-    let title: String
-    let firstColumn: String
-    let rows: [Row]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .briefingText(.jn(16, 700))
-                .foregroundStyle(BriefingEventPalette.ink)
-                .accessibilityAddTraits(.isHeader)
-            BriefingFractionLayout(fractions: [1.25, 1, 1, 1], spacing: 6) {
-                header(firstColumn, alignment: .leading)
-                header("Previous", alignment: .trailing)
-                header("Current", alignment: .trailing)
-                header("Delta", alignment: .trailing)
-            }
-            .padding(.vertical, 7)
-            .padding(.top, 10)
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                BriefingFractionLayout(fractions: [1.25, 1, 1, 1], spacing: 6, centered: true) {
-                    cell(row.label, alignment: .leading)
-                    cell(row.previous, alignment: .trailing)
-                    cell(row.current, alignment: .trailing)
-                    cell(row.delta, alignment: .trailing, emphasized: true)
-                }
-                .padding(.vertical, 10)
-                .briefingRule(.top, BriefingEventPalette.rule)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(row.label): from \(row.previous) to \(row.current), a change of \(row.delta)")
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            BriefingAppearanceBackground {
-                BriefingEventPalette.surface
-            } light: {
-                BriefingCSSGradient(angle: 135, stops: [.init(color: BriefingPalette.fixed(0xD9E9E5), location: 0), .init(color: BriefingPalette.fixed(0xE3E0ED), location: 1)])
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-        .padding(.top, 14)
-        .accessibilityElement(children: .contain)
-    }
-
-    private func header(_ text: String, alignment: Alignment) -> some View {
-        Text(text)
-            .briefingText(.jn(8, 800, tracking: 0.07, uppercase: true))
-            .foregroundStyle(BriefingEventPalette.muted)
-            .frame(maxWidth: .infinity, alignment: alignment)
-    }
-
-    private func cell(_ text: String, alignment: Alignment, emphasized: Bool = false) -> some View {
-        Text(text)
-            .briefingText(.jn(10, emphasized ? 800 : 400))
-            .foregroundStyle(emphasized ? BriefingEventPalette.green : BriefingEventPalette.ink)
-            .multilineTextAlignment(alignment == .leading ? .leading : .trailing)
-            .frame(maxWidth: .infinity, alignment: alignment)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-}
-
 /// `.phase-panel`: the restored Goal/Phase body-composition breakdown.
 struct DEXAPhaseBreakdown: View {
     @Environment(\.colorScheme) private var colorScheme
     let timeline: DEXACutTimeline
     var goal: String? = nil
     var phase: String? = nil
+    /// Canonical `semanticGoalType` for favorable / unfavorable color.
+    var goalType: String? = nil
 
     static func value(_ point: DEXATimelinePoint?, unit: String) -> String {
         guard let raw = point?.value, raw != "—" else { return "—" }
@@ -430,7 +364,8 @@ struct DEXAPhaseBreakdown: View {
                     HStack(alignment: .firstTextBaseline) {
                         Text(metric.label).briefingText(.jn(12, 700)).foregroundStyle(BriefingEventPalette.ink)
                         Spacer(minLength: 8)
-                        Text(metric.delta).briefingText(.jn(11, 800)).foregroundStyle(BriefingEventPalette.green)
+                        Text(metric.delta).briefingText(.jn(11, 800))
+                            .foregroundStyle(DEXADeltaSemantics.tone(delta: metric.delta, label: metric.label, group: .headline, goalType: goalType).color)
                     }
                     HStack(alignment: .center, spacing: 8) {
                         valueBox("Start", Self.value(metric.points.first, unit: metric.unit))
@@ -528,5 +463,250 @@ struct DEXAEvidenceNote: View {
             .overlay(alignment: .leading) { Rectangle().fill(BriefingEventPalette.purple).frame(width: 3) }
             .padding(.top, 14)
         }
+    }
+}
+
+// MARK: - Goal- and tissue-aware delta semantics
+
+/// Bounded presentation mapping from a canonical DEXA delta to whether it is
+/// favorable for the briefing's persisted physique goal. Never "positive =
+/// good": lean tissue up is favorable, fat tissue / body-fat % up is
+/// unfavorable — but only for goal types whose tissue semantics are known.
+/// Context-dependent metrics (weight, RMR, ratios, bone) and any metric
+/// under an unknown goal stay restrained amber; unchanged values are gray.
+enum DEXADeltaSemantics {
+    enum Tone: Equatable { case favorable, unfavorable, neutral, contextual }
+    enum Group: Equatable { case headline, regionalFat, regionalLean, supplemental }
+    enum Tissue: Equatable { case lean, fat, bodyFatPercent, contextDependent }
+
+    /// Canonical `semanticGoalType` values whose tissue semantics are known:
+    /// both physique goals want lean tissue kept/gained and fat reduced or
+    /// held, so a lean gain is favorable and a fat gain unfavorable.
+    static let tissueAwareGoalTypes: Set<String> = ["lean_mass_gain", "fat_loss"]
+
+    static func tissue(label: String, group: Group) -> Tissue {
+        switch group {
+        case .regionalFat: return .fat
+        case .regionalLean: return .lean
+        case .headline, .supplemental:
+            let l = label.lowercased()
+            if l.contains("lean") { return .lean }
+            if l.contains("body fat") || l == "body fat %" { return .bodyFatPercent }
+            if l.contains("fat mass") || l.contains("visceral fat") { return .fat }
+            return .contextDependent
+        }
+    }
+
+    /// The sign of a canonical delta string ("+0.4 pts", "−1.2 lb", "0.0",
+    /// "No change"); nil when it cannot be read.
+    static func direction(_ delta: String) -> Int? {
+        let trimmed = delta.trimmingCharacters(in: .whitespaces)
+        if trimmed.lowercased().hasPrefix("no change") || trimmed.lowercased() == "unchanged" { return 0 }
+        let numeric = trimmed.filter { "0123456789.".contains($0) }
+        guard let magnitude = Double(numeric) else { return nil }
+        if magnitude == 0 { return 0 }
+        if trimmed.hasPrefix("-") || trimmed.hasPrefix("−") || trimmed.hasPrefix("–") { return -1 }
+        return 1
+    }
+
+    static func tone(delta: String, label: String, group: Group, goalType: String?) -> Tone {
+        guard let direction = direction(delta) else { return .contextual }
+        if direction == 0 { return .neutral }
+        let tissue = tissue(label: label, group: group)
+        guard tissue != .contextDependent, let goalType, tissueAwareGoalTypes.contains(goalType) else { return .contextual }
+        switch tissue {
+        case .lean: return direction > 0 ? .favorable : .unfavorable
+        case .fat, .bodyFatPercent: return direction > 0 ? .unfavorable : .favorable
+        case .contextDependent: return .contextual
+        }
+    }
+}
+
+extension DEXADeltaSemantics.Tone {
+    var color: Color {
+        switch self {
+        case .favorable: BriefingEventPalette.green
+        case .unfavorable: BriefingEventPalette.coral
+        case .neutral: BriefingEventPalette.muted
+        case .contextual: BriefingEventPalette.amber
+        }
+    }
+
+    var accessibilityWord: String {
+        switch self {
+        case .favorable: "favorable"
+        case .unfavorable: "unfavorable"
+        case .neutral: "unchanged"
+        case .contextual: "context dependent"
+        }
+    }
+}
+
+// MARK: - Locked change rails (`.change`)
+
+/// The locked "What Measurably Changed" rows: label + signed delta, the
+/// previous / current endpoints, and a structural teal rail. Rail length is
+/// data-derived (the row's relative change against the largest relative
+/// change in the group), never a hand-authored value.
+struct DEXAChangeRails: View {
+    struct Row: Equatable {
+        let label: String
+        let previous: String
+        let current: String
+        let delta: String
+    }
+
+    let rows: [Row]
+    let group: DEXADeltaSemantics.Group
+    let goalType: String?
+
+    static func number(_ text: String) -> Double? {
+        Double(text.filter { "0123456789.-".contains($0) }.replacingOccurrences(of: "--", with: "-"))
+    }
+
+    /// Rail fill fraction per row: 0 when unchanged or unreadable, otherwise
+    /// 0.12…1 proportional to |current − previous| / |previous| relative to
+    /// the largest such change in the group.
+    static func fractions(_ rows: [Row]) -> [CGFloat] {
+        let relative: [Double?] = rows.map { row in
+            guard let p = number(row.previous), let c = number(row.current), p != 0 else { return nil }
+            return abs(c - p) / abs(p)
+        }
+        let maximum = relative.compactMap { $0 }.max() ?? 0
+        return relative.map { value in
+            guard let value, value > 0, maximum > 0 else { return 0 }
+            return CGFloat(0.12 + 0.88 * value / maximum)
+        }
+    }
+
+    var body: some View {
+        let fractions = Self.fractions(rows)
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                let tone = DEXADeltaSemantics.tone(delta: row.delta, label: row.label, group: group, goalType: goalType)
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .bottom, spacing: 10) {
+                        Text(row.label).briefingText(.jn(14, 700)).foregroundStyle(BriefingEventPalette.ink)
+                        Spacer(minLength: 0)
+                        Text(row.delta).briefingText(.jn(13, 800)).foregroundStyle(tone.color)
+                    }
+                    HStack {
+                        Text(row.previous)
+                        Spacer(minLength: 8)
+                        Text(row.current)
+                    }
+                    .briefingText(.jn(10, 400))
+                    .foregroundStyle(BriefingEventPalette.muted)
+                    .padding(.top, 9)
+                    DEXARail(fraction: fractions[index])
+                        .padding(.top, 7)
+                }
+                .padding(.vertical, 14)
+                .briefingRule(.top, BriefingEventPalette.rule)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(row.label): from \(row.previous) to \(row.current), \(row.delta), \(tone.accessibilityWord)")
+            }
+        }
+    }
+}
+
+/// `.rail`: 5 pt rule track, teal→green fill, 10 pt knob at the fill end.
+struct DEXARail: View {
+    let fraction: CGFloat
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width * min(max(fraction, 0), 1)
+            ZStack(alignment: .leading) {
+                Rectangle().fill(BriefingEventPalette.rule)
+                LinearGradient(colors: [BriefingEventPalette.teal, BriefingEventPalette.green], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: width)
+                Circle().fill(BriefingEventPalette.green)
+                    .frame(width: 10, height: 10)
+                    .offset(x: max(width - 10, 0))
+            }
+        }
+        .frame(height: 5)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Locked regional cards (`.data-field` + `.data-table`)
+
+/// Compact Region / previous scan / current scan / Change card, as locked;
+/// canonical units stay in the values (the locked unit correction) and the
+/// change column carries the semantic tone.
+struct DEXARegionCard: View {
+    struct Row: Equatable {
+        let label: String
+        let previous: String
+        let current: String
+        let delta: String
+    }
+
+    let title: String
+    let rows: [Row]
+    let group: DEXADeltaSemantics.Group
+    let goalType: String?
+    var previousDate: String?
+    var currentDate: String
+    var firstColumn = "Region"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .briefingText(.jn(14, 700))
+                .foregroundStyle(BriefingEventPalette.ink)
+                .accessibilityAddTraits(.isHeader)
+            BriefingFractionLayout(fractions: [1.3, 1, 1, 1], spacing: 6) {
+                header(firstColumn, alignment: .leading)
+                header(previousDate.map(BriefingDateFormatting.monthDay) ?? "Previous", alignment: .trailing)
+                header(BriefingDateFormatting.monthDay(currentDate), alignment: .trailing)
+                header("Change", alignment: .trailing)
+            }
+            .padding(.vertical, 8)
+            .padding(.top, 12)
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                let tone = DEXADeltaSemantics.tone(delta: row.delta, label: row.label, group: group, goalType: goalType)
+                BriefingFractionLayout(fractions: [1.3, 1, 1, 1], spacing: 6, centered: true) {
+                    cell(row.label, alignment: .leading)
+                    cell(row.previous, alignment: .trailing)
+                    cell(row.current, alignment: .trailing)
+                    cell(row.delta, alignment: .trailing, color: tone.color, weight: 800)
+                }
+                .padding(.vertical, 10)
+                .briefingRule(.top, BriefingEventPalette.rule)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(row.label): from \(row.previous) to \(row.current), \(row.delta), \(tone.accessibilityWord)")
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            BriefingAppearanceBackground {
+                BriefingEventPalette.surface
+            } light: {
+                BriefingCSSGradient(angle: 135, stops: [.init(color: BriefingPalette.fixed(0xD7EAE5), location: 0), .init(color: BriefingPalette.fixed(0xE4E0EF), location: 1)])
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .padding(.top, 15)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func header(_ text: String, alignment: Alignment) -> some View {
+        Text(text)
+            .briefingText(.jn(8, 800, tracking: 0.08, uppercase: true))
+            .foregroundStyle(BriefingEventPalette.muted)
+            .frame(maxWidth: .infinity, alignment: alignment)
+    }
+
+    private func cell(_ text: String, alignment: Alignment, color: Color = BriefingEventPalette.ink, weight: CGFloat = 400) -> some View {
+        Text(text)
+            .briefingText(.jn(11, weight))
+            .foregroundStyle(color)
+            .multilineTextAlignment(alignment == .leading ? .leading : .trailing)
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

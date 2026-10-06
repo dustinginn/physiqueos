@@ -80,6 +80,21 @@ enum BriefingHistoryPalette {
     static let teal = BriefingPalette.d(0x2CCDC0, 0x0C8F84)
 }
 
+/// The one briefing type → accent mapping (eyebrow + icon), restrained
+/// tones that clear 4.5:1 on both the Dark and Mineral Light History page.
+enum BriefingTypeAccent {
+    static func color(_ type: BriefingTypeIdentity) -> Color {
+        switch type {
+        case .weekly: BriefingPalette.d(0x2CCDC0, 0x08756D)   // teal
+        case .midweek: BriefingPalette.d(0xF3BD50, 0x875400)  // amber
+        case .monthly: BriefingPalette.d(0xA88BF5, 0x6B4FD0)  // violet
+        case .photo: BriefingPalette.d(0x53DDA0, 0x0B6B4D)    // green
+        case .dexa: BriefingPalette.d(0x54C6E7, 0x0E607A)     // blue
+        case .other: BriefingHistoryPalette.muted
+        }
+    }
+}
+
 /// `.topbar`: 52 px bar, `‹ Back`, bottom rule.
 struct BriefingHistoryTopBar: View {
     let onBack: () -> Void
@@ -140,6 +155,9 @@ struct BriefingHistoryContent: View {
                     }
                 }
                 .briefingRule(.top, BriefingHistoryPalette.line)
+                // `.contain` first: an identifier on a plain container would
+                // overwrite each row's own `briefingHistory.row.<id>`.
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("briefingHistory.list")
             }
         }
@@ -207,19 +225,21 @@ struct BriefingHistoryRow: View {
     }
 
     var body: some View {
+        let accent = BriefingTypeAccent.color(briefing.briefingType)
         Button(action: onTap) {
             HStack(alignment: .center, spacing: 10) {
                 Image(systemName: Self.symbol(for: briefing))
                     .font(.system(size: briefing.cadence == .weekly ? 12 : 14, weight: .semibold))
-                    .foregroundStyle(BriefingHistoryPalette.teal)
+                    .foregroundStyle(accent)
                     .frame(width: 36, height: 36)
-                    .background(BriefingHistoryPalette.surface2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(accent.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .frame(width: 42, alignment: .leading)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(briefing.displayCadenceLabel.uppercased())
-                        .briefingText(.sf(10, 850, tracking: 0.08))
-                        .foregroundStyle(BriefingHistoryPalette.purple)
-                    Text(briefing.label)
+                    Text(briefing.displayCadenceLabel)
+                        .briefingText(.sf(10, 850, tracking: 0.08, uppercase: true))
+                        .foregroundStyle(accent)
+                    // The main title stays neutral ink for hierarchy.
+                    Text(briefing.stableTitle)
                         .briefingText(.sf(15, 800, lineHeight: 18.75))
                         .foregroundStyle(BriefingHistoryPalette.ink)
                         .multilineTextAlignment(.leading)
@@ -246,7 +266,7 @@ struct BriefingHistoryRow: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(briefing.displayCadenceLabel), \(briefing.label)\(briefing.publicationDate.map { ", \(BriefingDateFormatting.historyTimestamp($0))" } ?? "")")
+        .accessibilityLabel("\(briefing.displayCadenceLabel), \(briefing.stableTitle)\(briefing.publicationDate.map { ", \(BriefingDateFormatting.historyTimestamp($0))" } ?? "")")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("briefingHistory.row.\(briefing.artifactId)")
     }

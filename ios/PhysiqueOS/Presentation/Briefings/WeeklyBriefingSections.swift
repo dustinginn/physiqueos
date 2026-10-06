@@ -128,11 +128,14 @@ struct BriefingEnergySection: View {
     let section: WeeklyEnergySection
     var showsDailySemanticRows = false
     var showsChart = true
+    /// The canonical evidence window named in the header (Midweek: "Sun–Tue").
+    var windowLabel: String? = nil
 
     var body: some View {
         BriefingSection(field: .energy, identifier: "briefing.section.energy") {
             BriefingSectionHead(glyph: "ϟ", label: "Energy Balance", tone: .amber) {
-                Text("\(section.pairedDayCount)/\(section.eligibleDayCount) days paired")
+                Text([windowLabel, "\(section.pairedDayCount)/\(section.eligibleDayCount) days paired"].compactMap { $0 }.joined(separator: " · "))
+                    .accessibilityIdentifier("briefing.energy.coverage")
                     .briefingText(.j(12, 400))
                     .foregroundStyle(BriefingPaletteReader.muted)
             }
@@ -204,6 +207,38 @@ struct BriefingEnergySection: View {
     private func nonEmpty(_ value: String?) -> String? {
         guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
         return value
+    }
+
+    private static let dateKeyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    /// "Sun" for a `YYYY-MM-DD` date key (UTC-anchored).
+    static func shortWeekday(_ value: String) -> String? {
+        guard let date = dateKeyFormatter.date(from: String(value.prefix(10))) else { return nil }
+        let output = DateFormatter()
+        output.locale = Locale(identifier: "en_US_POSIX")
+        output.timeZone = TimeZone(secondsFromGMT: 0)
+        output.dateFormat = "EEE"
+        return output.string(from: date)
+    }
+
+    /// Every date key from `start` through `end` inclusive (bounded to 14).
+    static func dateKeys(from start: String, through end: String) -> [String]? {
+        guard let first = dateKeyFormatter.date(from: String(start.prefix(10))),
+              let last = dateKeyFormatter.date(from: String(end.prefix(10))), first <= last else { return nil }
+        var keys: [String] = []
+        var cursor = first
+        while cursor <= last, keys.count < 14 {
+            keys.append(dateKeyFormatter.string(from: cursor))
+            cursor = cursor.addingTimeInterval(86_400)
+        }
+        return keys
     }
 
     static func fullWeekday(_ value: String, fallback: String?) -> String {

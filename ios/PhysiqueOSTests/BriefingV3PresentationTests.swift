@@ -1086,3 +1086,150 @@ extension BriefingLockedPresentationTests {
         XCTAssertEqual(midweek.bodyComposition?.bodyFatPercent, "8.1%")
     }
 }
+
+/// Founder final corrections (2026-10-06): DEXA locked rail layout with
+/// goal/tissue-aware delta color, stable Briefing History titles with type
+/// accents, and the Midweek Sunday–Tuesday window.
+@MainActor
+final class BriefingFounderCorrectionTests: XCTestCase {
+    private var root: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent() }
+    private func source(_ path: String) throws -> String { try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8) }
+
+    private func contrast(_ color: Color, on page: Color, _ style: UIUserInterfaceStyle) -> Double {
+        func lum(_ c: Color) -> Double {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            UIColor(c).resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getRed(&r, green: &g, blue: &b, alpha: &a)
+            func ch(_ v: CGFloat) -> Double { let v = Double(v); return v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+            return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+        }
+        let a = lum(color), b = lum(page)
+        return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+    }
+
+    // MARK: DEXA semantics
+
+    func testLeanMassGainSemanticsColorByTissueNotBySign() {
+        let goal = "lean_mass_gain"
+        typealias S = DEXADeltaSemantics
+        XCTAssertEqual(S.tone(delta: "+1.5 lb", label: "Lean Tissue", group: .headline, goalType: goal), .favorable)
+        XCTAssertEqual(S.tone(delta: "−0.8 lb", label: "Lean Tissue", group: .headline, goalType: goal), .unfavorable)
+        XCTAssertEqual(S.tone(delta: "+1.0 lb", label: "Fat Mass", group: .headline, goalType: goal), .unfavorable)
+        XCTAssertEqual(S.tone(delta: "-1.0 lb", label: "Fat Mass", group: .headline, goalType: goal), .favorable)
+        XCTAssertEqual(S.tone(delta: "+0.4 pts", label: "Body Fat", group: .headline, goalType: goal), .unfavorable)
+        XCTAssertEqual(S.tone(delta: "-0.4 pts", label: "Body Fat", group: .headline, goalType: goal), .favorable)
+        XCTAssertEqual(S.tone(delta: "+0.3 lb", label: "Arms", group: .regionalFat, goalType: goal), .unfavorable, "regional fat follows fat-tissue semantics")
+        XCTAssertEqual(S.tone(delta: "+0.3 lb", label: "Arms", group: .regionalLean, goalType: goal), .favorable, "regional lean follows lean-tissue semantics")
+        XCTAssertEqual(S.tone(delta: "+0.1 lb", label: "Visceral Fat", group: .supplemental, goalType: goal), .unfavorable)
+    }
+
+    func testAmbiguousUnchangedAndUnknownGoalStayNeutralOrAmber() {
+        typealias S = DEXADeltaSemantics
+        XCTAssertEqual(S.tone(delta: "+2.4 lb", label: "DEXA Weight", group: .headline, goalType: "lean_mass_gain"), .contextual, "weight is goal-ambiguous")
+        XCTAssertEqual(S.tone(delta: "+20 cal/day", label: "RMR", group: .supplemental, goalType: "lean_mass_gain"), .contextual)
+        XCTAssertEqual(S.tone(delta: "+0.02", label: "A:G Ratio", group: .supplemental, goalType: "fat_loss"), .contextual)
+        XCTAssertEqual(S.tone(delta: "0.0 lb", label: "Lean Tissue", group: .headline, goalType: "lean_mass_gain"), .neutral)
+        XCTAssertEqual(S.tone(delta: "No change", label: "Arms", group: .regionalFat, goalType: "lean_mass_gain"), .neutral)
+        XCTAssertEqual(S.tone(delta: "+1.5 lb", label: "Lean Tissue", group: .headline, goalType: nil), .contextual, "no goal context → never fabricated green")
+        XCTAssertEqual(S.tone(delta: "+1.5 lb", label: "Lean Tissue", group: .headline, goalType: "endurance"), .contextual)
+        XCTAssertEqual(S.tone(delta: "—", label: "Lean Tissue", group: .headline, goalType: "lean_mass_gain"), .contextual)
+        XCTAssertEqual(S.tone(delta: "-1.0 lb", label: "Fat Mass", group: .headline, goalType: "fat_loss"), .favorable)
+    }
+
+    func testDeltaToneColorsResolveInBothAppearances() {
+        let page = BriefingPalette.standard.page
+        for tone in [DEXADeltaSemantics.Tone.favorable, .unfavorable, .neutral, .contextual] {
+            for style in [UIUserInterfaceStyle.dark, .light] {
+                XCTAssertGreaterThanOrEqual(contrast(tone.color, on: page, style), 3.0, "\(tone) \(style.rawValue)")
+            }
+        }
+    }
+
+    // MARK: DEXA locked rails
+
+    func testRailsAreDataDerivedAndReplaceTheGenericTable() throws {
+        let rows = [
+            DEXAChangeRails.Row(label: "DEXA Weight", previous: "177.0 lb", current: "179.4 lb", delta: "+2.4 lb"),
+            DEXAChangeRails.Row(label: "Body Fat", previous: "9.0%", current: "9.4%", delta: "+0.4 pts"),
+            DEXAChangeRails.Row(label: "Fat Mass", previous: "15.9 lb", current: "16.9 lb", delta: "+1.0 lb"),
+            DEXAChangeRails.Row(label: "Unchanged", previous: "10.0 lb", current: "10.0 lb", delta: "0.0 lb"),
+        ]
+        let f = DEXAChangeRails.fractions(rows)
+        XCTAssertEqual(f[2], 1, accuracy: 0.0001, "the largest relative change fills the rail")
+        XCTAssertGreaterThan(f[1], f[0])
+        XCTAssertEqual(f[3], 0, "an unchanged metric shows an empty rail")
+        XCTAssertTrue(f.dropLast().allSatisfy { $0 >= 0.12 })
+        let dexa = try source("PhysiqueOS/Presentation/Briefings/DEXABriefingSections.swift")
+        XCTAssertTrue(dexa.contains("DEXAChangeRails("), "Since Last Scan uses the locked change rails")
+        XCTAssertFalse(dexa.contains("DEXAUnitTable"), "the generic Previous/Current/Delta table is gone")
+        XCTAssertFalse(dexa.contains("arrow.up") || dexa.contains("arrow.down"), "no redundant direction arrows")
+        XCTAssertTrue(dexa.contains("Measured Event"))
+    }
+
+    // MARK: History
+
+    private func row(_ cadence: BriefingCadence, type: String? = nil, label: String, id: String = "id", month: String? = nil) -> BriefingHistoryRowReadModel {
+        BriefingHistoryRowReadModel(artifactId: id, artifactType: type, cadence: cadence, label: label, publicationDate: nil, version: 1, briefingMonth: month)
+    }
+
+    func testHistoryTitlesAreStableTypeTitlesNeverNarrativeHeadlines() {
+        XCTAssertEqual(row(.weekly, label: "Two straight weeks of clean progression.").stableTitle, "Weekly Briefing")
+        XCTAssertEqual(row(.midweek, label: "Nothing here changes last week's plan.").stableTitle, "Midweek Briefing")
+        XCTAssertEqual(row(.event, type: "photo_event", label: "Four poses in, the visual story matches the scan.").stableTitle, "Photo Briefing")
+        XCTAssertEqual(row(.event, type: "dexa_event", label: "Two weeks into the surplus").stableTitle, "DEXA Briefing")
+    }
+
+    func testMonthlyKeepsMonthYearFromCanonicalMetadata() {
+        XCTAssertEqual(row(.monthly, label: "Monthly Briefing", month: "2026-09").stableTitle, "Monthly Briefing · September 2026")
+        XCTAssertEqual(row(.monthly, label: "Monthly Briefing", id: "monthly_briefing_user_founder_001_202609").stableTitle, "Monthly Briefing · September 2026")
+        XCTAssertEqual(row(.monthly, label: "x", id: "monthly_briefing_2026-08").stableTitle, "Monthly Briefing · August 2026")
+        XCTAssertEqual(row(.monthly, label: "x", id: "opaque").stableTitle, "Monthly Briefing", "no invented month")
+    }
+
+    func testTypeAccentsAreDistinctLegibleAndTheTitleStaysNeutral() throws {
+        let types: [BriefingTypeIdentity] = [.weekly, .midweek, .monthly, .photo, .dexa]
+        for style in [UIUserInterfaceStyle.dark, .light] {
+            var seen = Set<String>()
+            for type in types {
+                let color = BriefingTypeAccent.color(type)
+                XCTAssertGreaterThanOrEqual(contrast(color, on: BriefingHistoryPalette.page, style), 4.5, "\(type) in \(style.rawValue)")
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getRed(&r, green: &g, blue: &b, alpha: &a)
+                seen.insert(String(format: "%.2f%.2f%.2f", r, g, b))
+            }
+            XCTAssertEqual(seen.count, types.count, "each type has its own accent")
+        }
+        let history = try source("PhysiqueOS/Presentation/Briefings/BriefingHistoryView.swift")
+        XCTAssertTrue(history.contains("Text(briefing.stableTitle)\n                        .briefingText(.sf(15, 800, lineHeight: 18.75))\n                        .foregroundStyle(BriefingHistoryPalette.ink)"), "the main row title stays neutral ink")
+        XCTAssertFalse(history.contains("Text(briefing.label)"), "the narrative label is never the row title")
+        XCTAssertTrue(history.contains("BriefingTypeAccent.color(briefing.briefingType)"))
+    }
+
+    // MARK: Midweek Sunday–Tuesday window
+
+    private func midweek(points: [String]) throws -> MidweekBriefingSections {
+        var content = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.cadence == .midweek }?.midweek)
+        content.energy?.dailyBalances = points.map { BriefingDailyEnergyPoint(date: $0, intakeKcal: 2400, expenditureKcal: 2600, hasPairedData: true, balanceKcal: -200, label: nil) }
+        content.energy?.eligibleDayCount = points.count
+        let window = BriefingEvidenceWindowReadModel(id: "midweek:2026-09-27:2026-09-29", startDate: "2026-09-27", endDate: "2026-09-29", briefingDate: "2026-09-30", relativeLabel: "Sunday through Tuesday", timeZone: "America/Los_Angeles")
+        return MidweekBriefingSections(content: content, confidence: nil, evidenceWindow: window)
+    }
+
+    func testMidweekWindowIsSundayThroughTuesdayInclusive() throws {
+        let full = try midweek(points: ["2026-09-27", "2026-09-28", "2026-09-29"])
+        XCTAssertEqual(full.windowLabel, "Sun–Tue")
+        XCTAssertEqual(full.windowedEnergy?.dailyBalances?.map(\.date), ["2026-09-27", "2026-09-28", "2026-09-29"])
+        XCTAssertEqual(full.windowedEnergy?.eligibleDayCount, 3)
+        XCTAssertEqual(BriefingEnergySection.dateKeys(from: "2026-09-27", through: "2026-09-29")?.compactMap { BriefingEnergySection.shortWeekday($0) }, ["Sun", "Mon", "Tue"])
+    }
+
+    func testMidweekTuesdayNeverSilentlyDropsOut() throws {
+        let partial = try midweek(points: ["2026-09-27", "2026-09-28"])
+        let days = try XCTUnwrap(partial.windowedEnergy?.dailyBalances)
+        XCTAssertEqual(days.map(\.date), ["2026-09-27", "2026-09-28", "2026-09-29"])
+        let tuesday = try XCTUnwrap(days.last)
+        XCTAssertFalse(tuesday.hasPairedData)
+        XCTAssertNil(tuesday.intakeKcal, "a missing day is shown as No data, never an invented value")
+        XCTAssertEqual(tuesday.label, "Tue", "unlabelled published points → three-letter weekday")
+        XCTAssertEqual(partial.windowedEnergy?.eligibleDayCount, 3)
+    }
+}

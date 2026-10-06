@@ -194,10 +194,10 @@ final class TrainingAcceptanceUITests: XCTestCase {
         latestBriefing.tap()
         openBriefingHistory()
         attachScreenshot("18a-briefing-history-identities-and-colors")
-        openBriefingFromHistory(containing: "Two weeks into the surplus, the gain is real")
+        openBriefingFromHistory(artifactId: "dexa_event_dexa-fixture-005")
         assertText("DEXA EVENT BRIEFING")
         assertText("Two weeks into the surplus, the gain is real — and mostly lean.")
-        assertText("Current Scan")
+        assertText("Measured Event")
         attachScreenshot("18-dexa-event-briefing")
         scrollToLabel(containing: "What Measurably Changed")
         attachScreenshot("18b-dexa-what-measurably-changed")
@@ -245,7 +245,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         attachScreenshot("20d-midweek-coachs-take")
         openBriefingHistory()
 
-        openBriefingFromHistory(containing: "Two straight weeks of clean progression.")
+        openBriefingFromHistory(artifactId: "weekly_briefing_2026-08-23_2026-08-29")
         assertText("Two straight weeks of clean progression.")
         scrollToLabel(containing: "Energy Balance")
         attachScreenshot("21-weekly-energy")
@@ -255,7 +255,7 @@ final class TrainingAcceptanceUITests: XCTestCase {
         attachScreenshot("21c-coachs-take")
         openBriefingHistory()
 
-        openBriefingFromHistory(containing: "Four poses in, the visual story matches the scan.")
+        openBriefingFromHistory(artifactId: "event_briefing_progress_photo_photo-set-fixture-005")
         assertText("PHOTO EVENT")
         assertText("Four poses in, the visual story matches the scan.")
         scrollToLabel(containing: "Matching historical views show what changed")
@@ -284,13 +284,13 @@ final class TrainingAcceptanceUITests: XCTestCase {
         XCTAssertTrue(latestBriefing.waitForExistence(timeout: 5), "Latest Briefing was not available from Home.")
         latestBriefing.tap()
         openBriefingHistory()
-        openBriefingFromHistory(containing: "Two straight weeks of clean progression.")
+        openBriefingFromHistory(artifactId: "weekly_briefing_2026-08-23_2026-08-29")
         scrollToLabel(containing: "Energy Balance")
         scrollToLabel(containing: "3,340 lb volume", maxSwipes: 30)
         assertText("3,340 lb volume")
         openBriefingHistory()
 
-        openBriefingFromHistory(containing: "Four poses in, the visual story matches the scan.")
+        openBriefingFromHistory(artifactId: "event_briefing_progress_photo_photo-set-fixture-005")
         scrollToLabel(containing: "Matching historical views show what changed")
         attachScreenshot("22-photo-event-comparison")
     }
@@ -633,6 +633,17 @@ final class TrainingAcceptanceUITests: XCTestCase {
         XCTAssertTrue(history.isHittable, "Briefing History action could not be brought on screen.")
         history.tap()
         assertText("Briefing History")
+    }
+
+    /// History rows carry stable type titles (Founder correction), so a
+    /// specific artifact is opened by its row identifier.
+    private func openBriefingFromHistory(artifactId: String) {
+        let row = app.descendants(matching: .any)["briefingHistory.row.\(artifactId)"].firstMatch
+        for _ in 0..<16 where !row.exists || !row.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(row.exists && row.isHittable, "Briefing history row was not available: \(artifactId)")
+        row.tap()
     }
 
     private func openBriefingFromHistory(containing text: String) {

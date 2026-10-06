@@ -148,6 +148,11 @@ struct ProductionBriefingAPI: BriefingAPI {
         var label: String
         var publicationDate: String?
         var version: Int
+        var evidenceWindow: Window?
+
+        struct Window: Decodable {
+            var briefingMonth: String?
+        }
 
         var readModel: BriefingHistoryRowReadModel? {
             let resolvedCadence: BriefingCadence?
@@ -165,7 +170,8 @@ struct ProductionBriefingAPI: BriefingAPI {
                 cadence: resolvedCadence,
                 label: label,
                 publicationDate: publicationDate,
-                version: version
+                version: version,
+                briefingMonth: evidenceWindow?.briefingMonth
             )
         }
     }

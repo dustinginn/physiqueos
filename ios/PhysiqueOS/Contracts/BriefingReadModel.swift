@@ -74,6 +74,22 @@ struct BriefingOccurrenceIdentity: Codable, Equatable {
 /// (`"dexa_event"`/`"photo_event"`) — Native does not need to fetch full
 /// content just to pick the right icon/label the way `historyTitle`'s
 /// doc comment describes for the full-detail model.
+/// One briefing type identity, shared by every place type is presented.
+enum BriefingTypeIdentity: Equatable, CaseIterable {
+    case weekly, midweek, monthly, photo, dexa, other
+
+    var title: String {
+        switch self {
+        case .weekly: "Weekly Briefing"
+        case .midweek: "Midweek Briefing"
+        case .monthly: "Monthly Briefing"
+        case .photo: "Photo Briefing"
+        case .dexa: "DEXA Briefing"
+        case .other: "Briefing"
+        }
+    }
+}
+
 struct BriefingHistoryRowReadModel: Codable, Equatable, Identifiable {
     var id: String { artifactId }
     var artifactId: String
@@ -82,6 +98,9 @@ struct BriefingHistoryRowReadModel: Codable, Equatable, Identifiable {
     var label: String
     var publicationDate: String?
     var version: Int
+    /// `evidenceWindow.briefingMonth` ("2026-09") the bounded History row
+    /// carries for Monthly; nil for other cadences and older payloads.
+    var briefingMonth: String? = nil
 
     var isDEXAEvent: Bool { cadence == .event && ["dexa_event", "dexa-event"].contains(artifactType) }
     var isPhotoEvent: Bool { cadence == .event && ["photo_event", "photo-event"].contains(artifactType) }
@@ -90,6 +109,46 @@ struct BriefingHistoryRowReadModel: Codable, Equatable, Identifiable {
         if isDEXAEvent { return "DEXA Event Briefing" }
         if isPhotoEvent { return "Photo Event Briefing" }
         return cadence.label
+    }
+
+    /// The briefing type a History row represents (one identity for the
+    /// stable title and the type accent).
+    var briefingType: BriefingTypeIdentity {
+        if isDEXAEvent { return .dexa }
+        if isPhotoEvent { return .photo }
+        switch cadence {
+        case .weekly: return .weekly
+        case .midweek: return .midweek
+        case .monthly: return .monthly
+        case .daily, .event: return .other
+        }
+    }
+
+    /// Stable navigation title. Narrative headlines belong inside the
+    /// briefing, never in History: "Weekly Briefing", "Midweek Briefing",
+    /// "Photo Briefing", "DEXA Briefing", and for Monthly the month/year
+    /// qualifier ("Monthly Briefing · September 2026") from the row's
+    /// canonical briefing month (or its artifact id), else no qualifier.
+    var stableTitle: String {
+        guard briefingType == .monthly else { return briefingType.title }
+        guard let month = Self.monthYear(briefingMonth) ?? Self.monthYear(fromArtifactId: artifactId) else { return briefingType.title }
+        return "\(briefingType.title) · \(month)"
+    }
+
+    /// "2026-09" → "September 2026".
+    static func monthYear(_ key: String?) -> String? {
+        guard let key, key.count >= 7 else { return nil }
+        let parts = key.prefix(7).split(separator: "-")
+        guard parts.count == 2, let year = Int(parts[0]), let month = Int(parts[1]), (1...12).contains(month), year > 2000 else { return nil }
+        let names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        return "\(names[month - 1]) \(year)"
+    }
+
+    /// Monthly artifact ids end in `YYYYMM` or `YYYY-MM`.
+    static func monthYear(fromArtifactId id: String) -> String? {
+        guard let match = id.range(of: #"(\d{4})-?(\d{2})$"#, options: .regularExpression) else { return nil }
+        let digits = id[match].filter(\.isNumber)
+        return monthYear("\(digits.prefix(4))-\(digits.suffix(2))")
     }
 
     var iconName: String {

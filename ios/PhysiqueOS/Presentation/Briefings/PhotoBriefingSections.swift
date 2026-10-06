@@ -341,6 +341,8 @@ enum BriefingEventPalette {
     static let teal = BriefingPalette.d(0x35C8C1, 0x078F88)
     static let green = BriefingPalette.d(0x4BDC95, 0x138F63)
     static let purple = BriefingPalette.d(0xA68AF8, 0x7356D9)
+    static let amber = BriefingPalette.d(0xF5BD4F, 0xB97912)
+    static let coral = BriefingPalette.d(0xF06D84, 0xB7415A)
     static let viewer = BriefingPalette.d(0x02070C, 0xE3E9E5)
 }
 
