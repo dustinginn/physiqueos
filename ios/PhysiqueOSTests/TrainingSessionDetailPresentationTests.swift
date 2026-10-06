@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import PhysiqueOS
 
 /// Build 33: proves the Founder-observed Workout Detail duplication is
@@ -7,6 +8,25 @@ import XCTest
 /// (structured), and the generated one-line `detail` summary never
 /// appears alongside a structured exercise breakdown for the same session.
 final class TrainingSessionDetailPresentationTests: XCTestCase {
+    private static func record(
+        _ id: String,
+        exerciseId: String = "bench_press",
+        exerciseName: String = "Bench Press",
+        type: TrainingPerformanceEventType = .sessionVolumePR,
+        title: String = "Session volume record",
+        value: String = "4,200 lb",
+        relationshipContext: TrainingPerformanceRelationshipContext? = nil
+    ) -> TrainingPerformanceRecord {
+        TrainingPerformanceRecord(
+            id: id, canonicalExerciseId: exerciseId, canonicalExerciseName: exerciseName,
+            title: title, value: value, previousBaseline: "Previous: 4,000 lb",
+            improvement: "Improved by 200 lb", detail: "Previous: 4,000 lb · Improved by 200 lb",
+            workoutDate: "2026-09-28", executionVariant: nil,
+            relationshipContext: relationshipContext, achievedValue: 4200,
+            achievementType: type, sourceEventId: "event-\(id)"
+        )
+    }
+
     @MainActor
     func testWorkoutDateFormatsFractionalInstantsAndCalendarDatesWithoutRawSerialization() {
         XCTAssertNotEqual(TrainingSessionDetailView.formatDate("2026-09-14T19:00:00.123Z"), "2026-09-14")
@@ -117,6 +137,101 @@ final class TrainingSessionDetailPresentationTests: XCTestCase {
         XCTAssertEqual(renderedExerciseIDs, ["leg_press_feet_middle", "pendulum_squat_machine"], "Each exercise renders exactly once, in order, with no duplication.")
         let totalSets = multiExercise.exercises.reduce(0) { $0 + $1.sets.count }
         XCTAssertEqual(totalSets, 7, "Sets are not duplicated by the structured breakdown either.")
+    }
+
+    // MARK: - Build 89 workout-detail performance records
+
+    func testOneCanonicalRecordProducesOneHistoricalWorkoutGroup() throws {
+        let record = Self.record("one")
+        let presentation = try XCTUnwrap(TrainingSessionPerformanceRecordsPresentation(
+            performanceRecords: .init(status: "completed", records: [record])
+        ))
+        XCTAssertEqual(presentation.records, [record])
+        XCTAssertEqual(presentation.groups.map(\.canonicalExerciseName), ["Bench Press"])
+        XCTAssertEqual(presentation.groups.flatMap(\.records).map(\.value), ["4,200 lb"])
+    }
+
+    func testMultipleCanonicalRecordsPreserveServerOrderTypeAndValues() throws {
+        let records = [
+            Self.record("volume"),
+            Self.record(
+                "reps", type: .repsAtLoadPR,
+                title: "Reps-at-load record", value: "13 reps at 125 lb"
+            ),
+        ]
+        let presentation = try XCTUnwrap(TrainingSessionPerformanceRecordsPresentation(
+            performanceRecords: .init(status: "completed", records: records)
+        ))
+        XCTAssertEqual(presentation.records, records)
+        XCTAssertEqual(presentation.groups.flatMap(\.records).map(\.achievementType), [.sessionVolumePR, .repsAtLoadPR])
+        XCTAssertEqual(presentation.groups.flatMap(\.records).map(\.value), ["4,200 lb", "13 reps at 125 lb"])
+    }
+
+    func testNoCanonicalRecordsOrUnknownAuthorityOmitsHistoricalCard() {
+        XCTAssertNil(TrainingSessionPerformanceRecordsPresentation(performanceRecords: nil))
+        XCTAssertNil(TrainingSessionPerformanceRecordsPresentation(
+            performanceRecords: .init(status: "completed", records: [])
+        ))
+        XCTAssertNil(TrainingSessionPerformanceRecordsPresentation(
+            performanceRecords: .init(status: "deferred", records: [Self.record("not-authoritative")])
+        ))
+    }
+
+    func testExactWorkoutAttributionAndSupersetContextNeverCreateASecondCalculation() throws {
+        let relationship = TrainingPerformanceRelationshipContext(
+            relationshipType: "superset", memberIndex: 0,
+            orderedPartners: [.init(canonicalExerciseId: "cable_fly", name: "Cable Fly")],
+            comparisonKey: "superset|partners:cable_fly"
+        )
+        let exactWorkoutRecord = Self.record("exact", relationshipContext: relationship)
+        let exact = try XCTUnwrap(TrainingSessionPerformanceRecordsPresentation(
+            performanceRecords: .init(status: "completed", records: [exactWorkoutRecord])
+        ))
+        let anotherWorkout = TrainingSessionPerformanceRecordsPresentation(
+            performanceRecords: .init(status: "completed", records: [])
+        )
+
+        XCTAssertEqual(exact.records, [exactWorkoutRecord])
+        XCTAssertEqual(exact.records.first?.relationshipContext, relationship)
+        XCTAssertNil(anotherWorkout, "A different finalized workout cannot inherit a PR from history or a superset partner.")
+    }
+
+    func testWatchAndPhoneFinishedRecordsShareTheSameCanonicalPresentation() throws {
+        let serverRecords = TrainingSessionPerformanceRecords(
+            status: "completed", records: [Self.record("canonical")]
+        )
+        let phoneFinished = try XCTUnwrap(TrainingSessionPerformanceRecordsPresentation(performanceRecords: serverRecords))
+        let watchFinished = try XCTUnwrap(TrainingSessionPerformanceRecordsPresentation(performanceRecords: serverRecords))
+        XCTAssertEqual(watchFinished, phoneFinished)
+    }
+
+    func testHistoricalRecordAccessibilityAndSemanticGreenWorkInDarkAndMineral() {
+        let record = Self.record("accessible")
+        XCTAssertEqual(
+            TrainingSessionPerformanceRecordsPresentation.accessibilityLabel(for: record),
+            "Bench Press. Session volume record. 4,200 lb. Previous: 4,000 lb · Improved by 200 lb"
+        )
+        for style: UIUserInterfaceStyle in [.dark, .light] {
+            let traits = UITraitCollection(userInterfaceStyle: style)
+            let foreground = UIColor(EvidencePalette.training.green).resolvedColor(with: traits)
+            let background = UIColor(EvidencePalette.training.surface).resolvedColor(with: traits)
+            XCTAssertGreaterThanOrEqual(Self.contrast(foreground, background), 4.5)
+        }
+    }
+
+    private static func contrast(_ first: UIColor, _ second: UIColor) -> Double {
+        func luminance(_ color: UIColor) -> Double {
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            func channel(_ value: CGFloat) -> Double {
+                let value = Double(value)
+                return value <= 0.03928 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
+        }
+        let brighter = max(luminance(first), luminance(second))
+        let darker = min(luminance(first), luminance(second))
+        return (brighter + 0.05) / (darker + 0.05)
     }
 
     // MARK: - Real-JSON decode regressions for the Sep24 candidate-shape decode defect

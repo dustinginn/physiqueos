@@ -116,6 +116,10 @@ final class TrainingAcceptanceUITests: XCTestCase {
         assertText("WORKOUT DETAIL")
         assertText("Workout Summary")
         assertText("420 active cal")
+        assertText("Performance Records")
+        assertText("Earned in this workout")
+        assertText("6 reps at 155 lb")
+        assertText("10 reps at 40 lb")
         // Structured workouts show the unified exercise/set breakdown,
         // not a second generated serialization under Session Details.
         assertText("Exercises")
