@@ -27,7 +27,9 @@
     "db:migrate:dry-run": "node-pg-migrate up -d PHYSIQUEOS_DATABASE_URL -m db/migrations -t physiqueos_schema_migrations --schema physiqueos --create-schema --migrations-schema physiqueos --create-migrations-schema --dry-run",
     "ops:root:check": "node scripts/checkRootOperations.mjs",
     "ops:logs:check": "node scripts/cleanupOperationsLogs.mjs",
-    "ops:logs:clean": "node scripts/cleanupOperationsLogs.mjs --apply"
+    "ops:logs:clean": "node scripts/cleanupOperationsLogs.mjs --apply",
+    "ops:production-access": "node scripts/operations/productionAccessDoctor.mjs",
+    "test:production-access": "node --test scripts/operations/productionReadonlyRunner.test.mjs scripts/operations/productionAccessSafety.test.mjs scripts/operations/productionAccessDoctor.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1107.0",
@@ -37,6 +39,7 @@
     "@simplewebauthn/server": "^13.3.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "js-yaml": "^4.1.0",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "pdfjs-dist": "^6.1.200",

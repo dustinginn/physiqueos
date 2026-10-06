@@ -2,81 +2,118 @@
 
 ## Purpose
 
-This is the standing discovery pointer for Claude and Codex when a PhysiqueOS task needs bounded production inspection.
+This is the standing discovery pointer for Claude and Codex when an explicitly authorized PhysiqueOS task needs bounded production inspection. It documents the approved repository-owned path. It does not grant production access or production-write authority and contains no credentials.
 
-It documents **how to find and use the already-approved read-only path**. It does not grant production-write authority, and it contains no credentials or secret values.
+## Authorized-host requirement
 
-## Approved path
+An **authorized host** is a Founder-controlled Mac or PC with all of the following:
 
-On the Founder's PC, the established production read-only runner is in:
+1. a separately authenticated least-privilege doctl context named `physiqueos-final-cutover-config`;
+2. the repo-owned runner at reviewed repository authority;
+3. a passing `local` and `control-plane` production-access doctor;
+4. a recorded zero-data `console` doctor acceptance;
+5. explicit task-level authorization for the production inspection being attempted.
 
-`C:\Users\dusti\Documents\GitHub\physiqueos`
+Host authorization is necessary but never sufficient. A clone, chat, Remote Control session, worktree, or cloud-hosted session is not authorized merely because it can read this repository. Credentials never move with Git, chat, Remote Control, reports, or worktrees.
 
-Runner:
+## Repository-owned path
 
-`.tmp/digitalocean/run-app-console-context-gzip-source-on-open.mjs`
+Primary runner:
 
-The runner uses a saved DigitalOcean CLI context named:
+`scripts/operations/runAppConsoleContextGzipSourceOnOpen.mjs`
 
-`physiqueos-final-cutover-config`
+Guarded file wrapper:
 
-Invocation shape:
+`scripts/operations/runAppConsoleContextGzipFile.mjs`
 
-`<runner> <saved-context> <verified-app-id> <verified-component-name> <gzip-base64-node-source>`
+Shared safety primitives:
 
-Historical app/component identifiers may appear in old handoffs, but they are **hints only**. Reverify current application authority and the current component before every production inspection. Never assume an old app id, deployment id, component, SHA, schema version, or owner scope is still authoritative.
+`scripts/operations/productionAccessSafety.mjs`
 
-The runner executes bounded Node audit code inside the production App Platform component and consumes the component's existing production database URL / CA bindings internally.
+Doctor:
 
-## Hard safety contract
+```text
+npm run ops:production-access -- local
+npm run ops:production-access -- control-plane --expected-sha <verified-production-sha>
+npm run ops:production-access -- console --expected-sha <verified-production-sha>
+```
+
+`console` is never implied by a prior local/control-plane pass. It needs separate explicit authorization. A doctor pass proves host plumbing and the transaction fence, not the safety of an arbitrary task payload.
+
+The runner is one Node implementation supporting Windows, macOS, and Linux doctl config discovery. It does not require PowerShell, a local PostgreSQL client, a local database credential, or a local raw TTY.
+
+## Credential boundary
+
+Each host has its own provider-issued least-privilege context. Never copy a token or doctl config between hosts. Never pass a PAT/token as a CLI argument or environment-variable shortcut.
+
+The read context must have only the approved App Platform read/console scopes. It must remain separate from deployment, migration, database-credential, and other write contexts. The tooling accepts only `physiqueos-final-cutover-config` and never falls back to another context after failure.
+
+Never paste, print, export, decrypt, log, commit, or store production database credentials, CA material, DigitalOcean tokens, or secret environment values. The production component consumes its existing database bindings internally; only binding-presence booleans may be reported.
+
+## Before every real audit
+
+The task must explicitly authorize production inspection and define the exact owner/data bounds. Then:
+
+1. independently reverify the intended application, active deployment, component, Web SHA, worker SHA, and public health/source identity;
+2. require Web/worker agreement and no in-progress deployment;
+3. verify runtime `PHYSIQUEOS_GIT_SHA` before database access;
+4. require the exact approved owner scope for Founder-data audits;
+5. use only the repo-owned reviewed runner/wrapper and shared safety primitives;
+6. keep output schema-bounded and sanitized.
+
+Historical application, deployment, component, SHA, schema, and owner values are hints only. Never treat them as current authority.
+
+## Mandatory SQL safety contract
 
 Every production SQL audit must:
 
-1. Be diagnostic/read-only only.
-2. Start a transaction with `BEGIN READ ONLY` (use REPEATABLE READ when a stable multi-query snapshot is needed).
-3. Explicitly verify `transaction_read_only = on` before reading application data.
-4. Use bounded, owner-scoped SELECT queries only.
-5. Avoid bulk exports and avoid returning raw Founder evidence/media when a structural or summarized result is sufficient.
-6. `ROLLBACK` at the end, including error paths where possible.
-7. Print only sanitized diagnostic output and a unique success marker.
-8. Stop on 401/403, unavailable console access, missing production bindings, read-only verification failure, ambiguous owner scope, authority mismatch, or any requirement for mutation.
+1. open one bounded PostgreSQL connection with a task-specific application name and statement timeout;
+2. execute `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY`;
+3. execute `SHOW transaction_read_only` and require `on` before substantive queries;
+4. use parameterized, bounded, owner-scoped `SELECT` operations only;
+5. avoid side-effecting functions invoked through `SELECT`;
+6. avoid bulk exports and unrelated records;
+7. execute an explicit `ROLLBACK` on success and attempt rollback in `finally`;
+8. release the connection and close the pool;
+9. emit only sanitized schema-bounded output after rollback;
+10. emit the unique success marker exactly once, only after rollback.
 
-## Secrets and credentials
+The DigitalOcean console transport is powerful and is **not** database-read-only. The runtime component has write-capable bindings. Transaction fencing, owner scoping, reviewed payload code, bounded output, and explicit task authorization remain mandatory.
 
-Never:
+## Stop conditions
 
-- paste, print, export, decrypt, log, commit, or store production database credentials;
-- copy production database URLs, CA material, DigitalOcean tokens, or other secret environment values into prompts, source, shell history, GitHub handoffs, scratch files, or reports;
-- create a local `.env` containing production credentials;
-- manually decrypt credentials;
-- expose secret values merely to prove that a binding exists.
+Stop immediately, without retrying another context, PAT, component, console mechanism, or credential, on:
 
-The production component already has the required bindings. The runner is specifically intended to avoid moving those credentials onto the local machine or into agent context.
+- failed doctor or unsupported host;
+- HTTP 401 or 403;
+- missing/ambiguous doctl config or context;
+- wrong application/component or a changing/inactive deployment;
+- Web/worker source mismatch or runtime/control-plane SHA drift;
+- invalid WSS URL, WebSocket failure, timeout, truncation, or unexpected closure;
+- missing database binding or owner mismatch;
+- `transaction_read_only` not equal to `on`;
+- non-SELECT requirement, SQL error, rollback/resource-close failure;
+- unexpected output or credential-shaped output;
+- missing/duplicate success marker;
+- any requirement for mutation.
 
-## Authority and scope
+Read-only access is not permission to repair, replay, confirm, dismiss, enqueue, regenerate, deploy, alter outbox state, change evidence, or perform any production write. Mutation requires separate explicit authorization and a separate guarded path.
 
-Before an audit:
+## Claude and Codex host behavior
 
-- independently reverify current production Server SHA/deployment/component;
-- independently identify the Founder/owner scope required by the task;
-- treat task/handoff authority values as hints, not facts;
-- keep queries narrowly scoped to the records needed for the diagnosis.
+Claude and Codex use the same repo-owned command on the selected local authorized host, subject to that agent's filesystem/network approval policy. Local executable/PATH inheritance may differ between GUI and terminal sessions; use the doctor rather than improvising a credential path.
 
-Read-only access is not permission to repair, replay, confirm, dismiss, enqueue, regenerate, deploy, alter outbox state, modify evidence, or perform any other production write. Any mutation requires separate explicit authorization and its own guarded path.
+A worktree carries repository code, not the host's credential. A host credential does not authorize every chat or task. Cloud-hosted sessions remain unauthorized unless a separate Founder-approved host and credential design is established.
 
-## Mac / Remote Control sessions
+## Issuance, revocation, and rotation
 
-Normal Claude Remote Control Native sessions run on the Mac. The approved runner above is a **PC production-inspection path**. If the task requires production inspection and the current Mac session cannot reach that approved path through an already-established authorized mechanism, do not invent a new credential path and do not weaken permissions.
-
-Instead:
-
-- continue source/local analysis that is independently valid;
-- clearly mark conclusions that require production evidence as unproven;
-- report that the approved PC read-only audit is required;
-- stop the affected diagnosis if production evidence is necessary for correctness.
-
-A task may explicitly establish another approved read-only path in the future. Until then, absence of PC access is a stop condition, not permission to improvise.
+- Issue a distinct least-privilege PAT per authorized host through the provider account.
+- Authenticate it only at that host's interactive terminal with `doctl auth init --context physiqueos-final-cutover-config`.
+- Never copy another host's token/config.
+- Record scope names, host, owner, issuance/revocation responsibility, and acceptance result—never token contents.
+- Rotate only on expiry, compromise evidence, scope correction, or host retirement; then rerun all doctor stages.
+- A failed context is a stop condition, not permission to use a deploy/migration context.
 
 ## Agent startup rule
 
-When a new Claude or Codex task requires production inspection, read this file before attempting production access. If the GitHub task has stricter limits, the task wins. If current authority conflicts with historical documentation, current verified authority wins.
+Read this file before attempting production access. The current GitHub task may narrow or forbid access and always wins. If task authority is missing, continue source/local analysis, mark production-dependent conclusions unproven, and stop the affected diagnosis.
