@@ -2,36 +2,29 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- **Lane:** **FINAL Native candidate**: all lanes integrated (Claude, Batch 3 integration RC chat)
-- **Task:** `final-native-layer-evidence-reliability-20261006` (prompt `fd2287cb`)
-- **Status:** **Completed. STOPPED.** Release gates green; awaiting Build 88 authorization.
-- **Generated (UTC):** 2026-10-06T04:28:12Z
+- **Lane:** **Build 88 TestFlight release**: all lanes integrated (Claude)
+- **Task:** `build88-testflight-release-20261006` (prompt `9dc15c5b`)
+- **Status:** **Build 88 VALID in TestFlight. STOPPED** for Founder physical acceptance.
+- **Generated (UTC):** 2026-10-06T04:45:25Z
 
-| Item | SHA | State |
-|---|---|---|
-| **Final Native candidate** | `96e724a9` on `claude/batch3-integrated-on-workout-preview-20261005` | All gates green |
-| Parents | `fc693aeb` (integrated Batch 3) + `9fa2428c` (Evidence reliability, Batch 3-resolved) | 0 conflicts |
-| Production Server | `b7eb1e39` (`6fa4e887`) | Unchanged |
-| Build number | 87 (unbumped); next is 88 | Not uploaded |
+| Item | Value |
+|---|---|
+| Build 88 Native source | `7fce3b97` (final candidate `96e724a9` + build-number bump only) |
+| App | `com.physiqueos.native.dev` 1.0 (88) |
+| Delivery | `43fda86b-c542-4962-86bd-6158ce72c182`: **VALID** |
+| Archive | `Archives/2026-10-05/PhysiqueOS-Build88-7fce3b97.xcarchive` |
+| Production Server | `b7eb1e39` (`6fa4e887`), healthy, unchanged |
 
-**Gates on `96e724a9`:**
+**Post-bump gates:**
 - **Unit tests:** 2066 run, 0 failures.
-- **Watch:** 49/49.
-- **UI:** 60/60.
-- **Reliability tests:** 10/10.
-- **Release compile:** OK, with Watch and WidgetKit/Live Activity.
+- **Release compile:** OK; app, Watch and widget extension all at build 88.
 - **Seam scan:** 0.
-- **Generator:** stable.
+- **Guarded dry run:** all checks PASS.
 
-DNS incident resolved.
+**Next:** install Build 88 from TestFlight and run the acceptance checklist in the report.
 
-**Report:** `agent-handoffs/reports/20261006T042812Z-final-native-candidate-all-lanes.md`
+**Report:** `agent-handoffs/reports/20261006T044525Z-build88-testflight-valid.md`
 
-**Incorporated lane reports:**
-- `agent-handoffs/reports/20261006T031851Z-batch3-multilane-integration-candidate.md`
-- `agent-handoffs/reports/20261006T010500Z-evidence-dns-resync-verification.md`
-- `agent-handoffs/reports/20261006T003500Z-evidence-app-open-load-failure-audit.md`
-
-No build bump, no TestFlight upload, no deploy.
+Next build: 89. No deploy, no production mutation.
 
 Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`

@@ -1,74 +1,62 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-06T04:28:12Z",
+  "generated_at_utc": "2026-10-06T04:45:25Z",
   "task": {
-    "id": "final-native-layer-evidence-reliability-20261006",
-    "title": "FINAL NATIVE CANDIDATE: Evidence reliability 9fa2428c layered onto integrated Batch 3 authority fc693aeb; all release gates green",
+    "id": "build88-testflight-release-20261006",
+    "title": "Build 88 VALID in TestFlight from final Native candidate (all lanes integrated)",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "fc693aeb919efc6fa68a236092a7fa7f75767a19",
-    "final_sha": "96e724a9f40f9178a16ea492958c3acd4b1b282e",
-    "native_sha": "96e724a9f40f9178a16ea492958c3acd4b1b282e",
+    "base_sha": "96e724a9f40f9178a16ea492958c3acd4b1b282e",
+    "final_sha": "7fce3b9708c063f3c6b58571778c595012b5de6d",
+    "native_sha": "7fce3b9708c063f3c6b58571778c595012b5de6d",
     "native_branch": "claude/batch3-integrated-on-workout-preview-20261005",
-    "parents": [
-      "fc693aeb919efc6fa68a236092a7fa7f75767a19",
-      "9fa2428c9fb5204b03c8f9930c6ace83ce63c262"
-    ],
-    "included": {
-      "batch2_rc": "793462b1",
-      "workout_reliability_native": "e9f8a957",
-      "workout_preview": "70ebf753",
-      "batch3": "f5257ae1",
-      "macro_correction": "75160ae8",
-      "batch3_integration_merge": "09211edb",
-      "contract_restorations": "fc693aeb",
-      "evidence_reliability_resolved": "9fa2428c",
-      "evidence_reliability_build87_source_not_merged_directly": "c3d9d257"
-    },
     "production_server_sha": "b7eb1e397f0238df9ae904fd182ddbb51602e8d8",
     "production_deployment": "6fa4e887",
-    "native_build": 87,
-    "next_build": 88
+    "native_build": 88,
+    "next_build": 89,
+    "testflight_delivery_id": "43fda86b-c542-4962-86bd-6158ce72c182",
+    "archive": "~/Library/Developer/Xcode/Archives/2026-10-05/PhysiqueOS-Build88-7fce3b97.xcarchive"
   },
   "result": {
-    "summary": "Final Native candidate 96e724a9 = fc693aeb + 9fa2428c (0 conflicts; merge delta patch-identical to the reviewed reliability change). On exact SHA: generator stable; PhysiqueOSTests 2066/0 (1 skipped); PhysiqueOSWatchTests 49/49; PhysiqueOSUITests 60/60; 10/10 Evidence reliability tests; Release BUILD SUCCEEDED with Watch + WidgetKit/Live Activity; 0 Debug/review/synthetic seams in Release. Production Server b7eb1e39/6fa4e887 unchanged; DNS incident resolved. No build bump, no TestFlight.",
+    "summary": "Build 88 (com.physiqueos.native.dev 1.0 (88)) from 7fce3b97 (= final candidate 96e724a9 + build-number bump only) uploaded via guarded API-key tool; delivery 43fda86b-c542-4962-86bd-6158ce72c182 VALID (build/import VALID, on App Store Connect). Post-bump: unit 2066/0, pin test pass, Release OK (app/Watch/WidgetKit all 88), seams 0, generator stable. Server b7eb1e39/6fa4e887 unchanged and healthy; DNS synchronized. No deploy, no production mutation.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": false
+    "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "96e724a9: unit 2066/0, Watch 49/49, UI 60/60 (Batch 3 A-E, L13 Dark+Mineral, Home briefing identity, Logger/workout journeys, Recovery/Sleep incl accessible Try Again), reliability 10/10, peptide deterministic pass, Release OK, seam scan 0, generator stable. No failures."
+      "summary": "Pre-bump 96e724a9: unit 2066/0, Watch 49/49, UI 60/60, reliability 10/10, Release OK. Post-bump 7fce3b97: unit 2066/0 incl CFBundleVersion 88 pin, Release OK, seams 0, generator stable, guarded dry-run all PASS."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder authorization needed for Build 88 bump + TestFlight, then physical acceptance."
+      "summary": "Founder physical acceptance of Build 88 pending (checklist in report)."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Native-only merge; no Server, auth, endpoint, persistence or production changes."
+      "summary": "Native release only; no Server deploy or production data mutation; health/DNS checks read-only."
     }
   },
   "decisions_required": [
-    "Authorize Build 88: bump APP_BUILD_NUMBER + TrainingLoggerTests pin, regenerate, unit re-run, archive, guarded physiqueos-asc-upload",
-    "Physical Founder acceptance after TestFlight: real Progress Photos; Evidence recovery; Watch superset responsiveness; Watch-finished recap/PR/confetti; contextual superset Suggested/Maintain; redesigned Evidence surfaces",
-    "Carried (optional durable): move the physiqueos host DNS to a provider with consistent anycast authority"
+    "Founder: install Build 88 from TestFlight and run the physical acceptance checklist (Progress Photos, Evidence recovery, Watch superset, Watch-finish recap/PR/confetti, superset contextual progression, redesigned Evidence, general smoke)"
   ],
   "blockers": [],
   "unexpected_findings": [],
   "backlog": [
-    "Energy and Weekly/Monthly Briefing charts still use old overlay",
-    "Watch Review/Confirmation Complete Set gating + timed sets; reply-before-side-effects",
-    "Per-stream fail-soft Evidence Hub; persisted last-known Evidence Hub (needs decision); reduce scope-all Evidence Hub payloads and duplicate Log reads on launch"
+    "Watch Review/Confirmation Complete Set gating + timed-set projection",
+    "Next-workout latency follow-up / reply-before-side-effects if telemetry warrants",
+    "Evidence startup efficiency / read fan-out",
+    "Energy/Weekly/Monthly chart overlay",
+    "Beta Readiness issues #2-#5"
   ],
-  "recommended_next_step": "Founder authorizes Build 88 from 96e724a9: bump, archive, guarded TestFlight upload, then physical acceptance.",
-  "full_report_path": "agent-handoffs/reports/20261006T042812Z-final-native-candidate-all-lanes.md",
+  "recommended_next_step": "Founder installs Build 88 via TestFlight and completes physical acceptance.",
+  "full_report_path": "agent-handoffs/reports/20261006T044525Z-build88-testflight-valid.md",
   "related_reports": [
+    "agent-handoffs/reports/20261006T042812Z-final-native-candidate-all-lanes.md",
     "agent-handoffs/reports/20261006T031851Z-batch3-multilane-integration-candidate.md",
     "agent-handoffs/reports/20261006T010500Z-evidence-dns-resync-verification.md",
     "agent-handoffs/reports/20261006T003500Z-evidence-app-open-load-failure-audit.md"
