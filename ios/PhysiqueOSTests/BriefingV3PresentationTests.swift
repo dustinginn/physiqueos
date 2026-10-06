@@ -1079,14 +1079,9 @@ extension BriefingLockedPresentationTests {
     }
 
     func testMidweekBodyCompositionFallsBackToBaselineWhenNewScanIsTheFalseFlag() throws {
-        let json = #"""
-        {"schemaVersion":"x","artifact":{"id":"midweek-x","cadence":"midweek","generatedAt":"2026-09-30T14:54:55.410Z","version":3},
-         "presentation":{"evidenceWindow":{"startDate":"2026-09-27","endDate":"2026-09-29","briefingDate":"2026-09-30","relativeLabel":"Sunday through Tuesday","timeZone":"UTC"},
-           "hero":{"verdict":"V","summary":"S"},"coachTake":{"biggestTakeaway":"T","recommendation":"R"},"prioritiesThroughSunday":[],
-           "bodyComposition":{"newScan":false,"baseline":{"date":"2026-09-12","fatMass":14.2,"leanMass":153.3,"bodyFatPercentage":8.1},"objective":"O","prominent":false,"interpretation":null}}}
-        """#
+        let json = #"{"schemaVersion":"1","artifact":{"artifactId":"midweek-1","artifactType":"scheduled","cadence":"midweek","version":2,"evidenceWindow":{"id":"midweek-1","startDate":"2026-09-27","endDate":"2026-09-29","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-30T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"presentation":{"hero":{"verdict":"V","summary":"S"},"coachTake":{"biggestTakeaway":"T","recommendation":"R"},"bodyComposition":{"newScan":false,"baseline":{"date":"2026-09-12","fatMass":14.2,"leanMass":153.3,"bodyFatPercentage":8.1},"objective":"O","prominent":false,"interpretation":null},"activeGoal":{"id":"goal-canonical","name":"Build Lean Mass"},"activePhase":{"id":"phase-canonical","name":"Foundation"},"prioritiesThroughSunday":[]}}"#
         let value = try JSONDecoder().decode(BriefingJSONValue.self, from: Data(json.utf8))
-        guard let midweek = try ProductionBriefingMapper.detail(value)?.midweek else { throw XCTSkip("minimal midweek envelope not mapped") }
+        let midweek = try XCTUnwrap(try ProductionBriefingMapper.detail(value)?.midweek)
         XCTAssertEqual(midweek.bodyComposition?.scanDate, "2026-09-12")
         XCTAssertEqual(midweek.bodyComposition?.bodyFatPercent, "8.1%")
     }
