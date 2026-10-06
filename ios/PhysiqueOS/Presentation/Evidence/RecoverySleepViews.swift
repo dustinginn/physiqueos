@@ -344,9 +344,6 @@ struct RecoverySleepNightsSheet: View {
                 .padding(.bottom, rm.pt(30))
             }
             .background(rm.c.page)
-#if DEBUG
-            .modifier(EvidenceReviewScrollOffset(y: EnergyRecoveryRedesignReview.sheetScrollY))
-#endif
             .navigationDestination(for: AppDestination.self) { destination in
                 if case .progressStream(let streamId) = destination, let sleepDay = RecoverySleepDestination.sleepDay(fromStreamId: streamId) {
                     RecoverySleepNightView(sleepDay: sleepDay)
@@ -402,12 +399,6 @@ struct RecoveryEvidenceView: View {
     private var scopeRange: RecoverySleepScopeRange? { store.range(today: environment.recoverySleepAPI.today()) }
     private var reloadKey: String { "\(environment.nativeAuthority.rawValue)|\(store.selected.rawValue)|\(retryNonce)" }
 
-    init() {
-#if DEBUG
-        _showsAllNights = State(initialValue: EnergyRecoveryRedesignReview.sheet == "sleep-nights")
-#endif
-    }
-
     var body: some View {
         EvidenceScrollPage(spacing: 0, top: 10) {
             content
@@ -420,9 +411,6 @@ struct RecoveryEvidenceView: View {
             }
             selectedDay = nil
             await reload()
-#if DEBUG
-            selectedDay = EnergyRecoveryRedesignReview.selection
-#endif
         }
         .refreshable {
             if environment.nativeAuthority == .founderProduction {
@@ -727,12 +715,6 @@ struct RecoverySleepTrendsView: View {
 
     private let ranges: [RecoverySleepTrendRange] = [.twoWeeks, .oneMonth, .threeMonths, .sixMonths, .all]
 
-    init() {
-#if DEBUG
-        _showsStageMix = State(initialValue: EnergyRecoveryRedesignReview.expands("stage-mix"))
-#endif
-    }
-
     var body: some View {
         EvidenceScrollPage(spacing: 0, top: 10) {
             SleepReportHeader(eyebrow: "Recovery", title: "Sleep Trends", subtitle: "Inspect nights over time")
@@ -765,10 +747,6 @@ struct RecoverySleepTrendsView: View {
             if store.selected.isGoal { await store.loadWindows(api: api, authority: environment.nativeAuthority.rawValue) }
             guard let range = store.range(today: api.today()), !range.isEmpty else { return }
             await viewModel?.load(range: range)
-#if DEBUG
-            if let review = EnergyRecoveryRedesignReview.argumentRange { await viewModel?.select(review, range: range) }
-            selectedId = EnergyRecoveryRedesignReview.selection
-#endif
         }
         .sheet(isPresented: $showsAllNights) {
             if let range = scopeRange { RecoverySleepNightsSheet(range: range) }
@@ -979,13 +957,6 @@ struct RecoverySleepNightView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var viewModel: RecoverySleepNightViewModel?
     @State private var showsSourceDetails = false
-
-    init(sleepDay: String) {
-        self.sleepDay = sleepDay
-#if DEBUG
-        _showsSourceDetails = State(initialValue: EnergyRecoveryRedesignReview.expands("source"))
-#endif
-    }
 
     var body: some View {
         EvidenceScrollPage(spacing: 0, top: 10) {

@@ -56,15 +56,15 @@ struct FixtureEnergyAPI: EnergyAPI {
 }
 
 #if DEBUG
-/// Screenshot/UI-test-only state seam for the Energy and Recovery/Sleep
-/// redesign review (Build 90 remaining-redesign lane). Enabled only by
-/// `-physiqueos.energy-recovery-review.state <state>`; it wraps the Sandbox
-/// fixture APIs, never Founder Production, and is absent from Release.
+/// UI-test-only state seam for Energy and Recovery/Sleep Evidence. Enabled
+/// only by `-physiqueos.energy-recovery-review.state <state>`; it wraps the
+/// Sandbox fixture APIs (never Founder Production) and is compiled out of
+/// Release, like `EvidenceRedesignReview`.
 ///
 /// States: `loading` (reads never finish), `failed` (reads throw),
 /// `empty` (Energy with no evidence days / Recovery with no synced night),
 /// `not-available` (Recovery's calm unavailable state), `night-not-found`,
-/// `scope-loading` / `scope-failed` / `scope-empty` (Goal dates).
+/// `scope-loading` / `scope-failed` / `scope-empty` (Goal dates), `weekly`.
 /// `-physiqueos.energy-recovery-review.scope build-lean-mass|visible-abs`
 /// preselects the shared Recovery Goal scope.
 enum EnergyRecoveryRedesignReview {
@@ -90,30 +90,6 @@ enum EnergyRecoveryRedesignReview {
     }
 
     static var state: State? { argument("-physiqueos.energy-recovery-review.state").flatMap(State.init(rawValue:)) }
-
-    /// `-physiqueos.energy-recovery-review.scroll-y <pt>`: opens an Evidence
-    /// page scrolled to that content offset (re-applied as content loads).
-    static var scrollY: CGFloat? { argument("-physiqueos.energy-recovery-review.scroll-y").flatMap(Double.init).map { CGFloat($0) } }
-
-    /// `-physiqueos.energy-recovery-review.sheet-scroll-y <pt>` for an open sheet.
-    static var sheetScrollY: CGFloat? { argument("-physiqueos.energy-recovery-review.sheet-scroll-y").flatMap(Double.init).map { CGFloat($0) } }
-
-    /// `-physiqueos.energy-recovery-review.sheet energy-weekly|energy-daily|sleep-nights`.
-    static var sheet: String? { argument("-physiqueos.energy-recovery-review.sheet") }
-
-    /// `-physiqueos.energy-recovery-review.expand stage-mix,source`.
-    static func expands(_ name: String) -> Bool {
-        argument("-physiqueos.energy-recovery-review.expand")?.split(separator: ",").contains { $0 == name } ?? false
-    }
-
-    /// `-physiqueos.energy-recovery-review.select <week id | sleep day>`:
-    /// the chart selection a tap or scrub would make.
-    static var selection: String? { argument("-physiqueos.energy-recovery-review.select") }
-
-    /// `-physiqueos.energy-recovery-review.range 2w|1m|3m|6m|all` for Sleep Trends.
-    static var argumentRange: RecoverySleepTrendRange? {
-        argument("-physiqueos.energy-recovery-review.range").flatMap(RecoverySleepTrendRange.init(rawValue:))
-    }
 
     static var initialScope: RecoverySleepScope? {
         argument("-physiqueos.energy-recovery-review.scope").flatMap { RecoverySleepScope(rawValue: $0) }

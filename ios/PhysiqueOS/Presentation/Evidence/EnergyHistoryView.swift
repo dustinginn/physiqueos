@@ -37,15 +37,6 @@ struct EnergyHistoryView: View {
     static let historyPreviewLimit = 3
     private let m = EvidenceMetrics(family: .weight)
 
-    init() {
-#if DEBUG
-        _selectedOverTimeWeekID = State(initialValue: EnergyRecoveryRedesignReview.selection)
-        _selectedRecentWeekID = State(initialValue: EnergyRecoveryRedesignReview.selection)
-        _isWeeklyHistorySheetPresented = State(initialValue: EnergyRecoveryRedesignReview.sheet == "energy-weekly")
-        _isDailyHistorySheetPresented = State(initialValue: EnergyRecoveryRedesignReview.sheet == "energy-daily")
-#endif
-    }
-
     var body: some View {
         EvidenceScrollPage(spacing: 0, top: 10) {
             content
@@ -136,7 +127,7 @@ struct EnergyHistoryView: View {
         WeightSection(title: "Period Summary", identifier: "energy.summary") {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(7), alignment: .top), GridItem(.flexible(), spacing: m.pt(7), alignment: .top)], spacing: m.pt(7)) {
                 WeightStatTile(label: "Average Intake", value: EnergyEvidenceCalculator.formatCalories(summary.averageIntake))
-                WeightStatTile(label: "Avg Est. Expenditure", value: EnergyEvidenceCalculator.formatCalories(summary.averageExpenditure))
+                WeightStatTile(label: EnergyEvidenceCopy.summaryExpenditureLabel, value: EnergyEvidenceCalculator.formatCalories(summary.averageExpenditure))
                 WeightStatTile(label: "Average Balance", value: EnergyEvidenceCalculator.formatSignedCalories(summary.averageBalance))
                 WeightStatTile(label: "Complete Days", value: "\(summary.completeDays) of \(summary.evidenceDays)", detail: "evidence days")
             }
@@ -188,12 +179,39 @@ struct EnergyHistoryView: View {
     }
 }
 
+/// Founder-approved Energy wording (Build 90, delta 1): expenditure is always
+/// named as an estimate, and one footnote says what it is made of. Values
+/// keep the canonical `kcal` formatter (delta 2).
+enum EnergyEvidenceCopy {
+    static let summaryExpenditureLabel = "Avg Est. Expenditure"
+    static let rowExpenditureLabel = "Est. expenditure"
+    static let weekExpenditureLabel = "Avg est. expenditure"
+    static let estimateFootnote = "Expenditure is estimated from RMR plus wearable active calories, so small balances are approximate."
+
+    /// A missing value in a compact row reads as an em dash (locked E1–E3);
+    /// the summary tiles keep the canonical "Not available".
+    static func compact(_ formatted: String) -> String {
+        formatted == "Not available" ? "—" : formatted
+    }
+
+    /// Server completeness → the verbatim day tag.
+    static func completenessLabel(_ completeness: String) -> String {
+        switch completeness {
+        case "complete": "Complete · Estimated"
+        case "nutrition-only": "Nutrition only"
+        case "activity-only": "Activity only"
+        case "missing-rmr": "Missing RMR"
+        default: "No paired evidence"
+        }
+    }
+}
+
 /// The one estimate disclosure shared by the summary and both charts.
 struct EnergyEstimateFootnote: View {
     private let m = EvidenceMetrics(family: .weight)
 
     var body: some View {
-        Text("Expenditure is estimated from RMR plus wearable active calories, so small balances are approximate.")
+        Text(EnergyEvidenceCopy.estimateFootnote)
             .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
             .foregroundStyle(m.c.quiet)
             .fixedSize(horizontal: false, vertical: true)
@@ -214,13 +232,7 @@ private struct EnergyHistorySheet<Rows: View>: View {
     /// The sheet's own back trail, so a page pushed inside it reads
     /// `‹ Daily Energy History` instead of a generic `‹ Back`.
     @State private var trail: EvidenceBackTrail
-    @State private var detent: PresentationDetent = {
-#if DEBUG
-        EnergyRecoveryRedesignReview.sheet != nil ? .large : .medium
-#else
-        .medium
-#endif
-    }()
+    @State private var detent: PresentationDetent = .medium
     private let m = EvidenceMetrics(family: .weight)
 
     init(title: String, identifier: String, @ViewBuilder rows: () -> Rows) {
@@ -245,9 +257,6 @@ private struct EnergyHistorySheet<Rows: View>: View {
                 .padding(.bottom, m.pt(30))
             }
             .background(m.c.page)
-#if DEBUG
-            .modifier(EvidenceReviewScrollOffset(y: EnergyRecoveryRedesignReview.sheetScrollY))
-#endif
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(m.c.page, for: .navigationBar)
@@ -355,11 +364,7 @@ struct EnergyFieldGrid: View {
     }
 }
 
-/// A missing value in a compact row reads as an em dash (locked E1–E3);
-/// the summary tiles keep the canonical "Not available".
-private func compact(_ formatted: String) -> String {
-    formatted == "Not available" ? "—" : formatted
-}
+private func compact(_ formatted: String) -> String { EnergyEvidenceCopy.compact(formatted) }
 
 private struct EnergyWeekHistoryRow: View {
     let week: EnergyWeekRecord
@@ -376,7 +381,7 @@ private struct EnergyWeekHistoryRow: View {
             }
             EnergyFieldGrid(fields: [
                 ("Intake", compact(EnergyEvidenceCalculator.formatCalories(week.averageIntake))),
-                ("Est. expenditure", compact(EnergyEvidenceCalculator.formatCalories(week.averageExpenditure))),
+                (EnergyEvidenceCopy.rowExpenditureLabel, compact(EnergyEvidenceCalculator.formatCalories(week.averageExpenditure))),
                 ("Balance", compact(EnergyEvidenceCalculator.formatSignedCalories(week.averageBalance))),
                 ("Completed days", "\(week.completeDayCount)"),
             ])
@@ -393,16 +398,7 @@ private struct EnergyDayHistoryRow: View {
     let day: EnergyDayRecord
     private let m = EvidenceMetrics(family: .weight)
 
-    /// `completenessLabel` — verbatim.
-    private var completenessLabel: String {
-        switch day.completeness {
-        case "complete": "Complete · Estimated"
-        case "nutrition-only": "Nutrition only"
-        case "activity-only": "Activity only"
-        case "missing-rmr": "Missing RMR"
-        default: "No paired evidence"
-        }
-    }
+    private var completenessLabel: String { EnergyEvidenceCopy.completenessLabel(day.completeness) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -417,7 +413,7 @@ private struct EnergyDayHistoryRow: View {
             EnergyFieldGrid(fields: [
                 ("Intake", compact(EnergyEvidenceCalculator.formatCalories(day.calorieIntake))),
                 ("Active calories", compact(EnergyEvidenceCalculator.formatCalories(day.activeCalories))),
-                ("Est. expenditure", compact(EnergyEvidenceCalculator.formatCalories(day.estimatedExpenditure))),
+                (EnergyEvidenceCopy.rowExpenditureLabel, compact(EnergyEvidenceCalculator.formatCalories(day.estimatedExpenditure))),
                 ("Balance", compact(EnergyEvidenceCalculator.formatSignedCalories(day.energyBalance))),
             ])
             .padding(.top, m.pt(7))

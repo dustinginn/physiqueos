@@ -273,3 +273,57 @@ final class EnergyReadModelTests: XCTestCase {
         XCTAssertNotNil(activityOnly.activeCalories)
     }
 }
+
+/// Build 90 Founder-approved Energy presentation (deltas 1-2): expenditure is
+/// always named as an estimate, values keep the canonical `kcal` formatter,
+/// and compact rows use an em dash only where the summary says "Not available".
+final class EnergyEvidencePresentationTests: XCTestCase {
+    func testApprovedEstimateWordingIsExact() {
+        XCTAssertEqual(EnergyEvidenceCopy.summaryExpenditureLabel, "Avg Est. Expenditure")
+        XCTAssertEqual(EnergyEvidenceCopy.rowExpenditureLabel, "Est. expenditure")
+        XCTAssertEqual(EnergyEvidenceCopy.weekExpenditureLabel, "Avg est. expenditure")
+        XCTAssertEqual(EnergyEvidenceCopy.estimateFootnote,
+                       "Expenditure is estimated from RMR plus wearable active calories, so small balances are approximate.")
+        // Descriptive only: no coaching or judgement (EnergyEvidenceScreen.test.js parity).
+        for banned in ["on track", "increase calories", "should", "Current Energy Strategy", "Maintenance Calibration"] {
+            XCTAssertFalse(EnergyEvidenceCopy.estimateFootnote.localizedCaseInsensitiveContains(banned), banned)
+        }
+    }
+
+    func testValuesKeepTheCanonicalKcalFormatter() {
+        XCTAssertEqual(EnergyEvidenceCalculator.formatCalories(2603.4), "2603 kcal")
+        XCTAssertEqual(EnergyEvidenceCalculator.formatSignedCalories(47), "+47 kcal")
+        XCTAssertEqual(EnergyEvidenceCalculator.formatSignedCalories(-175), "-175 kcal")
+    }
+
+    func testCompactRowsUseAnEmDashOnlyForMissingValues() {
+        XCTAssertEqual(EnergyEvidenceCopy.compact(EnergyEvidenceCalculator.formatCalories(nil)), "—")
+        XCTAssertEqual(EnergyEvidenceCopy.compact(EnergyEvidenceCalculator.formatSignedCalories(nil)), "—")
+        XCTAssertEqual(EnergyEvidenceCopy.compact("2860 kcal"), "2860 kcal")
+        XCTAssertEqual(EnergyEvidenceCalculator.formatCalories(nil), "Not available")
+    }
+
+    func testCompletenessTagsAreVerbatim() {
+        XCTAssertEqual(EnergyEvidenceCopy.completenessLabel("complete"), "Complete · Estimated")
+        XCTAssertEqual(EnergyEvidenceCopy.completenessLabel("nutrition-only"), "Nutrition only")
+        XCTAssertEqual(EnergyEvidenceCopy.completenessLabel("activity-only"), "Activity only")
+        XCTAssertEqual(EnergyEvidenceCopy.completenessLabel("missing-rmr"), "Missing RMR")
+        XCTAssertEqual(EnergyEvidenceCopy.completenessLabel("no-paired-evidence"), "No paired evidence")
+    }
+
+    func testSandboxDailyHistoryExercisesEveryCompletenessTag() async throws {
+        let report = try await FixtureEnergyAPI().fetchEnergyReport(scope: .all)
+        let tags = Set(report.dailyHistory.map { EnergyEvidenceCopy.completenessLabel($0.completeness) })
+        XCTAssertEqual(tags, ["Complete · Estimated", "Nutrition only", "Activity only", "Missing RMR", "No paired evidence"])
+    }
+
+    func testSelectedWeekSpokenSummaryNamesTheEstimate() throws {
+        let week = EnergyWeekRecord(id: "energy-week-2026-08-23", weekStart: "2026-08-23", weekEnd: "2026-08-29",
+                                    averageIntake: 2783, averageExpenditure: 2558, averageBalance: 225,
+                                    completeDayCount: 7, evidenceDayCount: 7, expectedDayCount: 7, partial: false)
+        let spoken = EnergyWeekDetailView.spokenSummary(week)
+        XCTAssertTrue(spoken.contains("estimated expenditure 2558 kcal"), spoken)
+        XCTAssertTrue(spoken.contains("balance +225 kcal"), spoken)
+        XCTAssertFalse(spoken.contains("partial"))
+    }
+}

@@ -173,7 +173,11 @@ struct SleepTotalChart: View {
     /// The nightly line sits in a tighter field (whole hours below the
     /// shortest night) so night-to-night variation stays readable; bars
     /// always start at zero.
-    private var minimumHours: Double {
+    private var minimumHours: Double { Self.floorHours(points: points, style: style) }
+
+    /// Approved delta 6: the nightly line's floor is one whole hour below the
+    /// shortest night; bar summaries (root, weekly) always start at zero.
+    static func floorHours(points: [SleepTotalChartPoint], style: Style) -> Double {
         guard style == .area, let low = points.compactMap(\.asleepSeconds).min() else { return 0 }
         return max(0, floor(Double(low) / 3600) - 1)
     }
@@ -261,6 +265,7 @@ struct SleepTotalChart: View {
         .accessibilityLabel(isWeekly ? "Average sleep per week" : "Total sleep per night")
         .accessibilityValue(summary)
         .accessibilityChartDescriptor(SleepTotalChartDescriptor(points: ordered, isWeekly: isWeekly))
+        .accessibilityIdentifier("sleep.total.chart")
     }
 
     private func nearestId(to date: Date?) -> String? {
@@ -696,24 +701,11 @@ struct SleepStageBar: View {
 
 // MARK: - Continuity trend (Server rows; non-available nights are gaps)
 
-/// Founder correction R2: two related, separately scaled point/line panels
-/// (Awake in sleep window, minutes; Longest continuous sleep, hours). A
-/// night without stage detail stays a gap, bridged only by a dotted muted
-/// line. The selected (default: newest) night's two values sit below.
-struct SleepContinuityChart: View {
-    /// Newest first.
-    let rows: [RecoverySleepTrends.ContinuityRow]
-    let plan: SleepAxisPolicy.Plan
-    @State private var selectedDay: String? = {
-#if DEBUG
-        EnergyRecoveryRedesignReview.selection
-#else
-        nil
-#endif
-    }()
-    private let m = chartMetrics
-
-    private struct Point: Identifiable {
+/// One Continuity panel's plotted values: ascending nights with a value,
+/// split into runs at every night that is not `available` (or has no value),
+/// plus the dotted bridges drawn across each gap. Nothing is interpolated.
+struct SleepContinuitySeries {
+    struct Point: Identifiable, Equatable {
         var id: String { day }
         let day: String
         let date: Date
@@ -721,14 +713,17 @@ struct SleepContinuityChart: View {
         let run: Int
     }
 
-    private struct Bridge: Identifiable {
+    struct Bridge: Identifiable, Equatable {
         let id: Int
         let from: Point
         let to: Point
     }
 
-    /// Ascending points split into runs at every non-available night.
-    private func series(_ value: (RecoverySleepTrends.ContinuityRow) -> Double?) -> (points: [Point], bridges: [Bridge]) {
+    let points: [Point]
+    let bridges: [Bridge]
+
+    /// `rows` newest first, as the Server sends them.
+    init(rows: [RecoverySleepTrends.ContinuityRow], value: (RecoverySleepTrends.ContinuityRow) -> Double?) {
         var points: [Point] = []
         var run = 0
         var brokeSinceLast = false
@@ -745,7 +740,28 @@ struct SleepContinuityChart: View {
         for index in points.indices.dropFirst() where points[index].run != points[index - 1].run {
             bridges.append(Bridge(id: index, from: points[index - 1], to: points[index]))
         }
-        return (points, bridges)
+        self.points = points
+        self.bridges = bridges
+    }
+}
+
+/// Founder correction R2: two related, separately scaled point/line panels
+/// (Awake in sleep window, minutes; Longest continuous sleep, hours). A
+/// night without stage detail stays a gap, bridged only by a dotted muted
+/// line. The selected (default: newest) night's two values sit below.
+struct SleepContinuityChart: View {
+    /// Newest first.
+    let rows: [RecoverySleepTrends.ContinuityRow]
+    let plan: SleepAxisPolicy.Plan
+    @State private var selectedDay: String?
+    private let m = chartMetrics
+
+    private typealias Point = SleepContinuitySeries.Point
+    private typealias Bridge = SleepContinuitySeries.Bridge
+
+    private func series(_ value: (RecoverySleepTrends.ContinuityRow) -> Double?) -> (points: [Point], bridges: [Bridge]) {
+        let series = SleepContinuitySeries(rows: rows, value: value)
+        return (series.points, series.bridges)
     }
 
     private var selectedRow: RecoverySleepTrends.ContinuityRow? {

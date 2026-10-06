@@ -48,7 +48,7 @@ struct EnergyOverTimeChartView: View {
                     .padding(.top, m.pt(2))
                 EnergyAxisLabels(first: filteredWeeks.first?.weekStart, last: filteredWeeks.last?.weekStart)
                 if let selectedWeek {
-                    EnergyWeekDetailView(week: selectedWeek, isExplicit: selectedWeekID != nil)
+                    EnergyWeekDetailView(week: selectedWeek, isExplicit: selectedWeekID != nil, identifier: "energy.overTime.selectedWeek")
                         .padding(.top, m.pt(10))
                 }
             }
@@ -172,7 +172,7 @@ struct EnergyWeeklyBarChartView: View {
                 chart
                     .padding(.top, m.pt(2))
                 if let selectedWeek {
-                    EnergyWeekDetailView(week: selectedWeek, isExplicit: selectedWeekID != nil)
+                    EnergyWeekDetailView(week: selectedWeek, isExplicit: selectedWeekID != nil, identifier: "energy.weeklyBalance.selectedWeek")
                         .padding(.top, m.pt(10))
                 }
             }
@@ -354,6 +354,7 @@ struct EnergyWeekDetailView: View {
     let week: EnergyWeekRecord
     /// The latest week is shown until a week is tapped or scrubbed.
     var isExplicit = false
+    var identifier = "energy.selectedWeek"
     private let m = EvidenceMetrics(family: .weight)
 
     var body: some View {
@@ -372,7 +373,7 @@ struct EnergyWeekDetailView: View {
             }
             EnergyFieldGrid(fields: [
                 ("Average intake", EnergyEvidenceCalculator.formatCalories(week.averageIntake)),
-                ("Avg est. expenditure", EnergyEvidenceCalculator.formatCalories(week.averageExpenditure)),
+                (EnergyEvidenceCopy.weekExpenditureLabel, EnergyEvidenceCalculator.formatCalories(week.averageExpenditure)),
                 ("Average balance", EnergyEvidenceCalculator.formatSignedCalories(week.averageBalance)),
                 ("Evidence coverage", "\(week.completeDayCount) complete · \(week.evidenceDayCount) evidence"),
             ])
@@ -381,7 +382,7 @@ struct EnergyWeekDetailView: View {
         .padding(.top, m.pt(10))
         .overlay(alignment: .top) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("energy.selectedWeek")
+        .accessibilityIdentifier(identifier)
     }
 
     static func spokenSummary(_ week: EnergyWeekRecord) -> String {
