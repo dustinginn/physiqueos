@@ -9,6 +9,8 @@ This package contains compact review boards captured from shipping PhysiqueOS vi
 - `boards/C3-home-timeline-copy.png` — approved headline and compact Remaining copy; phase detail remains unchanged.
 - `boards/C4-widget-refresh-accent.png` — refresh uses the same teal/cyan action authority as Start Logger.
 - `boards/C5-logger-suggested-selection.png` — Suggested Today’s explicit target transitions to the selected checkmark while its Training Area tile stays synchronized.
+- `boards/C6-logger-set-typography-options.png` — Founder checkpoint comparing Current with restrained A/B/C numeric typography options in Mineral, plus a compact Dark verification strip. No shipping typography selection has been made.
+- `live-activity-stopwatch-integration.md` — exact state-specific post-merge correction for Claude A’s redesigned Live Activity; no Build 88 implementation was recreated.
 
 ## Capture provenance
 
@@ -16,5 +18,6 @@ This package contains compact review boards captured from shipping PhysiqueOS vi
 - C3: existing `FoamRollingPriorityDetailUITests` physical-parity journeys against the shipping Home screen.
 - C4: `HomeWidgetTests.testShippingViewsRenderAllRequiredStates` against `HomeLoggedTodayWidgetView`.
 - C5: focused real-SwiftUI component renders plus canonical `TrainingLoggerViewModel` selection tests.
+- C6: real `NumericEditField` SwiftUI rows rendered from one fixed Logger state and unchanged column geometry; representative values include `102.5` and `1250`.
 
-Raw screenshots live in `captures/`. `source/render-boards.swift` deterministically composes the boards without altering app code or runtime behavior.
+Raw screenshots live in `captures/`. The scripts in `source/` deterministically compose the boards without altering app code or runtime behavior.
