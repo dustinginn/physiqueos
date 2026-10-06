@@ -20,40 +20,19 @@ import SwiftUI
 /// no Related Goals (both test-enforced absent on web).
 struct WeightHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: WeightHistoryViewModel?
     @State private var isWeeklyAveragesExpanded = false
     @State private var isHistoryExpanded = false
 
     static let previewLimit = 3
+    private let m = EvidenceMetrics(family: .weight)
 
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage(spacing: 0, top: 10) {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Evidence Hub")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .evidencePageChrome("Weight")
+        .evidenceFamily(.weight)
         .task(id: environment.nativeAuthority) {
             // Recreate the provider when authority changes so a fixture
             // result can never remain visible in Founder Production mode.
@@ -73,231 +52,308 @@ struct WeightHistoryView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            WeightStatePanel(title: "Loading Weight Evidence…", loading: true, identifier: "weight.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            WeightStatePanel(title: "Weight could not be loaded.", detail: message, identifier: "weight.failure")
         case .loaded(let report):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: report)
-                TrainingScopeSelectorView(scope: report.scope) { scopeID in
-                    Task { await viewModel?.selectScope(pillID: scopeID) }
-                }
-                summaryGrid(report.summary)
-                trendCard(report.chart)
-                if let rollingAverages = report.rollingAverages { rollingAveragesCard(rollingAverages) }
-                weeklyAveragesCard(report.weeklyAverages)
-                historyCard(report.history)
+            header(for: report)
+                .padding(.top, m.pt(4))
+                .padding(.bottom, m.pt(18))
+            WeightScopePills(scope: report.scope) { scopeID in
+                Task { await viewModel?.selectScope(pillID: scopeID) }
             }
+            .padding(.bottom, m.pt(18))
+            summaryGrid(report.summary)
+                .padding(.bottom, m.pt(19))
+            trendSection(report.chart)
+                .padding(.bottom, m.pt(19))
+            if let rollingAverages = report.rollingAverages {
+                rollingAveragesSection(rollingAverages)
+                    .padding(.bottom, m.pt(19))
+            }
+            weeklyAveragesSection(report.weeklyAverages)
+                .padding(.bottom, m.pt(19))
+            historySection(report.history)
         }
     }
 
     private func header(for report: WeightReportReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: .evidence, size: .lg, isCircular: true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+        HStack(alignment: .top, spacing: m.pt(12)) {
+            Text("↘")
+                .evidenceText(.normal(16, 900, jakarta: false))
+                .foregroundStyle(m.c.accent)
+                .frame(width: m.pt(38), height: m.pt(38))
+                .background(m.c.accent.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("EVIDENCE REPORT")
+                    .evidenceText(.normal(11, 800, jakarta: false, tracking: 1.43, uppercase: true))
+                    .foregroundStyle(m.c.accent)
                 Text(report.title)
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .evidenceText(EvidenceTextStyle(size: 30, weight: 780, lineHeight: 31.5, tracking: -1.2))
+                    .foregroundStyle(m.c.ink)
+                    .accessibilityAddTraits(.isHeader)
                 Text(report.subtitle)
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .evidenceText(EvidenceTextStyle(size: 13, weight: 400, lineHeight: 17.55))
+                    .foregroundStyle(m.c.muted)
+                    .padding(.top, m.pt(4))
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("evidence.page.header")
     }
 
-    /// 4 cards, 2 columns — `report.summary`'s labels/values already carry
-    /// the correct per-scope semantics (see `WeightEvidenceCalculator`);
-    /// this view only lays them out.
+    /// Literal Goal-dependent summary cards (Latest, Since Start, …).
     private func summaryGrid(_ cards: [WeightSummaryCard]) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(7), alignment: .top), GridItem(.flexible(), spacing: m.pt(7), alignment: .top)], spacing: m.pt(7)) {
             ForEach(cards) { card in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(card.label)
-                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    Text(card.value)
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                }
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(card.label): \(card.value)")
+                WeightStatTile(label: card.label, value: card.value)
+                    .accessibilityLabel("\(card.label): \(card.value)")
             }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("weight.summary")
+    }
+
+    private func trendSection(_ chart: WeightChartData) -> some View {
+        WeightSection(title: "Weight Trend", identifier: "weight.trend") {
+            WeightTrendChartView(
+                chart: chart,
+                selectedPointID: viewModel?.selectedChartPointID,
+                onSelect: { id in viewModel?.selectChartPoint(id: id) }
+            )
         }
     }
 
-    private func trendCard(_ chart: WeightChartData) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Weight Trend")
-                WeightTrendChartView(
-                    chart: chart,
-                    selectedPointID: viewModel?.selectedChartPointID,
-                    onSelect: { id in viewModel?.selectChartPoint(id: id) }
-                )
-            }
-        }
-    }
-
-    /// Founder Production only — canonical rolling 3-day/7-day averages
-    /// (`report.rollingAverages`), a server computation with no Sandbox
-    /// equivalent to mirror; Native only formats what the server already
-    /// resolved (at most one weigh-in per intended day).
-    private func rollingAveragesCard(_ averages: WeightRollingAverages) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Rolling Averages")
-                HStack(spacing: 8) {
-                    rollingAverageTile(title: "3-Day Average", window: averages.threeDay)
-                    rollingAverageTile(title: "7-Day Average", window: averages.sevenDay)
-                }
+    private func rollingAveragesSection(_ averages: WeightRollingAverages) -> some View {
+        WeightSection(title: "Rolling Averages", identifier: "weight.rollingAverages") {
+            HStack(alignment: .top, spacing: m.pt(7)) {
+                rollingAverageTile(title: "3-Day Average", window: averages.threeDay)
+                rollingAverageTile(title: "7-Day Average", window: averages.sevenDay)
             }
         }
     }
 
     private func rollingAverageTile(title: String, window: WeightRollingAverageWindow) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            if let value = window.value, let unit = window.unit {
-                Text(String(format: "%.1f %@", value, unit))
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            } else {
-                Text("Pending")
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-            Text("\(window.observationCount) of \(window.requestedDays) days")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
+        let value = window.value.flatMap { v in window.unit.map { String(format: "%.1f %@", v, $0) } } ?? "Pending"
+        return WeightStatTile(label: title, value: value, detail: "\(window.observationCount) of \(window.requestedDays) days")
     }
 
-    private func weeklyAveragesCard(_ weeks: [WeightWeeklyAverage]) -> some View {
+    private func weeklyAveragesSection(_ weeks: [WeightWeeklyAverage]) -> some View {
         let preview = Array(weeks.prefix(Self.previewLimit))
-        return CardContainer {
-            EvidenceDisclosureRow(isExpanded: $isWeeklyAveragesExpanded) {
-                evidenceSectionHeader(
-                    title: "Weekly Averages",
-                    subtitle: "Weekly trend smoothing for scale noise.",
-                    expanded: isWeeklyAveragesExpanded
-                )
-            } expanded: {
-                if weeks.isEmpty {
-                    Text("More history needed to compute weekly averages.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 6) {
-                        ForEach(isWeeklyAveragesExpanded ? weeks : preview) { week in
-                            WeeklyAverageRow(week: week)
-                        }
+        return WeightSection(
+            title: "Weekly Averages",
+            identifier: "weight.weeklyAverages",
+            action: weeks.count > Self.previewLimit ? (isWeeklyAveragesExpanded ? "Close" : "Show All") : nil,
+            onAction: { withAnimation(.easeInOut(duration: 0.2)) { isWeeklyAveragesExpanded.toggle() } }
+        ) {
+            if weeks.isEmpty {
+                WeightEmptyLine(text: "More history needed to compute weekly averages.")
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(isWeeklyAveragesExpanded ? weeks : preview) { week in
+                        WeeklyAverageRow(week: week)
                     }
                 }
             }
         }
     }
 
-    private func historyCard(_ history: [WeightHistoryEntry]) -> some View {
+    private func historySection(_ history: [WeightHistoryEntry]) -> some View {
         let preview = Array(history.prefix(Self.previewLimit))
-        return CardContainer {
-            EvidenceDisclosureRow(isExpanded: $isHistoryExpanded) {
-                evidenceSectionHeader(title: "Weight History", subtitle: nil, expanded: isHistoryExpanded)
-            } expanded: {
-                if history.isEmpty {
-                    Text("Weight history will appear as weigh-ins are logged or connected.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 6) {
-                        ForEach(isHistoryExpanded ? history : preview) { entry in
-                            WeightHistoryRow(entry: entry)
-                        }
+        return WeightSection(
+            title: "Weight History",
+            identifier: "weight.history",
+            action: history.count > Self.previewLimit ? (isHistoryExpanded ? "Close" : "Show All") : nil,
+            onAction: { withAnimation(.easeInOut(duration: 0.2)) { isHistoryExpanded.toggle() } }
+        ) {
+            if history.isEmpty {
+                WeightEmptyLine(text: "Weight history will appear as weigh-ins are logged or connected.")
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(isHistoryExpanded ? history : preview) { entry in
+                        WeightHistoryRow(entry: entry)
                     }
                 }
             }
-        }
-    }
-
-    private func evidenceSectionHeader(title: String, subtitle: String?, expanded: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if let subtitle {
-                    Text(subtitle)
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-            Spacer(minLength: 8)
-            Text(expanded ? "Close" : "Show All")
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
         }
     }
 }
 
-/// A faithful Swift Charts port of `ProgressLineChart.jsx`, re-audited
-/// specifically for this correction pass (the first native attempt was too
-/// simplified). Reproduces, from the live web source:
-///
-/// - The trend line: a fixed `#0EA5E9` (`weightTrendLine`), 3pt, round cap —
-///   `WeightReportScreen.jsx` passes this literal color to the chart
-///   component rather than a semantic token, so this stays a literal here
-///   too.
-/// - Individual observation points as small hollow-ring dots (surface fill,
-///   line-color stroke) — the selected/active point enlarges into a solid
-///   filled dot, exactly matching the web's own `r=3` → `r=5`,
-///   hollow → solid transition on selection.
-/// - DEXA markers as full-height dashed **purple** (`dexaMarker`) rules
-///   with a small solid dot at the top — verified corrected color from a
-///   prior audit pass that mis-read this as an unlabeled neutral line; the
-///   web's `--chart-marker` token really is violet/purple in the dark
-///   theme, just easy to miss at 1.5pt.
-/// - A **data-driven y-domain** (tight to the actual plotted min/max, no
-///   padding) — replacing a prior arbitrary fixed 0–200 scale that
-///   flattened real weight variation. An x-domain tight to the first/last
-///   *plotted* point (not the selected scope's window bounds), also
-///   matching source exactly.
-/// - Touch equivalent of the web's pointer-scrub interaction: a
-///   `minimumDistance: 0` drag gesture over the full plot area snaps to
-///   the nearest observation by date and reports it up via `onSelect`,
-///   mirroring `updateActivePoint`'s own nearest-x-neighbor scan. A single
-///   tap and a horizontal drag both work through the same gesture.
-/// - A below-chart tooltip ("`MMM d` / Weight: `value` lb") for the
-///   selected point, defaulting to the latest point when nothing has been
-///   touched yet — matching the web's own `activeIndex === null → latest
-///   point` default — plus the web's separate, always-present summary row
-///   (first date / latest value / last date).
-///
-/// Falls back to a "More history needed" placeholder for fewer than 2
-/// points, mirroring `ProgressLineChart.jsx:41-47`'s own sparse-data guard
-/// and exact copy/threshold.
+// MARK: - Weight family components (`energy-weight-recovery` harness)
+
+/// `.section.contained`: 13 px inset, 15 px radius, 16 px title, accent
+/// action (`Show All` / `Close` expands the rows inline — no new route).
+private struct WeightSection<Content: View>: View {
+    let title: String
+    let identifier: String
+    var action: String?
+    var onAction: () -> Void = {}
+    @ViewBuilder var content: Content
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: m.pt(8)) {
+                Text(title)
+                    .evidenceText(.normal(16, 800, jakarta: false, tracking: -0.32))
+                    .foregroundStyle(m.c.ink)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                if let action {
+                    Button(action: onAction) {
+                        Text(action)
+                            .evidenceText(.normal(10, 760, jakarta: false))
+                            .foregroundStyle(m.c.accent)
+                            .evidenceHitTarget(visualHeight: m.pt(12))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("\(identifier).toggle")
+                }
+            }
+            .padding(.bottom, m.pt(10))
+            content
+        }
+        .padding(m.pt(13 + 1))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(m.c.surface, in: RoundedRectangle(cornerRadius: m.pt(15)))
+        .overlay(RoundedRectangle(cornerRadius: m.pt(15)).strokeBorder(m.c.line, lineWidth: m.pt(1)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// `.summary` / `.stat`: uppercase label, 14 px value, optional detail.
+private struct WeightStatTile: View {
+    let label: String
+    let value: String
+    var detail: String?
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(label)
+                .evidenceText(.normal(9, 800, jakarta: false, tracking: 0.54, uppercase: true))
+                .foregroundStyle(m.c.quiet)
+            Text(value)
+                .evidenceText(.normal(14, 820, jakarta: false, digits: true))
+                .foregroundStyle(m.c.ink)
+                .padding(.top, m.pt(3))
+            if let detail {
+                Text(detail)
+                    .evidenceText(.normal(9, 400, jakarta: false))
+                    .foregroundStyle(m.c.quiet)
+                    .padding(.top, m.pt(2))
+            }
+        }
+        .padding(m.pt(10))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(11)))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// `.pill` scope chips: 9 px radius; selected = surface-2 + lime ink + rule.
+private struct WeightScopePills: View {
+    let scope: TrainingScopeContext
+    let onSelect: (String) -> Void
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: m.pt(5)) {
+                row(scope.options)
+                if !scope.phaseOptions.isEmpty { row(scope.phaseOptions) }
+            }
+            Text(scope.dateRangeLabel)
+                .evidenceText(.normal(10, 400, jakarta: false))
+                .foregroundStyle(m.c.quiet)
+                .padding(.top, m.pt(7))
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("evidence.scope")
+    }
+
+    private func row(_ options: [TrainingScopeOption]) -> some View {
+        HStack(spacing: m.pt(5)) {
+            ForEach(options) { option in
+                Button { onSelect(option.id) } label: {
+                    Text(option.label)
+                        .evidenceText(.normal(9, 760, jakarta: false))
+                        .foregroundStyle(option.selected ? m.c.accent : m.c.quiet)
+                        .padding(.horizontal, m.pt(8))
+                        .padding(.vertical, m.pt(7))
+                        .background(option.selected ? m.c.surface2 : m.c.surface, in: RoundedRectangle(cornerRadius: m.pt(9)))
+                        .overlay {
+                            if option.selected {
+                                RoundedRectangle(cornerRadius: m.pt(9)).strokeBorder(m.c.accent.opacity(0.35), lineWidth: m.pt(1))
+                            }
+                        }
+                        .evidenceHitTarget(visualHeight: m.pt(25))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(option.selected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("evidence.scope.\(option.id)")
+            }
+        }
+    }
+}
+
+private struct WeightEmptyLine: View {
+    let text: String
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        Text(text)
+            .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+            .foregroundStyle(m.c.quiet)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// `.state-panel` for Weight's async states.
+private struct WeightStatePanel: View {
+    let title: String
+    var detail: String?
+    var loading = false
+    let identifier: String
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if loading {
+                ProgressView().tint(m.c.accent).padding(.bottom, m.pt(8))
+            }
+            Text(title)
+                .evidenceText(.normal(12, 800, jakarta: false))
+                .foregroundStyle(m.c.ink)
+            if let detail {
+                Text(detail)
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.6))
+                    .foregroundStyle(m.c.quiet)
+                    .padding(.top, m.pt(4))
+            }
+        }
+        .multilineTextAlignment(.center)
+        .padding(m.pt(15 + 1))
+        .frame(maxWidth: .infinity, minHeight: m.pt(110))
+        .background(m.c.surface, in: RoundedRectangle(cornerRadius: m.pt(14)))
+        .overlay(RoundedRectangle(cornerRadius: m.pt(14)).strokeBorder(m.c.line, lineWidth: m.pt(1)))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// Locked W1 trend: legend, a 140 px field with 25/50/75 % rules, the
+/// blue weight line with filled points, dashed violet DEXA markers, then
+/// the selected entry and the visible date range in one row. The
+/// tight-domain calculation, markers and scrub selection are unchanged.
 private struct WeightTrendChartView: View {
     let chart: WeightChartData
     let selectedPointID: String?
     let onSelect: (String) -> Void
+    private let m = EvidenceMetrics(family: .weight)
 
     private var validPoints: [WeightChartPoint] { chart.points.filter { $0.value != nil } }
 
@@ -307,112 +363,114 @@ private struct WeightTrendChartView: View {
 
     var body: some View {
         if validPoints.count < 2 {
-            Text("More history needed")
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 140)
+            VStack(spacing: m.pt(4)) {
+                Text("More history needed")
+                    .evidenceText(.normal(12, 800, jakarta: false))
+                    .foregroundStyle(m.c.ink)
+                Text("Shown when the trend has fewer than two valid points.")
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.6))
+                    .foregroundStyle(m.c.quiet)
+            }
+            .frame(maxWidth: .infinity, minHeight: m.pt(140))
+            .accessibilityElement(children: .combine)
         } else {
-            VStack(alignment: .leading, spacing: 10) {
-                chartBody
-                selectedPointDetail
-                summaryRow
+            VStack(alignment: .leading, spacing: 0) {
+                legend
+                chartField
+                    .padding(.top, m.pt(9 - 7))
+                selectionRow
             }
         }
     }
 
-    private var chartBody: some View {
+    private var legend: some View {
+        HStack(spacing: m.pt(11)) {
+            legendItem("Weight", m.c.blue)
+            if !chart.markers.isEmpty { legendItem("DEXA marker", m.c.purple) }
+        }
+        .padding(.bottom, m.pt(7))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func legendItem(_ label: String, _ color: Color) -> some View {
+        HStack(spacing: m.pt(4)) {
+            RoundedRectangle(cornerRadius: m.pt(3)).fill(color).frame(width: m.pt(12), height: m.pt(3))
+            Text(label)
+                .evidenceText(.normal(9, 700, jakarta: false))
+                .foregroundStyle(m.c.quiet)
+        }
+    }
+
+    private var chartField: some View {
         let yDomain = WeightEvidenceCalculator.chartYDomain(points: validPoints)
         let firstDate = dateValue(validPoints.first!.date)
         let lastDate = dateValue(validPoints.last!.date)
 
-        return Chart {
-            ForEach(validPoints) { point in
-                LineMark(x: .value("Date", dateValue(point.date)), y: .value("Weight", point.value ?? 0))
-                    .foregroundStyle(PhysiqueOSTheme.weightTrendLine)
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                    .interpolationMethod(.linear)
+        return ZStack {
+            VStack(spacing: 0) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Spacer(minLength: 0)
+                    Rectangle().fill(m.c.line).frame(height: m.pt(1))
+                }
+                Spacer(minLength: 0)
             }
-            ForEach(validPoints) { point in
-                let isSelected = point.id == selectedPoint?.id
-                PointMark(x: .value("Date", dateValue(point.date)), y: .value("Weight", point.value ?? 0))
-                    .symbol {
-                        if isSelected {
-                            Circle().fill(PhysiqueOSTheme.weightTrendLine).frame(width: 10, height: 10)
-                        } else {
-                            Circle().fill(PhysiqueOSTheme.surfaceElevated).frame(width: 6, height: 6)
-                                .overlay(Circle().strokeBorder(PhysiqueOSTheme.weightTrendLine, lineWidth: 2))
+            Chart {
+                ForEach(validPoints) { point in
+                    LineMark(x: .value("Date", dateValue(point.date)), y: .value("Weight", point.value ?? 0))
+                        .foregroundStyle(m.c.blue)
+                        .lineStyle(StrokeStyle(lineWidth: m.pt(2.5), lineCap: .round, lineJoin: .round))
+                        .interpolationMethod(.linear)
+                }
+                ForEach(validPoints) { point in
+                    let isSelected = point.id == selectedPoint?.id
+                    PointMark(x: .value("Date", dateValue(point.date)), y: .value("Weight", point.value ?? 0))
+                        .symbol {
+                            Circle().fill(m.c.blue).frame(width: m.pt(isSelected ? 9 : 5.4), height: m.pt(isSelected ? 9 : 5.4))
+                                .overlay { if isSelected { Circle().stroke(m.c.page, lineWidth: m.pt(2)) } }
                         }
-                    }
+                }
+                ForEach(chart.markers) { marker in
+                    RuleMark(x: .value("DEXA", dateValue(marker.date)))
+                        .foregroundStyle(m.c.purple)
+                        .lineStyle(StrokeStyle(lineWidth: m.pt(1.5), dash: [m.pt(4), m.pt(4)]))
+                }
             }
-            ForEach(chart.markers) { marker in
-                RuleMark(x: .value("DEXA", dateValue(marker.date)))
-                    .foregroundStyle(PhysiqueOSTheme.dexaMarker)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 4]))
-                    .annotation(position: .top, spacing: 0) {
-                        Circle().fill(PhysiqueOSTheme.dexaMarker).frame(width: 6, height: 6)
-                    }
+            .chartYScale(domain: yDomain)
+            .chartXScale(domain: firstDate...lastDate)
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .padding(m.pt(10))
+            .evidenceChartScrub { location, proxy, geometry in
+                let relativeX = geometry.relativeX(in: proxy, at: location)
+                guard let touchedDate: Date = proxy.value(atX: relativeX),
+                      let nearest = WeightEvidenceCalculator.nearestPoint(to: touchedDate, in: validPoints, dateValue: dateValue) else { return }
+                onSelect(nearest.id)
             }
-            if let selectedPoint {
-                RuleMark(x: .value("Selected", dateValue(selectedPoint.date)))
-                    .foregroundStyle(PhysiqueOSTheme.divider)
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-            }
+            .accessibilityLabel("Weight trend over \(validPoints.count) recorded entries")
         }
-        .chartYScale(domain: yDomain)
-        .chartXScale(domain: firstDate...lastDate)
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .frame(height: 160)
-        .chartScrub { location, proxy, geometry in selectNearestPoint(at: location, proxy: proxy, geometry: geometry) }
-        .accessibilityLabel("Weight trend over \(validPoints.count) recorded entries")
+        .frame(height: m.pt(140))
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(12)))
+        .clipShape(RoundedRectangle(cornerRadius: m.pt(12)))
     }
 
-    /// The below-chart tooltip — mirrors `ProgressLineChart.jsx`'s own
-    /// info bar exactly: date, a "/" separator, then "Weight: {value}".
-    private var selectedPointDetail: some View {
-        Group {
+    private var selectionRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: m.pt(10)) {
             if let selectedPoint {
                 Text("\(TrainingDateFormatting.short(selectedPoint.date)) / Weight: \(selectedPoint.label)")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .evidenceText(.normal(12, 790, jakarta: false))
+                    .foregroundStyle(m.c.ink)
             }
+            Spacer(minLength: 0)
+            Text("\(TrainingDateFormatting.short(validPoints.first!.date)) → \(TrainingDateFormatting.short(validPoints.last!.date))")
+                .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 13.5))
+                .foregroundStyle(m.c.muted)
         }
-    }
-
-    /// The web's own always-present static row, independent of any
-    /// interaction: first date (left), latest value (center), last date
-    /// (right).
-    private var summaryRow: some View {
-        HStack {
-            Text(TrainingDateFormatting.short(validPoints.first!.date))
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Spacer()
-            Text(validPoints.last!.label)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Spacer()
-            Text(TrainingDateFormatting.short(validPoints.last!.date))
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-        }
-    }
-
-    /// Nearest-x-neighbor scan, mirroring `updateActivePoint`
-    /// (`ProgressLineChart.jsx:49-62`) exactly: a tap or drag anywhere over
-    /// the plot area snaps to whichever observation's date is closest to
-    /// the touch location, not whichever dot the finger happens to land on
-    /// — the same "move across observations quickly" behavior the web's
-    /// pointer-scrub already provides.
-    private func selectNearestPoint(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        let relativeX = geometry.relativeX(in: proxy, at: location)
-        guard let touchedDate: Date = proxy.value(atX: relativeX) else { return }
-        guard let nearest = WeightEvidenceCalculator.nearestPoint(to: touchedDate, in: validPoints, dateValue: dateValue) else { return }
-        onSelect(nearest.id)
+        .padding(.vertical, m.pt(10))
+        .padding(.horizontal, m.pt(2))
+        .padding(.bottom, m.pt(1))
+        .overlay(alignment: .bottom) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("weight.trend.selection")
     }
 
     private func dateValue(_ dateString: String) -> Date {
@@ -420,8 +478,10 @@ private struct WeightTrendChartView: View {
     }
 }
 
+/// `.row`: week label + entry count, average and week-over-week delta.
 private struct WeeklyAverageRow: View {
     let week: WeightWeeklyAverage
+    private let m = EvidenceMetrics(family: .weight)
 
     private var deltaText: String {
         guard let delta = week.weekOverWeek else { return "Base" }
@@ -429,36 +489,13 @@ private struct WeeklyAverageRow: View {
         return String(format: "%@%.1f lb", sign, delta)
     }
 
-    private var deltaColor: Color {
-        guard let delta = week.weekOverWeek, delta < 0 else { return PhysiqueOSTheme.textMuted }
-        return PhysiqueOSTheme.chartSuccess
-    }
-
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Week of \(week.week)")
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text("\(week.entryCount) \(week.entryCount == 1 ? "entry" : "entries")")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-            Spacer(minLength: 8)
-            HStack(spacing: 14) {
-                Text(String(format: "%.1f lb", week.average))
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(deltaText)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(deltaColor)
-                    .frame(minWidth: 62, alignment: .trailing)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 18)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        WeightRow(
+            label: "Week of \(week.week)",
+            copy: "\(week.entryCount) \(week.entryCount == 1 ? "entry" : "entries")",
+            trailing: String(format: "%.1f lb", week.average),
+            trailingDetail: deltaText
+        )
     }
 }
 
@@ -466,59 +503,45 @@ private struct WeightHistoryRow: View {
     let entry: WeightHistoryEntry
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(TrainingDateFormatting.short(entry.date))
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(entry.detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-            Spacer(minLength: 8)
-            Text(entry.value)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 18)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
+        WeightRow(label: TrainingDayView.formatCompactDate(entry.date), copy: entry.detail, trailing: entry.value)
     }
 }
 
-/// A local disclosure (collapsed summary / expanded content) — mirrors
-/// `TrainingHistoryView.swift`'s private `TrainingDisclosureRow` exactly
-/// (matching the web's plain `<details>`/`<summary>` `ReportDrawer`
-/// styling), redefined here rather than exposed from that file since
-/// Training's own version stays `private` to its file by design.
-private struct EvidenceDisclosureRow<Summary: View, Expanded: View>: View {
-    @Binding var isExpanded: Bool
-    var summary: Summary
-    var expanded: Expanded
-
-    init(isExpanded: Binding<Bool>, @ViewBuilder summary: () -> Summary, @ViewBuilder expanded: () -> Expanded) {
-        self._isExpanded = isExpanded
-        self.summary = summary()
-        self.expanded = expanded()
-    }
+/// `.row`: 10 px vertical inset, 1 px rule below, read-only.
+private struct WeightRow: View {
+    let label: String
+    let copy: String
+    let trailing: String
+    var trailingDetail: String?
+    private let m = EvidenceMetrics(family: .weight)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-            } label: {
-                summary
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+        HStack(alignment: .center, spacing: m.pt(10)) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(label)
+                    .evidenceText(.normal(12, 790, jakarta: false))
+                    .foregroundStyle(m.c.ink)
+                Text(copy)
+                    .evidenceText(EvidenceTextStyle(size: 9.5, weight: 400, lineHeight: 12.825))
+                    .foregroundStyle(m.c.quiet)
+                    .padding(.top, m.pt(3))
             }
-            .buttonStyle(.plain)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-
-            expanded
-                .padding(.top, 12)
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: 0) {
+                Text(trailing)
+                    .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 13.5, monospacedDigits: true))
+                    .foregroundStyle(m.c.muted)
+                if let trailingDetail {
+                    Text(trailingDetail)
+                        .evidenceText(EvidenceTextStyle(size: 9.5, weight: 400, lineHeight: 12.825, monospacedDigits: true))
+                        .foregroundStyle(m.c.quiet)
+                }
+            }
         }
+        .padding(.vertical, m.pt(10))
+        .padding(.horizontal, m.pt(2))
+        .padding(.bottom, m.pt(1))
+        .overlay(alignment: .bottom) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
+        .accessibilityElement(children: .combine)
     }
 }

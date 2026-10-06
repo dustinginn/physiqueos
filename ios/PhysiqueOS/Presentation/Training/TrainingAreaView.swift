@@ -39,17 +39,14 @@ struct TrainingAreaView: View {
     let areaId: String
     var browseAll = false
 
+    private let m = EvidenceMetrics(family: .training)
+
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .evidencePageChrome(viewModel?.loadedArea?.title ?? "Training Library")
+        .evidenceFamily(.training)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = TrainingAreaViewModel(api: environment.trainingAPI, areaId: areaId, browseAll: browseAll)
@@ -63,76 +60,35 @@ struct TrainingAreaView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Training Evidence"), identifier: "training.area.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "training.area.failure")
         case .loaded(.none):
-            Text("This training area could not be found.")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .empty("This training area could not be found.", nil), identifier: "training.area.notFound")
         case .loaded(.some(let area)):
-            VStack(alignment: .leading, spacing: 24) {
-                TrainingLibraryHeaderView(title: area.title, breadcrumbs: area.breadcrumbs)
-                TrainingScopeSelectorView(scope: area.scope) { pillID in
-                    Task { await viewModel?.selectScope(pillID: pillID) }
+            TrainingLibraryHeaderView(title: area.title, breadcrumbs: area.breadcrumbs)
+            EvidenceScopePicker(scope: area.scope) { pillID in
+                Task { await viewModel?.selectScope(pillID: pillID) }
+            }
+            TrainingCatalogToggle(browseAll: viewModel?.browseAll == true) {
+                Task { await viewModel?.selectCatalog(browseAll: viewModel?.browseAll != true) }
+            }
+            EvidenceSection(title: "Browse", style: .open, identifier: "training.area.browse") {
+                EvidenceDividedList(data: area.exercises) { exercise in
+                    NavigationLink(value: exercise.destination) {
+                        EvidenceLinkRow(label: exercise.label, detail: exercise.detail)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("training.area.exercise.\(exercise.id)")
                 }
-                Button(viewModel?.browseAll == true ? "Show My Library" : "Browse All Exercises") {
-                    Task { await viewModel?.selectCatalog(browseAll: viewModel?.browseAll != true) }
-                }
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                browseCard(area.exercises)
             }
         }
     }
+}
 
-    /// `BrowseCard` (`DeepPagePrimitives.jsx:53-69`): `SectionHeader`
-    /// title="Browse" (no action) + `InformationList` — a flat, divided
-    /// list rather than individually-spaced cards like Training Areas'
-    /// own grid.
-    private func browseCard(_ exercises: [TrainingAreaExerciseRow]) -> some View {
-        CardContainer(padding: .sm) {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Browse")
-                LazyVStack(spacing: 0) {
-                    ForEach(exercises) { exercise in
-                        NavigationLink(value: exercise.destination) {
-                            HStack(spacing: 8) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(exercise.label)
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    if let detail = exercise.detail {
-                                        Text(detail)
-                                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                    }
-                                }
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 8)
-                            .frame(minHeight: 44)
-                            .frame(maxWidth: .infinity)
-                            .background(PhysiqueOSTheme.surfaceMuted)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-
-                        if exercise.id != exercises.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
-                        }
-                    }
-                }
-            }
-        }
+extension TrainingAreaViewModel {
+    var loadedArea: TrainingAreaReadModel? {
+        if case .loaded(let area) = state { return area }
+        return nil
     }
 }

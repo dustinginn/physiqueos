@@ -15,7 +15,8 @@ struct PhotoInspectionItem: Identifiable, Equatable {
     var isInspectable: Bool {
         switch source {
         case .authenticatedProduction, .authenticatedSandbox: true
-        case .placeholder, .assetName, .remoteURL: false
+        case .assetName: source.localImage != nil
+        case .placeholder, .remoteURL: false
         }
     }
 
@@ -44,10 +45,12 @@ struct PhotoInspectionRequest: Identifiable, Equatable {
 }
 
 extension View {
-    /// Presents the shared full-screen viewer for `request`.
-    func photoInspection(_ request: Binding<PhotoInspectionRequest?>) -> some View {
+    /// Presents the shared full-screen viewer for `request`. Evidence
+    /// presents it in the locked record chrome; every other caller keeps the
+    /// standard chrome.
+    func photoInspection(_ request: Binding<PhotoInspectionRequest?>, chrome: PhotoInspectionViewer.Chrome = .standard) -> some View {
         fullScreenCover(item: request) { request in
-            PhotoInspectionViewer(request: request)
+            PhotoInspectionViewer(request: request, chrome: chrome)
         }
     }
 
@@ -58,11 +61,13 @@ extension View {
     func inspectsPhoto(
         _ items: [PhotoInspectionItem],
         tapped id: String,
-        presenting request: Binding<PhotoInspectionRequest?>
+        presenting request: Binding<PhotoInspectionRequest?>,
+        showsCornerGlyph: Bool = true
     ) -> some View {
         if let target = items.first(where: { $0.id == id }), target.isInspectable {
             self
                 .overlay(alignment: .topTrailing) {
+                    if showsCornerGlyph {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.white.opacity(0.9))
@@ -71,6 +76,7 @@ extension View {
                         .padding(6)
                         .accessibilityHidden(true)
                         .allowsHitTesting(false)
+                    }
                 }
                 .contentShape(Rectangle())
                 // Not a Button: a tile's own Retry is a Button, and a Button nested
@@ -89,9 +95,15 @@ extension View {
 /// swipe down (when not zoomed) or Close to dismiss. Read-only: it can never
 /// mutate evidence.
 struct PhotoInspectionViewer: View {
+    /// `.record` is the locked Evidence inspector (P5): flat ✕ bar, the
+    /// photo inset in its own viewport, and a centered caption with the
+    /// pose/role, date, position and gesture hint.
+    enum Chrome { case standard, record }
+
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     let request: PhotoInspectionRequest
+    var chrome: Chrome = .standard
     /// Decoded images supplied by item id, used ahead of the stores. Lets the
     /// viewer render deterministically (previews, the visual/interaction test)
     /// without media transport; production callers never set it.
@@ -100,8 +112,9 @@ struct PhotoInspectionViewer: View {
     @State private var dragOffset: CGFloat = 0
     @State private var isZoomed = false
 
-    init(request: PhotoInspectionRequest, injectedImages: [String: UIImage] = [:]) {
+    init(request: PhotoInspectionRequest, chrome: Chrome = .standard, injectedImages: [String: UIImage] = [:]) {
         self.request = request
+        self.chrome = chrome
         self.injectedImages = injectedImages
         _selection = State(initialValue: min(max(request.startIndex, 0), max(request.items.count - 1, 0)))
     }
@@ -111,6 +124,111 @@ struct PhotoInspectionViewer: View {
     }
 
     var body: some View {
+        if chrome == .record {
+            recordBody
+        } else {
+            standardBody
+        }
+    }
+
+    private var pages: some View {
+        TabView(selection: $selection) {
+            ForEach(Array(request.items.enumerated()), id: \.element.id) { index, item in
+                PhotoInspectionPage(item: item, injectedImage: injectedImages[item.id], isSelected: index == selection, chrome: chrome, onZoomChange: { zoomed in
+                    if index == selection { isZoomed = zoomed }
+                })
+                .tag(index)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+    }
+
+    private var dismissDrag: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onChanged { value in
+                guard !isZoomed, value.translation.height > 0,
+                      abs(value.translation.height) > abs(value.translation.width) else { return }
+                dragOffset = value.translation.height
+            }
+            .onEnded { value in
+                if !isZoomed, value.translation.height > 140,
+                   abs(value.translation.height) > abs(value.translation.width) { dismiss() }
+                withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
+            }
+    }
+
+    /// The locked P5 record inspector.
+    private var recordBody: some View {
+        let m = EvidenceMetrics(family: .record)
+        return VStack(spacing: 0) {
+            HStack {
+                Button { dismiss() } label: {
+                    Text("✕")
+                        .evidenceText(.normal(12, 700, jakarta: false))
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, m.pt(16))
+                .accessibilityLabel("Close photo")
+                .accessibilityIdentifier("photoInspection.close")
+                Spacer()
+            }
+            .frame(height: m.pt(48 - 1))
+            .padding(.top, m.pt(-3))
+            Rectangle().fill(Color(red: 0x25 / 255, green: 0x2A / 255, blue: 0x2D / 255)).frame(height: m.pt(1))
+            ZStack(alignment: .bottom) {
+                RadialGradient(
+                    colors: [Color(red: 0x23 / 255, green: 0x30 / 255, blue: 0x3B / 255), Color(red: 0x06 / 255, green: 0x09 / 255, blue: 0x0C / 255)],
+                    center: UnitPoint(x: 0.5, y: 0.35), startRadius: 0, endRadius: m.pt(690) * 0.66 * 0.92
+                )
+                pages
+                if let current {
+                    VStack(spacing: 0) {
+                        Text(current.title).evidenceText(.normal(11, 700, jakarta: false)).foregroundStyle(.white)
+                        Text([current.caption, request.items.count > 1 ? "\(selection + 1) of \(request.items.count)" : nil].compactMap { $0 }.joined(separator: " · "))
+                            .evidenceText(.normal(11, 400, jakarta: false)).foregroundStyle(.white)
+                        Text(recordHint)
+                            .evidenceText(.normal(11, 400, jakarta: false))
+                            .foregroundStyle(Color(red: 0xAE / 255, green: 0xB8 / 255, blue: 0xBD / 255))
+                    }
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, m.pt(18))
+                    .padding(.bottom, m.pt(40))
+                    .allowsHitTesting(false)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .frame(maxHeight: m.pt(690))
+            .clipped()
+            .padding(.horizontal, m.pt(15))
+            .padding(.top, m.pt(14))
+            .offset(y: dragOffset)
+            .simultaneousGesture(dismissDrag)
+            .opacity(1 - min(Double(dragOffset) / 600, 0.4))
+            Spacer(minLength: 0)
+        }
+        .background(Color(red: 0x02 / 255, green: 0x04 / 255, blue: 0x05 / 255).ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
+        .accessibilityAction(.escape) { dismiss() }
+        .onChange(of: selection) { _, _ in isZoomed = false }
+        .onDisappear(perform: releaseImages)
+    }
+
+    private var recordHint: String {
+        guard request.items.count > 1 else { return "Pinch to zoom · double-tap" }
+        let other = request.items.indices.contains(selection == 0 ? 1 : selection - 1) ? request.items[selection == 0 ? 1 : selection - 1] : nil
+        let role = other?.title.components(separatedBy: " · ").last ?? "next photo"
+        return "Pinch to zoom · double-tap · swipe for \(role)"
+    }
+
+    private func releaseImages() {
+        let ids = request.items.compactMap(\.mediaKey)
+        environment.founderProductionPhotoMediaStore.releaseInspectionImages(mediaIds: ids)
+    }
+
+    private var standardBody: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             TabView(selection: $selection) {
@@ -198,6 +316,7 @@ private struct PhotoInspectionPage: View {
     /// away from a zoomed photo and back never leaves it zoomed behind a
     /// zoom flag that says otherwise.
     var isSelected: Bool = true
+    var chrome: PhotoInspectionViewer.Chrome = .standard
     let onZoomChange: (Bool) -> Void
 
     var body: some View {
@@ -205,9 +324,15 @@ private struct PhotoInspectionPage: View {
             switch resolvedState {
             case .image(let image):
                 ZoomableImageView(image: image, resetsZoom: !isSelected, onZoomChange: onZoomChange)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(edges: chrome == .record ? [] : .all)
+                    .overlay(alignment: .top) {
+                        if chrome == .record, showsLowResolutionNotice {
+                            recordState(title: "Full resolution unavailable", copy: nil, retry: true)
+                                .padding(.top, 12)
+                        }
+                    }
                     .overlay(alignment: .bottom) {
-                        if showsLowResolutionNotice {
+                        if chrome == .standard, showsLowResolutionNotice {
                             Button("Full resolution unavailable · Try again") { Task { await retry() } }
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                                 .foregroundStyle(.white)
@@ -221,11 +346,26 @@ private struct PhotoInspectionPage: View {
                     .accessibilityHint("Pinch to zoom. Double tap to zoom in or out.")
                     .accessibilityAddTraits(.isImage)
             case .loading:
-                ProgressView().tint(.white)
+                if chrome == .record {
+                    VStack(spacing: 8) {
+                        RecordSpinner()
+                        Text("Loading photo…").evidenceText(RecordText.stateCopy).foregroundStyle(Color(white: 0.7))
+                    }
+                } else {
+                    ProgressView().tint(.white)
+                }
             case .failed:
-                unavailable(message: "The photo couldn't be loaded.", showsRetry: true)
+                if chrome == .record {
+                    recordState(title: "The photo couldn't be loaded.", copy: nil, retry: true)
+                } else {
+                    unavailable(message: "The photo couldn't be loaded.", showsRetry: true)
+                }
             case .unavailable:
-                unavailable(message: "Photo unavailable", showsRetry: false)
+                if chrome == .record {
+                    recordState(title: "Photo unavailable", copy: "This item cannot be retrieved.", retry: false)
+                } else {
+                    unavailable(message: "Photo unavailable", showsRetry: false)
+                }
             }
         }
         .task(id: item.id) { await load() }
@@ -262,7 +402,9 @@ private struct PhotoInspectionPage: View {
             case .failed: return .failed
             default: return .loading
             }
-        case .placeholder, .assetName, .remoteURL:
+        case .assetName:
+            return item.source.localImage.map(PageState.image) ?? .unavailable
+        case .placeholder, .remoteURL:
             return .unavailable
         }
     }
@@ -284,6 +426,23 @@ private struct PhotoInspectionPage: View {
         } else if case .authenticatedSandbox(let viewIdentity, let mediaId) = item.source {
             await environment.founderPhotoMediaStore.retryImage(viewIdentity: viewIdentity, mediaId: mediaId)
         }
+    }
+
+    /// The locked P6 media state, on the inspector's dark viewport.
+    private func recordState(title: String, copy: String?, retry showsRetry: Bool) -> some View {
+        VStack(spacing: 0) {
+            Text(title).evidenceText(RecordText.stateTitle).foregroundStyle(.white)
+            if let copy {
+                Text(copy).evidenceText(RecordText.stateCopy).foregroundStyle(Color(white: 0.7)).padding(.top, 4)
+            }
+            if showsRetry {
+                Button { Task { await retry() } } label: { RecordRetryLabel() }
+                    .buttonStyle(.plain)
+                    .padding(.top, 8)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .padding(12)
     }
 
     private func unavailable(message: String, showsRetry: Bool) -> some View {

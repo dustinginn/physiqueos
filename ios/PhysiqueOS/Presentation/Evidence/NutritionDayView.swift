@@ -14,16 +14,14 @@ struct NutritionDayView: View {
     @State private var viewModelAuthority: NativeAPIEnvironment?
     let dayId: String
 
+    private let m = EvidenceMetrics(family: .daily)
+
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage(top: 10) {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .evidencePageChrome(TrainingDateFormatting.short(viewModel?.loadedDay?.date ?? ""))
+        .evidenceFamily(.daily)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = NutritionDayViewModel(api: environment.nutritionAPI, dayId: dayId)
@@ -37,81 +35,77 @@ struct NutritionDayView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Nutrition Evidence…"), identifier: "nutrition.day.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "nutrition.day.failure")
         case .loaded(.none):
-            Text("No nutrition evidence for this day.")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .empty("No nutrition evidence for this day.", nil), identifier: "nutrition.day.empty")
         case .loaded(.some(let day)):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: day)
-                summaryCard(day)
-                totalsCard(day.totals)
-                mealsCard(day.meals, totals: day.totals)
+            EvidencePageHeader(eyebrow: "Nutrition Day", title: TrainingDayView.formatCompactDate(day.date), subtitle: day.value, dateTitle: true)
+            EvidenceSection(title: "Summary", style: .containedDeep, identifier: "nutrition.day.summary") {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(day.detail)
+                        .evidenceText(EvidenceTextStyle(size: 9, weight: 600, lineHeight: 12.42))
+                        .foregroundStyle(m.c.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !day.sourceEvidence.isEmpty {
+                        EvidenceDailyProvenance(title: "Source · \(day.sourceEvidence.joined(separator: ", "))")
+                            .padding(.top, m.pt(9))
+                    }
+                }
             }
-        }
-    }
-
-    private func header(for day: NutritionDayRecord) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Nutrition Day")
-                .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
-                .foregroundStyle(PhysiqueOSTheme.accent)
-            Text(TrainingDayView.formatCompactDate(day.date))
-                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text(day.value)
-                .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func summaryCard(_ day: NutritionDayRecord) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionHeading("Summary")
-                Text(day.detail)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+            EvidenceSection(title: "Totals", style: .containedDeep, identifier: "nutrition.day.totals") {
+                NutritionMacroGridView(totals: day.totals)
             }
-        }
-    }
-
-    private func totalsCard(_ totals: NutritionMacroTotals) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeading("Totals")
-                NutritionMacroGridView(totals: totals)
-            }
-        }
-    }
-
-    private func mealsCard(_ meals: [NutritionMealRecord], totals: NutritionMacroTotals) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeading("Meals")
-                if meals.isEmpty {
-                    Text(NutritionDayView.emptyMealsCopy(totals: totals))
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            EvidenceSection(title: "Meals", style: .containedDeep, identifier: "nutrition.day.meals") {
+                if day.meals.isEmpty {
+                    NutritionDayTotalsOnlyPanel(text: NutritionDayView.emptyMealsCopy(totals: day.totals))
                 } else {
-                    VStack(spacing: 10) {
-                        ForEach(meals) { meal in
+                    VStack(spacing: 0) {
+                        ForEach(day.meals) { meal in
                             NutritionMealRowView(meal: meal)
                         }
                     }
                 }
             }
         }
+    }
+}
+
+extension NutritionDayViewModel {
+    var loadedDay: NutritionDayRecord? {
+        if case .loaded(let day) = state { return day }
+        return nil
+    }
+}
+
+/// Locked N4: an Apple Health totals-only day stays valid without meals.
+private struct NutritionDayTotalsOnlyPanel: View {
+    let text: String
+    private let m = EvidenceMetrics(family: .daily)
+
+    var body: some View {
+        let parts = text.components(separatedBy: ". ")
+        VStack(spacing: m.pt(4)) {
+            Text("≈")
+                .evidenceText(.normal(12, 900))
+                .foregroundStyle(m.c.teal)
+                .accessibilityHidden(true)
+            Text(parts.first.map { $0.hasSuffix(".") ? $0 : $0 + "." } ?? text)
+                .evidenceText(.normal(11, 840))
+                .foregroundStyle(m.c.ink)
+            if parts.count > 1 {
+                Text(parts.dropFirst().joined(separator: ". "))
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.6))
+                    .foregroundStyle(m.c.muted)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .padding(m.pt(18 + 1))
+        .frame(maxWidth: .infinity, minHeight: m.pt(100))
+        .overlay(RoundedRectangle(cornerRadius: m.pt(15)).strokeBorder(m.c.line, lineWidth: m.pt(1)))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
     }
 }
 
@@ -133,15 +127,18 @@ extension NutritionDayView {
 /// mirror `nutritionMealPresentation.js`'s dark-theme values exactly
 /// (`PhysiqueOSTheme.mealBreakfast/mealLunch/mealDinner/mealSnacks`,
 /// confirmed matching hex during this port's audit).
+/// `.meal`: glyph + name + calories, identification state, colored macro
+/// line, then foods with serving sizes. Ruled above each meal.
 private struct NutritionMealRowView: View {
     let meal: NutritionMealRecord
+    private let m = EvidenceMetrics(family: .daily)
 
     private var slotColor: Color {
         switch meal.slot {
-        case .breakfast: PhysiqueOSTheme.mealBreakfast
-        case .lunch: PhysiqueOSTheme.mealLunch
-        case .dinner: PhysiqueOSTheme.mealDinner
-        case .snacks: PhysiqueOSTheme.mealSnacks
+        case .breakfast: m.c.breakfast
+        case .lunch: m.c.lunch
+        case .dinner: m.c.dinner
+        case .snacks: m.c.snacks
         }
     }
 
@@ -150,67 +147,62 @@ private struct NutritionMealRowView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: m.pt(7)) {
                 Text(meal.slot.glyph)
+                    .evidenceText(.normal(12, 900))
                     .foregroundStyle(slotColor)
+                    .accessibilityHidden(true)
                 Text(meal.name ?? meal.slot.label)
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Spacer(minLength: 8)
+                    .evidenceText(.normal(11, 840))
+                    .foregroundStyle(m.c.ink)
+                Spacer(minLength: m.pt(8))
                 if let calories = meal.totals.calories, calories.isFinite {
                     Text("\(Int(calories)) cal")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .evidenceText(.normal(9, 750, digits: true))
+                        .foregroundStyle(m.c.muted)
                 }
             }
             Text(completenessLabel)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            HStack(spacing: 12) {
-                macroLabel("P", meal.totals.proteinG, PhysiqueOSTheme.macroProtein)
-                macroLabel("C", meal.totals.carbsG, PhysiqueOSTheme.macroCarbohydrates)
-                macroLabel("F", meal.totals.fatG, PhysiqueOSTheme.macroFat)
+                .evidenceText(.normal(8, 400))
+                .foregroundStyle(m.c.quiet)
+                .padding(.top, m.pt(3))
+            HStack(spacing: m.pt(12)) {
+                macroLabel("P", meal.totals.proteinG, m.c[keyPath: NutritionEvidenceMacro.protein.paletteColor])
+                macroLabel("C", meal.totals.carbsG, m.c[keyPath: NutritionEvidenceMacro.carbohydrates.paletteColor])
+                macroLabel("F", meal.totals.fatG, m.c[keyPath: NutritionEvidenceMacro.fat.paletteColor])
             }
-            if !meal.foods.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(meal.foods) { food in
-                        HStack(spacing: 4) {
-                            Text(food.name)
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            if let brand = food.brand {
-                                Text("(\(brand))")
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            }
-                            Spacer(minLength: 8)
-                            if let servingSize = food.servingSize {
-                                Text(servingSize)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            }
-                        }
+            .padding(.top, m.pt(6))
+            ForEach(meal.foods) { food in
+                HStack(spacing: m.pt(6)) {
+                    Text(food.name)
+                        .evidenceText(.normal(9, 750))
+                        .foregroundStyle(m.c.ink)
+                    if let brand = food.brand {
+                        Text(brand)
+                            .evidenceText(.normal(9, 400))
+                            .foregroundStyle(m.c.muted)
+                    }
+                    Spacer(minLength: m.pt(8))
+                    if let servingSize = food.servingSize {
+                        Text(servingSize)
+                            .evidenceText(.normal(9, 400, digits: true))
+                            .foregroundStyle(m.c.muted)
                     }
                 }
-                .padding(.top, 2)
+                .padding(.top, m.pt(5))
             }
         }
-        .padding(12)
+        .padding(.vertical, m.pt(11))
+        .padding(.top, m.pt(1))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(alignment: .top) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
         .accessibilityElement(children: .combine)
     }
 
     private func macroLabel(_ symbol: String, _ grams: Double?, _ color: Color) -> some View {
-        HStack(spacing: 2) {
-            Text(symbol)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(color)
-            Text(grams.map { $0.isFinite ? "\(Int($0))g" : "—" } ?? "—")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
+        Text("\(symbol) \(grams.map { $0.isFinite ? "\(Int($0))g" : "—" } ?? "—")")
+            .evidenceText(.normal(9, 800, digits: true))
+            .foregroundStyle(color)
     }
 }

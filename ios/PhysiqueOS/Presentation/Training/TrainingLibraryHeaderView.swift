@@ -1,59 +1,46 @@
 import SwiftUI
 
-/// Mirrors `TrainingLibraryHeader`/`TrainingReportingHeader`
-/// (`TrainingKnowledgeScreen.jsx:181-220` and the reporting equivalent):
-/// a small eyebrow, the page's own title, a breadcrumb pill row, and an
-/// optional description line — only the bare Training Library root page
-/// and Reporting pages have a description; a bare Training Area page or
-/// an exercise-detail page set `summary: null` (`getLibraryContent`/
-/// `getExerciseDetailContent`), so `summary` defaults to `nil` for those
-/// call sites. `eyebrow` defaults to "Training Library" (every
-/// `navigationMode: "training-library"` page); Reporting pages
-/// (`navigationMode: "training-reporting"`) pass `"Reporting"` instead —
-/// same header shape, different static label, verified from source rather
-/// than assumed identical. Shared by `TrainingAreaView`,
-/// `TrainingExerciseDetailView`, `TrainingLibraryRootView`, and
-/// `TrainingReportingView`.
+/// The locked Training Library / Reporting header: eyebrow, title, then
+/// the breadcrumb chips (real navigation links), then an optional summary.
 struct TrainingLibraryHeaderView: View {
     var eyebrow: String = "Training Library"
     let title: String
     let breadcrumbs: [TrainingBreadcrumb]
     var summary: String?
 
+    private let m = EvidenceMetrics(family: .training)
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(eyebrow)
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text(title)
-                    .physiqueOSFont(PhysiqueOSTypography.uploadingHeading24)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            }
-            HStack(spacing: 8) {
-                ForEach(breadcrumbs) { crumb in
-                    NavigationLink(value: crumb.destination) {
-                        Text(crumb.label)
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: 44)
-                            .background(PhysiqueOSTheme.surfaceMuted)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
-                            )
+        VStack(alignment: .leading, spacing: 0) {
+            EvidencePageHeader(eyebrow: eyebrow, title: title)
+            if !breadcrumbs.isEmpty {
+                HStack(spacing: m.pt(6)) {
+                    ForEach(breadcrumbs) { crumb in
+                        NavigationLink(value: crumb.destination) {
+                            Text(crumb.label)
+                                .evidenceText(.normal(10, 700))
+                                .foregroundStyle(m.c.muted)
+                                .padding(.horizontal, m.pt(9 + 1))
+                                .padding(.vertical, m.pt(7 + 1))
+                                .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(9)))
+                                .overlay(RoundedRectangle(cornerRadius: m.pt(9)).strokeBorder(m.c.line, lineWidth: m.pt(1)))
+                                .evidenceHitTarget(visualHeight: m.pt(28))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("training.crumb.\(crumb.label)")
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.top, m.pt(8 - 2))
             }
             if let summary {
                 Text(summary)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .evidenceText(EvidenceTextStyle(size: 12, weight: 400, lineHeight: 17.04))
+                    .foregroundStyle(m.c.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, m.pt(4))
             }
         }
+        .padding(.bottom, m.pt(breadcrumbs.isEmpty ? 0 : 2))
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

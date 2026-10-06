@@ -17,17 +17,14 @@ struct TrainingLibraryRootView: View {
     @State private var viewModel: TrainingLibraryRootViewModel?
     @State private var viewModelAuthority: NativeAPIEnvironment?
 
+    private let m = EvidenceMetrics(family: .training)
+
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .evidencePageChrome("Training Library")
+        .evidenceFamily(.training)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = TrainingLibraryRootViewModel(api: environment.trainingAPI)
@@ -48,73 +45,55 @@ struct TrainingLibraryRootView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Training Evidence"), identifier: "training.library.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "training.library.failure")
         case .loaded(let landing):
-            VStack(alignment: .leading, spacing: 24) {
-                TrainingLibraryHeaderView(
-                    title: "Training Library",
-                    breadcrumbs: [
-                        TrainingBreadcrumb(label: "Training", destination: .progressStream(streamId: "training")),
-                    ],
-                    summary: "Browse by muscle group and jump straight to exercises."
-                )
-                TrainingScopeSelectorView(scope: landing.scope) { pillID in
-                    Task { await viewModel?.selectScope(pillID: pillID) }
+            TrainingLibraryHeaderView(
+                title: "Training Library",
+                breadcrumbs: [
+                    TrainingBreadcrumb(label: "Training", destination: .progressStream(streamId: "training")),
+                ],
+                summary: "Browse by muscle group and jump straight to exercises."
+            )
+            EvidenceScopePicker(scope: landing.scope) { pillID in
+                Task { await viewModel?.selectScope(pillID: pillID) }
+            }
+            TrainingCatalogToggle(browseAll: viewModel?.browseAll == true) {
+                Task { await viewModel?.selectCatalog(browseAll: viewModel?.browseAll != true) }
+            }
+            EvidenceSection(title: "Browse", style: .open, identifier: "training.library.browse") {
+                EvidenceDividedList(data: landing.trainingAreas) { area in
+                    NavigationLink(value: AppDestination.trainingLibraryArea(areaId: area.id, browseAll: viewModel?.browseAll == true)) {
+                        EvidenceLinkRow(
+                            label: area.label,
+                            detail: area.exerciseCount > 0 ? "\(area.exerciseCount) exercise\(area.exerciseCount == 1 ? "" : "s")" : nil
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("training.library.area.\(area.id)")
                 }
-                Button(viewModel?.browseAll == true ? "Show My Library" : "Browse All Exercises") {
-                    Task { await viewModel?.selectCatalog(browseAll: viewModel?.browseAll != true) }
-                }
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                browseCard(landing.trainingAreas)
             }
         }
     }
+}
 
-    private func browseCard(_ areas: [TrainingAreaSummary]) -> some View {
-        CardContainer(padding: .sm) {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Browse")
-                VStack(spacing: 0) {
-                    ForEach(areas) { area in
-                        NavigationLink(value: AppDestination.trainingLibraryArea(areaId: area.id, browseAll: viewModel?.browseAll == true)) {
-                            HStack(spacing: 8) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(area.label)
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    if area.exerciseCount > 0 {
-                                        Text("\(area.exerciseCount) exercise\(area.exerciseCount == 1 ? "" : "s")")
-                                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                    }
-                                }
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 8)
-                            .frame(minHeight: 44)
-                            .frame(maxWidth: .infinity)
-                            .background(PhysiqueOSTheme.surfaceMuted)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
+/// The explicit catalog text toggle (`Browse All Exercises` /
+/// `Show My Library`), a `.section-action` line.
+struct TrainingCatalogToggle: View {
+    let browseAll: Bool
+    let action: () -> Void
+    private let m = EvidenceMetrics(family: .training)
 
-                        if area.id != areas.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
-                        }
-                    }
-                }
-            }
+    var body: some View {
+        Button(action: action) {
+            Text(browseAll ? "Show My Library" : "Browse All Exercises")
+                .evidenceText(.normal(10, 800))
+                .foregroundStyle(m.c.purple)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .evidenceHitTarget(visualHeight: m.pt(12))
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("training.catalogToggle")
     }
 }

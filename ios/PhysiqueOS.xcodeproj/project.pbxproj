@@ -381,6 +381,10 @@
 		000000000000000000001A03 /* NetworkDiagnosticsExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A02 /* NetworkDiagnosticsExport.swift */; };
 		000000000000000000001A05 /* NetworkDiagnosticsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A04 /* NetworkDiagnosticsSection.swift */; };
 		000000000000000000001B01 /* DEXAHealthKitWriteback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001B00 /* DEXAHealthKitWriteback.swift */; };
+		000000000000000000001D01 /* EvidenceKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D00 /* EvidenceKit.swift */; };
+		000000000000000000001D03 /* EvidenceKitComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D02 /* EvidenceKitComponents.swift */; };
+		000000000000000000001D05 /* EvidenceRecordComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D04 /* EvidenceRecordComponents.swift */; };
+		000000000000000000001D07 /* EvidenceWorkflowKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D06 /* EvidenceWorkflowKit.swift */; };
 		0000000000000000000012D9 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D8 /* HealthKitSynchronizationTests.swift */; };
 		0000000000000000000012DB /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DA /* HealthKitSleepIngestionTests.swift */; };
 		0000000000000000000012DD /* HealthKitSleepHistoricalValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DC /* HealthKitSleepHistoricalValidationTests.swift */; };
@@ -817,6 +821,10 @@
 		000000000000000000001A02 /* NetworkDiagnosticsExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkDiagnosticsExport.swift"; sourceTree = "<group>"; };
 		000000000000000000001A04 /* NetworkDiagnosticsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetworkDiagnosticsSection.swift"; sourceTree = "<group>"; };
 		000000000000000000001B00 /* DEXAHealthKitWriteback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHealthKitWriteback.swift"; sourceTree = "<group>"; };
+		000000000000000000001D00 /* EvidenceKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceKit.swift"; sourceTree = "<group>"; };
+		000000000000000000001D02 /* EvidenceKitComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceKitComponents.swift"; sourceTree = "<group>"; };
+		000000000000000000001D04 /* EvidenceRecordComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceRecordComponents.swift"; sourceTree = "<group>"; };
+		000000000000000000001D06 /* EvidenceWorkflowKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceWorkflowKit.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* HomeRedesignReviewFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeRedesignReviewFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011ED /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
@@ -1347,6 +1355,10 @@
 				0000000000000000000013AE /* RecoverySleepViewModels.swift */,
 				0000000000000000000013B0 /* RecoverySleepViews.swift */,
 				0000000000000000000013BA /* SleepAxisPolicy.swift */,
+				000000000000000000001D00 /* EvidenceKit.swift */,
+				000000000000000000001D02 /* EvidenceKitComponents.swift */,
+				000000000000000000001D04 /* EvidenceRecordComponents.swift */,
+				000000000000000000001D06 /* EvidenceWorkflowKit.swift */,
 			);
 			path = Evidence;
 			sourceTree = "<group>";
@@ -2243,6 +2255,10 @@
 				000000000000000000001A03 /* NetworkDiagnosticsExport.swift in Sources */,
 				000000000000000000001A05 /* NetworkDiagnosticsSection.swift in Sources */,
 				000000000000000000001B01 /* DEXAHealthKitWriteback.swift in Sources */,
+				000000000000000000001D01 /* EvidenceKit.swift in Sources */,
+				000000000000000000001D03 /* EvidenceKitComponents.swift in Sources */,
+				000000000000000000001D05 /* EvidenceRecordComponents.swift in Sources */,
+				000000000000000000001D07 /* EvidenceWorkflowKit.swift in Sources */,
 				000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */,
 				000000000000000000001618 /* CompleteWorkoutSetIntent.swift in Sources */,
 				00000000000000000000161B /* WorkoutLiveActivityViews.swift in Sources */,

@@ -30,41 +30,19 @@ import SwiftUI
 ///    interaction adaptation was needed here.
 struct NutritionHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: NutritionHistoryViewModel?
     @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var isHistorySheetPresented = false
 
-    /// `NUTRITION_HISTORY_PREVIEW_LIMIT` (`ProgressPlaceholderScreen.jsx`).
     static let historyPreviewLimit = 3
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Evidence Hub")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .evidencePageChrome("Nutrition")
+        .evidenceFamily(.daily)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = NutritionHistoryViewModel(api: environment.nutritionAPI)
@@ -85,197 +63,182 @@ struct NutritionHistoryView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Nutrition Evidence…"), identifier: "nutrition.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "nutrition.failure")
         case .loaded(let landing):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: landing)
-                TrainingScopeSelectorView(scope: landing.scope) { scopeID in
-                    Task { await viewModel?.selectScope(pillID: scopeID) }
-                }
-                latestNutritionDayCard(landing.latestNutritionDay)
-                infoLinksCard(title: "Reporting", links: landing.reportingLinks)
-                infoLinksCard(title: "Nutrition Areas", links: landing.nutritionAreas)
-                recentHistoryCard(landing.nutritionHistory)
+            EvidencePageHeader(symbol: "⌁", eyebrow: "Evidence Report", title: landing.title, subtitle: landing.subtitle ?? "What PhysiqueOS currently understands.")
+            EvidenceScopePicker(scope: landing.scope) { scopeID in
+                Task { await viewModel?.selectScope(pillID: scopeID) }
             }
+            latestNutritionDaySection(landing.latestNutritionDay)
+            reportingSection(landing.reportingLinks)
+            recentHistorySection(landing.nutritionHistory)
         }
     }
 
-    private func header(for landing: NutritionLandingReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: landing.tone, size: .lg, isCircular: true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text(landing.title)
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(landing.subtitle ?? "What PhysiqueOS currently understands.")
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
+    // MARK: - Latest Nutrition Day (hero field → Nutrition Day)
 
-    private func latestNutritionDayCard(_ day: NutritionDayRecord?) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Latest Nutrition Day")
-                if let day {
-                    NavigationLink(value: day.destination) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(TrainingDateFormatting.short(day.date))
-                                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+    private func latestNutritionDaySection(_ day: NutritionDayRecord?) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            EvidenceDailySectionHead(title: "Latest Nutrition Day") { EmptyView() }
+            if let day {
+                NavigationLink(value: day.destination) {
+                    EvidenceDailyHero {
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack(alignment: .top, spacing: m.pt(10)) {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(TrainingDayView.formatCompactDate(day.date))
+                                        .evidenceText(.normal(12, 840))
+                                        .foregroundStyle(m.c.ink)
                                     Text(day.value)
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .evidenceText(.normal(11, 800))
+                                        .foregroundStyle(m.c.ink)
+                                        .padding(.top, m.pt(2))
                                     Text(day.detail)
-                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .evidenceText(EvidenceTextStyle(size: 9, weight: 600, lineHeight: 12.42))
+                                        .foregroundStyle(m.c.muted)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .padding(.top, m.pt(3))
                                 }
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                Text("›")
+                                    .evidenceText(EvidenceTextStyle(size: 20, weight: 400, lineHeight: 20))
+                                    .foregroundStyle(m.c.teal)
                             }
                             NutritionMacroGridView(totals: day.totals)
+                                .padding(.top, m.pt(10))
                         }
-                        .padding(12)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) nutrition: \(day.value). \(day.detail)")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("nutrition.latestDay")
+            } else {
+                Text("Nutrition days will appear here once meals, macros, or nutrition screenshots are uploaded.")
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                    .foregroundStyle(m.c.muted)
+            }
+        }
+    }
+
+    // MARK: - Reporting (the three functional reports; the duplicate,
+    // non-navigating Nutrition Areas block is not presented — locked
+    // Founder correction `8e6bd94b`)
+
+    private func reportingSection(_ links: [NutritionInfoLink]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            EvidenceDailySectionHead(title: "Reporting") { EmptyView() }
+            EvidenceDailyOpenList(data: links) { link in
+                if let destination = link.destination {
+                    NavigationLink(value: destination) {
+                        EvidenceDailyRow(label: link.label, copy: link.detail, chevron: .center)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) nutrition: \(day.value). \(day.detail)")
                     .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier("nutrition.report.\(link.id)")
                 } else {
-                    Text("Nutrition days will appear here once meals, macros, or nutrition screenshots are uploaded.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    // A Reporting row without a canonical destination stays
+                    // informational, exactly as before — never dropped.
+                    EvidenceDailyRow(label: link.label, copy: link.detail, showsChevron: false)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("nutrition.report.\(link.id)")
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("nutrition.reporting")
     }
 
-    /// "Reporting" / "Nutrition Areas" — informational rows only (see the
-    /// type-level doc comment above for why these don't navigate yet).
-    /// Rows with a real `destination` (the 3 real Reporting ids) navigate;
-    /// rows without one (Nutrition Areas, still out of scope this pass)
-    /// stay informational, matching `ActivityAreaSummary`'s own
-    /// non-navigating treatment.
-    private func infoLinksCard(title: String, links: [NutritionInfoLink]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: title)
-                VStack(spacing: 8) {
-                    ForEach(links) { link in
-                        if let destination = link.destination {
-                            NavigationLink(value: destination) {
-                                infoLinkRow(link)
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            infoLinkRow(link)
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // MARK: - Recent Nutrition History (3-row preview + Show All sheet)
 
-    private func infoLinkRow(_ link: NutritionInfoLink) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(link.label)
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(link.detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-            if link.destination != nil {
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(link.destination != nil ? .isButton : [])
-    }
-
-    private func recentHistoryCard(_ history: [NutritionDayRecord]) -> some View {
+    private func recentHistorySection(_ history: [NutritionDayRecord]) -> some View {
         let preview = Array(history.prefix(Self.historyPreviewLimit))
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Recent Nutrition History") {
-                    if history.count > Self.historyPreviewLimit {
-                        Button {
-                            isHistorySheetPresented = true
-                        } label: {
-                            TrainingCompactActionLabel(label: "Show All")
-                        }
+        return VStack(alignment: .leading, spacing: 0) {
+            EvidenceDailySectionHead(title: "Recent Nutrition History") {
+                if history.count > Self.historyPreviewLimit {
+                    Button {
+                        isHistorySheetPresented = true
+                    } label: {
+                        EvidenceSectionAction(label: "Show All >")
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("nutrition.history.showAll")
                 }
-                if preview.isEmpty {
-                    Text("Nutrition history will appear as meals, macros, or nutrition screenshots are uploaded.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(preview) { day in
-                            NavigationLink(value: day.destination) {
-                                NutritionHistoryRow(day: day)
-                            }
-                            .buttonStyle(.plain)
-                        }
+            }
+            if preview.isEmpty {
+                Text("Nutrition history will appear as meals, macros, or nutrition screenshots are uploaded.")
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                    .foregroundStyle(m.c.muted)
+            } else {
+                EvidenceDailyOpenList(data: preview) { day in
+                    NavigationLink(value: day.destination) {
+                        NutritionHistoryRow(day: day)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("nutrition.history")
         .sheet(isPresented: $isHistorySheetPresented) {
             NutritionHistorySheet(days: history)
         }
     }
 }
 
+// MARK: - "Show All" sheet (locked N2)
+
 private struct NutritionHistorySheet: View {
+    @Environment(\.dismiss) private var dismiss
     let days: [NutritionDayRecord]
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(days) { day in
-                        NavigationLink(value: day.destination) {
-                            NutritionHistoryRow(day: day)
-                        }
-                        .buttonStyle(.plain)
+                EvidenceDailyOpenList(data: days) { day in
+                    NavigationLink(value: day.destination) {
+                        NutritionHistoryRow(day: day)
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(16)
+                .padding(.horizontal, m.pt(16))
+                .padding(.top, m.pt(6))
+                .padding(.bottom, m.pt(30))
             }
-            .background(PhysiqueOSTheme.background)
-            .navigationTitle("Recent Nutrition History")
+            .background(m.c.page)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(m.c.page, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Text("‹ Nutrition")
+                            .evidenceText(.normal(12, 750))
+                            .foregroundStyle(m.c.muted)
+                            .fixedSize()
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
+                    .accessibilityIdentifier("evidence.sheet.done")
+                }
+                .evidenceFlatToolbarItem()
+                ToolbarItem(placement: .principal) {
+                    Text("Recent Nutrition History")
+                        .evidenceText(.normal(12, 800))
+                        .foregroundStyle(m.c.ink)
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
+        .environment(\.evidenceBackTrail, nil)
+        .evidenceFamily(.daily)
         .presentationDetents([.medium, .large])
     }
 }
@@ -284,89 +247,37 @@ private struct NutritionHistoryRow: View {
     let day: NutritionDayRecord
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(TrainingDateFormatting.short(day.date))
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(day.detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(day.value)
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
+        EvidenceDailyRow(
+            label: TrainingDateFormatting.short(day.date),
+            copy: day.detail,
+            trailing: [day.value],
+            chevron: .stacked
+        )
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) nutrition: \(day.value). \(day.detail)")
+        .accessibilityIdentifier("nutrition.history.day.\(day.date)")
     }
 }
 
-/// Mirrors the web's exact semantic macro colors, verified directly from
-/// `src/app/globals.css`'s dark-theme custom properties (this app's single,
-/// fixed dark presentation): `--macro-protein: #fb7185`,
-/// `--macro-carbohydrates: #fbbf24`, `--macro-fat: #38bdf8` — these are the
-/// same hex values already defined as `PhysiqueOSTheme.macroProtein/
-/// macroCarbohydrates/macroFat`, confirmed to match exactly (this port adds
-/// no new color tokens for those three). Calories has no dedicated
-/// semantic token on the web — `NutritionCaloriesOverTimeChart.jsx` uses
-/// the generic chart palette `--chart-3` (`#fbbf24` dark), which is the
-/// same hex `PhysiqueOSTheme.chartEffort` already carries, reused here for
-/// the same reason rather than defining a redundant fourth token. Fiber
-/// has no web color at all (not part of the 3-macro palette) and renders
-/// in the neutral text color, matching that absence.
 struct NutritionMacroGridView: View {
     let totals: NutritionMacroTotals
 
-    private var tiles: [(label: String, value: String, color: Color)] {
+    var body: some View {
+        EvidenceDailyMetricGrid(items: Self.macroItems(totals).map { .init(label: $0.label, value: $0.value, valueColor: $0.macro?.color) })
+    }
+
+    /// The grid's labels, values and macro identities in order; colors come
+    /// from `NutritionEvidenceMacro`, the shared Nutrition color authority.
+    static func macroItems(_ totals: NutritionMacroTotals) -> [(label: String, value: String, macro: NutritionEvidenceMacro?)] {
         [
-            ("Calories", Self.formatWhole(totals.calories, unit: nil), PhysiqueOSTheme.nutritionCalories),
-            ("Protein", Self.formatWhole(totals.proteinG, unit: "g"), PhysiqueOSTheme.macroProtein),
-            ("Carbohydrates", Self.formatWhole(totals.carbsG, unit: "g"), PhysiqueOSTheme.macroCarbohydrates),
-            ("Fat", Self.formatWhole(totals.fatG, unit: "g"), PhysiqueOSTheme.macroFat),
-            ("Fiber", Self.formatWhole(totals.fiberG, unit: "g"), PhysiqueOSTheme.textPrimary),
+            ("Calories", formatWhole(totals.calories, unit: nil), .calories),
+            ("Protein", formatWhole(totals.proteinG, unit: "g"), .protein),
+            ("Carbohydrates", formatWhole(totals.carbsG, unit: "g"), .carbohydrates),
+            ("Fat", formatWhole(totals.fatG, unit: "g"), .fat),
+            ("Fiber", formatWhole(totals.fiberG, unit: "g"), nil),
         ]
     }
 
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-            ForEach(tiles, id: \.label) { tile in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tile.label)
-                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    Text(tile.value)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(tile.color)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(tile.label): \(tile.value)")
-            }
-        }
-    }
-
-    /// Always renders a whole number. HealthKit-derived Nutrition totals
-    /// frequently carry binary floating-point tails (e.g.
-    /// `2405.5120239257812`) that must never reach the user; round rather
-    /// than truncate so e.g. `2405.51` displays as `2406`, not `2405`.
-    /// Internal (not `private`) so `NutritionReadModelTests` can regression-test
-    /// it directly via `@testable import`, matching this app's convention
-    /// of testing formatting logic through the actual production entry point.
     static func formatWhole(_ value: Double?, unit: String?) -> String {
         guard let value, value.isFinite else { return "Pending" }
         let number = String(Int(value.rounded()))

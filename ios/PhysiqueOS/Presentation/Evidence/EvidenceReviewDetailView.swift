@@ -41,6 +41,39 @@ struct EvidenceReviewDetailView: View {
     }
 
     var body: some View {
+        presentation
+        .task(id: environment.nativeAuthority) { await load() }
+        .onAppear { environment.currentlyViewingReviewId = reviewId }
+        .onDisappear {
+            if environment.currentlyViewingReviewId == reviewId { environment.currentlyViewingReviewId = nil }
+        }
+        .alert(
+            "Dismiss this Evidence Review?",
+            isPresented: $showingDismissConfirmation
+        ) {
+            Button("Dismiss Review", role: .destructive) {
+                guard case .loaded(.some(let review)) = state else { return }
+                Task { await dismissReview(review: review) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The pending review will be discarded without changing canonical history.")
+        }
+    }
+
+    /// Generic reviews use the locked Evidence Review workflow (`85ef2a6c`);
+    /// Workout Match (`workoutReconciliation`) keeps its own branch, which
+    /// the Founder-approved Batch 2 L13 presentation owns.
+    @ViewBuilder
+    private var presentation: some View {
+        if EvidenceReviewPresentationRoute(state: state) == .workoutMatch {
+            workoutMatchScroll
+        } else {
+            genericWorkflowBody
+        }
+    }
+
+    private var workoutMatchScroll: some View {
         ScrollView {
             content
                 .padding(.horizontal, 16)
@@ -65,27 +98,16 @@ struct EvidenceReviewDetailView: View {
                 }
             }
         }
-        .task(id: environment.nativeAuthority) { await load() }
-        .onAppear { environment.currentlyViewingReviewId = reviewId }
-        .onDisappear {
-            if environment.currentlyViewingReviewId == reviewId { environment.currentlyViewingReviewId = nil }
-        }
-        .alert(
-            "Dismiss this Evidence Review?",
-            isPresented: $showingDismissConfirmation
-        ) {
-            Button("Dismiss Review", role: .destructive) {
-                guard case .loaded(.some(let review)) = state else { return }
-                Task { await dismissReview(review: review) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The pending review will be discarded without changing canonical history.")
-        }
     }
 
     private func load() async {
         state = .loading
+        #if DEBUG
+        if let fixture = EvidenceReviewWorkflowFixture.review(for: reviewId) {
+            applyReviewFixture(fixture)
+            return
+        }
+        #endif
         do {
             let review = try await environment.evidenceReviewAPI.fetchReview(reviewId: reviewId)
             state = .loaded(review)
@@ -682,14 +704,14 @@ struct EvidenceReviewDetailView: View {
         editedMeasurements = measurements
         measurementTexts = [
             "measuredAt": measurements.measuredAt ?? "",
-            "totalMass": measurements.totalMassLb.map(Self.formatNumber) ?? "",
-            "bodyFat": measurements.bodyFatPercentage.map(Self.formatNumber) ?? "",
-            "fatMass": measurements.fatMassLb.map(Self.formatNumber) ?? "",
-            "leanMass": measurements.leanMassLb.map(Self.formatNumber) ?? "",
-            "boneMineral": measurements.boneMineralContentLb.map(Self.formatNumber) ?? "",
-            "rmr": measurements.restingMetabolicRateKcal.map(Self.formatNumber) ?? "",
-            "vatMass": measurements.visceralAdiposeTissueMassLb.map(Self.formatNumber) ?? "",
-            "vatVolume": measurements.visceralAdiposeTissueVolumeIn3.map(Self.formatNumber) ?? "",
+            "totalMass": measurements.totalMassLb.map(Self.editableNumber) ?? "",
+            "bodyFat": measurements.bodyFatPercentage.map(Self.editableNumber) ?? "",
+            "fatMass": measurements.fatMassLb.map(Self.editableNumber) ?? "",
+            "leanMass": measurements.leanMassLb.map(Self.editableNumber) ?? "",
+            "boneMineral": measurements.boneMineralContentLb.map(Self.editableNumber) ?? "",
+            "rmr": measurements.restingMetabolicRateKcal.map(Self.editableNumber) ?? "",
+            "vatMass": measurements.visceralAdiposeTissueMassLb.map(Self.editableNumber) ?? "",
+            "vatVolume": measurements.visceralAdiposeTissueVolumeIn3.map(Self.editableNumber) ?? "",
         ]
         actionState = .editingMeasurements
     }
@@ -1160,6 +1182,17 @@ struct EvidenceReviewDetailView: View {
         value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 
+    /// The correction form's starting text: the exact interpreted value
+    /// (trailing zeros trimmed). The correction is a full replacement, so a
+    /// display-rounded pre-fill (`0.24` → `0.2`) would silently rewrite every
+    /// field the Founder did not touch.
+    static func editableNumber(_ value: Double) -> String {
+        var text = String(format: "%.6f", value)
+        while text.hasSuffix("0") { text.removeLast() }
+        if text.hasSuffix(".") { text.removeLast() }
+        return text
+    }
+
     /// What the Founder reads when the Server refuses a confirmation. A refusal
     /// is a failure, never an acknowledgement: the review stays pending and the
     /// message says why and what to do.
@@ -1248,3 +1281,516 @@ struct EvidenceReviewDetailView: View {
         return date.formatted(date: .omitted, time: .shortened)
     }
 }
+
+// MARK: - Presentation route
+
+/// Which presentation a review uses. Only a Workout Match
+/// (`workoutReconciliation`) keeps its specialised branch (Founder-approved
+/// Batch 2 L13); every other review — Nutrition, Activity, DEXA, Progress
+/// Photos, typed and mixed — uses the locked generic Evidence Review.
+enum EvidenceReviewPresentationRoute: Equatable {
+    case generic
+    case workoutMatch
+
+    init(review: EvidenceReviewDetailReadModel?) {
+        self = review?.workoutReconciliation == nil ? .generic : .workoutMatch
+    }
+
+    init(state: EvidenceReviewDetailView.LoadState) {
+        if case .loaded(let review) = state { self.init(review: review) } else { self = .generic }
+    }
+}
+
+// MARK: - Generic Evidence Review (locked Final Design Batch 1, `85ef2a6c`)
+
+extension EvidenceReviewDetailView {
+    var genericWorkflowBody: some View {
+        WorkflowPage {
+            genericContent
+        }
+        .physiqueOSScrollBottomClearance()
+        .workflowChrome(back: "Back")
+    }
+
+    @ViewBuilder
+    private var genericContent: some View {
+        switch state {
+        case .loading:
+            WorkflowSurface(tone: .rich) {
+                WorkflowStateRow(lead: .spinner, title: "Loading Evidence Review", isLast: true, identifier: "evidenceReview.loading")
+                    .padding(.vertical, -13)
+            }
+        case .failed(let message):
+            WorkflowSurface(tone: .rich) {
+                WorkflowStateRow(lead: .icon(.error), title: message, isLast: true, identifier: "evidenceReview.loadFailed")
+                    .padding(.vertical, -13)
+            }
+        case .loaded(.none):
+            WorkflowSurface(tone: .rich) {
+                WorkflowStateRow(lead: .icon(.question), title: "This Evidence Review could not be found.", isLast: true, identifier: "evidenceReview.notFound")
+                    .padding(.vertical, -13)
+            }
+        case .loaded(.some(let review)):
+            WorkflowReviewHero(
+                title: Self.statusLabel(review.status),
+                date: Self.genericOccurrenceDate(for: review),
+                version: review.version.map { "Version \($0)" }
+            )
+            if actionState == .editingMeasurements,
+               let dexaItem = review.items.first(where: { $0.dexaMeasurements != nil }) {
+                genericCorrectionForm(review: review, item: dexaItem)
+            } else {
+                genericItems(review)
+                genericActions(review)
+            }
+        }
+    }
+
+    /// The occurrence date in the locked long form (`Sep 23, 2026`): the
+    /// same items and rules as `occurrenceDateLabel`, never `createdAt`.
+    static func genericOccurrenceDate(for review: EvidenceReviewDetailReadModel) -> String? {
+        let included = review.items.filter(\.included)
+        let sourceItems = included.isEmpty ? review.items : included
+        var unique: [String] = []
+        for label in sourceItems.compactMap(\.date).map(longEvidenceDate) where !unique.contains(label) {
+            unique.append(label)
+        }
+        switch unique.count {
+        case 0: return nil
+        case 1: return unique[0]
+        default: return "\(unique.count) dates"
+        }
+    }
+
+    /// `Sep 23, 2026` for a `YYYY-MM-DD` key; Server-formatted labels pass through.
+    static func longEvidenceDate(_ value: String) -> String {
+        value.contains(",") ? value : TimelineDateFormatting.long(value)
+    }
+
+    // MARK: Captured evidence
+
+    private func genericItems(_ review: EvidenceReviewDetailReadModel) -> some View {
+        WorkflowSurface(tone: review.items.count == 1 ? .rich : .plain) {
+            VStack(alignment: .leading, spacing: 0) {
+                if review.items.count != 1 || review.summary != nil {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("CAPTURED EVIDENCE").evidenceText(WorkflowText.micro).foregroundStyle(WorkflowColor.muted)
+                        if let summary = review.summary {
+                            Text(summary)
+                                .evidenceText(WorkflowText.h2)
+                                .foregroundStyle(WorkflowColor.text)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(.bottom, 11)
+                }
+                if review.items.isEmpty {
+                    Text("No evidence items are attached to this review.")
+                        .evidenceText(WorkflowText.small)
+                        .foregroundStyle(WorkflowColor.muted)
+                        .padding(.top, 11)
+                } else {
+                    ForEach(Array(review.items.enumerated()), id: \.element.id) { index, item in
+                        genericItem(item, review: review, isLast: index == review.items.count - 1)
+                    }
+                }
+                if let excluded = review.excludedSummary {
+                    Text(excluded)
+                        .evidenceText(WorkflowText.small)
+                        .foregroundStyle(WorkflowColor.muted)
+                        .padding(.top, 10)
+                        .accessibilityIdentifier("evidenceReview.excludedSummary")
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("evidenceReview.items")
+    }
+
+    private func genericItem(_ item: EvidenceReviewDetailItem, review: EvidenceReviewDetailReadModel, isLast: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(item.title ?? Self.typeLabel(item.type)).evidenceText(WorkflowText.h3).foregroundStyle(WorkflowColor.text)
+                        .accessibilityIdentifier("evidenceReview.item.\(item.type)")
+                    if let source = item.sourceLabel {
+                        Text(source).evidenceText(WorkflowText.secondary).foregroundStyle(WorkflowColor.muted)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .trailing, spacing: 5) {
+                    WorkflowTag(text: item.included ? "✓ Included" : "− Excluded", tone: item.included ? .green : .muted)
+                    if let date = item.date {
+                        Text(Self.longEvidenceDate(date)).evidenceText(WorkflowText.secondary).foregroundStyle(WorkflowColor.muted)
+                    }
+                }
+            }
+            .padding(.bottom, 10)
+            if !item.metrics.isEmpty {
+                WorkflowGrid(items: item.metrics) { metric in
+                    WorkflowMetricTile(label: metric.label, value: metric.value, tone: Self.metricTone(metric.label, itemType: item.type))
+                }
+            } else if let measurements = item.dexaMeasurements {
+                // Server metrics own the DEXA presentation; the measurement
+                // set is shown only when the Server sent no metrics.
+                WorkflowGrid(items: Self.measurementTiles(measurements)) { tile in
+                    WorkflowMetricTile(label: tile.0, value: tile.1, tone: tile.0 == "Body fat" ? .amber : tile.0 == "RMR" ? .purple : .teal)
+                }
+            }
+            ForEach(item.meals) { meal in
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(meal.name).evidenceText(WorkflowText.h3).foregroundStyle(WorkflowColor.text)
+                    if !meal.summary.isEmpty {
+                        Text(meal.summary).evidenceText(WorkflowText.small).foregroundStyle(WorkflowColor.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(meal.foods) { food in
+                        let details = [food.brand, food.serving, food.calories].compactMap { $0 }.joined(separator: " · ")
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(food.name).evidenceText(WorkflowText.label).foregroundStyle(WorkflowColor.text)
+                            if !details.isEmpty { Text(details).evidenceText(WorkflowText.small).foregroundStyle(WorkflowColor.muted) }
+                        }
+                        .padding(.top, 6)
+                        .padding(.leading, 8)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 10)
+                .overlay(alignment: .top) { Rectangle().fill(WorkflowColor.line).frame(height: 1) }
+            }
+            ForEach(item.exercises) { exercise in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(exercise.name).evidenceText(WorkflowText.h3).foregroundStyle(WorkflowColor.text)
+                    ForEach([exercise.occurrenceLabel, exercise.variantLabel, exercise.sets.isEmpty ? nil : exercise.sets.joined(separator: " · "), exercise.supersetWith.isEmpty ? nil : "Superset with \(exercise.supersetWith.joined(separator: ", "))"].compactMap { $0 }, id: \.self) { line in
+                        Text(line).evidenceText(WorkflowText.small).foregroundStyle(WorkflowColor.muted)
+                    }
+                    if exercise.proposedNewExercise {
+                        WorkflowTag(text: "New exercise definition", tone: .green).padding(.top, 4)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 10)
+                .overlay(alignment: .top) { Rectangle().fill(WorkflowColor.line).frame(height: 1) }
+            }
+            if let reconciliation = item.reconciliation {
+                Text(reconciliation).evidenceText(WorkflowText.small).foregroundStyle(WorkflowColor.muted).padding(.top, 8)
+            }
+            if let typed = item.typedEvidence, !typed.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("SUBMITTED TEXT").evidenceText(WorkflowText.micro).foregroundStyle(WorkflowColor.teal)
+                    Text(typed).evidenceText(WorkflowText.small).foregroundStyle(WorkflowColor.muted).fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 10)
+            }
+            if let session = item.photoSession {
+                genericPhotoSession(session)
+            }
+        }
+        .padding(.vertical, 13)
+        .overlay(alignment: .bottom) {
+            if !isLast { Rectangle().fill(WorkflowColor.line).frame(height: 1) }
+        }
+    }
+
+    private func genericPhotoSession(_ session: EvidenceReviewPhotoSession) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("PHOTO SESSION").evidenceText(WorkflowText.micro).foregroundStyle(WorkflowColor.muted)
+            Text("Session \(session.sessionId)").evidenceText(WorkflowText.small).foregroundStyle(WorkflowColor.muted).padding(.vertical, 6)
+            if let time = session.timeOfDay {
+                Text("Time of day: \(time.capitalized)").evidenceText(WorkflowText.small).foregroundStyle(WorkflowColor.muted)
+            }
+            if let goal = session.goalRelationship {
+                Text("Goal relationship: \(goal)").evidenceText(WorkflowText.small).foregroundStyle(WorkflowColor.muted)
+            }
+            ForEach(Array(session.photos.enumerated()), id: \.element.id) { index, photo in
+                let identity = photo.label ?? photo.poseId ?? [photo.orientation, photo.contractionState, photo.poseVariant].compactMap { $0 }.joined(separator: " · ")
+                HStack(spacing: 9) {
+                    WorkflowFileIcon(size: 32)
+                    Text(identity.isEmpty ? "Pose needs review" : identity).evidenceText(WorkflowText.label).foregroundStyle(WorkflowColor.text)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .overlay(alignment: .bottom) {
+                    if index < session.photos.count - 1 { Rectangle().fill(WorkflowColor.line).frame(height: 1) }
+                }
+            }
+        }
+        .padding(.top, 7)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("evidenceReview.photoSession")
+    }
+
+    /// Nutrition macros resolve through `NutritionEvidenceMacro`, the same
+    /// authority as the Nutrition Evidence page; other metrics keep the
+    /// locked review tones.
+    static func metricTone(_ label: String, itemType: String) -> WorkflowMetricTile.Tone {
+        if itemType == "nutrition", let macro = NutritionEvidenceMacro(metricLabel: label) {
+            return .nutrition(macro)
+        }
+        return switch label.lowercased() {
+        case "protein", "rmr", "goal relationship": .purple
+        case "fat", "body fat": .amber
+        default: .teal
+        }
+    }
+
+    private static func measurementTiles(_ m: DEXAScanMeasurements) -> [(String, String)] {
+        [
+            m.totalMassLb.map { ("Total mass", "\(formatNumber($0)) lb") },
+            m.bodyFatPercentage.map { ("Body fat", "\(formatNumber($0))%") },
+            m.fatMassLb.map { ("Fat mass", "\(formatNumber($0)) lb") },
+            m.leanMassLb.map { ("Lean mass", "\(formatNumber($0)) lb") },
+            m.boneMineralContentLb.map { ("Bone mineral", "\(formatNumber($0)) lb") },
+            m.restingMetabolicRateKcal.map { ("RMR", "\(formatNumber($0)) kcal/day") },
+            m.visceralAdiposeTissueMassLb.map { ("VAT mass", "\(formatNumber($0)) lb") },
+            m.visceralAdiposeTissueVolumeIn3.map { ("VAT volume", "\(formatNumber($0)) in³") },
+        ].compactMap { $0 }
+    }
+
+    // MARK: Actions and lifecycle
+
+    @ViewBuilder
+    private func genericActions(_ review: EvidenceReviewDetailReadModel) -> some View {
+        switch actionState {
+        case .idle:
+            if review.status == "confirmed" {
+                lifecycleCard(.icon(.ok), "Confirmed", copy: Self.backgroundCopy, back: true)
+            } else if review.status == "committing" {
+                lifecycleCard(.spinner, "Confirming…")
+            } else if Self.isActionable(review.status) {
+                if review.items.contains(where: { $0.dexaMeasurements != nil }) {
+                    HStack(spacing: 9) {
+                        WorkflowButton(title: "Correct Measurements", identifier: "evidenceReview.correctMeasurements") { beginEditingMeasurements(review: review) }
+                    }
+                }
+                WorkflowPrimaryButton(title: "Confirm", identifier: "evidenceReview.confirm") { Task { await confirm(review: review) } }
+                if ["pending", "commit_failed"].contains(review.status) {
+                    WorkflowButton(title: "Dismiss", destructive: true, fullWidth: true, identifier: "evidenceReview.dismiss") { showingDismissConfirmation = true }
+                        .padding(.top, 10)
+                }
+            } else {
+                lifecycleCard(.icon(.muted), "Review unavailable")
+            }
+        case .editingMeasurements:
+            EmptyView()
+        case .savingMeasurements:
+            lifecycleCard(.spinner, "Saving corrections…")
+        case .confirming(let message):
+            lifecycleCard(.spinner, message)
+        case .dismissing:
+            lifecycleCard(.spinner, "Dismissing review…")
+        case .dismissed:
+            lifecycleCard(.icon(.muted), "Dismissed")
+        case .accepted:
+            lifecycleCard(.icon(.ok), "Confirmation accepted", copy: Self.backgroundCopy, back: true)
+        case .confirmed:
+            lifecycleCard(.icon(.ok), "Confirmed", copy: Self.backgroundCopy, back: true)
+        case .workoutReconciliationResolved:
+            lifecycleCard(.icon(.ok), "Confirmed", copy: Self.backgroundCopy, back: true)
+        case .stillProcessing:
+            WorkflowSurface(tone: .rich) {
+                WorkflowStateRow(lead: .icon(.wait), title: "Still confirming", copy: "This is taking longer than usual. Reopen this review in a moment to check its status — confirmation continues on the server regardless of this screen.", isLast: true, identifier: "evidenceReview.stillConfirming") {
+                    WorkflowActions { WorkflowButton(title: "Check Now", identifier: "evidenceReview.checkNow") { Task { await load(); actionState = .idle } } }
+                }
+                .padding(.vertical, -13)
+            }
+        case .refreshRequired(let message):
+            WorkflowSurface(tone: .rich) {
+                WorkflowStateRow(lead: .icon(.wait), title: "Refresh required", copy: message, isLast: true, identifier: "evidenceReview.refreshRequired") {
+                    WorkflowActions { WorkflowButton(title: "Refresh Review", identifier: "evidenceReview.refresh") { Task { actionState = .idle; await load() } } }
+                }
+                .padding(.vertical, -13)
+            }
+        case .failed(let message):
+            WorkflowSurface(tone: .rich) {
+                WorkflowStateRow(lead: .icon(.error), title: message, isLast: true, identifier: "evidenceReview.failed") {
+                    WorkflowActions { WorkflowButton(title: "Try Again", identifier: "evidenceReview.tryAgain") { actionState = .idle } }
+                }
+                .padding(.vertical, -13)
+            }
+        }
+    }
+
+    static let backgroundCopy = "PhysiqueOS owns this confirmation. Remaining analysis and briefing updates continue in the background."
+
+    private func lifecycleCard(_ lead: WorkflowStateRow<EmptyView>.Lead, _ title: String, copy: String? = nil, back: Bool = false) -> some View {
+        WorkflowSurface(tone: .rich) {
+            Group {
+                if back {
+                    WorkflowStateRow<WorkflowActions<WorkflowButton>>(lead: lead == .spinner ? .spinner : Self.iconLead(lead), title: title, copy: copy, isLast: true, identifier: "evidenceReview.lifecycle") {
+                        WorkflowActions {
+                            WorkflowButton(title: "Back to Log", identifier: "evidenceReview.backToLog") { onReturnToLog(); dismiss() }
+                        }
+                    }
+                } else {
+                    WorkflowStateRow(lead: lead, title: title, copy: copy, isLast: true, identifier: "evidenceReview.lifecycle")
+                }
+            }
+            .padding(.vertical, -13)
+        }
+    }
+
+    private static func iconLead(_ lead: WorkflowStateRow<EmptyView>.Lead) -> WorkflowStateRow<WorkflowActions<WorkflowButton>>.Lead {
+        switch lead {
+        case .spinner: .spinner
+        case .icon(let tone): .icon(tone)
+        }
+    }
+
+    // MARK: DEXA correction (full replacement)
+
+    private func genericCorrectionForm(review: EvidenceReviewDetailReadModel, item: EvidenceReviewDetailItem) -> some View {
+        WorkflowSurface {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Correct the interpreted scan").evidenceText(WorkflowText.h2).foregroundStyle(WorkflowColor.text)
+                Text("Every field is resent together — the server replaces the full measurement set, it does not merge.")
+                    .evidenceText(WorkflowText.small)
+                    .foregroundStyle(WorkflowColor.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 6)
+                    .padding(.bottom, 8)
+                ForEach(Array(Self.correctionFields.enumerated()), id: \.offset) { index, field in
+                    WorkflowRow(isLast: index == Self.correctionFields.count - 1) {
+                        HStack(spacing: 12) {
+                            Text(field.0).evidenceText(WorkflowText.label).foregroundStyle(WorkflowColor.text).fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            WorkflowNumericField(
+                                label: field.0,
+                                text: Binding(get: { measurementTexts[field.1] ?? "" }, set: { measurementTexts[field.1] = $0 }),
+                                width: 112,
+                                keyboard: field.1 == "measuredAt" ? .numbersAndPunctuation : .decimalPad
+                            )
+                        }
+                    }
+                }
+                HStack(spacing: 9) {
+                    WorkflowButton(title: "Cancel", identifier: "evidenceReview.cancelCorrection") { actionState = .idle }
+                    WorkflowButton(title: "Save Corrections", identifier: "evidenceReview.saveMeasurements") {
+                        Task { await saveMeasurements(review: review, item: item) }
+                    }
+                }
+                .padding(.top, 12)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("evidenceReview.correction")
+    }
+
+    /// Exact order and units of `dexa-review.measurements.v1`.
+    static let correctionFields: [(String, String)] = [
+        ("Measured date (YYYY-MM-DD)", "measuredAt"),
+        ("Total mass (lb)", "totalMass"),
+        ("Body fat (%)", "bodyFat"),
+        ("Fat mass (lb)", "fatMass"),
+        ("Lean mass (lb)", "leanMass"),
+        ("Bone mineral content (lb)", "boneMineral"),
+        ("Resting metabolic rate (kcal/day)", "rmr"),
+        ("Visceral fat mass (lb)", "vatMass"),
+        ("Visceral fat volume (in³)", "vatVolume"),
+    ]
+}
+
+extension WorkflowStateRow.Lead: Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.spinner, .spinner): true
+        case (.icon(let a), .icon(let b)): a == b
+        default: false
+        }
+    }
+}
+
+#if DEBUG
+// MARK: - Review-only fixtures (`evidence:review=<id>`), never in Release
+
+enum EvidenceReviewWorkflowFixture {
+    enum Load { case review(EvidenceReviewDetailReadModel, EvidenceReviewDetailView.ActionState), loading, failed, notFound }
+
+    static func review(for reviewId: String) -> Load? {
+        guard reviewId.hasPrefix("fixture-") else { return nil }
+        let key = String(reviewId.dropFirst("fixture-".count))
+        switch key {
+        case "loading": return .loading
+        case "failed": return .failed
+        case "notfound": return .notFound
+        case "mixed": return .review(mixed(status: "pending"), .idle)
+        case "photo": return .review(photo, .idle)
+        case "dexa": return .review(dexa, .idle)
+        case "dexa-correction": return .review(dexa, .editingMeasurements)
+        case "workout": return .review(workout, .idle)
+        default:
+            if key.hasPrefix("status-") { return .review(mixed(status: String(key.dropFirst("status-".count))), .idle) }
+            if key.hasPrefix("state-") {
+                let state: EvidenceReviewDetailView.ActionState = switch key.dropFirst("state-".count) {
+                case "saving": .savingMeasurements
+                case "confirming": .confirming("Confirming…")
+                case "dismissing": .dismissing
+                case "dismissed": .dismissed
+                case "accepted": .accepted
+                case "confirmed": .confirmed
+                case "still": .stillProcessing
+                case "refresh": .refreshRequired("The correction may have been accepted, but its final state could not be verified. Refresh before making another change.")
+                default: .failed("This review could not be updated.")
+                }
+                return .review(mixed(status: "pending"), state)
+            }
+            return nil
+        }
+    }
+
+    static func mixed(status: String) -> EvidenceReviewDetailReadModel {
+        EvidenceReviewDetailReadModel(
+            id: "fixture-mixed", status: status, createdAt: nil, version: 4,
+            items: [
+                EvidenceReviewDetailItem(id: "n1", type: "nutrition", date: "2026-09-23", title: "Nutrition", sourceLabel: "Screenshot", included: true,
+                    metrics: [.init(label: "Calories", value: "2,300 cal"), .init(label: "Protein", value: "198 g"), .init(label: "Carbs", value: "244 g"), .init(label: "Fat", value: "73 g")],
+                    meals: [.init(id: "m1", name: "Daily totals", summary: "Meal totals match the daily total.", foods: [])]),
+                EvidenceReviewDetailItem(id: "a1", type: "activity", date: "2026-09-23", title: "Activity", sourceLabel: "Screenshot", included: false,
+                    metrics: [.init(label: "Active calories", value: "650 cal"), .init(label: "Exercise", value: "45 min")]),
+            ],
+            summary: "1 nutrition entry and 1 activity entry",
+            excludedSummary: "1 activity entry excluded"
+        )
+    }
+
+    static let photo = EvidenceReviewDetailReadModel(
+        id: "fixture-photo", status: "pending", createdAt: nil, version: 4,
+        items: [EvidenceReviewDetailItem(id: "p1", type: "photo_session", date: "2026-09-23", title: "Progress Photos", sourceLabel: "Progress photos", included: true,
+            metrics: [.init(label: "Poses", value: "1 photo · Rear Relaxed"), .init(label: "Time of day", value: "Afternoon"), .init(label: "Goal relationship", value: "Build Lean Mass"), .init(label: "Source", value: "Progress photos")],
+            photoSession: EvidenceReviewPhotoSession(sessionId: "photo_session_20260923", timeOfDay: "afternoon", goalRelationship: "Build Lean Mass", photos: [EvidenceReviewPhotoIdentity(id: "ph1", poseId: nil, label: "Rear Relaxed", orientation: nil, contractionState: nil, poseVariant: nil)]))]
+    )
+
+    static let dexa = EvidenceReviewDetailReadModel(
+        id: "fixture-dexa", status: "pending", createdAt: nil, version: 4,
+        items: [EvidenceReviewDetailItem(id: "d1", type: "dexa_scan", date: "2026-09-23", title: "DEXA", sourceLabel: "Submitted evidence", included: true,
+            metrics: [.init(label: "Total mass", value: "172.9 lb"), .init(label: "Body fat", value: "8.1%"), .init(label: "Fat tissue", value: "14.0 lb"), .init(label: "Lean tissue", value: "152.3 lb"), .init(label: "Bone mineral", value: "6.6 lb"), .init(label: "RMR", value: "1,774 kcal/day"), .init(label: "VAT mass", value: "0.24 lb"), .init(label: "VAT volume", value: "7.1 in³"), .init(label: "PDF", value: "BodySpec_DXA_2026-09-23.pdf")],
+            dexaMeasurements: DEXAScanMeasurements(measuredAt: "2026-09-23", totalMassLb: 172.9, bodyFatPercentage: 8.1, fatMassLb: 14.0, leanMassLb: 152.3, boneMineralContentLb: 6.6, restingMetabolicRateKcal: 1774, visceralAdiposeTissueMassLb: 0.24, visceralAdiposeTissueVolumeIn3: 7.1))]
+    )
+
+    static let workout = EvidenceReviewDetailReadModel(
+        id: "fixture-workout", status: "pending", createdAt: nil, version: 2,
+        items: [],
+        workoutReconciliation: WorkoutReconciliationDetail(
+            localDate: "2026-09-23", title: "Apple Health strength workout", summary: "Choose the Logger session this workout belongs to.",
+            workout: .init(family: "strength", canonicalType: "traditional_strength_training", startedAt: "2026-09-23T17:02:00-07:00", endedAt: "2026-09-23T18:05:00-07:00"),
+            candidates: [.init(loggerSessionCanonicalId: "logger-1", confidence: 92, basis: "logger_session_window", activityType: "traditional_strength_training", startedAt: "2026-09-23T17:00:00-07:00", endedAt: "2026-09-23T18:04:00-07:00")]
+        )
+    )
+}
+
+extension EvidenceReviewDetailView {
+    func applyReviewFixture(_ fixture: EvidenceReviewWorkflowFixture.Load) {
+        switch fixture {
+        case .loading: state = .loading
+        case .failed: state = .failed("This Evidence Review could not be loaded.")
+        case .notFound: state = .loaded(nil)
+        case .review(let review, let action):
+            state = .loaded(review)
+            if action == .editingMeasurements {
+                beginEditingMeasurements(review: review)
+            } else {
+                // Same as a real load: a committing review is accepted.
+                actionState = review.status == "committing" ? .accepted : action
+            }
+        }
+    }
+}
+#endif

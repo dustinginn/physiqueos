@@ -42,41 +42,19 @@ import SwiftUI
 ///    `ActivityMetricGridView`.
 struct ActivityHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: ActivityHistoryViewModel?
     @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var isHistorySheetPresented = false
 
-    /// `ACTIVITY_HISTORY_PREVIEW_LIMIT` (`ProgressPlaceholderScreen.jsx`).
     static let historyPreviewLimit = 3
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage(top: 10) {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Evidence Hub")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .evidencePageChrome("Activity")
+        .evidenceFamily(.daily)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = ActivityHistoryViewModel(api: environment.activityAPI)
@@ -97,344 +75,233 @@ struct ActivityHistoryView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Activity Evidence…"), identifier: "activity.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "activity.failure")
         case .loaded(let landing):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: landing)
-                TrainingScopeSelectorView(scope: landing.scope) { scopeID in
-                    Task { await viewModel?.selectScope(pillID: scopeID) }
-                }
-                latestActivityDayCard(landing.latestActivityDay)
-                activityAreasCard(landing.activityAreas)
-                linkedTrainingContextCard(landing.linkedTrainingContext)
-                recentHistoryCard(landing.activityHistory)
+            EvidencePageHeader(symbol: "⌁", eyebrow: "Evidence Report", title: landing.title, subtitle: landing.subtitle)
+            EvidenceScopePicker(scope: landing.scope) { scopeID in
+                Task { await viewModel?.selectScope(pillID: scopeID) }
             }
+            latestActivityDaySection(landing.latestActivityDay)
+            activityAreasSection(landing.activityAreas)
+            ActivityLinkedTrainingSection(entries: landing.linkedTrainingContext)
+            recentHistorySection(landing.activityHistory)
         }
     }
 
-    // MARK: - Header ("Evidence Report" eyebrow, IconBadge, title, subtitle)
+    // MARK: - Today's / Latest Activity Day (hero field → Activity Day)
 
-    private func header(for landing: ActivityLandingReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: landing.tone, size: .lg, isCircular: true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text(landing.title)
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(landing.subtitle)
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - Latest Activity Day (always expanded on web; tap navigates to detail)
-
-    private func latestActivityDayCard(_ day: ActivityDayRecord?) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: day?.isToday == true ? "Today's Activity" : "Latest Activity Day")
-                if let day {
-                    NavigationLink(value: AppDestination.activityDay(date: day.date)) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(TrainingDateFormatting.short(day.date))
-                                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+    private func latestActivityDaySection(_ day: ActivityDayRecord?) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            EvidenceDailySectionHead(title: day?.isToday == true ? "Today's Activity" : "Latest Activity Day") { EmptyView() }
+            if let day {
+                NavigationLink(value: AppDestination.activityDay(date: day.date)) {
+                    EvidenceDailyHero {
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack(alignment: .top, spacing: m.pt(10)) {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(TrainingDayView.formatCompactDate(day.date))
+                                        .evidenceText(.normal(12, 840))
+                                        .foregroundStyle(m.c.ink)
                                     Text(day.value)
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                        .evidenceText(.normal(11, 800))
+                                        .foregroundStyle(m.c.ink)
+                                        .padding(.top, m.pt(2))
                                     Text(day.detail)
-                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .evidenceText(EvidenceTextStyle(size: 9, weight: 600, lineHeight: 12.42))
+                                        .foregroundStyle(m.c.muted)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .padding(.top, m.pt(3))
                                     if day.isInProgress {
                                         Text("Still updating from Apple Health")
-                                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                            .evidenceText(EvidenceTextStyle(size: 9, weight: 600, lineHeight: 12.42))
+                                            .foregroundStyle(m.c.teal)
+                                            .padding(.top, m.pt(3))
                                     }
                                 }
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                Text("›")
+                                    .evidenceText(EvidenceTextStyle(size: 20, weight: 400, lineHeight: 20))
+                                    .foregroundStyle(m.c.teal)
                             }
                             ActivityMetricGridView(day: day)
+                                .padding(.top, m.pt(10))
                             if let warning = day.energyAnomalyMessage {
-                                Label(warning, systemImage: day.energyAnomalyIsProvisional ? "clock.arrow.circlepath" : "exclamationmark.triangle.fill")
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(day.energyAnomalyIsProvisional ? PhysiqueOSTheme.textSecondary : PhysiqueOSTheme.chartEffort)
+                                EvidenceDailyWarning(text: warning, provisional: day.energyAnomalyIsProvisional)
+                                    .padding(.top, m.pt(10))
                             }
                         }
-                        .padding(12)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) activity: \(day.value). \(day.detail)")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("activity.latestDay")
+            } else {
+                Text("Activity days will appear here once daily movement evidence is uploaded or connected.")
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                    .foregroundStyle(m.c.muted)
+            }
+        }
+    }
+
+    // MARK: - Activity Areas (informational, not navigation)
+
+    private func activityAreasSection(_ areas: [ActivityAreaSummary]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            EvidenceDailySectionHead(title: "Activity Areas") { EmptyView() }
+            EvidenceDailyAreaGrid(items: areas.map { ($0.label, $0.value) })
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("activity.areas")
+    }
+
+    // MARK: - Recent Activity History (3-row preview + Show All sheet)
+
+    private func recentHistorySection(_ history: [ActivityDayRecord]) -> some View {
+        let preview = Array(history.prefix(Self.historyPreviewLimit))
+        return VStack(alignment: .leading, spacing: 0) {
+            EvidenceDailySectionHead(title: "Recent Activity History") {
+                if history.count > Self.historyPreviewLimit {
+                    Button {
+                        isHistorySheetPresented = true
+                    } label: {
+                        EvidenceSectionAction(label: "Show All >")
                     }
                     .buttonStyle(.plain)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) activity: \(day.value). \(day.detail)")
-                    .accessibilityAddTraits(.isButton)
-                } else {
-                    Text("Activity days will appear here once daily movement evidence is uploaded or connected.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .accessibilityIdentifier("activity.history.showAll")
+                }
+            }
+            if preview.isEmpty {
+                Text("Activity history will appear as daily movement evidence is uploaded or connected.")
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                    .foregroundStyle(m.c.muted)
+            } else {
+                EvidenceDailyOpenList(data: preview) { day in
+                    NavigationLink(value: AppDestination.activityDay(date: day.date)) {
+                        ActivityHistoryRow(day: day)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
-    }
-
-    // MARK: - Activity Areas (informational: the web's own tap targets 404, see the type-level doc comment)
-
-    private func activityAreasCard(_ areas: [ActivityAreaSummary]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Activity Areas")
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    ForEach(areas) { area in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(area.label)
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                .lineLimit(1)
-                            Text(area.value)
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(area.label): \(area.value)")
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Linked Training Context (non-clickable preview, matching web)
-
-    private func linkedTrainingContextCard(_ entries: [ActivityTrainingContextEntry]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Linked Training Context")
-                if entries.isEmpty {
-                    Text("No linked workouts are available for this activity day.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(entries) { entry in
-                            ActivityTrainingContextRow(entry: entry)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Recent Activity History (preview + "Show All" sheet)
-
-    private func recentHistoryCard(_ history: [ActivityDayRecord]) -> some View {
-        let preview = Array(history.prefix(Self.historyPreviewLimit))
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Recent Activity History") {
-                    if history.count > Self.historyPreviewLimit {
-                        Button {
-                            isHistorySheetPresented = true
-                        } label: {
-                            TrainingCompactActionLabel(label: "Show All")
-                        }
-                    }
-                }
-                if preview.isEmpty {
-                    Text("Activity history will appear as daily movement evidence is uploaded or connected.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(preview) { day in
-                            NavigationLink(value: AppDestination.activityDay(date: day.date)) {
-                                ActivityHistoryRow(day: day)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("activity.history")
         .sheet(isPresented: $isHistorySheetPresented) {
             ActivityHistorySheet(days: history)
         }
     }
 }
 
-// MARK: - "Show All" history sheet (mirrors `ActivityHistorySheet.jsx`)
+/// Current Linked Training Context — real evidence, not navigation.
+struct ActivityLinkedTrainingSection: View {
+    let entries: [ActivityTrainingContextEntry]
+    private let m = EvidenceMetrics(family: .daily)
+
+    var body: some View {
+        EvidenceSection(title: "Linked Training Context", style: .containedDeep, identifier: "activity.linkedTraining") {
+            if entries.isEmpty {
+                Text("No linked workouts are available for this activity day.")
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                    .foregroundStyle(m.c.muted)
+            } else {
+                VStack(spacing: m.pt(6)) {
+                    ForEach(entries) { entry in
+                        EvidenceDailyRow(
+                            label: entry.label,
+                            copy: entry.detail,
+                            trailing: [entry.value] + (entry.date.map { [TrainingDateFormatting.short($0)] } ?? []),
+                            showsChevron: false,
+                            railColor: m.c.purple
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - "Show All" history sheet (locked A5)
 
 private struct ActivityHistorySheet: View {
+    @Environment(\.dismiss) private var dismiss
     let days: [ActivityDayRecord]
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 8) {
+                VStack(spacing: 0) {
                     ForEach(days) { day in
                         NavigationLink(value: AppDestination.activityDay(date: day.date)) {
-                            HStack(spacing: 8) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(TrainingDateFormatting.short(day.date))
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    Text(day.protocolStatus)
-                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                }
-                                Spacer(minLength: 8)
-                                Text(day.value)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .black))
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
-                            }
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 56)
-                            .frame(maxWidth: .infinity)
+                            ActivityHistoryRow(day: day)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) activity: \(day.value). \(day.protocolStatus)")
-                        if day.id != days.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
-                        }
+                        .padding(.bottom, m.pt(1))
+                        .overlay(alignment: .bottom) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
                     }
                 }
-                .padding(16)
+                .padding(.horizontal, m.pt(16))
+                .padding(.top, m.pt(6))
+                .padding(.bottom, m.pt(30))
             }
-            .background(PhysiqueOSTheme.background)
-            .navigationTitle("Recent Activity History")
+            .background(m.c.page)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(m.c.page, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Text("Done")
+                            .evidenceText(.normal(12, 750))
+                            .foregroundStyle(m.c.muted)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("evidence.sheet.done")
+                }
+                .evidenceFlatToolbarItem()
+                ToolbarItem(placement: .principal) {
+                    Text("Recent Activity History")
+                        .evidenceText(.normal(12, 800))
+                        .foregroundStyle(m.c.ink)
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
+        .environment(\.evidenceBackTrail, nil)
+        .evidenceFamily(.daily)
         .presentationDetents([.medium, .large])
     }
 }
 
-// MARK: - Shared small pieces local to the Activity landing/history page
-
-/// Mirrors `ActivityDayHistory`'s row content (date + protocolStatus, value
-/// trailing) — the web disclosure-toggles this row in place; Native pushes
-/// to `ActivityDayView` instead (see the type-level doc comment above).
+/// One Activity day row: date, protocol status, value split into the
+/// locked two trailing lines (`612 active cal` / `48 min ›`).
 private struct ActivityHistoryRow: View {
     let day: ActivityDayRecord
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(TrainingDateFormatting.short(day.date))
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(day.protocolStatus)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(day.value)
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
+        EvidenceDailyRow(
+            label: TrainingDateFormatting.short(day.date),
+            copy: day.protocolStatus,
+            trailing: day.value.components(separatedBy: " / ")
+        )
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(TrainingDateFormatting.short(day.date)) activity: \(day.value). \(day.protocolStatus)")
+        .accessibilityIdentifier("activity.history.day.\(day.date)")
     }
 }
 
-/// A `RecordPreview` row inside "Linked Training Context" — non-clickable
-/// on the web, so unlike `TrainingRecordPreviewRow` this is a plain `View`,
-/// not wrapped in a `NavigationLink` by its caller.
-private struct ActivityTrainingContextRow: View {
-    let entry: ActivityTrainingContextEntry
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(entry.label)
-                        .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text(entry.detail)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(entry.value)
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    if let date = entry.date {
-                        Text(TrainingDateFormatting.short(date))
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                }
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// Mirrors `ActivityMetricGrid` (`ProgressPlaceholderScreen.jsx:562-589`)
-/// exactly: a 2-column grid of the same 8 metric tiles, in the same order.
-/// `internal` (not `private`): shared between the Latest Activity Day card
-/// above and `ActivityDayView`'s detail screen — the web itself renders
-/// this identical component in both places.
 struct ActivityMetricGridView: View {
     let day: ActivityDayRecord
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-            ForEach(day.metricTiles) { tile in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tile.label)
-                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    Text(tile.value)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(tile.label): \(tile.value)")
-            }
-        }
+        EvidenceDailyMetricGrid(items: day.metricTiles.map {
+            .init(label: $0.label, value: $0.value, accent: $0.label == "Active Calories")
+        })
     }
 }

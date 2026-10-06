@@ -1,32 +1,15 @@
 import SwiftUI
 
-/// Row/sheet views for `NutritionReportingView` — kept in a separate file
-/// since there are many small, single-purpose pieces (one row type per
-/// weekly/daily/recurring/history list across all 3 reports).
+// Nutrition Reporting rows in the locked daily `.row` language (open-list
+// rows: label + copy, muted trailing values, inline `›` when navigable).
 
-/// A generic "range / value / detail" row — Calories' and Meals' own
-/// Weekly rows share this exact 3-field shape.
 struct NutritionWeeklyStatRow: View {
     let range: String
     let value: String
     let detail: String
 
     var body: some View {
-        HStack(alignment: .top) {
-            Text(range)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(value)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-        }
-        .padding(.vertical, 4)
+        EvidenceDailyRow(label: range, copy: detail, trailing: [value], showsChevron: false)
     }
 }
 
@@ -34,237 +17,261 @@ struct NutritionDailyCalorieRowView: View {
     let row: NutritionDailyCalorieRow
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(TrainingDateFormatting.short(row.date))
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text("\(row.mealCount) meal\(row.mealCount == 1 ? "" : "s")")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+        EvidenceDailyRow(
+            label: TrainingDateFormatting.short(row.date),
+            copy: "\(row.mealCount) meal\(row.mealCount == 1 ? "" : "s")",
+            trailing: [row.calories.map { "\(Int($0.rounded())) cal" } ?? "Pending"]
+        )
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Macro rows: each macro in its own ink; the selected macro full strength.
+private struct NutritionMacroValues: View {
+    let values: [NutritionMacroKey: Double]
+    let selectedMacro: NutritionMacroKey
+    private let m = EvidenceMetrics(family: .daily)
+
+    var body: some View {
+        HStack(spacing: m.pt(8)) {
+            ForEach(NutritionMacroKey.allCases) { macro in
+                let isSelected = macro == selectedMacro
+                Text("\(macro.label.prefix(1)) \(values[macro].map { "\(Int($0.rounded()))g" } ?? "—")")
+                    .evidenceText(.normal(9, isSelected ? 850 : 700, digits: true))
+                    .foregroundStyle(macroColorFor(macro).opacity(isSelected ? 1 : 0.72))
             }
-            Spacer(minLength: 8)
-            Text(row.calories.map { "\(Int($0.rounded())) cal" } ?? "Pending")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.accent)
         }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
     }
 }
 
 struct NutritionWeeklyMacroRowView: View {
     let row: NutritionWeeklyMacroRow
     let selectedMacro: NutritionMacroKey
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(spacing: m.pt(10)) {
             Text("\(TrainingDateFormatting.short(row.weekStart)) – \(TrainingDateFormatting.short(row.weekEnd))")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Spacer(minLength: 8)
-            HStack(spacing: 8) {
-                ForEach(NutritionMacroKey.allCases) { macro in
-                    let isSelected = macro == selectedMacro
-                    Text("\(macro.label.prefix(1)) \(row.averages[macro].map { "\(Int($0.rounded()))g" } ?? "—")")
-                        .physiqueOSFont(isSelected ? PhysiqueOSTypography.caption12Semibold : PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(macroColorFor(macro).opacity(isSelected ? 1 : 0.72))
-                }
-            }
+                .evidenceText(.normal(11, 810))
+                .foregroundStyle(m.c.ink)
+            Spacer(minLength: 0)
+            NutritionMacroValues(values: row.averages, selectedMacro: selectedMacro)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, m.pt(9))
+        .padding(.horizontal, m.pt(2))
+        .frame(minHeight: max(44, m.pt(49)))
+        .accessibilityElement(children: .combine)
     }
 }
 
 struct NutritionDailyMacroRowView: View {
     let row: NutritionDailyMacroRow
     let selectedMacro: NutritionMacroKey
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(spacing: m.pt(10)) {
             Text(TrainingDateFormatting.short(row.date))
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Spacer(minLength: 8)
-            HStack(spacing: 8) {
-                ForEach(NutritionMacroKey.allCases) { macro in
-                    let isSelected = macro == selectedMacro
-                    Text("\(macro.label.prefix(1)) \(row.macros[macro].map { "\(Int($0.rounded()))g" } ?? "—")")
-                        .physiqueOSFont(isSelected ? PhysiqueOSTypography.caption12Semibold : PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(macroColorFor(macro).opacity(isSelected ? 1 : 0.72))
-                }
-            }
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.accent)
+                .evidenceText(.normal(11, 810))
+                .foregroundStyle(m.c.ink)
+            Spacer(minLength: 0)
+            NutritionMacroValues(values: row.macros, selectedMacro: selectedMacro)
+            Text("›")
+                .evidenceText(.normal(10, 750))
+                .foregroundStyle(m.c.muted)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, m.pt(9))
+        .padding(.horizontal, m.pt(2))
+        .frame(minHeight: max(44, m.pt(49)))
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
 struct NutritionRecurringMealRow: View {
     let meal: NutritionRecurringMeal
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: m.pt(10)) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(meal.name)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .evidenceText(.normal(11, 810))
+                    .foregroundStyle(m.c.ink)
                     .lineLimit(1)
                 Text("\(meal.slot.label) · Last \(TrainingDateFormatting.short(meal.lastEaten))")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                HStack(spacing: 6) {
-                    Text("\(meal.occurrenceCount) occurrences")
-                    Text("•")
-                    Text(meal.averageCalories.map { "\(Int($0.rounded())) cal average" } ?? "Calories pending")
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                    .foregroundStyle(m.c.muted)
+                    .padding(.top, m.pt(2))
+                Text("\(meal.occurrenceCount) occurrences · \(meal.averageCalories.map { "\(Int($0.rounded())) cal average" } ?? "Calories pending")")
+                    .evidenceText(.normal(9, 750))
+                    .foregroundStyle(mealSlotColorFor(meal.slot))
+                    .padding(.top, m.pt(3))
+                HStack(spacing: m.pt(12)) {
+                    macroValue("P", meal.averageProteinG, color: m.c[keyPath: NutritionEvidenceMacro.protein.paletteColor])
+                    macroValue("C", meal.averageCarbohydratesG, color: m.c[keyPath: NutritionEvidenceMacro.carbohydrates.paletteColor])
+                    macroValue("F", meal.averageFatG, color: m.c[keyPath: NutritionEvidenceMacro.fat.paletteColor])
                 }
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(mealSlotColorFor(meal.slot))
-                HStack(spacing: 10) {
-                    macroValue("P", meal.averageProteinG, color: PhysiqueOSTheme.macroProtein)
-                    macroValue("C", meal.averageCarbohydratesG, color: PhysiqueOSTheme.macroCarbohydrates)
-                    macroValue("F", meal.averageFatG, color: PhysiqueOSTheme.macroFat)
-                }
+                .padding(.top, m.pt(4))
             }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: 0) {
                 Text("\(meal.occurrenceCount)×")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .evidenceText(.normal(10, 750, digits: true))
+                    .foregroundStyle(m.c.ink)
                 Text(meal.averageCalories.map { "\(Int($0.rounded())) cal" } ?? "Pending")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .evidenceText(.normal(10, 750, digits: true))
+                    .foregroundStyle(m.c.muted)
             }
         }
-        .padding(16)
+        .padding(.vertical, m.pt(9))
+        .padding(.horizontal, m.pt(2))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
 
     private func macroValue(_ label: String, _ value: Double?, color: Color) -> some View {
         Text("\(label) \(value.map { "\(Int($0.rounded()))g" } ?? "—")")
-            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
+            .evidenceText(.normal(9, 800, digits: true))
             .foregroundStyle(color)
     }
 }
 
 struct NutritionWeeklyMealRowView: View {
     let row: NutritionWeeklyMealRow
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: m.pt(8)) {
             HStack(alignment: .firstTextBaseline) {
                 Text("\(TrainingDateFormatting.short(row.weekStart)) – \(TrainingDateFormatting.short(row.weekEnd))")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Spacer(minLength: 8)
+                    .evidenceText(.normal(11, 810))
+                    .foregroundStyle(m.c.ink)
+                Spacer(minLength: m.pt(8))
                 Text("\(row.mealCount) meals · \(row.loggedDayCount) days")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .evidenceText(.normal(10, 750, digits: true))
+                    .foregroundStyle(m.c.muted)
             }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: m.pt(6)) {
                 ForEach(row.slots) { slot in
-                    HStack(spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: m.pt(6)) {
                         Text(slot.slot.glyph)
-                        VStack(alignment: .leading, spacing: 1) {
+                            .evidenceText(.normal(10, 900))
+                            .foregroundStyle(mealSlotColorFor(slot.slot))
+                        VStack(alignment: .leading, spacing: 0) {
                             Text(slot.slot.label)
+                                .evidenceText(.normal(9, 750))
+                                .foregroundStyle(m.c.ink)
                             Text(slot.averageCalories.map { "\(slot.occurrenceCount)× · \(Int($0.rounded())) cal avg" } ?? "No entries")
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                                .foregroundStyle(m.c.muted)
                         }
                     }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(mealSlotColorFor(slot.slot))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
-        .padding(16)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, m.pt(9))
+        .padding(.horizontal, m.pt(2))
         .accessibilityElement(children: .combine)
     }
 }
 
 struct NutritionMealHistoryGroupRow: View {
     let group: NutritionMealHistoryGroup
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: m.pt(10)) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(TrainingDateFormatting.short(group.date))
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                HStack(spacing: 4) {
+                    .evidenceText(.normal(11, 810))
+                    .foregroundStyle(m.c.ink)
+                HStack(spacing: m.pt(4)) {
                     ForEach(group.meals) { meal in
                         Text(meal.slot.glyph)
+                            .evidenceText(.normal(10, 900))
                             .foregroundStyle(mealSlotColorFor(meal.slot))
                     }
+                    Text("\(group.mealCount) meal\(group.mealCount == 1 ? "" : "s")")
+                        .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                        .foregroundStyle(m.c.muted)
                 }
-                Text("\(group.mealCount) meal\(group.mealCount == 1 ? "" : "s")")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .padding(.top, m.pt(2))
             }
-            Spacer(minLength: 8)
-            Text(group.dailyCalories.map { "\(Int($0.rounded())) cal" } ?? "Pending")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.accent)
+            Spacer(minLength: 0)
+            Text("\(group.dailyCalories.map { "\(Int($0.rounded())) cal" } ?? "Pending") ›")
+                .evidenceText(.normal(10, 750, digits: true))
+                .foregroundStyle(m.c.muted)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, m.pt(9))
+        .padding(.horizontal, m.pt(2))
+        .frame(minHeight: max(44, m.pt(49)))
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 
 private func mealSlotColorFor(_ slot: NutritionMealSlot) -> Color {
+    let c = EvidencePalette.daily
     switch slot {
-    case .breakfast: PhysiqueOSTheme.mealBreakfast
-    case .lunch: PhysiqueOSTheme.mealLunch
-    case .dinner: PhysiqueOSTheme.mealDinner
-    case .snacks: PhysiqueOSTheme.mealSnacks
+    case .breakfast: return c.breakfast
+    case .lunch: return c.lunch
+    case .dinner: return c.dinner
+    case .snacks: return c.snacks
     }
 }
 
 private func macroColorFor(_ macro: NutritionMacroKey) -> Color {
-    switch macro {
-    case .protein: PhysiqueOSTheme.macroProtein
-    case .carbohydrates: PhysiqueOSTheme.macroCarbohydrates
-    case .fat: PhysiqueOSTheme.macroFat
-    }
+    NutritionEvidenceMacro(macro).color
 }
 
 // MARK: - Sheets
 
-/// A generic "Show All" sheet — every one of the weekly-row cards
-/// (Calories/Macros/Meals) shares this exact scrollable-list-in-a-sheet
-/// shape.
 struct NutritionReportListSheet<Content: View>: View {
+    @Environment(\.dismiss) private var dismiss
     let title: String
     @ViewBuilder var content: Content
+    private let m = EvidenceMetrics(family: .daily)
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 8) {
-                    content
-                }
-                .padding(16)
+                content
+                    .padding(.horizontal, m.pt(16))
+                    .padding(.top, m.pt(6))
+                    .padding(.bottom, m.pt(30))
             }
-            .background(PhysiqueOSTheme.background)
-            .navigationTitle(title)
+            .background(m.c.page)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(m.c.page, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Text("Done")
+                            .evidenceText(.normal(12, 750))
+                            .foregroundStyle(m.c.muted)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("evidence.sheet.done")
+                }
+                .evidenceFlatToolbarItem()
+                ToolbarItem(placement: .principal) {
+                    Text(title)
+                        .evidenceText(.normal(12, 800))
+                        .foregroundStyle(m.c.ink)
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
+        .environment(\.evidenceBackTrail, nil)
+        .evidenceFamily(.daily)
         .presentationDetents([.medium, .large])
     }
 }
@@ -274,7 +281,7 @@ struct NutritionReportDailyCaloriesSheet: View {
 
     var body: some View {
         NutritionReportListSheet(title: "Recent Daily Calories") {
-            ForEach(rows) { row in
+            EvidenceDailyOpenList(data: rows) { row in
                 NavigationLink(value: AppDestination.nutritionDay(dayId: row.id)) {
                     NutritionDailyCalorieRowView(row: row)
                 }
@@ -290,7 +297,7 @@ struct NutritionReportDailyMacrosSheet: View {
 
     var body: some View {
         NutritionReportListSheet(title: "Recent Daily Macros") {
-            ForEach(rows) { row in
+            EvidenceDailyOpenList(data: rows) { row in
                 NavigationLink(value: AppDestination.nutritionDay(dayId: row.id)) {
                     NutritionDailyMacroRowView(row: row, selectedMacro: selectedMacro)
                 }

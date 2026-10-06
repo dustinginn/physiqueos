@@ -21,16 +21,14 @@ struct ActivityDayView: View {
     @State private var viewModelAuthority: NativeAPIEnvironment?
     let date: String
 
+    private let m = EvidenceMetrics(family: .daily)
+
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+        .evidencePageChrome(TrainingDateFormatting.short(date))
+        .evidenceFamily(.daily)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = ActivityDayViewModel(api: environment.activityAPI, date: date)
@@ -38,14 +36,8 @@ struct ActivityDayView: View {
             }
             await viewModel?.load()
         }
-        // Matches `ActivityHistoryView`'s own refreshable/scenePhase
-        // reload — the "refresh asymmetry" half of the Build 58 stale-
-        // Detail defect (History could force a fresh read; Detail had no
-        // way to). `ActivityAPI.fetchActivityDay(date:)` itself always
-        // bypasses the cache now (see its doc comment), so this reload is
-        // belt-and-suspenders freshness plus keeping the shared
-        // `activity` cache bucket in sync for other readers, not the sole
-        // guarantee against staleness.
+        // Matches `ActivityHistoryView`'s refresh (Build 58 stale-Detail fix);
+        // `fetchActivityDay(date:)` itself always bypasses the cache.
         .refreshable {
             if environment.nativeAuthority == .founderProduction {
                 await environment.productionNativeAPI.invalidateReadResources(["activity"])
@@ -59,65 +51,42 @@ struct ActivityDayView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Activity Evidence…"), identifier: "activity.day.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "activity.day.failure")
         case .loaded(.none):
-            Text("No activity evidence for this day.")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .empty("No activity evidence for this day.", nil), identifier: "activity.day.empty")
         case .loaded(.some(let day)):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: day)
-                metricsCard(day)
+            header(for: day)
+            if day.isInProgress {
+                EvidenceDailyProvenance(title: "Still updating from Apple Health", detail: "Partial-day coverage; values remain provisional.")
+                    .padding(.top, m.pt(-(16 - 9)))
             }
-        }
-    }
-
-    private func header(for day: ActivityDayRecord) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Activity Day")
-                .physiqueOSFont(PhysiqueOSTypography.sectionLabel)
-                .foregroundStyle(PhysiqueOSTheme.accent)
-            // Reuses `TrainingDayView`'s own UTC-safe, DateComponents-only
-            // compact-date formatter rather than a second parallel
-            // implementation — this is the exact bug class
-            // (midnight-UTC day shift in Pacific time) the brief calls out
-            // to avoid, and this codebase has already gotten right once.
-            Text(TrainingDayView.formatCompactDate(day.date))
-                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                .accessibilityLabel(TrainingDayView.formatCompactDate(day.date))
-            Text(day.value)
-                .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            Text(day.detail)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text(day.protocolStatus)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func metricsCard(_ day: ActivityDayRecord) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeading("Activity Metrics")
-                ActivityMetricGridView(day: day)
-                if let warning = day.energyAnomalyMessage {
-                    Label(warning, systemImage: day.energyAnomalyIsProvisional ? "clock.arrow.circlepath" : "exclamationmark.triangle.fill")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(day.energyAnomalyIsProvisional ? PhysiqueOSTheme.textSecondary : PhysiqueOSTheme.chartEffort)
+            EvidenceSection(title: "Activity Metrics", style: .containedDeep, identifier: "activity.day.metrics") {
+                VStack(alignment: .leading, spacing: 0) {
+                    ActivityMetricGridView(day: day)
+                    if let warning = day.energyAnomalyMessage {
+                        EvidenceDailyWarning(text: warning, provisional: day.energyAnomalyIsProvisional)
+                    }
                 }
             }
+        }
+    }
+
+    /// `.report-head`: eyebrow, date title, value, detail, protocol status.
+    private func header(for day: ActivityDayRecord) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            EvidencePageHeader(eyebrow: "Activity Day", title: TrainingDayView.formatCompactDate(day.date), subtitle: day.value, dateTitle: true)
+            Text(day.detail)
+                .evidenceText(EvidenceTextStyle(size: 9, weight: 600, lineHeight: 12.42))
+                .foregroundStyle(m.c.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, m.pt(3 - 2))
+            Text(day.protocolStatus)
+                .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.15))
+                .foregroundStyle(m.c.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, m.pt(7))
         }
     }
 }

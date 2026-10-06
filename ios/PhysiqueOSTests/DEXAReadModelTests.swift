@@ -154,4 +154,30 @@ final class DEXAReadModelTests: XCTestCase {
         XCTAssertFalse(fieldNames.contains("relatedGoals"))
         XCTAssertFalse(fieldNames.contains("latestMuscleBalance"))
     }
+
+    // MARK: - Batch 3 Checkpoint D regression inventory
+
+    /// Every data-bearing DEXA section the redesigned page renders has its
+    /// canonical content: 17 graphs (Body Fat + four Core Trends, VAT Mass +
+    /// A/G Ratio, five lean and five fat regions), nine supplemental rows,
+    /// five headline metrics, Since Prior Scan and the latest scan.
+    func testCheckpointDPageInventoryKeepsEveryCanonicalSection() async throws {
+        let report = try await api.fetchDEXAReport(scope: .all)
+        XCTAssertNotNil(report.latestScan)
+        XCTAssertEqual(report.summary.count, 5)
+        XCTAssertNotNil(report.delta)
+        let core = [report.bodyFatTrend] + report.coreTrends
+        XCTAssertEqual(core.map(\.title), ["Body Fat %", "Fat Mass", "Lean Mass", "Total Mass", "RMR"])
+        XCTAssertEqual(report.supplementalDetails.count, 9)
+        XCTAssertEqual(report.supplementalTrends.map(\.title), ["VAT Mass", "A/G Ratio"])
+        XCTAssertEqual(report.regionalLeanTrends.count, 5)
+        XCTAssertEqual(report.regionalFatTrends.count, 5)
+        let graphs = core.count + report.supplementalTrends.count + report.regionalLeanTrends.count + report.regionalFatTrends.count
+        XCTAssertEqual(graphs, 17)
+        XCTAssertGreaterThan(report.history.count, DEXAHistoryView.historyPreviewLimit)
+        XCTAssertEqual(DEXAHistoryView.supplementalPreviewLimit, 3)
+        XCTAssertEqual(DEXAHistoryView.regionalPreviewLimit, 3)
+        XCTAssertEqual(DEXAHistoryView.historyPreviewLimit, 3)
+    }
 }
+

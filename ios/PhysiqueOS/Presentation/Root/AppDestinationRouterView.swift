@@ -8,6 +8,16 @@ import SwiftUI
 /// matter which tab pushed it. A destination without a real screen yet
 /// falls through to the existing `DestinationPlaceholderView`.
 struct AppDestinationRouterView: View {
+    /// Founder Production intake; Debug parity review can render the same
+    /// production intake surface in Sandbox (nothing submits without a
+    /// paired Production session).
+    private var usesProductionIntake: Bool {
+        #if DEBUG
+        if ProductionEvidenceUploadView.reviewProductionIntake { return true }
+        #endif
+        return environment.nativeAuthority == .founderProduction
+    }
+
     @Environment(AppEnvironment.self) private var environment
     let destination: AppDestination
     var onReturnToLog: () -> Void = {}
@@ -63,19 +73,19 @@ struct AppDestinationRouterView: View {
         case .manualWeighIn:
             ManualWeighInView(onReturnToLog: onReturnToLog)
         case .evidenceIntake:
-            if environment.nativeAuthority == .founderProduction {
+            if usesProductionIntake {
                 ProductionEvidenceUploadView(onNavigate: onNavigate, onReturnToLog: onReturnToLog)
             } else {
                 EvidenceIntakeView(onNavigate: onNavigate)
             }
         case .photoUpload:
-            if environment.nativeAuthority == .founderProduction {
+            if usesProductionIntake {
                 ProductionEvidenceUploadView(fixedScenario: .progressPhotos, onNavigate: onNavigate, onReturnToLog: onReturnToLog)
             } else {
                 EvidenceIntakeView(initialScenario: .progressPhotos, onNavigate: onNavigate)
             }
         case .dexaUpload:
-            if environment.nativeAuthority == .founderProduction {
+            if usesProductionIntake {
                 ProductionEvidenceUploadView(fixedScenario: .dexa, onNavigate: onNavigate, onReturnToLog: onReturnToLog)
             } else {
                 EvidenceIntakeView(initialScenario: .dexa, onNavigate: onNavigate)

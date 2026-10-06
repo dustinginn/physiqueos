@@ -19,7 +19,6 @@ import SwiftUI
 /// unchanged in this patch — see `TrainingDayView`/`TrainingSessionDetailView`.
 struct TrainingHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: TrainingHistoryViewModel?
 
     @State private var isLatestDayExpanded = false
@@ -27,38 +26,14 @@ struct TrainingHistoryView: View {
     @State private var isProtocolExpanded = false
     @State private var isHistorySheetPresented = false
 
+    private let m = EvidenceMetrics(family: .training)
+
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    // `ArrowLeft` (lucide) — a straight arrow, not a chevron
-                    // — is the literal icon `ProgressPlaceholderScreen.jsx`'s
-                    // own back link uses; `arrow.left` is the faithful SF
-                    // Symbol match (verified against source, corrected from
-                    // a prior `chevron.left` mismatch).
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Evidence Hub")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .evidencePageChrome("Training", arrowBack: true)
+        .evidenceFamily(.training)
         .task {
             if viewModel == nil { viewModel = TrainingHistoryViewModel(api: environment.trainingAPI) }
             await viewModel?.load()
@@ -74,81 +49,50 @@ struct TrainingHistoryView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .loading("Loading Training Evidence"), identifier: "training.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStatePanel(kind: .failure(message, nil), identifier: "training.failure")
         case .loaded(let landing):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: landing)
-                TrainingScopeSelectorView(scope: landing.scope) { scopeID in
-                    Task { await viewModel?.selectScope(pillID: scopeID) }
-                }
-                latestTrainingDayCard(landing.latestTrainingDay)
-                trainingAreasCard(landing.trainingAreas)
-                reportingCard(landing.reportingLinks)
-                recentHistoryCard(landing)
-                currentProtocolCard(landing.currentProtocol)
-                RelatedGoalsView(goals: landing.relatedGoals)
+            EvidencePageHeader(
+                symbol: "⌁",
+                eyebrow: "Evidence Report",
+                title: landing.title,
+                subtitle: landing.subtitle ?? "What PhysiqueOS currently understands."
+            )
+            EvidenceScopePicker(scope: landing.scope) { scopeID in
+                Task { await viewModel?.selectScope(pillID: scopeID) }
             }
+            latestTrainingDaySection(landing.latestTrainingDay)
+            trainingAreasSection(landing.trainingAreas)
+            reportingSection(landing.reportingLinks)
+            recentHistorySection(landing)
+            currentProtocolSection(landing.currentProtocol)
+            RelatedGoalsView(goals: landing.relatedGoals)
         }
-    }
-
-    // MARK: - Header ("Evidence Report" eyebrow, IconBadge, title, subtitle)
-
-    private func header(for landing: TrainingLandingReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: landing.tone, size: .lg, isCircular: true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text(landing.title)
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(landing.subtitle ?? "What PhysiqueOS currently understands.")
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Latest Training Day
 
-    /// The web's card is a single inert `&lt;details&gt;`/`&lt;summary&gt;`
-    /// disclosure — "View Training Day →" is static affordance text with no
-    /// `href` anywhere in `LatestTrainingDayCard`
-    /// (`ProgressPlaceholderScreen.jsx:724-758`), confirmed by reading the
-    /// JSX directly. This is an explicitly approved Native V1 deviation
-    /// (Founder decision, this slice): the inline expand/collapse — which
-    /// the Founder likes and this preserves unchanged — and "View Training
-    /// Day →" are split into two independent controls. The label/day-summary
-    /// text stays the disclosure toggle; "View Training Day →" becomes its
-    /// own `NavigationLink` to the same `day.destination` every other
-    /// Training Day link already uses (`.trainingDay(date:)`) — no second
-    /// route model, no duplicated day data.
-    private func latestTrainingDayCard(_ day: TrainingLandingDay?) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Latest Training Day")
-                if let day {
+    /// The label/summary stays the inline disclosure toggle (approved
+    /// Native V1 behavior); "View Training Day →" is its own link to the
+    /// same `day.destination` every other Training Day link uses.
+    private func latestTrainingDaySection(_ day: TrainingLandingDay?) -> some View {
+        EvidenceSection(title: "Latest Training Day", identifier: "training.latestDay") {
+            if let day {
+                EvidenceField {
                     VStack(alignment: .leading, spacing: 0) {
                         Button {
                             withAnimation(.easeInOut(duration: 0.2)) { isLatestDayExpanded.toggle() }
                         } label: {
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: 0) {
                                 Text(day.label)
-                                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .evidenceText(EvidenceTextStyle(size: 12, weight: 760, lineHeight: 15.84))
+                                    .foregroundStyle(m.c.ink)
                                 if let daySummary = day.daySummary {
                                     Text(daySummary)
-                                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+                                        .foregroundStyle(m.c.muted)
+                                        .padding(.top, m.pt(2))
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -160,149 +104,118 @@ struct TrainingHistoryView: View {
 
                         NavigationLink(value: day.destination) {
                             Text("View Training Day →")
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.accent)
-                                .padding(.top, 6)
+                                .evidenceText(.normal(10, 800))
+                                .foregroundStyle(m.c.purple)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
+                                .evidenceHitTarget(visualHeight: m.pt(12))
                         }
                         .buttonStyle(.plain)
+                        .padding(.top, m.pt(7))
+                        .accessibilityIdentifier("training.latestDay.view")
 
                         if isLatestDayExpanded {
-                            VStack(spacing: 8) {
-                                ForEach(day.sessions) { session in
-                                    NavigationLink(value: session.destination) {
-                                        TrainingRecordPreviewRow(
-                                            label: session.label,
-                                            detail: session.detail,
-                                            value: session.value,
-                                            date: session.date,
-                                            sourceEvidence: session.sourceEvidence
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
+                            EvidenceDividedList(data: day.sessions) { session in
+                                NavigationLink(value: session.destination) {
+                                    EvidenceRailRow(
+                                        label: session.label,
+                                        detail: session.detail,
+                                        value: session.value,
+                                        tone: .strength
+                                    )
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .padding(.top, 12)
+                            .padding(.top, m.pt(10))
                         }
                     }
-                    .padding(12)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    Text("Upload or enter a workout to begin building your training history.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                }
+            } else {
+                Text("Upload or enter a workout to begin building your training history.")
+                    .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+                    .foregroundStyle(m.c.muted)
+            }
+        }
+    }
+
+    // MARK: - Training Areas (all 10, exact order and counts)
+
+    private func trainingAreasSection(_ areas: [TrainingAreaSummary]) -> some View {
+        EvidenceSection(title: "Training Areas", identifier: "training.areas") {
+            NavigationLink(value: AppDestination.progressStream(streamId: "training/library")) {
+                EvidenceSectionAction(label: "Browse >")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("training.areas.browse")
+        } content: {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(7)), GridItem(.flexible(), spacing: m.pt(7))], spacing: m.pt(7)) {
+                ForEach(areas) { area in
+                    NavigationLink(value: area.destination) {
+                        TrainingAreaTile(area: area)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("training.area.\(area.id)")
                 }
             }
         }
     }
 
-    // MARK: - Training Areas
+    // MARK: - Reporting (one disclosure over all six reporting routes)
 
-    private func trainingAreasCard(_ areas: [TrainingAreaSummary]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Training Areas") {
-                    NavigationLink(value: AppDestination.progressStream(streamId: "training/library")) {
-                        TrainingCompactActionLabel(label: "Browse")
+    private func reportingSection(_ links: [TrainingReportingLink]) -> some View {
+        EvidenceSection(title: "Reporting", identifier: "training.reporting") {
+            EvidenceField {
+                VStack(alignment: .leading, spacing: 0) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { isReportingExpanded.toggle() }
+                    } label: {
+                        EvidenceKitDisclosureRow(
+                            label: "Review trends and summaries",
+                            detail: "Resistance, cardio, volume, frequency, consistency, and history.",
+                            isExpanded: isReportingExpanded
+                        )
                     }
-                }
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    ForEach(areas) { area in
-                        NavigationLink(value: area.destination) {
-                            TrainingAreaRow(area: area)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Review trends and summaries")
+                    .accessibilityHint("Resistance, cardio, volume, frequency, consistency, and history.")
+                    .accessibilityValue(isReportingExpanded ? "Expanded" : "Collapsed")
+                    .accessibilityIdentifier("training-reporting-disclosure")
 
-    // MARK: - Reporting (compact expandable summary of all six reporting links)
-
-    private func reportingCard(_ links: [TrainingReportingLink]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Reporting")
-                PhysiqueOSDisclosureRow(isExpanded: $isReportingExpanded) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Review trends and summaries")
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text("Resistance, cardio, volume, frequency, consistency, and history.")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        }
-                        Spacer(minLength: 8)
-                        // `ReportingLinks`'s compact `&lt;summary&gt;` carries
-                        // its own trailing "&gt;" (`ProgressPlaceholderScreen.jsx`'s
-                        // `ReportingLinks` compact mode) — previously missing here.
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                    }
-                } expanded: {
-                    VStack(spacing: 8) {
-                        ForEach(links) { link in
+                    if isReportingExpanded {
+                        EvidenceDividedList(data: links) { link in
                             NavigationLink(value: link.destination) {
-                                TrainingLinkRow(label: link.label, detail: link.detail)
+                                EvidenceLinkRow(label: link.label, detail: link.detail)
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("training-report-\(link.id)")
                         }
+                        .overlay(alignment: .top) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
                     }
                 }
-                .accessibilityIdentifier("training-reporting-disclosure")
             }
         }
     }
 
-    // MARK: - Recent Training History (single preview row + "Show All" sheet)
+    // MARK: - Recent Training History (preview row + Show All sheet)
 
-    private func recentHistoryCard(_ landing: TrainingLandingReadModel) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Recent Training History") {
-                    Button {
-                        isHistorySheetPresented = true
-                    } label: {
-                        TrainingCompactActionLabel(label: "Show All")
-                    }
+    private func recentHistorySection(_ landing: TrainingLandingReadModel) -> some View {
+        EvidenceSection(title: "Recent Training History", style: .open, identifier: "training.recentHistory") {
+            Button {
+                isHistorySheetPresented = true
+            } label: {
+                EvidenceSectionAction(label: "Show All >")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("training.recentHistory.showAll")
+        } content: {
+            if let mostRecent = landing.trainingDays.first {
+                NavigationLink(value: mostRecent.destination) {
+                    TrainingDayRailRow(day: mostRecent)
                 }
-                if let mostRecent = landing.trainingDays.first {
-                    NavigationLink(value: mostRecent.destination) {
-                        HStack(spacing: 8) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(mostRecent.label)
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    .lineLimit(1)
-                                if let summary = mostRecent.summary {
-                                    Text(summary)
-                                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                }
-                            }
-                            Spacer(minLength: 8)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(PhysiqueOSTheme.accent)
-                        }
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 48)
-                        .frame(maxWidth: .infinity)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    Text("Training days will appear as workouts are uploaded or connected.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
+                .buttonStyle(.plain)
+            } else {
+                Text("Training days will appear as workouts are uploaded or connected.")
+                    .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+                    .foregroundStyle(m.c.muted)
             }
         }
         .sheet(isPresented: $isHistorySheetPresented) {
@@ -312,32 +225,32 @@ struct TrainingHistoryView: View {
 
     // MARK: - Current Protocol
 
-    private func currentProtocolCard(_ protocolSummary: TrainingProtocolSummary) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Current Protocol")
-                PhysiqueOSDisclosureRow(isExpanded: $isProtocolExpanded) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(protocolSummary.sourceOfTruth)
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text(protocolSummary.goal)
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        }
-                        Spacer(minLength: 8)
-                        Text("View protocol details")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.accent)
+    private func currentProtocolSection(_ protocolSummary: TrainingProtocolSummary) -> some View {
+        EvidenceSection(title: "Current Protocol", identifier: "training.protocol") {
+            EvidenceField {
+                VStack(alignment: .leading, spacing: 0) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { isProtocolExpanded.toggle() }
+                    } label: {
+                        EvidenceKitDisclosureRow(
+                            label: protocolSummary.sourceOfTruth,
+                            detail: protocolSummary.goal,
+                            isExpanded: isProtocolExpanded,
+                            trailingText: "View protocol details"
+                        )
                     }
-                } expanded: {
-                    VStack(spacing: 8) {
-                        TrainingProtocolRow(label: "Source of truth", value: protocolSummary.sourceOfTruth)
-                        TrainingProtocolRow(label: "Daily activity target", value: protocolSummary.dailyActivityTarget)
-                        TrainingProtocolRow(label: "Training objective", value: protocolSummary.trainingObjective)
-                        TrainingProtocolRow(label: "Goal", value: protocolSummary.goal)
-                        TrainingProtocolRow(label: "Future protocol settings", value: "Coming soon")
+                    .buttonStyle(.plain)
+                    .accessibilityValue(isProtocolExpanded ? "Expanded" : "Collapsed")
+
+                    if isProtocolExpanded {
+                        EvidenceDefinitionList(rows: [
+                            ("Source of truth", protocolSummary.sourceOfTruth),
+                            ("Daily activity target", protocolSummary.dailyActivityTarget),
+                            ("Training objective", protocolSummary.trainingObjective),
+                            ("Goal", protocolSummary.goal),
+                            ("Future protocol settings", "Coming soon"),
+                        ])
+                        .padding(.top, m.pt(4))
                     }
                 }
             }
@@ -345,52 +258,175 @@ struct TrainingHistoryView: View {
     }
 }
 
-// MARK: - "Show All" history sheet (mirrors `TrainingHistorySheet.jsx`)
+// MARK: - "Show All" history sheet (locked T2)
 
 private struct TrainingHistorySheet: View {
+    @Environment(\.dismiss) private var dismiss
     let days: [TrainingDaySummary]
+
+    private let m = EvidenceMetrics(family: .training)
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(days) { day in
-                        NavigationLink(value: day.destination) {
-                            HStack(spacing: 8) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(day.label)
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    if let summary = day.summary {
-                                        Text(summary)
-                                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                    }
-                                }
-                                Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .black))
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
-                            }
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 56)
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.plain)
-                        if day.id != days.last?.id {
-                            Divider().overlay(PhysiqueOSTheme.divider)
-                        }
+                EvidenceDividedList(data: days) { day in
+                    NavigationLink(value: day.destination) {
+                        TrainingDayRailRow(day: day)
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(16)
+                .padding(.horizontal, m.pt(16))
+                .padding(.top, m.pt(10))
+                .padding(.bottom, m.pt(30))
             }
-            .background(PhysiqueOSTheme.background)
-            .navigationTitle("Recent Training History")
+            .background(m.c.page)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(m.c.page, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Text("Done")
+                            .evidenceText(.normal(13, 750))
+                            .foregroundStyle(m.c.muted)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("training.history.done")
+                }
+                .evidenceFlatToolbarItem()
+                ToolbarItem(placement: .principal) {
+                    Text("Recent Training History")
+                        .evidenceText(.normal(13, 750))
+                        .foregroundStyle(m.c.ink)
+                }
+            }
             .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
         }
+        .environment(\.evidenceBackTrail, nil)
+        .evidenceFamily(.training)
         .presentationDetents([.medium, .large])
+    }
+}
+
+/// A Training day in the locked rail-row language: the type line is the
+/// canonical summary's own classification (body areas = Strength; Walking,
+/// Cardio and Cooldown are activity classes), never a new label.
+struct TrainingDayRailRow: View {
+    let day: TrainingDaySummary
+
+    var body: some View {
+        let kind = TrainingDayKindLabel(summary: day.summary)
+        EvidenceRailRow(type: kind.type, label: day.label, detail: day.summary, tone: kind.tone)
+            .accessibilityElement(children: .combine)
+    }
+}
+
+/// Classifies a canonical Training day summary ("Chest · Triceps ·
+/// Walking", "Cardio") into the locked row type and rail tone.
+struct TrainingDayKindLabel: Equatable {
+    static let activityClasses = ["Walking", "Cardio", "Cooldown"]
+
+    let type: String?
+    let tone: EvidenceRailTone
+
+    init(summary: String?) {
+        let tokens = (summary ?? "").components(separatedBy: " · ").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let activities = tokens.filter { Self.activityClasses.contains($0) }
+        let hasStrength = tokens.contains { !Self.activityClasses.contains($0) }
+        var parts: [String] = hasStrength ? ["Strength"] : []
+        for activity in activities where !parts.contains(activity) { parts.append(activity) }
+        type = parts.isEmpty ? nil : parts.joined(separator: " + ")
+        if hasStrength {
+            tone = .strength
+        } else if activities.contains("Cooldown") && activities.count == 1 {
+            tone = .cooldown
+        } else if activities.isEmpty {
+            tone = .neutral
+        } else {
+            tone = activities.contains("Walking") && !activities.contains("Cardio") ? .walking : .cardio
+        }
+    }
+}
+
+/// `.tile`: an area mark, label and exercise count (locked T1 grid).
+private struct TrainingAreaTile: View {
+    let area: TrainingAreaSummary
+    private let m = EvidenceMetrics(family: .training)
+
+    var body: some View {
+        HStack(spacing: m.pt(8)) {
+            Image(systemName: TrainingAreaIcon.systemImage(for: area.id))
+                .resizable()
+                .fontWeight(.medium)
+                .scaledToFit()
+                .frame(width: m.pt(TrainingAreaIcon.glyphBox), height: m.pt(TrainingAreaIcon.glyphBox))
+                .foregroundStyle(m.c.muted)
+                .frame(width: m.pt(22), height: m.pt(22))
+                .overlay(Circle().strokeBorder(m.c.line, lineWidth: m.pt(1)))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(area.label)
+                    .evidenceText(.normal(10, 760))
+                    .foregroundStyle(m.c.ink)
+                    .lineLimit(1)
+                Text("\(area.exerciseCount) exercise\(area.exerciseCount == 1 ? "" : "s")")
+                    .evidenceText(.normal(8, 400))
+                    .foregroundStyle(m.c.muted)
+                    .lineLimit(1)
+                    .padding(.top, m.pt(2))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, m.pt(9))
+        .padding(.horizontal, m.pt(10))
+        .frame(maxWidth: .infinity, minHeight: max(44, m.pt(50)), alignment: .leading)
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(11)))
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A disclosure row: label, detail, trailing text or `›` that turns down
+/// when expanded.
+struct EvidenceKitDisclosureRow: View {
+    @Environment(\.evidenceFamily) private var family
+    let label: String
+    var detail: String?
+    let isExpanded: Bool
+    var trailingText: String?
+
+    var body: some View {
+        let m = EvidenceMetrics(family: family)
+        HStack(spacing: m.pt(10)) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(label)
+                    .evidenceText(EvidenceTextStyle(size: 12, weight: 760, lineHeight: 15.84))
+                    .foregroundStyle(m.c.ink)
+                if let detail {
+                    Text(detail)
+                        .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+                        .foregroundStyle(m.c.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, m.pt(2))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let trailingText {
+                Text(trailingText)
+                    .evidenceText(.normal(10, 800))
+                    .foregroundStyle(m.c.purple)
+            }
+            Text("›")
+                .evidenceText(EvidenceTextStyle(size: 17, weight: 400, lineHeight: 17))
+                .foregroundStyle(m.c.purple)
+                .rotationEffect(.degrees(isExpanded ? 90 : 0))
+        }
+        .padding(.horizontal, m.pt(5))
+        .padding(.vertical, m.pt(9))
+        .frame(minHeight: max(44, m.pt(48)))
+        .contentShape(Rectangle())
     }
 }
 
@@ -444,92 +480,12 @@ struct TrainingCompactActionLabel: View {
     }
 }
 
-private struct TrainingRecordPreviewRow: View {
-    let label: String
-    let detail: String
-    let value: String
-    let date: String
-    let sourceEvidence: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label)
-                        .physiqueOSFont(PhysiqueOSTypography.calloutStrong)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text(detail)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-                Spacer(minLength: 8)
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(value)
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text(TrainingDateFormatting.short(date))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-private struct TrainingAreaRow: View {
-    let area: TrainingAreaSummary
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
-                    .background(Circle().fill(PhysiqueOSTheme.surfaceElevated))
-                Image(systemName: TrainingAreaIcon.systemImage(for: area.id))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-            .frame(width: 28, height: 28)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(area.label)
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    .lineLimit(1)
-                if area.exerciseCount > 0 {
-                    Text("\(area.exerciseCount) exercise\(area.exerciseCount == 1 ? "" : "s")")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 4)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.accent)
-        }
-        .padding(.horizontal, 10)
-        .frame(minHeight: 56)
-        .frame(maxWidth: .infinity)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-/// `getTrainingAreaIcon` (`ProgressPlaceholderScreen.jsx:1041-1056`) —
-/// verified against the exact lucide icon per area, then mapped to the
-/// closest faithful SF Symbol equivalent (not a generic fitness-icon
-/// guess). `Dumbbell`→`dumbbell.fill`, `Activity`→`waveform.path.ecg`,
-/// `Shield`→`shield.fill`, `Flame`→`flame.fill`, and `Zap`→`bolt.fill` are
-/// all direct concept matches. `CircleDot` (Chest) is a ring with a small
-/// filled center dot — `smallcircle.filled.circle` is SF Symbols' own
-/// literal equivalent of that exact shape; the previously-shipped
-/// `circle.circle.fill` (concentric filled circles) was a mismatch,
-/// corrected here.
+/// The Training Area icon system. SF Symbols has no muscle-anatomy
+/// glyphs, so every area uses one consistent metaphor: the native SF
+/// fitness figure (or equipment) for a movement that primarily trains that
+/// area. Biceps and Triceps deliberately share the arm-oriented dumbbell.
+/// The icon sits in the locked T1 22-pt ring tile mark; only the glyph
+/// content changed from the harness's abstract marks (◉ ⌁ ◌ …).
 enum TrainingAreaIcon {
     /// The 10 canonical muscle-group Training Area ids, in
     /// `TRAINING_AREA_NAV_GROUPS` order. Also doubles as the set
@@ -544,15 +500,22 @@ enum TrainingAreaIcon {
         "core", "quads", "hamstrings", "glutes", "calves",
     ]
 
+    /// Every glyph is fitted into this square inside the 22-pt ring
+    /// (before harness scaling), so wide figures (Core, the dumbbell) keep
+    /// the same clearance from the ring as the upright ones.
+    static let glyphBox: CGFloat = 12
+
     static func systemImage(for areaId: String) -> String {
         switch areaId {
-        case "chest": "smallcircle.filled.circle" // CircleDot
-        case "back", "biceps", "triceps": "dumbbell.fill" // Dumbbell
-        case "shoulders", "hamstrings": "waveform.path.ecg" // Activity
-        case "core": "shield.fill" // Shield
-        case "glutes": "flame.fill" // Flame
-        case "quads": "bolt.fill" // Zap
-        case "calves": "waveform.path.ecg" // Activity
+        case "chest": "figure.strengthtraining.traditional" // barbell press
+        case "back": "figure.rower" // row / pull
+        case "shoulders": "figure.mixed.cardio" // arms overhead
+        case "biceps", "triceps": "dumbbell.fill" // arm work
+        case "core": "figure.core.training" // floor core work
+        case "quads": "figure.strengthtraining.functional" // loaded lunge
+        case "hamstrings": "figure.flexibility" // hinge / hamstring reach
+        case "glutes": "figure.step.training" // step-up / hip extension
+        case "calves": "figure.run" // ankle push-off
         default: "dumbbell.fill"
         }
     }
@@ -586,26 +549,6 @@ struct TrainingLinkRow: View {
         .frame(maxWidth: .infinity)
         .background(PhysiqueOSTheme.surfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-private struct TrainingProtocolRow: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -705,27 +648,24 @@ struct TrainingScopeSelectorView: View {
 /// tappable goal pills, only rendered when non-empty.
 private struct RelatedGoalsView: View {
     let goals: [TrainingRelatedGoal]
+    private let m = EvidenceMetrics(family: .training)
 
     var body: some View {
         if !goals.isEmpty {
-            CardContainer(padding: .sm) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Related Goals")
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    FlowLayout(spacing: 8) {
-                        ForEach(goals) { goal in
-                            NavigationLink(value: goal.destination) {
-                                Text(goal.title)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.accent)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(PhysiqueOSTheme.accent.opacity(0.14))
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
+            EvidenceSection(title: "Related Goals", style: .open, identifier: "training.relatedGoals") {
+                FlowLayout(spacing: m.pt(6)) {
+                    ForEach(goals) { goal in
+                        NavigationLink(value: goal.destination) {
+                            Text(goal.title)
+                                .evidenceText(.normal(10, 700))
+                                .foregroundStyle(m.c.muted)
+                                .padding(.horizontal, m.pt(9 + 1))
+                                .padding(.vertical, m.pt(7 + 1))
+                                .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(9)))
+                                .overlay(RoundedRectangle(cornerRadius: m.pt(9)).strokeBorder(m.c.line, lineWidth: m.pt(1)))
+                                .evidenceHitTarget(visualHeight: m.pt(28))
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }

@@ -24,6 +24,7 @@ struct RootTabView: View {
     @State private var goalsPath = NavigationPath()
     @State private var logPath = NavigationPath()
     @State private var evidencePath = NavigationPath()
+    @State private var evidenceBackTrail = EvidenceBackTrail()
     @State private var youPath = NavigationPath()
 
     init() {
@@ -37,6 +38,9 @@ struct RootTabView: View {
             ]))
         } else if let review = AppearanceReviewLaunchConfiguration.route {
             _selectedTab = State(initialValue: review.tab)
+            if let titles = AppearanceReviewLaunchConfiguration.evidenceTrail {
+                _evidenceBackTrail = State(initialValue: EvidenceBackTrail(seed: titles))
+            }
             switch review.tab {
             case .home:
                 _homePath = State(initialValue: NavigationPath(review.destinations))
@@ -88,6 +92,7 @@ struct RootTabView: View {
                         AppDestinationRouterView(destination: $0, onReturnToLog: returnToLog, onReturnToHome: returnToHome, onNavigate: { noteNavigation($0); evidencePath.append($0) })
                     }
             }
+            .environment(\.evidenceBackTrail, evidenceBackTrail)
             .tabItem { Label(AppTab.evidence.title, systemImage: AppTab.evidence.systemImageName) }
             .tag(AppTab.evidence)
 
@@ -261,6 +266,17 @@ private enum AppearanceReviewLaunchConfiguration {
         let destinations: [AppDestination]
     }
 
+    /// `-physiqueos.evidence-review.trail "Training/Aug 26"`: the titles of
+    /// the pages a deep-linked capture skips, so back labels read as they
+    /// do after real navigation.
+    static var evidenceTrail: [String]? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-physiqueos.evidence-review.trail"),
+              arguments.indices.contains(flag + 1)
+        else { return nil }
+        return arguments[flag + 1].components(separatedBy: "/").filter { !$0.isEmpty }
+    }
+
     static var route: Route? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let flag = arguments.firstIndex(of: "-physiqueos.appearance-review.route"),
@@ -278,6 +294,7 @@ private enum AppearanceReviewLaunchConfiguration {
         case "goal-phase-completed": Route(tab: .goals, destinations: [.goalPhase(goalId: "goal_fixture_build_lean_mass", phaseId: "phase_fixture_maintenance")])
         case "log": Route(tab: .log, destinations: [])
         case "evidence": Route(tab: .evidence, destinations: [])
+        case "evidence-timeline": Route(tab: .evidence, destinations: [.progressStream(streamId: "timeline")])
         case "you": Route(tab: .you, destinations: [])
         case "settings": Route(tab: .you, destinations: [.settings])
         case "appearance": Route(tab: .you, destinations: [.settings, .appearance])
@@ -288,8 +305,31 @@ private enum AppearanceReviewLaunchConfiguration {
             tab: .home,
             destinations: [.briefingDetail(briefingId: "weekly_briefing_2026-08-23_2026-08-29")]
         )
-        default: nil
+        default: evidenceReviewPath(value)
         }
+    }
+
+    /// `evidence:<step>;<step>` — e.g. `evidence:stream=training;trainingDay=2026-08-26`.
+    /// Opens any Evidence vertical deterministically for parity captures.
+    private static func evidenceReviewPath(_ value: String) -> Route? {
+        guard value.hasPrefix("evidence:") else { return nil }
+        let steps = value.dropFirst("evidence:".count).split(separator: ";").compactMap { step -> AppDestination? in
+            let parts = step.split(separator: "=", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { return nil }
+            switch parts[0] {
+            case "stream": return .progressStream(streamId: parts[1])
+            case "trainingDay": return .trainingDay(date: parts[1])
+            case "trainingSession": return .trainingSession(sessionId: parts[1])
+            case "trainingExercise": return .trainingExercise(exerciseId: parts[1])
+            case "trainingArea": return .trainingLibraryArea(areaId: parts[1], browseAll: false)
+            case "activityDay": return .activityDay(date: parts[1])
+            case "nutritionDay": return .nutritionDay(dayId: parts[1])
+            case "intake": return parts[1] == "photos" ? .photoUpload : parts[1] == "dexa" ? .dexaUpload : .evidenceIntake
+            case "review": return .evidenceReview(reviewId: parts[1])
+            default: return nil
+            }
+        }
+        return Route(tab: .evidence, destinations: steps)
     }
 }
 #endif

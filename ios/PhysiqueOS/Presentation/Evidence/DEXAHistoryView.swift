@@ -23,24 +23,17 @@ import PDFKit
 struct DEXAHistoryView: View {
     static let sincePriorScanColumnLabels = ["Body Fat", "Fat Mass", "Lean Mass"]
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: DEXAHistoryViewModel?
     @State private var viewModelAuthority: NativeAPIEnvironment?
 
-    @State private var selectedBodyFatPointID: String?
-    /// One selection per secondary metric series, keyed by a
-    /// section-namespaced series title (e.g. `"regionalFat-Arms"`) since
-    /// "Arms"/"Legs"/etc. titles repeat across the lean and fat regional
-    /// sections. Re-verified against source: every DEXA metric chart on the
-    /// live web page (Fat/Lean/Total Mass, RMR, VAT Mass, A/G Ratio, and
-    /// all 10 regional lean/fat series) reuses the same fully-interactive
-    /// hover/drag-scrub chart component as Body Fat % — none of them are
-    /// decorative sparklines on web, so none stay sparkline-only here.
+    /// One selection per series, keyed by a section-namespaced title (e.g.
+    /// `"regionalFat-Arms"`) since region titles repeat across the lean and
+    /// fat sections. Every DEXA series is the same interactive chart.
     @State private var selectedMetricPointIDs: [String: String] = [:]
-    @State private var isSupplementalExpanded = false
-    @State private var isRegionalLeanExpanded = false
-    @State private var isRegionalFatExpanded = false
-    @State private var isHistoryExpanded = false
+    @State private var isSupplementalExpanded = Self.reviewExpanded("supplemental")
+    @State private var isRegionalLeanExpanded = Self.reviewExpanded("lean")
+    @State private var isRegionalFatExpanded = Self.reviewExpanded("fat")
+    @State private var isHistoryExpanded = Self.reviewExpanded("history")
     @State private var selectedPDF: DEXAPDFPresentation?
     @State private var sourceMediaMessage: String?
     @State private var loadingSourceMediaID: String?
@@ -48,34 +41,24 @@ struct DEXAHistoryView: View {
     static let supplementalPreviewLimit = 3
     static let regionalPreviewLimit = 3
     static let historyPreviewLimit = 3
+    private let m = EvidenceMetrics(family: .record)
 
     var body: some View {
-        ScrollView {
-            content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    content
+                }
+                .padding(.horizontal, m.pt(15))
+                .padding(.top, m.pt(14))
+                .padding(.bottom, m.pt(42))
+            }
+            .task(id: reviewLoaded) { scrollToReviewSection(proxy) }
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Evidence Hub")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .defaultScrollAnchor(Self.reviewScrollAnchor)
+        .evidencePageChrome("DEXA")
+        .evidenceFamily(.record)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = DEXAHistoryViewModel(api: environment.dexaAPI)
@@ -95,291 +78,387 @@ struct DEXAHistoryView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStateCard(kind: .loading("Loading DEXA Evidence…"), identifier: "dexa.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "dexa.failure")
         case .loaded(let report):
-            VStack(alignment: .leading, spacing: 26) {
-                header(for: report)
-                TrainingScopeSelectorView(scope: report.scope) { pillID in
-                    Task { await viewModel?.selectScope(pillID: pillID) }
-                }
-                latestScanCard(report.latestScan)
-                if environment.nativeAuthority == .founderProduction {
-                    dexaWritebackStatus
-                }
-                summaryGrid(report.summary)
-                if let delta = report.delta { deltaRow(delta) }
-                coreTrendsCard(report)
-                supplementalCard(report)
-                regionalCard(title: "Regional Tissue Lean Mass", series: report.regionalLeanTrends, namespace: "regionalLean", isExpanded: $isRegionalLeanExpanded)
-                regionalCard(title: "Regional Tissue Fat Mass", series: report.regionalFatTrends, namespace: "regionalFat", isExpanded: $isRegionalFatExpanded)
-                historyCard(report.history)
+            EvidenceHeaderView(symbol: "D", eyebrow: "Evidence Report", title: report.title, subtitle: report.subtitle, exposesTexts: true)
+            EvidenceScopePicker(scope: report.scope) { pillID in
+                Task { await viewModel?.selectScope(pillID: pillID) }
             }
+            latestScanCard(report.latestScan)
+            if let writeback = writebackDisplay {
+                writebackCard(writeback)
+            }
+            summaryGrid(report.summary)
+            if let delta = report.delta { sincePriorScanCard(delta) }
+            coreTrendsCard(report)
+            supplementalSection(report)
+            regionalSection(title: "Regional Tissue Lean Mass", subtitle: "Regional lean tissue in pounds.", series: report.regionalLeanTrends, namespace: "regionalLean", color: m.c.green, identifier: "dexa.regionalLean", isExpanded: $isRegionalLeanExpanded)
+            regionalSection(title: "Regional Tissue Fat Mass", subtitle: "Regional fat tissue in pounds.", series: report.regionalFatTrends, namespace: "regionalFat", color: m.c.amber, identifier: "dexa.regionalFat", isExpanded: $isRegionalFatExpanded)
+            historyCard(report.history)
         }
     }
 
-    private var dexaWritebackStatus: some View {
-        let coordinator = environment.dexaHealthKitWritebackCoordinator
-        return CardContainer {
-            HStack(spacing: 10) {
-                let completed = coordinator.state == .current || coordinator.state == .deleted
-                Image(systemName: completed ? "checkmark.icloud.fill" : "heart.text.square")
-                    .foregroundStyle(completed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textSecondary)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("DEXA → Apple Health")
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Text(coordinator.state.label)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-                Spacer()
-                if coordinator.isEnabled && coordinator.state != .reconciling {
-                    Button("Retry") { Task { await coordinator.reconcilePermanent() } }
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                }
-            }
-        }
+    private var reviewLoaded: Bool {
+        if case .loaded = viewModel?.state { return true }
+        return false
     }
 
-    private func header(for report: DEXAReportReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.clipboard.fill", color: .success, size: .lg, isCircular: true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text(report.title)
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(report.subtitle)
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
+    /// Debug review only: `-physiqueos.evidence-review.scroll-to <section>`.
+    private func scrollToReviewSection(_ proxy: ScrollViewProxy) {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        guard reviewLoaded, let flag = arguments.firstIndex(of: "-physiqueos.evidence-review.scroll-to"),
+              arguments.indices.contains(flag + 1) else { return }
+        let target = arguments[flag + 1]
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            proxy.scrollTo(target, anchor: .top)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        #endif
     }
+
+    // MARK: - Latest Scan
 
     private func latestScanCard(_ scan: DEXALatestScan?) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 8) {
-                TrainingSectionHeaderView(title: "Latest Scan")
-                if let scan {
-                    HStack {
-                        Text(TrainingDateFormatting.short(scan.date))
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Spacer(minLength: 8)
-                        Text(scan.sourceLabel)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                    if let mediaId = scan.sourceMediaId {
+        RecordCard {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline, spacing: m.pt(8)) {
+                    Text("Latest Scan")
+                        .evidenceText(RecordText.sectionTitle)
+                        .foregroundStyle(m.c.ink)
+                    Spacer(minLength: 0)
+                    if let mediaId = scan?.sourceMediaId {
                         sourceMediaButton(mediaId: mediaId)
                     }
+                }
+                .padding(.bottom, m.pt(9))
+                if let scan {
+                    HStack(alignment: .center, spacing: m.pt(10)) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(RecordDate.long(scan.date))
+                                .evidenceText(RecordText.rowLabel)
+                                .foregroundStyle(m.c.ink)
+                            Text(scan.sourceLabel)
+                                .evidenceText(RecordText.rowCopy)
+                                .foregroundStyle(m.c.quiet)
+                                .padding(.top, m.pt(3))
+                        }
+                        Spacer(minLength: 0)
+                        RecordTag(text: "Latest")
+                    }
+                    .padding(.vertical, m.pt(9))
+                    .padding(.horizontal, m.pt(1))
+                    .accessibilityElement(children: .combine)
                     if let sourceMediaMessage {
                         Text(sourceMediaMessage)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .evidenceText(RecordText.rowCopy)
+                            .foregroundStyle(m.c.muted)
                     }
                 } else {
                     Text("No DEXA scans in this period.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .evidenceText(RecordText.body)
+                        .foregroundStyle(m.c.muted)
+                        .padding(.vertical, m.pt(9))
                 }
             }
         }
+        .padding(.bottom, m.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("dexa.latestScan")
     }
 
+    private func sourceMediaButton(mediaId: String) -> some View {
+        Button {
+            loadSourcePDF(mediaId: mediaId)
+        } label: {
+            Text(loadingSourceMediaID == mediaId ? "Loading PDF…" : "View BodySpec PDF")
+                .evidenceText(RecordText.action)
+                .foregroundStyle(m.c.accent)
+                .evidenceHitTarget(visualHeight: m.pt(12))
+        }
+        .buttonStyle(.plain)
+        .disabled(loadingSourceMediaID != nil)
+        .accessibilityIdentifier("dexa.latestScan.viewPDF")
+    }
+
+    // MARK: - DEXA → Apple Health
+
+    private struct WritebackDisplay {
+        let completed: Bool
+        let attention: Bool
+        let label: String
+        let showsRetry: Bool
+    }
+
+    /// Founder Production's real writeback coordinator. The Debug review
+    /// seam renders the same card in Sandbox for parity capture only.
+    private var writebackDisplay: WritebackDisplay? {
+        #if DEBUG
+        if let label = Self.reviewWritebackLabel {
+            return WritebackDisplay(completed: true, attention: false, label: label, showsRetry: false)
+        }
+        #endif
+        guard environment.nativeAuthority == .founderProduction else { return nil }
+        let coordinator = environment.dexaHealthKitWritebackCoordinator
+        let attention: Bool
+        switch coordinator.state {
+        case .failed, .permissionNeeded: attention = true
+        default: attention = false
+        }
+        return WritebackDisplay(
+            completed: coordinator.state == .current || coordinator.state == .deleted,
+            attention: attention,
+            label: coordinator.state.label,
+            showsRetry: coordinator.isEnabled && coordinator.state != .reconciling
+        )
+    }
+
+    private func writebackCard(_ display: WritebackDisplay) -> some View {
+        RecordCard {
+            HStack(alignment: .center, spacing: m.pt(9)) {
+                Text(display.completed ? "✓" : (display.attention ? "!" : "○"))
+                    .evidenceText(.normal(18, 400, jakarta: false))
+                    .foregroundStyle(display.completed ? m.c.green : (display.attention ? m.c.amber : m.c.quiet))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("DEXA → Apple Health")
+                        .evidenceText(RecordText.rowLabel)
+                        .foregroundStyle(m.c.ink)
+                    Text(display.label)
+                        .evidenceText(RecordText.rowCopy)
+                        .foregroundStyle(m.c.quiet)
+                        .padding(.top, m.pt(3))
+                }
+                Spacer(minLength: 0)
+                if display.showsRetry {
+                    Button("Retry") {
+                        Task { await environment.dexaHealthKitWritebackCoordinator.reconcilePermanent() }
+                    }
+                    .buttonStyle(.plain)
+                    .evidenceText(RecordText.action)
+                    .foregroundStyle(m.c.accent)
+                    .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                    .accessibilityIdentifier("dexa.writeback.retry")
+                }
+            }
+            .accessibilityElement(children: .combine)
+        }
+        .padding(.bottom, m.pt(17))
+        .accessibilityIdentifier("dexa.writeback")
+    }
+
+    // MARK: - Headline metrics
+
+    /// `.summary-grid`: two columns of `surface2` metrics; an odd last item
+    /// spans both columns.
     private func summaryGrid(_ items: [DEXASummaryItem]) -> some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-            ForEach(items) { item in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.label)
-                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    Text(item.value)
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        let pairs = stride(from: 0, to: items.count, by: 2).map { Array(items[$0..<min($0 + 2, items.count)]) }
+        return VStack(spacing: m.pt(7)) {
+            ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
+                HStack(spacing: m.pt(7)) {
+                    ForEach(pair) { item in summaryMetric(item) }
                 }
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(item.label): \(item.value)")
             }
         }
+        .padding(.bottom, m.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("dexa.summary")
     }
 
-    /// "Since prior scan" — the inline delta, part of `/progress/dexa`
-    /// itself (not the separate DEXA Event Briefing comparison story).
-    private func deltaRow(_ delta: DEXADelta) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 14) {
-                TrainingSectionHeaderView(title: "Since Prior Scan")
+    private func summaryMetric(_ item: DEXASummaryItem) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(item.label)
+                .evidenceText(RecordText.metricLabel)
+                .foregroundStyle(m.c.quiet)
+            Text(item.value)
+                .evidenceText(RecordText.metricValue)
+                .foregroundStyle(m.c.ink)
+                .padding(.top, m.pt(3))
+        }
+        .padding(m.pt(10))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(10)))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.label): \(item.value)")
+    }
+
+    // MARK: - Since Prior Scan (locked final correction)
+
+    /// One horizontal summary: three equal columns, compact uppercase
+    /// labels, semantic value colors and subtle separators — no nested
+    /// tiles. Values and units are the canonical delta strings.
+    private func sincePriorScanCard(_ delta: DEXADelta) -> some View {
+        RecordCard(padding: 14) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Since Prior Scan")
+                    .evidenceText(RecordText.sectionTitle)
+                    .foregroundStyle(m.c.ink)
                 HStack(spacing: 0) {
-                    deltaItem("Body Fat", delta.bodyFatPercentagePoints, color: PhysiqueOSTheme.chartSuccess)
-                    Divider().overlay(PhysiqueOSTheme.divider).frame(height: 48)
-                    deltaItem("Fat Mass", delta.fatMassPounds, color: PhysiqueOSTheme.chartEffort)
-                    Divider().overlay(PhysiqueOSTheme.divider).frame(height: 48)
-                    deltaItem("Lean Mass", delta.leanMassPounds, color: PhysiqueOSTheme.chartEvidence)
+                    deltaColumn(Self.sincePriorScanColumnLabels[0], delta.bodyFatPercentagePoints, color: m.c.green, separated: false)
+                    deltaColumn(Self.sincePriorScanColumnLabels[1], delta.fatMassPounds, color: m.c.amber, separated: true)
+                    deltaColumn(Self.sincePriorScanColumnLabels[2], delta.leanMassPounds, color: m.c.blue, separated: true)
                 }
+                .padding(.top, m.pt(13))
             }
         }
+        .padding(.bottom, m.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("dexa.sincePriorScan")
+        .id("dexa.sincePriorScan")
     }
 
-    private func deltaItem(_ label: String, _ value: String, color: Color) -> some View {
-        VStack(alignment: .center, spacing: 5) {
+    private func deltaColumn(_ label: String, _ value: String, color: Color, separated: Bool) -> some View {
+        VStack(spacing: 0) {
             Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .evidenceText(.normal(9, 500, jakarta: false, tracking: 0.54, uppercase: true, relativeTo: .caption2))
+                .foregroundStyle(m.c.quiet)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                .foregroundStyle(value == "0.0 lb" || value == "0.0 pts" ? PhysiqueOSTheme.textMuted : color)
+                .evidenceText(.normal(16, 500, jakarta: false, relativeTo: .headline))
+                .foregroundStyle(value == "0.0 lb" || value == "0.0 pts" ? m.c.quiet : color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.top, m.pt(7))
         }
-        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, m.pt(3))
+        .padding(.bottom, m.pt(2))
+        .padding(.horizontal, m.pt(12))
+        .frame(maxWidth: .infinity)
+        .overlay(alignment: .leading) {
+            if separated { Rectangle().fill(m.c.line).frame(width: m.pt(1)) }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
     }
 
+    // MARK: - Core Trends (always open, five charts)
+
     private func coreTrendsCard(_ report: DEXAReportReadModel) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 4) {
-                    TrainingSectionHeaderView(title: "Core Trends")
-                    Text("Primary BodySpec trend lines for the selected timeline.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        let series = [report.bodyFatTrend] + report.coreTrends
+        return RecordCard {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Core Trends")
+                    .evidenceText(RecordText.sectionTitle)
+                    .foregroundStyle(m.c.ink)
+                Text(series.map(\.title).joined(separator: ", "))
+                    .evidenceText(RecordText.rowCopy)
+                    .foregroundStyle(m.c.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, m.pt(3))
+                VStack(spacing: m.pt(8)) {
+                    ForEach(series) { item in
+                        chart(item, namespace: "core", color: item.title.contains("Fat Mass") ? m.c.amber : m.c.green)
+                    }
                 }
-                chartCard(
-                    report.bodyFatTrend,
-                    namespace: "core",
-                    color: PhysiqueOSTheme.chartSuccess,
-                    description: "Verified BodySpec scan history."
-                )
-                ForEach(report.coreTrends) { series in
-                    chartCard(
-                        series,
-                        namespace: "core",
-                        color: series.title.contains("Fat") ? PhysiqueOSTheme.chartEffort : PhysiqueOSTheme.chartSuccess,
-                        description: "Structured values extracted from BodySpec reports."
-                    )
-                }
+                .padding(.top, m.pt(8))
             }
         }
+        .padding(.bottom, m.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("dexa.coreTrends")
+        .id("dexa.coreTrends")
     }
 
-    private func supplementalCard(_ report: DEXAReportReadModel) -> some View {
-        let preview = Array(report.supplementalDetails.prefix(Self.supplementalPreviewLimit))
-        return CardContainer {
-            DEXADisclosureRow(isExpanded: $isSupplementalExpanded) {
-                drawerHeader(title: "Supplemental Metrics", subtitle: "Secondary calibration metrics from BodySpec.", expanded: isSupplementalExpanded)
-            } expanded: {
-                VStack(alignment: .leading, spacing: 10) {
-                    VStack(spacing: 0) {
-                        ForEach(isSupplementalExpanded ? report.supplementalDetails : preview) { row in
-                            HStack {
-                                Text(row.label)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                Spacer(minLength: 8)
-                                Text(row.value)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 11)
-                            .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    if isSupplementalExpanded {
-                        VStack(spacing: 14) {
-                            ForEach(report.supplementalTrends) { series in
-                                chartCard(
-                                    series,
-                                    namespace: "supplemental",
-                                    color: PhysiqueOSTheme.chartEffort,
-                                    description: "Structured values extracted from BodySpec reports."
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func regionalCard(title: String, series: [DEXAMetricSeries], namespace: String, isExpanded: Binding<Bool>) -> some View {
-        let preview = Array(series.prefix(Self.regionalPreviewLimit))
-        return CardContainer {
-            DEXADisclosureRow(isExpanded: isExpanded) {
-                drawerHeader(title: title, subtitle: title.contains("Lean") ? "Regional lean tissue in pounds." : "Regional fat tissue in pounds.", expanded: isExpanded.wrappedValue)
-            } expanded: {
-                VStack(spacing: 14) {
-                    VStack(spacing: 0) {
-                        ForEach(isExpanded.wrappedValue ? series : preview) { item in
-                            HStack {
-                                Text(item.title)
-                                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                Spacer(minLength: 8)
-                                Text(latestValue(item))
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 11)
-                            .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    if isExpanded.wrappedValue {
-                        ForEach(series) { item in
-                            chartCard(
-                                item,
-                                namespace: namespace,
-                                color: title.contains("Lean") ? PhysiqueOSTheme.chartEvidence : PhysiqueOSTheme.chartEffort,
-                                description: title.contains("Lean") ? "Regional lean tissue mass extracted from BodySpec reports." : "Regional fat tissue mass extracted from BodySpec reports."
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// A titled, fully-interactive tap-and-drag chart for one secondary
-    /// DEXA metric series — see `selectedMetricPointIDs`'s doc comment for
-    /// why every series (not just Body Fat %) is interactive here.
-    private func chartCard(_ series: DEXAMetricSeries, namespace: String, color: Color, description: String) -> some View {
+    private func chart(_ series: DEXAMetricSeries, namespace: String, color: Color) -> some View {
         let key = "\(namespace)-\(series.title)"
-        return VStack(alignment: .leading, spacing: 6) {
-            Text(series.title)
-                .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Text(description)
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            DEXATrendChartView(
-                series: series, color: color,
-                selectedPointID: Binding(
-                    get: { selectedMetricPointIDs[key] },
-                    set: { selectedMetricPointIDs[key] = $0 }
-                )
+        return DEXATrendChartView(
+            series: series,
+            color: color,
+            selectedPointID: Binding(
+                get: { selectedMetricPointIDs[key] },
+                set: { selectedMetricPointIDs[key] = $0 }
             )
+        )
+    }
+
+    // MARK: - Disclosures (independent Show All / Close)
+
+    private func metricList(_ rows: [(String, String)], identifier: String) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                HStack(spacing: m.pt(10)) {
+                    Text(row.0)
+                        .evidenceText(.normal(10, 400, jakarta: false))
+                        .foregroundStyle(m.c.ink)
+                    Spacer(minLength: 0)
+                    Text(row.1)
+                        .evidenceText(.normal(10, 800, jakarta: false))
+                        .foregroundStyle(m.c.ink)
+                }
+                .padding(m.pt(10))
+                .background(m.c.surface2.opacity(0.7))
+                .overlay(alignment: .bottom) {
+                    if index < rows.count - 1 { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("\(identifier).row.\(row.0)")
+            }
         }
-        .padding(16)
-        .background(PhysiqueOSTheme.surfaceElevated)
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(PhysiqueOSTheme.divider, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: m.pt(11)))
+    }
+
+    /// Supplemental Metrics: three rows, or all nine followed by the VAT
+    /// Mass and A/G Ratio charts.
+    @ViewBuilder
+    private func supplementalSection(_ report: DEXAReportReadModel) -> some View {
+        let rows = isSupplementalExpanded ? report.supplementalDetails : Array(report.supplementalDetails.prefix(Self.supplementalPreviewLimit))
+        RecordCard {
+            VStack(alignment: .leading, spacing: 0) {
+                RecordDisclosureHead(
+                    title: "Supplemental Metrics",
+                    subtitle: "Secondary calibration metrics from BodySpec.",
+                    isExpanded: isSupplementalExpanded,
+                    identifier: "dexa.supplemental.toggle"
+                ) { withAnimation(.easeInOut(duration: 0.2)) { isSupplementalExpanded.toggle() } }
+                metricList(rows.map { ($0.label, $0.value) }, identifier: "dexa.supplemental")
+                    .padding(.top, m.pt(10))
+            }
+        }
+        .padding(.bottom, m.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("dexa.supplemental")
+        .id("dexa.supplemental")
+        if isSupplementalExpanded, !report.supplementalTrends.isEmpty {
+            expandedCharts(report.supplementalTrends, namespace: "supplemental", color: m.c.amber, identifier: "dexa.supplemental.charts")
+        }
+    }
+
+    @ViewBuilder
+    private func regionalSection(title: String, subtitle: String, series: [DEXAMetricSeries], namespace: String, color: Color, identifier: String, isExpanded: Binding<Bool>) -> some View {
+        let rows = isExpanded.wrappedValue ? series : Array(series.prefix(Self.regionalPreviewLimit))
+        RecordCard {
+            VStack(alignment: .leading, spacing: 0) {
+                RecordDisclosureHead(
+                    title: title,
+                    subtitle: subtitle,
+                    isExpanded: isExpanded.wrappedValue,
+                    identifier: "\(identifier).toggle"
+                ) { withAnimation(.easeInOut(duration: 0.2)) { isExpanded.wrappedValue.toggle() } }
+                metricList(rows.map { ($0.title, latestValue($0)) }, identifier: identifier)
+                    .padding(.top, m.pt(10))
+            }
+        }
+        .padding(.bottom, m.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(identifier)
+        .id(identifier)
+        if isExpanded.wrappedValue, !series.isEmpty {
+            expandedCharts(series, namespace: namespace, color: color, identifier: "\(identifier).charts")
+        }
+    }
+
+    /// The locked expanded state: the section's rows, then its graphs as
+    /// standalone chart blocks before the next section.
+    private func expandedCharts(_ series: [DEXAMetricSeries], namespace: String, color: Color, identifier: String) -> some View {
+        VStack(spacing: m.pt(8)) {
+            ForEach(series) { item in chart(item, namespace: namespace, color: color) }
+        }
+        .padding(.bottom, m.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(identifier)
     }
 
     private func latestValue(_ series: DEXAMetricSeries) -> String {
@@ -387,71 +466,40 @@ struct DEXAHistoryView: View {
         return series.unit.isEmpty ? String(format: "%.2f", value) : "\(String(format: "%.1f", value))\(series.unit)"
     }
 
-    private func drawerHeader(title: String, subtitle: String?, expanded: Bool) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                if let subtitle {
-                    Text(subtitle)
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-            Spacer(minLength: 8)
-            Text(expanded ? "Close" : "Show All")
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-        }
-    }
+    // MARK: - Scan History
 
     private func historyCard(_ rows: [DEXAScanHistoryRow]) -> some View {
-        let preview = Array(rows.prefix(Self.historyPreviewLimit))
-        return CardContainer {
-            DEXADisclosureRow(isExpanded: $isHistoryExpanded) {
-                drawerHeader(title: "Scan History", subtitle: nil, expanded: isHistoryExpanded)
-            } expanded: {
+        let visible = isHistoryExpanded ? rows : Array(rows.prefix(Self.historyPreviewLimit))
+        return RecordCard {
+            VStack(alignment: .leading, spacing: 0) {
+                RecordDisclosureHead(
+                    title: "Scan History",
+                    isExpanded: isHistoryExpanded,
+                    identifier: "dexa.history.toggle"
+                ) { withAnimation(.easeInOut(duration: 0.2)) { isHistoryExpanded.toggle() } }
                 if rows.isEmpty {
                     Text("No DEXA scans in this period.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .evidenceText(RecordText.body)
+                        .foregroundStyle(m.c.muted)
+                        .padding(.top, m.pt(11))
                 } else {
-                    VStack(spacing: 6) {
-                        ForEach(isHistoryExpanded ? rows : preview) { row in
+                    VStack(spacing: m.pt(7)) {
+                        ForEach(visible) { row in
                             DEXAScanHistoryRowView(row: row) {
                                 guard let mediaId = row.sourceMediaId else { return }
                                 loadSourcePDF(mediaId: mediaId)
                             }
                         }
                     }
+                    .padding(.top, m.pt(11))
+                    .padding(.bottom, m.pt(7))
                 }
             }
         }
-    }
-
-    private func sourceMediaButton(mediaId: String) -> some View {
-        Button {
-            loadSourcePDF(mediaId: mediaId)
-        } label: {
-            HStack(spacing: 8) {
-                if loadingSourceMediaID == mediaId {
-                    ProgressView().tint(PhysiqueOSTheme.textPrimary)
-                } else {
-                    Image(systemName: "doc.richtext.fill")
-                }
-                Text("View BodySpec PDF")
-            }
-            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 11)
-            .background(PhysiqueOSTheme.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-        }
-        .buttonStyle(.plain)
-        .disabled(loadingSourceMediaID != nil)
-        .accessibilityIdentifier("dexa.latestScan.viewPDF")
+        .padding(.bottom, m.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("dexa.history")
+        .id("dexa.history")
     }
 
     private func loadSourcePDF(mediaId: String) {
@@ -478,50 +526,84 @@ struct DEXAHistoryView: View {
     }
 }
 
+private extension DEXAHistoryView {
+    static var reviewScrollAnchor: UnitPoint? {
+        #if DEBUG
+        EvidenceRedesignReview.scrollsToBottom ? .bottom : nil
+        #else
+        nil
+        #endif
+    }
+
+    /// `-physiqueos.evidence-review.dexa-expanded supplemental,lean,fat,history`.
+    static func reviewExpanded(_ section: String) -> Bool {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-physiqueos.evidence-review.dexa-expanded"),
+              arguments.indices.contains(flag + 1) else { return false }
+        return arguments[flag + 1].split(separator: ",").contains(Substring(section))
+        #else
+        return false
+        #endif
+    }
+
+    #if DEBUG
+    /// `-physiqueos.evidence-review.dexa-writeback <label>` shows the
+    /// Production writeback card in Sandbox for parity capture only.
+    static var reviewWritebackLabel: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-physiqueos.evidence-review.dexa-writeback"),
+              arguments.indices.contains(flag + 1) else { return nil }
+        return arguments[flag + 1]
+    }
+    #endif
+}
+
+/// `.scan`: date and source, Body Fat in green, the fat · lean · RMR line
+/// and View BodySpec PDF only when source media exists. Read-only; no scan
+/// detail route.
 private struct DEXAScanHistoryRowView: View {
     let row: DEXAScanHistoryRow
     var onOpenSource: () -> Void = {}
+    private let m = EvidenceMetrics(family: .record)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(TrainingDateFormatting.short(row.date))
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: m.pt(12)) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(RecordDate.long(row.date))
+                        .evidenceText(RecordText.rowLabel)
+                        .foregroundStyle(m.c.ink)
                     Text(row.sourceLabel)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .evidenceText(RecordText.rowCopy)
+                        .foregroundStyle(m.c.quiet)
+                        .padding(.top, m.pt(3))
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
                 Text(row.bodyFatPercentage)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
+                    .evidenceText(.normal(13, 700, jakarta: false))
+                    .foregroundStyle(m.c.green)
             }
-            HStack(spacing: 18) {
-                historyMetric(row.fatMass, suffix: " fat")
-                historyMetric(row.leanMass, suffix: " lean")
-                historyMetric(row.restingMetabolicRate, suffix: " RMR")
-            }
+            Text("\(row.fatMass) fat · \(row.leanMass) lean · \(row.restingMetabolicRate) RMR")
+                .evidenceText(.normal(8.5, 400, jakarta: false, relativeTo: .caption2))
+                .foregroundStyle(m.c.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, m.pt(7))
             if row.sourceMediaId != nil {
                 Button("View BodySpec PDF", action: onOpenSource)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
                     .buttonStyle(.plain)
+                    .evidenceText(RecordText.action)
+                    .foregroundStyle(m.c.accent)
+                    .evidenceHitTarget(visualHeight: m.pt(12))
+                    .padding(.top, m.pt(8))
                     .accessibilityIdentifier("dexa.history.\(row.id).viewPDF")
             }
         }
-        .padding(18)
+        .padding(m.pt(11))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-    }
-
-    private func historyMetric(_ value: String, suffix: String) -> some View {
-        Text("\(value)\(suffix)")
-            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(11)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("dexa.history.\(row.id)")
     }
 }
 
@@ -566,39 +648,6 @@ private struct DEXAPDFView: UIViewRepresentable {
     func updateUIView(_ uiView: PDFView, context: Context) {
         if uiView.document?.dataRepresentation() != data {
             uiView.document = PDFDocument(data: data)
-        }
-    }
-}
-
-/// A local disclosure — matches `EvidenceDisclosureRow`'s established
-/// shape (`WeightHistoryView.swift`), redefined here per this codebase's
-/// own per-file-private convention for small shared UI pieces.
-private struct DEXADisclosureRow<Summary: View, Expanded: View>: View {
-    @Binding var isExpanded: Bool
-    var summary: Summary
-    var expanded: Expanded
-
-    init(isExpanded: Binding<Bool>, @ViewBuilder summary: () -> Summary, @ViewBuilder expanded: () -> Expanded) {
-        self._isExpanded = isExpanded
-        self.summary = summary()
-        self.expanded = expanded()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
-            } label: {
-                summary
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityAddTraits(.isButton)
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-
-            expanded
-                .padding(.top, 12)
         }
     }
 }

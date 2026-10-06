@@ -1,41 +1,33 @@
 import SwiftUI
 
-/// The bounded, cross-domain Timeline — a genuinely new Founder Production
-/// feature (Patch 3 continuation) with no Sandbox precedent. Server
-/// identity/chronology/ordering is authoritative; this view renders one
-/// bounded page verbatim (newest-first, matching the server's own sort)
-/// and never invents client-side pagination beyond it.
+/// The bounded, cross-domain Timeline (locked T1) — a genuinely new
+/// Founder Production feature (Patch 3 continuation) with no Sandbox
+/// precedent. Server identity/chronology/ordering is authoritative; this
+/// view renders one bounded page verbatim (newest-first, matching the
+/// server's own sort) as a single chronology rail, never invents
+/// client-side pagination, filters or row navigation, and only states
+/// `Showing N of M` when the Server says more entries exist.
 struct TimelineView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: TimelineViewModel?
     @State private var viewModelAuthority: NativeAPIEnvironment?
 
+    private typealias S = EvidenceLockedStyle
+
     var body: some View {
         ScrollView {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+                .padding(.horizontal, S.pt(16))
+                .padding(.top, S.pt(14))
         }
         .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
+        .defaultScrollAnchor(Self.reviewScrollAnchor)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button { dismiss() } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Evidence Hub")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .toolbar { backToolbarItem }
+        .evidenceLockedPageChrome()
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = TimelineViewModel(api: environment.timelineAPI)
@@ -45,95 +37,166 @@ struct TimelineView: View {
         }
     }
 
+    private var backToolbarItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button { dismiss() } label: {
+                Text("‹ Evidence Hub")
+                    .evidenceLockedText(S.navBack)
+                    .foregroundStyle(S.sub)
+                    .fixedSize()
+                    .padding(.leading, S.pt(3.3))
+                    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Evidence Hub")
+            .accessibilityHint("Returns to the Evidence Hub.")
+            .accessibilityIdentifier("evidence.timeline.back")
+        }
+        .evidenceLockedFlatToolbarItem()
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStateCard(kind: .loading("Loading Timeline…"), identifier: "evidence.timeline.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "evidence.timeline.failure")
         case .loaded(let timeline):
-            VStack(alignment: .leading, spacing: 16) {
-                header
+            VStack(alignment: .leading, spacing: 0) {
+                EvidenceHeaderView(
+                    symbol: "⌁",
+                    eyebrow: "Evidence",
+                    title: "Timeline",
+                    subtitle: "A chronological record of what PhysiqueOS has captured."
+                )
                 if timeline.items.isEmpty {
-                    CardContainer(padding: .md) {
-                        Text("No Timeline entries yet.")
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
-                    }
+                    EvidenceStateCard(
+                        kind: .message(title: "No Timeline entries yet.", detail: nil),
+                        identifier: "evidence.timeline.empty"
+                    )
                 } else {
-                    VStack(spacing: 8) {
-                        ForEach(timeline.items) { item in
-                            TimelineRow(item: item)
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(timeline.items.enumerated()), id: \.element.id) { index, item in
+                            TimelineEventRow(item: item, isLast: index == timeline.items.count - 1)
                         }
                     }
+                    .padding(.leading, S.pt(5))
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("evidence.timeline.events")
+
                     if timeline.hasMore {
                         Text("Showing \(timeline.items.count) of \(timeline.totalCount)")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            .frame(maxWidth: .infinity, alignment: .center)
+                            .evidenceLockedText(S.note)
+                            .foregroundStyle(S.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("evidence.timeline.count")
                     }
                 }
             }
         }
-    }
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "list.bullet.clipboard.fill", color: .primary, size: .lg, isCircular: true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Evidence Report")
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text("Timeline")
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text("A chronological record of what PhysiqueOS has captured.")
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private struct TimelineRow: View {
+/// One T1 `.event`: a toned 8-px node with a 4-px 14% halo on the rail,
+/// the uppercase type · date eyebrow, the title and the optional detail.
+/// Rows are read-only; the rail and node are decorative.
+private struct TimelineEventRow: View {
     let item: TimelineItem
+    let isLast: Bool
+
+    private typealias S = EvidenceLockedStyle
+
+    private var tone: Color { S.tone(item.tone) }
+    private var dateText: String { TimelineDateFormatting.long(item.date) }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Circle()
-                .fill(item.tone.foreground)
-                .frame(width: 8, height: 8)
-                .padding(.top, 6)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(item.title)
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    Spacer(minLength: 8)
-                    Text(TrainingDateFormatting.short(item.date))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            Text("\(item.type) · \(dateText)")
+                .evidenceLockedText(S.eventType)
+                .foregroundStyle(tone)
+            Text(item.title)
+                .evidenceLockedText(S.eventTitle)
+                .foregroundStyle(S.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, S.pt(2))
+            if !item.detail.isEmpty {
                 Text(item.detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                Text(item.type)
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .evidenceLockedText(S.eventCopy)
+                    .foregroundStyle(S.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, S.pt(3))
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, S.pt(26))
+        .padding(.bottom, S.pt(16))
+        .background(alignment: .topLeading) { rail }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(item.type), \(dateText). \(item.title)\(item.detail.isEmpty ? "" : ". \(item.detail)")")
+        .accessibilityIdentifier("evidence.timeline.event.\(item.id)")
+    }
+
+    /// `.event:before` (node at 3,7) and `.event:after` (1-px rule at x 6,
+    /// from 19 px below the row top to 2 px above its bottom).
+    private var rail: some View {
+        ZStack(alignment: .topLeading) {
+            if !isLast {
+                Rectangle()
+                    .fill(S.line)
+                    .frame(width: S.pt(1))
+                    .padding(.top, S.pt(19))
+                    .padding(.bottom, S.pt(2))
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .offset(x: S.pt(6))
+            }
+            Circle()
+                .fill(tone)
+                .frame(width: S.pt(8), height: S.pt(8))
+                .padding(S.pt(4))
+                .background(tone.opacity(0.14), in: Circle())
+                .offset(x: S.pt(-1), y: S.pt(3))
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+enum TimelineDateFormatting {
+    /// `Sep 10, 2026` from the Server's ISO day or timestamp.
+    static func long(_ value: String) -> String {
+        let parser = DateFormatter()
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = TimeZone(identifier: "UTC")
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: String(value.prefix(10))) else { return value }
+        let display = DateFormatter()
+        display.locale = Locale(identifier: "en_US_POSIX")
+        display.timeZone = TimeZone(identifier: "UTC")
+        display.dateFormat = "MMM d, yyyy"
+        return display.string(from: date)
+    }
+}
+
+private extension ToolbarContent {
+    /// The locked back affordance is plain text on the flat bar, not a
+    /// Liquid Glass capsule.
+    @ToolbarContentBuilder
+    func evidenceLockedFlatToolbarItem() -> some ToolbarContent {
+        if #available(iOS 26.0, *) {
+            sharedBackgroundVisibility(.hidden)
+        } else {
+            self
+        }
+    }
+}
+
+private extension TimelineView {
+    static var reviewScrollAnchor: UnitPoint? {
+#if DEBUG
+        EvidenceRedesignReview.scrollsToBottom ? .bottom : nil
+#else
+        nil
+#endif
     }
 }

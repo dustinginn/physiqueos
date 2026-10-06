@@ -547,7 +547,10 @@ final class AppEnvironment {
     /// (see `ProductionEvidenceAPI`'s doc comment) rather than a single
     /// fixture-only constant that never switched with authority.
     var evidenceAPI: EvidenceAPI {
-        nativeAuthority == .founderProduction ? ProductionEvidenceAPI(api: productionNativeAPI) : sandboxEvidenceAPI
+#if DEBUG
+        if let review = EvidenceRedesignReview.evidenceAPI { return review }
+#endif
+        return nativeAuthority == .founderProduction ? ProductionEvidenceAPI(api: productionNativeAPI) : sandboxEvidenceAPI
     }
 
     /// Log → Logged Today / pending Evidence Review queue — see
@@ -617,7 +620,10 @@ final class AppEnvironment {
     /// continuation) with no Sandbox precedent to mirror — Sandbox shows
     /// an honest "not available" state.
     var timelineAPI: TimelineAPI {
-        nativeAuthority == .founderProduction ? ProductionTimelineAPI(api: productionNativeAPI) : NotAvailableTimelineAPI()
+#if DEBUG
+        if let review = EvidenceRedesignReview.timelineAPI { return review }
+#endif
+        return nativeAuthority == .founderProduction ? ProductionTimelineAPI(api: productionNativeAPI) : NotAvailableTimelineAPI()
     }
 
     /// Evidence Review detail is only ever reached via the `.evidenceReview`
@@ -869,6 +875,11 @@ final class AppEnvironment {
     @MainActor
     func photoMediaSource(for view: PhotoViewRecord) -> PhotoMediaSource {
         if let mediaId = view.mediaId { return .authenticatedProduction(mediaId: mediaId) }
+        #if DEBUG
+        if SyntheticProgressPhoto.isEnabled {
+            return .assetName(SyntheticProgressPhoto.name(poseId: view.poseId, date: view.captureDate))
+        }
+        #endif
         return founderPhotoMediaStore.source(viewIdentity: view.id)
     }
 }
