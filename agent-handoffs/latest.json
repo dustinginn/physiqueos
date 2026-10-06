@@ -1,23 +1,31 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-06T01:05:00Z",
+  "generated_at_utc": "2026-10-06T03:18:51Z",
   "task": {
-    "id": "evidence-dns-resync-verification-20261006",
-    "title": "Verify GoDaddy authoritative DNS resync after Founder CNAME re-save (Evidence Reliability addendum)",
+    "id": "integrate-approved-batch3-on-workout-preview-20261006",
+    "title": "APPROVED BATCH 3 MULTI-LANE INTEGRATION CANDIDATE: Batch 3 A-E + macro-color correction onto Batch 2 + workout reliability preview 70ebf753",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "final_sha": "c3d9d2571b7e881577c393d37d11475fccd891a8",
-    "native_sha": "c3d9d2571b7e881577c393d37d11475fccd891a8",
+    "base_sha": "70ebf7534a90ec4256bbddd140cb98920a4025a4",
+    "final_sha": "fc693aeb919efc6fa68a236092a7fa7f75767a19",
+    "native_sha": "fc693aeb919efc6fa68a236092a7fa7f75767a19",
+    "native_branch": "claude/batch3-integrated-on-workout-preview-20261005",
+    "merge_sha": "09211edb4a295ab24a1450dae7fc485f675a7b01",
+    "batch3_authority_sha": "f5257ae1013dbb04e996bab27e144201b84da8b7",
+    "macro_correction_sha": "75160ae81e17211dbf37c49a7f587fd3c25bfd53",
+    "batch2_rc_sha": "793462b1",
+    "workout_reliability_native_sha": "e9f8a957",
+    "evidence_reliability_native_sha_not_integrated": "c3d9d2571b7e881577c393d37d11475fccd891a8",
+    "evidence_reliability_batch3_preview_not_integrated": "9fa2428c9fb5204b03c8f9930c6ace83ce63c262",
     "production_server_sha": "b7eb1e397f0238df9ae904fd182ddbb51602e8d8",
     "production_deployment": "6fa4e887",
     "native_build": 87
   },
   "result": {
-    "summary": "DNS incident RESOLVED at authority level: verified 00:52:01Z that ns65 and ns66 both serve SOA 2026100600 with physiqueos.dustinginn.com CNAME physiqueos-foundation-staging-a9or4.ondigitalocean.app (TTL 600); ns66 no longer NXDOMAIN. 1.1.1.1/8.8.8.8/9.9.9.9 resolve 3/3. Home router 10.0.0.1 held the old ns66 NXDOMAIN (negative TTL) until it expired; it resolved at 01:03:51Z and the custom domain /live and /ready returned 200 over normal DNS. Prod unchanged (6fa4e887 @ b7eb1e39). No polling window or GoDaddy escalation needed. Native reliability candidate c3d9d257 and Batch 3 preview 9fa2428c unchanged; the separate Batch 3 integration lane (prompt cc4ac08c) is untouched.",
+    "summary": "Clean integrated Native authority fc693aeb (claude/batch3-integrated-on-workout-preview-20261005): 70ebf753 + Batch 3 f5257ae1 + macro-color correction 75160ae8 (generic Review Nutrition macros now resolve through the shared NutritionEvidenceMacro authority = Nutrition Evidence .daily tokens). One conflict (HomeJourneyFieldView.swift) resolved with release side. Integrated gates found 2 Batch 3 regressions of Build 87 contracts (provenance source guard; shared Reduce-Motion disclosure) - fixed in fc693aeb, Training pixel-identical. On fc693aeb: unit 2056/0, Watch 49/49, full UI 60/60 (incl. L13 Dark/Light, Home briefing identity, Logger journeys), Release OK with Watch+WidgetKit, 0 seams, generator stable. Evidence reliability fix NOT integrated; layering 9fa2428c onto fc693aeb is conflict-free. No build bump, no TestFlight.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -25,29 +33,40 @@
   },
   "validation": {
     "tests": {
-      "status": "not_run",
-      "summary": "Verification-only task: no code changes. Prior lane validation for c3d9d257/9fa2428c stands (see the audit report)."
+      "status": "passed",
+      "summary": "fc693aeb: generator byte-stable; PhysiqueOSTests 2056/0 (1 skipped); PhysiqueOSWatchTests 49/49; PhysiqueOSUITests 60/60; generic iOS Release BUILD SUCCEEDED (Watch + WidgetKit/Live Activity, 0 debug seams). No remaining failures; the Batch 3 lane's 9 pre-existing TrainingAcceptance failures pass integrated."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder review of the Evidence Reliability audit + Native candidate still requested."
+      "summary": "No visual review required for the macro correction (color-only); Founder build authorization pending."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Read-only DNS queries (authoritative with recursion disabled, public and home resolvers), health GETs and a read-only doctl deployment read; no DNS, app or production change."
+      "summary": "Native-only; no Server change, no production access, workout reliability and Evidence reliability lanes untouched."
     }
   },
   "decisions_required": [
-    "Authorize including Native reliability fix c3d9d257 in the next build, layered onto the integrated Native authority produced by the separate Batch 3 integration lane (cc4ac08c); resolve EvidenceView.swift as in preview 9fa2428c",
-    "Optional durable: move the physiqueos host DNS to a provider with consistent anycast authority"
+    "Authorize layering the Evidence reliability fix: merge 9fa2428c onto fc693aeb (dry-run 0 conflicts), re-run gates, then authorize build bump + TestFlight",
+    "Carried from Evidence reliability lane: authorize including Native reliability fix c3d9d257 (via Batch 3 preview 9fa2428c) in the next build",
+    "Carried from Evidence reliability lane (optional durable): move the physiqueos host DNS to a provider with consistent anycast authority"
   ],
   "blockers": [],
-  "unexpected_findings": [],
-  "backlog": [
-    "Per-stream fail-soft Evidence Hub; persisted last-known Evidence Hub (needs decision); reduce scope-all Evidence Hub payloads and duplicate Log reads on launch (carried from the audit report)"
+  "unexpected_findings": [
+    "Batch 3 regressed two Build 87 source contracts not in its focused suites (Debug review fixture tripped the provenance guard; Training disclosures dropped shared Reduce-Motion row); both fixed in fc693aeb",
+    "Full unit suite rewrites committed home-screen-widget-v1 PNGs as a side effect; restored, never committed"
   ],
-  "recommended_next_step": "No DNS action needed. Continue the Batch 3 integration lane; then layer Native c3d9d257 onto its integrated authority for the next authorized build.",
-  "full_report_path": "agent-handoffs/reports/20261006T010500Z-evidence-dns-resync-verification.md",
+  "backlog": [
+    "Validate real Founder Progress Photos on device after TestFlight",
+    "Energy and Weekly/Monthly Briefing charts still use old overlay",
+    "Watch Review/Confirmation Complete Set gating + timed sets; reply-before-side-effects",
+    "Carried from Evidence reliability lane: per-stream fail-soft Evidence Hub; persisted last-known Evidence Hub (needs decision); reduce scope-all Evidence Hub payloads and duplicate Log reads on launch"
+  ],
+  "recommended_next_step": "Layer Evidence reliability preview 9fa2428c onto fc693aeb, re-run full gates, then Founder authorizes build bump + TestFlight.",
+  "full_report_path": "agent-handoffs/reports/20261006T031851Z-batch3-multilane-integration-candidate.md",
+  "related_reports": [
+    "agent-handoffs/reports/20261006T010500Z-evidence-dns-resync-verification.md",
+    "agent-handoffs/reports/20261006T003500Z-evidence-app-open-load-failure-audit.md"
+  ],
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
