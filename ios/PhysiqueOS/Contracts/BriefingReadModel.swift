@@ -587,6 +587,14 @@ struct MonthlyEnergyEvolutionSection: Codable, Equatable {
         var coverageLabel: String? = nil
     }
     var weeks: [WeekBar]
+    /// Weeks the Server marked `missing` (not enough readable days), kept
+    /// so the chart can say "not shown" instead of silently dropping them.
+    struct OmittedWeek: Codable, Equatable, Identifiable {
+        var id: String { weekLabel }
+        var weekLabel: String
+        var observedDayCount: Int? = nil
+    }
+    var omittedWeeks: [OmittedWeek]? = nil
     var averageIntakeKcal: Int
     var averageExpenditureKcal: Int
     var averageBalanceKcal: Int
@@ -637,6 +645,10 @@ struct MonthlyActionCard: Codable, Equatable, Identifiable {
     var title: String
     var narrative: String
     var icon: String
+    /// The canonical guidance `value` and `detail`, kept separately (the
+    /// joined `narrative` stays for older readers). Nil on older fixtures.
+    var headline: String? = nil
+    var detail: String? = nil
 }
 
 struct MonthlyBriefingContent: Codable, Equatable {
@@ -656,6 +668,14 @@ struct MonthlyBriefingContent: Codable, Equatable {
     var monthAheadIntroduction: String? = nil
     var monthAheadActions: [MonthlyActionCard]? = nil
     var heroHighlights: [MonthlyHeroHighlight]? = nil
+    /// Canonical section titles the Server publishes (`changes.title`,
+    /// `moments.title`, `monthAhead.title`). Nil on older fixtures, which
+    /// keep the established composed titles.
+    /// The second half of the canonical hero period ("Delivered October 1").
+    var monthPeriodDetail: String? = nil
+    var whatChangedTitle: String? = nil
+    var definingMomentsTitle: String? = nil
+    var monthAheadTitle: String? = nil
     /// Server `strategicSummaryV3` for a Monthly published with canonical
     /// V3 intelligence (first run Oct 1); nil for frozen V2 Monthly.
     var strategicSummaryV3: MonthlyStrategicSummaryV3? = nil
@@ -902,6 +922,11 @@ struct PhotoBriefingView: Codable, Equatable, Identifiable {
     /// absent from bundled fixtures and never contains a provider URL or
     /// object key.
     var mediaId: String? = nil
+    /// The artifact's own pose label ("Rear flexed — double biceps"); nil
+    /// on older fixtures, which fall back to the pose vocabulary.
+    var label: String? = nil
+
+    var displayLabel: String { label ?? poseId.label }
 }
 
 struct PhotoComparisonEntry: Codable, Equatable, Identifiable {
@@ -917,6 +942,10 @@ struct PhotoComparisonEntry: Codable, Equatable, Identifiable {
     var narrative: String
     var priorMediaId: String? = nil
     var currentMediaId: String? = nil
+    /// The artifact's own pose label; nil on older fixtures.
+    var label: String? = nil
+
+    var displayLabel: String { label ?? poseId.label }
 }
 
 struct PhotoNewBaselineEntry: Codable, Equatable, Identifiable {

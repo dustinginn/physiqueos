@@ -1004,3 +1004,4 @@ final class BriefingLockedPresentationTests: XCTestCase {
         XCTAssertTrue(detail.contains("#if DEBUG\nprivate struct BriefingReviewScrollOffset") || detail.contains("#if DEBUG\nstruct BriefingReviewScrollOffset"))
     }
 }
+

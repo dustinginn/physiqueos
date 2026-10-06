@@ -312,6 +312,14 @@ struct BriefingTextStyle {
         BriefingTextStyle(size: size, weight: weight, lineHeight: (size * lineHeight * 100).rounded() / 100, tracking: em * size, uppercase: uppercase, relativeTo: relativeTo)
     }
 
+    /// Plus Jakarta with Chrome's `line-height: normal` box (each of the
+    /// face's ascent 1.038 / descent 0.222 rounded to whole px) — the
+    /// event-briefing harness's default.
+    static func jn(_ size: CGFloat, _ weight: CGFloat, tracking em: CGFloat = 0, uppercase: Bool = false, relativeTo: Font.TextStyle = .body) -> BriefingTextStyle {
+        let normal = (size * 1.038).rounded() + (size * 0.222).rounded()
+        return BriefingTextStyle(size: size, weight: weight, lineHeight: normal, tracking: em * size, uppercase: uppercase, relativeTo: relativeTo)
+    }
+
     /// SF Pro with an explicit CSS line box (or Chrome's `normal`).
     static func sf(_ size: CGFloat, _ weight: CGFloat, lineHeight: CGFloat? = nil, tracking em: CGFloat = 0, uppercase: Bool = false, relativeTo: Font.TextStyle = .body) -> BriefingTextStyle {
         let normal = (size * 0.9668).rounded() + (size * 0.2109).rounded()
@@ -382,9 +390,9 @@ extension View {
     /// (the 14 px phone default): the line box is the parent's strut
     /// (`parentSize × 1.42`) and the small text sits on the strut's
     /// baseline, below where a centered box would put it.
-    func briefingStrutText(_ style: BriefingTextStyle, parentSize: CGFloat = 14) -> some View {
+    func briefingStrutText(_ style: BriefingTextStyle, parentSize: CGFloat = 14, parentLineHeight: CGFloat? = nil) -> some View {
         let ascent: CGFloat = 1.038, descent: CGFloat = 0.222
-        let strut = (parentSize * 1.42 * 100).rounded() / 100
+        let strut = parentLineHeight ?? (parentSize * 1.42 * 100).rounded() / 100
         let parentBaseline = (strut - parentSize * (ascent + descent)) / 2 + parentSize * ascent
         let childBaseline = (strut - style.size * (ascent + descent)) / 2 + style.size * ascent
         var boxed = style
@@ -414,6 +422,38 @@ extension View {
 
 // MARK: Greedy paragraphs
 
+/// Hosts the paragraph label at its own natural height: TextKit needs a
+/// little extra room for the half-leading baseline shift, while SwiftUI
+/// lays the paragraph out at the exact CSS box (line count × line box).
+final class BriefingParagraphView: UIView {
+    let label: UILabel = {
+        let label = UILabel()
+        label.numberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.lineBreakStrategy = []
+        label.adjustsFontForContentSizeCategory = false
+        return label
+    }()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        clipsToBounds = false
+        isAccessibilityElement = false
+        addSubview(label)
+        setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        setContentHuggingPriority(.defaultLow, for: .horizontal)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let natural = label.sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude))
+        label.frame = CGRect(x: 0, y: 0, width: bounds.width, height: max(bounds.height, ceil(natural.height)))
+    }
+}
+
 /// Multi-line copy rendered with Chrome's greedy line breaking. SwiftUI
 /// `Text` on iOS 26/27 pushes words down to avoid short last lines, which
 /// changes the locked wraps; a `UILabel` with an empty line-break strategy
@@ -433,29 +473,32 @@ struct BriefingParagraph: UIViewRepresentable {
         self.alignment = alignment
     }
 
-    func makeUIView(context: Context) -> UILabel {
-        let label = UILabel()
-        label.numberOfLines = 0
-        label.lineBreakMode = .byWordWrapping
-        label.lineBreakStrategy = []
-        label.adjustsFontForContentSizeCategory = false
-        label.clipsToBounds = false
-        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        return label
+    func makeUIView(context: Context) -> BriefingParagraphView {
+        BriefingParagraphView()
     }
 
-    func updateUIView(_ label: UILabel, context: Context) {
-        label.attributedText = attributed(traits: label.traitCollection)
-        label.accessibilityLabel = style.uppercase ? text.uppercased() : text
+    func updateUIView(_ view: BriefingParagraphView, context: Context) {
+        view.label.attributedText = attributed(traits: view.traitCollection)
+        view.label.accessibilityLabel = style.uppercase ? text.uppercased() : text
+        view.setNeedsLayout()
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView label: UILabel, context: Context) -> CGSize? {
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView view: BriefingParagraphView, context: Context) -> CGSize? {
+        let label = view.label
         let width = proposal.width ?? UIView.layoutFittingExpandedSize.width
         guard width.isFinite, width > 0 else { return nil }
+        // Count lines with an unshifted copy (a baseline offset perturbs
+        // TextKit's fragment heights), then size the CSS box exactly as
+        // line count × line box.
+        let measure = NSMutableAttributedString(attributedString: attributed(traits: label.traitCollection))
+        measure.removeAttribute(.baselineOffset, range: NSRange(location: 0, length: measure.length))
+        let measuring = Self.measuringLabel
+        measuring.attributedText = measure
+        let size = measuring.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
         label.attributedText = attributed(traits: label.traitCollection)
-        let size = label.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-        return CGSize(width: proposal.width ?? ceil(size.width), height: ceil(size.height * 2) / 2)
+        let lineBox = style.lineHeight * scale
+        let lines = max(1, (size.height / lineBox).rounded())
+        return CGSize(width: proposal.width ?? ceil(size.width), height: lines * lineBox)
     }
 
     /// TextKit puts a fixed line height's extra leading above the glyphs;
@@ -466,6 +509,14 @@ struct BriefingParagraph: UIViewRepresentable {
         let leading = lineBox - fontLineHeight
         return leading * (leading >= 0 ? baselineFactor : baselineFactor / 3)
     }
+
+    @MainActor private static let measuringLabel: UILabel = {
+        let label = UILabel()
+        label.numberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        label.lineBreakStrategy = []
+        return label
+    }()
 
     static let baselineFactor: CGFloat = {
         #if DEBUG
@@ -656,30 +707,31 @@ struct BriefingHeroField<Content: View>: View {
             .padding(padding)
             .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
             .background {
-                ZStack(alignment: .bottomTrailing) {
-                    BriefingAppearanceBackground {
-                        BriefingCSSGradient(angle: 155, stops: [
-                            .init(color: BriefingPalette.fixed(0x087F76), location: 0),
-                            .init(color: BriefingPalette.fixed(0x0B4860), location: monthly ? 0.54 : 0.58),
-                            .init(color: BriefingPalette.fixed(0x142A55), location: 1),
-                        ])
-                    } light: {
-                        BriefingCSSGradient(angle: 155, stops: [
-                            .init(color: BriefingPalette.fixed(0xD9EEEA), location: 0),
-                            .init(color: BriefingPalette.fixed(0xC7E3E3), location: monthly ? 0.54 : 0.58),
-                            .init(color: BriefingPalette.fixed(0xD8E0EF), location: 1),
-                        ])
-                    }
+                BriefingAppearanceBackground {
+                    BriefingCSSGradient(angle: 155, stops: [
+                        .init(color: BriefingPalette.fixed(0x087F76), location: 0),
+                        .init(color: BriefingPalette.fixed(0x0B4860), location: monthly ? 0.54 : 0.58),
+                        .init(color: BriefingPalette.fixed(0x142A55), location: 1),
+                    ])
+                } light: {
+                    BriefingCSSGradient(angle: 155, stops: [
+                        .init(color: BriefingPalette.fixed(0xD9EEEA), location: 0),
+                        .init(color: BriefingPalette.fixed(0xC7E3E3), location: monthly ? 0.54 : 0.58),
+                        .init(color: BriefingPalette.fixed(0xD8E0EF), location: 1),
+                    ])
+                }
+                // Decorations are overlays so they never size the field.
+                .overlay(alignment: .topTrailing) {
                     if monthly {
                         // `.hero:after` — 280 px disc, right −90, top 158.
-                        GeometryReader { geometry in
-                            Circle()
-                                .fill(colorScheme == .dark ? BriefingPalette.fixed(0x0C334A, 0.34) : BriefingPalette.fixed(0x6F99A4, 0.13))
-                                .frame(width: 280, height: 280)
-                                .position(x: geometry.size.width + 90 - 140, y: 158 + 140)
-                        }
-                        .accessibilityHidden(true)
+                        Circle()
+                            .fill(colorScheme == .dark ? BriefingPalette.fixed(0x0C334A, 0.34) : BriefingPalette.fixed(0x6F99A4, 0.13))
+                            .frame(width: 280, height: 280)
+                            .offset(x: 90, y: 158)
+                            .accessibilityHidden(true)
                     }
+                }
+                .overlay(alignment: .bottomTrailing) {
                     // `.hero:before` — recurring: 430 px circle, 62 px border,
                     // right −220, bottom −84; Monthly: 500 / 68, −250 / −120.
                     Circle()
@@ -961,11 +1013,15 @@ struct BriefingSection<Content: View>: View {
             .environment(\.briefingPalette, isRichLight ? .richField : .standard)
             .padding(.vertical, verticalPadding)
             .padding(.horizontal, isRichLight ? 8 : 4)
+            // CSS borders live inside the border-box: the rich Energy field's
+            // 1 px frame and Body Composition's 3 px left rule narrow it.
+            .padding(isRichLight && field == .energy ? 1 : 0)
+            .padding(.leading, isRichLight && field == .bodyComposition ? 3 : 0)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background { if isRichLight { richBackground } }
-            .padding(.bottom, !isRichLight || field == .bodyComposition ? 1 : 0)
+            .padding(.bottom, isRichLight && field == .energy ? 0 : 1)
             .overlay(alignment: .bottom) {
-                if !isRichLight || field == .bodyComposition {
+                if !(isRichLight && field == .energy) {
                     Rectangle().fill(isRichLight ? BriefingPalette.richField.line : BriefingPalette.standard.line).frame(height: 1)
                 }
             }
