@@ -44,6 +44,7 @@ export function parseDoctorArguments(args) {
     appName: DEFAULT_APP_NAME,
     componentName: DEFAULT_COMPONENT_NAME,
     configPath: null,
+    structuralDiagnostics: false,
   };
   const options = new Map([
     ["--context", "context"],
@@ -52,11 +53,17 @@ export function parseDoctorArguments(args) {
     ["--component", "componentName"],
     ["--doctl-config", "configPath"],
   ]);
-  for (let index = 0; index < rest.length; index += 2) {
+  for (let index = 0; index < rest.length; index += 1) {
+    if (rest[index] === "--structural-diagnostics") {
+      if (values.structuralDiagnostics) throw coded("DOCTOR_OPTION_INVALID");
+      values.structuralDiagnostics = true;
+      continue;
+    }
     const key = options.get(rest[index]);
     const value = rest[index + 1];
     if (!key || !value) throw coded("DOCTOR_OPTION_INVALID");
     values[key] = value;
+    index += 1;
   }
   assertApprovedReadContext(values.context);
   if ((mode === "control-plane" || mode === "console") && !/^[a-f0-9]{40}$/.test(values.expectedSha ?? "")) {
@@ -64,6 +71,7 @@ export function parseDoctorArguments(args) {
   }
   if (!/^[a-z0-9][a-z0-9-]{2,62}$/.test(values.appName)) throw coded("DOCTOR_APP_NAME_INVALID");
   if (!/^[A-Za-z0-9_-]+$/.test(values.componentName)) throw coded("DOCTOR_COMPONENT_INVALID");
+  if (values.structuralDiagnostics && mode !== "console") throw coded("DOCTOR_DIAGNOSTICS_MODE_INVALID");
   return Object.freeze(values);
 }
 
@@ -216,6 +224,7 @@ export async function runConsoleDoctor({
   WebSocketImpl = globalThis.WebSocket,
   controlPlaneDoctor = runControlPlaneDoctor,
   primaryRunner = runPrimaryRunner,
+  structuralDiagnostics = false,
 } = {}) {
   const before = await controlPlaneDoctor({ root, context, expectedSha, appName, componentName, configPath, fetchImpl });
   const marker = `PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_OK_${expectedSha.slice(0, 12)}`;
@@ -242,8 +251,8 @@ return {
     WebSocketImpl,
     stdout: { write: (value) => { rawOutput += String(value); } },
   });
-  validateSanitizedConsoleOutput(rawOutput, { marker });
-  const consoleReport = parseFramedJson(rawOutput, outputPrefix, { marker });
+  validateSanitizedConsoleOutput(rawOutput, { marker, prefix: outputPrefix, structuralDiagnostics });
+  const consoleReport = parseFramedJson(rawOutput, outputPrefix, { marker, structuralDiagnostics });
   if (consoleReport.runtime?.gitSha !== expectedSha || consoleReport.bindingPresence?.databaseUrl !== true ||
       consoleReport.bindingPresence?.databaseCa !== true || consoleReport.transaction?.readOnly !== "on" ||
       consoleReport.probe?.selectOne !== true) {
@@ -316,6 +325,9 @@ if (isMainModule()) {
     process.stdout.write(`PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_${options.mode.replace("-", "_").toUpperCase()}_OK\n`);
   } catch (error) {
     process.stderr.write(`PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_FAILED:${error?.code ?? "UNKNOWN"}\n`);
+    if (error?.structuralDiagnostics) {
+      process.stderr.write(`PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_DIAGNOSTICS:${JSON.stringify(error.structuralDiagnostics)}\n`);
+    }
     process.exitCode = 1;
   }
 }

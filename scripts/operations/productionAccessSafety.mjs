@@ -14,6 +14,37 @@ const SIDE_EFFECTING_SELECT = /\b(?:nextval|setval|pg_advisory|pg_notify|dblink|
 const CREDENTIAL_SHAPE = /(?:postgres(?:ql)?:\/\/|-----BEGIN [A-Z ]*PRIVATE KEY-----|-----BEGIN CERTIFICATE-----|\bBearer\s+[A-Za-z0-9._~-]+|\bdop_v1_[A-Za-z0-9]+|\bdoo_v1_[A-Za-z0-9]+)/i;
 const STRUCTURED_BEGIN = "__PHYSIQUEOS_STRUCTURED_BEGIN__";
 const STRUCTURED_END = "__PHYSIQUEOS_STRUCTURED_END__";
+const DIAGNOSTIC_KEYS = Object.freeze([
+  "ansiSequenceCount",
+  "backspaceEventCount",
+  "beginBeforeEnd",
+  "beginContiguous",
+  "beginSentinelCount",
+  "carriageReturnEventCount",
+  "chunkCount",
+  "endBeforeMarker",
+  "endContiguous",
+  "endSentinelCount",
+  "errorCode",
+  "expectedFrameLinePosition",
+  "markerOrderingValid",
+  "normalizedByteCount",
+  "normalizedLineCount",
+  "parserStage",
+  "rawByteCount",
+  "successMarkerCount",
+  "zeroExitMarkerCount",
+]);
+const DIAGNOSTIC_STAGES = new Set([
+  "output_validation",
+  "normalization",
+  "sentinel_count",
+  "frame_bounds",
+  "frame_encoding",
+  "json_parse",
+  "outside_validation",
+  "complete",
+]);
 
 export function assertApprovedReadContext(context) {
   if (context !== APPROVED_READ_CONTEXT || FORBIDDEN_CONTEXT.test(String(context))) {
@@ -34,59 +65,155 @@ export function assertSelectOnlySql(text) {
   return sql.replace(/;\s*$/, "");
 }
 
-export function validateSanitizedConsoleOutput(output, { marker, maxBytes = MAX_CONSOLE_OUTPUT_BYTES } = {}) {
+export function validateSanitizedConsoleOutput(output, {
+  marker,
+  prefix = null,
+  maxBytes = MAX_CONSOLE_OUTPUT_BYTES,
+  structuralDiagnostics = false,
+} = {}) {
   if (!SAFE_MARKER.test(marker ?? "")) throw coded("AUDIT_SUCCESS_MARKER_INVALID");
   const raw = reassembleConsoleOutput(output);
-  if (Buffer.byteLength(raw) > maxBytes) throw coded("AUDIT_OUTPUT_TOO_LARGE");
-  if (CREDENTIAL_SHAPE.test(raw)) throw coded("AUDIT_OUTPUT_CREDENTIAL_SHAPE");
-  const text = normalizePtyOutput(raw);
+  if (Buffer.byteLength(raw) > maxBytes) throw diagnosticFailure("AUDIT_OUTPUT_TOO_LARGE", output, prefix, marker, "output_validation", structuralDiagnostics);
+  if (CREDENTIAL_SHAPE.test(raw)) throw diagnosticFailure("AUDIT_OUTPUT_CREDENTIAL_SHAPE", output, prefix, marker, "output_validation", structuralDiagnostics);
+  let text;
+  try { text = normalizePtyOutput(raw); } catch (error) {
+    throw diagnosticFailure(error?.code ?? "AUDIT_OUTPUT_NORMALIZATION_FAILED", output, prefix, marker, "normalization", structuralDiagnostics);
+  }
   const markerCount = text.split("\n").filter((line) => line === marker).length;
-  if (markerCount !== 1) throw coded("AUDIT_SUCCESS_MARKER_MISSING");
+  if (markerCount !== 1) throw diagnosticFailure("AUDIT_SUCCESS_MARKER_MISSING", output, prefix, marker, "output_validation", structuralDiagnostics);
   return raw;
 }
 
-export function parseFramedJson(output, prefix, { marker, maxBytes = MAX_SANITIZED_REPORT_BYTES } = {}) {
+export function parseFramedJson(output, prefix, {
+  marker,
+  maxBytes = MAX_SANITIZED_REPORT_BYTES,
+  structuralDiagnostics = false,
+} = {}) {
   if (!/^[A-Z0-9_]{12,120}$/.test(prefix ?? "")) throw coded("AUDIT_OUTPUT_PREFIX_INVALID");
   if (!SAFE_MARKER.test(marker ?? "")) throw coded("AUDIT_SUCCESS_MARKER_INVALID");
-  const text = normalizePtyOutput(reassembleConsoleOutput(output));
+  let text;
+  try { text = normalizePtyOutput(reassembleConsoleOutput(output)); } catch (error) {
+    throw diagnosticFailure(error?.code ?? "AUDIT_OUTPUT_NORMALIZATION_FAILED", output, prefix, marker, "normalization", structuralDiagnostics);
+  }
   const lines = text.split("\n");
   const beginPattern = new RegExp(`^${STRUCTURED_BEGIN}:${prefix}:(\\d{1,8})$`);
   const endLine = `${STRUCTURED_END}:${prefix}`;
   const begins = lines.map((line, index) => ({ index, match: line.match(beginPattern) })).filter((entry) => entry.match);
   const ends = lines.map((line, index) => ({ index, line })).filter((entry) => entry.line === endLine);
-  if (begins.length === 0 || ends.length === 0) throw coded("AUDIT_JSON_MISSING");
-  if (begins.length !== 1 || ends.length !== 1) throw coded("AUDIT_JSON_DUPLICATE");
+  if (begins.length === 0 || ends.length === 0) throw diagnosticFailure("AUDIT_JSON_MISSING", output, prefix, marker, "sentinel_count", structuralDiagnostics);
+  if (begins.length !== 1 || ends.length !== 1) throw diagnosticFailure("AUDIT_JSON_DUPLICATE", output, prefix, marker, "sentinel_count", structuralDiagnostics);
   const begin = begins[0];
   const end = ends[0];
-  if (end.index <= begin.index + 1) throw coded("AUDIT_JSON_FRAME_INVALID");
+  if (end.index <= begin.index + 1) throw diagnosticFailure("AUDIT_JSON_FRAME_INVALID", output, prefix, marker, "frame_bounds", structuralDiagnostics);
   const encodedLines = lines.slice(begin.index + 1, end.index);
-  if (encodedLines.some((line) => !/^[A-Za-z0-9+/]+={0,2}$/.test(line))) throw coded("AUDIT_JSON_FRAME_INVALID");
+  if (encodedLines.some((line) => !/^[A-Za-z0-9+/]+={0,2}$/.test(line))) {
+    throw diagnosticFailure("AUDIT_JSON_FRAME_INVALID", output, prefix, marker, "frame_encoding", structuralDiagnostics);
+  }
   const encoded = encodedLines.join("");
   const declaredLength = Number(begin.match[1]);
   if (encoded.length !== declaredLength || encoded.length % 4 !== 0 || Buffer.from(encoded, "base64").toString("base64") !== encoded) {
-    throw coded("AUDIT_JSON_FRAME_INVALID");
+    throw diagnosticFailure("AUDIT_JSON_FRAME_INVALID", output, prefix, marker, "frame_encoding", structuralDiagnostics);
   }
   const raw = Buffer.from(encoded, "base64").toString("utf8");
-  if (Buffer.byteLength(raw) > maxBytes) throw coded("AUDIT_JSON_TOO_LARGE");
-  if (CREDENTIAL_SHAPE.test(raw)) throw coded("AUDIT_OUTPUT_CREDENTIAL_SHAPE");
+  if (Buffer.byteLength(raw) > maxBytes) throw diagnosticFailure("AUDIT_JSON_TOO_LARGE", output, prefix, marker, "frame_encoding", structuralDiagnostics);
+  if (CREDENTIAL_SHAPE.test(raw)) throw diagnosticFailure("AUDIT_OUTPUT_CREDENTIAL_SHAPE", output, prefix, marker, "frame_encoding", structuralDiagnostics);
   let value;
-  try { value = JSON.parse(raw); } catch { throw coded("AUDIT_JSON_INVALID"); }
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw coded("AUDIT_JSON_INVALID");
+  try { value = JSON.parse(raw); } catch { throw diagnosticFailure("AUDIT_JSON_INVALID", output, prefix, marker, "json_parse", structuralDiagnostics); }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw diagnosticFailure("AUDIT_JSON_INVALID", output, prefix, marker, "json_parse", structuralDiagnostics);
+  }
   const outside = [...lines.slice(0, begin.index), ...lines.slice(end.index + 1)];
   if (outside.filter((line) => line === marker).length !== 1 || outside.some((line) => !isAllowedPtyFramingLine(line, marker))) {
-    throw coded("AUDIT_OUTPUT_UNEXPECTED");
+    throw diagnosticFailure("AUDIT_OUTPUT_UNEXPECTED", output, prefix, marker, "outside_validation", structuralDiagnostics);
   }
   return value;
 }
 
+export function collectStructuralDiagnostics(output, prefix, marker, {
+  parserStage = "output_validation",
+  errorCode = "AUDIT_DIAGNOSTIC",
+} = {}) {
+  const raw = reassembleConsoleOutput(output);
+  const chunks = Array.isArray(output) ? output.length : 1;
+  let normalized = "";
+  let normalization = { ansiSequenceCount: 0, carriageReturnEventCount: 0, backspaceEventCount: 0 };
+  try {
+    const result = normalizePtyOutputWithStats(raw);
+    normalized = result.text;
+    normalization = result.stats;
+  } catch {
+    parserStage = "normalization";
+  }
+  const beginToken = `${STRUCTURED_BEGIN}:${prefix}:`;
+  const endToken = `${STRUCTURED_END}:${prefix}`;
+  const lines = normalized.split("\n");
+  const beginIndexes = indexesMatching(lines, (line) => line.startsWith(beginToken));
+  const exactBeginIndexes = indexesMatching(lines, (line) => new RegExp(`^${escapeRegExp(beginToken)}\\d{1,8}$`).test(line));
+  const endIndexes = indexesMatching(lines, (line) => line === endToken);
+  const markerIndexes = indexesMatching(lines, (line) => line === marker);
+  const zeroExitIndexes = indexesMatching(lines, (line) => line === "__PHYSIQUEOS_REMOTE_EXIT__:0");
+  const beginBeforeEnd = beginIndexes.length > 0 && endIndexes.length > 0 && beginIndexes[0] < endIndexes[0];
+  const endBeforeMarker = endIndexes.length > 0 && markerIndexes.length > 0 && endIndexes[0] < markerIndexes[0];
+  const diagnostics = {
+    rawByteCount: boundedCount(Buffer.byteLength(raw)),
+    normalizedByteCount: boundedCount(Buffer.byteLength(normalized)),
+    chunkCount: boundedCount(chunks),
+    normalizedLineCount: boundedCount(lines.length),
+    beginSentinelCount: boundedCount(countOccurrences(normalized, beginToken)),
+    endSentinelCount: boundedCount(countOccurrences(normalized, endToken)),
+    successMarkerCount: boundedCount(markerIndexes.length),
+    zeroExitMarkerCount: boundedCount(zeroExitIndexes.length),
+    beginBeforeEnd,
+    endBeforeMarker,
+    markerOrderingValid: beginBeforeEnd && endBeforeMarker,
+    beginContiguous: beginIndexes.length > 0 && beginIndexes.length === exactBeginIndexes.length,
+    endContiguous: endIndexes.length === countOccurrences(normalized, endToken),
+    expectedFrameLinePosition: exactBeginIndexes.length === 1 && endIndexes.length === 1 && endIndexes[0] === exactBeginIndexes[0] + 2,
+    ansiSequenceCount: boundedCount(normalization.ansiSequenceCount),
+    carriageReturnEventCount: boundedCount(normalization.carriageReturnEventCount),
+    backspaceEventCount: boundedCount(normalization.backspaceEventCount),
+    parserStage,
+    errorCode: sanitizeDiagnosticCode(errorCode),
+  };
+  return validateStructuralDiagnostics(diagnostics);
+}
+
+export function validateStructuralDiagnostics(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw coded("AUDIT_DIAGNOSTICS_INVALID");
+  const keys = Object.keys(value).sort();
+  if (JSON.stringify(keys) !== JSON.stringify([...DIAGNOSTIC_KEYS].sort())) throw coded("AUDIT_DIAGNOSTICS_SCHEMA_INVALID");
+  for (const [key, item] of Object.entries(value)) {
+    if (key === "parserStage") {
+      if (!DIAGNOSTIC_STAGES.has(item)) throw coded("AUDIT_DIAGNOSTICS_STAGE_INVALID");
+    } else if (key === "errorCode") {
+      if (!/^AUDIT_[A-Z0-9_]{1,100}$/.test(item)) throw coded("AUDIT_DIAGNOSTICS_CODE_INVALID");
+    } else if (key.endsWith("Count")) {
+      if (!Number.isInteger(item) || item < 0 || item > MAX_CONSOLE_OUTPUT_BYTES) throw coded("AUDIT_DIAGNOSTICS_COUNT_INVALID");
+    } else if (typeof item !== "boolean") {
+      throw coded("AUDIT_DIAGNOSTICS_VALUE_INVALID");
+    }
+  }
+  const json = JSON.stringify(value);
+  if (Buffer.byteLength(json) > 2_048 || CREDENTIAL_SHAPE.test(json)) throw coded("AUDIT_DIAGNOSTICS_OUTPUT_INVALID");
+  return Object.freeze({ ...value });
+}
+
 export function normalizePtyOutput(output) {
-  const stripped = stripTerminalSequences(String(output ?? ""));
+  return normalizePtyOutputWithStats(output).text;
+}
+
+function normalizePtyOutputWithStats(output) {
+  const strippedResult = stripTerminalSequences(String(output ?? ""));
+  const stripped = strippedResult.text;
   let normalized = "";
   let line = "";
+  let carriageReturnEventCount = 0;
+  let backspaceEventCount = 0;
   for (let index = 0; index < stripped.length; index += 1) {
     const character = stripped[index];
     const code = stripped.charCodeAt(index);
     if (character === "\r") {
+      carriageReturnEventCount += 1;
       if (stripped[index + 1] === "\n") {
         normalized += `${line}\n`;
         line = "";
@@ -98,6 +225,7 @@ export function normalizePtyOutput(output) {
       normalized += `${line}\n`;
       line = "";
     } else if (character === "\b") {
+      backspaceEventCount += 1;
       line = line.slice(0, -1);
     } else if (character === "\t" || code >= 0x20) {
       line += character;
@@ -105,7 +233,14 @@ export function normalizePtyOutput(output) {
       throw coded("AUDIT_OUTPUT_CONTROL_CHARACTER");
     }
   }
-  return normalized + line;
+  return {
+    text: normalized + line,
+    stats: {
+      ansiSequenceCount: strippedResult.removedCount,
+      carriageReturnEventCount,
+      backspaceEventCount,
+    },
+  };
 }
 
 export function reassembleConsoleOutput(output) {
@@ -270,11 +405,13 @@ if (failure || !report) {
 
 function stripTerminalSequences(value) {
   let output = "";
+  let removedCount = 0;
   for (let index = 0; index < value.length; index += 1) {
     if (value.charCodeAt(index) !== 0x1b) {
       output += value[index];
       continue;
     }
+    removedCount += 1;
     const next = value[index + 1];
     if (next === "[") {
       index += 2;
@@ -294,7 +431,7 @@ function stripTerminalSequences(value) {
       throw coded("AUDIT_OUTPUT_ANSI_INVALID");
     }
   }
-  return output;
+  return { text: output, removedCount };
 }
 
 function isAllowedPtyFramingLine(line, marker) {
@@ -304,6 +441,45 @@ function isAllowedPtyFramingLine(line, marker) {
   if (/^(?:Connecting(?: to)?|Connected(?: to)?|Welcome|Last login:)[^\n]{0,180}$/i.test(line)) return true;
   if (new Set(["stty -echo", "exit"]).has(line)) return true;
   return false;
+}
+
+function diagnosticFailure(code, output, prefix, marker, parserStage, enabled) {
+  const error = coded(code);
+  if (enabled && /^[A-Z0-9_]{12,120}$/.test(prefix ?? "") && SAFE_MARKER.test(marker ?? "")) {
+    error.structuralDiagnostics = collectStructuralDiagnostics(output, prefix, marker, { parserStage, errorCode: code });
+  }
+  return error;
+}
+
+function countOccurrences(value, token) {
+  if (!token) return 0;
+  let count = 0;
+  let offset = 0;
+  while (true) {
+    const index = value.indexOf(token, offset);
+    if (index === -1) return count;
+    count += 1;
+    offset = index + token.length;
+  }
+}
+
+function indexesMatching(lines, predicate) {
+  const indexes = [];
+  for (let index = 0; index < lines.length; index += 1) if (predicate(lines[index])) indexes.push(index);
+  return indexes;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function sanitizeDiagnosticCode(value) {
+  const code = String(value ?? "AUDIT_DIAGNOSTIC").toUpperCase().replace(/[^A-Z0-9_]/g, "_").slice(0, 106);
+  return code.startsWith("AUDIT_") ? code : `AUDIT_${code}`;
+}
+
+function boundedCount(value) {
+  return Math.min(MAX_CONSOLE_OUTPUT_BYTES, Math.max(0, Number.isFinite(value) ? Math.trunc(value) : 0));
 }
 
 function coded(code) {

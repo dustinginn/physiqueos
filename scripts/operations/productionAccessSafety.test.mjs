@@ -9,8 +9,10 @@ import {
   assertApprovedReadContext,
   assertSelectOnlySql,
   buildGuardedReadOnlyPayload,
+  collectStructuralDiagnostics,
   normalizePtyOutput,
   parseFramedJson,
+  validateStructuralDiagnostics,
   validateSanitizedConsoleOutput,
 } from "./productionAccessSafety.mjs";
 
@@ -21,6 +23,87 @@ const PREFIX = "PHYSIQUEOS_TEST_GUARDED_JSON";
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+});
+
+describe("non-content structural diagnostics", () => {
+  it("distinguishes missing, partial, malformed, duplicated, reversed, and marker-only structures", () => {
+    const encoded = Buffer.from('{"passed":true}').toString("base64");
+    const begin = `__PHYSIQUEOS_STRUCTURED_BEGIN__:${PREFIX}:${encoded.length}`;
+    const end = `__PHYSIQUEOS_STRUCTURED_END__:${PREFIX}`;
+    const cases = [
+      { output: `${MARKER}\n`, code: "AUDIT_JSON_MISSING", begin: 0, end: 0, marker: 1 },
+      { output: `${begin}\n${encoded}\n${MARKER}\n`, code: "AUDIT_JSON_MISSING", begin: 1, end: 0, marker: 1 },
+      { output: `${begin}\n%%%\n${end}\n${MARKER}\n`, code: "AUDIT_JSON_FRAME_INVALID", begin: 1, end: 1, marker: 1 },
+      { output: `${framed({ passed: true })}${framed({ passed: true })}`, code: "AUDIT_JSON_DUPLICATE", begin: 2, end: 2, marker: 2 },
+      { output: `${end}\n${begin}\n${encoded}\n${MARKER}\n`, code: "AUDIT_JSON_FRAME_INVALID", begin: 1, end: 1, marker: 1, ordered: false },
+    ];
+    for (const fixture of cases) {
+      const diagnostics = thrownDiagnostics(() => parseFramedJson(fixture.output, PREFIX, {
+        marker: MARKER,
+        structuralDiagnostics: true,
+      }));
+      assert.equal(diagnostics.errorCode, fixture.code);
+      assert.equal(diagnostics.beginSentinelCount, fixture.begin);
+      assert.equal(diagnostics.endSentinelCount, fixture.end);
+      assert.equal(diagnostics.successMarkerCount, fixture.marker);
+      if (fixture.ordered === false) assert.equal(diagnostics.beginBeforeEnd, false);
+    }
+  });
+
+  it("reports full-frame-without-marker and unexpected payload without leaking either", () => {
+    const withoutMarker = framed({ passed: true }).replace(`${MARKER}\n`, "");
+    const markerDiagnostic = thrownDiagnostics(() => validateSanitizedConsoleOutput(withoutMarker, {
+      marker: MARKER,
+      prefix: PREFIX,
+      structuralDiagnostics: true,
+    }));
+    assert.equal(markerDiagnostic.errorCode, "AUDIT_SUCCESS_MARKER_MISSING");
+    assert.equal(markerDiagnostic.beginSentinelCount, 1);
+    assert.equal(markerDiagnostic.endSentinelCount, 1);
+    assert.equal(markerDiagnostic.successMarkerCount, 0);
+
+    const unexpected = "synthetic application payload that must never appear in diagnostics";
+    const unexpectedDiagnostic = thrownDiagnostics(() => parseFramedJson(`${unexpected}\n${framed({ passed: true })}`, PREFIX, {
+      marker: MARKER,
+      structuralDiagnostics: true,
+    }));
+    assert.equal(unexpectedDiagnostic.errorCode, "AUDIT_OUTPUT_UNEXPECTED");
+    assert.equal(JSON.stringify(unexpectedDiagnostic).includes(unexpected), false);
+  });
+
+  it("counts only structure for ANSI, prompt, split chunks, and carriage overwrite", () => {
+    const output = `\u001b[32mweb-host:/workspace#\u001b[0m\r\nprogress text\r${framed({ passed: true })}`;
+    const markerIndex = output.indexOf(MARKER) + 7;
+    const beginIndex = output.indexOf("STRUCTURED_BEGIN") + 5;
+    const chunks = [output.slice(0, beginIndex), output.slice(beginIndex, markerIndex), output.slice(markerIndex)];
+    const diagnostics = collectStructuralDiagnostics(chunks, PREFIX, MARKER, { parserStage: "complete", errorCode: "AUDIT_DIAGNOSTIC" });
+    assert.equal(diagnostics.chunkCount, 3);
+    assert.equal(diagnostics.beginSentinelCount, 1);
+    assert.equal(diagnostics.endSentinelCount, 1);
+    assert.equal(diagnostics.successMarkerCount, 1);
+    assert.equal(diagnostics.zeroExitMarkerCount, 1);
+    assert.equal(diagnostics.markerOrderingValid, true);
+    assert.equal(diagnostics.expectedFrameLinePosition, true);
+    assert.equal(diagnostics.ansiSequenceCount, 2);
+    assert.equal(diagnostics.carriageReturnEventCount, 2);
+  });
+
+  it("proves diagnostics cannot contain fixture text, JSON, base64, credentials, or extra fields", () => {
+    const sensitive = "postgresql://synthetic-user:synthetic-password@example.invalid/database";
+    const rawJson = JSON.stringify({ sensitive, fixtureText: "NEVER_EXPOSE_THIS_FIXTURE_TEXT" });
+    const encoded = Buffer.from(rawJson).toString("base64");
+    const diagnostics = thrownDiagnostics(() => parseFramedJson(framedRaw(rawJson), PREFIX, {
+      marker: MARKER,
+      structuralDiagnostics: true,
+    }));
+    const serialized = JSON.stringify(diagnostics);
+    for (const forbidden of [sensitive, rawJson, encoded, "NEVER_EXPOSE_THIS_FIXTURE_TEXT", "synthetic-password"]) {
+      assert.equal(serialized.includes(forbidden), false);
+    }
+    assert.deepEqual(validateStructuralDiagnostics(diagnostics), diagnostics);
+    assert.throws(() => validateStructuralDiagnostics({ ...diagnostics, content: sensitive }),
+      { code: "AUDIT_DIAGNOSTICS_SCHEMA_INVALID" });
+  });
 });
 
 describe("production access safety primitives", () => {
@@ -178,4 +261,14 @@ function framedRaw(raw, { lineEnding = "\n" } = {}) {
     "__PHYSIQUEOS_REMOTE_EXIT__:0",
     "",
   ].join(lineEnding);
+}
+
+function thrownDiagnostics(callback) {
+  try {
+    callback();
+  } catch (error) {
+    assert.ok(error.structuralDiagnostics, `missing structural diagnostics for ${error?.code ?? "unknown"}`);
+    return error.structuralDiagnostics;
+  }
+  assert.fail("expected a fail-closed parser error");
 }

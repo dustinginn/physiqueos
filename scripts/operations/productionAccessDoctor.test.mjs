@@ -22,8 +22,10 @@ describe("production access doctor arguments", () => {
   it("requires expected authority for network modes and rejects other contexts", () => {
     assert.equal(parseDoctorArguments(["local"]).context, CONTEXT);
     assert.equal(parseDoctorArguments(["control-plane", "--expected-sha", SHA]).expectedSha, SHA);
+    assert.equal(parseDoctorArguments(["console", "--expected-sha", SHA, "--structural-diagnostics"]).structuralDiagnostics, true);
     assert.throws(() => parseDoctorArguments(["console"]), { code: "DOCTOR_EXPECTED_SHA_REQUIRED" });
     assert.throws(() => parseDoctorArguments(["local", "--context", "physiqueos-production-deploy"]), { code: "DOCTL_CONTEXT_NOT_APPROVED" });
+    assert.throws(() => parseDoctorArguments(["local", "--structural-diagnostics"]), { code: "DOCTOR_DIAGNOSTICS_MODE_INVALID" });
   });
 });
 
@@ -128,6 +130,21 @@ describe("console doctor", () => {
       },
     }), { code: "DOCTOR_POST_CONSOLE_AUTHORITY_DRIFT" });
   });
+
+  it("attaches only structural diagnostics when explicitly requested", async () => {
+    const failure = await runConsoleDoctor({
+      expectedSha: SHA,
+      structuralDiagnostics: true,
+      controlPlaneDoctor: async () => controlPlaneResult(),
+      primaryRunner: async ({ stdout }) => { stdout.write(`${doctorMarker()}\n__PHYSIQUEOS_REMOTE_EXIT__:0\n`); },
+    }).catch((error) => error);
+    assert.equal(failure.code, "AUDIT_JSON_MISSING");
+    assert.ok(failure.structuralDiagnostics);
+    assert.equal(failure.structuralDiagnostics.beginSentinelCount, 0);
+    assert.equal(failure.structuralDiagnostics.endSentinelCount, 0);
+    assert.equal(failure.structuralDiagnostics.successMarkerCount, 1);
+    assert.equal(JSON.stringify(failure.structuralDiagnostics).includes("REMOTE_EXIT"), false);
+  });
 });
 
 function successfulFetch({ inProgress = null } = {}) {
@@ -186,4 +203,8 @@ function doctorFrame({ databaseUrl, deploymentNoise = false }) {
     "__PHYSIQUEOS_REMOTE_EXIT__:0",
     "",
   ].filter((line, index) => line || index === 0).join("\r\n");
+}
+
+function doctorMarker() {
+  return `PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_OK_${SHA.slice(0, 12)}`;
 }
