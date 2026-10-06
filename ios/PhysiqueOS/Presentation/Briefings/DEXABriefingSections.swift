@@ -126,15 +126,37 @@ struct DEXABriefingSections: View {
 
     // MARK: What This Scan Means
 
+    /// The prominent lead beneath WHAT THIS SCAN MEANS. The persisted DEXA
+    /// interpretation has no separate headline field (the locked reference's
+    /// headline was harness copy), so the lead is the canonical
+    /// `interpretation.opening`, which the original DEXA screen emphasized
+    /// in that same position. Nothing is invented: no opening, no lead.
+    static func interpretationLead(_ interpretation: DEXAInterpretationSection) -> String? {
+        let opening = interpretation.opening.trimmingCharacters(in: .whitespacesAndNewlines)
+        return opening.isEmpty ? nil : interpretation.opening
+    }
+
+    /// The explanatory paragraphs that follow the lead (the opening is not
+    /// repeated).
+    static func interpretationParagraphs(_ interpretation: DEXAInterpretationSection) -> [String] {
+        [interpretation.fatLoss, interpretation.leanMass, interpretation.regional,
+         interpretation.phaseMeaning, interpretation.stoodOut, interpretation.goalProgress, interpretation.guardrailStatus]
+            .compactMap { $0 }.filter { !$0.isEmpty }
+    }
+
     private var interpretationSection: some View {
         let interpretation = content.interpretation
-        let paragraphs = [interpretation.opening, interpretation.fatLoss, interpretation.leanMass, interpretation.regional,
-                          interpretation.phaseMeaning, interpretation.stoodOut, interpretation.goalProgress, interpretation.guardrailStatus]
-            .compactMap { $0 }.filter { !$0.isEmpty }
         return BriefingEventSection(bottomPadding: 5, identifier: "briefing.dexa.interpretation") {
             BriefingEventLabel(text: "What This Scan Means")
-            BriefingEventDataParagraphs(paragraphs: paragraphs)
-                .padding(.top, 12)
+            if let lead = Self.interpretationLead(interpretation) {
+                BriefingParagraph(lead, .j(19, 700, 1.3, tracking: -0.01, relativeTo: .title3), color: BriefingEventPalette.ink)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("briefing.dexa.interpretationLead")
+            }
+            BriefingEventDataParagraphs(paragraphs: Self.interpretationParagraphs(interpretation))
+                .padding(.top, Self.interpretationLead(interpretation) == nil ? 12 : 4)
             DEXAEvidenceNote(items: [("Supporting evidence", interpretation.supportingEvidence), ("Uncertainty", interpretation.uncertainty)].filter { !$0.1.isEmpty })
                 .padding(.bottom, 23)
         }

@@ -1232,4 +1232,36 @@ final class BriefingFounderCorrectionTests: XCTestCase {
         XCTAssertEqual(tuesday.label, "Tue", "unlabelled published points → three-letter weekday")
         XCTAssertEqual(partial.windowedEnergy?.eligibleDayCount, 3)
     }
+
+    // MARK: DEXA interpretive lead (final Founder correction)
+
+    func testDEXAInterpretationLeadIsTheCanonicalOpeningWithNoInventedFallback() throws {
+        let briefing = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.id == "dexa_event_dexa-fixture-005" })
+        let dexa = try XCTUnwrap(briefing.dexa)
+        XCTAssertEqual(DEXABriefingSections.interpretationLead(dexa.interpretation), dexa.interpretation.opening, "the lead is the persisted interpretation.opening")
+        XCTAssertFalse(DEXABriefingSections.interpretationParagraphs(dexa.interpretation).contains(dexa.interpretation.opening), "the opening is not repeated below")
+        XCTAssertEqual(DEXABriefingSections.interpretationParagraphs(dexa.interpretation).first, dexa.interpretation.fatLoss)
+        var empty = dexa.interpretation
+        empty.opening = "  "
+        XCTAssertNil(DEXABriefingSections.interpretationLead(empty), "no canonical opening → no headline, never a fallback")
+        let source = try source("PhysiqueOS/Presentation/Briefings/DEXABriefingSections.swift")
+        XCTAssertFalse(source.contains("Controlled gain"), "the lock harness example is never hard-coded")
+        let eyebrow = try XCTUnwrap(source.range(of: "BriefingEventLabel(text: \"What This Scan Means\")"))
+        let lead = try XCTUnwrap(source.range(of: "interpretationLead(interpretation) {"))
+        let paragraphs = try XCTUnwrap(source.range(of: "BriefingEventDataParagraphs(paragraphs: Self.interpretationParagraphs"))
+        XCTAssertLessThan(eyebrow.lowerBound, lead.lowerBound)
+        XCTAssertLessThan(lead.lowerBound, paragraphs.lowerBound, "eyebrow → prominent lead → paragraphs")
+    }
+
+    func testDEXALeadRendersInBothAppearancesWithoutChangingThePayload() throws {
+        let briefing = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.id == "dexa_event_dexa-fixture-005" })
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        let before = try encoder.encode(briefing)
+        for scheme in [ColorScheme.dark, .light] {
+            let image = ImageRenderer(content: BriefingCadenceBody(briefing: briefing).frame(width: 402)
+                .environment(AppEnvironment(nativeAuthority: .sandbox)).environment(\.colorScheme, scheme)).uiImage
+            XCTAssertNotNil(image)
+        }
+        XCTAssertEqual(try encoder.encode(briefing), before)
+    }
 }
