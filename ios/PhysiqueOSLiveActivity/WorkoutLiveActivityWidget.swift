@@ -16,23 +16,22 @@ struct WorkoutLiveActivityWidget: Widget {
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
-                        Image(systemName: "dumbbell.fill").foregroundStyle(WorkoutActivityPalette.accent)
-                        Text("Workout").font(.system(size: 11, weight: .semibold)).lineLimit(1)
+                        Image(systemName: "dumbbell.fill").font(.system(size: 10, weight: .semibold))
+                        Text("Workout").font(WorkoutActivityType.font(11, 500)).lineLimit(1)
                     }
+                    .foregroundStyle(WorkoutActivityTheme.dark.text)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     WorkoutElapsedText(startedAt: context.attributes.startedAt, finishedAt: context.state.finishedAt)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(WorkoutActivityPalette.secondaryText)
+                        .font(WorkoutActivityType.font(11, 500))
+                        .foregroundStyle(WorkoutActivityTheme.dark.text)
                         .frame(width: 54, alignment: .trailing)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     WorkoutIslandExpandedBottom(attributes: context.attributes, state: context.state, isStale: context.isStale)
                 }
             } compactLeading: {
-                Image(systemName: "dumbbell.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(WorkoutActivityPalette.accent)
+                WorkoutIslandCompactLeading()
             } compactTrailing: {
                 WorkoutIslandCompactTrailing(attributes: context.attributes, state: context.state)
             } minimal: {

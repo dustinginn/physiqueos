@@ -1,5 +1,6 @@
 import AppIntents
 import SwiftUI
+import UIKit
 
 // SwiftUI for the Workout Logger Live Activity, shared by the Widget
 // Extension (which hosts it in ActivityKit) and by the app (unit tests and
@@ -11,16 +12,81 @@ import SwiftUI
 // Timers use the system's date-based `Text(timerInterval:)`, so the rest
 // clock and workout elapsed tick with no per-second activity updates.
 
+/// Locked Live Activity translation (Founder lock 2026-10-04, design package
+/// `utility-surfaces-design-20261004`): navy/teal fields, restrained purple,
+/// semantic green/amber. The Lock Screen follows the system appearance (the
+/// platform's rule, never an app setting): Dark is deep navy, Light is the
+/// Mineral translation. The Dynamic Island is system black in both.
+struct WorkoutActivityTheme: Equatable {
+    var page: Color
+    var row: Color
+    var privacyRow: Color
+    var text: Color
+    var secondaryText: Color
+    var mutedText: Color
+    /// Current / up-next labels and the Complete Set action.
+    var teal: Color
+    var onTeal: Color
+    /// Rest and lifecycle success.
+    var green: Color
+    /// Needs-update and the final-set cue.
+    var amber: Color
+    /// Finishing / reviewing (restrained brand purple).
+    var purple: Color
+
+    static let dark = WorkoutActivityTheme(
+        page: .activityHex(0x061019), row: .activityHex(0x132735), privacyRow: .activityHex(0x172235),
+        text: .activityHex(0xF3F8FA), secondaryText: .activityHex(0xC3D2D9), mutedText: .activityHex(0x92A5AF),
+        teal: .activityHex(0x3BD2CA), onTeal: .activityHex(0x061019), green: .activityHex(0x55E39A),
+        amber: .activityHex(0xEFB84F), purple: .activityHex(0xAA98FF)
+    )
+
+    static let mineralLight = WorkoutActivityTheme(
+        page: .activityHex(0xE8ECE5), row: .activityHex(0xFBFAF4), privacyRow: .activityHex(0xFBFAF4),
+        text: .activityHex(0x102431), secondaryText: .activityHex(0x526970), mutedText: .activityHex(0x526970),
+        teal: .activityHex(0x087E78), onTeal: .white, green: .activityHex(0x16875F),
+        amber: .activityHex(0xC88228), purple: .activityHex(0x5C3FD2)
+    )
+
+    /// The Lock Screen's palette for the system appearance. The Dynamic
+    /// Island is always system black, so it always uses `.dark`.
+    static func of(_ scheme: ColorScheme) -> Self { scheme == .light ? .mineralLight : .dark }
+}
+
+/// Fixed tokens kept for ActivityKit modifiers and test backdrops. The
+/// background is dynamic so the Lock Screen tint follows the appearance.
 enum WorkoutActivityPalette {
-    static let background = Color(red: 8 / 255, green: 13 / 255, blue: 24 / 255)
-    static let elevated = Color(red: 20 / 255, green: 31 / 255, blue: 49 / 255)
-    static let muted = Color(red: 23 / 255, green: 34 / 255, blue: 53 / 255)
-    static let accent = Color(red: 139 / 255, green: 140 / 255, blue: 255 / 255)
-    static let success = Color(red: 74 / 255, green: 222 / 255, blue: 128 / 255)
-    static let warning = Color(red: 251 / 255, green: 191 / 255, blue: 36 / 255)
-    static let primaryText = Color(red: 243 / 255, green: 246 / 255, blue: 251 / 255)
-    static let secondaryText = Color(red: 203 / 255, green: 213 / 255, blue: 225 / 255)
-    static let mutedText = Color(red: 154 / 255, green: 168 / 255, blue: 186 / 255)
+    static let background = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .light ? UIColor(activityHex: 0xE8ECE5) : UIColor(activityHex: 0x061019)
+    })
+    static let elevated = Color.activityHex(0x132735)
+    static let muted = Color.activityHex(0x172235)
+    static let accent = Color.activityHex(0x3BD2CA)
+    static let success = Color.activityHex(0x55E39A)
+    static let warning = Color.activityHex(0xEFB84F)
+    static let primaryText = Color.activityHex(0xF3F8FA)
+    static let secondaryText = Color.activityHex(0xC3D2D9)
+    static let mutedText = Color.activityHex(0x92A5AF)
+}
+
+extension Color {
+    static func activityHex(_ hex: UInt32) -> Color { Color(uiColor: UIColor(activityHex: hex)) }
+}
+
+extension UIColor {
+    convenience init(activityHex hex: UInt32) {
+        self.init(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+}
+
+/// Live Activity type: Plus Jakarta Sans (bundled in the Widget Extension).
+enum WorkoutActivityType {
+    static func font(_ size: CGFloat, _ weight: CGFloat) -> Font { PlusJakartaSans.font(size: size, weight: weight) }
 }
 
 typealias WorkoutActivityState = WorkoutActivityAttributes.ContentState
@@ -104,8 +170,10 @@ private enum WorkoutRoleStyle {
 }
 
 private extension WorkoutActivityState.Row {
+    /// "3/4 · 85 lb × 8" (the board's up-next format, used for every row so
+    /// the set position is never lost).
     var setText: String {
-        let position = "S\(setNumber)/\(setCount)"
+        let position = "\(setNumber)/\(setCount)"
         return valueText.map { "\(position) · \($0)" } ?? position
     }
 }
@@ -114,21 +182,25 @@ struct WorkoutCompleteSetButton: View {
     let attributes: WorkoutActivityAttributes
     let state: WorkoutActivityState
     var compact = true
+    @Environment(\.colorScheme) private var colorScheme
+    /// The Island is system black: it always uses the Dark tokens.
+    var forceDark = false
 
     var body: some View {
         if let target = state.target, state.canCompleteSet {
+            let theme = forceDark ? WorkoutActivityTheme.dark : .of(colorScheme)
             Button(intent: CompleteWorkoutSetIntent(
                 sessionId: attributes.sessionId, authority: attributes.authority,
                 exerciseId: target.exerciseId, setId: target.setId, expectedRevision: state.revision
             )) {
                 HStack(spacing: 5) {
                     Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
-                    Text("Complete Set").font(.system(size: compact ? 11 : 13, weight: .bold))
+                    Text("Complete Set").font(WorkoutActivityType.font(compact ? 11 : 13, 760))
                 }
-                .foregroundStyle(Color.black)
+                .foregroundStyle(theme.onTeal)
                 .frame(maxWidth: compact ? 124 : .infinity, minHeight: 44)
-                .padding(.horizontal, compact ? 9 : 0)
-                .background(RoundedRectangle(cornerRadius: 13).fill(WorkoutActivityPalette.accent))
+                .padding(.horizontal, compact ? 6 : 0)
+                .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(theme.teal))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Complete Set")
@@ -137,107 +209,112 @@ struct WorkoutCompleteSetButton: View {
     }
 }
 
-private struct WorkoutRestSummary: View {
+/// The lower-left clock block: green glyph, a 7 pt label and a 20 pt value.
+/// Rest when resting; otherwise (Rest Off, or privacy) the workout clock.
+private struct WorkoutClockBlock: View {
     let state: WorkoutActivityState
     let isStale: Bool
+    let theme: WorkoutActivityTheme
+    var showsRest = true
     var compact = false
+    @Environment(\.workoutActivityStartedAt) private var attributesStartedAt
 
     var body: some View {
-        if let rest = state.rest {
+        if showsRest, let rest = state.rest {
             let isCountdown = rest.mode == .countdown
             let expired = isCountdown && isStale
-            HStack(spacing: 6) {
-                Image(systemName: isCountdown ? "timer" : "stopwatch.fill")
-                    .font(.system(size: compact ? 10 : 13, weight: .semibold))
-                    .foregroundStyle(isCountdown ? WorkoutActivityPalette.warning : WorkoutActivityPalette.success)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(expired ? "REST · COMPLETE" : (isCountdown ? "REST · COUNTDOWN" : "REST · STOPWATCH"))
-                        .font(.system(size: compact ? 7 : 8, weight: .bold))
-                        .tracking(0.45)
-                        .foregroundStyle(WorkoutActivityPalette.mutedText)
-                    WorkoutRestClockText(rest: rest)
-                        .font(.system(size: compact ? 13 : 21, weight: .bold, design: .rounded))
-                        .foregroundStyle(WorkoutActivityPalette.primaryText)
-                        .frame(width: compact ? 58 : 84, alignment: .leading)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
+            block(
+                glyph: isCountdown ? "timer" : "stopwatch",
+                label: expired ? "REST · COMPLETE" : (isCountdown ? "REST · COUNTDOWN" : "REST · STOPWATCH")
+            ) {
+                WorkoutRestClockText(rest: rest)
             }
-            .accessibilityElement(children: .combine)
             .accessibilityLabel(isCountdown ? "Rest countdown" : "Rest stopwatch")
         } else {
-            HStack(spacing: 6) {
-                Image(systemName: "chart.bar.fill")
-                    .font(.system(size: compact ? 10 : 12, weight: .semibold))
-                    .foregroundStyle(WorkoutActivityPalette.accent)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("WORKOUT")
-                        .font(.system(size: 8, weight: .bold))
-                        .tracking(0.45)
-                        .foregroundStyle(WorkoutActivityPalette.mutedText)
-                    WorkoutElapsedText(startedAt: attributesStartedAt, finishedAt: state.finishedAt)
-                        .font(.system(size: compact ? 12 : 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(WorkoutActivityPalette.primaryText)
-                        .frame(width: 70, alignment: .leading)
-                }
+            block(glyph: "dumbbell.fill", label: "WORKOUT") {
+                WorkoutElapsedText(startedAt: attributesStartedAt, finishedAt: state.finishedAt)
             }
+            .accessibilityLabel("Workout time")
         }
     }
 
-    // The elapsed fallback needs the activity's start; injected by the host.
-    @Environment(\.workoutActivityStartedAt) private var attributesStartedAt
+    private func block<Clock: View>(glyph: String, label: String, @ViewBuilder clock: () -> Clock) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: glyph)
+                .font(.system(size: compact ? 12 : 14, weight: .semibold))
+                .foregroundStyle(theme.green)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(label)
+                    .font(WorkoutActivityType.font(7, 760))
+                    .foregroundStyle(theme.mutedText)
+                    .lineLimit(1)
+                clock()
+                    .font(WorkoutActivityType.font(compact ? 15 : 20, 700))
+                    .foregroundStyle(theme.text)
+                    .frame(width: compact ? 58 : 84, alignment: .leading)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
 }
 
+/// One 31 pt context row: a 57 pt role column (teal for current / up next),
+/// the exercise, and the set position + value.
 private struct WorkoutContextRow: View {
     let row: WorkoutActivityState.Row
+    let theme: WorkoutActivityTheme
 
     var body: some View {
         let emphasized = row.role == .current || row.role == .upNext
         HStack(spacing: 7) {
             Text(WorkoutRoleStyle.label(row.role))
-                .font(.system(size: 8, weight: .bold))
-                .tracking(0.45)
-                .foregroundStyle(emphasized ? WorkoutActivityPalette.accent : WorkoutActivityPalette.mutedText)
-                .frame(width: 54, alignment: .leading)
+                .font(WorkoutActivityType.font(7, 780))
+                .tracking(0.49)
+                .foregroundStyle(emphasized ? theme.teal : theme.mutedText)
+                .frame(width: 57, alignment: .leading)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 4) {
                     if let label = row.supersetLabel {
                         Text("\(label)\(row.setNumber)")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Color.black)
+                            .font(WorkoutActivityType.font(8, 760))
+                            .foregroundStyle(theme.onTeal)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(Capsule().fill(WorkoutActivityPalette.warning))
+                            .background(Capsule().fill(theme.amber))
                     }
                     Text(row.exerciseName)
-                        .font(.system(size: emphasized ? 11 : 10, weight: .semibold))
+                        .font(WorkoutActivityType.font(11, 700))
+                        .foregroundStyle(theme.text)
                         .lineLimit(1)
                         .minimumScaleFactor(0.62)
                 }
                 if let partner = row.partnerName, row.role == .current {
                     Text("with \(partner)")
-                        .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(WorkoutActivityPalette.mutedText)
+                        .font(WorkoutActivityType.font(8, 500))
+                        .foregroundStyle(theme.mutedText)
                         .lineLimit(1)
                 }
             }
             Spacer(minLength: 3)
             Text(row.setText)
-                .font(.system(size: emphasized ? 10 : 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(WorkoutRoleStyle.isDone(row.role) ? WorkoutActivityPalette.secondaryText : WorkoutActivityPalette.primaryText)
+                .font(WorkoutActivityType.font(9, 500))
+                .monospacedDigit()
+                .foregroundStyle(WorkoutRoleStyle.isDone(row.role) ? theme.secondaryText : theme.text)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             if WorkoutRoleStyle.isDone(row.role) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 10))
-                    .foregroundStyle(WorkoutActivityPalette.success)
+                    .foregroundStyle(theme.green)
             }
         }
         .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity, minHeight: 27)
-        .background(RoundedRectangle(cornerRadius: 9).fill(emphasized ? WorkoutActivityPalette.accent.opacity(0.12) : WorkoutActivityPalette.muted.opacity(0.78)))
+        .frame(maxWidth: .infinity, minHeight: 31)
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(theme.row))
         .accessibilityElement(children: .combine)
     }
 }
@@ -249,7 +326,9 @@ struct WorkoutLockScreenView: View {
     let state: WorkoutActivityState
     var isStale = false
     @Environment(\.redactionReasons) private var redactionReasons
+    @Environment(\.colorScheme) private var colorScheme
 
+    private var theme: WorkoutActivityTheme { .of(colorScheme) }
     private var isPrivate: Bool { !WorkoutActivityPrivacy.showsSetDetails(redaction: redactionReasons) }
 
     private var presentation: WorkoutActivityPresentation {
@@ -261,25 +340,25 @@ struct WorkoutLockScreenView: View {
             switch presentation.phase {
             case .inProgress: activeBody
             case .allSetsComplete:
-                statusBody(symbol: "checkmark.circle.fill", color: WorkoutActivityPalette.success,
-                           title: "All sets complete", message: "Finish when you're ready", action: "Open Logger")
+                statusBody(symbol: "checkmark", color: theme.green,
+                           title: "All sets complete", message: "Finish when you're ready")
             case .reviewing:
-                statusBody(symbol: "list.clipboard.fill", color: WorkoutActivityPalette.accent,
-                           title: "Reviewing workout", message: "Finish in PhysiqueOS", action: "Open Logger")
+                statusBody(symbol: "list.clipboard", color: theme.purple,
+                           title: "Reviewing workout", message: "Finish in PhysiqueOS")
             case .finishing:
-                statusBody(symbol: "arrow.triangle.2.circlepath", color: WorkoutActivityPalette.accent,
-                           title: "Saving workout…", message: "Keep PhysiqueOS nearby", action: nil)
+                statusBody(symbol: "arrow.triangle.2.circlepath", color: theme.purple,
+                           title: "Saving workout…", message: "Keep PhysiqueOS nearby")
             case .saved:
-                statusBody(symbol: "checkmark.seal.fill", color: WorkoutActivityPalette.success,
-                           title: "Workout saved", message: "\(state.completedSets) sets", action: nil)
+                statusBody(symbol: "checkmark", color: theme.green,
+                           title: "Workout saved", message: "\(state.completedSets) sets")
             case .paused:
-                statusBody(symbol: "exclamationmark.arrow.triangle.2.circlepath", color: WorkoutActivityPalette.warning,
-                           title: "Workout needs an update", message: "Open Logger to refresh", action: "Open Logger")
+                statusBody(symbol: "exclamationmark", color: theme.amber,
+                           title: "Workout needs an update", message: "Open Logger to refresh")
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .foregroundStyle(WorkoutActivityPalette.primaryText)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .foregroundStyle(theme.text)
         .environment(\.workoutActivityStartedAt, attributes.startedAt)
         .accessibilityElement(children: .contain)
     }
@@ -291,92 +370,88 @@ struct WorkoutLockScreenView: View {
                 privacyBody
             } else {
                 ForEach(Array(state.rows.prefix(2).enumerated()), id: \.offset) { _, row in
-                    WorkoutContextRow(row: row)
+                    WorkoutContextRow(row: row, theme: theme)
                 }
             }
             HStack(spacing: 8) {
-                WorkoutRestSummary(state: state, isStale: isStale)
+                // Privacy keeps only progress and a generic clock (LA9).
+                WorkoutClockBlock(state: state, isStale: isStale, theme: theme, showsRest: !isPrivate)
                 Spacer(minLength: 4)
                 if presentation.showsCompleteSet { WorkoutCompleteSetButton(attributes: attributes, state: state) }
             }
             .frame(minHeight: 44)
+            .padding(.top, 1)
         }
     }
 
     private var header: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 7) {
             Image(systemName: "dumbbell.fill")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(WorkoutActivityPalette.accent)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(theme.text)
             Text(isPrivate ? "Workout" : state.label)
-                .font(.system(size: 11, weight: .semibold))
+                .font(WorkoutActivityType.font(11, 650))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
             Spacer(minLength: 5)
             Text(state.progressText)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(WorkoutActivityPalette.mutedText)
+                .font(WorkoutActivityType.font(11, 650))
             WorkoutElapsedText(startedAt: attributes.startedAt, finishedAt: state.finishedAt)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .frame(width: 46, alignment: .trailing)
+                .font(WorkoutActivityType.font(11, 650))
+                .frame(width: 40, alignment: .trailing)
         }
-        .frame(height: 16)
+        .frame(height: 20)
     }
 
     private var privacyBody: some View {
         HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("ACTIVE WORKOUT")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(0.8)
-                    .foregroundStyle(WorkoutActivityPalette.mutedText)
-                Text("Set details hidden").font(.system(size: 14, weight: .semibold))
+                    .font(WorkoutActivityType.font(8, 500))
+                    .foregroundStyle(theme.mutedText)
+                Text("Set details hidden").font(WorkoutActivityType.font(14, 700))
             }
             Spacer()
-            Image(systemName: "eye.slash.fill").foregroundStyle(WorkoutActivityPalette.secondaryText)
+            Image(systemName: "eye.slash").font(.system(size: 14, weight: .semibold)).foregroundStyle(theme.text)
         }
-        .padding(.horizontal, 9)
+        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, minHeight: 64)
-        .background(RoundedRectangle(cornerRadius: 12).fill(WorkoutActivityPalette.muted.opacity(0.9)))
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(theme.privacyRow))
     }
 
-    private func statusBody(symbol: String, color: Color, title: String, message: String, action: String?) -> some View {
-        VStack(spacing: 11) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle().fill(color.opacity(0.15)).frame(width: 42, height: 42)
-                    Image(systemName: symbol).font(.system(size: 20, weight: .semibold)).foregroundStyle(color)
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.system(size: 16, weight: .bold))
-                    Text(message).font(.system(size: 12, weight: .medium)).foregroundStyle(WorkoutActivityPalette.secondaryText)
-                }
-                Spacer()
-                WorkoutElapsedText(startedAt: attributes.startedAt, finishedAt: state.finishedAt)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(WorkoutActivityPalette.mutedText)
-                    .frame(width: 48, alignment: .trailing)
+    /// The sparse lifecycle template: a 44 pt tinted glyph, title + reason,
+    /// and the frozen workout clock. The whole activity opens the Logger.
+    private func statusBody(symbol: String, color: Color, title: String, message: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(color.opacity(0.13)).frame(width: 44, height: 44)
+                Image(systemName: symbol).font(.system(size: 19, weight: .bold)).foregroundStyle(color)
             }
-            if let action {
-                Text(action)
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(maxWidth: .infinity, minHeight: 40)
-                    .background(RoundedRectangle(cornerRadius: 13).fill(WorkoutActivityPalette.accent.opacity(0.2)))
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(WorkoutActivityType.font(16, 700)).lineLimit(1).minimumScaleFactor(0.8)
+                Text(message).font(WorkoutActivityType.font(11, 500)).foregroundStyle(theme.secondaryText)
             }
+            Spacer()
+            WorkoutElapsedText(startedAt: attributes.startedAt, finishedAt: state.finishedAt)
+                .font(WorkoutActivityType.font(16, 500))
+                .frame(width: 52, alignment: .trailing)
         }
+        .frame(minHeight: 96)
     }
 }
 
 // MARK: - Dynamic Island
 
-/// Expanded bottom region: the same max-two-row semantics as the Lock
-/// Screen, the large rest clock lower-left, Complete Set trailing.
+/// Expanded bottom region (system black): two side-by-side context cards,
+/// the rest clock lower-left, Complete Set trailing.
 struct WorkoutIslandExpandedBottom: View {
     let attributes: WorkoutActivityAttributes
     let state: WorkoutActivityState
     var isStale = false
     @Environment(\.redactionReasons) private var redactionReasons
 
+    private let theme = WorkoutActivityTheme.dark
     private var isPrivate: Bool { !WorkoutActivityPrivacy.showsSetDetails(redaction: redactionReasons) }
 
     private var presentation: WorkoutActivityPresentation {
@@ -388,26 +463,28 @@ struct WorkoutIslandExpandedBottom: View {
             if presentation.phase == .inProgress {
                 if isPrivate {
                     Text("Set details hidden")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(WorkoutActivityType.font(12, 700))
                         .frame(maxWidth: .infinity, minHeight: 38)
-                        .background(RoundedRectangle(cornerRadius: 9).fill(WorkoutActivityPalette.muted))
+                        .background(RoundedRectangle(cornerRadius: 9).fill(theme.teal.opacity(0.125)))
                 } else {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 7) {
                         ForEach(Array(state.rows.prefix(2).enumerated()), id: \.offset) { _, row in
                             context(row)
                         }
                     }
                 }
-                HStack(spacing: 10) {
-                    WorkoutRestSummary(state: state, isStale: isStale)
+                HStack(spacing: 8) {
+                    WorkoutClockBlock(state: state, isStale: isStale, theme: theme, showsRest: !isPrivate)
                     Spacer(minLength: 4)
-                    if presentation.showsCompleteSet { WorkoutCompleteSetButton(attributes: attributes, state: state).frame(width: 122, height: 44) }
+                    if presentation.showsCompleteSet {
+                        WorkoutCompleteSetButton(attributes: attributes, state: state, forceDark: true).frame(width: 124, height: 44)
+                    }
                 }
             } else {
-                Text(statusText).font(.system(size: 13, weight: .semibold)).frame(maxWidth: .infinity, minHeight: 44)
+                Text(statusText).font(WorkoutActivityType.font(13, 650)).frame(maxWidth: .infinity, minHeight: 44)
             }
         }
-        .foregroundStyle(WorkoutActivityPalette.primaryText)
+        .foregroundStyle(theme.text)
         .environment(\.workoutActivityStartedAt, attributes.startedAt)
     }
 
@@ -426,59 +503,73 @@ struct WorkoutIslandExpandedBottom: View {
         let label = isFinalCurrent ? "CURRENT · FINAL" : WorkoutRoleStyle.label(row.role)
         let accent: Color = {
             switch row.role {
-            case .previous: WorkoutActivityPalette.mutedText
-            case .completed: WorkoutActivityPalette.success
-            case .current: isFinalCurrent ? WorkoutActivityPalette.warning : WorkoutActivityPalette.accent
-            case .upNext: WorkoutActivityPalette.accent
+            case .previous: theme.mutedText
+            case .completed: theme.green
+            case .current: isFinalCurrent ? theme.amber : theme.teal
+            case .upNext: theme.teal
             }
         }()
-        return VStack(alignment: .leading, spacing: 1) {
+        return VStack(alignment: .leading, spacing: 3) {
             Text(label)
-                .font(.system(size: 7, weight: .bold))
-                .tracking(0.5)
+                .font(WorkoutActivityType.font(7, 760))
                 .foregroundStyle(accent)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
             Text(row.exerciseName)
-                .font(.system(size: 10, weight: .semibold))
+                .font(WorkoutActivityType.font(10, 700))
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
             Text("Set \(row.setNumber)/\(row.setCount)" + (row.valueText.map { " · \($0)" } ?? ""))
-                .font(.system(size: 9, weight: .medium, design: .rounded))
-                .foregroundStyle(WorkoutActivityPalette.secondaryText)
+                .font(WorkoutActivityType.font(9, 500))
+                .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
         }
         .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 9).fill(accent.opacity(0.12)))
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(accent.opacity(0.125)))
+        .accessibilityElement(children: .combine)
     }
 }
 
-/// Compact trailing: the rest clock while resting, else workout elapsed.
+/// Compact leading: the workout glyph (white on system black).
+struct WorkoutIslandCompactLeading: View {
+    var body: some View {
+        Image(systemName: "dumbbell.fill")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(WorkoutActivityTheme.dark.text)
+    }
+}
+
+/// Compact trailing: a green rest dot + rest clock while resting, else the
+/// workout elapsed.
 struct WorkoutIslandCompactTrailing: View {
     let attributes: WorkoutActivityAttributes
     let state: WorkoutActivityState
 
     var body: some View {
         if let rest = state.rest, state.phase == .inProgress {
-            HStack(spacing: 3) {
-                Circle().fill(WorkoutActivityPalette.success).frame(width: 5, height: 5)
+            HStack(spacing: 4) {
+                Circle().fill(WorkoutActivityTheme.dark.green).frame(width: 6, height: 6)
                 WorkoutRestClockText(rest: rest)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(WorkoutActivityPalette.success)
-                    .frame(width: 44, alignment: .trailing)
+                    .font(WorkoutActivityType.font(12, 760))
+                    .foregroundStyle(WorkoutActivityTheme.dark.text)
+                    .frame(width: 40, alignment: .trailing)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Rest")
         } else {
             WorkoutElapsedText(startedAt: attributes.startedAt, finishedAt: state.finishedAt)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .frame(width: 46, alignment: .trailing)
+                .font(WorkoutActivityType.font(12, 760))
+                .foregroundStyle(WorkoutActivityTheme.dark.text)
+                .frame(width: 44, alignment: .trailing)
         }
     }
 }
 
-/// Minimal: an unmistakable rest-stopwatch/timer ring while resting,
-/// else the workout glyph.
+/// Minimal: an unmistakable rest ring + glyph while resting, else the
+/// workout glyph.
 struct WorkoutIslandMinimal: View {
     let state: WorkoutActivityState
 
@@ -486,17 +577,18 @@ struct WorkoutIslandMinimal: View {
         if let rest = state.rest, state.phase == .inProgress {
             ZStack {
                 Circle()
-                    .trim(from: 0.12, to: 0.82)
-                    .stroke(WorkoutActivityPalette.success, style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .padding(3)
-                Image(systemName: rest.mode == .countdown ? "timer" : "stopwatch.fill")
-                    .font(.system(size: 11, weight: .semibold))
+                    .stroke(WorkoutActivityTheme.dark.green.opacity(0.33), lineWidth: 2)
+                    .padding(2)
+                Image(systemName: rest.mode == .countdown ? "timer" : "stopwatch")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(WorkoutActivityTheme.dark.green)
             }
+            .accessibilityLabel("Resting")
         } else {
             Image(systemName: "dumbbell.fill")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(WorkoutActivityPalette.accent)
+                .foregroundStyle(WorkoutActivityTheme.dark.text)
+                .accessibilityLabel("Workout")
         }
     }
 }
