@@ -1,6 +1,8 @@
 # Overnight Lane A — Checkpoints A1 + A2: Apple Watch
 
-**Status: ready for Founder review (not accepted).**
+**Status: FOUNDER VISUAL APPROVED, pending integrated-build physical-device acceptance.**
+
+The Founder approved the lane (2026-10-06) except the Mineral clock band. **Option A, the compact clock capsule**, was selected (prompt `3afd3f57`) and is now the only Mineral clock treatment, implemented in `7932f963`.
 The overnight continuation was authorized; continuing past this checkpoint does not mean it was accepted.
 
 - **Lane branch:** `claude/overnight-lane-a-watch-live-priorities-capture-20261006`.
@@ -16,6 +18,7 @@ The overnight continuation was authorized; continuing past this checkpoint does 
 
 | Board | Dark | Mineral Light |
 |---|---|---|
+| **Final Mineral clock (Option A)** | — | `boards/mineral-clock-final.png` |
 | A1: handoff, execution, variants, Crown pages | `boards/a1-dark.png` | `boards/a1-mineral.png` |
 | A2: controls, confirmations, saving, summary | `boards/a2-dark.png` | `boards/a2-mineral.png` |
 | Before / after (Build 88 → Lane A) | `boards/before-after.png` | — |
@@ -123,9 +126,12 @@ Full-resolution captures of every fixture are in `screens/dark/` and `screens/mi
   - The board renders them white only because of CSS specificity: `.watch-action.quiet` beats `.red`.
   - The package token rule says destructive is red with an explicit label.
 - **D3:** content starts below the real watchOS clock (the existing 70% safe-area rule). The board's "10:09" is a smaller stand-in, so pages sit about 10 pt lower.
-- **D4 (Mineral only, practicality):** watchOS always draws the system time in white, which made it unreadable on mineral.
-  - A slim ink band (`#102431`) sits behind the clock zone and ends exactly where content starts.
-  - The board's dark clock text is not achievable on a real Watch.
+- **D4 (Mineral only, practicality), now resolved by Founder selection:** watchOS always draws the system time in white. Mineral now uses **Option A**:
+  - a compact ink capsule behind the real system clock;
+  - sized to the time shown and re-measured each minute;
+  - centered on the clock and clamped to end at least 1 pt above page content.
+  - The rejected full-width band, the B/C options and the DEBUG option seam are removed.
+  - The options board stays in `../overnight-lane-a-watch-mineral-clock-options-20261006/`.
 - **D5:** the light board's W13 "HEALTH START FAILED" eyebrow renders purple, again because of CSS specificity. Shipping uses the amber warning role in both palettes.
 - **D6:** the "WORKOUT CONTROLS" eyebrow is purple, following the rendered board. It was muted in Build 88.
 - **D7:** Mineral quiet labels use the acceptance board's `#5B7179`. The base board left the dark-muted `#92A5AF` on paper, which is too light.
