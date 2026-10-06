@@ -219,6 +219,29 @@ enum PhysiqueOSTheme {
     static let priorityEvidenceEnd = dynamic(dark: 0x17436D, light: 0xC9DFE9)
     static let priorityEvidenceInk = dynamic(dark: 0xFFFFFF, light: 0x0A1B2C)
 
+    // MARK: Locked daily capture + Confidence explanation
+    // Founder-accepted Final Design Batch 2 (`final-design-batch2-daily-
+    // capture-explanation-20261004`): Morning Check-In, manual Weight and
+    // the Home Confidence sheet, at the exact locked values.
+    static let captureCanvas = dynamic(dark: 0x06131E, light: 0xEFEEE7)
+    static let captureSurface = dynamic(dark: 0x0E2230, light: 0xFBFAF6)
+    static let captureSurfaceTint = dynamic(dark: 0x132B39, light: 0xE5F1EE)
+    static let captureRule = dynamic(dark: 0x25404B, light: 0xC7D1CD)
+    static let captureInk = dynamic(dark: 0xF2F6F4, light: 0x0B2030)
+    static let captureSecondary = dynamic(dark: 0xAEC0C7, light: 0x536B73)
+    static let captureMuted = dynamic(dark: 0x7F98A2, light: 0x789097)
+    static let capturePurple = dynamic(dark: 0xA88BF5, light: 0x7658D7)
+    static let captureTeal = dynamic(dark: 0x2CCDC0, light: 0x0C8F84)
+    static let captureGreen = dynamic(dark: 0x53DDA0, light: 0x13895E)
+    static let captureAmber = dynamic(dark: 0xF3BD50, light: 0xB77412)
+    static let captureRed = dynamic(dark: 0xFF7187, light: 0xC54157)
+    static let captureInput = dynamic(dark: 0x0A1B27, light: 0xF8F8F3)
+    static let captureShadow = dynamic(dark: 0x000000, light: 0x24373B, darkOpacity: 0.34, lightOpacity: 0.12)
+    /// Primary action: teal → blue field on Dark, solid deep teal on Light.
+    static let capturePrimaryStart = dynamic(dark: 0x2CCDC0, light: 0x0C837A)
+    static let capturePrimaryEnd = dynamic(dark: 0x2A83A7, light: 0x0C837A)
+    static let captureOnPrimary = dynamic(dark: 0x03191E, light: 0xFFFFFF)
+
     private static func dynamic(
         dark: UInt32,
         light: UInt32,

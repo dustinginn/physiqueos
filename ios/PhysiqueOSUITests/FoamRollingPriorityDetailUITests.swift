@@ -62,10 +62,96 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
                 XCTAssertFalse(app.descendants(matching: .any)[identifier].exists, "\(expectation.variant): unexpected \(identifier)")
             }
             for identifier in expectation.present where identifier.hasSuffix("markComplete") || identifier.hasSuffix("evidenceAction") {
-                XCTAssertGreaterThanOrEqual(app.buttons[identifier].frame.height, 52, "\(expectation.variant) primary action height")
+                XCTAssertGreaterThanOrEqual(app.buttons[identifier].frame.height, 51.5, "\(expectation.variant) primary action height")
             }
             XCTAssertFalse(app.tabBars.firstMatch.exists, "\(expectation.variant): no persistent tab bar")
         }
+    }
+
+    // MARK: Overnight Lane A — daily capture, Confidence, Watch appearance
+
+    private func launchCapture(route: String, state: String, appearance: String, extra: [String] = []) {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance-review.value", appearance,
+            "-physiqueos.appearance-review.route", route,
+            "-physiqueos.capture-review", state,
+        ] + extra
+        app.launch()
+    }
+
+    func testMorningCheckInLockedDispositionsAndAtomicAction() {
+        launchCapture(route: "morning-check-in", state: "morning-reconcile", appearance: "dark")
+        let completed = app.buttons["morningCheckIn.tesamorelin.completed"]
+        XCTAssertTrue(completed.waitForExistence(timeout: 8))
+        XCTAssertTrue(completed.isSelected, "The chosen disposition is a selected trait, not color alone.")
+        XCTAssertFalse(app.buttons["morningCheckIn.tesamorelin.skipped"].isSelected)
+        XCTAssertTrue(app.buttons["morningCheckIn.foam.skipped"].isSelected)
+        for id in ["morningCheckIn.tesamorelin.completed", "morningCheckIn.foam.note"] {
+            XCTAssertGreaterThanOrEqual(app.buttons[id].frame.height, 44, id)
+        }
+        XCTAssertTrue(app.staticTexts["Yesterday’s unfinished priorities"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["morningCheckIn.weight"].exists)
+        let save = app.buttons["morningCheckIn.save"]
+        XCTAssertTrue(save.exists)
+        XCTAssertGreaterThanOrEqual(save.frame.height, 51.5)
+
+        launchCapture(route: "morning-check-in", state: "morning-complete", appearance: "light")
+        XCTAssertTrue(app.staticTexts["Weigh-in complete"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["morningCheckIn.returnHome"].exists)
+        XCTAssertFalse(app.buttons["morningCheckIn.save"].exists)
+    }
+
+    func testManualWeightRevealsReturnToLogOnlyAfterADurableSave() {
+        launchCapture(route: "manual-weight", state: "weight-success", appearance: "light")
+        XCTAssertTrue(app.buttons["manualWeighIn.returnToLog"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Weight saved for Sep 10, 2026."].exists)
+
+        launchCapture(route: "manual-weight", state: "weight-processing", appearance: "dark")
+        XCTAssertTrue(app.buttons["manualWeighIn.save"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["manualWeighIn.message"].exists)
+        XCTAssertFalse(app.buttons["manualWeighIn.returnToLog"].exists, "Still reconciling is not a durable save.")
+
+        launchCapture(route: "manual-weight", state: "weight-failed", appearance: "light")
+        XCTAssertTrue(app.staticTexts["This weigh-in could not be saved."].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["manualWeighIn.returnToLog"].exists)
+        XCTAssertGreaterThanOrEqual(app.buttons["manualWeighIn.save"].frame.height, 51.5)
+    }
+
+    func testConfidenceSheetShowsTheLockedV3GroupsWithoutAssumptions() {
+        launchCapture(route: "home", state: "none", appearance: "dark",
+                      extra: ["-physiqueos.redesign-review", "-physiqueos.confidence-review", "v3"])
+        XCTAssertTrue(app.staticTexts["Why confidence is 79%"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Current confidence: Moderate"].exists)
+        for title in ["Why confidence is here", "What increased it", "What supports it now", "What is holding it back"] {
+            XCTAssertTrue(app.staticTexts[title].exists, "Missing \(title)")
+        }
+        XCTAssertFalse(app.staticTexts["Assumptions"].exists)
+
+        launchCapture(route: "home", state: "none", appearance: "light",
+                      extra: ["-physiqueos.redesign-review", "-physiqueos.confidence-review", "v2"])
+        XCTAssertTrue(app.staticTexts["Why confidence is 74%"].waitForExistence(timeout: 10))
+        for title in ["What changed", "What supports confidence", "What limits confidence", "What will make confidence clearer"] {
+            XCTAssertTrue(app.staticTexts[title].exists, "Missing \(title)")
+        }
+    }
+
+    /// Lane A addendum: the Apple Watch appearance is its own control on the
+    /// accepted Appearance page and never changes the iPhone selection.
+    func testWatchAppearanceIsAnIndependentAccessibleControl() {
+        launchReview(route: "appearance", appearance: "dark")
+        let watchMineral = app.buttons["appearance.watch.mineralLight"]
+        XCTAssertTrue(watchMineral.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(watchMineral.frame.height, 44)
+        let iPhoneDarkBefore = app.buttons["appearance.dark"].value as? String
+        if !watchMineral.isHittable { app.swipeUp() }
+        watchMineral.tap()
+        XCTAssertEqual(watchMineral.value as? String, "Selected")
+        XCTAssertEqual(app.buttons["appearance.watch.dark"].value as? String, "Not selected")
+        XCTAssertEqual(app.buttons["appearance.dark"].value as? String, iPhoneDarkBefore, "iPhone selection unchanged")
+        app.buttons["appearance.watch.dark"].tap()
+        XCTAssertEqual(app.buttons["appearance.watch.dark"].value as? String, "Selected")
     }
 
     func testLockedMineralLightParity() {

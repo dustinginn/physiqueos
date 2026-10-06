@@ -100,6 +100,12 @@ struct HomeView: View {
         )) { presentation in
             ConfidenceDetailSheet(confidence: presentation.confidence, detail: presentation.detail)
         }
+#if DEBUG
+        // Review captures of the locked Confidence sheet (DEBUG only).
+        .onAppear {
+            if let review = ConfidenceReviewFixture.requested { confidenceDetailPresentation = review }
+        }
+#endif
     }
 
     /// The review fixture is a source-shaped snapshot of the accepted Home
