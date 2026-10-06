@@ -8,6 +8,7 @@
 - Initial four-item candidate content tip: `721b0aebe2e7833bb544e11c273a0fc9dce25c9b`
 - Logger selection-control addendum: `1162682a`
 - Typography selection checkpoint and Live Activity integration note: `184c9f68`
+- Founder-selected Option B implementation: `80c815de`
 - Merge-base audit: exact Build 88 base above
 
 ## Bounded changes
@@ -29,10 +30,10 @@
    - Adds an obvious 44 pt top-right selection target to the unselected suggestion card; it becomes the existing teal checkmark when selected.
    - The card, control, and matching Training Area tile all read and mutate the same canonical draft selection state. Suggestion generation, multi-select behavior, and the Logger flow are unchanged.
    - Files: `TrainingLoggerView.swift`, `TrainingLoggerViewModel.swift`, `TrainingLoggerTests.swift`, C5 captures/board.
-6. Logger set-value typography — Founder selection checkpoint only — `184c9f68`
+6. Logger set-value typography — Founder selected Option B after checkpoint `184c9f68`
    - Current: 12 pt Regular. A: 14 pt Regular. B: 16 pt Semibold. C: 15 pt Medium with a proportional 13 pt SET number.
    - Uses real `NumericEditField` SwiftUI rows, fixed 390 pt geometry, one representative state, and identical headers/controls/behavior in Mineral and Dark.
-   - Shipping typography remains unchanged pending Founder selection.
+   - Founder selected Option B. The shipping editable REPS/LOAD authority is now 16 pt Semibold; SET numbers, headers, geometry, and behavior remain unchanged.
 7. Live Activity elapsed-workout icon clarification — integration note only — `184c9f68`
    - Claude A's redesigned source exists only on unmerged candidate `f3579d87`; the Build 88 implementation was not recreated.
    - Exact post-merge change recorded: in Claude A's no-rest `WORKOUT` branch only, change `dumbbell.fill` to `stopwatch`; preserve the active-rest `timer`/`stopwatch`, green treatment, labels, clocks, and state pipeline exactly.
@@ -61,7 +62,8 @@ Review harness and package: `721b0aebe2e7833bb544e11c273a0fc9dce25c9b`.
 - Generic iOS Simulator Release compile: succeeded.
 - Logger selection-control focused suite: 91 tests, 0 failures (`/private/tmp/physiqueos-build89-logger-focused.xcresult`).
 - Logger typography fit/render checkpoint: 2 tests, 0 failures (`/private/tmp/physiqueos-build89-logger-type-options.xcresult`); all eight real SwiftUI captures inspected.
-- A later combined Xcode rerun was intentionally not launched after free disk fell below the repository's 15 GiB safety floor. No shipping source changed after the successful 91-test Logger run; the typography checkpoint changes only tests/review artifacts, and the Live Activity outcome is documentation-only.
+- Option B finalization: production and test files pass Swift frontend parsing; exact source checks confirm the sole production typography authority is 16 pt / weight 600, the 8 pt column header authority is unchanged, both numeric fields retain their 36 pt height, and `git diff --check` is clean.
+- A final Xcode rerun was intentionally not launched: deleting 2.1 GB of this lane's disposable DerivedData and Release output restored the repository's 15 GiB floor, but left no safe headroom to regenerate Xcode build products without falling below it. The earlier 2/2 real-SwiftUI checkpoint already rendered Option B with the shipping `NumericEditField`; this report does not claim an unrun post-selection Xcode gate.
 - Project generator: stable; `project.pbxproj` SHA-256 stayed `cde880e5571fa2ce1d07f2d551be6e432789efa051303ca02f91d83f0aa4e68b`.
 - `git diff --check`: clean.
 - No app-target Build 89/debug/review seam introduced; review capture code is UI-test-only.
@@ -77,4 +79,4 @@ Review harness and package: `721b0aebe2e7833bb544e11c273a0fc9dce25c9b`.
 
 ## Stop boundary
 
-This lane stops after pushing the isolated candidate and review package. Logger set-value typography is deliberately unselected and unimplemented in shipping code pending Founder choice of Current, A, B, or C. No merge, build-number bump, TestFlight action, Server deploy, or production mutation was performed.
+This lane stops after pushing the isolated candidate and review package with Founder-selected Logger typography Option B finalized. No merge, build-number bump, TestFlight action, Server deploy, or production mutation was performed.

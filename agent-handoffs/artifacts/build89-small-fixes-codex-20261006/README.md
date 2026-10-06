@@ -9,7 +9,7 @@ This package contains compact review boards captured from shipping PhysiqueOS vi
 - `boards/C3-home-timeline-copy.png` — approved headline and compact Remaining copy; phase detail remains unchanged.
 - `boards/C4-widget-refresh-accent.png` — refresh uses the same teal/cyan action authority as Start Logger.
 - `boards/C5-logger-suggested-selection.png` — Suggested Today’s explicit target transitions to the selected checkmark while its Training Area tile stays synchronized.
-- `boards/C6-logger-set-typography-options.png` — Founder checkpoint comparing Current with restrained A/B/C numeric typography options in Mineral, plus a compact Dark verification strip. No shipping typography selection has been made.
+- `boards/C6-logger-set-typography-options.png` — Founder comparison of Current with restrained A/B/C numeric typography options in Mineral, plus a compact Dark verification strip. Founder selected Option B: editable REPS/LOAD values now ship at 16 pt Semibold; SET numbers, headers, geometry, and behavior remain unchanged.
 - `live-activity-stopwatch-integration.md` — exact state-specific post-merge correction for Claude A’s redesigned Live Activity; no Build 88 implementation was recreated.
 
 ## Capture provenance
