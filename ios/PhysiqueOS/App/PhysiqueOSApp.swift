@@ -35,6 +35,18 @@ struct PhysiqueOSApp: App {
         return nil
     }
 
+    /// DEBUG review captures of the Watch appearance setting; never persisted.
+    private static var debugWatchAppearanceOverride: WatchAppearancePreference? {
+#if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let flagIndex = arguments.firstIndex(of: "-physiqueos.appearance-review.watch"),
+           arguments.indices.contains(flagIndex + 1) {
+            return WatchAppearancePreference(rawValue: arguments[flagIndex + 1])
+        }
+#endif
+        return nil
+    }
+
     init() {
         // A notification action may be the process-launch event. Registering
         // the delegate in RootTabView.task was too late: iOS could deliver
@@ -42,7 +54,10 @@ struct PhysiqueOSApp: App {
         // specialized command before dispatch. Establish the response path
         // before SwiftUI creates the first scene.
         let environment = AppEnvironment(healthKitFeatureGate: .n1Automatic)
-        let appearance = AppAppearanceStore(initialOverride: Self.debugAppearanceOverride)
+        let appearance = AppAppearanceStore(
+            initialOverride: Self.debugAppearanceOverride,
+            initialWatchOverride: Self.debugWatchAppearanceOverride
+        )
         let notificationDelegate = PriorityNotificationDelegate(environment: environment)
         UNUserNotificationCenter.current().delegate = notificationDelegate
         PriorityNotificationCategoryRegistrar.registerCategories()
@@ -76,6 +91,8 @@ struct PhysiqueOSApp: App {
             // Seed from the stored snapshot so the first publish already
             // carries today's totals (a locked launch cannot refresh them).
             watchWorkoutConnectivity.publishDailyTotals(WatchDailyTotals(snapshot: homeWidget.coordinator.storedSnapshot()))
+            // The Watch's own appearance rides the same application context.
+            watchWorkoutConnectivity.publishWatchAppearance(appearance.watchSelection)
             watchWorkoutConnectivity.install()
         }
         _watchWorkoutConnectivity = State(initialValue: watchWorkoutConnectivity)
@@ -109,6 +126,11 @@ struct PhysiqueOSApp: App {
                 // change propagate live. Explicit choices also govern
                 // system controls, sheets, alerts, keyboards and forms.
                 .preferredColorScheme(appearance.preferredColorScheme)
+                // Independent of the iPhone appearance; delivered whenever
+                // the Watch next connects (never blocked on reachability).
+                .onChange(of: appearance.watchSelection) { _, selection in
+                    watchWorkoutConnectivity.publishWatchAppearance(selection)
+                }
                 .task {
                     // Idempotent defensive refresh. The action-response path
                     // is already live from init; this is not its authority.

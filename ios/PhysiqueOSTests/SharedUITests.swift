@@ -342,6 +342,89 @@ final class SharedUITests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: AppAppearanceStore.persistenceKey))
     }
 
+    // MARK: Independent Apple Watch appearance (Lane A addendum)
+
+    @MainActor
+    func testWatchAppearanceDefaultsToDarkAndIsNeverInferredFromTheIPhone() throws {
+        for iPhone in AppAppearance.allCases {
+            let defaults = try appearanceDefaults()
+            if iPhone != .system { defaults.set(iPhone.rawValue, forKey: AppAppearanceStore.persistenceKey) }
+            let store = AppAppearanceStore(defaults: defaults)
+            XCTAssertEqual(store.selection, iPhone)
+            XCTAssertEqual(store.watchSelection, .dark, "Unset Watch is Dark even when iPhone is \(iPhone)")
+            XCTAssertNil(defaults.object(forKey: AppAppearanceStore.watchPersistenceKey), "Default is not written")
+        }
+    }
+
+    @MainActor
+    func testIPhoneAndWatchAppearancesAreIndependentInEveryCombination() throws {
+        let combinations: [(AppAppearance, WatchAppearancePreference)] = [
+            (.light, .dark), (.dark, .mineralLight), (.system, .dark), (.system, .mineralLight),
+        ]
+        for (iPhone, watch) in combinations {
+            let defaults = try appearanceDefaults()
+            let store = AppAppearanceStore(defaults: defaults)
+            store.select(iPhone)
+            store.selectWatch(watch)
+            let relaunched = AppAppearanceStore(defaults: defaults)
+            XCTAssertEqual(relaunched.selection, iPhone, "\(iPhone)+\(watch)")
+            XCTAssertEqual(relaunched.watchSelection, watch, "\(iPhone)+\(watch)")
+        }
+    }
+
+    @MainActor
+    func testChangingOneDeviceAppearanceNeverChangesTheOther() throws {
+        let defaults = try appearanceDefaults()
+        let store = AppAppearanceStore(defaults: defaults)
+        store.selectWatch(.mineralLight)
+        for iPhone in AppAppearance.allCases {
+            store.select(iPhone)
+            XCTAssertEqual(store.watchSelection, .mineralLight, "iPhone \(iPhone) left the Watch alone")
+        }
+        store.select(.dark)
+        for watch in WatchAppearancePreference.allCases {
+            store.selectWatch(watch)
+            XCTAssertEqual(store.selection, .dark, "Watch \(watch) left the iPhone alone")
+        }
+        XCTAssertEqual(defaults.string(forKey: AppAppearanceStore.persistenceKey), "dark")
+        XCTAssertEqual(defaults.string(forKey: AppAppearanceStore.watchPersistenceKey), "mineralLight", "Last Watch choice")
+    }
+
+    @MainActor
+    func testUnknownStoredWatchAppearanceDecodesToDark() throws {
+        let defaults = try appearanceDefaults()
+        defaults.set("system", forKey: AppAppearanceStore.watchPersistenceKey)
+        XCTAssertEqual(AppAppearanceStore(defaults: defaults).watchSelection, .dark)
+        XCTAssertNil(WatchAppearancePreference.decode(42))
+        XCTAssertNil(WatchAppearancePreference.decode(String(repeating: "x", count: 500)))
+        XCTAssertEqual(WatchAppearancePreference.decode("mineralLight"), .mineralLight)
+    }
+
+    /// The Watch appearance rides the established replace-whole application
+    /// context next to the projection and Daily Totals slots.
+    @MainActor
+    func testWatchAppearanceTravelsInTheEstablishedApplicationContext() {
+        let projection = Data("p".utf8), totals = Data("t".utf8)
+        let context = PhoneWatchWorkoutConnectivityBridge.applicationContext(
+            projection: projection, dailyTotals: totals, appearance: .mineralLight
+        )
+        XCTAssertEqual(context[WatchWorkoutContract.applicationContextProjectionKey] as? Data, projection)
+        XCTAssertEqual(context[WatchWorkoutContract.applicationContextDailyTotalsKey] as? Data, totals)
+        XCTAssertEqual(context[WatchWorkoutContract.applicationContextAppearanceKey] as? String, "mineralLight")
+
+        let appearanceOnly = PhoneWatchWorkoutConnectivityBridge.applicationContext(
+            projection: nil, dailyTotals: nil, appearance: .dark
+        )
+        XCTAssertEqual(appearanceOnly.count, 1, "Not blocked on a projection: an unconnected Watch still gets it later")
+    }
+
+    @MainActor
+    func testWatchAppearanceSettingMirrorsTheIPhoneAppearanceTitles() {
+        XCTAssertEqual(AppAppearance.allCases.map(\.title), ["System", "Dark", "Mineral Light"])
+        XCTAssertEqual(WatchAppearancePreference.allCases.map(\.title), ["Dark", "Mineral Light"],
+                       "watchOS has no system appearance, so there is no System option")
+    }
+
     @MainActor
     func testAppearanceSchemeMappingKeepsSystemUnforced() {
         XCTAssertNil(AppAppearance.system.preferredColorScheme)

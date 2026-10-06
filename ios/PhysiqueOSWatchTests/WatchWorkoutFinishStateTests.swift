@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import PhysiqueOSWatch
 
 /// Build 83 Watch finish state machine, HealthKit save/discard resolution,
@@ -352,6 +353,144 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         XCTAssertEqual(WatchWorkoutClock.sessionSeconds(projection, at: now), 2_000, "Frozen at the confirmed finish.")
         XCTAssertEqual(WatchWorkoutClock.format(3_725), "1:02:05")
         XCTAssertEqual(WatchWorkoutClock.format(125), "2:05")
+    }
+
+    // MARK: Overnight Lane A — utility translation presentation
+
+    func testTimedSetShowsItsSecondsInsteadOfAnEmptyRepsTile() throws {
+        let timed = try XCTUnwrap(try fixture("timed").rows.first(where: \.isCompletionTarget))
+        XCTAssertEqual(WatchExecutionValues(row: timed), .init(load: "BW", primary: "45", primaryLabel: "SECONDS"))
+
+        let reps = try XCTUnwrap(try fixture("normal").rows.first(where: \.isCompletionTarget))
+        XCTAssertEqual(WatchExecutionValues(row: reps), .init(load: "185", primary: "8", primaryLabel: "REPS"))
+
+        var missing = reps
+        missing.loadText = nil
+        missing.repsText = nil
+        XCTAssertEqual(WatchExecutionValues(row: missing), .init(load: "—", primary: "—", primaryLabel: "REPS"),
+                       "Missing values stay an honest em dash.")
+    }
+
+    @MainActor
+    func testPhoneReviewDisablesCompleteSetAndNamesTheReason() throws {
+        let (store, _) = makeStore("laneA.review")
+        store.apply(try fixture("review"))
+        XCTAssertEqual(store.presentedPhase, .active)
+        XCTAssertTrue(store.isReviewingOnPhone)
+        XCTAssertFalse(store.isCompleteSetAvailable, "No actionable Complete Set while the phone reviews.")
+        store.completeSet()
+        XCTAssertFalse(store.isMutationPending, "A tap issues no command.")
+
+        store.apply(try fixture("normal"))
+        XCTAssertFalse(store.isReviewingOnPhone)
+    }
+
+    func testWatchTypographyKeepsTheBoardAtStandardSizesAndGrowsOnlyForAccessibility() {
+        for size in [DynamicTypeSize.xSmall, .large, .xLarge, .xxLarge, .xxxLarge] {
+            XCTAssertEqual(WatchType.scale(size), 1, "\(size)")
+        }
+        XCTAssertGreaterThan(WatchType.scale(.accessibility1), 1)
+        XCTAssertGreaterThanOrEqual(WatchType.scale(.accessibility5), WatchType.scale(.accessibility1))
+    }
+
+    func testLockedUtilityTokensAndRetainedMetricIdentity() {
+        let saved = WatchPhysiqueOSTheme.current
+        defer { WatchPhysiqueOSTheme.current = saved }
+        WatchPhysiqueOSTheme.current = .dark
+        XCTAssertEqual(WatchPhysiqueOSTheme.background, Color(watchHex: 0x061019))
+        XCTAssertEqual(WatchPhysiqueOSTheme.purple, Color(watchHex: 0xAA98FF))
+        XCTAssertEqual(WatchPhysiqueOSTheme.progress, Color(watchHex: 0x55E39A))
+        // The Founder's acceptance correction: production metric accents stay.
+        XCTAssertEqual(WatchPhysiqueOSTheme.timeAccent, Color(watchHex: 0x60A5FA))
+        XCTAssertEqual(WatchPhysiqueOSTheme.activeEnergyAccent, Color(watchHex: 0xFBBF24))
+        XCTAssertEqual(WatchPhysiqueOSTheme.totalEnergyAccent, Color(watchHex: 0x4ADE80))
+        XCTAssertEqual(WatchPhysiqueOSTheme.nutritionAccent, Color(watchHex: 0xC084FC))
+        XCTAssertEqual(WatchPhysiqueOSTheme.heartRateAccent, Color(watchHex: 0xFF697A))
+    }
+
+    // MARK: Independent Watch appearance (Lane A addendum)
+
+    @MainActor
+    func testWatchAppearanceDefaultsToDarkPersistsAndSurvivesAnOfflineLaunch() throws {
+        let (store, defaults) = makeStore("laneA.appearance")
+        XCTAssertEqual(store.appearance, .dark, "Unset is Dark")
+
+        store.receiveApplicationContext([WatchWorkoutContract.applicationContextAppearanceKey: "mineralLight"])
+        XCTAssertEqual(store.appearance, .mineralLight)
+        XCTAssertEqual(defaults.string(forKey: WatchWorkoutStore.appearanceKey), "mineralLight")
+
+        // Relaunch with no phone: the stored choice renders immediately.
+        let relaunched = WatchWorkoutStore(session: nil, defaults: defaults, now: { self.now }, health: FakeWatchHealth(startDate: now))
+        XCTAssertEqual(relaunched.appearance, .mineralLight)
+    }
+
+    @MainActor
+    func testReconnectWithoutOrWithAnUnknownAppearanceKeepsTheStoredChoice() throws {
+        let (store, defaults) = makeStore("laneA.appearance.reconnect")
+        store.receiveAppearance("mineralLight")
+        // An older phone omits the slot; a future one may send a new value.
+        store.receiveApplicationContext([:])
+        XCTAssertEqual(store.appearance, .mineralLight, "No reset or flash on reconnect")
+        store.receiveAppearance("sepia")
+        store.receiveAppearance(7)
+        XCTAssertEqual(store.appearance, .mineralLight)
+        store.receiveApplicationContext([
+            WatchWorkoutContract.applicationContextProjectionKey: try WatchWorkoutWireCodec.encode(try fixture("normal")),
+            WatchWorkoutContract.applicationContextAppearanceKey: "dark",
+        ])
+        XCTAssertEqual(store.appearance, .dark)
+        XCTAssertEqual(defaults.string(forKey: WatchWorkoutStore.appearanceKey), "dark")
+    }
+
+    func testEveryWatchScreenResolvesTheSelectedPalette() {
+        let saved = WatchPhysiqueOSTheme.current
+        defer { WatchPhysiqueOSTheme.current = saved }
+        XCTAssertEqual(WatchPalette.of(.dark), .dark)
+        XCTAssertEqual(WatchPalette.of(.mineralLight), .mineralLight)
+        XCTAssertNil(WatchPalette.dark.clockCapsule, "Dark needs no clock treatment")
+        XCTAssertNotNil(WatchPalette.mineralLight.clockCapsule, "The white system clock stays legible on Mineral")
+
+        WatchPhysiqueOSTheme.current = .of(.mineralLight)
+        XCTAssertEqual(WatchPhysiqueOSTheme.background, Color(watchHex: 0xE8ECE5))
+        XCTAssertEqual(WatchPhysiqueOSTheme.surface, Color(watchHex: 0xFBFAF4))
+        XCTAssertEqual(WatchPhysiqueOSTheme.purple, Color(watchHex: 0x5C3FD2))
+        XCTAssertEqual(WatchPhysiqueOSTheme.text, Color(watchHex: 0x102431))
+        XCTAssertEqual(WatchPhysiqueOSTheme.onPrimary, .white)
+        XCTAssertEqual(WatchPhysiqueOSTheme.timeAccent, Color(watchHex: 0x2563B8))
+        XCTAssertEqual(WatchPhysiqueOSTheme.heartRateAccent, Color(watchHex: 0xC73850))
+
+        WatchPhysiqueOSTheme.current = .of(.dark)
+        XCTAssertEqual(WatchPhysiqueOSTheme.background, Color(watchHex: 0x061019))
+        XCTAssertEqual(WatchPhysiqueOSTheme.onPrimary, Color(watchHex: 0x061019))
+    }
+
+    /// Founder-selected Option A: a compact capsule around the real system
+    /// time — never a full-width band — that clears the page content on both
+    /// supported case sizes.
+    func testMineralClockCapsuleIsCompactAndClearsContentOnBothCaseSizes() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let us = Locale(identifier: "en_US")
+        let sevenOhOne = calendar.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 7, minute: 1))!
+        let twelveFiftyEight = calendar.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 12, minute: 58))!
+        let utc = TimeZone(identifier: "UTC")!
+        XCTAssertEqual(WatchClockCapsule.clockWidth(at: sevenOhOne, locale: us, timeZone: utc), 34)
+        XCTAssertEqual(WatchClockCapsule.clockWidth(at: twelveFiftyEight, locale: us, timeZone: utc), 44)
+
+        // (page width, top safe area) measured on the Ultra 3 (49 mm: 207, 57)
+        // and the 42 mm (183, 48.6) simulators via the geometry fixture.
+        for (width, safeTop) in [(CGFloat(207), CGFloat(57)), (183, 48.6)] {
+            let frame = WatchClockCapsule.frame(screenWidth: width, safeAreaTop: safeTop, clockWidth: 44)
+            XCTAssertLessThanOrEqual(frame.width, 60, "Compact: only as wide as the widest time (\(width))")
+            XCTAssertLessThanOrEqual(frame.width, width * 0.34, "Never a band (\(width))")
+            XCTAssertLessThanOrEqual(frame.maxX, width, "Stays on screen (\(width))")
+            XCTAssertGreaterThan(frame.minX, width / 2, "Anchored top-trailing (\(width))")
+            XCTAssertLessThanOrEqual(frame.maxY, WatchExecutionLayout.topInset(safeAreaTop: safeTop) - 1,
+                                     "Ends above the first content line (\(width))")
+            XCTAssertLessThanOrEqual(frame.midY, safeTop * 0.5 + 0.001, "Never sits below the clock's own center")
+            XCTAssertGreaterThanOrEqual(frame.midY, safeTop * 0.5 - 2.5, "Stays on the digits (\(width))")
+            XCTAssertGreaterThanOrEqual(frame.minY, 0)
+        }
     }
 
     // MARK: Fixed execution layout

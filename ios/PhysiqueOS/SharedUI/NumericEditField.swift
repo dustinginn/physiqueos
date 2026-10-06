@@ -18,6 +18,9 @@ struct NumericEditField: UIViewRepresentable {
     var font: UIFont? = nil
     var textColor: Color? = nil
     var placeholderColor: Color? = nil
+    /// Daily capture's large weight field is leading-aligned; every other
+    /// host keeps the centered default.
+    var textAlignment: NSTextAlignment = .center
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -25,7 +28,7 @@ struct NumericEditField: UIViewRepresentable {
         let field = UITextField()
         field.delegate = context.coordinator
         field.keyboardType = .decimalPad
-        field.textAlignment = .center
+        field.textAlignment = textAlignment
         field.borderStyle = .none
         field.backgroundColor = UIColor(fieldBackground ?? PhysiqueOSTheme.surfaceMuted)
         if let font { field.font = font }

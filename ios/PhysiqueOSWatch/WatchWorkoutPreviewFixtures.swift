@@ -19,6 +19,8 @@ enum WatchWorkoutPreviewFixtures {
         var finishingObservedAt: Date?
         var pendingCommand: WatchWorkoutCommand?
         var pendingIssuedAt: Date?
+        var cancelConfirmationVisible = false
+        var orphanedHealthSessionId: String?
     }
 
     static func totals(
@@ -136,6 +138,54 @@ enum WatchWorkoutPreviewFixtures {
                 serverWaitingForNetwork: name == "finishing-waiting"
             )
             fixture.finishingObservedAt = Date().addingTimeInterval(name == "finishing-waiting" ? -45 : -3)
+        case "idle":
+            fixture.projection.phase = .unavailable
+            fixture.heartRate = nil
+            fixture.activeCalories = nil
+        case "idle-unavailable":
+            fixture.projection.phase = .unavailable
+            fixture.connectionState = .phoneUnavailable
+            fixture.heartRate = nil
+            fixture.activeCalories = nil
+        case "orphan":
+            fixture.projection.phase = .unavailable
+            fixture.heartRate = nil
+            fixture.activeCalories = nil
+            fixture.orphanedHealthSessionId = "22222222-2222-4222-8222-222222222222"
+        case "cancel-confirmation":
+            fixture.page = .controls
+            fixture.cancelConfirmationVisible = true
+        case "health-failed":
+            fixture.page = .controls
+            fixture.notice = .healthStartFailed
+            fixture.heartRate = nil
+            fixture.activeCalories = nil
+        case "authority-warning":
+            fixture.connectionState = .phoneUnavailable
+            fixture.projection.stalenessReason = .phoneUnreachable
+        case "bodyweight-superset":
+            fixture.projection.completedSets = 5
+            fixture.projection.totalSets = 10
+            fixture.projection.rows = [
+                row(role: "previous", name: "Pull-Up", set: 2, count: 3, load: "BW", reps: "10", target: false, superset: "A"),
+                row(role: "current", name: "Dips", set: 2, count: 3, load: "BW", reps: "12", target: true, superset: "B"),
+            ]
+        case "timed":
+            fixture.projection.completedSets = 2
+            fixture.projection.rows = [
+                row(role: "current", name: "Wall Sit", set: 1, count: 3, load: "BW", reps: "", target: true, duration: "45"),
+                row(role: "upNext", name: "Wall Sit", set: 2, count: 3, load: "BW", reps: "", target: false, duration: "45"),
+            ]
+        case "review":
+            // The phone Logger is on Workout Review: sets are read-only, so the
+            // projection withholds Complete Set and names the reason.
+            fixture.projection.canCompleteSet = false
+            fixture.projection.isPhoneReviewing = true
+            fixture.projection.rows = fixture.projection.rows.map { row in
+                var copy = row
+                copy.isCompletionTarget = false
+                return copy
+            }
         case "summary":
             fixture.projection.phase = .committed
             fixture.projection.completedSets = fixture.projection.totalSets
@@ -196,7 +246,8 @@ enum WatchWorkoutPreviewFixtures {
         load: String,
         reps: String,
         target: Bool,
-        superset: String? = nil
+        superset: String? = nil,
+        duration: String? = nil
     ) -> WatchWorkoutProjection.Row {
         .init(
             role: role,
@@ -205,9 +256,10 @@ enum WatchWorkoutPreviewFixtures {
             setId: "set-\(name)-\(set)",
             setNumber: set,
             setCount: count,
-            valueText: "\(reps) × \(load) lb",
+            valueText: duration.map { "\($0) s" } ?? "\(reps) × \(load) lb",
             loadText: load,
-            repsText: reps,
+            repsText: duration == nil ? reps : nil,
+            durationText: duration,
             supersetLabel: superset,
             partnerName: nil,
             isCompletionTarget: target

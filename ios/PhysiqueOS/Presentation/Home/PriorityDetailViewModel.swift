@@ -9,6 +9,25 @@ import Foundation
 enum FoamRollingPriorityPilotLaunchConfiguration {
     static let enabledKey = "physiqueos.priority-pilot.enabled"
     static let appearanceKey = "physiqueos.priority-pilot.appearance"
+    /// Overnight Lane A: the whole locked family through the same seam.
+    /// foam (default) | generic | peptide | paused | supplement | morning |
+    /// morning-completed | photos | dexa | completed | skipped | setup |
+    /// failed | not-found.
+    static let variantKey = "physiqueos.priority-pilot.variant"
+
+    static var variant: String {
+        UserDefaults.standard.string(forKey: variantKey)?.lowercased() ?? "foam"
+    }
+
+    /// The load outcome a capture variant asks for (nil = a loaded occurrence).
+    static var forcedState: PriorityDetailViewModel.LoadState? {
+        guard isEnabled else { return nil }
+        switch variant {
+        case "failed": return .failed("This priority could not be loaded. Pull to refresh and try again.")
+        case "not-found": return .loaded(nil)
+        default: return nil
+        }
+    }
     static let priorityId = "reminder_foam_roll_daily"
     static let occurrenceDate = "2026-10-04"
 
@@ -22,6 +41,11 @@ enum FoamRollingPriorityPilotLaunchConfiguration {
 
     static func occurrence(for requestedPriorityId: String) -> PriorityOccurrence? {
         guard isEnabled, requestedPriorityId == priorityId else { return nil }
+        let foam = foamOccurrence()
+        return PriorityFamilyReviewFixtures.occurrence(variant, foam: foam) ?? foam
+    }
+
+    private static func foamOccurrence() -> PriorityOccurrence {
         var occurrence = PriorityOccurrence(
             id: priorityId,
             routePriorityId: priorityId,
@@ -67,6 +91,130 @@ enum FoamRollingPriorityPilotLaunchConfiguration {
         return occurrence
     }
 }
+
+/// Source-shaped occurrences for every locked Priority Detail variant: the
+/// exact content of the locked review board (Server section copy, planned
+/// doses, pause dates). DEBUG captures only.
+enum PriorityFamilyReviewFixtures {
+    static func occurrence(_ variant: String, foam: PriorityOccurrence) -> PriorityOccurrence? {
+        let date = FoamRollingPriorityPilotLaunchConfiguration.occurrenceDate
+        func base(_ id: String, _ title: String, _ subtitle: String, sections: [(String, String, String)]) -> PriorityOccurrence {
+            PriorityOccurrence(
+                id: id, routePriorityId: id, executionItemId: id, date: date, title: title, subtitle: subtitle,
+                metadata: sections.first?.2, changeLabel: nil, icon: .target, color: .primary, urgency: .available,
+                completed: false, completable: true, expectedVersion: 12,
+                completionContext: .init(occurrenceDate: date),
+                detailSections: sections.map { .init(title: $0.0, items: [.init(label: $0.1, detail: $0.2)]) }
+            )
+        }
+        switch variant {
+        case "generic":
+            var o = base("reminder_server_priority", "Server Priority", "Server-owned occurrence", sections: [
+                ("What", "Server Priority", "Production"),
+                ("When", "Sep 10", "Scheduled by the operating plan."),
+            ])
+            o.skippable = true
+            return o
+        case "peptide":
+            var o = base("execution_tesamorelin", "Tesamorelin", "Tonight · 10:29 PM", sections: [
+                ("What", "Tesamorelin", "Complete the scheduled Execution action."),
+                ("When", "Sun–Thu · 10:29 PM", "fasted before bed"),
+                ("Dose", "0.5 mg", "May 24 – Until changed"),
+                ("Preparation", "Finish eating approximately 2–3 hours before injection", "Take fasted before bed. Preserve the normal fasted-before-bed timing window. Use the saved Execution conditions."),
+                ("Execution Notes", "Saved Support note", "Taken five times per week, Sunday through Thursday, at night, fasted before bed."),
+                ("Why it matters", "Supports the current operating plan", "This Execution action supports the current operating plan."),
+                ("Next Execution Change", "None scheduled", "No upcoming Execution phase is scheduled."),
+            ])
+            o.completionContext = .init(occurrenceDate: date, dose: "0.5 mg", protocolId: "tesamorelin")
+            o.doseAdjustableState = true
+            o.skippable = true
+            return o
+        case "paused":
+            var o = base("execution_retatrutide", "Retatrutide", "Thursday · 9:45 PM", sections: [
+                ("What", "Retatrutide is paused", "Resume it from the Operating Plan to record doses again."),
+                ("When", "Thursday · 9:45 PM", "fasted before bed"),
+                ("Dose", "1.5 mg", "Aug 6 – Until changed"),
+                ("Next Execution Change", "2.5 mg", "Begins Oct 8."),
+            ])
+            o.completable = false
+            o.completionContext = nil
+            o.paused = true
+            o.pauseContext = .init(pausedFrom: "2026-09-12")
+            o.continueActionDestination = .operatingPlanPeptideExecution(protocolId: "retatrutide")
+            return o
+        case "supplement":
+            return base("execution_fadogia", "Fadogia Agrestis", "Every other day", sections: [
+                ("What", "Fadogia Agrestis", "Complete the scheduled supplement support."),
+                ("When", "Every other day", "Timing comes from the saved Support schedule."),
+                ("Dose / Quantity", "Not specified", "No quantity is currently configured."),
+                ("Execution Notes", "Saved Support note", "Every-other-day supplement. Available for reminders if desired, but not currently surfaced by default."),
+                ("Why it matters", "Supports the current supplement strategy", "This supplement supports the current strategy."),
+            ])
+        case "morning", "morning-completed":
+            var o = base("morning-check-in", "Morning Weigh-In", "Daily · Morning", sections: [
+                ("What", "Record your weight", "A valid Weight recorded for Oct 4 satisfies this routine automatically."),
+                ("When", "Daily · Morning", "Timing comes from the saved Support schedule."),
+                ("Execution Notes", "Saved Support note", "Before food or fluids."),
+                ("Why it matters", "Track the body-weight trend", "This evidence helps PI evaluate progress and energy strategy against the current goal."),
+            ])
+            o.completable = false
+            o.completionContext = nil
+            o.actionLabel = "Log Weight"
+            o.continueActionDestination = .checkIn(checkInType: "morning")
+            if variant == "morning-completed" {
+                o.completed = true
+                o.relatedWeight = .init(canonicalId: "weight-oct-4", date: date, value: 182.4, unit: "lb", version: 1)
+            }
+            return o
+        case "photos":
+            var o = base("progress-photos", "Progress Photos", "Scheduled for this afternoon.", sections: [
+                ("What", "Progress Photos", "Upload Front Relaxed, Back Relaxed, and Back Flexed to complete today's check-in."),
+                ("When", "Saturday · Afternoon", "This occurrence follows your saved Progress Photos schedule."),
+                ("Execution Notes", "Saved Support note", "Capture the grouped progress photo set under comparable conditions."),
+                ("Why it matters", "Visual calibration", "Progress photos support qualitative goals without replacing DEXA or weight evidence."),
+            ])
+            o.completable = false
+            o.completionContext = nil
+            o.actionLabel = "Upload Photos"
+            o.continueActionDestination = .photoUpload
+            return o
+        case "dexa":
+            var o = base("dexa-appointment", "DEXA tomorrow", "Tomorrow at 7:30 AM", sections: [
+                ("What", "DEXA tomorrow", "Your DEXA appointment remains scheduled. This priority does not complete the scan itself."),
+                ("When", "Saturday, August 15, 2026 · 7:30 AM", "Timing uses America/Los_Angeles."),
+                ("Preparation", "Saved preparation note", "Use the saved clinic instructions."),
+                ("Why it matters", "Body-composition calibration", "Confirmed DEXA evidence updates the body-composition record supporting your current strategy."),
+            ])
+            o.completable = false
+            o.completionContext = nil
+            o.urgency = .upcoming
+            o.actionLabel = "View DEXA Appointment"
+            o.continueActionDestination = .operatingPlanDexaAppointment
+            return o
+        case "completed":
+            var o = foam
+            o.completed = true
+            o.completable = false
+            o.skippable = false
+            o.detailSections = foam.detailSections.map { $0.filter { $0.title != "Execution Notes" } }
+            return o
+        case "skipped":
+            var o = foam
+            o.skipped = true
+            o.completable = false
+            o.skippable = false
+            return o
+        case "setup":
+            var o = foam
+            o.completable = false
+            o.skippable = false
+            o.actionLabel = "Review Support"
+            return o
+        default:
+            return nil
+        }
+    }
+}
 #endif
 
 /// Reads/writes through the same shared `LoggingSandboxStore` Home and
@@ -109,6 +257,10 @@ final class PriorityDetailViewModel {
 
     func load() async {
 #if DEBUG
+        if let forced = FoamRollingPriorityPilotLaunchConfiguration.forcedState {
+            state = forced
+            return
+        }
         if let pilotOccurrence = FoamRollingPriorityPilotLaunchConfiguration.occurrence(for: priorityId) {
             state = .loaded(pilotOccurrence)
             return

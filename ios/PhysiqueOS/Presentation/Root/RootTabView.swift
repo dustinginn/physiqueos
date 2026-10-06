@@ -301,6 +301,7 @@ private enum AppearanceReviewLaunchConfiguration {
         case "operating-plan": Route(tab: .you, destinations: [.operatingPlan])
         case "training-logger": Route(tab: .log, destinations: [.trainingLogger])
         case "manual-weight": Route(tab: .log, destinations: [.manualWeighIn])
+        case "morning-check-in": Route(tab: .home, destinations: [.checkIn(checkInType: "morning")])
         case "briefing": Route(
             tab: .home,
             destinations: [.briefingDetail(briefingId: "weekly_briefing_2026-08-23_2026-08-29")]

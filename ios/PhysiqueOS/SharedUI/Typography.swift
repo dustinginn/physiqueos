@@ -182,6 +182,12 @@ enum PhysiqueOSTypography {
     static let priorityDetailFieldValue = Style(size: 15, weight: .heavy)
     static let priorityDetailFieldDetail = Style(size: 14, weight: .medium)
     static let priorityDetailAction = Style(size: 15, weight: .heavy)
+    /// Family additions (locked board): field label, evidence metric,
+    /// evidence banner title and unavailable title.
+    static let priorityDetailFieldLabel = Style(size: 9, weight: .heavy, trackingEm: 0.08, uppercase: true)
+    static let priorityDetailMetric = Style(size: 23, weight: .heavy)
+    static let priorityDetailEvidenceTitle = Style(size: 21, weight: .heavy)
+    static let priorityDetailErrorTitle = Style(size: 25, weight: .heavy)
 
     // MARK: Log cards (LogHubScreen.jsx, UploadAnythingForm.jsx)
     /// `text-xl font-black leading-tight` (Tailwind default scale: 20px) —

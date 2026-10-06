@@ -1214,11 +1214,17 @@ struct ProductionPriorityAPI: PriorityAPI {
     /// web-route-to-`AppDestination` router. Foam Rolling's setup-required
     /// state must retain the Server's Review Support route during the parity
     /// pilot. An unrecognized href stays `nil` rather than guessing.
-    private static func destination(forActionHref href: String?) -> AppDestination? {
+    static func destination(forActionHref href: String?) -> AppDestination? {
         switch href {
         case "/check-in/morning": .checkIn(checkInType: "morning")
         case "/profile/operating-plan/execution/execution_foam_roll":
             .operatingPlanRecoverySupport(executionId: "execution_foam_roll")
+        // Evidence-driven Priority actions (locked Priority Detail family):
+        // the Server's verified Progress Photos / DEXA hrefs open the
+        // existing Native intake and appointment screens.
+        case "/evidence/photos": .photoUpload
+        case "/evidence/dexa": .dexaUpload
+        case "/profile/operating-plan/execution/dexa": .operatingPlanDexaAppointment
         default: nil
         }
     }

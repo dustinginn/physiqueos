@@ -24,6 +24,10 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
     /// replaces the whole dictionary, so every publish carries both.
     private var latestProjectionData: Data?
     private var latestDailyTotalsData: Data?
+    /// The Founder's Watch appearance, carried in the same replace-whole
+    /// application context so it reaches the Watch whenever it next
+    /// activates, with no network or Server involvement.
+    private(set) var latestWatchAppearance: WatchAppearancePreference?
     private var connectivityObservation: UUID?
 
     init(environment: AppEnvironment, session: WCSession? = WCSession.isSupported() ? .default : nil) {
@@ -55,6 +59,26 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
     func publishDailyTotals(_ totals: WatchDailyTotals?) {
         latestDailyTotalsData = totals.flatMap { try? WatchWorkoutWireCodec.encode($0) }
         publishContext()
+    }
+
+    /// Publishes the Watch appearance. Never blocked on reachability:
+    /// application context is delivered when the Watch next connects.
+    func publishWatchAppearance(_ appearance: WatchAppearancePreference) {
+        guard latestWatchAppearance != appearance else { return }
+        latestWatchAppearance = appearance
+        publishContext()
+    }
+
+    /// The exact application-context dictionary a publish sends (pure, so
+    /// tests can assert every slot is carried together).
+    static func applicationContext(
+        projection: Data?, dailyTotals: Data?, appearance: WatchAppearancePreference?
+    ) -> [String: Any] {
+        var context: [String: Any] = [:]
+        if let projection { context[WatchWorkoutContract.applicationContextProjectionKey] = projection }
+        if let dailyTotals { context[WatchWorkoutContract.applicationContextDailyTotalsKey] = dailyTotals }
+        if let appearance { context[WatchWorkoutContract.applicationContextAppearanceKey] = appearance.rawValue }
+        return context
     }
 
     func attachToSelectedAuthority() {
@@ -103,9 +127,9 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
 
     private func publishContext() {
         guard let session, session.activationState == .activated else { return }
-        var context: [String: Any] = [:]
-        if let latestProjectionData { context[WatchWorkoutContract.applicationContextProjectionKey] = latestProjectionData }
-        if let latestDailyTotalsData { context[WatchWorkoutContract.applicationContextDailyTotalsKey] = latestDailyTotalsData }
+        let context = Self.applicationContext(
+            projection: latestProjectionData, dailyTotals: latestDailyTotalsData, appearance: latestWatchAppearance
+        )
         guard !context.isEmpty else { return }
         try? session.updateApplicationContext(context)
     }

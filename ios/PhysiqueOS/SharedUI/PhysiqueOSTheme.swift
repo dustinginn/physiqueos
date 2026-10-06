@@ -14,7 +14,7 @@ enum AppAppearance: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .system: "System"
         case .dark: "Dark"
-        case .light: "Light"
+        case .light: "Mineral Light"
         }
     }
 
@@ -35,26 +35,40 @@ enum AppAppearance: String, CaseIterable, Codable, Identifiable {
     }
 }
 
-/// App-level observable preference with injectable persistence for tests.
-/// System removes the key, so fresh install and an explicit reset are equal.
+/// App-level observable preferences with injectable persistence for tests.
+/// The iPhone appearance and the Apple Watch appearance are independent:
+/// separate keys, separate setters, and neither is ever derived from the
+/// other. iPhone System removes its key, so fresh install and an explicit
+/// reset are equal; an unset Watch appearance is Dark.
 @MainActor
 @Observable
 final class AppAppearanceStore {
     static let persistenceKey = "physiqueos.appearance.preference.v1"
+    static let watchPersistenceKey = "physiqueos.appearance.watch.v1"
 
     private let defaults: UserDefaults
     private let key: String
+    private let watchKey: String
     private let initialOverride: AppAppearance?
+    private let initialWatchOverride: WatchAppearancePreference?
     private(set) var selection: AppAppearance
+    private(set) var watchSelection: WatchAppearancePreference
 
     init(
         defaults: UserDefaults = .standard,
         key: String = AppAppearanceStore.persistenceKey,
-        initialOverride: AppAppearance? = nil
+        watchKey: String = AppAppearanceStore.watchPersistenceKey,
+        initialOverride: AppAppearance? = nil,
+        initialWatchOverride: WatchAppearancePreference? = nil
     ) {
         self.defaults = defaults
         self.key = key
+        self.watchKey = watchKey
         self.initialOverride = initialOverride
+        self.initialWatchOverride = initialWatchOverride
+        watchSelection = initialWatchOverride
+            ?? WatchAppearancePreference.decode(defaults.string(forKey: watchKey))
+            ?? .fallback
         if let initialOverride {
             selection = initialOverride
         } else if let rawValue = defaults.string(forKey: key),
@@ -69,6 +83,13 @@ final class AppAppearanceStore {
     }
 
     var preferredColorScheme: ColorScheme? { selection.preferredColorScheme }
+
+    /// The Apple Watch appearance. Never touches the iPhone selection.
+    func selectWatch(_ appearance: WatchAppearancePreference) {
+        watchSelection = appearance
+        guard initialWatchOverride == nil else { return }
+        defaults.set(appearance.rawValue, forKey: watchKey)
+    }
 
     func select(_ appearance: AppAppearance) {
         selection = appearance
@@ -174,6 +195,52 @@ enum PhysiqueOSTheme {
     /// Suggested Today eyebrow on the teal field (#E9FFFF on dark field;
     /// deep teal ink on the light field so it stays legible).
     static let redesignSuggestionInk = dynamic(dark: 0xE9FFFF, light: 0x087E78)
+
+    // MARK: Locked Priority Detail family
+    // Founder-locked 2026-10-04 (`priority-detail-ui-style-translation-20261004`).
+    // Migrated from the accepted Foam Rolling pilot's private palette into
+    // this shared authority at the exact locked values; they differ subtly
+    // from the Home/utility `redesign*` set by design of that lock.
+    static let priorityCanvas = dynamic(dark: 0x06121D, light: 0xF0EEE6)
+    static let priorityInk = dynamic(dark: 0xF4F7F5, light: 0x0A1B2C)
+    static let priorityMuted = dynamic(dark: 0x95A6AE, light: 0x65767D)
+    static let priorityRule = dynamic(dark: 0x203441, light: 0xCAD4CF)
+    static let prioritySurface = dynamic(dark: 0x102432, light: 0xFBFAF6)
+    static let prioritySurfaceRaised = dynamic(dark: 0x142E3A, light: 0xDCEBE8)
+    static let priorityTeal = dynamic(dark: 0x20C5B7, light: 0x0E9186)
+    static let priorityGreen = dynamic(dark: 0x4EE09A, light: 0x138C60)
+    static let priorityAmber = dynamic(dark: 0xF3BA49, light: 0xB9780D)
+    static let priorityCyan = dynamic(dark: 0x40C7D7, light: 0x168D9D)
+    static let priorityPurple = dynamic(dark: 0x9F7CFF, light: 0x7655DC)
+    static let priorityRed = dynamic(dark: 0xEF6F82, light: 0xC44F64)
+    static let priorityNavy = dynamic(dark: 0x123D61, light: 0x143E60)
+    /// Evidence-driven banner field (teal → navy); light keeps ink text.
+    static let priorityEvidenceStart = dynamic(dark: 0x16A69C, light: 0xD5EEE8)
+    static let priorityEvidenceEnd = dynamic(dark: 0x17436D, light: 0xC9DFE9)
+    static let priorityEvidenceInk = dynamic(dark: 0xFFFFFF, light: 0x0A1B2C)
+
+    // MARK: Locked daily capture + Confidence explanation
+    // Founder-accepted Final Design Batch 2 (`final-design-batch2-daily-
+    // capture-explanation-20261004`): Morning Check-In, manual Weight and
+    // the Home Confidence sheet, at the exact locked values.
+    static let captureCanvas = dynamic(dark: 0x06131E, light: 0xEFEEE7)
+    static let captureSurface = dynamic(dark: 0x0E2230, light: 0xFBFAF6)
+    static let captureSurfaceTint = dynamic(dark: 0x132B39, light: 0xE5F1EE)
+    static let captureRule = dynamic(dark: 0x25404B, light: 0xC7D1CD)
+    static let captureInk = dynamic(dark: 0xF2F6F4, light: 0x0B2030)
+    static let captureSecondary = dynamic(dark: 0xAEC0C7, light: 0x536B73)
+    static let captureMuted = dynamic(dark: 0x7F98A2, light: 0x789097)
+    static let capturePurple = dynamic(dark: 0xA88BF5, light: 0x7658D7)
+    static let captureTeal = dynamic(dark: 0x2CCDC0, light: 0x0C8F84)
+    static let captureGreen = dynamic(dark: 0x53DDA0, light: 0x13895E)
+    static let captureAmber = dynamic(dark: 0xF3BD50, light: 0xB77412)
+    static let captureRed = dynamic(dark: 0xFF7187, light: 0xC54157)
+    static let captureInput = dynamic(dark: 0x0A1B27, light: 0xF8F8F3)
+    static let captureShadow = dynamic(dark: 0x000000, light: 0x24373B, darkOpacity: 0.34, lightOpacity: 0.12)
+    /// Primary action: teal → blue field on Dark, solid deep teal on Light.
+    static let capturePrimaryStart = dynamic(dark: 0x2CCDC0, light: 0x0C837A)
+    static let capturePrimaryEnd = dynamic(dark: 0x2A83A7, light: 0x0C837A)
+    static let captureOnPrimary = dynamic(dark: 0x03191E, light: 0xFFFFFF)
 
     private static func dynamic(
         dark: UInt32,

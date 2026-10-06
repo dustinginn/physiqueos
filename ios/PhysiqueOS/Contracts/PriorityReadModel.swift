@@ -187,12 +187,113 @@ enum PriorityDetailPresentation {
     }
 
     static func foamRollingStateLabel(_ occurrence: PriorityOccurrence) -> String {
+        stateLabel(occurrence)
+    }
+
+    // MARK: Locked Priority Detail family (one template, every variant)
+
+    /// Which locked template an occurrence renders. Decided only from the
+    /// canonical occurrence (state flags, Server action destination, related
+    /// Weight); never from display copy.
+    enum Template: Equatable {
+        /// Ordinary reminder / recovery / supplement: Mark Complete (+ Skip).
+        case manual
+        /// Peptide with a planned dose: "Took a different amount?" + Mark Complete.
+        case doseAware
+        /// Suspended peptide: Paused notice + "Go to <protocol>".
+        case paused
+        /// Morning Weigh-In: evidence card (Log Weight / the exact-date Weight).
+        case morningEvidence
+        /// Progress Photos: evidence banner + Upload Photos.
+        case photoEvidence
+        /// DEXA stages: evidence banner + the stage's action.
+        case dexaEvidence
+        /// Setup required / inactive with a Server action (e.g. Review Support).
+        case continueAction
+        case completed
+        case skipped
+        /// Non-completable with no resolvable action.
+        case noAction
+    }
+
+    static func isMorningWeighIn(_ occurrence: PriorityOccurrence) -> Bool {
+        occurrence.relatedWeight != nil
+            || occurrence.continueActionDestination == .checkIn(checkInType: "morning")
+            || occurrence.routePriorityId == "morning-check-in"
+            || occurrence.id == "morning-check-in"
+    }
+
+    static func template(_ occurrence: PriorityOccurrence) -> Template {
+        if occurrence.skipped { return .skipped }
+        if occurrence.paused { return .paused }
+        if isMorningWeighIn(occurrence) { return .morningEvidence }
+        if occurrence.completed { return .completed }
+        switch occurrence.continueActionDestination {
+        case .photoUpload?: return .photoEvidence
+        case .dexaUpload?, .operatingPlanDexaAppointment?: return .dexaEvidence
+        default: break
+        }
+        if occurrence.completable {
+            let plannedDose = occurrence.doseAdjustable ? occurrence.completionContext?.dose : nil
+            return plannedDose.flatMap(PriorityDoseEntry.components(of:)) != nil ? .doseAware : .manual
+        }
+        return occurrence.continueActionDestination == nil ? .noAction : .continueAction
+    }
+
+    static func stateLabel(_ occurrence: PriorityOccurrence) -> String {
         if occurrence.completed { return "Completed" }
         if occurrence.skipped { return "Skipped" }
         if occurrence.paused { return "Paused" }
         if occurrence.urgency == .upcoming { return "Upcoming" }
-        if occurrence.completable { return "Open" }
-        return "Setup required"
+        if occurrence.completable || isMorningWeighIn(occurrence) { return "Open" }
+        switch occurrence.continueActionDestination {
+        case .photoUpload?, .dexaUpload?, .operatingPlanDexaAppointment?: return "Open"
+        default: return "Setup required"
+        }
+    }
+
+    enum StateTone: Equatable { case green, cyan, amber, muted }
+
+    /// The status word's color (always paired with the word and a dot).
+    static func stateTone(_ occurrence: PriorityOccurrence) -> StateTone {
+        switch stateLabel(occurrence) {
+        case "Completed", "Open": return .green
+        case "Upcoming": return .cyan
+        case "Skipped": return .muted
+        default: return .amber
+        }
+    }
+
+    /// Visible sections with consecutive same-titled sections consolidated
+    /// into one (the locked Tesamorelin "one Preparation section" rule).
+    /// Every field is kept, in order; titles stay unique for identity.
+    static func groupedSections(_ sections: [PrioritySectionReadModel]) -> [PrioritySectionReadModel] {
+        var grouped: [PrioritySectionReadModel] = []
+        for section in visibleSections(sections) {
+            if let last = grouped.last, last.title == section.title {
+                grouped[grouped.count - 1].items += section.items
+            } else if let index = grouped.firstIndex(where: { $0.title == section.title }) {
+                // A non-adjacent repeat would collide on identity; keep its
+                // fields under the first occurrence rather than drop them.
+                grouped[index].items += section.items
+            } else {
+                grouped.append(section)
+            }
+        }
+        return grouped
+    }
+
+    enum SectionKind: Equatable { case plain, when, dose, preparation, nextChange, notes, why }
+
+    static func sectionKind(_ title: String) -> SectionKind {
+        let key = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if key == "when" { return .when }
+        if key.contains("dose") { return .dose }
+        if key == "preparation" { return .preparation }
+        if key.contains("change") { return .nextChange }
+        if key == "execution notes" { return .notes }
+        if key == "why it matters" { return .why }
+        return .plain
     }
 }
 

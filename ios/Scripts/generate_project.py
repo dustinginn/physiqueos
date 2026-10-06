@@ -533,6 +533,18 @@ batch3_evidence_app_files = [
 ]
 BATCH3_EVIDENCE_BLOCK = 0x1CFF
 
+# Overnight Lane A (Watch utility translation): the Watch target also builds
+# the shared Plus Jakarta Sans helper and bundles the same font file. Only
+# new PBXBuildFile ids, pinned at 0x1EFF (0x1DFF is left free for a parallel
+# lane) so nothing earlier renumbers.
+lane_a_watch_font_source_files = [
+    ("SharedUI", "PlusJakartaSans.swift"),
+]
+lane_a_watch_font_resource_files = [
+    ("Resources/Fonts", "PlusJakartaSans[wght].ttf"),
+]
+LANE_A_WATCH_FONT_BLOCK = 0x1EFF
+
 # Daily-driver local-day authority. Allocated after every established object
 # (including the N1 tests) so adding it renumbers nothing.
 dd_app_files = [
@@ -905,6 +917,10 @@ _counter[0] = BATCH3_EVIDENCE_BLOCK
 for group, fname in batch3_evidence_app_files:
     I(f"fileref:{group}/{fname}")
     I(f"buildfile:{group}/{fname}")
+assert _counter[0] < LANE_A_WATCH_FONT_BLOCK, "Lane A Watch font ID block would collide with the Batch 3 block"
+_counter[0] = LANE_A_WATCH_FONT_BLOCK
+for group, fname in lane_a_watch_font_source_files + lane_a_watch_font_resource_files:
+    I(f"buildfile:watch:{group}/{fname}")
 _counter[0] = _resume_counter
 
 # ---------------- PBXBuildFile ----------------
@@ -1578,8 +1594,7 @@ sources_phases = sources_phases.replace(
     f"{app_source_build_ids}\n", f"{app_source_build_ids}\n{_shared_app_ids}\n", 1)
 _ext_source_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:ext:{g}/{f}')} /* {f} in Sources */,"
-    for g, f in live_activity_shared_files + home_widget_shared_files + live_activity_extension_files + home_widget_extension_files
-)
+    for g, f in live_activity_shared_files + home_widget_shared_files + live_activity_extension_files + home_widget_extension_files)
 sources_phases += f"""
 \t\t{I('extSourcesPhase')} /* Sources */ = {{
 \t\t\tisa = PBXSourcesBuildPhase;
@@ -1738,6 +1753,13 @@ buildfile_lines.append(
     f"\t\t{I(f'buildfile:watch:{WATCH_ASSETS[0]}/{WATCH_ASSETS[1]}')} /* {WATCH_ASSETS[1]} in Resources */ = "
     f"{{isa = PBXBuildFile; fileRef = {I(f'fileref:{WATCH_ASSETS[0]}/{WATCH_ASSETS[1]}')} /* {WATCH_ASSETS[1]} */; }};"
 )
+for group, fname in lane_a_watch_font_source_files:
+    buildfile_lines.append(_bf_sources(f"buildfile:watch:{group}/{fname}", group, fname))
+for group, fname in lane_a_watch_font_resource_files:
+    buildfile_lines.append(
+        f"\t\t{I(f'buildfile:watch:{group}/{fname}')} /* {fname} in Resources */ = "
+        f"{{isa = PBXBuildFile; fileRef = {I(f'fileref:{group}/{fname}')} /* {fname} */; }};"
+    )
 
 def _append_group_child(group_key, child_line):
     indexes = [i for i, line in enumerate(group_lines) if line.startswith(f"\t\t{I(group_key)} ")]
@@ -1786,7 +1808,7 @@ sources_phases = sources_phases.replace(
     ), 1
 )
 _watch_source_ids = "\n".join(
-    f"\t\t\t\t{I(f'buildfile:watch:{g}/{f}')} /* {f} in Sources */," for g, f in watch_app_files + watch_shared_files
+    f"\t\t\t\t{I(f'buildfile:watch:{g}/{f}')} /* {f} in Sources */," for g, f in watch_app_files + watch_shared_files + lane_a_watch_font_source_files
 )
 _watch_test_source_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:watchtest:{g}/{f}')} /* {f} in Sources */," for g, f in watch_test_files + build83_watch_test_files
@@ -1844,12 +1866,16 @@ frameworks_phases += f"""
 \t\t\tfiles = ();
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};"""
+_lane_a_watch_font_resource_ids = "\n".join(
+    f"\t\t\t\t{I(f'buildfile:watch:{g}/{f}')} /* {f} in Resources */," for g, f in lane_a_watch_font_resource_files
+)
 resources_phases += f"""
 \t\t{I('watchResourcesPhase')} /* Resources */ = {{
 \t\t\tisa = PBXResourcesBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = (
 \t\t\t\t{I(f'buildfile:watch:{WATCH_ASSETS[0]}/{WATCH_ASSETS[1]}')} /* {WATCH_ASSETS[1]} in Resources */,
+{_lane_a_watch_font_resource_ids}
 \t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};

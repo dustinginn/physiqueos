@@ -134,16 +134,20 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
         XCTAssertGreaterThan(distinct.count, 6, "\(name) rendered blank", file: file, line: line)
     }
 
-    private func lockScreen(_ attributes: WorkoutActivityAttributes, _ state: State, stale: Bool = false) -> some View {
+    private func lockScreen(_ attributes: WorkoutActivityAttributes, _ state: State, stale: Bool = false,
+                            scheme: ColorScheme = .dark) -> some View {
         WorkoutLockScreenView(attributes: attributes, state: state, isStale: stale)
             .frame(width: 365)
-            .background(RoundedRectangle(cornerRadius: 23, style: .continuous).fill(WorkoutActivityPalette.background.opacity(0.96)))
+            .background(RoundedRectangle(cornerRadius: 23, style: .continuous).fill(WorkoutActivityTheme.of(scheme).page.opacity(0.96)))
             .overlay(RoundedRectangle(cornerRadius: 23, style: .continuous).stroke(Color.white.opacity(0.12), lineWidth: 0.75))
+            .environment(\.colorScheme, scheme)
     }
 
-    private func scene<V: View>(_ card: V) -> some View {
+    private func scene<V: View>(_ card: V, scheme: ColorScheme = .dark) -> some View {
         ZStack {
-            LinearGradient(colors: [Color(red: 27 / 255, green: 24 / 255, blue: 66 / 255), WorkoutActivityPalette.background, .black],
+            LinearGradient(colors: scheme == .light
+                           ? [Color(red: 0.80, green: 0.85, blue: 0.86), Color(red: 0.62, green: 0.70, blue: 0.74)]
+                           : [Color(red: 27 / 255, green: 24 / 255, blue: 66 / 255), WorkoutActivityTheme.dark.page, .black],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
             VStack(spacing: 0) {
                 Image(systemName: "lock.fill").font(.system(size: 13, weight: .semibold)).padding(.top, 17)
@@ -160,14 +164,31 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
     // MARK: Tests
 
     func testLockScreenStatesRenderAndStayWithinTheActivityHeightBudget() throws {
-        for (name, attributes, state) in all {
-            let view = lockScreen(attributes, state)
-            let height = fittingHeight(view, width: 365)
-            XCTAssertLessThanOrEqual(height, 160, "\(name) is \(height) pt; Live Activities truncate beyond 160 pt.")
-            let image = render(scene(view), size: CGSize(width: 393, height: 852))
-            assertNotBlank(image, name)
-            try save(image, named: name)
+        // Both system appearances: Dark (deep navy) and Light (Mineral).
+        for scheme in [ColorScheme.dark, .light] {
+            for (name, attributes, state) in all {
+                let view = lockScreen(attributes, state, scheme: scheme)
+                let height = fittingHeight(view, width: 365)
+                XCTAssertLessThanOrEqual(height, 160, "\(name) is \(height) pt; Live Activities truncate beyond 160 pt.")
+                let image = render(scene(view, scheme: scheme), size: CGSize(width: 393, height: 852), scheme: scheme)
+                assertNotBlank(image, name)
+                try save(image, named: scheme == .light ? "\(name)-mineral" : name)
+            }
         }
+    }
+
+    /// Locked translation tokens: the Lock Screen follows the system
+    /// appearance; the Dynamic Island is always the Dark (system black) set.
+    func testLockedThemeFollowsTheSystemAppearanceAndTheIslandStaysDark() {
+        XCTAssertEqual(WorkoutActivityTheme.of(.dark), .dark)
+        XCTAssertEqual(WorkoutActivityTheme.of(.light), .mineralLight)
+        XCTAssertEqual(WorkoutActivityTheme.dark.teal, Color.activityHex(0x3BD2CA))
+        XCTAssertEqual(WorkoutActivityTheme.dark.green, Color.activityHex(0x55E39A))
+        XCTAssertEqual(WorkoutActivityTheme.mineralLight.teal, Color.activityHex(0x087E78))
+        XCTAssertEqual(WorkoutActivityTheme.mineralLight.page, Color.activityHex(0xE8ECE5))
+        // The Island resolves Dark whatever the environment says.
+        let lightIsland = WorkoutIslandExpandedBottom(attributes: attributes(), state: normal).environment(\.colorScheme, .light)
+        XCTAssertLessThanOrEqual(fittingHeight(lightIsland.padding(12), width: 371), 160)
     }
 
     func testCompleteSetIsPresentOnlyWhileInProgressAndMeetsTheTouchTarget() throws {
@@ -192,17 +213,16 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
         /// capsule on a dark backdrop. The system supplies this chrome on device.
         func island(_ state: State, attributes: WorkoutActivityAttributes) -> some View {
             ZStack(alignment: .top) {
-                LinearGradient(colors: [WorkoutActivityPalette.elevated, WorkoutActivityPalette.background], startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [WorkoutActivityTheme.dark.row, WorkoutActivityTheme.dark.page], startPoint: .top, endPoint: .bottom)
                 VStack(spacing: 7) {
                     HStack {
                         HStack(spacing: 6) {
-                            Image(systemName: "dumbbell.fill").foregroundStyle(WorkoutActivityPalette.accent)
-                            Text("Workout").font(.system(size: 11, weight: .semibold))
+                            Image(systemName: "dumbbell.fill").font(.system(size: 10, weight: .semibold))
+                            Text("Workout").font(WorkoutActivityType.font(11, 500))
                         }
                         Spacer()
                         WorkoutElapsedText(startedAt: attributes.startedAt, finishedAt: state.finishedAt)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(WorkoutActivityPalette.secondaryText)
+                            .font(WorkoutActivityType.font(11, 500))
                     }
                     WorkoutIslandExpandedBottom(attributes: attributes, state: state)
                 }
@@ -213,7 +233,7 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
                 .foregroundStyle(.white)
             }
             .frame(width: 393, height: 200)
-            .background(WorkoutActivityPalette.background)
+            .background(WorkoutActivityTheme.dark.page)
         }
         let attributes = attributes()
         let states: [(String, State)] = [("G-island-expanded-normal-previous-current", normal),
@@ -231,12 +251,12 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
         }
 
         let compactWorkout = HStack(spacing: 0) {
-            Image(systemName: "dumbbell.fill").foregroundStyle(WorkoutActivityPalette.accent).frame(width: 48, alignment: .leading)
+            WorkoutIslandCompactLeading().frame(width: 48, alignment: .leading)
             Spacer(minLength: 25)
             WorkoutIslandCompactTrailing(attributes: attributes, state: { var s = normal; s.rest = nil; return s }())
         }.padding(.horizontal, 10).frame(width: 139, height: 37).background(Capsule().fill(Color.black))
         let compactRest = HStack(spacing: 0) {
-            Image(systemName: "dumbbell.fill").foregroundStyle(WorkoutActivityPalette.accent).frame(width: 48, alignment: .leading)
+            WorkoutIslandCompactLeading().frame(width: 48, alignment: .leading)
             Spacer(minLength: 25)
             WorkoutIslandCompactTrailing(attributes: attributes, state: normal)
         }.padding(.horizontal, 10).frame(width: 139, height: 37).background(Capsule().fill(Color.black))
@@ -259,6 +279,8 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
         let image = render(scene(view), size: CGSize(width: 393, height: 852))
         assertNotBlank(image, "privacy")
         try save(image, named: "P-lock-privacy-redacted")
+        let light = lockScreen(attributes(), normal, scheme: .light).environment(\.redactionReasons, .privacy)
+        try save(render(scene(light, scheme: .light), size: CGSize(width: 393, height: 852), scheme: .light), named: "P-lock-privacy-redacted-mineral")
 
         let island = WorkoutIslandExpandedBottom(attributes: attributes(), state: normal).environment(\.redactionReasons, .privacy)
         try save(render(island.padding(12).frame(width: 393, height: 200).background(Color.black), size: CGSize(width: 393, height: 200)), named: "P2-island-privacy-redacted")
@@ -290,6 +312,8 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
     func testStaleActivityShowsTheSafeStateExceptForACountdownReachingZero() throws {
         let stale = lockScreen(attributes(), normal, stale: true)
         try save(render(scene(stale), size: CGSize(width: 393, height: 852)), named: "Q-lock-stale-safe")
+        let staleLight = lockScreen(attributes(), normal, stale: true, scheme: .light)
+        try save(render(scene(staleLight, scheme: .light), size: CGSize(width: 393, height: 852), scheme: .light), named: "Q-lock-stale-safe-mineral")
         var expiredCountdown = normal
         expiredCountdown.rest = countdown(elapsed: 95, remaining: -5)
         let expired = lockScreen(attributes(), expiredCountdown, stale: true)
