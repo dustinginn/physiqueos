@@ -1178,13 +1178,11 @@ final class Build89IntegrationUITests: XCTestCase {
         capture("I2-briefing-direct-dexa-\(appearance)")
 
         // I5: DEXA rail layout + WHAT THIS SCAN MEANS lead (canonical interpretation.opening).
-        let since = app.descendants(matching: .any)["briefing.dexa.sinceLastScan"]
-        for _ in 0..<10 where !(since.exists && since.isHittable) { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(since.exists, "DEXA change rails (Since Last Scan) were not reachable.")
+        let since = app.descendants(matching: .any)["briefing.dexa.sinceLastScan"].firstMatch
+        XCTAssertTrue(scrollToTop(since), "DEXA change rails (Since Last Scan) were not reachable.")
         capture("I5-dexa-rails-\(appearance)")
         let means = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "what this scan means")).firstMatch
-        for _ in 0..<14 where !(means.exists && means.isHittable) { app.swipeUp(velocity: .slow) }
-        XCTAssertTrue(means.exists, "WHAT THIS SCAN MEANS was not reachable.")
+        XCTAssertTrue(scrollToTop(means), "WHAT THIS SCAN MEANS was not reachable.")
         capture("I5-dexa-what-this-scan-means-\(appearance)")
 
         // Existing Evidence path still resolves after the briefing fallback.
@@ -1238,6 +1236,26 @@ final class Build89IntegrationUITests: XCTestCase {
         ]
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+    }
+
+    /// Scrolls until the element's top edge sits in the upper part of the
+    /// screen, so the capture shows the section itself rather than wherever
+    /// the scroll happened to stop.
+    private func scrollToTop(_ element: XCUIElement) -> Bool {
+        let height = app.windows.firstMatch.frame.height
+        for _ in 0..<30 {
+            if element.exists {
+                let top = element.frame.minY
+                if top >= 110, top <= height * 0.42 { return true }
+                if top < 110 {
+                    app.swipeDown(velocity: .slow)
+                    continue
+                }
+            }
+            let start = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.62))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -height * 0.28)))
+        }
+        return element.exists
     }
 
     private func discardSavedDrafts() {
