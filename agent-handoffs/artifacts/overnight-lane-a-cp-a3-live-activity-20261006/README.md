@@ -2,7 +2,7 @@
 
 **Status: ready for Founder review (not accepted).**
 
-- **Code commit:** `461b3651` on `claude/overnight-lane-a-watch-live-priorities-capture-20261006`.
+- **Code commits:** `461b3651`, plus the A6 regression fix `3d112478` on `claude/overnight-lane-a-watch-live-priorities-capture-20261006`.
 - **Base:** Build 88 `7fce3b97`.
 - **Visual authority:** Founder-locked "as presented, no changes" (P:20261004T150500Z / T160500Z).
   - Design package `29d2fe1f`, boards LA1–LA9, both dark and light.
@@ -27,9 +27,9 @@ The 12 Lock Screen states are:
 | Lock Screen tokens | Dark is `#061019` page, `#132735` rows, teal `#3BD2CA` role labels and Complete Set (label `#061019`), green `#55E39A` rest glyph, amber `#EFB84F` needs-update, purple `#AA98FF` saving/reviewing. |
 | Mineral Light tokens | `#E8ECE5` page, `#FBFAF4` rows, teal `#087E78` with a white label, `#16875F`, `#C88228`, `#5C3FD2`, ink `#102431`. |
 | Appearance rule | The Lock Screen follows the **iPhone system appearance** (ActivityKit's own rule). It follows neither the app's iPhone setting nor the Watch preference, as the addendum requires. |
-| Activity tint | `activityBackgroundTint` is dynamic (navy or mineral). |
+| Activity tint | Static navy tint; the Lock Screen draws its own page (navy or mineral) from the system appearance. |
 | Dynamic Island | System black in both appearances, always on the Dark tokens. |
-| Typography | Plus Jakarta Sans, now bundled in the Widget Extension (block `0x1EFF`, `UIAppFonts`). |
+| Typography | **SF system faces** (changed in A6; see below). |
 | Header (20 pt) | Glyph, session label, "6/18 sets", elapsed time, all 11 pt / 650. |
 | Rows | 31 pt rows, 9 pt radius, 57 pt role column at 7 pt / 780 with tracking, 11 pt / 700 name. "n/m · value" at 9 pt. |
 | Clock block | Green glyph, 7 pt label, 20 pt / 700 value. |
@@ -61,3 +61,21 @@ The 12 Lock Screen states are:
 - Every Lock Screen state is checked in **both** appearances against the 160 pt budget, with non-blank renders.
 - A theme test: Dark/Light map to the locked tokens, and the Island stays Dark even in a light environment.
 - Privacy and needs-update renders in Mineral.
+
+## A6 regression fix (`3d112478`): the Live Activity extension crash
+
+The integrated UI gate found that the first A3 build **crashed the PhysiqueOSLiveActivity extension** when a real Live Activity rendered.
+
+- **Crash:** `EXC_BREAKPOINT`, `KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS` in SwiftUI's `CodableAttributedString` display-list encoder. ActivityKit archives the view, and it cannot archive:
+  - a `UIFont` built from the variable Jakarta font descriptor;
+  - `UIColor`-backed `Color`s.
+- **Fix:**
+  - Live Activity type now uses SF system faces with the same sizes and weights. The utility package allows SF "where Apple owns the surface".
+  - Every Live Activity color is a plain sRGB `Color`.
+  - The Mineral Lock Screen page is drawn by the view instead of a dynamic tint.
+  - Jakarta was removed from the extension target, so generator block `0x1EFF` is Watch-only again (4 pbxproj lines).
+- **Verified:**
+  - `LoggerParityCaptureUITests` CP4 Review / Finish / Complete, plus the 8 Logger journeys that cascaded from it, pass on a freshly erased simulator.
+  - No new extension crash reports.
+  - The boards above are re-rendered with the fix.
+- **Deviation:** the board uses Jakarta, and the shipping Live Activity uses SF. This is a platform constraint.

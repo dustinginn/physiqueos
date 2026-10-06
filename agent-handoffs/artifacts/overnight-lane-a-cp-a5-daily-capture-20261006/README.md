@@ -40,7 +40,7 @@ Each row shows the locked board (402 pt, first screen) beside the real shipping 
 - The Sandbox-only recovery and briefing cards are restyled but stay Sandbox-only (the locked Production boundary).
 
 **Manual / backdated weight:**
-- Date measured (system compact picker capped at today, over the locked well).
+- Date measured: the locked well opens the **unchanged shared `DateField` sheet** (graphical picker capped at today, Today and Done) through an additive `.capture` style. The A6 fix `3d112478` restored the Today shortcut after the integrated UI gate caught its loss.
 - Weight plus a 104 pt Unit menu (lb / kg).
 - Save Weight.
 - **Return to Log appears only after a durable save.** The lock says "Success alone reveals Return to Log"; Build 88 also showed it while still reconciling.
