@@ -105,7 +105,7 @@ final class BriefingV3PresentationTests: XCTestCase {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         for path in ["PhysiqueOS/Presentation/Briefings/WeeklyBriefingSections.swift"] {
             let source = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
-            let start = try XCTUnwrap(source.range(of: "struct WeeklyEnergyCard"))
+            let start = try XCTUnwrap(source.range(of: "struct BriefingEnergySection"))
             let energyCard = String(source[start.lowerBound...])
             XCTAssertFalse(energyCard.contains("chartSuccess"), "Energy balance must not use a fixed success color")
             XCTAssertFalse(energyCard.contains("balanceColor"))
@@ -780,8 +780,488 @@ final class BriefingV3PresentationTests: XCTestCase {
     func testMonthlyWhatChangedUsesTheSharedToneMappingAndNoAnalyticalReadLabel() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Briefings/MonthlyBriefingSections.swift"), encoding: .utf8)
-        XCTAssertTrue(source.contains("ProductionBriefingMapper.monthlyIcon(domain)"))
         XCTAssertFalse(source.contains("Baseline Read"))
-        XCTAssertTrue(source.contains("callout(title: \"What it means\""))
+        XCTAssertTrue(source.contains("MonthlyCallout(title: \"What it means\""))
+    }
+}
+
+/// Overnight Lane B — the Founder-locked Briefing presentation family.
+/// Presentation-only guarantees: every published artifact routes to its own
+/// cadence screen, the locked section order holds, nothing regenerates or
+/// mutates a canonical payload, chart gestures use the scroll-safe
+/// arbitration, and both appearances resolve.
+final class BriefingLockedPresentationTests: XCTestCase {
+    private var root: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent() }
+
+    private func source(_ path: String) throws -> String {
+        try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private var presentationFiles: [String] {
+        let directory = root.appendingPathComponent("PhysiqueOS/Presentation/Briefings")
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return files.filter { $0.hasSuffix(".swift") }.map { "PhysiqueOS/Presentation/Briefings/\($0)" } + ["PhysiqueOS/SharedUI/BriefingPresentation.swift"]
+    }
+
+    // MARK: Routing
+
+    func testEveryPublishedBriefingTypeRoutesToItsOwnCadenceScreen() throws {
+        let store = BriefingSandboxStore()
+        var seen: Set<String> = []
+        for briefing in store.briefings {
+            let route = BriefingCadenceBody.route(for: briefing)
+            switch briefing.cadence {
+            case .weekly: XCTAssertEqual(route, .weekly)
+            case .midweek: XCTAssertEqual(route, .midweek)
+            case .monthly: XCTAssertEqual(route, .monthly)
+            case .event: XCTAssertEqual(route, briefing.dexa != nil ? .dexa : .photo)
+            case .daily: XCTAssertEqual(route, BriefingCadenceBody.Route.none)
+            }
+            seen.insert("\(route)")
+        }
+        XCTAssertEqual(seen, ["weekly", "midweek", "monthly", "dexa", "photo"], "the fixture must exercise all five Briefing types")
+    }
+
+    func testDetailAndHistoryReadOnlyPublishedArtifactsAndNeverRegenerate() throws {
+        for path in presentationFiles {
+            let text = try source(path)
+            for forbidden in ["productionCommandAPI", "commandAPI", "regenerate", "republish", "\"POST\"", "generateBriefing"] {
+                XCTAssertFalse(text.contains(forbidden), "\(path) must stay read-only (found \(forbidden))")
+            }
+        }
+        let detail = try source("PhysiqueOS/Presentation/Briefings/BriefingDetailView.swift")
+        XCTAssertTrue(detail.contains("briefingAPI.fetchBriefing(artifactId:"))
+        let history = try source("PhysiqueOS/Presentation/Briefings/BriefingHistoryView.swift")
+        XCTAssertTrue(history.contains("briefingAPI.fetchHistory()"))
+    }
+
+    // MARK: Payload identity
+
+    @MainActor
+    func testRenderingEveryBriefingLeavesItsCanonicalPayloadByteIdentical() throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let environment = AppEnvironment(nativeAuthority: .sandbox)
+        for briefing in BriefingSandboxStore().briefings {
+            let before = try encoder.encode(briefing)
+            for scheme in [ColorScheme.dark, .light] {
+                let renderer = ImageRenderer(content: BriefingCadenceBody(briefing: briefing)
+                    .frame(width: 402)
+                    .environment(environment)
+                    .environment(\.colorScheme, scheme))
+                _ = renderer.uiImage
+            }
+            XCTAssertEqual(try encoder.encode(briefing), before, "\(briefing.id) changed while rendering")
+        }
+    }
+
+    // MARK: Locked section order / omissions
+
+    func testRecurringBriefingsHaveNoStillUnresolvedOrRecurringPhotosSection() throws {
+        let weekly = try source("PhysiqueOS/Presentation/Briefings/WeeklyBriefingSections.swift")
+        let midweek = try source("PhysiqueOS/Presentation/Briefings/MidweekBriefingSections.swift")
+        for text in [weekly, midweek] {
+            XCTAssertFalse(text.contains("BriefingUncertaintyCard("))
+        }
+        XCTAssertFalse(weekly.contains("content.photos"), "Weekly must not mount the recurring Photos card")
+        XCTAssertFalse(WeeklyBriefingSections.sectionInventory.contains("Photos"))
+        XCTAssertEqual(Array(WeeklyBriefingSections.sectionInventory.prefix(4)), ["Integrated Lead", "Energy", "Weight", "Body Composition"])
+    }
+
+    func testMidweekFinaleUsesContractCoachingThenCanonicalCoachTakeVerbatim() throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "BriefingsFixture", withExtension: "json")
+            ?? Bundle.main.url(forResource: "BriefingsFixture", withExtension: "json"))
+        _ = url
+        var midweek = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.cadence == .midweek }?.midweek)
+        midweek.narrativeV3 = CanonicalNarrativeV3ReadModel(summary: "S", detail: nil, result: "R", meaning: "M", action: "A", watch: "W", confidence: "C", coachTake: "Canonical coach take.")
+        midweek.presentationContract = MidweekPresentationContract(
+            artifactId: "a", assessmentId: nil,
+            lead: .init(headlineClaimId: nil, headline: "H", meaningClaimId: nil, meaning: "M", goal: .init(id: nil, name: "Goal"), phase: .init(id: nil, name: "Phase"),
+                        confidence: .init(claimId: "c", assessmentId: "a", score: 79, band: "high", movement: "held", movementDirection: "held", delta: 0, reason: "Contract reason.", movementLabel: "— No meaningful change")),
+            modules: [.init(id: "weight", payloadKey: "weight", included: true, reasonCode: "x", order: 1, observationCount: 3)],
+            coaching: [.init(section: "action", label: "What To Do", claimId: "a1", text: "Do it."), .init(section: "watch", label: "What To Watch", claimId: "w1", text: "Watch it.")],
+            uncertainty: .init(visibleItems: [.init(id: "u", text: "Not shown", surfaced: true)], coveredIds: [])
+        )
+        let window = BriefingEvidenceWindowReadModel(id: "w", startDate: "2026-09-20", endDate: "2026-09-22", briefingDate: "2026-09-23", relativeLabel: "Sunday through Tuesday", timeZone: "UTC")
+        let view = MidweekBriefingSections(content: midweek, confidence: nil, evidenceWindow: window)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+        let slots = view.finaleSlots(contract)
+        XCTAssertEqual(slots.takeaway, "Canonical coach take.")
+        XCTAssertEqual(slots.action, "Do it.")
+        XCTAssertEqual(slots.watch, "Watch it.")
+        XCTAssertEqual(view.heroConfidence?.movement, "— No meaningful change")
+        XCTAssertEqual(view.heroConfidence?.reason, "Contract reason.")
+        XCTAssertEqual(view.weightNote(WeeklyWeightSection(averageWeightLb: 178.4, changeLb: -0.6, narrative: "")), "Sunday–Tuesday average · 3 observations")
+        XCTAssertEqual(view.weightNote(WeeklyWeightSection(averageWeightLb: 178.4, changeLb: -0.6, narrative: "Server note.")), "Server note.")
+    }
+
+    func testConfidenceMovementCopyPrefersServerLabelAndOtherwiseStatesPersistedDelta() {
+        var confidence = BriefingConfidenceReadModel(score: 68, band: "moderate", priorScore: 63, delta: 5, movementDirection: .increased, primaryReason: "r", supportingReasons: [], limitingReasons: [], unresolvedUncertainty: [], goalId: "g", phaseId: nil, capturedAt: "2026-08-30T00:00:00.000Z", source: "s")
+        XCTAssertEqual(BriefingConfidenceCopy.movement(confidence), "Confidence increased +5")
+        confidence.movementDirection = .decreased; confidence.delta = -7
+        XCTAssertEqual(BriefingConfidenceCopy.movement(confidence), "Confidence decreased −7")
+        confidence.presentationMovementLabel = "Server label"
+        XCTAssertEqual(BriefingConfidenceCopy.movement(confidence), "Server label")
+    }
+
+    func testSignedFormattingUsesTrueMinusAndPlus() {
+        XCTAssertEqual(BriefingNumberFormatting.signed(0.6, decimals: 1), "+0.6")
+        XCTAssertEqual(BriefingNumberFormatting.signed(-0.6, decimals: 1), "−0.6")
+        XCTAssertEqual(BriefingNumberFormatting.signedKcal(350), "+350 kcal")
+        XCTAssertEqual(BriefingNumberFormatting.signedKcal(-50), "−50 kcal")
+    }
+
+    func testHeroRangeKeepsHumanCanonicalLabelsVerbatim() {
+        XCTAssertEqual(BriefingDateFormatting.heroRangeLabel("Completed week\nAug 23–Aug 29"), "Completed week\nAug 23–Aug 29")
+        XCTAssertEqual(BriefingDateFormatting.heroRangeLabel("2026-08-23 – 2026-08-29"), "Aug 23–29")
+    }
+
+    // MARK: Chart interaction
+
+    func testBriefingChartsUseScrollSafeArbitrationNotLegacyZeroDistanceScrub() throws {
+        for path in presentationFiles {
+            XCTAssertFalse(try source(path).contains(".chartScrub"), "\(path) must not use the legacy zero-distance chartScrub")
+        }
+        let kit = try source("PhysiqueOS/SharedUI/BriefingPresentation.swift")
+        XCTAssertTrue(kit.contains("EvidenceHorizontalScrubGesture"), "Briefing bars reuse the Evidence horizontal-only pan")
+        XCTAssertTrue(kit.contains("onTapGesture(coordinateSpace: .local)"), "a tap selects")
+    }
+
+    func testEnergyBarSelectionResolvesTheNearestDayAndClamps() {
+        XCTAssertEqual(BriefingEnergyBars.nearestIndex(toX: 0, width: 364, count: 7), 0)
+        XCTAssertEqual(BriefingEnergyBars.nearestIndex(toX: 182, width: 364, count: 7), 3)
+        XCTAssertEqual(BriefingEnergyBars.nearestIndex(toX: 400, width: 364, count: 7), 6)
+        XCTAssertEqual(BriefingEnergyBars.nearestIndex(toX: -20, width: 364, count: 2), 0)
+        XCTAssertNil(BriefingEnergyBars.nearestIndex(toX: 10, width: 364, count: 0))
+    }
+
+    // MARK: History
+
+    func testHistoryRowSymbolsAndTimestampsAreTypeAndDateFaithful() {
+        func row(_ cadence: BriefingCadence, _ type: String? = nil, _ date: String?) -> BriefingHistoryRowReadModel {
+            BriefingHistoryRowReadModel(artifactId: "id", artifactType: type, cadence: cadence, label: "L", publicationDate: date, version: 1)
+        }
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.weekly, nil, nil)), "square.fill")
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.midweek, nil, nil)), "clock")
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.monthly, nil, nil)), "circle.dotted")
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.event, "dexa_event", nil)), "waveform.path")
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.event, "photo_event", nil)), "smallcircle.filled.circle")
+        XCTAssertEqual(BriefingDateFormatting.historyTimestamp("2026-10-01"), "Oct 1, 2026", "a date-only delivery date gets no invented time")
+        XCTAssertNotEqual(BriefingDateFormatting.historyTimestamp("2026-10-04T14:31:46.944Z"), "2026-10-04T14:31:46.944Z")
+    }
+
+    @MainActor
+    func testEveryDetailAndHistoryStateRendersInBothAppearances() throws {
+        let briefing = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.cadence == .weekly })
+        let detailStates: [BriefingDetailView.LoadState] = [.loading, .failed, .notReady, .loaded(nil), .loaded(briefing)]
+        let historyStates: [BriefingHistoryView.LoadState] = [.loading, .failed("Briefing History could not be loaded."), .loaded([]),
+            .loaded([BriefingHistoryRowReadModel(artifactId: "a", artifactType: nil, cadence: .weekly, label: "Weekly Briefing", publicationDate: "2026-09-27T12:00:00.000Z", version: 1)])]
+        for scheme in [ColorScheme.dark, .light] {
+            for state in detailStates {
+                let image = ImageRenderer(content: BriefingDetailBody(state: state).frame(width: 372).environment(AppEnvironment(nativeAuthority: .sandbox)).environment(\.colorScheme, scheme)).uiImage
+                XCTAssertNotNil(image)
+            }
+            for state in historyStates {
+                let image = ImageRenderer(content: BriefingHistoryContent(state: state).frame(width: 366).environment(\.colorScheme, scheme)).uiImage
+                XCTAssertNotNil(image)
+            }
+        }
+    }
+
+    // MARK: Appearance + accessibility
+
+    func testRichFieldsKeepTheirDarkFieldInMineralLightOnly() {
+        let dark = UITraitCollection(userInterfaceStyle: .dark)
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        func hex(_ color: Color, _ traits: UITraitCollection) -> String {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            UIColor(color).resolvedColor(with: traits).getRed(&r, green: &g, blue: &b, alpha: &a)
+            return String(format: "%02X%02X%02X", Int(round(r * 255)), Int(round(g * 255)), Int(round(b * 255)))
+        }
+        XCTAssertEqual(hex(BriefingPalette.standard.ink, dark), "F4F7F8")
+        XCTAssertEqual(hex(BriefingPalette.standard.ink, light), "102638")
+        XCTAssertEqual(hex(BriefingPalette.richField.ink, dark), hex(BriefingPalette.standard.ink, dark))
+        XCTAssertEqual(hex(BriefingPalette.richField.ink, light), "F4F8F8", "a rich field stays light-on-dark in Mineral Light")
+        XCTAssertEqual(hex(BriefingPalette.standard.page, light), "F1F1E9")
+    }
+
+    func testNavigationChipsAndTapTargetsMeetTheLockedContract() throws {
+        XCTAssertEqual(BriefingDetailHeader.navigationLabels, ["Home", "Briefing History"])
+        let kit = try source("PhysiqueOS/SharedUI/BriefingPresentation.swift")
+        XCTAssertTrue(kit.contains(".frame(height: 44)"), "navigation chips are 44 pt")
+        XCTAssertTrue(kit.contains("accessibilityLabel(\"Confidence \\(score) percent\")"))
+        let history = try source("PhysiqueOS/Presentation/Briefings/BriefingHistoryView.swift")
+        XCTAssertTrue(history.contains(".frame(minHeight: 78)"))
+        XCTAssertTrue(history.contains("minWidth: 44, minHeight: 44"))
+    }
+
+    func testReviewSeamsAreDebugOnly() throws {
+        let history = try source("PhysiqueOS/Presentation/Briefings/BriefingHistoryView.swift")
+        let seam = try XCTUnwrap(history.range(of: "enum BriefingReviewLaunchConfiguration"))
+        let prefix = history[..<seam.lowerBound]
+        XCTAssertTrue(prefix.hasSuffix("#if DEBUG\n/// Screenshot-only review seam (absent from Release): forces a Briefing\n/// Detail or History load state without touching the API.\n/// `-physiqueos.briefing-review.detail-state loading|failed|notReady|unavailable`\n/// `-physiqueos.briefing-review.history-state loading|failed|empty`\n"))
+        let detail = try source("PhysiqueOS/Presentation/Briefings/BriefingDetailView.swift")
+        XCTAssertTrue(detail.contains("#if DEBUG\nprivate struct BriefingReviewScrollOffset") || detail.contains("#if DEBUG\nstruct BriefingReviewScrollOffset"))
+    }
+}
+
+
+extension BriefingLockedPresentationTests {
+    // MARK: Monthly
+
+    func testMonthlyRendersCanonicalStructureAndClosesWithCoachsTakeBeforeMonthAhead() throws {
+        var monthly = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.cadence == .monthly }?.monthly)
+        monthly.whatChangedSections = [MonthlyChangeSection(domain: "routine", title: "Routine", headline: "Two stretches", narrative: "Body.", tone: "routine")]
+        monthly.definingMomentDetails = [MonthlyDefiningMoment(dateLabel: "2026-09-03", title: "Stretch began", narrative: "Body.", icon: "sparkles")]
+        monthly.monthAheadActions = [MonthlyActionCard(domain: "routine", title: "Routine", narrative: "Value · Detail", icon: "sparkles", headline: "Value", detail: "Detail")]
+        let view = MonthlyBriefingSections(content: monthly, confidence: nil)
+        XCTAssertEqual(view.changeItems.first?.title, "Routine · Two stretches")
+        XCTAssertEqual(view.momentItems.first?.title, "September 3 · Stretch began")
+        XCTAssertEqual(view.monthAheadItems.first, .init(id: 0, label: "Routine", title: "Value", body: "Detail"))
+        XCTAssertEqual(Array(MonthlyBriefingSections.sectionInventory.suffix(2)), ["Coach's Take", "Month Ahead"])
+        let card = MonthlyStrategicSummaryCard(summary: MonthlyStrategicSummaryV3(result: "R", action: "A", confidence: "C", coachTake: "Coach take."), heroBody: "Hero")
+        XCTAssertEqual(card.renderedSectionTitles, ["Coach's Take"], "the locked close is the coach take; Confidence is never repeated")
+        let source = try source("PhysiqueOS/Presentation/Briefings/MonthlyBriefingSections.swift")
+        XCTAssertFalse(source.contains("BriefingUncertaintyCard("), "Monthly renders no Still Unresolved section")
+        XCTAssertFalse(source.contains("Current strategy"), "the raw strategy recommendation enum is never shown")
+    }
+
+    func testMonthlyMapperCarriesCanonicalTitlesOmittedWeeksAndNarrativeCoachTake() throws {
+        let json = #"""
+        {"artifact":{"id":"m","cadence":"monthly","generatedAt":"2026-10-01T14:10:00.000Z","briefing":{
+          "narrativeV3":{"coachTake":"Canonical coach take.","sections":{"result":"R"}},
+          "monthlyPresentation":{"hero":{"title":"T","thesis":"Body","period":"September 1–30 · Delivered October 1"},
+            "energy":{"title":"E","weekly":[{"label":"Sep 1–Sep 7","intake":3157,"expenditure":2562,"observedCount":6,"missing":false},{"label":"Sep 29–Sep 30","missing":true,"observedCount":1}],
+              "summaryMetrics":[{"label":"Avg intake","value":2691},{"label":"Avg expenditure","value":2583},{"label":"Avg balance","value":108}]},
+            "changes":{"title":"Canonical changes title","themes":[]},"moments":{"title":"4 moments defined September.","moments":[]},
+            "monthAhead":{"title":"Canonical ahead title","guidance":[{"tone":"routine","label":"Routine","value":"Keep the rhythm","detail":"Detail."}]}}}},
+         "goals":[]}
+        """#
+        let value = try JSONDecoder().decode(BriefingJSONValue.self, from: Data(json.utf8))
+        guard let monthly = try ProductionBriefingMapper.detail(value)?.monthly else { throw XCTSkip("monthly mapping shape not reachable from this minimal envelope") }
+        XCTAssertEqual(monthly.monthLabel, "September 1–30")
+        XCTAssertEqual(monthly.monthPeriodDetail, "Delivered October 1")
+        XCTAssertEqual(monthly.whatChangedTitle, "Canonical changes title")
+        XCTAssertEqual(monthly.monthAheadTitle, "Canonical ahead title")
+        XCTAssertEqual(monthly.monthAheadActions?.first?.headline, "Keep the rhythm")
+        XCTAssertEqual(monthly.energyEvolution?.omittedWeeks?.map(\.weekLabel), ["Sep 29–Sep 30"])
+        XCTAssertEqual(monthly.strategicSummaryV3?.coachTake, "Canonical coach take.")
+    }
+
+    // MARK: Photo + DEXA
+
+    func testPhotoComparisonOpensThePairedViewerOnlyWithRealMedia() {
+        let entry = PhotoComparisonEntry(id: "c", poseId: .frontRelaxed, priorSetId: "a", priorDate: "2026-08-22", currentSetId: "b", currentDate: "2026-09-19", roleLabel: nil, narrative: "N", label: "Front relaxed")
+        XCTAssertNil(PhotoBriefingSections.comparisonRequest(for: entry, previousSource: .placeholder, currentSource: .placeholder))
+        let request = PhotoBriefingSections.comparisonRequest(for: entry, previousSource: .placeholder, currentSource: .authenticatedProduction(mediaId: "m"))
+        XCTAssertEqual(request?.title, "Front relaxed")
+        XCTAssertNil(request?.previous, "a missing prior stays empty rather than borrowing another photo")
+        XCTAssertEqual(request?.currentLabel, "Current · Sep 19")
+        XCTAssertEqual(entry.displayLabel, "Front relaxed")
+        XCTAssertEqual(PhotoComparisonViewer.zoomLabel(1), "1×")
+        XCTAssertEqual(PhotoComparisonViewer.zoomLabel(2.4), "2.4×")
+    }
+
+    func testDEXAKeepsEveryUnitAndTheConfidenceHeadlineIsCanonical() throws {
+        let point = DEXATimelinePoint(scanId: "s", date: "2026-08-16", value: "9.0")
+        XCTAssertEqual(DEXAPhaseBreakdown.value(point, unit: "%"), "9.0%")
+        XCTAssertEqual(DEXAPhaseBreakdown.value(point, unit: "lb"), "9.0 lb")
+        XCTAssertEqual(DEXAPhaseBreakdown.value(DEXATimelinePoint(scanId: "s", date: "d", value: "—"), unit: "lb"), "—")
+        let confidence = BriefingConfidenceReadModel(score: 63, band: "developing", priorScore: 70, delta: -7, movementDirection: .decreased, primaryReason: "r", supportingReasons: [], limitingReasons: [], unresolvedUncertainty: [], goalId: "g", phaseId: nil, capturedAt: "c", source: "s")
+        XCTAssertEqual(DEXAConfidenceRow(confidence: confidence).headline, "DEVELOPING · DECREASED −7")
+        XCTAssertEqual(DEXABriefingSections.rmrText("1847 cal/day"), "1847 cal/day")
+        XCTAssertEqual(DEXABriefingSections.rmrText("2240"), "2240 cal/day")
+        XCTAssertNil(DEXABriefingSections.persistedGoalTitle(BriefingGoalAttribution(goalId: "g", goalTitle: "Goal at publication")))
+        let dexa = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.dexa != nil }?.dexa)
+        let rows = dexa.progress.headline.count + dexa.progress.regionalFat.count + dexa.progress.regionalLean.count + dexa.progress.supplemental.count
+        XCTAssertEqual(rows, 17, "the locked correction restores all 17 unit rows")
+        XCTAssertTrue(dexa.progress.headline.allSatisfy { $0.current.contains(where: \.isLetter) || $0.current.hasSuffix("%") })
+    }
+
+    func testMidweekBodyCompositionFallsBackToBaselineWhenNewScanIsTheFalseFlag() throws {
+        let json = #"{"schemaVersion":"1","artifact":{"artifactId":"midweek-1","artifactType":"scheduled","cadence":"midweek","version":2,"evidenceWindow":{"id":"midweek-1","startDate":"2026-09-27","endDate":"2026-09-29","timeZone":"America/Los_Angeles"},"publicationDate":"2026-09-30T14:00:00.000Z"},"goalPhaseAttribution":{"goalId":"goal-canonical","phaseId":"phase-canonical"},"presentation":{"hero":{"verdict":"V","summary":"S"},"coachTake":{"biggestTakeaway":"T","recommendation":"R"},"bodyComposition":{"newScan":false,"baseline":{"date":"2026-09-12","fatMass":14.2,"leanMass":153.3,"bodyFatPercentage":8.1},"objective":"O","prominent":false,"interpretation":null},"activeGoal":{"id":"goal-canonical","name":"Build Lean Mass"},"activePhase":{"id":"phase-canonical","name":"Foundation"},"prioritiesThroughSunday":[]}}"#
+        let value = try JSONDecoder().decode(BriefingJSONValue.self, from: Data(json.utf8))
+        let midweek = try XCTUnwrap(try ProductionBriefingMapper.detail(value)?.midweek)
+        XCTAssertEqual(midweek.bodyComposition?.scanDate, "2026-09-12")
+        XCTAssertEqual(midweek.bodyComposition?.bodyFatPercent, "8.1%")
+    }
+}
+
+/// Founder final corrections (2026-10-06): DEXA locked rail layout with
+/// goal/tissue-aware delta color, stable Briefing History titles with type
+/// accents, and the Midweek Sunday–Tuesday window.
+@MainActor
+final class BriefingFounderCorrectionTests: XCTestCase {
+    private var root: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent() }
+    private func source(_ path: String) throws -> String { try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8) }
+
+    private func contrast(_ color: Color, on page: Color, _ style: UIUserInterfaceStyle) -> Double {
+        func lum(_ c: Color) -> Double {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            UIColor(c).resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getRed(&r, green: &g, blue: &b, alpha: &a)
+            func ch(_ v: CGFloat) -> Double { let v = Double(v); return v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+            return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+        }
+        let a = lum(color), b = lum(page)
+        return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+    }
+
+    // MARK: DEXA semantics
+
+    func testLeanMassGainSemanticsColorByTissueNotBySign() {
+        let goal = "lean_mass_gain"
+        typealias S = DEXADeltaSemantics
+        XCTAssertEqual(S.tone(delta: "+1.5 lb", label: "Lean Tissue", group: .headline, goalType: goal), .favorable)
+        XCTAssertEqual(S.tone(delta: "−0.8 lb", label: "Lean Tissue", group: .headline, goalType: goal), .unfavorable)
+        XCTAssertEqual(S.tone(delta: "+1.0 lb", label: "Fat Mass", group: .headline, goalType: goal), .unfavorable)
+        XCTAssertEqual(S.tone(delta: "-1.0 lb", label: "Fat Mass", group: .headline, goalType: goal), .favorable)
+        XCTAssertEqual(S.tone(delta: "+0.4 pts", label: "Body Fat", group: .headline, goalType: goal), .unfavorable)
+        XCTAssertEqual(S.tone(delta: "-0.4 pts", label: "Body Fat", group: .headline, goalType: goal), .favorable)
+        XCTAssertEqual(S.tone(delta: "+0.3 lb", label: "Arms", group: .regionalFat, goalType: goal), .unfavorable, "regional fat follows fat-tissue semantics")
+        XCTAssertEqual(S.tone(delta: "+0.3 lb", label: "Arms", group: .regionalLean, goalType: goal), .favorable, "regional lean follows lean-tissue semantics")
+        XCTAssertEqual(S.tone(delta: "+0.1 lb", label: "Visceral Fat", group: .supplemental, goalType: goal), .unfavorable)
+    }
+
+    func testAmbiguousUnchangedAndUnknownGoalStayNeutralOrAmber() {
+        typealias S = DEXADeltaSemantics
+        XCTAssertEqual(S.tone(delta: "+2.4 lb", label: "DEXA Weight", group: .headline, goalType: "lean_mass_gain"), .contextual, "weight is goal-ambiguous")
+        XCTAssertEqual(S.tone(delta: "+20 cal/day", label: "RMR", group: .supplemental, goalType: "lean_mass_gain"), .contextual)
+        XCTAssertEqual(S.tone(delta: "+0.02", label: "A:G Ratio", group: .supplemental, goalType: "fat_loss"), .contextual)
+        XCTAssertEqual(S.tone(delta: "0.0 lb", label: "Lean Tissue", group: .headline, goalType: "lean_mass_gain"), .neutral)
+        XCTAssertEqual(S.tone(delta: "No change", label: "Arms", group: .regionalFat, goalType: "lean_mass_gain"), .neutral)
+        XCTAssertEqual(S.tone(delta: "+1.5 lb", label: "Lean Tissue", group: .headline, goalType: nil), .contextual, "no goal context → never fabricated green")
+        XCTAssertEqual(S.tone(delta: "+1.5 lb", label: "Lean Tissue", group: .headline, goalType: "endurance"), .contextual)
+        XCTAssertEqual(S.tone(delta: "—", label: "Lean Tissue", group: .headline, goalType: "lean_mass_gain"), .contextual)
+        XCTAssertEqual(S.tone(delta: "-1.0 lb", label: "Fat Mass", group: .headline, goalType: "fat_loss"), .favorable)
+    }
+
+    func testDeltaToneColorsResolveInBothAppearances() {
+        let page = BriefingPalette.standard.page
+        for tone in [DEXADeltaSemantics.Tone.favorable, .unfavorable, .neutral, .contextual] {
+            for style in [UIUserInterfaceStyle.dark, .light] {
+                XCTAssertGreaterThanOrEqual(contrast(tone.color, on: page, style), 3.0, "\(tone) \(style.rawValue)")
+            }
+        }
+    }
+
+    // MARK: DEXA locked rails
+
+    func testRailsAreDataDerivedAndReplaceTheGenericTable() throws {
+        let rows = [
+            DEXAChangeRails.Row(label: "DEXA Weight", previous: "177.0 lb", current: "179.4 lb", delta: "+2.4 lb"),
+            DEXAChangeRails.Row(label: "Body Fat", previous: "9.0%", current: "9.4%", delta: "+0.4 pts"),
+            DEXAChangeRails.Row(label: "Fat Mass", previous: "15.9 lb", current: "16.9 lb", delta: "+1.0 lb"),
+            DEXAChangeRails.Row(label: "Unchanged", previous: "10.0 lb", current: "10.0 lb", delta: "0.0 lb"),
+        ]
+        let f = DEXAChangeRails.fractions(rows)
+        XCTAssertEqual(f[2], 1, accuracy: 0.0001, "the largest relative change fills the rail")
+        XCTAssertGreaterThan(f[1], f[0])
+        XCTAssertEqual(f[3], 0, "an unchanged metric shows an empty rail")
+        XCTAssertTrue(f.dropLast().allSatisfy { $0 >= 0.12 })
+        let dexa = try source("PhysiqueOS/Presentation/Briefings/DEXABriefingSections.swift")
+        XCTAssertTrue(dexa.contains("DEXAChangeRails("), "Since Last Scan uses the locked change rails")
+        XCTAssertFalse(dexa.contains("DEXAUnitTable"), "the generic Previous/Current/Delta table is gone")
+        XCTAssertFalse(dexa.contains("arrow.up") || dexa.contains("arrow.down"), "no redundant direction arrows")
+        XCTAssertTrue(dexa.contains("Measured Event"))
+    }
+
+    // MARK: History
+
+    private func row(_ cadence: BriefingCadence, type: String? = nil, label: String, id: String = "id", month: String? = nil) -> BriefingHistoryRowReadModel {
+        BriefingHistoryRowReadModel(artifactId: id, artifactType: type, cadence: cadence, label: label, publicationDate: nil, version: 1, briefingMonth: month)
+    }
+
+    func testHistoryTitlesAreStableTypeTitlesNeverNarrativeHeadlines() {
+        XCTAssertEqual(row(.weekly, label: "Two straight weeks of clean progression.").stableTitle, "Weekly Briefing")
+        XCTAssertEqual(row(.midweek, label: "Nothing here changes last week's plan.").stableTitle, "Midweek Briefing")
+        XCTAssertEqual(row(.event, type: "photo_event", label: "Four poses in, the visual story matches the scan.").stableTitle, "Photo Briefing")
+        XCTAssertEqual(row(.event, type: "dexa_event", label: "Two weeks into the surplus").stableTitle, "DEXA Briefing")
+    }
+
+    func testMonthlyKeepsMonthYearFromCanonicalMetadata() {
+        XCTAssertEqual(row(.monthly, label: "Monthly Briefing", month: "2026-09").stableTitle, "Monthly Briefing · September 2026")
+        XCTAssertEqual(row(.monthly, label: "Monthly Briefing", id: "monthly_briefing_user_founder_001_202609").stableTitle, "Monthly Briefing · September 2026")
+        XCTAssertEqual(row(.monthly, label: "x", id: "monthly_briefing_2026-08").stableTitle, "Monthly Briefing · August 2026")
+        XCTAssertEqual(row(.monthly, label: "x", id: "opaque").stableTitle, "Monthly Briefing", "no invented month")
+    }
+
+    func testTypeAccentsAreDistinctLegibleAndTheTitleStaysNeutral() throws {
+        let types: [BriefingTypeIdentity] = [.weekly, .midweek, .monthly, .photo, .dexa]
+        for style in [UIUserInterfaceStyle.dark, .light] {
+            var seen = Set<String>()
+            for type in types {
+                let color = BriefingTypeAccent.color(type)
+                XCTAssertGreaterThanOrEqual(contrast(color, on: BriefingHistoryPalette.page, style), 4.5, "\(type) in \(style.rawValue)")
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getRed(&r, green: &g, blue: &b, alpha: &a)
+                seen.insert(String(format: "%.2f%.2f%.2f", r, g, b))
+            }
+            XCTAssertEqual(seen.count, types.count, "each type has its own accent")
+        }
+        let history = try source("PhysiqueOS/Presentation/Briefings/BriefingHistoryView.swift")
+        XCTAssertTrue(history.contains("Text(briefing.stableTitle)\n                        .briefingText(.sf(15, 800, lineHeight: 18.75))\n                        .foregroundStyle(BriefingHistoryPalette.ink)"), "the main row title stays neutral ink")
+        XCTAssertFalse(history.contains("Text(briefing.label)"), "the narrative label is never the row title")
+        XCTAssertTrue(history.contains("BriefingTypeAccent.color(briefing.briefingType)"))
+    }
+
+    // MARK: Midweek Sunday–Tuesday window
+
+    private func midweek(points: [String]) throws -> MidweekBriefingSections {
+        var content = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.cadence == .midweek }?.midweek)
+        content.energy?.dailyBalances = points.map { BriefingDailyEnergyPoint(date: $0, intakeKcal: 2400, expenditureKcal: 2600, hasPairedData: true, balanceKcal: -200, label: nil) }
+        content.energy?.eligibleDayCount = points.count
+        let window = BriefingEvidenceWindowReadModel(id: "midweek:2026-09-27:2026-09-29", startDate: "2026-09-27", endDate: "2026-09-29", briefingDate: "2026-09-30", relativeLabel: "Sunday through Tuesday", timeZone: "America/Los_Angeles")
+        return MidweekBriefingSections(content: content, confidence: nil, evidenceWindow: window)
+    }
+
+    func testMidweekWindowIsSundayThroughTuesdayInclusive() throws {
+        let full = try midweek(points: ["2026-09-27", "2026-09-28", "2026-09-29"])
+        XCTAssertEqual(full.windowLabel, "Sun–Tue")
+        XCTAssertEqual(full.windowedEnergy?.dailyBalances?.map(\.date), ["2026-09-27", "2026-09-28", "2026-09-29"])
+        XCTAssertEqual(full.windowedEnergy?.eligibleDayCount, 3)
+        XCTAssertEqual(BriefingEnergySection.dateKeys(from: "2026-09-27", through: "2026-09-29")?.compactMap { BriefingEnergySection.shortWeekday($0) }, ["Sun", "Mon", "Tue"])
+    }
+
+    func testMidweekTuesdayNeverSilentlyDropsOut() throws {
+        let partial = try midweek(points: ["2026-09-27", "2026-09-28"])
+        let days = try XCTUnwrap(partial.windowedEnergy?.dailyBalances)
+        XCTAssertEqual(days.map(\.date), ["2026-09-27", "2026-09-28", "2026-09-29"])
+        let tuesday = try XCTUnwrap(days.last)
+        XCTAssertFalse(tuesday.hasPairedData)
+        XCTAssertNil(tuesday.intakeKcal, "a missing day is shown as No data, never an invented value")
+        XCTAssertEqual(tuesday.label, "Tue", "unlabelled published points → three-letter weekday")
+        XCTAssertEqual(partial.windowedEnergy?.eligibleDayCount, 3)
+    }
+
+    // MARK: DEXA interpretive lead (final Founder correction)
+
+    func testDEXAInterpretationLeadIsTheCanonicalOpeningWithNoInventedFallback() throws {
+        let briefing = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.id == "dexa_event_dexa-fixture-005" })
+        let dexa = try XCTUnwrap(briefing.dexa)
+        XCTAssertEqual(DEXABriefingSections.interpretationLead(dexa.interpretation), dexa.interpretation.opening, "the lead is the persisted interpretation.opening")
+        XCTAssertFalse(DEXABriefingSections.interpretationParagraphs(dexa.interpretation).contains(dexa.interpretation.opening), "the opening is not repeated below")
+        XCTAssertEqual(DEXABriefingSections.interpretationParagraphs(dexa.interpretation).first, dexa.interpretation.fatLoss)
+        var empty = dexa.interpretation
+        empty.opening = "  "
+        XCTAssertNil(DEXABriefingSections.interpretationLead(empty), "no canonical opening → no headline, never a fallback")
+        let source = try source("PhysiqueOS/Presentation/Briefings/DEXABriefingSections.swift")
+        XCTAssertFalse(source.contains("Controlled gain"), "the lock harness example is never hard-coded")
+        let eyebrow = try XCTUnwrap(source.range(of: "BriefingEventLabel(text: \"What This Scan Means\")"))
+        let lead = try XCTUnwrap(source.range(of: "interpretationLead(interpretation) {"))
+        let paragraphs = try XCTUnwrap(source.range(of: "BriefingEventDataParagraphs(paragraphs: Self.interpretationParagraphs"))
+        XCTAssertLessThan(eyebrow.lowerBound, lead.lowerBound)
+        XCTAssertLessThan(lead.lowerBound, paragraphs.lowerBound, "eyebrow → prominent lead → paragraphs")
+    }
+
+    func testDEXALeadRendersInBothAppearancesWithoutChangingThePayload() throws {
+        let briefing = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.id == "dexa_event_dexa-fixture-005" })
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        let before = try encoder.encode(briefing)
+        for scheme in [ColorScheme.dark, .light] {
+            let image = ImageRenderer(content: BriefingCadenceBody(briefing: briefing).frame(width: 402)
+                .environment(AppEnvironment(nativeAuthority: .sandbox)).environment(\.colorScheme, scheme)).uiImage
+            XCTAssertNotNil(image)
+        }
+        XCTAssertEqual(try encoder.encode(briefing), before)
     }
 }

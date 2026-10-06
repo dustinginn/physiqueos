@@ -1164,7 +1164,7 @@ extension View {
 /// A UIKit pan that only begins when the motion is predominantly
 /// horizontal (the shared 1.35 directional bias), so vertical swipes fall
 /// through to the enclosing ScrollView.
-private struct EvidenceHorizontalScrubGesture: UIGestureRecognizerRepresentable {
+struct EvidenceHorizontalScrubGesture: UIGestureRecognizerRepresentable {
     let onChanged: (CGPoint) -> Void
 
     func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {

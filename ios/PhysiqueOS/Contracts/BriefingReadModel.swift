@@ -74,6 +74,22 @@ struct BriefingOccurrenceIdentity: Codable, Equatable {
 /// (`"dexa_event"`/`"photo_event"`) — Native does not need to fetch full
 /// content just to pick the right icon/label the way `historyTitle`'s
 /// doc comment describes for the full-detail model.
+/// One briefing type identity, shared by every place type is presented.
+enum BriefingTypeIdentity: Equatable, CaseIterable {
+    case weekly, midweek, monthly, photo, dexa, other
+
+    var title: String {
+        switch self {
+        case .weekly: "Weekly Briefing"
+        case .midweek: "Midweek Briefing"
+        case .monthly: "Monthly Briefing"
+        case .photo: "Photo Briefing"
+        case .dexa: "DEXA Briefing"
+        case .other: "Briefing"
+        }
+    }
+}
+
 struct BriefingHistoryRowReadModel: Codable, Equatable, Identifiable {
     var id: String { artifactId }
     var artifactId: String
@@ -82,6 +98,9 @@ struct BriefingHistoryRowReadModel: Codable, Equatable, Identifiable {
     var label: String
     var publicationDate: String?
     var version: Int
+    /// `evidenceWindow.briefingMonth` ("2026-09") the bounded History row
+    /// carries for Monthly; nil for other cadences and older payloads.
+    var briefingMonth: String? = nil
 
     var isDEXAEvent: Bool { cadence == .event && ["dexa_event", "dexa-event"].contains(artifactType) }
     var isPhotoEvent: Bool { cadence == .event && ["photo_event", "photo-event"].contains(artifactType) }
@@ -90,6 +109,46 @@ struct BriefingHistoryRowReadModel: Codable, Equatable, Identifiable {
         if isDEXAEvent { return "DEXA Event Briefing" }
         if isPhotoEvent { return "Photo Event Briefing" }
         return cadence.label
+    }
+
+    /// The briefing type a History row represents (one identity for the
+    /// stable title and the type accent).
+    var briefingType: BriefingTypeIdentity {
+        if isDEXAEvent { return .dexa }
+        if isPhotoEvent { return .photo }
+        switch cadence {
+        case .weekly: return .weekly
+        case .midweek: return .midweek
+        case .monthly: return .monthly
+        case .daily, .event: return .other
+        }
+    }
+
+    /// Stable navigation title. Narrative headlines belong inside the
+    /// briefing, never in History: "Weekly Briefing", "Midweek Briefing",
+    /// "Photo Briefing", "DEXA Briefing", and for Monthly the month/year
+    /// qualifier ("Monthly Briefing · September 2026") from the row's
+    /// canonical briefing month (or its artifact id), else no qualifier.
+    var stableTitle: String {
+        guard briefingType == .monthly else { return briefingType.title }
+        guard let month = Self.monthYear(briefingMonth) ?? Self.monthYear(fromArtifactId: artifactId) else { return briefingType.title }
+        return "\(briefingType.title) · \(month)"
+    }
+
+    /// "2026-09" → "September 2026".
+    static func monthYear(_ key: String?) -> String? {
+        guard let key, key.count >= 7 else { return nil }
+        let parts = key.prefix(7).split(separator: "-")
+        guard parts.count == 2, let year = Int(parts[0]), let month = Int(parts[1]), (1...12).contains(month), year > 2000 else { return nil }
+        let names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        return "\(names[month - 1]) \(year)"
+    }
+
+    /// Monthly artifact ids end in `YYYYMM` or `YYYY-MM`.
+    static func monthYear(fromArtifactId id: String) -> String? {
+        guard let match = id.range(of: #"(\d{4})-?(\d{2})$"#, options: .regularExpression) else { return nil }
+        let digits = id[match].filter(\.isNumber)
+        return monthYear("\(digits.prefix(4))-\(digits.suffix(2))")
     }
 
     var iconName: String {
@@ -587,6 +646,14 @@ struct MonthlyEnergyEvolutionSection: Codable, Equatable {
         var coverageLabel: String? = nil
     }
     var weeks: [WeekBar]
+    /// Weeks the Server marked `missing` (not enough readable days), kept
+    /// so the chart can say "not shown" instead of silently dropping them.
+    struct OmittedWeek: Codable, Equatable, Identifiable {
+        var id: String { weekLabel }
+        var weekLabel: String
+        var observedDayCount: Int? = nil
+    }
+    var omittedWeeks: [OmittedWeek]? = nil
     var averageIntakeKcal: Int
     var averageExpenditureKcal: Int
     var averageBalanceKcal: Int
@@ -637,6 +704,10 @@ struct MonthlyActionCard: Codable, Equatable, Identifiable {
     var title: String
     var narrative: String
     var icon: String
+    /// The canonical guidance `value` and `detail`, kept separately (the
+    /// joined `narrative` stays for older readers). Nil on older fixtures.
+    var headline: String? = nil
+    var detail: String? = nil
 }
 
 struct MonthlyBriefingContent: Codable, Equatable {
@@ -656,6 +727,14 @@ struct MonthlyBriefingContent: Codable, Equatable {
     var monthAheadIntroduction: String? = nil
     var monthAheadActions: [MonthlyActionCard]? = nil
     var heroHighlights: [MonthlyHeroHighlight]? = nil
+    /// Canonical section titles the Server publishes (`changes.title`,
+    /// `moments.title`, `monthAhead.title`). Nil on older fixtures, which
+    /// keep the established composed titles.
+    /// The second half of the canonical hero period ("Delivered October 1").
+    var monthPeriodDetail: String? = nil
+    var whatChangedTitle: String? = nil
+    var definingMomentsTitle: String? = nil
+    var monthAheadTitle: String? = nil
     /// Server `strategicSummaryV3` for a Monthly published with canonical
     /// V3 intelligence (first run Oct 1); nil for frozen V2 Monthly.
     var strategicSummaryV3: MonthlyStrategicSummaryV3? = nil
@@ -902,6 +981,11 @@ struct PhotoBriefingView: Codable, Equatable, Identifiable {
     /// absent from bundled fixtures and never contains a provider URL or
     /// object key.
     var mediaId: String? = nil
+    /// The artifact's own pose label ("Rear flexed — double biceps"); nil
+    /// on older fixtures, which fall back to the pose vocabulary.
+    var label: String? = nil
+
+    var displayLabel: String { label ?? poseId.label }
 }
 
 struct PhotoComparisonEntry: Codable, Equatable, Identifiable {
@@ -917,6 +1001,10 @@ struct PhotoComparisonEntry: Codable, Equatable, Identifiable {
     var narrative: String
     var priorMediaId: String? = nil
     var currentMediaId: String? = nil
+    /// The artifact's own pose label; nil on older fixtures.
+    var label: String? = nil
+
+    var displayLabel: String { label ?? poseId.label }
 }
 
 struct PhotoNewBaselineEntry: Codable, Equatable, Identifiable {

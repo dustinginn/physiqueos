@@ -137,7 +137,7 @@ enum ProductionBriefingMapper {
                 id: id, cadence: .monthly, generatedAt: generatedAt, window: window,
                 attribution: attribution(from: rawAttribution, fallbackTitle: presentation["hero"]?["goal"]?.string ?? goalTitle),
                 confidence: try confidence(from: presentation["hero"]?["confidence"]),
-                monthly: monthly(from: presentation, strategicSummaryV3: briefing?["monthlyNarrative"]?["strategicSummaryV3"])
+                monthly: monthly(from: presentation, strategicSummaryV3: briefing?["monthlyNarrative"]?["strategicSummaryV3"] ?? briefing?["narrativeV3"])
             )
         case .event:
             if let narrative = briefing?["dexaEventNarrative"] {
@@ -403,7 +403,10 @@ enum ProductionBriefingMapper {
         )
         let weight = value["weightContext"]
         let body = value["bodyComposition"]
-        let bodyScan = body?["newScan"] ?? body?["baseline"]
+        // `newScan` is the boolean flag `false` when no scan landed in the
+        // window; only an object is a scan. Falling through to `baseline`
+        // keeps the contract-included Body Composition module populated.
+        let bodyScan = body?["newScan"]?.object != nil ? body?["newScan"] : body?["baseline"]
         let weightSection: WeeklyWeightSection?
         if let averageWeight = weight?["averageWeight"]?.double {
             weightSection = .init(
@@ -660,7 +663,9 @@ enum ProductionBriefingMapper {
         let changes = value["changes"]?["themes"]?.array ?? []
         let moments = value["moments"]?["moments"]?.array ?? []
         let ahead = value["monthAhead"]
-        let monthLabel = hero?["period"]?.string?.components(separatedBy: " · ").first ?? "Monthly"
+        let periodParts: [String] = hero?["period"]?.string?.components(separatedBy: " · ") ?? []
+        let monthLabel: String = periodParts.first ?? "Monthly"
+        let periodDetail: String? = periodParts.count > 1 ? periodParts.dropFirst().joined(separator: " · ") : nil
         let factPairs: [(String, String)] = (baseline?["facts"]?.array ?? []).compactMap { item in
             guard let key = item["label"]?.string, let val = item["value"]?.string else { return nil }
             return (key.lowercased(), val)
@@ -693,8 +698,15 @@ enum ProductionBriefingMapper {
         let summaryIntake = summaryMetric("Avg intake", in: energy)
         let summaryExpenditure = summaryMetric("Avg expenditure", in: energy)
         let summaryBalance = summaryMetric("Avg balance", in: energy)
+        let whatChangedTitle: String? = changesTitle(value["changes"])
+        let definingMomentsTitle: String? = value["moments"]?["title"]?.string
+        let monthAheadTitle: String? = ahead?["title"]?.string
+        let omittedWeeks: [MonthlyEnergyEvolutionSection.OmittedWeek] = (energy?["weekly"]?.array ?? [])
+            .filter { $0["missing"]?.bool == true }
+            .map { .init(weekLabel: $0["label"]?.string ?? "Week", observedDayCount: $0["observedCount"]?.int) }
         let energyEvolution: MonthlyEnergyEvolutionSection? = summaryIntake == nil || summaryExpenditure == nil || summaryBalance == nil ? nil : .init(
             weeks: weeks,
+            omittedWeeks: omittedWeeks.isEmpty ? nil : omittedWeeks,
             averageIntakeKcal: summaryIntake!,
             averageExpenditureKcal: summaryExpenditure!,
             averageBalanceKcal: summaryBalance!,
@@ -722,9 +734,9 @@ enum ProductionBriefingMapper {
             return .init(dateLabel: date, title: title, narrative: item["body"]?.string ?? "", icon: monthlyIcon(item["tone"]?.string))
         }
         let actions: [MonthlyActionCard] = (ahead?["guidance"]?.array ?? []).enumerated().map { index, item in
-            .init(domain: item["tone"]?.string ?? "action-\(index)", title: item["label"]?.string ?? "Next", narrative: [item["value"]?.string, item["detail"]?.string].compactMap { $0 }.joined(separator: " · "), icon: monthlyIcon(item["tone"]?.string))
+            .init(domain: item["tone"]?.string ?? "action-\(index)", title: item["label"]?.string ?? "Next", narrative: [item["value"]?.string, item["detail"]?.string].compactMap { $0 }.joined(separator: " · "), icon: monthlyIcon(item["tone"]?.string), headline: item["value"]?.string, detail: item["detail"]?.string)
         }
-        return .init(
+        var content = MonthlyBriefingContent(
             monthLabel: monthLabel,
             heroHeadline: hero?["title"]?.string ?? "Monthly Briefing",
             heroBody: hero?["thesis"]?.string ?? "",
@@ -755,6 +767,15 @@ enum ProductionBriefingMapper {
             },
             strategicSummaryV3: monthlyStrategicSummary(strategicSummaryV3)
         )
+        content.monthPeriodDetail = periodDetail
+        content.whatChangedTitle = whatChangedTitle
+        content.definingMomentsTitle = definingMomentsTitle
+        content.monthAheadTitle = monthAheadTitle
+        return content
+    }
+
+    private static func changesTitle(_ value: BriefingJSONValue?) -> String? {
+        value?["title"]?.string
     }
 
     private static func monthlyStrategicSummary(_ value: BriefingJSONValue?) -> MonthlyStrategicSummaryV3? {
@@ -865,7 +886,8 @@ enum ProductionBriefingMapper {
                     comparisonStatus: item["comparisonStatus"]?.string ?? "unknown",
                     establishesBaseline: item["establishesBaseline"]?.bool ?? false,
                     goalRelevance: item["goalRelevance"]?.string ?? "supporting",
-                    mediaId: item["media"]?["mediaId"]?.string
+                    mediaId: item["media"]?["mediaId"]?.string,
+                    label: item["label"]?.string
                 )
             },
             heroTitle: cards?["hero"]?["title"]?.string ?? "Photo Event Briefing",
@@ -895,7 +917,8 @@ enum ProductionBriefingMapper {
             roleLabel: nil,
             narrative: item["headline"]?.string ?? strings(item["supportingObservations"]).first ?? "",
             priorMediaId: item["previousMedia"]?["mediaId"]?.string,
-            currentMediaId: item["media"]?["mediaId"]?.string
+            currentMediaId: item["media"]?["mediaId"]?.string,
+            label: item["label"]?.string
         )
     }
 
@@ -1134,4 +1157,8 @@ enum ProductionBriefingMapper {
         guard !start.isEmpty else { return "" }
         return start == end ? start : "\(start)–\(end)"
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
