@@ -2,29 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- **Lane:** **Build 88 TestFlight release**: all lanes integrated (Claude)
-- **Task:** `build88-testflight-release-20261006` (prompt `9dc15c5b`)
-- **Status:** **Build 88 VALID in TestFlight. STOPPED** for Founder physical acceptance.
-- **Generated (UTC):** 2026-10-06T04:45:25Z
+- Task: Build 89 VALID in TestFlight from Founder-authorized integrated candidate 4d4ca187 (`build89-testflight-release-20261006`)
+- Agent: claude
+- Status: completed
+- Generated (UTC): 2026-10-06T18:46:12Z
+- Success: true
 
-| Item | Value |
-|---|---|
-| Build 88 Native source | `7fce3b97` (final candidate `96e724a9` + build-number bump only) |
-| App | `com.physiqueos.native.dev` 1.0 (88) |
-| Delivery | `43fda86b-c542-4962-86bd-6158ce72c182`: **VALID** |
-| Archive | `Archives/2026-10-05/PhysiqueOS-Build88-7fce3b97.xcarchive` |
-| Production Server | `b7eb1e39` (`6fa4e887`), healthy, unchanged |
+Summary: Build 89 (com.physiqueos.native.dev 1.0 (89)) from 51399425 (= Founder-authorized integrated candidate 4d4ca187 + build-number bump only; Claude A f3579d87 + Live Activity stopwatch fix + Claude B 156808fa + Codex 5b79118f on Build 88) uploaded via the guarded API-key tool; delivery cc70050d-b573-4cb8-98d0-e163b76b205a VALID (build/import VALID, on App Store Connect). Post-bump gates green. Training progression correction lane excluded. Server b7eb1e39/6fa4e887 unchanged and healthy. No deploy, no production mutation. Archive PhysiqueOS-Build89-51399425.xcarchive (2026-10-06); next build 90.
 
-**Post-bump gates:**
-- **Unit tests:** 2066 run, 0 failures.
-- **Release compile:** OK; app, Watch and widget extension all at build 88.
-- **Seam scan:** 0.
-- **Guarded dry run:** all checks PASS.
+Detailed report: `agent-handoffs/reports/20261006T184556Z-build89-testflight-valid.md`
 
-**Next:** install Build 88 from TestFlight and run the acceptance checklist in the report.
-
-**Report:** `agent-handoffs/reports/20261006T044525Z-build88-testflight-valid.md`
-
-Next build: 89. No deploy, no production mutation.
-
-Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
+Protocol: `agent-handoffs/README.md`
