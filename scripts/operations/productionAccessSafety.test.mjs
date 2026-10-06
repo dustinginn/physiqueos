@@ -175,6 +175,45 @@ describe("generated read-only payload", () => {
     });
   });
 
+  it("isolates the begin sentinel after PTY carriage framing without accepting a same-line prefix", () => {
+    const execution = runGeneratedPayload({ transactionReadOnly: "on" });
+    assert.equal(execution.status, 0, execution.stderr);
+    assert.equal(execution.stdout.startsWith("\n"), true);
+
+    const prompt = "\u001b[32mweb-host:/workspace#\u001b[0m\rweb-host:/workspace#";
+    const sameLineFrame = `${prompt}${execution.stdout.slice(1)}`;
+    const sameLineDiagnostics = thrownDiagnostics(() => parseFramedJson(sameLineFrame, PREFIX, {
+      marker: MARKER,
+      structuralDiagnostics: true,
+    }));
+    assert.equal(sameLineDiagnostics.errorCode, "AUDIT_JSON_MISSING");
+    assert.equal(sameLineDiagnostics.beginSentinelCount, 1);
+    assert.equal(sameLineDiagnostics.endSentinelCount, 1);
+    assert.equal(sameLineDiagnostics.successMarkerCount, 1);
+    assert.equal(sameLineDiagnostics.beginBeforeEnd, false);
+    assert.equal(sameLineDiagnostics.beginContiguous, false);
+    assert.equal(sameLineDiagnostics.endContiguous, true);
+
+    const isolatedFrame = `${prompt}${execution.stdout}`;
+    const beginSplit = isolatedFrame.indexOf("STRUCTURED_BEGIN") + 9;
+    const markerSplit = isolatedFrame.indexOf(MARKER) + 13;
+    const chunks = [
+      isolatedFrame.slice(0, beginSplit),
+      isolatedFrame.slice(beginSplit, markerSplit),
+      isolatedFrame.slice(markerSplit),
+    ];
+    assert.deepEqual(parseFramedJson(chunks, PREFIX, { marker: MARKER }), {
+      bindingPresence: { databaseUrl: true, databaseCa: true },
+      probe: { selectOne: true },
+      runtime: { gitSha: SHA },
+      transaction: { readOnly: "on" },
+    });
+    assert.equal(collectStructuralDiagnostics(chunks, PREFIX, MARKER, {
+      parserStage: "complete",
+      errorCode: "AUDIT_DIAGNOSTIC",
+    }).beginContiguous, true);
+  });
+
   it("fails closed and rolls back when transaction_read_only is not on", () => {
     const execution = runGeneratedPayload({ transactionReadOnly: "off" });
     assert.equal(execution.status, 1);

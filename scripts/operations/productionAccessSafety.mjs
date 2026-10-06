@@ -390,7 +390,7 @@ if (failure || !report) {
   try {
     const json = validateReport(report, [rawUrl, certificate, CONFIG.ownerUserId]);
     const encoded = Buffer.from(json).toString("base64");
-    process.stdout.write("${STRUCTURED_BEGIN}:" + CONFIG.outputPrefix + ":" + encoded.length + "\\n");
+    process.stdout.write("\\n${STRUCTURED_BEGIN}:" + CONFIG.outputPrefix + ":" + encoded.length + "\\n");
     process.stdout.write(encoded + "\\n");
     process.stdout.write("${STRUCTURED_END}:" + CONFIG.outputPrefix + "\\n");
     process.stdout.write(CONFIG.marker + "\\n");
