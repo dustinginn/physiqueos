@@ -240,8 +240,8 @@ struct DEXAHeroMetrics: View {
                 HStack(alignment: .top, spacing: 0) {
                     ForEach(Array(rows[row].enumerated()), id: \.element.id) { column, result in
                         VStack(alignment: .leading, spacing: 0) {
-                            Text(result.label.uppercased())
-                                .briefingStrutText(.jn(9, 400, tracking: 0.08), parentSize: 16, parentLineHeight: 21)
+                            Text(result.label)
+                                .briefingStrutText(.jn(9, 400, tracking: 0.08, uppercase: true), parentSize: 16, parentLineHeight: 21)
                                 .opacity(0.68)
                             Text(result.value)
                                 .briefingText(.jn(19, 700))
@@ -280,8 +280,8 @@ struct DEXASnapshotGrid: View {
                 HStack(spacing: 1) {
                     ForEach(rows[row].indices, id: \.self) { index in
                         VStack(alignment: .leading, spacing: 0) {
-                            Text(rows[row][index].0.uppercased())
-                                .briefingStrutText(.jn(9, 400, tracking: 0.08), parentSize: 16, parentLineHeight: 21)
+                            Text(rows[row][index].0)
+                                .briefingStrutText(.jn(9, 400, tracking: 0.08, uppercase: true), parentSize: 16, parentLineHeight: 21)
                                 .foregroundStyle(BriefingEventPalette.muted)
                             Text(rows[row][index].1)
                                 .briefingText(.jn(17, 700))
@@ -363,8 +363,8 @@ struct DEXAUnitTable: View {
     }
 
     private func header(_ text: String, alignment: Alignment) -> some View {
-        Text(text.uppercased())
-            .briefingText(.jn(8, 800, tracking: 0.07))
+        Text(text)
+            .briefingText(.jn(8, 800, tracking: 0.07, uppercase: true))
             .foregroundStyle(BriefingEventPalette.muted)
             .frame(maxWidth: .infinity, alignment: alignment)
     }

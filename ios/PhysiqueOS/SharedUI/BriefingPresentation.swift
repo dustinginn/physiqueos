@@ -479,7 +479,7 @@ struct BriefingParagraph: UIViewRepresentable {
 
     func updateUIView(_ view: BriefingParagraphView, context: Context) {
         view.label.attributedText = attributed(traits: view.traitCollection)
-        view.label.accessibilityLabel = style.uppercase ? text.uppercased() : text
+        view.label.accessibilityLabel = text
         view.setNeedsLayout()
     }
 
@@ -770,8 +770,8 @@ struct BriefingHeroTopline: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            Text(eyebrow.uppercased())
-                .briefingText(.j(11, 800, tracking: 0.1))
+            Text(eyebrow)
+                .briefingText(.j(11, 800, tracking: 0.1, uppercase: true))
                 .foregroundStyle(monthly && colorScheme == .dark ? BriefingPalette.fixed(0xD0C4FF) : c.purple)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
@@ -840,8 +840,8 @@ struct BriefingHeroConfidence: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack { Spacer(minLength: 0); BriefingConfidenceRing(score: score, diameter: ringDiameter, scoreSize: scoreSize) }
             VStack(alignment: .leading, spacing: 5) {
-                Text(band.uppercased())
-                    .briefingText(.j(11, 800, tracking: 0.09))
+                Text(band)
+                    .briefingText(.j(11, 800, tracking: 0.09, uppercase: true))
                     .foregroundStyle(c.green)
                 Text(movement)
                     .briefingText(.j(15, 700))
@@ -918,8 +918,8 @@ struct BriefingHeroFooter: View {
             BriefingHeroRule()
             BriefingFractionRow(fractions: items.count == 1 ? [1] : Array(fractions.prefix(items.count)), spacing: 12) { index in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(items[index].0.uppercased())
-                        .briefingText(.j(10, 800, tracking: 0.08))
+                    Text(items[index].0)
+                        .briefingText(.j(10, 800, tracking: 0.08, uppercase: true))
                         .foregroundStyle(c.muted)
                     Text(items[index].1)
                         .briefingText(.j(12, 700))
@@ -1096,8 +1096,8 @@ struct BriefingSectionHead<Trailing: View>: View {
                 .frame(width: 28, height: 28)
                 .background(tone.color(c).opacity(0.15), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .accessibilityHidden(true)
-            Text(label.uppercased())
-                .briefingText(.j(11, 800, tracking: 0.1))
+            Text(label)
+                .briefingText(.j(11, 800, tracking: 0.1, uppercase: true))
                 .foregroundStyle(tone.color(c))
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
@@ -1157,8 +1157,8 @@ struct BriefingMetricsRow: View {
     var body: some View {
         BriefingFractionRow(fractions: Array(repeating: 1, count: items.count), spacing: 8) { index in
             VStack(alignment: .leading, spacing: 4) {
-                Text(items[index].0.uppercased())
-                    .briefingText(.j(10, 800, tracking: 0.08))
+                Text(items[index].0)
+                    .briefingText(.j(10, 800, tracking: 0.08, uppercase: true))
                     .foregroundStyle(c.muted)
                 Text(items[index].1)
                     .briefingText(.j(14, 800))
@@ -1432,8 +1432,8 @@ struct BriefingBodyMetrics: View {
     var body: some View {
         BriefingFractionRow(fractions: Array(repeating: 1, count: items.count)) { index in
             VStack(alignment: .leading, spacing: 4) {
-                Text(items[index].0.uppercased())
-                    .briefingText(.j(10, 800, tracking: 0.08))
+                Text(items[index].0)
+                    .briefingText(.j(10, 800, tracking: 0.08, uppercase: true))
                     .foregroundStyle(c.muted)
                 Text(items[index].1)
                     .briefingText(.j(15, 700))
@@ -1649,8 +1649,8 @@ private struct BriefingTrainingResponseContent: View {
                         .briefingText(.j(13, 700))
                         .foregroundStyle(c.ink)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text(highlight.recordType.uppercased())
-                        .briefingText(.j(10, 800))
+                    Text(highlight.recordType)
+                        .briefingText(.j(10, 800, uppercase: true))
                         .foregroundStyle(c.muted)
                 }
                 Text(highlight.performanceValue ?? highlight.headline)

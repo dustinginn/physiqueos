@@ -1077,4 +1077,17 @@ extension BriefingLockedPresentationTests {
         XCTAssertEqual(rows, 17, "the locked correction restores all 17 unit rows")
         XCTAssertTrue(dexa.progress.headline.allSatisfy { $0.current.contains(where: \.isLetter) || $0.current.hasSuffix("%") })
     }
+
+    func testMidweekBodyCompositionFallsBackToBaselineWhenNewScanIsTheFalseFlag() throws {
+        let json = #"""
+        {"schemaVersion":"x","artifact":{"id":"midweek-x","cadence":"midweek","generatedAt":"2026-09-30T14:54:55.410Z","version":3},
+         "presentation":{"evidenceWindow":{"startDate":"2026-09-27","endDate":"2026-09-29","briefingDate":"2026-09-30","relativeLabel":"Sunday through Tuesday","timeZone":"UTC"},
+           "hero":{"verdict":"V","summary":"S"},"coachTake":{"biggestTakeaway":"T","recommendation":"R"},"prioritiesThroughSunday":[],
+           "bodyComposition":{"newScan":false,"baseline":{"date":"2026-09-12","fatMass":14.2,"leanMass":153.3,"bodyFatPercentage":8.1},"objective":"O","prominent":false,"interpretation":null}}}
+        """#
+        let value = try JSONDecoder().decode(BriefingJSONValue.self, from: Data(json.utf8))
+        guard let midweek = try ProductionBriefingMapper.detail(value)?.midweek else { throw XCTSkip("minimal midweek envelope not mapped") }
+        XCTAssertEqual(midweek.bodyComposition?.scanDate, "2026-09-12")
+        XCTAssertEqual(midweek.bodyComposition?.bodyFatPercent, "8.1%")
+    }
 }

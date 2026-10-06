@@ -403,7 +403,10 @@ enum ProductionBriefingMapper {
         )
         let weight = value["weightContext"]
         let body = value["bodyComposition"]
-        let bodyScan = body?["newScan"] ?? body?["baseline"]
+        // `newScan` is the boolean flag `false` when no scan landed in the
+        // window; only an object is a scan. Falling through to `baseline`
+        // keeps the contract-included Body Composition module populated.
+        let bodyScan = body?["newScan"]?.object != nil ? body?["newScan"] : body?["baseline"]
         let weightSection: WeeklyWeightSection?
         if let averageWeight = weight?["averageWeight"]?.double {
             weightSection = .init(

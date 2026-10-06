@@ -208,8 +208,8 @@ struct MonthlyBriefingSections: View {
                             .background(Color.white.opacity(0.12), in: Circle())
                         VStack(alignment: .leading, spacing: 0) {
                             if let label = item.label {
-                                Text(label.uppercased())
-                                    .briefingStrutText(.j(9, 800, tracking: 0.08))
+                                Text(label)
+                                    .briefingStrutText(.j(9, 800, tracking: 0.08, uppercase: true))
                                     .foregroundStyle(BriefingPalette.fixed(0xC7B8FF))
                             }
                             BriefingParagraph(item.title, .j(13, 700), color: .white)
@@ -254,8 +254,8 @@ struct MonthlyHeroHighlights: View {
         let rule = colorScheme == .dark ? BriefingPalette.fixed(0xFFFFFF, 0.18) : BriefingPalette.fixed(0x102638, 0.14)
         BriefingFractionRow(fractions: Array(repeating: 1, count: items.count)) { index in
             VStack(alignment: .leading, spacing: 0) {
-                Text(items[index].label.uppercased())
-                    .briefingText(.j(9, 800, tracking: 0.08))
+                Text(items[index].label)
+                    .briefingText(.j(9, 800, tracking: 0.08, uppercase: true))
                     .foregroundStyle(c.muted)
                 BriefingParagraph(items[index].value, .j(14, 700), color: c.ink)
                     .padding(.top, 5)
@@ -299,8 +299,8 @@ struct MonthlyCallout: View {
     var body: some View {
         let color = tone.color(c)
         VStack(alignment: .leading, spacing: 5) {
-            Text(title.uppercased())
-                .briefingStrutText(.j(11, 800, tracking: 0.07))
+            Text(title)
+                .briefingStrutText(.j(11, 800, tracking: 0.07, uppercase: true))
                 .foregroundStyle(color)
             BriefingParagraph(text, .j(13, 400, 1.5), color: c.secondary)
         }
@@ -583,8 +583,8 @@ private struct MonthlyBaselineContent: View {
             BriefingFractionRow(fractions: [1, 1, 1]) { index in
                 let items = [("Body Fat", baseline.bodyFatPercent), ("Lean Mass", baseline.leanMassLb), ("Fat Mass", baseline.fatMassLb)]
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(items[index].0.uppercased())
-                        .briefingText(.j(10, 800, tracking: 0.08))
+                    Text(items[index].0)
+                        .briefingText(.j(10, 800, tracking: 0.08, uppercase: true))
                         .foregroundStyle(c.muted)
                     Text(items[index].1)
                         .briefingText(.j(16, 700))

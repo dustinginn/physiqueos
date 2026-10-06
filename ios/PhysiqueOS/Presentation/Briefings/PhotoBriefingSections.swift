@@ -356,8 +356,8 @@ struct BriefingEventHero<Extra: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 10) {
-                Text(eyebrow.uppercased())
-                    .briefingText(.jn(10, 850, tracking: 0.11))
+                Text(eyebrow)
+                    .briefingText(.jn(10, 850, tracking: 0.11, uppercase: true))
                     .foregroundStyle(colorScheme == .dark ? BriefingPalette.fixed(0xD6C9FF) : BriefingPalette.fixed(0x6B4FD0))
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 0)
@@ -428,8 +428,8 @@ struct BriefingEventLabel: View {
     var color: Color = BriefingEventPalette.ink
 
     var body: some View {
-        Text(text.uppercased())
-            .briefingStrutText(.jn(10, 850, tracking: 0.11), parentSize: 16, parentLineHeight: 21)
+        Text(text)
+            .briefingStrutText(.jn(10, 850, tracking: 0.11, uppercase: true), parentSize: 16, parentLineHeight: 21)
             .foregroundStyle(color)
             .accessibilityAddTraits(.isHeader)
     }
@@ -441,13 +441,13 @@ struct BriefingEventSectionHead: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Text(label.uppercased())
-                .briefingText(.jn(10, 850, tracking: 0.11))
+            Text(label)
+                .briefingText(.jn(10, 850, tracking: 0.11, uppercase: true))
                 .foregroundStyle(BriefingEventPalette.ink)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
-            Text(trailing.uppercased())
-                .briefingText(.jn(10, 850, tracking: 0.11))
+            Text(trailing)
+                .briefingText(.jn(10, 850, tracking: 0.11, uppercase: true))
                 .foregroundStyle(BriefingEventPalette.ink)
         }
     }
@@ -477,8 +477,8 @@ struct BriefingEventSubLabel: View {
     let text: String
 
     var body: some View {
-        Text(text.uppercased())
-            .briefingText(.j(9, 800, tracking: 0.07))
+        Text(text)
+            .briefingText(.j(9, 800, tracking: 0.07, uppercase: true))
             .foregroundStyle(BriefingEventPalette.teal)
             .padding(.top, 16)
             .accessibilityAddTraits(.isHeader)
@@ -493,8 +493,8 @@ struct BriefingEventFactGrid: View {
         HStack(spacing: 1) {
             ForEach(items.indices, id: \.self) { index in
                 VStack(spacing: 5) {
-                    Text(items[index].0.uppercased())
-                        .briefingStrutText(.jn(8, 400, tracking: 0.07), parentSize: 16, parentLineHeight: 21)
+                    Text(items[index].0)
+                        .briefingStrutText(.jn(8, 400, tracking: 0.07, uppercase: true), parentSize: 16, parentLineHeight: 21)
                         .foregroundStyle(BriefingEventPalette.muted)
                     Text(items[index].1)
                         .briefingText(.jn(11, 700))
@@ -599,8 +599,8 @@ struct BriefingEventPaneCaption: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text(role.uppercased())
-                .briefingText(.jn(9, 700, tracking: 0.06))
+            Text(role)
+                .briefingText(.jn(9, 700, tracking: 0.06, uppercase: true))
                 .foregroundStyle(BriefingEventPalette.ink)
             Spacer(minLength: 0)
             if let date {
@@ -629,8 +629,8 @@ struct BriefingEventComparison<Pair: View>: View {
                 BriefingParagraph(title, .jn(16, 700), color: BriefingEventPalette.ink)
                     .accessibilityAddTraits(.isHeader)
                 if let range {
-                    Text(range.uppercased())
-                        .briefingText(.jn(9, 400, tracking: 0.07))
+                    Text(range)
+                        .briefingText(.jn(9, 400, tracking: 0.07, uppercase: true))
                         .foregroundStyle(BriefingEventPalette.muted)
                         .fixedSize()
                 }
@@ -697,8 +697,8 @@ struct BriefingEventCoach: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(label.uppercased())
-                .briefingStrutText(.jn(10, 850, tracking: 0.11), parentSize: 16, parentLineHeight: 21)
+            Text(label)
+                .briefingStrutText(.jn(10, 850, tracking: 0.11, uppercase: true), parentSize: 16, parentLineHeight: 21)
                 .foregroundStyle(BriefingPalette.fixed(0xCBBCFF))
                 .accessibilityAddTraits(.isHeader)
             if !text.isEmpty {
@@ -709,8 +709,8 @@ struct BriefingEventCoach: View {
                 switch rowStyle {
                 case .stacked:
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(row.0.uppercased())
-                            .briefingText(.j(9, 800, tracking: 0.08))
+                        Text(row.0)
+                            .briefingText(.j(9, 800, tracking: 0.08, uppercase: true))
                             .foregroundStyle(BriefingPalette.fixed(0xCBBCFF))
                         BriefingParagraph(row.1, .j(13, 400, 1.5), color: BriefingPalette.fixed(0xF5F7F8, 0.88))
                     }
