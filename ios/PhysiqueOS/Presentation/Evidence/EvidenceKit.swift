@@ -281,7 +281,7 @@ struct EvidencePalette {
 
 /// The one Nutrition macro → color authority, taken from the accepted
 /// Nutrition Evidence surface (Checkpoint C macro grid and reporting):
-/// Calories amber, Protein / Carbohydrates / Fat their macro tokens, all in
+/// Calories green, Protein / Carbohydrates / Fat their macro tokens, all in
 /// the `.daily` palette. Nutrition Evidence and generic Evidence Review both
 /// resolve through it, so the two can never drift.
 enum NutritionEvidenceMacro: CaseIterable, Equatable {
@@ -318,7 +318,7 @@ enum NutritionEvidenceMacro: CaseIterable, Equatable {
 
     var paletteColor: KeyPath<EvidencePalette, Color> {
         switch self {
-        case .calories: \.amber
+        case .calories: \.green
         case .protein: \.protein
         case .carbohydrates: \.carbs
         case .fat: \.fat

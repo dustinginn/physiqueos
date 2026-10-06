@@ -188,7 +188,7 @@ final class EvidenceReviewHeaderDateTests: XCTestCase {
         }
 
         // Each macro is one palette token: the accepted Nutrition Evidence mapping.
-        XCTAssertEqual(NutritionEvidenceMacro.calories.paletteColor, \EvidencePalette.amber)
+        XCTAssertEqual(NutritionEvidenceMacro.calories.paletteColor, \EvidencePalette.green)
         XCTAssertEqual(NutritionEvidenceMacro.protein.paletteColor, \EvidencePalette.protein)
         XCTAssertEqual(NutritionEvidenceMacro.carbohydrates.paletteColor, \EvidencePalette.carbs)
         XCTAssertEqual(NutritionEvidenceMacro.fat.paletteColor, \EvidencePalette.fat)
@@ -205,4 +205,3 @@ final class EvidenceReviewHeaderDateTests: XCTestCase {
         XCTAssertEqual(EvidenceReviewDetailView.metricTone("Source", itemType: "nutrition"), .teal)
     }
 }
-
