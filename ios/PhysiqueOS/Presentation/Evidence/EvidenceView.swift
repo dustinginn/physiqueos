@@ -36,7 +36,9 @@ struct EvidenceView: View {
             }
             await viewModel?.load()
         }
-        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) { await viewModel?.load() }
+        .refreshable { await viewModel?.load(trigger: .pullToRefresh) }
+        .refreshesOnForegroundWhenVisible { await viewModel?.retryAfterForegroundIfNeeded() }
+        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) { await viewModel?.load(trigger: .dayChange) }
     }
 
     @ViewBuilder
@@ -47,12 +49,26 @@ struct EvidenceView: View {
                 .tint(PhysiqueOSTheme.accent)
                 .frame(maxWidth: .infinity, minHeight: 300)
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            VStack(spacing: 14) {
+                Text(message)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("evidence.hub.failure")
+                Button("Try Again") { Task { await viewModel?.load(trigger: .retry) } }
+                    .buttonStyle(.borderedProminent)
+                    .tint(PhysiqueOSTheme.accent)
+                    .accessibilityIdentifier("evidence.hub.retry")
+            }
+            .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let hub):
             VStack(alignment: .leading, spacing: 16) {
+                if viewModel?.refreshFailed == true {
+                    Text("Couldn't refresh. Showing Evidence loaded earlier — pull to refresh.")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .accessibilityIdentifier("evidence.hub.refreshFailed")
+                }
                 EvidenceHeaderView(title: hub.title, subtitle: hub.subtitle)
 
                 if !recentlyUsedStreams(in: hub).isEmpty {

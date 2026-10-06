@@ -2940,6 +2940,57 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(streamsByID["health-metrics"]?.metric, "Coming soon")
     }
 
+    /// Build 87 app-open audit (2026-10-06): a stale authoritative DNS
+    /// server returned NXDOMAIN for the production host, so every read
+    /// failed in transport with `cannotFindHost` and the Evidence root sat
+    /// on a terminal "Evidence could not be loaded." with no recovery. The
+    /// same outage must now show a recoverable unreachable state, keep the
+    /// transport identity in `NetworkFailureDiagnostics`, and recover on
+    /// retry once the host resolves — re-reading only what failed.
+    @MainActor
+    func testEvidenceHubRecoversFromHostResolutionOutage() async throws {
+        let routed = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: [
+                "weight": productionWeightJSON(value: 172.4, id: "weight-canonical"),
+                "training-landing": productionTrainingLandingJSON,
+                "training-library": productionEmptyTrainingLibraryJSON,
+                "nutrition": productionNutritionJSON,
+                "activity": productionActivityJSON,
+                "energy": productionEnergyJSON,
+                "dexa": productionDexaJSON,
+                "photos": productionPhotosJSON,
+            ]
+        )
+        let transport = HostResolutionOutageTransport(base: routed)
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let defaults = UserDefaults(suiteName: "evidence-dns-outage-\(UUID().uuidString)")!
+        let viewModel = EvidenceViewModel(
+            api: ProductionEvidenceAPI(api: native),
+            usageStore: UserDefaultsEvidenceHubUsageStore(defaults: defaults)
+        )
+        NetworkFailureDiagnostics.clear()
+        defer { NetworkFailureDiagnostics.clear() }
+
+        await transport.setOutage(true)
+        await viewModel.load()
+        XCTAssertEqual(viewModel.state, .failed(EvidenceViewModel.unreachableMessage))
+        XCTAssertTrue(viewModel.needsRetry)
+        let recorded = NetworkFailureDiagnostics.recentEvents()
+        XCTAssertFalse(recorded.isEmpty)
+        XCTAssertTrue(recorded.allSatisfy { $0.errorDomain == NSURLErrorDomain && $0.errorCode == NSURLErrorCannotFindHost })
+
+        await transport.setOutage(false)
+        let readsBeforeRetry = await routed.requests.count
+        await viewModel.load(trigger: .retry)
+        guard case .loaded(let hub) = viewModel.state else { return XCTFail("Evidence must recover on retry") }
+        XCTAssertEqual(hub.streams.first { $0.id == "weight" }?.metric, "172.4 lb")
+        XCTAssertFalse(viewModel.needsRetry)
+        let retryReads = await routed.requests.dropFirst(readsBeforeRetry).compactMap { $0.url?.lastPathComponent }
+        XCTAssertEqual(retryReads.count, Set(retryReads).count, "a retry must not issue duplicate reads of the same resource")
+    }
+
     /// The server already selects/scopes scans before this report is
     /// built, so Production must decode its output directly rather than
     /// re-running scan selection — and must reconcile several genuine
@@ -7191,6 +7242,22 @@ private actor RoutedFounderTransport: FounderHTTPTransport {
 
     private func response(request: URLRequest) -> HTTPURLResponse {
         HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+    }
+}
+
+/// Fails every non-pairing request with `cannotFindHost` while the outage
+/// is on — the exact transport error an NXDOMAIN answer produces.
+private actor HostResolutionOutageTransport: FounderHTTPTransport {
+    private let base: RoutedFounderTransport
+    private var outage = false
+
+    init(base: RoutedFounderTransport) { self.base = base }
+
+    func setOutage(_ value: Bool) { outage = value }
+
+    func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        if outage, !(request.url?.path ?? "").hasSuffix("/auth/pair") { throw URLError(.cannotFindHost) }
+        return try await base.data(for: request)
     }
 }
 
