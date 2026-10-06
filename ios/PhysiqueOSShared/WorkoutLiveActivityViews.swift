@@ -216,6 +216,33 @@ struct WorkoutCompleteSetButton: View {
     }
 }
 
+/// The clock block's glyph and label, decided in one place so tests can
+/// assert them without pixels. Rest shows the rest timer's own glyph; with no
+/// rest (Rest Off, before the first set, or privacy) the elapsed WORKOUT clock
+/// uses the stopwatch glyph. Both render in the block's green.
+struct WorkoutClockPresentation: Equatable {
+    enum Clock: Equatable { case rest, workoutElapsed }
+
+    var clock: Clock
+    var glyph: String
+    var label: String
+    var accessibilityLabel: String
+
+    static func make(state: WorkoutActivityState, isStale: Bool, showsRest: Bool) -> Self {
+        if showsRest, let rest = state.rest {
+            let isCountdown = rest.mode == .countdown
+            let expired = isCountdown && isStale
+            return .init(
+                clock: .rest,
+                glyph: isCountdown ? "timer" : "stopwatch",
+                label: expired ? "REST · COMPLETE" : (isCountdown ? "REST · COUNTDOWN" : "REST · STOPWATCH"),
+                accessibilityLabel: isCountdown ? "Rest countdown" : "Rest stopwatch"
+            )
+        }
+        return .init(clock: .workoutElapsed, glyph: "stopwatch", label: "WORKOUT", accessibilityLabel: "Workout time")
+    }
+}
+
 /// The lower-left clock block: green glyph, a 7 pt label and a 20 pt value.
 /// Rest when resting; otherwise (Rest Off, or privacy) the workout clock.
 private struct WorkoutClockBlock: View {
@@ -227,21 +254,17 @@ private struct WorkoutClockBlock: View {
     @Environment(\.workoutActivityStartedAt) private var attributesStartedAt
 
     var body: some View {
+        let content = WorkoutClockPresentation.make(state: state, isStale: isStale, showsRest: showsRest)
         if showsRest, let rest = state.rest {
-            let isCountdown = rest.mode == .countdown
-            let expired = isCountdown && isStale
-            block(
-                glyph: isCountdown ? "timer" : "stopwatch",
-                label: expired ? "REST · COMPLETE" : (isCountdown ? "REST · COUNTDOWN" : "REST · STOPWATCH")
-            ) {
+            block(glyph: content.glyph, label: content.label) {
                 WorkoutRestClockText(rest: rest)
             }
-            .accessibilityLabel(isCountdown ? "Rest countdown" : "Rest stopwatch")
+            .accessibilityLabel(content.accessibilityLabel)
         } else {
-            block(glyph: "dumbbell.fill", label: "WORKOUT") {
+            block(glyph: content.glyph, label: content.label) {
                 WorkoutElapsedText(startedAt: attributesStartedAt, finishedAt: state.finishedAt)
             }
-            .accessibilityLabel("Workout time")
+            .accessibilityLabel(content.accessibilityLabel)
         }
     }
 

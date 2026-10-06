@@ -322,6 +322,81 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
         XCTAssertLessThanOrEqual(fittingHeight(expired, width: 365), 160)
     }
 
+    // MARK: Clock block (Build 89 integration: no-rest WORKOUT stopwatch)
+
+    /// Glyphs that must never mark the elapsed WORKOUT clock: the workout
+    /// identity glyph and any bars / equalizer / level semantic.
+    private func assertNotAWorkoutOrBarsGlyph(_ glyph: String, _ context: String, file: StaticString = #filePath, line: UInt = #line) {
+        for forbidden in ["dumbbell", "figure.", "chart.bar", "waveform", "equalizer", "cellularbars", "slider"] {
+            XCTAssertFalse(glyph.contains(forbidden), "\(context): \(glyph) is a workout/bars glyph", file: file, line: line)
+        }
+    }
+
+    func testNoRestAndPreFirstSetWorkoutClockUsesTheStopwatchGlyph() throws {
+        typealias C = WorkoutClockPresentation
+        let preFirstSet = state(layout: .currentAndUpNext, rows: [
+            row(.current, "Incline Dumbbell Press", 1, 4, "80 lb × 10", target: true),
+            row(.upNext, "Incline Dumbbell Press", 2, 4, "80 lb × 10"),
+        ], rest: nil, completed: 0)
+        var restOff = normal; restOff.rest = nil
+        let workout = C(clock: .workoutElapsed, glyph: "stopwatch", label: "WORKOUT", accessibilityLabel: "Workout time")
+        for (name, state, stale, showsRest) in [
+            ("pre-first-set", preFirstSet, false, true),
+            ("rest-off", restOff, false, true),
+            ("rest-off-stale", restOff, true, true),
+            ("privacy-with-rest", normal, false, false),
+            ("all-sets-complete", self.state(phase: .allSetsComplete, layout: .completedOnly, rows: [], rest: nil, completed: 18), false, true),
+        ] {
+            let presentation = C.make(state: state, isStale: stale, showsRest: showsRest)
+            XCTAssertEqual(presentation, workout, name)
+            assertNotAWorkoutOrBarsGlyph(presentation.glyph, name)
+        }
+        // The pre-first-set Lock Screen still renders within budget, both appearances.
+        for scheme in [ColorScheme.dark, .light] {
+            let view = lockScreen(attributes(elapsed: 95), preFirstSet, scheme: scheme)
+            XCTAssertLessThanOrEqual(fittingHeight(view, width: 365), 160)
+            let image = render(scene(view, scheme: scheme), size: CGSize(width: 393, height: 852), scheme: scheme)
+            assertNotBlank(image, "pre-first-set")
+            try save(image, named: scheme == .light ? "T-lock-pre-first-set-workout-stopwatch-mineral" : "T-lock-pre-first-set-workout-stopwatch")
+        }
+    }
+
+    func testActiveRestClockPresentationIsUnchanged() throws {
+        typealias C = WorkoutClockPresentation
+        XCTAssertEqual(C.make(state: normal, isStale: false, showsRest: true),
+                       C(clock: .rest, glyph: "stopwatch", label: "REST · STOPWATCH", accessibilityLabel: "Rest stopwatch"))
+        var countdown = normal; countdown.rest = self.countdown(elapsed: 17, remaining: 73)
+        XCTAssertEqual(C.make(state: countdown, isStale: false, showsRest: true),
+                       C(clock: .rest, glyph: "timer", label: "REST · COUNTDOWN", accessibilityLabel: "Rest countdown"))
+        XCTAssertEqual(C.make(state: countdown, isStale: true, showsRest: true),
+                       C(clock: .rest, glyph: "timer", label: "REST · COMPLETE", accessibilityLabel: "Rest countdown"))
+        // Green treatment: the block tints every clock glyph with the locked green.
+        XCTAssertEqual(WorkoutActivityTheme.dark.green, Color.activityHex(0x55E39A))
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("PhysiqueOSShared/WorkoutLiveActivityViews.swift"), encoding: .utf8)
+        let block = try XCTUnwrap(source.range(of: "private func block<Clock: View>(glyph: String"))
+        let body = source[block.upperBound...].prefix(400)
+        XCTAssertTrue(body.contains("Image(systemName: glyph)") && body.contains(".foregroundStyle(theme.green)"),
+                      "The clock glyph keeps the green treatment.")
+        XCTAssertEqual(source.components(separatedBy: "\"dumbbell.fill\", label: \"WORKOUT\"").count, 1,
+                       "The WORKOUT clock no longer uses the workout glyph.")
+    }
+
+    func testCompleteSetMovesTheClockFromWorkoutToRestStopwatch() {
+        typealias C = WorkoutClockPresentation
+        let before = state(layout: .currentAndUpNext, rows: [
+            row(.current, "Incline Dumbbell Press", 1, 4, "80 lb × 10", target: true),
+            row(.upNext, "Incline Dumbbell Press", 2, 4, "80 lb × 10"),
+        ], rest: nil, completed: 0)
+        var after = before
+        after.rest = stopwatch(0)
+        after.completedSets = 1
+        XCTAssertEqual(C.make(state: before, isStale: false, showsRest: true).clock, .workoutElapsed)
+        XCTAssertEqual(C.make(state: before, isStale: false, showsRest: true).glyph, "stopwatch")
+        XCTAssertEqual(C.make(state: after, isStale: false, showsRest: true),
+                       C(clock: .rest, glyph: "stopwatch", label: "REST · STOPWATCH", accessibilityLabel: "Rest stopwatch"))
+    }
+
     /// The Live Activity uses fixed point sizes (as the approved prototype
     /// does), so Dynamic Type does not rescale it; this guards that the
     /// layout is still intact and within budget when the environment asks

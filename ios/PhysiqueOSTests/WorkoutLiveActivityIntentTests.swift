@@ -196,6 +196,33 @@ final class WorkoutLiveActivityIntentTests: XCTestCase {
         XCTAssertNotNil(rendered?.rest)
     }
 
+    /// Build 89 integration: the real Complete Set pipeline moves the
+    /// rendered clock from the no-rest WORKOUT stopwatch to the rest
+    /// stopwatch; the timer authority (rest state, revision) is untouched.
+    func testCompleteSetRendersTheTransitionFromWorkoutStopwatchToRestStopwatch() async {
+        let previous = WorkoutActivityIntentRuntime.handler
+        defer { WorkoutActivityIntentRuntime.handler = previous }
+        let rig = rig(draft: session())
+        rig.bridge.install()
+        let draftBefore = rig.authority.draft(id: "session-1")
+        XCTAssertNil(draftBefore?.rest, "Before the first set there is no rest.")
+        let projection = TrainingSessionLiveProjection.make(from: draftBefore!, areaLabels: [:], now: Date())!
+        let beforeState = WorkoutActivityAttributes.ContentState(projection: projection, finishing: false)
+        XCTAssertNil(beforeState.rest)
+        XCTAssertEqual(WorkoutClockPresentation.make(state: beforeState, isStale: false, showsRest: true),
+                       .init(clock: .workoutElapsed, glyph: "stopwatch", label: "WORKOUT", accessibilityLabel: "Workout time"))
+
+        let outcome = await WorkoutActivityIntentRuntime.resolve(request(rig))
+        XCTAssertEqual(outcome, .applied)
+        let draftAfter = rig.authority.draft(id: "session-1")
+        let rendered = rig.client.live.first?.state
+        XCTAssertEqual(rendered?.rest?.mode, .stopwatch)
+        XCTAssertEqual(rendered?.rest?.id, draftAfter?.rest?.id, "The rendered rest is the authority's rest.")
+        XCTAssertEqual(rendered?.revision, draftAfter?.currentRevision)
+        XCTAssertEqual(rendered.map { WorkoutClockPresentation.make(state: $0, isStale: false, showsRest: true) },
+                       .init(clock: .rest, glyph: "stopwatch", label: "REST · STOPWATCH", accessibilityLabel: "Rest stopwatch"))
+    }
+
     func testTheIntentCarriesTheExactRenderedIdentityAndIsNotDiscoverable() async throws {
         let intent = CompleteWorkoutSetIntent(sessionId: "s1", authority: "founderProduction", exerciseId: "e1", setId: "set1", expectedRevision: 7)
         XCTAssertEqual(intent.sessionId, "s1")
