@@ -1275,3 +1275,196 @@ final class Build89IntegrationUITests: XCTestCase {
         add(attachment)
     }
 }
+
+/// Build 90 Founder design round captures (B90-1..B90-3). Drives the real
+/// sandbox app through the DEBUG-only `-physiqueos.b90.*` review seams and
+/// writes full-screen PNGs only when `B90_CAPTURE_DIR` is set; nothing here
+/// is a shipping assertion beyond the journeys completing.
+@MainActor
+final class Build90DesignRoundCaptureUITests: XCTestCase {
+    private let app = XCUIApplication()
+
+    override func setUp() async throws {
+        continueAfterFailure = false
+    }
+
+    // MARK: B90-1 Logger rest stopwatch
+
+    func testB90StopwatchOptionAMineral() { stopwatch("a", appearance: "light") }
+    func testB90StopwatchOptionBMineral() { stopwatch("b", appearance: "light") }
+    func testB90StopwatchOptionCMineral() { stopwatch("c", appearance: "light") }
+    func testB90StopwatchOptionADark() { stopwatch("a", appearance: "dark") }
+    func testB90StopwatchOptionBDark() { stopwatch("b", appearance: "dark") }
+    func testB90StopwatchOptionCDark() { stopwatch("c", appearance: "dark") }
+
+    func testB90StopwatchCurrentMineral() { stopwatch("current", appearance: "light") }
+
+    private func stopwatch(_ option: String, appearance: String) {
+        launch(appearance: appearance, route: "training-logger", extra: (option == "current" ? [] : [
+            "-physiqueos.b90.stopwatch", option,
+        ]) + [
+            "-physiqueos.b90.rest-seconds", "84",
+            "-physiqueos.b90.workout-seconds", "754",
+        ])
+        startWorkout()
+        capture("b90-1-\(option)-\(appearance)-norest")
+        let complete = app.buttons["Mark set complete"].firstMatch
+        XCTAssertTrue(complete.waitForExistence(timeout: 5))
+        complete.tap()
+        app.buttons["Mark set complete"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Mark set incomplete"].firstMatch.waitForExistence(timeout: 3))
+        if option != "current" {
+            XCTAssertTrue(app.descendants(matching: .any)["trainingLogger.b90.stopwatch"].firstMatch.waitForExistence(timeout: 3))
+        }
+        capture("b90-1-\(option)-\(appearance)-rest")
+        for _ in 0..<8 { app.swipeUp() }
+        capture("b90-1-\(option)-\(appearance)-scrolled")
+        cancelWorkout()
+    }
+
+    // MARK: B90-2 Guided Watch handoff
+
+    func testB90HandoffOptionAMineral() { handoff("a", appearance: "light") }
+    func testB90HandoffOptionBMineral() { handoff("b", appearance: "light") }
+    func testB90HandoffOptionCMineral() { handoff("c", appearance: "light") }
+    func testB90HandoffOptionsDark() {
+        for option in ["a", "b", "c"] { handoffState(option, state: "offer", appearance: "dark") }
+    }
+    func testB90HandoffAfterFlowMineral() {
+        for state in ["without", "on-watch"] { handoffState("a", state: state, appearance: "light", stopwatch: "a") }
+    }
+
+    private func handoff(_ option: String, appearance: String) {
+        handoffState(option, state: "offer", appearance: appearance) {
+            let primary = self.app.buttons["trainingLogger.b90.handoff.primary"]
+            XCTAssertTrue(primary.waitForExistence(timeout: 3))
+            primary.tap()
+            XCTAssertTrue(self.app.staticTexts["Waiting for your Watch"].waitForExistence(timeout: 3))
+            self.capture("b90-2-\(option)-\(appearance)-waiting")
+        }
+        for state in ["acknowledged", "unreachable"] { handoffState(option, state: state, appearance: appearance) }
+    }
+
+    private func handoffState(_ option: String, state: String, appearance: String, stopwatch: String? = nil, then: (() -> Void)? = nil) {
+        launch(appearance: appearance, route: "training-logger", extra: [
+            "-physiqueos.b90.handoff", option,
+            "-physiqueos.b90.handoff-state", state,
+            "-physiqueos.b90.workout-seconds", "754",
+        ] + (stopwatch.map { ["-physiqueos.b90.stopwatch", $0] } ?? []))
+        startWorkout()
+        if ["offer", "waiting", "acknowledged", "unreachable"].contains(state) {
+            XCTAssertTrue(app.descendants(matching: .any)["trainingLogger.b90.handoff"].firstMatch.waitForExistence(timeout: 5))
+        }
+        capture("b90-2-\(option)-\(appearance)-\(state)")
+        then?()
+        dismissHandoffIfPresent()
+        cancelWorkout()
+    }
+
+    private func dismissHandoffIfPresent() {
+        let secondary = app.buttons["trainingLogger.b90.handoff.secondary"]
+        if secondary.exists { secondary.tap() }
+        if app.descendants(matching: .any)["trainingLogger.b90.handoff"].firstMatch.exists {
+            // Acknowledged has no buttons: relaunching resets the review state.
+            app.terminate()
+            launch(appearance: "light", route: "training-logger", extra: [])
+        }
+    }
+
+    // MARK: B90-3 Photo comparison viewer
+
+    func testB90PhotoViewerMineral() { photo(appearance: "light") }
+    func testB90PhotoViewerDark() { photo(appearance: "dark") }
+
+    private func photo(appearance: String) {
+        for option in ["current", "a", "b", "c"] {
+            for (index, pose) in [(0, "front"), (1, "back"), (2, "flexed")] {
+                photoCapture(option: option, index: index, name: pose, appearance: appearance)
+            }
+            photoCapture(option: option, index: 2, name: "flexed-wide", appearance: appearance, aspect: "1.0")
+        }
+    }
+
+    private func photoCapture(option: String, index: Int, name: String, appearance: String, aspect: String? = nil) {
+        var extra = ["-physiqueos.evidence-review.synthetic-photos", "-physiqueos.briefing-review.photo-compare", "\(index)"]
+        if option != "current" { extra += ["-physiqueos.b90.photo-viewer", option] }
+        if let aspect { extra += ["-physiqueos.b90.photo-aspect", aspect] }
+        launch(appearance: appearance, route: "briefing:event_briefing_progress_photo_photo-set-fixture-005", extra: extra)
+        XCTAssertTrue(app.buttons["briefing.photo.comparison.close"].waitForExistence(timeout: 10))
+        capture("b90-3-\(option)-\(appearance)-\(name)")
+    }
+
+    // MARK: Helpers
+
+    private func launch(appearance: String, route: String, extra: [String]) {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance.preference.v1", appearance,
+            "-physiqueos.appearance-review.route", route,
+        ] + extra
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+    }
+
+    /// The same representative workout for every option: Chest + Core,
+    /// four exercises (two weighted, bodyweight, timed).
+    private func startWorkout() {
+        let start = app.buttons["trainingLogger.start"]
+        if !start.waitForExistence(timeout: 6),
+           app.descendants(matching: .any)["trainingLogger.workoutIdentity"].exists {
+            // A previous capture's workout resumed: discard it first.
+            dismissHandoffIfPresent()
+            cancelWorkout()
+        }
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        let discard = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "trainingLogger.discard.")).firstMatch
+        for _ in 0..<12 where discard.exists { discard.tap() }
+        start.tap()
+        for area in ["chest", "core"] {
+            let button = app.buttons["trainingLogger.area.\(area)"]
+            XCTAssertTrue(button.waitForExistence(timeout: 5))
+            button.tap()
+        }
+        let choose = app.buttons["Choose exercises"]
+        XCTAssertTrue(choose.waitForExistence(timeout: 5))
+        choose.tap()
+        for name in ["Bench Press", "Cable Fly", "Push-ups", "Planks"] {
+            var row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(name),")).firstMatch
+            for _ in 0..<6 where !(row.exists && row.isHittable) { app.swipeUp() }
+            if !row.exists {
+                for _ in 0..<8 { app.swipeDown() }
+                let browse = app.buttons["trainingLogger.browseAll"]
+                if browse.waitForExistence(timeout: 2) { browse.tap() }
+                row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(name),")).firstMatch
+                for _ in 0..<10 where !(row.exists && row.isHittable) { app.swipeUp() }
+            }
+            XCTAssertTrue(row.exists, "Exercise \(name) not found")
+            row.tap()
+        }
+        let startLogging = app.buttons["trainingLogger.startLogging"]
+        XCTAssertTrue(startLogging.waitForExistence(timeout: 5))
+        startLogging.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["trainingLogger.workoutIdentity"].waitForExistence(timeout: 5))
+    }
+
+    private func cancelWorkout() {
+        let cancel = app.buttons["trainingLogger.cancelWorkout"]
+        for _ in 0..<10 where !(cancel.exists && cancel.isHittable) { app.swipeDown() }
+        guard cancel.exists else { return }
+        cancel.tap()
+        let alert = app.alerts["Cancel this workout?"]
+        if alert.waitForExistence(timeout: 3) { alert.buttons["Cancel Workout"].tap() }
+    }
+
+    private func capture(_ name: String) {
+        Thread.sleep(forTimeInterval: 1.2)
+        let screenshot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let directory = ProcessInfo.processInfo.environment["B90_CAPTURE_DIR"] else { return }
+        try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
+    }
+}

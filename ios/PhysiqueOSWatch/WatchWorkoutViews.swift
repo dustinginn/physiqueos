@@ -231,9 +231,8 @@ struct WatchPanelPage<Content: View, Actions: View>: View {
             let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
             let topInset = WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top)
             ScrollView {
-                VStack(spacing: 6) {
-                    content()
-                    Spacer(minLength: 6)
+                WatchPanelActionLayout(actionFraction: WatchPanelActionPlacement.current.actionFraction) {
+                    VStack(spacing: 6) { content() }
                     VStack(spacing: 6) { actions() }
                 }
                 .padding(.horizontal, 9)
@@ -245,6 +244,63 @@ struct WatchPanelPage<Content: View, Actions: View>: View {
             .contentMargins(.horizontal, 0, for: .scrollContent)
             .ignoresSafeArea(edges: [.top, .bottom])
         }
+    }
+}
+
+/// Where a panel page's actions sit in the space left below its content.
+/// Release always uses `.bottom` (the shipping, edge-pinned layout).
+enum WatchPanelActionPlacement: String {
+    case bottom, centered, optical
+
+    /// 0 = directly under the content, 1 = pinned to the bottom edge.
+    var actionFraction: CGFloat {
+        switch self {
+        case .bottom: 1
+        case .centered: 0.5
+        case .optical: 0.42
+        }
+    }
+
+    static var current: WatchPanelActionPlacement {
+#if DEBUG
+        // Build 90 Founder review seam only: `-watchPanelActionPlacement centered|optical`.
+        if let index = ProcessInfo.processInfo.arguments.firstIndex(of: "-watchPanelActionPlacement"),
+           ProcessInfo.processInfo.arguments.indices.contains(index + 1),
+           let placement = WatchPanelActionPlacement(rawValue: ProcessInfo.processInfo.arguments[index + 1]) {
+            return placement
+        }
+#endif
+        return .bottom
+    }
+}
+
+/// Content at the top, actions placed at `actionFraction` of the free space
+/// below it. The 18 pt minimum gap equals the original VStack (6 pt spacing
+/// either side of a `Spacer(minLength: 6)`).
+/// When the page is taller than the screen the gap collapses to 18 pt and the
+/// enclosing ScrollView scrolls, exactly as before.
+struct WatchPanelActionLayout: Layout {
+    let actionFraction: CGFloat
+    private let minimumGap: CGFloat = 18
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let width = proposal.width
+        let content = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil))
+        let actions = subviews[1].sizeThatFits(ProposedViewSize(width: width, height: nil))
+        let natural = content.height + minimumGap + actions.height
+        return CGSize(width: width ?? max(content.width, actions.width), height: max(natural, proposal.height ?? natural))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let width = ProposedViewSize(width: bounds.width, height: nil)
+        let content = subviews[0].sizeThatFits(width)
+        let actions = subviews[1].sizeThatFits(width)
+        let free = max(0, bounds.height - content.height - minimumGap - actions.height)
+        subviews[0].place(at: CGPoint(x: bounds.midX, y: bounds.minY), anchor: .top, proposal: ProposedViewSize(width: bounds.width, height: content.height))
+        let actionsY = bounds.minY + content.height + minimumGap + free * actionFraction
+        subviews[1].place(at: CGPoint(x: bounds.midX, y: actionsY), anchor: .top, proposal: ProposedViewSize(width: bounds.width, height: actions.height))
     }
 }
 

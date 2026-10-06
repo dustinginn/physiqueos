@@ -144,6 +144,10 @@ struct TrainingLoggerView: View {
     /// SwiftUI may keep a tab's hierarchy alive while another tab is visible.
     /// A late PR read must not consume the one-shot celebration off-screen.
     @State private var isSurfaceVisible = false
+#if DEBUG
+    /// Build 90 design-round review state only (see `Build90ReviewSeam`).
+    @State private var b90HandoffState: Build90HandoffState? = Build90ReviewSeam.handoffOption == nil ? nil : Build90ReviewSeam.handoffState
+#endif
 
     var body: some View {
         Group {
@@ -330,7 +334,60 @@ struct TrainingLoggerView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             persistentAction(viewModel)
         }
+#if DEBUG
+        .modifier(Build90HandoffPresenter(
+            state: $b90HandoffState,
+            isEligible: viewModel.draft?.step == .workout && viewModel.draft?.completedSetCount == 0
+        ))
+#endif
     }
+
+#if DEBUG
+    private func build90StopwatchFooter(option: String, viewModel: TrainingLoggerViewModel) -> some View {
+        let presentation = viewModel.workoutPresentation
+        let clock = Build90LoggerClock(draft: viewModel.draft)
+        let finish = LoggerExecutionButton(title: "Finish Workout", isEnabled: presentation?.canFinish == true) {
+            viewModel.reviewWorkout()
+        }
+        .accessibilityIdentifier("trainingLogger.finishWorkout")
+        return VStack(spacing: 0) {
+            switch option {
+            case "a":
+                persistentActionBar {
+                    HStack(spacing: 8) {
+                        Build90StopwatchTile(clock: clock)
+                        finish
+                    }
+                }
+            case "b":
+                if clock.isResting {
+                    Build90StopwatchPill(clock: clock).padding(.bottom, 10)
+                }
+                persistentActionBar { finish }
+            default:
+                persistentActionBar {
+                    VStack(spacing: 8) {
+                        Build90StopwatchStatusLine(clock: clock)
+                        finish
+                    }
+                }
+            }
+        }
+    }
+
+    /// Option C handoff: the prompt docks in the sticky-bar slot (before the
+    /// first set Finish is disabled anyway); the Logger stays scrollable.
+    private func build90HandoffPanel(_ state: Build90HandoffState) -> some View {
+        persistentActionBar {
+            Build90HandoffContent(state: state, compact: true, primary: {
+                b90HandoffState = .waiting
+            }, secondary: {
+                b90HandoffState = .without
+            })
+            .padding(.top, 6)
+        }
+    }
+#endif
 
     @ViewBuilder
     private func persistentAction(_ viewModel: TrainingLoggerViewModel) -> some View {
@@ -347,6 +404,28 @@ struct TrainingLoggerView: View {
                 }
                 .accessibilityIdentifier("trainingLogger.startLogging")
             }
+        case .workout:
+#if DEBUG
+            if let handoff = b90HandoffState, Build90ReviewSeam.handoffOption == "c", handoff.presentsPrompt,
+               viewModel.draft?.completedSetCount == 0 {
+                build90HandoffPanel(handoff)
+            } else if let option = Build90ReviewSeam.stopwatchOption,
+               NumericEditingContract.finishActionVisible(step: viewModel.draft?.step, keyboardVisible: isNumericKeyboardVisible) {
+                build90StopwatchFooter(option: option, viewModel: viewModel)
+            } else {
+                standardWorkoutFooter(viewModel)
+            }
+#else
+            standardWorkoutFooter(viewModel)
+#endif
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func standardWorkoutFooter(_ viewModel: TrainingLoggerViewModel) -> some View {
+        switch viewModel.draft?.step {
         case .workout:
             if NumericEditingContract.finishActionVisible(step: viewModel.draft?.step, keyboardVisible: isNumericKeyboardVisible) {
                 let presentation = viewModel.workoutPresentation
@@ -795,7 +874,7 @@ struct TrainingLoggerView: View {
             if let draft = viewModel.draft, let presentation = viewModel.workoutPresentation {
                 workoutIdentity(draft: draft, presentation: presentation)
 
-                if draft.completedSetCount == 0, !draft.exercises.isEmpty {
+                if draft.completedSetCount == 0, !draft.exercises.isEmpty, !LoggerReviewSeam.build90ReplacesReadyCard {
                     readyForWatchField(draft: draft, viewModel: viewModel)
                 }
 
@@ -2098,6 +2177,16 @@ struct LoggerFinishPresentation {
 /// durability waits, Server-only performance records). Presentation only:
 /// nothing here touches the session authority. Release builds compile to nil.
 enum LoggerReviewSeam {
+    /// Build 90 design round: the guided handoff options replace the large
+    /// Ready for Watch card. Always false in Release.
+    static var build90ReplacesReadyCard: Bool {
+#if DEBUG
+        Build90ReviewSeam.handoffOption != nil
+#else
+        false
+#endif
+    }
+
     static var forcedFinish: String? {
 #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
@@ -2124,3 +2213,413 @@ enum LoggerReviewSeam {
     }
 #endif
 }
+
+#if DEBUG
+// MARK: - Build 90 Founder design round (DEBUG review seams only)
+
+/// Build 90 design-round seams. Presentation only: every option reads the
+/// canonical `TrainingSessionAuthority` draft (`draft.rest`, `startedAt`,
+/// pause anchors) exactly as the Watch and Live Activity do; nothing here
+/// writes, ticks or owns timer state. Absent from Release builds.
+enum Build90ReviewSeam {
+    private static func value(_ flag: String) -> String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1]
+    }
+
+    /// `-physiqueos.b90.stopwatch a|b|c`
+    static var stopwatchOption: String? { value("-physiqueos.b90.stopwatch") }
+    /// `-physiqueos.b90.rest-seconds 84` / `-physiqueos.b90.workout-seconds 754`:
+    /// freeze the displayed clock value for deterministic captures (the real
+    /// canonical anchor is still required for the clock to appear at all).
+    static var frozenRestSeconds: Double? { value("-physiqueos.b90.rest-seconds").flatMap(Double.init) }
+    static var frozenWorkoutSeconds: Double? { value("-physiqueos.b90.workout-seconds").flatMap(Double.init) }
+    /// `-physiqueos.b90.handoff a|b|c`
+    static var handoffOption: String? { value("-physiqueos.b90.handoff") }
+    /// `-physiqueos.b90.handoff-state offer|waiting|acknowledged|unreachable|without|on-watch`
+    static var handoffState: Build90HandoffState {
+        value("-physiqueos.b90.handoff-state").flatMap(Build90HandoffState.init(rawValue:)) ?? .offer
+    }
+}
+
+/// What the Logger's phone stopwatch shows, derived from canonical draft
+/// state with the same gates as `TrainingSessionLiveProjection` (no rest
+/// while Finish confirmation is open, after finish or during submission).
+struct Build90LoggerClock {
+    enum Kind { case rest(TrainingSessionRestState), workoutElapsed(Date), none }
+    var kind: Kind
+    var frozenSeconds: Double?
+
+    init(draft: TrainingLoggerDraft?) {
+        guard let draft, draft.step == .workout, draft.finishConfirmationRequestedAt == nil,
+              draft.finishedAt == nil, draft.submissionState == nil else { kind = .none; return }
+        if let rest = draft.rest {
+            kind = .rest(rest)
+            frozenSeconds = Build90ReviewSeam.frozenRestSeconds ?? rest.frozenElapsedSeconds
+        } else if let started = draft.startedAt.flatMap(TrainingSessionClock.date(from:)) {
+            kind = .workoutElapsed(started.addingTimeInterval(draft.accumulatedPausedSeconds ?? 0))
+            frozenSeconds = Build90ReviewSeam.frozenWorkoutSeconds
+        } else {
+            kind = .none
+        }
+    }
+
+    var isResting: Bool { if case .rest = kind { true } else { false } }
+    var glyph: String { if case .rest(let rest) = kind, rest.mode == .countdown { "timer" } else { "stopwatch" } }
+    var label: String {
+        switch kind {
+        case .rest(let rest): rest.mode == .countdown ? "Rest · Countdown" : "Rest · Stopwatch"
+        case .workoutElapsed: "Workout"
+        case .none: "Rest"
+        }
+    }
+    var shortLabel: String { isResting ? "Rest" : "Workout" }
+
+    @ViewBuilder
+    func text(size: CGFloat) -> some View {
+        let font = Font(PlusJakartaSans.uiFont(size: size, weight: 700))
+        Group {
+            if let frozenSeconds {
+                Text(Self.clock(frozenSeconds))
+            } else {
+                switch kind {
+                case .rest(let rest):
+                    let start = rest.startedAtDate ?? Date()
+                    if rest.mode == .countdown {
+                        let end = max(rest.endsAtDate ?? start, start.addingTimeInterval(1))
+                        Text(timerInterval: start...end, countsDown: true, showsHours: false)
+                    } else {
+                        Text(timerInterval: start...start.addingTimeInterval(24 * 3600), countsDown: false, showsHours: false)
+                    }
+                case .workoutElapsed(let start):
+                    Text(timerInterval: start...start.addingTimeInterval(24 * 3600), countsDown: false, showsHours: false)
+                case .none:
+                    Text("0:00")
+                }
+            }
+        }
+        .font(font)
+        .monospacedDigit()
+        .lineLimit(1)
+    }
+
+    static func clock(_ seconds: Double) -> String {
+        let total = max(0, Int(seconds))
+        return total >= 3600
+            ? String(format: "%d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
+            : String(format: "%d:%02d", total / 60, total % 60)
+    }
+}
+
+/// Option A: a stopwatch tile docked beside Finish Workout in the sticky bar.
+struct Build90StopwatchTile: View {
+    let clock: Build90LoggerClock
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        HStack(spacing: 8) {
+            Image(systemName: clock.glyph)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(PhysiqueOSTheme.redesignGreen)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(clock.shortLabel)
+                    .logText(LoggerType.eyebrow8)
+                    .foregroundStyle(clock.isResting ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignUtilityMuted)
+                clock.text(size: 19)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(width: 120, height: 52, alignment: .leading)
+        .background(clock.isResting ? PhysiqueOSTheme.redesignGreen.opacity(0.1) : PhysiqueOSTheme.redesignSoft, in: shape)
+        .overlay(shape.strokeBorder(clock.isResting ? PhysiqueOSTheme.redesignGreen.opacity(0.55) : PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(clock.isResting ? "Rest stopwatch" : "Workout time")
+        .accessibilityIdentifier("trainingLogger.b90.stopwatch")
+    }
+}
+
+/// Option B: a compact pill floating directly above the sticky bar; shown
+/// only while a rest is running.
+struct Build90StopwatchPill: View {
+    let clock: Build90LoggerClock
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Circle().fill(PhysiqueOSTheme.redesignGreen).frame(width: 6, height: 6)
+            Image(systemName: clock.glyph)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(PhysiqueOSTheme.redesignGreen)
+            Text("Rest")
+                .logText(LoggerType.eyebrow8)
+                .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
+            clock.text(size: 16)
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 36)
+        .background(PhysiqueOSTheme.redesignPaper, in: Capsule())
+        .overlay(Capsule().strokeBorder(PhysiqueOSTheme.redesignGreen.opacity(0.55), lineWidth: 1))
+        .shadow(color: .black.opacity(0.18), radius: 8, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Rest stopwatch")
+        .accessibilityIdentifier("trainingLogger.b90.stopwatch")
+    }
+}
+
+/// Option C: a restrained status line inside the sticky bar, above a
+/// full-width Finish Workout.
+struct Build90StopwatchStatusLine: View {
+    let clock: Build90LoggerClock
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: clock.glyph)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(clock.isResting ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignUtilityMuted)
+            Text(clock.isResting ? clock.label : "Rest · Stopwatch")
+                .logText(LoggerType.eyebrow8)
+                .foregroundStyle(clock.isResting ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignUtilityMuted)
+            Spacer(minLength: 8)
+            if clock.isResting {
+                clock.text(size: 17)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
+            } else {
+                Text("Starts when you complete a set")
+                    .logText(LoggerType.meta11)
+                    .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
+            }
+        }
+        .padding(.horizontal, 4)
+        .frame(height: 24)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("trainingLogger.b90.stopwatch")
+    }
+}
+
+// MARK: Guided iPhone → Watch handoff
+
+enum Build90HandoffState: String {
+    case offer, waiting, acknowledged, unreachable
+    /// After Use without Watch: the normal Logger, never asked again.
+    case without
+    /// After acknowledgment dismissed the sheet: the normal Logger.
+    case onWatch = "on-watch"
+
+    var presentsPrompt: Bool { [.offer, .waiting, .acknowledged, .unreachable].contains(self) }
+}
+
+/// The handoff prompt's content, shared by all three treatments so only the
+/// container differs between options.
+struct Build90HandoffContent: View {
+    let state: Build90HandoffState
+    var compact = false
+    let primary: () -> Void
+    let secondary: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 10 : 12) {
+            HStack(alignment: .top, spacing: 12) {
+                glyph
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .logText(LoggerType.surfaceTitle16)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                    Text(message)
+                        .logText(LoggerType.body11)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            if let primaryTitle {
+                Button(action: primary) {
+                    Text(primaryTitle)
+                        .logText(LoggerType.execution14)
+                        // Paper reads as near-white on Mineral's deep purple
+                        // and as deep ink on Dark's light purple.
+                        .foregroundStyle(PhysiqueOSTheme.redesignPaper)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(PhysiqueOSTheme.redesignPurple, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("trainingLogger.b90.handoff.primary")
+            }
+            if let secondaryTitle {
+                Button(action: secondary) {
+                    Text(secondaryTitle)
+                        .logText(LoggerType.control14)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(PhysiqueOSTheme.redesignSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("trainingLogger.b90.handoff.secondary")
+            }
+            if let footnote {
+                Text(footnote)
+                    .logText(LoggerType.fieldCaption9)
+                    .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("trainingLogger.b90.handoff")
+    }
+
+    @ViewBuilder private var glyph: some View {
+        let tile = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        ZStack {
+            tile.fill(tint.opacity(0.14))
+            switch state {
+            case .waiting:
+                ProgressView().tint(tint)
+            default:
+                Image(systemName: symbol).font(.system(size: 19, weight: .semibold)).foregroundStyle(tint)
+            }
+        }
+        .frame(width: 42, height: 42)
+        .accessibilityHidden(true)
+    }
+
+    private var symbol: String {
+        switch state {
+        case .acknowledged: "checkmark.circle.fill"
+        case .unreachable: "applewatch.slash"
+        default: "applewatch"
+        }
+    }
+
+    private var tint: Color {
+        switch state {
+        case .acknowledged: PhysiqueOSTheme.redesignGreen
+        case .unreachable: PhysiqueOSTheme.redesignAmber
+        default: PhysiqueOSTheme.redesignPurple
+        }
+    }
+
+    private var title: String {
+        switch state {
+        case .offer: "Log this workout on Apple Watch?"
+        case .waiting: "Waiting for your Watch"
+        case .acknowledged: "Started on Watch"
+        case .unreachable: "Watch not reachable"
+        case .without, .onWatch: ""
+        }
+    }
+
+    private var message: String {
+        switch state {
+        case .offer: "Your Watch records heart rate and Apple Health. Sets stay in sync with this iPhone."
+        case .waiting: "Opening PhysiqueOS on your Watch. If it doesn’t appear, raise your wrist, open PhysiqueOS and tap Start Workout."
+        case .acknowledged: "Your Watch confirmed the start. Log sets on either device."
+        case .unreachable: "Open PhysiqueOS on your Apple Watch, keep it unlocked and nearby, then tap Start Workout there."
+        case .without, .onWatch: ""
+        }
+    }
+
+    private var primaryTitle: String? {
+        switch state {
+        case .offer: "Ready on Watch"
+        case .unreachable: "Try Again"
+        default: nil
+        }
+    }
+
+    private var secondaryTitle: String? {
+        switch state {
+        case .offer, .waiting, .unreachable: "Use without Watch"
+        default: nil
+        }
+    }
+
+    private var footnote: String? {
+        switch state {
+        case .waiting: "This iPhone keeps the workout until the Watch confirms."
+        case .acknowledged: "Opening your workout…"
+        default: nil
+        }
+    }
+}
+
+/// Option C replacement for the large Ready for Watch card once the guided
+/// flow exists: a quiet status chip (after acknowledgment) or nothing.
+struct Build90WatchStatusChip: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(PhysiqueOSTheme.redesignGreen).frame(width: 6, height: 6)
+            Image(systemName: "applewatch").font(.system(size: 11, weight: .semibold))
+            Text("On Watch").logText(LoggerType.pill10Strong)
+        }
+        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(PhysiqueOSTheme.redesignSoft, in: Capsule())
+        .overlay(Capsule().strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("trainingLogger.b90.watchStatus")
+    }
+}
+
+/// Presents the handoff prompt for options A (system sheet) and B (centered
+/// card over a scrim), plus the post-flow Watch status chip.
+struct Build90HandoffPresenter: ViewModifier {
+    static func sheetHeight(_ state: Build90HandoffState) -> CGFloat {
+        switch state {
+        case .acknowledged: 168
+        case .waiting: 232
+        default: 252
+        }
+    }
+
+    @Binding var state: Build90HandoffState?
+    /// The prompt belongs to entering the active Logger before the first set.
+    let isEligible: Bool
+
+    func body(content: Content) -> some View {
+        let option = isEligible ? Build90ReviewSeam.handoffOption : nil
+        content
+            .sheet(isPresented: Binding(
+                get: { option == "a" && state?.presentsPrompt == true },
+                set: { if !$0 { state = .without } }
+            )) {
+                if let state {
+                    Build90HandoffContent(state: state, primary: { self.state = .waiting }, secondary: { self.state = .without })
+                        .padding(.horizontal, 20)
+                        .padding(.top, 26)
+                        .padding(.bottom, 12)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .presentationDetents([.height(Self.sheetHeight(state))])
+                        .presentationDragIndicator(.visible)
+                        .presentationBackground(PhysiqueOSTheme.redesignPaper)
+                        .presentationCornerRadius(28)
+                        .interactiveDismissDisabled(state == .waiting)
+                }
+            }
+            .overlay {
+                if option == "b", let current = state, current.presentsPrompt {
+                    ZStack {
+                        Color.black.opacity(0.38).ignoresSafeArea()
+                        Build90HandoffContent(state: current, primary: { state = .waiting }, secondary: { state = .without })
+                            .padding(18)
+                            .background(PhysiqueOSTheme.redesignPaper, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+                            .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
+                            .padding(.horizontal, 22)
+                    }
+                }
+            }
+            .toolbar {
+                if state == .onWatch {
+                    ToolbarItem(placement: .navigationBarTrailing) { Build90WatchStatusChip() }
+                }
+            }
+    }
+}
+#endif
