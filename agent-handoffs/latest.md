@@ -2,43 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- **Lane:** Redesign Batch 3 Evidence (Claude), final checkpoint E + closeout
-- **Task:** `batch3-d-accepted-final-e-dexa-proof-20261005` (prompt `387bbdb9`)
-- **Status:** **Completed. STOPPED for final Founder review.**
-- **Generated (UTC):** 2026-10-05T23:58:40Z
+- Task: Evidence intermittent app-open failure audit ("Evidence could not be loaded.") + bounded Native resilience fix (`evidence-app-open-load-failure-audit-20261006`)
+- Agent: claude
+- Status: completed
+- Generated (UTC): 2026-10-06T00:35:00Z
+- Success: true
 
-| Item | SHA | State |
-|---|---|---|
-| Final Batch 3 Native | `f5257ae1` on `claude/redesign-batch3-evidence-takeover-20261005` (code `44609af1`) | Ready for final review |
-| A / B / C | `ce5c7dd8` / `8aa2d00b` | Locked |
-| D | `9d2d0e06` | Accepted; DEXA proof complete |
-| E | `44609af1` | Ready for review |
-| Production Server | `b7eb1e39` (`6fa4e887`) | Unchanged |
+Summary: Root cause PROVEN outside the app: authoritative DNS ns66.domaincontrol.com serves a stale dustinginn.com zone (SOA 2026082000 vs ns65 2026090800) with no physiqueos CNAME, so resolvers that ask ns66 cache NXDOMAIN for up to 3600 s; every Native/web request then fails before reaching the Server (zero Server traffic 23:50-00:10Z; Server healthy, live/ready 200 via ondigitalocean host and pinned custom domain; home router 10.0.0.1 still NXDOMAIN at 00:33Z). Native defect PROVEN: Evidence root was the only tab root with a catch-all terminal failure, no Retry/pull/foreground retry, and blanked a loaded hub on refresh failure (Home hides the same outage with its last-known snapshot). Bounded fix c3d9d257: newest-load-wins guard, cancellation is non-terminal, failed refresh keeps the in-memory hub, classified copy, Try Again + pull to refresh + foreground retry when failed, bounded EvidenceHubLoad diagnostics. Batch 3 preview 9fa2428c keeps the locked design. Founder must fix GoDaddy DNS.
 
-**Review:**
-- Primary board: https://github.com/dustinginn/physiqueos/blob/f5257ae1013dbb04e996bab27e144201b84da8b7/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-e-20261005/checkpoint-e-primary-mobile-review-board.png (Light: https://github.com/dustinginn/physiqueos/blob/f5257ae1013dbb04e996bab27e144201b84da8b7/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-e-20261005/checkpoint-e-primary-mobile-review-board-light.png)
-- Package README: https://github.com/dustinginn/physiqueos/blob/f5257ae1013dbb04e996bab27e144201b84da8b7/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-e-20261005/README.md
-- DEXA inventory: https://github.com/dustinginn/physiqueos/blob/f5257ae1013dbb04e996bab27e144201b84da8b7/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-e-20261005/DEXA-REGRESSION-INVENTORY.md
-- Integration map: https://github.com/dustinginn/physiqueos/blob/f5257ae1013dbb04e996bab27e144201b84da8b7/agent-handoffs/artifacts/redesign-batch3-claude-checkpoint-e-20261005/INTEGRATION-MAP.md
+Detailed report: `agent-handoffs/reports/20261006T003500Z-evidence-app-open-load-failure-audit.md`
 
-**Gates:**
-- **Unit tests:** 831 run, 0 failures.
-- **Batch 3 / Recovery / Training-Evidence UI journeys:** 33/33.
-- **Pre-existing failures:** 9 in `TrainingAcceptanceUITests`, identical on base `8aa2d00b`.
-- **Release compile:** OK, 0 seams.
-- **Generator:** stable.
-
-**Integration:**
-- Against `793462b1` / `70ebf753`: one conflict, `HomeJourneyFieldView.swift`. Take the release side.
-- Against `e9f8a957` and against L13 `79a1a33d`: no conflicts.
-- Workout Match keeps Batch 2 L13.
-
-Report: `agent-handoffs/reports/20261005T235840Z-redesign-batch3-claude-checkpoint-e-closeout.md`
-
-**Carried forward:**
-- Include workout reliability `e9f8a957` (preview `70ebf753`) in the next authorized build.
-- Build 88 authorization for Batch 2 `793462b1`.
-
-No TestFlight upload, no build bump, no release merge.
-
-Protocol: `agent-handoffs/README_REPORTING_STANDARD.md`
+Protocol: `agent-handoffs/README.md`
