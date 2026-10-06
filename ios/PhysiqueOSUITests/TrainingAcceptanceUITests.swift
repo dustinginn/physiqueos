@@ -1139,3 +1139,121 @@ final class LoggerParityCaptureUITests: XCTestCase {
         try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
     }
 }
+
+/// Build 89 integration proof: the merged Claude A / Claude B / Codex
+/// surfaces reached through the real sandbox app. The DEBUG review routes
+/// cover the combined RootTabView table (A's Morning Check-In, B's Briefing
+/// History and `briefing:<artifactId>` fallback, the existing Evidence
+/// path); the Logger journey covers Codex's Option B set-value
+/// typography. Screenshots are XCTest attachments only.
+@MainActor
+final class Build89IntegrationUITests: XCTestCase {
+    private let app = XCUIApplication()
+
+    override func setUp() async throws {
+        continueAfterFailure = false
+    }
+
+    func testCombinedRootReviewRoutesDark() { combinedRootReviewRoutes(appearance: "dark") }
+    func testCombinedRootReviewRoutesMineralLight() { combinedRootReviewRoutes(appearance: "light") }
+
+    private func combinedRootReviewRoutes(appearance: String) {
+        // Claude A: Morning Check-In.
+        launch(appearance: appearance, route: "morning-check-in")
+        XCTAssertTrue(app.descendants(matching: .any)["morningCheckIn.weight"].waitForExistence(timeout: 10),
+                      "Morning Check-In route did not open the morning capture.")
+        XCTAssertTrue(app.buttons["morningCheckIn.save"].exists)
+        capture("I2-morning-check-in-\(appearance)")
+
+        // Claude B: Briefing History (stable type titles, per-artifact rows).
+        launch(appearance: appearance, route: "briefing-history")
+        XCTAssertTrue(app.staticTexts["Briefing History"].waitForExistence(timeout: 10), "Briefing History route failed.")
+        XCTAssertTrue(app.descendants(matching: .any)["briefingHistory.row.dexa_event_dexa-fixture-005"].waitForExistence(timeout: 5))
+        capture("I2-briefing-history-\(appearance)")
+
+        // Claude B: direct `briefing:<artifactId>` — resolved before the Evidence path.
+        launch(appearance: appearance, route: "briefing:dexa_event_dexa-fixture-005")
+        XCTAssertTrue(app.staticTexts["DEXA EVENT BRIEFING"].waitForExistence(timeout: 10), "Direct briefing artifact route failed.")
+        XCTAssertTrue(app.descendants(matching: .any)["briefing.dexa"].exists)
+        capture("I2-briefing-direct-dexa-\(appearance)")
+
+        // I5: DEXA rail layout + WHAT THIS SCAN MEANS lead (canonical interpretation.opening).
+        let since = app.descendants(matching: .any)["briefing.dexa.sinceLastScan"]
+        for _ in 0..<10 where !(since.exists && since.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(since.exists, "DEXA change rails (Since Last Scan) were not reachable.")
+        capture("I5-dexa-rails-\(appearance)")
+        let means = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "what this scan means")).firstMatch
+        for _ in 0..<14 where !(means.exists && means.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(means.exists, "WHAT THIS SCAN MEANS was not reachable.")
+        capture("I5-dexa-what-this-scan-means-\(appearance)")
+
+        // Existing Evidence path still resolves after the briefing fallback.
+        launch(appearance: appearance, route: "evidence:stream=training;trainingDay=2026-08-26")
+        XCTAssertTrue(app.staticTexts["TRAINING DAY"].waitForExistence(timeout: 10), "Evidence review route regressed.")
+        capture("I2-evidence-training-day-\(appearance)")
+    }
+
+    /// Codex Option B (16 pt Semibold REPS/LOAD) in the real sandbox Logger.
+    /// Suggested Today is supplied only by the Production payload's
+    /// `initialCategorySuggestion` (Sandbox never offers one), so its control
+    /// is proven by TrainingLoggerTests' shipping-component renders and
+    /// canonical selection tests instead of this journey.
+    func testLoggerOptionBSetValuesDark() { loggerOptionBSetValues(appearance: "dark") }
+    func testLoggerOptionBSetValuesMineralLight() { loggerOptionBSetValues(appearance: "light") }
+
+    private func loggerOptionBSetValues(appearance: String) {
+        launch(appearance: appearance, route: "training-logger")
+        discardSavedDrafts()
+        app.buttons["trainingLogger.start"].tap()
+        XCTAssertFalse(app.buttons["trainingLogger.suggestedToday"].exists, "Sandbox offers no Suggested Today.")
+        let chest = app.buttons["trainingLogger.area.chest"]
+        XCTAssertTrue(chest.waitForExistence(timeout: 5))
+        chest.tap()
+        let choose = app.buttons["Choose exercises"]
+        XCTAssertTrue(choose.waitForExistence(timeout: 5))
+        choose.tap()
+        let bench = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Bench Press,")).firstMatch
+        XCTAssertTrue(bench.waitForExistence(timeout: 5))
+        bench.tap()
+        let startLogging = app.buttons["trainingLogger.startLogging"]
+        XCTAssertTrue(startLogging.waitForExistence(timeout: 5))
+        startLogging.tap()
+        XCTAssertTrue(app.buttons["Mark set complete"].firstMatch.waitForExistence(timeout: 5))
+        let load = app.textFields["Set 1 optional external load"].firstMatch
+        XCTAssertTrue(load.waitForExistence(timeout: 3))
+        XCTAssertGreaterThanOrEqual(load.frame.height, 35.5, "Numeric fields keep their 36 pt height.")
+        capture("I3-logger-option-b-set-values-\(appearance)")
+
+        app.buttons["trainingLogger.cancelWorkout"].tap()
+        XCTAssertTrue(app.alerts["Cancel this workout?"].waitForExistence(timeout: 3))
+        app.alerts["Cancel this workout?"].buttons["Cancel Workout"].tap()
+    }
+
+    private func launch(appearance: String, route: String) {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance.preference.v1", appearance,
+            "-physiqueos.appearance-review.route", route,
+        ]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+    }
+
+    private func discardSavedDrafts() {
+        let start = app.buttons["trainingLogger.start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        let discard = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "trainingLogger.discard.")).firstMatch
+        for _ in 0..<12 where discard.exists {
+            discard.tap()
+        }
+    }
+
+    private func capture(_ name: String) {
+        Thread.sleep(forTimeInterval: 0.9)
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+}

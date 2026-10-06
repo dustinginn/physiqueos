@@ -1930,4 +1930,3 @@ struct BriefingUncertaintyCard: View {
     /// Never mounted by the locked family; kept inert.
     var body: some View { EmptyView() }
 }
-

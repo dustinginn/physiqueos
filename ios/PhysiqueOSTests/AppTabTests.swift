@@ -162,4 +162,31 @@ final class AppTabTests: XCTestCase {
         XCTAssertTrue(logger.contains("viewModel?.draft == nil || (viewModel?.draft?.step == .complete && viewModel?.draft?.id != draftId)"))
         XCTAssertTrue(logger.contains("if viewModelAuthority != environment.nativeAuthority {"))
     }
+
+    /// Build 89 integration: Claude A's and Claude B's review routes share
+    /// RootTabView's DEBUG-only launch table. Both survive the merge, the
+    /// `briefing:<artifactId>` fallback runs before the Evidence path, and the
+    /// whole table stays out of Release.
+    func testCombinedReviewRoutesStayDebugOnlyAndKeepBothLanes() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let tabs = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Root/RootTabView.swift"), encoding: .utf8)
+        let start = try XCTUnwrap(tabs.range(of: "#if DEBUG\n/// Screenshot-only navigation seam"))
+        let table = try XCTUnwrap(tabs.range(of: "private enum AppearanceReviewLaunchConfiguration {", range: start.upperBound..<tabs.endIndex))
+        let end = try XCTUnwrap(tabs.range(of: "#endif", range: table.upperBound..<tabs.endIndex))
+        let debugOnly = tabs[start.lowerBound..<end.upperBound]
+        XCTAssertFalse(debugOnly.contains("#else"), "The review table has no Release branch.")
+        for route in [
+            "case \"morning-check-in\": Route(tab: .home, destinations: [.checkIn(checkInType: \"morning\")])",
+            "case \"briefing-history\": Route(tab: .home, destinations: [.briefingList])",
+            "default: briefingReviewPath(value) ?? evidenceReviewPath(value)",
+            "guard value.hasPrefix(\"briefing:\") else { return nil }",
+            "guard value.hasPrefix(\"evidence:\") else { return nil }",
+        ] {
+            XCTAssertTrue(debugOnly.contains(route), "Missing from the DEBUG review table: \(route)")
+        }
+        let outside = String(tabs[..<start.lowerBound]) + String(tabs[end.upperBound...])
+        for seam in ["appearance-review.route", "morning-check-in", "briefing-history", "briefingReviewPath", "evidenceReviewPath"] {
+            XCTAssertFalse(outside.contains(seam), "\(seam) leaked outside the DEBUG review table.")
+        }
+    }
 }
