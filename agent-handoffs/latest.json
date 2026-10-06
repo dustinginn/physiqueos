@@ -1,57 +1,65 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-05T22:00:15Z",
+  "generated_at_utc": "2026-10-05T23:58:40Z",
   "task": {
-    "id": "workout-reliability-deploy-2c-closeout-20261005",
-    "title": "Workout reliability lane CLOSEOUT: 2-C Server b7eb1e39 live; Native e9f8a957 + Batch 2 preview 70ebf753 ready for next build",
+    "id": "batch3-d-accepted-final-e-dexa-proof-20261005",
+    "title": "Redesign Batch 3 Checkpoint E (Add Evidence + generic Evidence Review) + DEXA regression proof + final Batch 3 closeout",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
     "base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
-    "final_sha": "e9f8a957be419d89a10b316c57b90afeb08d2f17",
+    "final_sha": "f5257ae1013dbb04e996bab27e144201b84da8b7",
+    "native_sha": "f5257ae1013dbb04e996bab27e144201b84da8b7",
+    "native_last_code_sha": "44609af1c3c04946231a656a340dd83a2b42910a",
+    "native_branch": "claude/redesign-batch3-evidence-takeover-20261005",
+    "review_package_sha": "f5257ae1013dbb04e996bab27e144201b84da8b7",
+    "locked_design_sha": "85ef2a6c",
     "production_server_sha": "b7eb1e397f0238df9ae904fd182ddbb51602e8d8",
     "production_deployment": "6fa4e887",
-    "native_sha": "e9f8a957be419d89a10b316c57b90afeb08d2f17",
     "native_build": 87
   },
   "result": {
-    "summary": "Workout reliability lane CLOSED (Batch 3 untouched). Server b7eb1e39 (2-C additive contextualProgressionRecommendations, includes UUID fix b5de242f) DEPLOYED: 6fa4e887 ACTIVE, web+worker source, /live, /ready, log gitSha verified, 0 errors. Read-only contract proof with the exact deployed functions over 245 sessions: field compiled in; today 0 entries (only 09-14 counts before today); from 2026-10-06 Leg Extension+Sissy superset entries 80x15 / 50x12 (recover, load-first rule); standalone unchanged. UUID link verified earlier (21:29:05Z). Native e9f8a957 unchanged (shape matches); preview 70ebf753: unit 2034/0, Watch 49/49, Release OK. No TestFlight, bump or release merge.",
+    "summary": "Batch 3 Evidence redesign complete: A/B/C locked, D visually accepted with DEXA regression proof now complete (20-item inventory, nothing dropped, UI+unit tests), E implemented on locked 85ef2a6c (Add Evidence + generic Evidence Review, Dark/Mineral, residuals <=2.0 pt). Workout Match (workoutReconciliation) routed to the untouched branch that holds Batch 2 L13 on integration. DEXA correction exact-prefill defect fixed. Unit 831/0; Batch 3 + Recovery + Training-Evidence UI 33/33; 9 TrainingAcceptance failures pre-existing (identical on base 8aa2d00b). Release compile OK, 0 seams; generator stable. One integration conflict (HomeJourneyFieldView.swift -> take release side). No TestFlight, bump or merge.",
     "success": true,
     "production_mutated": false,
-    "deployed": true,
+    "deployed": false,
     "testflight_uploaded": false
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Server focused 133/133, wider 23 reds identical at base; preview 70ebf753 full 2034/0, Watch 49/49, Release compile OK; known Watch UI NotYetReturns case pre-existing (not a gate)."
+      "summary": "Unit 37 suites 831/0 (1 skipped); UI EvidenceIntakeReview 5/5, PhotosDEXA 4/4, TrainingNutritionWeight 11/11, HubTimeline 3/3, RecoverySleep 3/3, TrainingAcceptance Evidence 7/7; 9 TrainingAcceptance Home-Briefing/Logger failures pre-existing on base 8aa2d00b (Briefing x3 fixed by Batch 2 b1488c2e on integration); generic Release compile OK (Watch + WidgetKit/Live Activity embedded, 0 debug seams); generator byte-stable; resolved preview tree 41ba03dd built and passed routing + Batch 2 L13 test."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder review of closeout requested."
+      "summary": "Founder final review of Checkpoint E and Batch 3 requested."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Read-only production contract probe (REPEATABLE READ READ ONLY, SELECT-only, ROLLBACK, fs/net writes denied); 2-C change is read-time projection only."
+      "summary": "Native-only presentation work; no Server change, no production access, workout reliability lane untouched."
     }
   },
   "decisions_required": [
-    "Include Native e9f8a957 (preview 70ebf753) in the next authorized build",
-    "Optional product decision: should lower-load/higher-rep sessions count as regression (Server compares load first)?",
-    "Unchanged concurrent lanes: Batch 3 acceptance; Build 88 authorization for Batch 2 793462b1"
+    "Final Founder review of Checkpoint E and Batch 3 (f5257ae1)",
+    "Authorize the multi-lane merge per INTEGRATION-MAP (70ebf753 + Batch 3; resolve HomeJourneyFieldView.swift with release side) and the next build (TestFlight/build bump)",
+    "Carried forward: include workout reliability Native e9f8a957 (preview 70ebf753) in the next authorized build; Build 88 authorization for Batch 2 793462b1",
+    "Carried forward (optional product): should lower-load/higher-rep sessions count as regression (Server compares load first)?"
   ],
   "blockers": [],
   "unexpected_findings": [
-    "Server progression compares load first, so today's 40x30 Leg Extensions read as below 09-14's 80x15 -> superset context recommends 'recover 80x15' from 2026-10-06 (pre-existing semantics, unchanged)"
+    "Build 87 DEXA correction pre-filled display-rounded values (0.24 -> 0.2), so a full-replacement save silently rounded untouched fields; fixed with exact prefill + test"
   ],
   "backlog": [
-    "Watch Review/Confirmation Complete Set gating + timed-set projection (shared Watch mapper root)",
-    "Phone reply-before-side-effects / one projection build per command, pending next real-workout latency evidence"
+    "Validate real Founder Progress Photos on device after TestFlight",
+    "Energy and Weekly/Monthly Briefing charts still use old overlay (owning families)",
+    "TrainingAcceptance Logger journeys order-coupled (Build 87 ledger)",
+    "Carried forward: Watch Review/Confirmation Complete Set gating + timed-set projection",
+    "Carried forward: Phone reply-before-side-effects / one projection build per command"
   ],
-  "recommended_next_step": "Integrate e9f8a957 via preview 70ebf753 into the next build authority when Build 88/89 is authorized.",
-  "full_report_path": "agent-handoffs/reports/20261005T215919Z-workout-reliability-closeout.md",
+  "recommended_next_step": "Founder final review of Batch 3 package f5257ae1; then authorize the merge per INTEGRATION-MAP and the next build.",
+  "full_report_path": "agent-handoffs/reports/20261005T235840Z-redesign-batch3-claude-checkpoint-e-closeout.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
