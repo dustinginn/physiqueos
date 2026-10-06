@@ -41,6 +41,18 @@ struct DEXABriefingSections: View {
         .accessibilityIdentifier("briefing.dexa")
     }
 
+    /// The frozen Goal title, or nil when the artifact persisted none (the
+    /// mapper's "Goal at publication" placeholder is never shown as a goal).
+    static func persistedGoalTitle(_ attribution: BriefingGoalAttribution?) -> String? {
+        guard let title = attribution?.goalTitle, !title.isEmpty, title != "Goal at publication" else { return nil }
+        return title
+    }
+
+    /// Canonical RMR text; production values already carry their unit.
+    static func rmrText(_ value: String) -> String {
+        value.contains(where: \.isLetter) ? value : "\(value) cal/day"
+    }
+
     // MARK: Hero
 
     private var hero: some View {
@@ -75,7 +87,7 @@ struct DEXABriefingSections: View {
                 ("Body Fat", content.snapshot.bodyFatPercent),
                 ("Fat Mass", content.snapshot.fatMassLb),
                 ("Lean Tissue", content.snapshot.leanMassLb),
-            ] + (content.snapshot.restingMetabolicRateKcal.map { [("RMR", "\($0) cal/day")] } ?? []))
+            ] + (content.snapshot.restingMetabolicRateKcal.map { [("RMR", Self.rmrText($0))] } ?? []))
             .padding(.bottom, 23)
         }
     }
@@ -102,7 +114,7 @@ struct DEXABriefingSections: View {
                 DEXAUnitTable(title: "Other Notable Changes", firstColumn: "Metric", rows: content.progress.supplemental.map { .init(label: $0.label, previous: $0.previous, current: $0.current, delta: $0.delta) })
                     .accessibilityIdentifier("briefing.dexa.supplemental")
             }
-            DEXAPhaseBreakdown(timeline: content.progress.timeline, goal: attribution?.goalTitle, phase: attribution?.phaseName)
+            DEXAPhaseBreakdown(timeline: content.progress.timeline, goal: Self.persistedGoalTitle(attribution), phase: attribution?.phaseName)
                 .padding(.bottom, 23)
         }
     }

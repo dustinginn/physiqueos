@@ -1069,6 +1069,9 @@ extension BriefingLockedPresentationTests {
         XCTAssertEqual(DEXAPhaseBreakdown.value(DEXATimelinePoint(scanId: "s", date: "d", value: "—"), unit: "lb"), "—")
         let confidence = BriefingConfidenceReadModel(score: 63, band: "developing", priorScore: 70, delta: -7, movementDirection: .decreased, primaryReason: "r", supportingReasons: [], limitingReasons: [], unresolvedUncertainty: [], goalId: "g", phaseId: nil, capturedAt: "c", source: "s")
         XCTAssertEqual(DEXAConfidenceRow(confidence: confidence).headline, "DEVELOPING · DECREASED −7")
+        XCTAssertEqual(DEXABriefingSections.rmrText("1847 cal/day"), "1847 cal/day")
+        XCTAssertEqual(DEXABriefingSections.rmrText("2240"), "2240 cal/day")
+        XCTAssertNil(DEXABriefingSections.persistedGoalTitle(BriefingGoalAttribution(goalId: "g", goalTitle: "Goal at publication")))
         let dexa = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.dexa != nil }?.dexa)
         let rows = dexa.progress.headline.count + dexa.progress.regionalFat.count + dexa.progress.regionalLean.count + dexa.progress.supplemental.count
         XCTAssertEqual(rows, 17, "the locked correction restores all 17 unit rows")
