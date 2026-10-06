@@ -1952,7 +1952,11 @@ enum LoggerType {
     static let strutTitle12 = LogType(size: 12, weight: 700, lineHeight: 1.68)
     static let strutTitle13 = LogType(size: 13, weight: 700, lineHeight: 1.55)
     static let confirmed20 = LogType(size: 20, weight: 700, lineHeight: 1.26)
-    static var fieldValueFont: UIFont { PlusJakartaSans.uiFont(size: UIFontMetrics.default.scaledValue(for: 12), weight: 400) }
+    static let fieldValuePointSize: CGFloat = 16
+    static let fieldValueWeight: CGFloat = 600
+    static var fieldValueFont: UIFont {
+        PlusJakartaSans.uiFont(size: UIFontMetrics.default.scaledValue(for: fieldValuePointSize), weight: fieldValueWeight)
+    }
 }
 
 /// Superset group letters in the order groups first appear in the workout.

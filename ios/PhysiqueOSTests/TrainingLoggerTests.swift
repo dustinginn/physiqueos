@@ -2144,7 +2144,9 @@ extension TrainingLoggerTests {
     func testLoggerSetTypographyOptionsAreRestrainedAndFitRepresentativeValues() throws {
         let specs = Self.loggerSetTypographyReviewSpecs
         XCTAssertEqual(specs.map(\.valueSize), [12, 14, 16, 15])
-        XCTAssertEqual(specs[0].valueFont.pointSize, LoggerType.fieldValueFont.pointSize, accuracy: 0.01)
+        XCTAssertEqual(LoggerType.fieldValuePointSize, specs[2].valueSize, "Founder-selected Option B must remain the shipping Logger value size.")
+        XCTAssertEqual(LoggerType.fieldValueWeight, specs[2].valueWeight, "Founder-selected Option B must remain the shipping Logger value weight.")
+        XCTAssertEqual(specs[2].valueFont.pointSize, LoggerType.fieldValueFont.pointSize, accuracy: 0.01)
         XCTAssertTrue(specs[0...2].map(\.valueSize).elementsEqual([12, 14, 16]))
         XCTAssertEqual(specs[3].setSize, 13, "Only balanced Option C explores a proportional SET-number increase.")
 
