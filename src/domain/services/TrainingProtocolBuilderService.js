@@ -162,7 +162,7 @@ export function createFounderTrainingProtocolActivation({
       evidenceBasis: {
         evidenceTypes: ["training_session"],
         directEvidenceConfidence: "moderate",
-        limitations: ["Exercise-level progression evaluation is not active yet."],
+        limitations: ["Exercise-specific rep-range maxima and equipment increments are not configured yet."],
       },
       confirmation: {
         confirmedByUser: true,

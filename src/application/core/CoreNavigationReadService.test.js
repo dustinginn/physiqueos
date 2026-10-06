@@ -329,7 +329,13 @@ describe("provider-native core navigation reads", () => {
         suggestedLoad: null,
         suggestedLoadType: null,
         suggestedReps: null,
+        status: "progression_opportunity",
+        recommendedAction: "consider_progression",
         reasonCode: "strategy_eligibility_gates_satisfied",
+        historyReferences: expect.arrayContaining([
+          expect.objectContaining({ sessionId: "session-pull-up-0" }),
+        ]),
+        calibration: expect.objectContaining({ eligibilityRole: "diagnostic_only" }),
         successfulSessionsRequired: 2,
         qualifyingSuccessfulSessions: 3,
         exposureStartDate: "2026-08-01",
@@ -349,6 +355,71 @@ describe("provider-native core navigation reads", () => {
     expect(set).toMatchObject({ weight: 25, weight_unit: "lb", load_type: "external_load" });
     // Additive Server-owned set-level load semantics for Native's completion copy.
     expect(set.load_semantics).toBe("weighted_bodyweight");
+  });
+
+  it("re-reads a durable same-day Finish and reflects the new qualifying session", async () => {
+    const { narrow, runtime } = services();
+    installTrainingProgressionStrategy(runtime);
+    const canonicalRecord = (id, date) => ({
+      canonicalId: id,
+      quality: { status: "complete" },
+      payload: {
+        id,
+        evidence_type: "training",
+        observed_at: date,
+        exercises: [{
+          id: `${id}_front_raise`,
+          canonicalExerciseId: "cable_machine_front_raise",
+          name: "Cable Machine Front Raises",
+          sets: Array.from({ length: 4 }, () => ({
+            reps: 10, weight: 150, weight_unit: "lb", load_type: "external_load",
+          })),
+        }],
+      },
+    });
+    runtime.canonicalEvidenceObjects.push(canonicalRecord("front-raise-day-0", "2026-08-15"));
+    expect((await narrow.getTrainingLogger()).initialProgressionRecommendations
+      .some((item) => item.canonicalExerciseId === "cable_machine_front_raise")).toBe(false);
+
+    // Mirrors the canonical store state immediately after durable Finish.
+    // The read must include today's committed session (not exclude it as an
+    // in-progress workout) and recompute from the active Strategy.
+    runtime.canonicalEvidenceObjects.push(canonicalRecord("front-raise-day-14", "2026-08-29"));
+    expect((await narrow.getTrainingLogger()).initialProgressionRecommendations
+      .find((item) => item.canonicalExerciseId === "cable_machine_front_raise"))
+      .toMatchObject({
+        state: "opportunity",
+        exposureStartDate: "2026-08-15",
+        exposureDays: 14,
+        qualifyingSuccessfulSessions: 2,
+      });
+  });
+
+  it("omits progression guidance when the active Training Strategy rule is unsupported", async () => {
+    const { narrow, runtime } = services();
+    installTrainingProgressionStrategy(runtime, { action: "unsupported_action" });
+    for (const date of ["2026-08-01", "2026-08-15"]) {
+      runtime.canonicalEvidenceObjects.push({
+        canonicalId: `unsupported-front-raise-${date}`,
+        quality: { status: "complete" },
+        payload: {
+          id: `unsupported-front-raise-${date}`,
+          evidence_type: "training",
+          observed_at: date,
+          exercises: [{
+            id: `front-raise-${date}`,
+            canonicalExerciseId: "cable_machine_front_raise",
+            name: "Cable Machine Front Raises",
+            sets: [{ reps: 10, weight: 150, weight_unit: "lb" }],
+          }],
+        },
+      });
+    }
+    const logger = await narrow.getTrainingLogger();
+    expect(logger.initialProgressionRecommendations
+      .some((item) => item.canonicalExerciseId === "cable_machine_front_raise")).toBe(false);
+    expect(logger.contextualProgressionRecommendations
+      .some((item) => item.canonicalExerciseId === "cable_machine_front_raise")).toBe(false);
   });
 
   it("projects additive superset-context progression recommendations from the separate superset pool", async () => {

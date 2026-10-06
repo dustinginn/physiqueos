@@ -1,6 +1,7 @@
 # Training progression authority correction — implementation plan
 
-- Baseline: shipped Build 88 source `7fce3b9708c063f3c6b58571778c595012b5de6d`
+- Server baseline: current combined-app Server tip `b7eb1e397f0238df9ae904fd182ddbb51602e8d8` (preserves the deployed-lineage contextual superset recommendation work)
+- Audit source authority: shipped Build 88 source `7fce3b9708c063f3c6b58571778c595012b5de6d`
 - Audit authority: `e6c10085e12da4223e6430bc1f47a9e0b6c4aa84`
 - Task authority: `e5347f4d388b1fa4a953132865fc041c45d9d152`
 - Lane: `codex/training-progression-authority-candidate-20261006`

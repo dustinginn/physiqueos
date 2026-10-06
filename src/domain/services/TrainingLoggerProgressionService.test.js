@@ -207,8 +207,8 @@ describe("TrainingLoggerProgressionService", () => {
       qualifyingSuccessfulSessions: 2,
     });
     expect(recommendation({ nowDate: "2026-09-15", sessions: duplicate })).toMatchObject({
-      status: TRAINING_LOGGER_PROGRESSION_STATUS.MAINTAIN,
-      qualifyingSuccessfulSessions: 1,
+      status: TRAINING_LOGGER_PROGRESSION_STATUS.INSUFFICIENT,
+      qualifyingSuccessfulSessions: 0,
     });
   });
 
@@ -260,8 +260,22 @@ describe("TrainingLoggerProgressionService", () => {
       nowDate: "2026-09-15",
       sessions,
     });
+    const maintenanceWithoutCadenceHistory = recommendation({
+      goalContext: { phase: { type: "maintenance" } },
+      nowDate: "2026-09-15",
+      sessions: [session("2026-09-01"), session("2026-09-08")],
+    });
+    const beforeLockedExposure = recommendation({
+      nowDate: "2026-09-14",
+      sessions,
+    });
     expect(cut.status).toBe(TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY);
     expect(gain.status).toBe(TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY);
+    expect(maintenanceWithoutCadenceHistory).toMatchObject({
+      status: TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY,
+      calibration: { effectiveCadenceDays: 28, eligibilityRole: "diagnostic_only" },
+    });
+    expect(beforeLockedExposure.status).toBe(TRAINING_LOGGER_PROGRESSION_STATUS.MAINTAIN);
     expect(cut.calibration).toMatchObject({ phase: "cut", eligibilityRole: "diagnostic_only" });
     expect(cut.exposureStartDate).toBe(gain.exposureStartDate);
     expect(resolveTrainingProgressionPhase({ title: "Build Mass", phase: { type: "cut" } })).toBe("cut");
@@ -295,6 +309,24 @@ describe("TrainingLoggerProgressionService", () => {
       recommendedLoad: 160,
       recommendedReps: 8,
       targetSelection: { status: "available", policy: "historical_minimum_load_increment" },
+    });
+
+    const configuredRepRange = recommendation({
+      nowDate: "2026-09-15",
+      sessions: [
+        session("2026-07-01", { load: 130 }),
+        session("2026-07-08", { load: 140 }),
+        session("2026-07-15", { load: 150 }),
+        session("2026-09-01"),
+        session("2026-09-15"),
+      ],
+      trainingStrategy: strategy({ repRange: { minimum: 8, maximum: 10 }, workingSetsRequired: 4 }),
+    });
+    expect(configuredRepRange).toMatchObject({
+      status: TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY,
+      recommendedLoad: 160,
+      recommendedReps: 8,
+      progressionPolicy: { qualificationMode: "prescribed_top_of_rep_range" },
     });
   });
 

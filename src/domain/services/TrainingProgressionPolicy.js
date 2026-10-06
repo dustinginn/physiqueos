@@ -55,6 +55,11 @@ export function resolveExecutableTrainingProgressionPolicy({
       configuredRule: configuredRuleSummary(rule),
     });
   }
+  if (successfulSessionsRequired < 2) {
+    return unsupported("successful_sessions_below_founder_floor", {
+      configuredRule: configuredRuleSummary(rule),
+    });
+  }
 
   const configuredMinimumExposureDays = rule.minimumExposureDays ??
     progression.minimumExposureDays;
@@ -63,6 +68,11 @@ export function resolveExecutableTrainingProgressionPolicy({
     : nonNegativeInteger(configuredMinimumExposureDays);
   if (minimumExposureDays === null) {
     return unsupported("invalid_minimum_exposure_days", {
+      configuredRule: configuredRuleSummary(rule),
+    });
+  }
+  if (minimumExposureDays < FOUNDER_MINIMUM_TRAINING_EXPOSURE_DAYS) {
+    return unsupported("minimum_exposure_below_founder_floor", {
       configuredRule: configuredRuleSummary(rule),
     });
   }
