@@ -292,6 +292,11 @@ final class EvidenceHubTimelineUITests: XCTestCase {
         app.buttons["Evidence"].tap()
         XCTAssertTrue(element("evidence.hub.failure").waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Evidence could not be loaded."].exists)
+        // A failed hub is never terminal: Try Again is an accessible button.
+        let retry = app.buttons["evidence.hub.retry"]
+        XCTAssertTrue(retry.exists)
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertEqual(retry.label, "Try Again")
         app.terminate()
 
         app.launchArguments = ["-physiqueos.native.authority-selection.v1", "sandbox",

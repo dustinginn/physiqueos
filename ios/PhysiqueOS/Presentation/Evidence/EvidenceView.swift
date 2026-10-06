@@ -45,7 +45,9 @@ struct EvidenceView: View {
             }
             await viewModel?.load()
         }
-        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) { await viewModel?.load() }
+        .refreshable { await viewModel?.load(trigger: .pullToRefresh) }
+        .refreshesOnForegroundWhenVisible { await viewModel?.retryAfterForegroundIfNeeded() }
+        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) { await viewModel?.load(trigger: .dayChange) }
     }
 
     private static func makeViewModel(api: EvidenceAPI) -> EvidenceViewModel {
@@ -63,9 +65,22 @@ struct EvidenceView: View {
         case .none, .loading:
             EvidenceStateCard(kind: .loading("Loading Evidence…"), identifier: "evidence.hub.loading")
         case .failed(let message):
-            EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "evidence.hub.failure")
+            VStack(spacing: S.pt(12)) {
+                EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "evidence.hub.failure")
+                Button("Try Again") { Task { await viewModel?.load(trigger: .retry) } }
+                    .buttonStyle(.bordered)
+                    .tint(S.ink)
+                    .accessibilityIdentifier("evidence.hub.retry")
+            }
         case .loaded(let hub):
             VStack(alignment: .leading, spacing: 0) {
+                if viewModel?.refreshFailed == true {
+                    Text("Couldn't refresh. Showing Evidence loaded earlier — pull to refresh.")
+                        .evidenceLockedText(S.stateCopy)
+                        .foregroundStyle(S.muted)
+                        .padding(.bottom, S.pt(8))
+                        .accessibilityIdentifier("evidence.hub.refreshFailed")
+                }
                 EvidenceHeaderView(
                     symbol: "◇",
                     eyebrow: "Your record",
