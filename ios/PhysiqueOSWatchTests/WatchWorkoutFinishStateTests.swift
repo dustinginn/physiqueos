@@ -447,8 +447,8 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         defer { WatchPhysiqueOSTheme.current = saved }
         XCTAssertEqual(WatchPalette.of(.dark), .dark)
         XCTAssertEqual(WatchPalette.of(.mineralLight), .mineralLight)
-        XCTAssertNil(WatchPalette.dark.clockBand)
-        XCTAssertNotNil(WatchPalette.mineralLight.clockBand, "The white system clock stays legible on Mineral")
+        XCTAssertNil(WatchPalette.dark.clockCapsule, "Dark needs no clock treatment")
+        XCTAssertNotNil(WatchPalette.mineralLight.clockCapsule, "The white system clock stays legible on Mineral")
 
         WatchPhysiqueOSTheme.current = .of(.mineralLight)
         XCTAssertEqual(WatchPhysiqueOSTheme.background, Color(watchHex: 0xE8ECE5))
@@ -462,6 +462,35 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         WatchPhysiqueOSTheme.current = .of(.dark)
         XCTAssertEqual(WatchPhysiqueOSTheme.background, Color(watchHex: 0x061019))
         XCTAssertEqual(WatchPhysiqueOSTheme.onPrimary, Color(watchHex: 0x061019))
+    }
+
+    /// Founder-selected Option A: a compact capsule around the real system
+    /// time — never a full-width band — that clears the page content on both
+    /// supported case sizes.
+    func testMineralClockCapsuleIsCompactAndClearsContentOnBothCaseSizes() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let us = Locale(identifier: "en_US")
+        let sevenOhOne = calendar.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 7, minute: 1))!
+        let twelveFiftyEight = calendar.date(from: DateComponents(year: 2026, month: 10, day: 6, hour: 12, minute: 58))!
+        let utc = TimeZone(identifier: "UTC")!
+        XCTAssertEqual(WatchClockCapsule.clockWidth(at: sevenOhOne, locale: us, timeZone: utc), 34)
+        XCTAssertEqual(WatchClockCapsule.clockWidth(at: twelveFiftyEight, locale: us, timeZone: utc), 44)
+
+        // (page width, top safe area) measured on the Ultra 3 (49 mm: 207, 57)
+        // and the 42 mm (183, 48.6) simulators via the geometry fixture.
+        for (width, safeTop) in [(CGFloat(207), CGFloat(57)), (183, 48.6)] {
+            let frame = WatchClockCapsule.frame(screenWidth: width, safeAreaTop: safeTop, clockWidth: 44)
+            XCTAssertLessThanOrEqual(frame.width, 60, "Compact: only as wide as the widest time (\(width))")
+            XCTAssertLessThanOrEqual(frame.width, width * 0.34, "Never a band (\(width))")
+            XCTAssertLessThanOrEqual(frame.maxX, width, "Stays on screen (\(width))")
+            XCTAssertGreaterThan(frame.minX, width / 2, "Anchored top-trailing (\(width))")
+            XCTAssertLessThanOrEqual(frame.maxY, WatchExecutionLayout.topInset(safeAreaTop: safeTop) - 1,
+                                     "Ends above the first content line (\(width))")
+            XCTAssertLessThanOrEqual(frame.midY, safeTop * 0.5 + 0.001, "Never sits below the clock's own center")
+            XCTAssertGreaterThanOrEqual(frame.midY, safeTop * 0.5 - 2.5, "Stays on the digits (\(width))")
+            XCTAssertGreaterThanOrEqual(frame.minY, 0)
+        }
     }
 
     // MARK: Fixed execution layout

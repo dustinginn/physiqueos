@@ -30,8 +30,9 @@ struct WatchPalette: Equatable {
     var reducedSaturation: Double
     var reducedBrightness: Double
     /// watchOS always draws the system time in white. On a light palette a
-    /// band behind the clock zone keeps it legible on the physical Watch.
-    var clockBand: Color? = nil
+    /// compact ink capsule behind the time keeps it legible (Founder-selected
+    /// Option A, 2026-10-06); Dark needs none.
+    var clockCapsule: Color? = nil
 
     /// OLED Dark (the default).
     static let dark = WatchPalette(
@@ -79,7 +80,7 @@ struct WatchPalette: Equatable {
         heartRateAccent: Color(watchHex: 0xC73850),
         reducedSaturation: 0.5,
         reducedBrightness: -0.05,
-        clockBand: Color(watchHex: 0x102431)
+        clockCapsule: Color(watchHex: 0x102431)
     )
 
     static func of(_ appearance: WatchAppearancePreference) -> WatchPalette {
@@ -427,7 +428,7 @@ struct WatchWorkoutRootView: View {
         }
         .foregroundStyle(WatchPhysiqueOSTheme.text)
         .overlay(alignment: .top) {
-            if let band = palette.clockBand { WatchClockBand(color: band) }
+            if let capsule = palette.clockCapsule { WatchClockCapsule(color: capsule) }
         }
         .environment(\.colorScheme, palette.colorScheme)
         // A different appearance rebuilds every screen against its palette.
@@ -480,104 +481,64 @@ struct WatchWorkoutRootView: View {
     }
 }
 
-/// The band behind the system clock on a light palette: it ends just above
-/// where every page's content starts (the shared below-clock inset).
-struct WatchClockBand: View {
+/// Mineral Light's clock contrast (Founder-selected Option A): a compact ink
+/// capsule localized behind the watchOS system time. It is anchored to where
+/// watchOS draws the time (top-trailing, vertically centered in the top safe
+/// area) and sized to the time actually shown, re-measured each minute, so the
+/// white digits sit on ink with even margins. No header band, and the real
+/// system clock is never replaced or redrawn.
+struct WatchClockCapsule: View {
     let color: Color
 
     var body: some View {
         GeometryReader { geometry in
-            switch WatchClockTreatment.current {
-            case .band:
-                color
-                    .frame(height: max(0, WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top) - 3))
-                    .frame(maxWidth: .infinity, alignment: .top)
-                    .ignoresSafeArea(edges: .top)
-            case .capsule, .patch, .halo:
-                WatchClockLocalTreatment(treatment: WatchClockTreatment.current, color: color, geometry: geometry)
+            TimelineView(.everyMinute) { context in
+                let frame = Self.frame(
+                    screenWidth: geometry.size.width,
+                    safeAreaTop: geometry.safeAreaInsets.top,
+                    clockWidth: Self.clockWidth(at: context.date)
+                )
+                Capsule(style: .continuous)
+                    .fill(color)
+                    .frame(width: frame.width, height: frame.height)
+                    // Local coordinates start below the top safe area.
+                    .position(x: frame.midX, y: frame.midY - geometry.safeAreaInsets.top)
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
-}
 
-/// Founder review of the Mineral system-clock contrast treatment (2026-10-06).
-/// `band` is the current (rejected) production treatment and the only one
-/// Release can render; the localized options exist behind a DEBUG launch
-/// seam (`-watchClockTreatment capsule|patch|halo`) until one is selected.
-enum WatchClockTreatment: String {
-    case band, capsule, patch, halo
+    static let height: CGFloat = 21
+    static let horizontalPadding: CGFloat = 8
 
-    static var current: Self {
-#if DEBUG
-        let arguments = ProcessInfo.processInfo.arguments
-        if let index = arguments.firstIndex(of: "-watchClockTreatment"), arguments.indices.contains(index + 1),
-           let treatment = Self(rawValue: arguments[index + 1]) {
-            return treatment
-        }
-#endif
-        return .band
-    }
-}
-
-/// Localized clock contrast: anchored to where watchOS draws the system time
-/// (top-trailing, vertically centered in the top safe area) and sized to the
-/// time actually shown, re-measured each minute, so the white digits always
-/// sit on ink with even margins. The real system clock is never replaced.
-struct WatchClockLocalTreatment: View {
-    let treatment: WatchClockTreatment
-    let color: Color
-    let geometry: GeometryProxy
-
-    var body: some View {
-        TimelineView(.everyMinute) { context in
-            shape(clockWidth: Self.clockWidth(at: context.date))
-        }
-    }
-
-    /// Measured on the Ultra 3 and 42 mm simulators: the time's trailing edge
-    /// sits ~8% of the screen width in from the edge, its vertical center at
-    /// half the top safe area; each digit is ~10 pt wide, the colon ~4 pt.
-    static func clockWidth(at date: Date) -> CGFloat {
+    /// Measured on the Ultra 3 and 42 mm simulators: each digit of the time is
+    /// ~10 pt wide and the colon ~4 pt.
+    static func clockWidth(at date: Date, locale: Locale = .current, timeZone: TimeZone = .current) -> CGFloat {
         let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
         formatter.setLocalizedDateFormatFromTemplate("jmm")
         let digits = formatter.string(from: date).filter(\.isNumber).count
         return CGFloat(min(max(digits, 3), 4)) * 10 + 4
     }
 
-    @ViewBuilder
-    private func shape(clockWidth: CGFloat) -> some View {
-        let top = geometry.safeAreaInsets.top
-        let centerY = top * 0.5
-        let clockTrailing = geometry.size.width - (geometry.size.width * 0.08).rounded()
-        let clockCenterX = clockTrailing - clockWidth / 2
-        switch treatment {
-        case .capsule:
-            // A: a compact pill just around the time.
-            Capsule(style: .continuous)
-                .fill(color)
-                .frame(width: clockWidth + 16, height: 21)
-                .position(x: clockCenterX, y: centerY - top)
-        case .patch:
-            // B: a rounded field dropping from the bezel into the corner, flush
-            // with the top edge so it reads as part of the bezel, not a header.
-            let height = centerY + 10
-            UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 11,
-                                   bottomTrailingRadius: 11, topTrailingRadius: 0, style: .continuous)
-                .fill(color)
-                .frame(width: clockWidth + 20, height: height)
-                .position(x: clockCenterX, y: height / 2 - top)
-        case .halo:
-            // C: a soft ink halo, opaque under the digits and fading out.
-            Ellipse()
-                .fill(RadialGradient(colors: [color, color.opacity(0.95), color.opacity(0)],
-                                     center: .center, startRadius: 0, endRadius: (clockWidth + 34) / 2))
-                .frame(width: clockWidth + 34, height: 30)
-                .position(x: clockCenterX, y: centerY - top)
-        case .band:
-            EmptyView()
-        }
+    /// The capsule in page coordinates (top = screen top): the time's trailing
+    /// edge sits ~8% of the page width in from the edge and its center at half
+    /// the top safe area (measured on 49 mm and 42 mm).
+    static func frame(screenWidth: CGFloat, safeAreaTop: CGFloat, clockWidth: CGFloat) -> CGRect {
+        let clockTrailing = screenWidth - (screenWidth * 0.08).rounded()
+        let width = clockWidth + horizontalPadding * 2
+        // Centered on the time, but always ending at least 1 pt above where
+        // page content starts (the shared below-clock inset).
+        let contentTop = WatchExecutionLayout.topInset(safeAreaTop: safeAreaTop)
+        let centerY = min(safeAreaTop * 0.5, contentTop - 1 - height / 2)
+        return CGRect(
+            x: clockTrailing - clockWidth / 2 - width / 2,
+            y: centerY - height / 2,
+            width: width,
+            height: height
+        )
     }
 }
 
