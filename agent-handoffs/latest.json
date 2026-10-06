@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-06T00:35:00Z",
+  "generated_at_utc": "2026-10-06T01:05:00Z",
   "task": {
-    "id": "evidence-app-open-load-failure-audit-20261006",
-    "title": "Evidence intermittent app-open failure audit (\"Evidence could not be loaded.\") + bounded Native resilience fix",
+    "id": "evidence-dns-resync-verification-20261006",
+    "title": "Verify GoDaddy authoritative DNS resync after Founder CNAME re-save (Evidence Reliability addendum)",
     "agent": "claude",
     "status": "completed"
   },
@@ -17,7 +17,7 @@
     "native_build": 87
   },
   "result": {
-    "summary": "Root cause PROVEN outside the app: authoritative DNS ns66.domaincontrol.com serves a stale dustinginn.com zone (SOA 2026082000 vs ns65 2026090800) with no physiqueos CNAME, so resolvers that ask ns66 cache NXDOMAIN for up to 3600 s; every Native/web request then fails before reaching the Server (zero Server traffic 23:50-00:10Z; Server healthy, live/ready 200 via ondigitalocean host and pinned custom domain; home router 10.0.0.1 still NXDOMAIN at 00:33Z). Native defect PROVEN: Evidence root was the only tab root with a catch-all terminal failure, no Retry/pull/foreground retry, and blanked a loaded hub on refresh failure (Home hides the same outage with its last-known snapshot). Bounded fix c3d9d257: newest-load-wins guard, cancellation is non-terminal, failed refresh keeps the in-memory hub, classified copy, Try Again + pull to refresh + foreground retry when failed, bounded EvidenceHubLoad diagnostics. Batch 3 preview 9fa2428c keeps the locked design. Founder must fix GoDaddy DNS.",
+    "summary": "DNS incident RESOLVED at authority level: verified 00:52:01Z that ns65 and ns66 both serve SOA 2026100600 with physiqueos.dustinginn.com CNAME physiqueos-foundation-staging-a9or4.ondigitalocean.app (TTL 600); ns66 no longer NXDOMAIN. 1.1.1.1/8.8.8.8/9.9.9.9 resolve 3/3. Home router 10.0.0.1 held the old ns66 NXDOMAIN (negative TTL) until it expired; it resolved at 01:03:51Z and the custom domain /live and /ready returned 200 over normal DNS. Prod unchanged (6fa4e887 @ b7eb1e39). No polling window or GoDaddy escalation needed. Native reliability candidate c3d9d257 and Batch 3 preview 9fa2428c unchanged; the separate Batch 3 integration lane (prompt cc4ac08c) is untouched.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -25,39 +25,29 @@
   },
   "validation": {
     "tests": {
-      "status": "passed",
-      "summary": "Build 87 lane: focused Evidence 26/0 (9 new VM reliability + production DNS-outage test), FounderServerAPITests 247/0, generic Release compile OK. Batch 3 preview: focused unit 28/0, EvidenceHubTimelineUITests 3/3 (new accessible Try Again assertion), generic Release compile OK. Full unit/UI suites not run. Merge-tree clean vs 793462b1, 70ebf753, e9f8a957."
+      "status": "not_run",
+      "summary": "Verification-only task: no code changes. Prior lane validation for c3d9d257/9fa2428c stands (see the audit report)."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder review of the audit and the Native candidate requested."
+      "summary": "Founder review of the Evidence Reliability audit + Native candidate still requested."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Read-only doctl logs/spec/deployment (physiqueos-final-cutover-config), public DNS queries and health GETs only; no production mutation, no DNS change, no deploy."
+      "summary": "Read-only DNS queries (authoritative with recursion disabled, public and home resolvers), health GETs and a read-only doctl deployment read; no DNS, app or production change."
     }
   },
   "decisions_required": [
-    "Founder: fix GoDaddy DNS now - re-save the physiqueos CNAME (e.g. lower TTL to 600) so ns66 re-syncs; verify dig @ns66.domaincontrol.com physiqueos.dustinginn.com +norecurse returns the CNAME; open a GoDaddy case if ns66 stays on serial 2026082000",
-    "Optional durable: move dustinginn.com (or the physiqueos host) DNS to a consistent provider (Cloudflare/DigitalOcean DNS)",
-    "Authorize including Native c3d9d257 in the next build, and the Batch 3 resolution per preview 9fa2428c at final merge"
+    "Authorize including Native reliability fix c3d9d257 in the next build, layered onto the integrated Native authority produced by the separate Batch 3 integration lane (cc4ac08c); resolve EvidenceView.swift as in preview 9fa2428c",
+    "Optional durable: move the physiqueos host DNS to a provider with consistent anycast authority"
   ],
-  "blockers": [
-    "Production DNS outage persists until the GoDaddy zone is re-synced (Founder action; not authorized/possible from this lane)"
-  ],
-  "unexpected_findings": [
-    "ns66.domaincontrol.com serves stale zone serial 2026082000 without the physiqueos CNAME; ns65 serves 2026090800 - production host intermittently NXDOMAIN with a 1 h negative cache (also takes down the web app)",
-    "Cold-launch Evidence Hub pulls ~20 MB of scope-all reads alongside Home 6.2 MB and Log 9.5 MB (Log read 3x in 10 s) on one 1 vCPU / 1 GB web instance - headroom risk vs the 15 s idle timeout, not the cause of this incident",
-    "doctl context physiqueos-audit now returns 401; physiqueos-final-cutover-config works for reads"
-  ],
+  "blockers": [],
+  "unexpected_findings": [],
   "backlog": [
-    "Consider per-stream fail-soft Evidence Hub (one failed domain read currently fails the hub)",
-    "Consider a persisted last-known Evidence Hub snapshot (new persistence - needs a decision)",
-    "Reduce scope-all Evidence Hub payloads (summary projections) and duplicate Log reads on launch",
-    "Ask Founder for one You > Network diagnostics export after the next occurrence to confirm NSURLError -1003"
+    "Per-stream fail-soft Evidence Hub; persisted last-known Evidence Hub (needs decision); reduce scope-all Evidence Hub payloads and duplicate Log reads on launch (carried from the audit report)"
   ],
-  "recommended_next_step": "Founder fixes GoDaddy DNS (re-save physiqueos CNAME, verify ns66); then review Native c3d9d257 for the next build and preview 9fa2428c for the Batch 3 merge.",
-  "full_report_path": "agent-handoffs/reports/20261006T003500Z-evidence-app-open-load-failure-audit.md",
+  "recommended_next_step": "No DNS action needed. Continue the Batch 3 integration lane; then layer Native c3d9d257 onto its integrated authority for the next authorized build.",
+  "full_report_path": "agent-handoffs/reports/20261006T010500Z-evidence-dns-resync-verification.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
