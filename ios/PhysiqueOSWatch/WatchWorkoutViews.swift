@@ -487,13 +487,97 @@ struct WatchClockBand: View {
 
     var body: some View {
         GeometryReader { geometry in
-            color
-                .frame(height: max(0, WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top) - 3))
-                .frame(maxWidth: .infinity, alignment: .top)
-                .ignoresSafeArea(edges: .top)
+            switch WatchClockTreatment.current {
+            case .band:
+                color
+                    .frame(height: max(0, WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top) - 3))
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .ignoresSafeArea(edges: .top)
+            case .capsule, .patch, .halo:
+                WatchClockLocalTreatment(treatment: WatchClockTreatment.current, color: color, geometry: geometry)
+            }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Founder review of the Mineral system-clock contrast treatment (2026-10-06).
+/// `band` is the current (rejected) production treatment and the only one
+/// Release can render; the localized options exist behind a DEBUG launch
+/// seam (`-watchClockTreatment capsule|patch|halo`) until one is selected.
+enum WatchClockTreatment: String {
+    case band, capsule, patch, halo
+
+    static var current: Self {
+#if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-watchClockTreatment"), arguments.indices.contains(index + 1),
+           let treatment = Self(rawValue: arguments[index + 1]) {
+            return treatment
+        }
+#endif
+        return .band
+    }
+}
+
+/// Localized clock contrast: anchored to where watchOS draws the system time
+/// (top-trailing, vertically centered in the top safe area) and sized to the
+/// time actually shown, re-measured each minute, so the white digits always
+/// sit on ink with even margins. The real system clock is never replaced.
+struct WatchClockLocalTreatment: View {
+    let treatment: WatchClockTreatment
+    let color: Color
+    let geometry: GeometryProxy
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            shape(clockWidth: Self.clockWidth(at: context.date))
+        }
+    }
+
+    /// Measured on the Ultra 3 and 42 mm simulators: the time's trailing edge
+    /// sits ~8% of the screen width in from the edge, its vertical center at
+    /// half the top safe area; each digit is ~10 pt wide, the colon ~4 pt.
+    static func clockWidth(at date: Date) -> CGFloat {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("jmm")
+        let digits = formatter.string(from: date).filter(\.isNumber).count
+        return CGFloat(min(max(digits, 3), 4)) * 10 + 4
+    }
+
+    @ViewBuilder
+    private func shape(clockWidth: CGFloat) -> some View {
+        let top = geometry.safeAreaInsets.top
+        let centerY = top * 0.5
+        let clockTrailing = geometry.size.width - (geometry.size.width * 0.08).rounded()
+        let clockCenterX = clockTrailing - clockWidth / 2
+        switch treatment {
+        case .capsule:
+            // A: a compact pill just around the time.
+            Capsule(style: .continuous)
+                .fill(color)
+                .frame(width: clockWidth + 16, height: 21)
+                .position(x: clockCenterX, y: centerY - top)
+        case .patch:
+            // B: a rounded field dropping from the bezel into the corner, flush
+            // with the top edge so it reads as part of the bezel, not a header.
+            let height = centerY + 10
+            UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 11,
+                                   bottomTrailingRadius: 11, topTrailingRadius: 0, style: .continuous)
+                .fill(color)
+                .frame(width: clockWidth + 20, height: height)
+                .position(x: clockCenterX, y: height / 2 - top)
+        case .halo:
+            // C: a soft ink halo, opaque under the digits and fading out.
+            Ellipse()
+                .fill(RadialGradient(colors: [color, color.opacity(0.95), color.opacity(0)],
+                                     center: .center, startRadius: 0, endRadius: (clockWidth + 34) / 2))
+                .frame(width: clockWidth + 34, height: 30)
+                .position(x: clockCenterX, y: centerY - top)
+        case .band:
+            EmptyView()
+        }
     }
 }
 
