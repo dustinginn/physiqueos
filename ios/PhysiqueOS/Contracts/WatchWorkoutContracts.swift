@@ -147,6 +147,10 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
         /// never edits them and only completes the exact set named here.
         var loadText: String? = nil
         var repsText: String? = nil
+        /// Timed (duration-measured) sets: the entered seconds, so the Watch
+        /// shows the set's real value instead of an empty reps tile. Optional
+        /// and additive: an older Watch ignores it, an older phone omits it.
+        var durationText: String? = nil
         var supersetLabel: String?
         var partnerName: String?
         var isCompletionTarget: Bool
@@ -198,6 +202,10 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
     /// workout for this session (Watch Start, or a reported automatic start).
     /// Absent on older phones and on sessions with no Watch Health workout.
     var watchHealthStartedAt: Date? = nil
+    /// The phone Logger is on Workout Review / Final Confirmation: sets are
+    /// read-only there, so the Watch shows why Complete Set is unavailable.
+    /// Optional and additive (older phones omit it, older Watches ignore it).
+    var isPhoneReviewing: Bool? = nil
 
     var isTerminalAuthorityState: Bool {
         phase == .cancelled || phase == .unavailable

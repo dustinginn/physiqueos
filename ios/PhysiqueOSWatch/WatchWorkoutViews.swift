@@ -1,23 +1,229 @@
 import SwiftUI
 
+/// Locked Watch utility translation (Founder lock 2026-10-04, design package
+/// `utility-surfaces-design-20261004` + acceptance corrections): the OLED
+/// dark token set. The Watch stays dark-only; the mineral-light boards were
+/// review translations, not a light Watch.
 enum WatchPhysiqueOSTheme {
-    static let background = Color(red: 8 / 255, green: 13 / 255, blue: 24 / 255)
-    static let surface = Color(red: 20 / 255, green: 31 / 255, blue: 49 / 255)
-    static let secondarySurface = Color(red: 23 / 255, green: 34 / 255, blue: 53 / 255)
-    static let purple = Color(red: 139 / 255, green: 140 / 255, blue: 255 / 255)
-    static let text = Color(red: 244 / 255, green: 246 / 255, blue: 255 / 255)
-    static let muted = Color(red: 154 / 255, green: 164 / 255, blue: 186 / 255)
-    static let success = Color(red: 63 / 255, green: 214 / 255, blue: 141 / 255)
-    static let warning = Color(red: 255 / 255, green: 190 / 255, blue: 92 / 255)
-    static let destructive = Color(red: 255 / 255, green: 105 / 255, blue: 122 / 255)
-    /// The phone Logger's progress green (`PhysiqueOSTheme.chartSuccess`).
-    static let progress = Color(red: 74 / 255, green: 222 / 255, blue: 128 / 255)
-    /// Metric icon accents (phone chart palette); Heart Rate keeps its pink.
+    static let background = Color(watchHex: 0x061019)
+    /// Quiet cell (`utility.surface`).
+    static let surface = Color(watchHex: 0x0F1C2A)
+    /// The current set's cell (`utility.surface.soft`).
+    static let secondarySurface = Color(watchHex: 0x132735)
+    static let progressTrack = Color(watchHex: 0x20303C)
+    static let purple = Color(watchHex: 0xAA98FF)
+    static let text = Color(watchHex: 0xF3F8FA)
+    static let secondaryText = Color(watchHex: 0xC3D2D9)
+    static let muted = Color(watchHex: 0x92A5AF)
+    static let success = Color(watchHex: 0x55E39A)
+    static let warning = Color(watchHex: 0xEFB84F)
+    static let destructive = Color(watchHex: 0xFF697A)
+    /// Set progress shares the success green.
+    static let progress = success
+    /// Metric icon accents: the shipping production identity, retained
+    /// exactly by the Founder's acceptance correction (never normalized).
     static let timeAccent = Color(red: 96 / 255, green: 165 / 255, blue: 250 / 255)
     static let activeEnergyAccent = Color(red: 251 / 255, green: 191 / 255, blue: 36 / 255)
     static let totalEnergyAccent = Color(red: 74 / 255, green: 222 / 255, blue: 128 / 255)
     static let nutritionAccent = Color(red: 192 / 255, green: 132 / 255, blue: 252 / 255)
     static let heartRateAccent = destructive
+}
+
+extension Color {
+    init(watchHex hex: UInt32) {
+        self.init(
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255
+        )
+    }
+}
+
+/// Watch typography: Plus Jakarta Sans for product-owned labels, values and
+/// controls (the utility translation's family). Sizes are the locked board's
+/// true-point geometry (205 x 251 pt, 49 mm), with 7 pt board labels raised to
+/// an 8 pt legibility floor per the package's Watch type rule.
+enum WatchType {
+    static func font(_ size: CGFloat, _ weight: CGFloat) -> Font {
+        PlusJakartaSans.font(size: size, weight: weight)
+    }
+
+    /// Reflowing text (panels, confirmations, summary) grows at the
+    /// accessibility Dynamic Type sizes, capped so a page scrolls instead of
+    /// clipping. watchOS defaults larger cases to an above-`large` size, so
+    /// the standard sizes keep the board geometry on every case. The fixed
+    /// execution page keeps its own fit-to-screen sizing.
+    static func scale(_ size: DynamicTypeSize) -> CGFloat {
+        switch size {
+        case .accessibility1, .accessibility2: return 1.2
+        case .accessibility3, .accessibility4, .accessibility5: return 1.35
+        default: return 1
+        }
+    }
+
+    static let eyebrowTracking: CGFloat = 0.09
+}
+
+/// A centered panel title (18 pt / 760), the locked board's `watch-panel-title`.
+struct WatchPanelTitle: View {
+    let text: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        let scale = WatchType.scale(dynamicTypeSize)
+        let size = 18 * scale
+        // At the default size a title keeps the board's two lines, shrinking
+        // slightly if needed; larger Dynamic Type sizes reflow freely.
+        Text(text)
+            .font(WatchType.font(size, 760))
+            .tracking(-0.025 * size)
+            .multilineTextAlignment(.center)
+            .lineLimit(scale == 1 ? 2 : nil)
+            .minimumScaleFactor(scale == 1 ? 0.8 : 1)
+            .frame(maxWidth: .infinity)
+    }
+}
+
+/// Supporting copy (10 pt, secondary text, 1.3 line height).
+struct WatchPanelCopy: View {
+    let text: String
+    var color: Color = WatchPhysiqueOSTheme.secondaryText
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    init(_ text: String, color: Color = WatchPhysiqueOSTheme.secondaryText) {
+        self.text = text
+        self.color = color
+    }
+
+    var body: some View {
+        let size = 10 * WatchType.scale(dynamicTypeSize)
+        Text(text)
+            .font(WatchType.font(size, 500))
+            .lineSpacing(size * 0.3)
+            .foregroundStyle(color)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The small tracked uppercase page title (9 pt / 760, purple by default).
+struct WatchEyebrow: View {
+    let text: String
+    var color: Color = WatchPhysiqueOSTheme.purple
+
+    init(_ text: String, color: Color = WatchPhysiqueOSTheme.purple) {
+        self.text = text
+        self.color = color
+    }
+
+    var body: some View {
+        Text(text)
+            .font(WatchType.font(9, 760))
+            .tracking(9 * WatchType.eyebrowTracking)
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+    }
+}
+
+/// A panel page laid out like the locked board: content from just below the
+/// clock, actions pinned to the bottom edge, scrolling only when Dynamic Type
+/// or a small case makes the page taller than the screen.
+struct WatchPanelPage<Content: View, Actions: View>: View {
+    @ViewBuilder let content: () -> Content
+    @ViewBuilder let actions: () -> Actions
+
+    var body: some View {
+        GeometryReader { geometry in
+            let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
+            let topInset = WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top)
+            ScrollView {
+                VStack(spacing: 6) {
+                    content()
+                    Spacer(minLength: 6)
+                    VStack(spacing: 6) { actions() }
+                }
+                .padding(.horizontal, 9)
+                .padding(.top, topInset)
+                .padding(.bottom, 8)
+                .frame(minHeight: fullHeight, alignment: .top)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .contentMargins(.horizontal, 0, for: .scrollContent)
+            .ignoresSafeArea(edges: [.top, .bottom])
+        }
+    }
+}
+
+/// The 25 pt state glyph above a panel title.
+struct WatchPanelIcon: View {
+    let systemName: String
+    let color: Color
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 22, weight: .semibold))
+            .foregroundStyle(color)
+            .frame(height: 25)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Full-width capsule actions: primary (filled), quiet (surface) and
+/// destructive (filled red, or quiet with red text). 38 pt tall, 15 pt / 760.
+struct WatchActionButton: View {
+    enum Style { case primary, warning, quiet, quietDestructive, destructive }
+
+    let title: String
+    var systemImage: String? = nil
+    var style: Style = .primary
+    var height: CGFloat = 38
+    var enabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if let systemImage {
+                    Image(systemName: systemImage).font(.system(size: 12, weight: .bold))
+                }
+                Text(title)
+                    .font(WatchType.font(15, 760))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .padding(.horizontal, 6)
+            .background(background)
+            .foregroundStyle(foreground)
+            .clipShape(Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.45)
+    }
+
+    private var background: Color {
+        switch style {
+        case .primary: return WatchPhysiqueOSTheme.purple
+        case .warning: return WatchPhysiqueOSTheme.warning
+        case .destructive: return WatchPhysiqueOSTheme.destructive
+        case .quiet, .quietDestructive: return WatchPhysiqueOSTheme.surface
+        }
+    }
+
+    private var foreground: Color {
+        switch style {
+        case .primary, .warning: return WatchPhysiqueOSTheme.background
+        case .destructive: return .white
+        case .quiet: return WatchPhysiqueOSTheme.text
+        case .quietDestructive: return WatchPhysiqueOSTheme.destructive
+        }
+    }
 }
 
 /// Authoritative structured session time from the phone's anchors: the
@@ -45,9 +251,11 @@ enum WatchWorkoutClock {
 }
 
 /// Fixed execution layout metrics. The execution page never scrolls:
-/// sizes start generous and shrink toward legible minimums until the whole
-/// page fits the space below the clock. Critical values never go below the
-/// minimums (Load/Reps 24 pt, rest 22 pt, a 32 pt tall primary action).
+/// sizes start at the locked board's geometry (26 pt context rows, 49 pt
+/// value tiles, 28 pt values, 25 pt rest, a 38 pt action) and shrink toward
+/// legible minimums until the whole page fits the space below the clock.
+/// Critical values never go below the minimums (Load/Reps 24 pt, rest 22 pt,
+/// a 32 pt tall primary action).
 struct WatchExecutionLayout: Equatable {
     static let minimumMetricFont: CGFloat = 24
     static let minimumRestFont: CGFloat = 22
@@ -66,15 +274,15 @@ struct WatchExecutionLayout: Equatable {
 
     init(size: CGSize, hasRest: Bool = true) {
         isCompact = size.height < 190 || size.width < 170
-        spacing = isCompact ? 2 : 3
-        headerHeight = isCompact ? 19 : 22
-        bottomPadding = isCompact ? 3 : 6
-        horizontalInset = isCompact ? 4 : 6
-        rowHeight = 24
-        metricHeight = 50
-        metricFont = 31
-        restFont = 29
-        buttonHeight = 42
+        spacing = isCompact ? 2 : 4
+        headerHeight = isCompact ? 15 : 17
+        bottomPadding = isCompact ? 3 : 8
+        horizontalInset = isCompact ? 6 : 9
+        rowHeight = 26
+        metricHeight = 49
+        metricFont = 28
+        restFont = 25
+        buttonHeight = 38
         var steps = 0
         while requiredHeight(hasRest: hasRest) > size.height, steps < 60 {
             rowHeight = max(19, rowHeight - 0.5)
@@ -88,13 +296,14 @@ struct WatchExecutionLayout: Equatable {
 
     /// Header, two context rows, Load/Reps, rest, primary action.
     func requiredHeight(hasRest: Bool = true) -> CGFloat {
-        headerHeight + rowHeight * 2 + 2 + metricHeight
+        headerHeight + rowHeight * 2 + spacing + metricHeight
             + (hasRest ? restLineHeight : 0)
             + buttonHeight + bottomPadding
             + spacing * (hasRest ? 4 : 3)
     }
 
-    var restLineHeight: CGFloat { (restFont * 1.2).rounded(.up) }
+    /// The board's 32 pt rest line at the 25 pt value.
+    var restLineHeight: CGFloat { (restFont * 1.28).rounded(.up) }
 
     /// Where content starts: just below the system clock. A vertical page
     /// reserves more than the clock needs (Ultra 56 pt for a clock ending
@@ -145,33 +354,29 @@ struct WatchWorkoutRootView: View {
     @ViewBuilder
     private var unavailable: some View {
         if store.orphanedHealthSessionId != nil {
-            ScrollView { WatchOrphanHealthBanner(store: store).padding(.horizontal, 6) }
+            WatchOrphanHealthBanner(store: store)
         } else {
             idle
         }
     }
 
     private var idle: some View {
-        VStack(spacing: 10) {
-            Image(systemName: store.connectionState == .phoneUnavailable ? "iphone.slash" : "applewatch")
-                .font(.title2)
-                .foregroundStyle(WatchPhysiqueOSTheme.purple)
-            Text(store.connectionState == .phoneUnavailable ? "Phone unavailable" : "Prepare a workout on iPhone")
-                .font(.headline)
-                .multilineTextAlignment(.center)
-            Text(store.connectionState == .phoneUnavailable
+        let phoneUnavailable = store.connectionState == .phoneUnavailable
+        return WatchPanelPage {
+            WatchPanelIcon(
+                systemName: phoneUnavailable ? "iphone.slash" : "applewatch",
+                color: phoneUnavailable ? WatchPhysiqueOSTheme.warning : WatchPhysiqueOSTheme.purple
+            )
+            WatchPanelTitle(phoneUnavailable ? "Phone unavailable" : "Prepare a workout on iPhone")
+            WatchPanelCopy(phoneUnavailable
                  ? (store.health.recordingCorrelationId != nil
                     ? "Apple Health keeps recording. Set logging waits for iPhone."
                     : "Set logging waits for iPhone.")
                  : "Build the exercises and sets, then choose Ready for Watch.")
-                .font(.caption2)
-                .foregroundStyle(WatchPhysiqueOSTheme.muted)
-                .multilineTextAlignment(.center)
-            Button("Refresh") { store.refresh() }
-                .buttonStyle(.borderedProminent)
-                .tint(WatchPhysiqueOSTheme.purple)
+        } actions: {
+            WatchActionButton(title: "Refresh") { store.refresh() }
+                .accessibilityIdentifier("watch.idle.refresh")
         }
-        .padding()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.idle")
     }
@@ -217,31 +422,23 @@ struct WatchWorkoutStartView: View {
     let projection: WatchWorkoutProjection
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 10) {
-                Text("READY FOR WATCH")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(WatchPhysiqueOSTheme.purple)
-                Text(projection.title)
-                    .font(.title3.bold())
-                    .multilineTextAlignment(.center)
-                Text("\(projection.totalSets) planned sets")
-                    .font(.caption)
-                    .foregroundStyle(WatchPhysiqueOSTheme.muted)
-                Button {
-                    store.startPreparedWorkout()
-                } label: {
-                    Label("Start Workout", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(WatchPhysiqueOSTheme.purple)
-                .disabled(store.isMutationPending || store.connectionState != .reachable)
-                if store.orphanedHealthSessionId != nil {
-                    WatchOrphanHealthBanner(store: store)
-                }
+        WatchPanelPage {
+            WatchEyebrow("READY FOR WATCH")
+            WatchPanelTitle(projection.title)
+            WatchPanelCopy("\(projection.totalSets) planned sets")
+            if store.orphanedHealthSessionId != nil {
+                WatchOrphanHealthContent()
+                    .padding(.top, 8)
             }
-            .padding(.horizontal, 8)
+        } actions: {
+            WatchActionButton(title: "Start Workout", systemImage: "play.fill",
+                              enabled: !store.isMutationPending && store.connectionState == .reachable) {
+                store.startPreparedWorkout()
+            }
+            .accessibilityIdentifier("watch.start")
+            if store.orphanedHealthSessionId != nil {
+                WatchOrphanHealthActions(store: store)
+            }
         }
     }
 }
@@ -253,22 +450,34 @@ struct WatchOrphanHealthBanner: View {
     @Bindable var store: WatchWorkoutStore
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "heart.text.square").font(.title3).foregroundStyle(WatchPhysiqueOSTheme.warning)
-            Text("Apple Health workout still recording")
-                .font(.system(size: 14, weight: .bold)).multilineTextAlignment(.center)
-            Text("iPhone isn't showing this workout. Save it to Apple Health or discard it.")
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(WatchPhysiqueOSTheme.muted)
-                .multilineTextAlignment(.center)
-            Button("End & Save") { store.saveOrphanedWorkout() }
-                .buttonStyle(.borderedProminent).tint(WatchPhysiqueOSTheme.purple)
-                .accessibilityIdentifier("watch.orphan.save")
-            Button("Discard", role: .destructive) { store.discardOrphanedWorkout() }
-                .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.destructive)
-                .accessibilityIdentifier("watch.orphan.discard")
+        WatchPanelPage {
+            WatchOrphanHealthContent()
+        } actions: {
+            WatchOrphanHealthActions(store: store)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.orphan")
+    }
+}
+
+struct WatchOrphanHealthContent: View {
+    var body: some View {
+        VStack(spacing: 6) {
+            WatchPanelIcon(systemName: "heart.fill", color: WatchPhysiqueOSTheme.warning)
+            WatchPanelTitle("Apple Health workout still recording")
+            WatchPanelCopy("iPhone isn't showing this workout.")
+        }
+    }
+}
+
+struct WatchOrphanHealthActions: View {
+    @Bindable var store: WatchWorkoutStore
+
+    var body: some View {
+        WatchActionButton(title: "End & Save") { store.saveOrphanedWorkout() }
+            .accessibilityIdentifier("watch.orphan.save")
+        WatchActionButton(title: "Discard", style: .quietDestructive) { store.discardOrphanedWorkout() }
+            .accessibilityIdentifier("watch.orphan.discard")
     }
 }
 
@@ -280,8 +489,10 @@ struct WatchWorkoutExecutionView: View {
     var forceReducedLuminance = false
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
+    private var reduced: Bool { isLuminanceReduced || forceReducedLuminance }
+
     var body: some View {
-        TimelineView(.periodic(from: .now, by: (isLuminanceReduced || forceReducedLuminance) ? 15 : 1)) { context in
+        TimelineView(.periodic(from: .now, by: reduced ? 15 : 1)) { context in
             GeometryReader { geometry in
                 // Insets come from this safe-area-respecting reader; only the
                 // content below extends to the physical top and bottom.
@@ -290,7 +501,15 @@ struct WatchWorkoutExecutionView: View {
                 let available = CGSize(width: geometry.size.width, height: fullHeight - topInset)
                 let layout = WatchExecutionLayout(size: available, hasRest: store.visibleRest != nil)
                 VStack(spacing: layout.spacing) {
-                    header(layout)
+                    // The confirmation and saving panels own the whole page
+                    // (locked W6/W7): no set header above them.
+                    if store.presentedPhase != .finishConfirmation, store.presentedPhase != .finishing {
+                        header(layout)
+                    } else {
+                        // Keeps the panel a distinct accessibility container
+                        // (a sole child would be flattened into the page).
+                        Color.clear.frame(height: 0).accessibilityHidden(true)
+                    }
                     switch store.presentedPhase {
                     case .finishConfirmation:
                         WatchFinishConfirmationPanel(store: store, projection: projection, layout: layout, date: context.date)
@@ -305,11 +524,15 @@ struct WatchWorkoutExecutionView: View {
                         rest(at: context.date, layout)
                         Spacer(minLength: 0)
                         primaryAction(layout)
+                            .opacity(reduced ? 0.65 : 1)
                     }
                 }
                 .padding(.horizontal, layout.horizontalInset)
                 .padding(.top, topInset)
                 .frame(width: geometry.size.width, height: fullHeight, alignment: .top)
+                // Always-On: the same content at reduced luminance/saturation.
+                .saturation(reduced ? 0.45 : 1)
+                .brightness(reduced ? -0.08 : 0)
                 .overlay(alignment: .topLeading) {
                     if store.debugSurface == "geometry" {
                         Text("avail \(Int(available.width))x\(Int(available.height)) need \(Int(layout.requiredHeight(hasRest: store.visibleRest != nil))) top \(Int(topInset))")
@@ -327,28 +550,31 @@ struct WatchWorkoutExecutionView: View {
     /// Set progress (green, like the phone Logger) and, in one line, the
     /// session title, or the status that matters more right now.
     private func header(_ layout: WatchExecutionLayout) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: layout.isCompact ? 2 : 3) {
             HStack(spacing: 4) {
                 Text("\(projection.completedSets)/\(projection.totalSets) SETS")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(WatchType.font(8, 760))
                     .foregroundStyle(WatchPhysiqueOSTheme.muted)
                     .fixedSize()
                 Spacer(minLength: 2)
                 if let status = statusText {
                     Text(status.text)
-                        .font(.system(size: 9, weight: .black))
+                        .font(WatchType.font(8, 800))
                         .foregroundStyle(status.color)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 } else {
-                    Text(projection.title).font(.system(size: 10, weight: .semibold)).lineLimit(1)
+                    Text(projection.title.uppercased())
+                        .font(WatchType.font(8, 760))
+                        .foregroundStyle(WatchPhysiqueOSTheme.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
-            ProgressView(value: Double(projection.completedSets), total: Double(max(projection.totalSets, 1)))
-                .tint(WatchPhysiqueOSTheme.progress)
-                .accessibilityIdentifier("watch.progress")
+            WatchProgressBar(completed: projection.completedSets, total: projection.totalSets)
+                .frame(height: layout.isCompact ? 3 : 4)
         }
-        .frame(height: layout.headerHeight)
+        .frame(height: layout.headerHeight, alignment: .bottom)
         .padding(.trailing, Self.pageIndicatorClearance)
     }
 
@@ -375,24 +601,27 @@ struct WatchWorkoutExecutionView: View {
         if let health = store.healthHeaderText {
             return (health, store.healthStatus == .starting ? WatchPhysiqueOSTheme.muted : WatchPhysiqueOSTheme.warning)
         }
+        if store.isReviewingOnPhone { return ("REVIEWING ON IPHONE", WatchPhysiqueOSTheme.muted) }
         return nil
     }
 
     private func contextRows(_ layout: WatchExecutionLayout) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: layout.spacing) {
             ForEach(Array(projection.rows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 4) {
                     Text(row.role == "upNext" ? "UP NEXT" : row.role.uppercased())
-                        .font(.system(size: 8, weight: .bold))
+                        .font(WatchType.font(8, 780))
                         .foregroundStyle(row.isCompletionTarget ? WatchPhysiqueOSTheme.purple : WatchPhysiqueOSTheme.muted)
-                        .fixedSize()
-                    Text([row.supersetLabel, row.exerciseName].compactMap { $0 }.joined(separator: " · "))
-                        .font(.system(size: row.isCompletionTarget ? 13 : 11, weight: .bold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    Spacer(minLength: 2)
+                        .frame(width: 42, alignment: .leading)
+                    Text([row.supersetLabel, row.exerciseName].compactMap { $0 }.joined(separator: " · "))
+                        .font(WatchType.font(10, 700))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text(row.setCount == 1 ? "ONLY SET" : "\(row.setNumber)/\(row.setCount)")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(WatchType.font(8, 500))
                         .foregroundStyle(WatchPhysiqueOSTheme.muted)
                         .fixedSize()
                 }
@@ -405,24 +634,30 @@ struct WatchWorkoutExecutionView: View {
     }
 
     private func splitMetrics(_ row: WatchWorkoutProjection.Row, _ layout: WatchExecutionLayout) -> some View {
-        HStack(spacing: 4) {
-            metricTile(value: row.loadText ?? "—", label: "LOAD", layout)
-            metricTile(value: row.repsText ?? "—", label: "REPS", layout)
+        let values = WatchExecutionValues(row: row)
+        return HStack(spacing: 4) {
+            metricTile(value: values.load, label: "LOAD", layout)
+            metricTile(value: values.primary, label: values.primaryLabel, layout)
         }
     }
 
     private func metricTile(value: String, label: String, _ layout: WatchExecutionLayout) -> some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 1) {
             Text(value)
-                .font(.system(size: layout.metricFont, weight: .black, design: .rounded))
+                .font(WatchType.font(layout.metricFont, 700))
+                .tracking(-0.05 * layout.metricFont)
+                .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(label).font(.system(size: 8, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.muted)
+                .minimumScaleFactor(0.6)
+            Text(label)
+                .font(WatchType.font(8, 760))
+                .foregroundStyle(WatchPhysiqueOSTheme.muted)
         }
         .frame(maxWidth: .infinity)
         .frame(height: layout.metricHeight)
         .background(WatchPhysiqueOSTheme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -437,16 +672,18 @@ struct WatchWorkoutExecutionView: View {
                 if rest.mode == .countdown, let endsAt = rest.endsAt { return max(0, endsAt.timeIntervalSince(date)) }
                 return max(0, date.timeIntervalSince(rest.startedAt))
             }()
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
                 Text(rest.mode == .countdown ? "REST LEFT" : "REST")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(WatchType.font(8, 760))
                     .foregroundStyle(WatchPhysiqueOSTheme.muted)
                     .fixedSize()
                 Text(WatchWorkoutClock.format(seconds))
-                    .font(.system(size: layout.restFont, weight: .black, design: .rounded))
+                    .font(WatchType.font(layout.restFont, 700))
+                    .tracking(-0.04 * layout.restFont)
                     .monospacedDigit()
             }
             .frame(height: layout.restLineHeight)
+            .accessibilityElement(children: .combine)
             .accessibilityIdentifier("watch.rest")
         }
     }
@@ -455,7 +692,7 @@ struct WatchWorkoutExecutionView: View {
     private func primaryAction(_ layout: WatchExecutionLayout) -> some View {
         if store.shouldShowAuthorityWarning(at: Date()) {
             WatchEdgeCapsuleButton(
-                title: "Retry iPhone", layout: layout, enabled: true,
+                title: "Retry iPhone", systemImage: "arrow.clockwise", layout: layout, enabled: true,
                 tint: WatchPhysiqueOSTheme.warning
             ) { store.retryAuthorityConnection() }
                 .accessibilityIdentifier("watch.execution.retryPhone")
@@ -478,10 +715,58 @@ struct WatchWorkoutExecutionView: View {
     }
 }
 
+/// Execution tile values (pure, testable). A timed set shows its entered
+/// seconds in the second tile ("SECONDS", like the phone Logger's column)
+/// instead of an empty reps tile; reps sets are unchanged.
+struct WatchExecutionValues: Equatable {
+    var load: String
+    var primary: String
+    var primaryLabel: String
+
+    init(load: String, primary: String, primaryLabel: String) {
+        self.load = load
+        self.primary = primary
+        self.primaryLabel = primaryLabel
+    }
+
+    init(row: WatchWorkoutProjection.Row) {
+        load = row.loadText ?? "—"
+        if let duration = row.durationText {
+            primary = duration
+            primaryLabel = "SECONDS"
+        } else {
+            primary = row.repsText ?? "—"
+            primaryLabel = "REPS"
+        }
+    }
+}
+
+/// The 4 pt set-progress bar (green fill on a quiet track).
+struct WatchProgressBar: View {
+    let completed: Int
+    let total: Int
+
+    var body: some View {
+        GeometryReader { geometry in
+            let fraction = total > 0 ? min(1, max(0, Double(completed) / Double(total))) : 0
+            ZStack(alignment: .leading) {
+                Capsule().fill(WatchPhysiqueOSTheme.progressTrack)
+                Capsule().fill(WatchPhysiqueOSTheme.progress)
+                    .frame(width: geometry.size.width * fraction)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Sets")
+        .accessibilityValue("\(completed) of \(total)")
+        .accessibilityIdentifier("watch.progress")
+    }
+}
+
 /// The bottom primary action: a capsule sitting on the lower edge of the
 /// display, inset so its rounded ends follow the Watch's corner curve.
 struct WatchEdgeCapsuleButton: View {
     let title: String
+    var systemImage: String? = nil
     let layout: WatchExecutionLayout
     var enabled = true
     var tint: Color = WatchPhysiqueOSTheme.purple
@@ -490,20 +775,26 @@ struct WatchEdgeCapsuleButton: View {
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: layout.isCompact ? 16 : 17, weight: .bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity)
-                .frame(height: layout.buttonHeight)
-                .background(tint)
-                .foregroundStyle(foreground)
-                .clipShape(Capsule())
+            HStack(spacing: 5) {
+                if let systemImage {
+                    Image(systemName: systemImage).font(.system(size: 12, weight: .bold))
+                }
+                Text(title)
+                    .font(WatchType.font(layout.isCompact ? 14 : 15, 760))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity)
+            .frame(height: layout.buttonHeight)
+            .background(tint)
+            .foregroundStyle(foreground)
+            .clipShape(Capsule())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.45)
-        .padding(.horizontal, layout.isCompact ? 6 : 8)
         .padding(.bottom, layout.bottomPadding)
     }
 }
@@ -518,42 +809,28 @@ struct WatchFinishConfirmationPanel: View {
 
     var body: some View {
         let remaining = max(0, projection.totalSets - projection.completedSets)
-        VStack(spacing: layout.spacing + 2) {
+        let waiting = store.connectionState != .reachable || store.isWaitingForPhone(at: date)
+        VStack(spacing: layout.spacing + 1) {
             if !layout.isCompact {
-                Image(systemName: "flag.checkered")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(WatchPhysiqueOSTheme.purple)
+                WatchPanelIcon(systemName: "flag.fill", color: WatchPhysiqueOSTheme.purple)
             }
-            Text("Finish workout?")
-                .font(.system(size: layout.isCompact ? 17 : 19, weight: .bold))
-            Text(remaining == 0
+            WatchPanelTitle("Finish workout?")
+            WatchPanelCopy(remaining == 0
                  ? "All \(projection.totalSets) sets complete."
                  : "\(remaining) set\(remaining == 1 ? "" : "s") not done. Only completed sets count.")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(WatchPhysiqueOSTheme.muted)
-                .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
-            if store.connectionState != .reachable || store.isWaitingForPhone(at: date) {
+            if waiting {
                 Text("Waiting for iPhone")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(WatchType.font(10, 760))
                     .foregroundStyle(WatchPhysiqueOSTheme.warning)
             }
             Spacer(minLength: 0)
-            Button(action: store.cancelFinish) {
-                Text("Not Yet")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: layout.buttonHeight - 4)
-                    .background(WatchPhysiqueOSTheme.surface)
-                    .foregroundStyle(WatchPhysiqueOSTheme.text)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, layout.isCompact ? 6 : 8)
-            .accessibilityIdentifier("watch.finishConfirmation.notYet")
-            if store.connectionState != .reachable || store.isWaitingForPhone(at: date) {
-                WatchEdgeCapsuleButton(title: "Retry", layout: layout, tint: WatchPhysiqueOSTheme.warning) {
+            WatchActionButton(title: "Not Yet", style: .quiet, height: layout.buttonHeight) { store.cancelFinish() }
+                .accessibilityIdentifier("watch.finishConfirmation.notYet")
+            if waiting {
+                WatchEdgeCapsuleButton(title: "Retry", systemImage: "arrow.clockwise", layout: layout,
+                                       tint: WatchPhysiqueOSTheme.warning) {
                     store.retryPending()
                 }
                 .accessibilityIdentifier("watch.finishConfirmation.retry")
@@ -583,31 +860,29 @@ struct WatchFinishingPanel: View {
         VStack(spacing: layout.spacing + 2) {
             if let reason = store.finishWaitReason(at: date) {
                 if !layout.isCompact {
-                    Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(WatchPhysiqueOSTheme.warning)
+                    WatchPanelIcon(systemName: "exclamationmark.arrow.triangle.2.circlepath", color: WatchPhysiqueOSTheme.warning)
                 }
-                Text(reason)
-                    .font(.system(size: 15, weight: .bold))
-                    .multilineTextAlignment(.center)
+                WatchPanelTitle(reason)
                     .lineLimit(2)
-                    .minimumScaleFactor(0.85)
-                Text("Sets are safe on iPhone.")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(WatchPhysiqueOSTheme.muted)
+                legs
+                WatchPanelCopy("Sets are safe on iPhone.")
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
-                legs
                 Spacer(minLength: 0)
-                WatchEdgeCapsuleButton(title: "Retry", layout: layout, tint: WatchPhysiqueOSTheme.warning) {
+                WatchEdgeCapsuleButton(title: "Retry", systemImage: "arrow.clockwise", layout: layout,
+                                       tint: WatchPhysiqueOSTheme.warning) {
                     store.retryPending()
                 }
                 .accessibilityIdentifier("watch.finishing.retry")
             } else {
-                ProgressView().tint(WatchPhysiqueOSTheme.purple)
-                Text("Saving workout…")
-                    .font(.system(size: 16, weight: .bold))
+                ProgressView()
+                    .tint(WatchPhysiqueOSTheme.purple)
+                    .frame(height: 25)
+                WatchPanelTitle("Saving workout…")
                 legs
+                WatchPanelCopy("Sets are safe on iPhone.")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Spacer(minLength: 0)
             }
         }
@@ -616,7 +891,7 @@ struct WatchFinishingPanel: View {
     }
 
     private var legs: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 3) {
             leg("PhysiqueOS", done: projection.finish?.serverCommitted == true)
             if projection.finish?.healthExpected != false {
                 leg("Apple Health", done: projection.finish?.healthSaved == true, failed: projection.finish?.healthFailed == true)
@@ -625,11 +900,14 @@ struct WatchFinishingPanel: View {
     }
 
     private func leg(_ title: String, done: Bool, failed: Bool = false) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             Image(systemName: done ? "checkmark.circle.fill" : failed ? "exclamationmark.circle" : "circle.dotted")
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(done ? WatchPhysiqueOSTheme.success : failed ? WatchPhysiqueOSTheme.warning : WatchPhysiqueOSTheme.muted)
-            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(WatchPhysiqueOSTheme.muted)
+            Text(title).font(WatchType.font(10, 600)).foregroundStyle(WatchPhysiqueOSTheme.muted)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(done ? "Saved" : failed ? "Needs retry" : "Saving")
     }
 }
 
@@ -664,11 +942,10 @@ struct WatchWorkoutMetricsView: View {
             VStack(spacing: compact ? 3 : 4) {
                 let values = WatchWorkoutMetricsPresentation(health: store.health)
                 if let caption = store.healthHeaderText {
-                    Text(caption).font(.system(size: 9, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.warning)
-                        .lineLimit(1).minimumScaleFactor(0.7)
+                    WatchEyebrow(caption, color: WatchPhysiqueOSTheme.warning)
                         .accessibilityIdentifier("watch.metrics.healthStatus")
                 } else {
-                    Text("WORKOUT METRICS").font(.system(size: 9, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.purple)
+                    WatchEyebrow("WORKOUT METRICS")
                 }
                 WatchMetricRow(
                     compact: compact,
@@ -696,8 +973,8 @@ struct WatchWorkoutMetricsView: View {
                     icon: "heart.fill", accent: WatchPhysiqueOSTheme.heartRateAccent
                 )
             }
-            .padding(.horizontal, 6)
-            .padding(.trailing, WatchWorkoutExecutionView.pageIndicatorClearance)
+            .padding(.horizontal, 9)
+            .padding(.trailing, WatchWorkoutExecutionView.pageIndicatorClearance - 4)
             }
         }
         .accessibilityElement(children: .contain)
@@ -722,8 +999,9 @@ struct WatchWorkoutMetricsPresentation: Equatable {
     }
 }
 
-/// One metric row. Only the icon carries the accent; every card shares the
-/// same PhysiqueOS surface.
+/// One metric row. Only the icon carries the accent (the retained
+/// production icon and per-metric color); every card shares the same quiet
+/// surface, an 8 pt label and a 15 pt tabular value.
 struct WatchMetricRow: View {
     var compact = false
     let label: String
@@ -733,22 +1011,23 @@ struct WatchMetricRow: View {
     var caption: String? = nil
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(accent)
-                .frame(width: 20)
-            VStack(alignment: .leading, spacing: 0) {
+                .frame(width: 23)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
-                    Text(label).font(.system(size: 8, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.muted)
+                    Text(label).font(WatchType.font(8, 760)).foregroundStyle(WatchPhysiqueOSTheme.muted)
                     if let caption {
-                        Text(caption).font(.system(size: 8, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.muted.opacity(0.75))
+                        Text(caption).font(WatchType.font(8, 760)).foregroundStyle(WatchPhysiqueOSTheme.muted.opacity(0.75))
                     }
                 }
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 Text(value)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(WatchType.font(15, 700))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -756,9 +1035,10 @@ struct WatchMetricRow: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 7)
-        .padding(.vertical, compact ? 3 : 5)
+        .padding(.vertical, compact ? 4 : 6)
         .background(WatchPhysiqueOSTheme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 9))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -778,7 +1058,7 @@ struct WatchDailyTotalsView: View {
             WatchBelowClockPage { size in
             let compact = size.height < 190
             VStack(spacing: compact ? 3 : 4) {
-                Text("DAILY TOTALS").font(.system(size: 9, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.purple)
+                WatchEyebrow("DAILY TOTALS")
                 WatchMetricRow(
                     compact: compact,
                     label: "TRAINING SESSION",
@@ -800,14 +1080,15 @@ struct WatchDailyTotalsView: View {
                     icon: "fork.knife", accent: WatchPhysiqueOSTheme.nutritionAccent
                 )
                 Text(WatchDailyTotalsPresentation.freshness(store.dailyTotals, connection: store.connectionState, at: context.date))
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(WatchType.font(9, 650))
                     .foregroundStyle(WatchPhysiqueOSTheme.muted)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .padding(.top, 1)
                     .accessibilityIdentifier("watch.dailyTotals.freshness")
             }
-            .padding(.horizontal, 6)
-            .padding(.trailing, WatchWorkoutExecutionView.pageIndicatorClearance)
+            .padding(.horizontal, 9)
+            .padding(.trailing, WatchWorkoutExecutionView.pageIndicatorClearance - 4)
             }
         }
         .accessibilityElement(children: .contain)
@@ -857,7 +1138,9 @@ struct WatchWorkoutControlsView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             GeometryReader { geometry in
-                let layout = WatchExecutionLayout(size: geometry.size)
+                let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
+                let topInset = WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top)
+                let layout = WatchExecutionLayout(size: CGSize(width: geometry.size.width, height: fullHeight - topInset))
                 Group {
                     if store.cancelConfirmationVisible {
                         cancelConfirmation(layout)
@@ -867,11 +1150,12 @@ struct WatchWorkoutControlsView: View {
                         controls(layout)
                     }
                 }
-                .padding(.horizontal, layout.horizontalInset + 2)
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                .padding(.horizontal, layout.horizontalInset)
+                .padding(.top, topInset)
+                .frame(width: geometry.size.width, height: fullHeight, alignment: .top)
+                .ignoresSafeArea(edges: [.top, .bottom])
             }
         }
-        .ignoresSafeArea(edges: .bottom)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.controls")
     }
@@ -880,47 +1164,51 @@ struct WatchWorkoutControlsView: View {
         let phase = store.presentedPhase
         let canControl = (phase == .active || phase == .paused)
             && !store.isMutationPending && store.connectionState == .reachable
+        // A failed Health start leads the page (W13): the status names the
+        // lane and Retry Health Start comes first.
+        let healthStartFailed = (phase == .active || phase == .paused)
+            && store.canStartHealthManually && store.healthStatus == .failed
+        let height: CGFloat = layout.isCompact ? 34 : 38
         return VStack(spacing: layout.isCompact ? 5 : 7) {
-            Text("WORKOUT CONTROLS")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(WatchPhysiqueOSTheme.muted)
+            WatchEyebrow(healthStartFailed ? "HEALTH START FAILED" : "WORKOUT CONTROLS",
+                         color: healthStartFailed ? WatchPhysiqueOSTheme.warning : WatchPhysiqueOSTheme.purple)
                 .accessibilityIdentifier("watch.controls.title")
             if store.shouldShowAuthorityWarning(at: Date()) {
-                controlButton(
-                    "Retry iPhone", icon: "arrow.clockwise", tint: WatchPhysiqueOSTheme.warning,
-                    prominent: true, enabled: true, layout
-                ) { store.retryAuthorityConnection() }
-                    .accessibilityIdentifier("watch.controls.retryPhone")
+                WatchActionButton(title: "Retry iPhone", systemImage: "arrow.clockwise", style: .warning, height: height) {
+                    store.retryAuthorityConnection()
+                }
+                .accessibilityIdentifier("watch.controls.retryPhone")
+            }
+            if healthStartFailed {
+                WatchActionButton(title: "Retry Health Start", systemImage: "heart.fill", style: .warning, height: height) {
+                    store.retryHealthStart()
+                }
+                .accessibilityIdentifier("watch.controls.recordHealth")
             }
             if phase == .active || phase == .paused {
-                controlButton(phase == .paused ? "Resume" : "Pause",
-                              icon: phase == .paused ? "play.fill" : "pause.fill",
-                              tint: WatchPhysiqueOSTheme.purple, prominent: true, enabled: canControl, layout) {
+                WatchActionButton(title: phase == .paused ? "Resume" : "Pause",
+                                  systemImage: phase == .paused ? "play.fill" : "pause.fill",
+                                  height: height, enabled: canControl) {
                     store.pauseOrResume()
                 }
                 .accessibilityIdentifier("watch.controls.pauseResume")
-                controlButton("Finish Workout", icon: "flag.checkered", tint: WatchPhysiqueOSTheme.purple,
-                              enabled: canControl && (store.projection?.completedSets ?? 0) > 0, layout) { store.requestFinish() }
+                WatchActionButton(title: "Finish Workout", systemImage: "flag.fill", style: .quiet, height: height,
+                                  enabled: canControl && (store.projection?.completedSets ?? 0) > 0) { store.requestFinish() }
                     .accessibilityIdentifier("watch.controls.finish")
-                controlButton("Cancel Workout", icon: "xmark", tint: WatchPhysiqueOSTheme.destructive,
-                              enabled: canControl, layout) { store.requestCancelWorkout() }
+                WatchActionButton(title: "Cancel Workout", systemImage: "xmark", style: .quietDestructive, height: height,
+                                  enabled: canControl) { store.requestCancelWorkout() }
                     .accessibilityIdentifier("watch.controls.cancel")
-                if store.canStartHealthManually {
-                    controlButton(
-                        store.healthStatus == .failed ? "Retry Health Start" : "Record to Health",
-                        icon: "heart", tint: WatchPhysiqueOSTheme.warning, enabled: true, layout
-                    ) {
+                if store.canStartHealthManually, !healthStartFailed {
+                    WatchActionButton(title: "Record to Health", systemImage: "heart", style: .quiet, height: height) {
                         store.retryHealthStart()
                     }
                     .accessibilityIdentifier("watch.controls.recordHealth")
                 }
             } else {
-                Text(phase == .finishing ? "Finishing — controls are closed." : "No workout in progress.")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(WatchPhysiqueOSTheme.muted)
-                    .multilineTextAlignment(.center)
+                WatchPanelCopy(phase == .finishing ? "Finishing — controls are closed." : "No workout in progress.",
+                               color: WatchPhysiqueOSTheme.muted)
                 if store.projection?.finish?.healthFailed == true {
-                    controlButton("Retry Health Save", icon: "heart", tint: WatchPhysiqueOSTheme.warning, enabled: true, layout) {
+                    WatchActionButton(title: "Retry Health Save", systemImage: "heart.fill", style: .warning, height: height) {
                         store.retryHealthFinish()
                     }
                 }
@@ -929,38 +1217,20 @@ struct WatchWorkoutControlsView: View {
         }
     }
 
-    private func controlButton(
-        _ title: String, icon: String, tint: Color, prominent: Bool = false, enabled: Bool,
-        _ layout: WatchExecutionLayout, action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.system(size: 15, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: layout.isCompact ? 34 : 38)
-                .background(prominent ? tint : WatchPhysiqueOSTheme.surface)
-                .foregroundStyle(prominent ? WatchPhysiqueOSTheme.background : tint)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.45)
-    }
-
     private func cancelConfirmation(_ layout: WatchExecutionLayout) -> some View {
         VStack(spacing: layout.spacing + 2) {
-            Text("Cancel this workout?")
-                .font(.headline).multilineTextAlignment(.center)
-            Text("This discards the workout. Completed sets will not be saved to training history.")
-                .font(.caption2).foregroundStyle(WatchPhysiqueOSTheme.muted).multilineTextAlignment(.center)
+            WatchPanelTitle("Cancel this workout?")
+            WatchPanelCopy("This discards the workout. Completed sets will not be saved to training history.")
                 .minimumScaleFactor(0.85)
             Spacer(minLength: 0)
-            Button("Keep Workout") { store.dismissCancelWorkout() }
-                .buttonStyle(.bordered).tint(WatchPhysiqueOSTheme.purple)
+            WatchActionButton(title: "Keep Workout", style: .quiet, height: layout.buttonHeight) {
+                store.dismissCancelWorkout()
+            }
+            .accessibilityIdentifier("watch.controls.keepWorkout")
             WatchEdgeCapsuleButton(
                 title: "Cancel Workout", layout: layout,
                 enabled: !store.isMutationPending && store.connectionState == .reachable,
-                tint: WatchPhysiqueOSTheme.destructive, foreground: WatchPhysiqueOSTheme.text
+                tint: WatchPhysiqueOSTheme.destructive, foreground: .white
             ) { store.confirmCancelWorkout() }
             .accessibilityIdentifier("watch.controls.confirmCancel")
         }
@@ -976,15 +1246,15 @@ struct WatchWorkoutSummaryView: View {
     var body: some View {
         GeometryReader { geometry in
             let layout = WatchExecutionLayout(size: geometry.size)
-            VStack(spacing: 0) {
+            VStack(spacing: 4) {
                 ScrollView {
-                    VStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill").font(.title2).foregroundStyle(WatchPhysiqueOSTheme.success)
-                        Text("WORKOUT SAVED").font(.headline)
-                        Text("\(projection.completedSets) completed sets").font(.caption).foregroundStyle(WatchPhysiqueOSTheme.muted)
+                    VStack(spacing: 5) {
+                        WatchPanelIcon(systemName: "checkmark", color: WatchPhysiqueOSTheme.success)
+                        WatchPanelTitle("WORKOUT SAVED")
+                        WatchPanelCopy("\(projection.completedSets) completed sets")
                         LazyVGrid(
-                            columns: [.init(.flexible()), .init(.flexible())],
-                            spacing: 5
+                            columns: [.init(.flexible(), spacing: 4), .init(.flexible(), spacing: 4)],
+                            spacing: 4
                         ) {
                             if let duration = projection.summary?.activeDurationSeconds {
                                 summaryMetric("\(Int(duration) / 60)m", "ACTIVE")
@@ -1002,14 +1272,18 @@ struct WatchWorkoutSummaryView: View {
                                 summaryMetric("\(prs)", "PR\(prs == 1 ? "" : "S")")
                             }
                         }
+                        .padding(.top, 2)
                         if let health = healthLine {
                             Text(health)
-                                .font(.caption2).foregroundStyle(WatchPhysiqueOSTheme.muted).multilineTextAlignment(.center)
+                                .font(WatchType.font(9, 500))
+                                .foregroundStyle(WatchPhysiqueOSTheme.muted)
+                                .multilineTextAlignment(.center)
                         }
                     }
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, 9)
                 }
                 WatchEdgeCapsuleButton(title: "Done", layout: layout) { store.dismissSummary() }
+                    .padding(.horizontal, 9)
                     .accessibilityIdentifier("watch.summary.done")
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -1027,12 +1301,19 @@ struct WatchWorkoutSummaryView: View {
     }
 
     private func summaryMetric(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 0) {
-            Text(value).font(.system(size: 15, weight: .bold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.65)
-            Text(label).font(.system(size: 8, weight: .bold)).foregroundStyle(WatchPhysiqueOSTheme.muted)
+        VStack(spacing: 1) {
+            Text(value)
+                .font(WatchType.font(14, 700))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+            Text(label).font(WatchType.font(8, 760)).foregroundStyle(WatchPhysiqueOSTheme.muted)
         }
-        .frame(maxWidth: .infinity, minHeight: 36)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 3)
         .background(WatchPhysiqueOSTheme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
     }
 }

@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import PhysiqueOSWatch
 
 /// Build 83 Watch finish state machine, HealthKit save/discard resolution,
@@ -352,6 +353,56 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         XCTAssertEqual(WatchWorkoutClock.sessionSeconds(projection, at: now), 2_000, "Frozen at the confirmed finish.")
         XCTAssertEqual(WatchWorkoutClock.format(3_725), "1:02:05")
         XCTAssertEqual(WatchWorkoutClock.format(125), "2:05")
+    }
+
+    // MARK: Overnight Lane A — utility translation presentation
+
+    func testTimedSetShowsItsSecondsInsteadOfAnEmptyRepsTile() throws {
+        let timed = try XCTUnwrap(try fixture("timed").rows.first(where: \.isCompletionTarget))
+        XCTAssertEqual(WatchExecutionValues(row: timed), .init(load: "BW", primary: "45", primaryLabel: "SECONDS"))
+
+        let reps = try XCTUnwrap(try fixture("normal").rows.first(where: \.isCompletionTarget))
+        XCTAssertEqual(WatchExecutionValues(row: reps), .init(load: "185", primary: "8", primaryLabel: "REPS"))
+
+        var missing = reps
+        missing.loadText = nil
+        missing.repsText = nil
+        XCTAssertEqual(WatchExecutionValues(row: missing), .init(load: "—", primary: "—", primaryLabel: "REPS"),
+                       "Missing values stay an honest em dash.")
+    }
+
+    @MainActor
+    func testPhoneReviewDisablesCompleteSetAndNamesTheReason() throws {
+        let (store, _) = makeStore("laneA.review")
+        store.apply(try fixture("review"))
+        XCTAssertEqual(store.presentedPhase, .active)
+        XCTAssertTrue(store.isReviewingOnPhone)
+        XCTAssertFalse(store.isCompleteSetAvailable, "No actionable Complete Set while the phone reviews.")
+        store.completeSet()
+        XCTAssertFalse(store.isMutationPending, "A tap issues no command.")
+
+        store.apply(try fixture("normal"))
+        XCTAssertFalse(store.isReviewingOnPhone)
+    }
+
+    func testWatchTypographyKeepsTheBoardAtStandardSizesAndGrowsOnlyForAccessibility() {
+        for size in [DynamicTypeSize.xSmall, .large, .xLarge, .xxLarge, .xxxLarge] {
+            XCTAssertEqual(WatchType.scale(size), 1, "\(size)")
+        }
+        XCTAssertGreaterThan(WatchType.scale(.accessibility1), 1)
+        XCTAssertGreaterThanOrEqual(WatchType.scale(.accessibility5), WatchType.scale(.accessibility1))
+    }
+
+    func testLockedUtilityTokensAndRetainedMetricIdentity() {
+        XCTAssertEqual(WatchPhysiqueOSTheme.background, Color(watchHex: 0x061019))
+        XCTAssertEqual(WatchPhysiqueOSTheme.purple, Color(watchHex: 0xAA98FF))
+        XCTAssertEqual(WatchPhysiqueOSTheme.progress, Color(watchHex: 0x55E39A))
+        // The Founder's acceptance correction: production metric accents stay.
+        XCTAssertEqual(WatchPhysiqueOSTheme.timeAccent, Color(watchHex: 0x60A5FA))
+        XCTAssertEqual(WatchPhysiqueOSTheme.activeEnergyAccent, Color(watchHex: 0xFBBF24))
+        XCTAssertEqual(WatchPhysiqueOSTheme.totalEnergyAccent, Color(watchHex: 0x4ADE80))
+        XCTAssertEqual(WatchPhysiqueOSTheme.nutritionAccent, Color(watchHex: 0xC084FC))
+        XCTAssertEqual(WatchPhysiqueOSTheme.heartRateAccent, Color(watchHex: 0xFF697A))
     }
 
     // MARK: Fixed execution layout

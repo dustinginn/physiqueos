@@ -15,7 +15,12 @@ extension WatchWorkoutProjection {
     ) -> Self? {
         guard let live = TrainingSessionLiveProjection.make(from: draft, now: now) else { return nil }
         let phase = Self.phase(of: draft, prepared: prepared)
+        // Mirrors the authority's own acceptance rule for Watch-origin content
+        // mutations, so the Watch never offers a Complete Set the phone would
+        // refuse (Review / Final Confirmation, Save & Leave). The authority
+        // still rejects such a command on its own; this is presentation only.
         let canComplete = phase == .active && live.currentSet != nil
+            && TrainingSessionInvariants.acceptsExternalContentMutation(draft)
         let finishEligibility: FinishEligibility
         if phase == .finishConfirmation { finishEligibility = .confirmable }
         else if phase == .active || phase == .paused { finishEligibility = .confirmationRequired }
@@ -39,6 +44,7 @@ extension WatchWorkoutProjection {
                     valueText: row.set.valueText,
                     loadText: Self.loadText(row.set),
                     repsText: Self.number(row.set.reps),
+                    durationText: Self.durationText(row),
                     supersetLabel: row.exercise?.supersetLabel,
                     partnerName: row.exercise?.supersetPartnerName,
                     isCompletionTarget: canComplete && row.isCompletionTarget
@@ -72,7 +78,8 @@ extension WatchWorkoutProjection {
             finishedAt: draft.finishedAt.flatMap(TrainingSessionClock.date(from:)),
             recentlyEnded: Self.recentlyEnded(authority: authority, excluding: draft.id),
             watchHealthStartedAt: (draft.watchStartedAt ?? draft.watchHealthStartedAt)
-                .flatMap(TrainingSessionClock.date(from:))
+                .flatMap(TrainingSessionClock.date(from:)),
+            isPhoneReviewing: phase == .active && live.phase == .reviewing ? true : nil
         )
     }
 
@@ -163,6 +170,13 @@ extension WatchWorkoutProjection {
     private static func number(_ value: Double?) -> String? {
         guard let value else { return nil }
         return value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+    }
+
+    /// Seconds for a duration-measured set ("45"); nil for reps sets and for
+    /// a timed set with nothing entered yet.
+    private static func durationText(_ row: TrainingSessionLiveProjection.ContextRow) -> String? {
+        guard row.exercise?.measurement == .duration else { return nil }
+        return number(row.set.durationSeconds)
     }
 
     private static func loadText(_ set: TrainingSessionLiveProjection.SetCue) -> String? {

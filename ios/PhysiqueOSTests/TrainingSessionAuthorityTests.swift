@@ -271,6 +271,105 @@ final class TrainingSessionAuthorityTests: XCTestCase {
         XCTAssertEqual(authority.draft(id: "session-1")?.currentRevision, 1)
     }
 
+    // MARK: Overnight Lane A — Watch Complete Set gating + timed-set projection
+
+    /// The phone on Workout Review (or Final Confirmation) makes sets
+    /// read-only for the Watch. The projection must not offer Complete Set
+    /// there, must say why, and the authority must still refuse the command.
+    func testWatchProjectionWithholdsCompleteSetWhileThePhoneReviewsAndAuthorityStillRejects() throws {
+        for step in [TrainingLoggerStep.summary, .evidence, .review] {
+            let (authority, clock) = makeAuthority(RecordingStore([liveSession(step: step)]))
+            let draft = try XCTUnwrap(authority.draft(id: "session-1"))
+            let projection = try XCTUnwrap(WatchWorkoutProjection.make(draft: draft, authority: authority, now: clock.now))
+            XCTAssertEqual(projection.phase, .active, "\(step)")
+            XCTAssertFalse(projection.canCompleteSet, "\(step): no actionable Complete Set while reviewing")
+            XCTAssertFalse(projection.rows.contains(where: \.isCompletionTarget), "\(step)")
+            XCTAssertEqual(projection.isPhoneReviewing, true, "\(step)")
+
+            let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+            let complete = WatchWorkoutCommand(
+                schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "c-\(step)", mutationId: "m-\(step)",
+                kind: .completeSet, sessionId: "session-1", expectedRevision: draft.currentRevision,
+                exerciseId: "bench", setId: "b1", issuedAt: clock.now
+            )
+            let response = router.route(complete)
+            XCTAssertEqual(response.status, .rejected, "\(step): UI gating is not a substitute for rejection")
+            XCTAssertEqual(response.reason, .sessionNotMutable, "\(step)")
+            XCTAssertEqual(authority.draft(id: "session-1")?.completedSetCount, 0, "\(step)")
+        }
+    }
+
+    func testWatchProjectionOffersCompleteSetDuringSetEntryOnly() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        let draft = try XCTUnwrap(authority.draft(id: "session-1"))
+        let projection = try XCTUnwrap(WatchWorkoutProjection.make(draft: draft, authority: authority, now: clock.now))
+        XCTAssertTrue(projection.canCompleteSet)
+        XCTAssertNil(projection.isPhoneReviewing)
+        XCTAssertEqual(projection.rows.first(where: \.isCompletionTarget)?.setId, "b1")
+
+        XCTAssertEqual(authority.pause(sessionId: "session-1"), .applied(revision: 1))
+        let paused = try XCTUnwrap(authority.draft(id: "session-1"))
+        let pausedProjection = try XCTUnwrap(WatchWorkoutProjection.make(draft: paused, authority: authority, now: clock.now))
+        XCTAssertFalse(pausedProjection.canCompleteSet)
+        XCTAssertNil(pausedProjection.isPhoneReviewing, "Paused is its own phase, not review.")
+    }
+
+    /// A timed set carries its entered seconds to the Watch instead of an
+    /// empty reps value; reps sets carry no duration.
+    func testWatchProjectionCarriesTimedSetSeconds() throws {
+        let draft = liveSession(exercises: [
+            exercise("plank", name: "Plank", measurement: .duration,
+                     sets: [set("p1", 1, reps: nil, load: nil, duration: 45), set("p2", 2, reps: nil, load: nil, duration: 60.5)]),
+            exercise("bench", sets: [set("b1", 1)]),
+        ])
+        let (authority, clock) = makeAuthority(RecordingStore([draft]))
+        let projection = try XCTUnwrap(WatchWorkoutProjection.make(
+            draft: try XCTUnwrap(authority.draft(id: "session-1")), authority: authority, now: clock.now
+        ))
+        let current = try XCTUnwrap(projection.rows.first(where: \.isCompletionTarget))
+        XCTAssertEqual(current.setId, "p1")
+        XCTAssertEqual(current.durationText, "45")
+        XCTAssertNil(current.repsText)
+        XCTAssertEqual(current.valueText, "45 s")
+
+        XCTAssertEqual(authority.completeSet(sessionId: "session-1", exerciseId: "plank", setId: "p1"), .applied(revision: 1))
+        let next = try XCTUnwrap(WatchWorkoutProjection.make(
+            draft: try XCTUnwrap(authority.draft(id: "session-1")), authority: authority, now: clock.now
+        ))
+        XCTAssertEqual(next.rows.first(where: \.isCompletionTarget)?.durationText, "60.5")
+
+        let reps = try XCTUnwrap(WatchWorkoutProjection.make(
+            draft: liveSession(), authority: makeAuthority(RecordingStore([liveSession()])).0, now: clock.now
+        ))
+        XCTAssertTrue(reps.rows.allSatisfy { $0.durationText == nil })
+    }
+
+    /// Additive wire fields: an older phone's payload (no `durationText`,
+    /// no `isPhoneReviewing`) still decodes, and round-trips keep them.
+    func testWatchProjectionLaneAFieldsAreOptionalOnTheWire() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession(step: .review)]))
+        let projection = try XCTUnwrap(WatchWorkoutProjection.make(
+            draft: try XCTUnwrap(authority.draft(id: "session-1")), authority: authority, now: clock.now
+        ))
+        let data = try WatchWorkoutWireCodec.encode(projection)
+        let decoded = try WatchWorkoutWireCodec.decode(WatchWorkoutProjection.self, from: data)
+        XCTAssertEqual(decoded.isPhoneReviewing, true)
+        XCTAssertEqual(decoded.rows, projection.rows)
+
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        json.removeValue(forKey: "isPhoneReviewing")
+        json["rows"] = (json["rows"] as? [[String: Any]])?.map { row in
+            var row = row
+            row.removeValue(forKey: "durationText")
+            return row
+        }
+        let legacy = try WatchWorkoutWireCodec.decode(
+            WatchWorkoutProjection.self, from: try JSONSerialization.data(withJSONObject: json)
+        )
+        XCTAssertNil(legacy.isPhoneReviewing)
+        XCTAssertTrue(legacy.rows.allSatisfy { $0.durationText == nil })
+    }
+
     func testSimultaneousPhoneAndWatchCompleteFailsWatchStaleWithoutAdvancingAnotherSet() {
         let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
         let watch = WatchWorkoutCommand(

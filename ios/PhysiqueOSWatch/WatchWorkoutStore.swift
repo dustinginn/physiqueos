@@ -256,6 +256,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     /// by Not Yet, by the confirm, or by authoritative state.
     private(set) var localFinishConfirmation = false
     private(set) var debugSurface: String?
+#if DEBUG
+    /// Fixture-only: renders the orphaned Health workout state.
+    private(set) var debugOrphanedHealthSessionId: String?
+#endif
     private(set) var gate = WatchWorkoutCommandDeliveryGate()
     private(set) var pendingIssuedAt: Date?
     private(set) var lastAuthoritativeContactAt: Date?
@@ -333,6 +337,12 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     }
 
     var isMutationPending: Bool { gate.pending != nil }
+
+    /// The phone is on Workout Review / Final Confirmation, where sets are
+    /// read-only; the projection already withholds Complete Set.
+    var isReviewingOnPhone: Bool {
+        presentedPhase == .active && projection?.isPhoneReviewing == true
+    }
 
     /// Complete Set is tappable. A read-only refresh never blocks it.
     var isCompleteSetAvailable: Bool {
@@ -507,6 +517,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
                 pendingIssuedAt = fixture.pendingIssuedAt
             }
             debugSurface = fixtureName
+            cancelConfirmationVisible = fixture.cancelConfirmationVisible
+            debugOrphanedHealthSessionId = fixture.orphanedHealthSessionId
             health.installDebugMetrics(
                 heartRate: fixture.heartRate,
                 activeCalories: fixture.activeCalories,
@@ -533,6 +545,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     /// A HealthKit workout still recording on this Watch for a session the
     /// phone is not showing (Save & Leave, a newer session, a lost record).
     var orphanedHealthSessionId: String? {
+#if DEBUG
+        if let debugOrphanedHealthSessionId { return debugOrphanedHealthSessionId }
+#endif
         guard let active = health.activeCorrelationId else { return nil }
         return projection?.sessionId == active ? nil : active
     }
