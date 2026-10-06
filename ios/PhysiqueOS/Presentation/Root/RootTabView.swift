@@ -305,8 +305,15 @@ private enum AppearanceReviewLaunchConfiguration {
             tab: .home,
             destinations: [.briefingDetail(briefingId: "weekly_briefing_2026-08-23_2026-08-29")]
         )
-        default: evidenceReviewPath(value)
+        case "briefing-history": Route(tab: .home, destinations: [.briefingList])
+        default: briefingReviewPath(value) ?? evidenceReviewPath(value)
         }
+    }
+
+    /// `briefing:<artifactId>` — opens one published Briefing (Home stack).
+    private static func briefingReviewPath(_ value: String) -> Route? {
+        guard value.hasPrefix("briefing:") else { return nil }
+        return Route(tab: .home, destinations: [.briefingDetail(briefingId: String(value.dropFirst("briefing:".count)))])
     }
 
     /// `evidence:<step>;<step>` — e.g. `evidence:stream=training;trainingDay=2026-08-26`.

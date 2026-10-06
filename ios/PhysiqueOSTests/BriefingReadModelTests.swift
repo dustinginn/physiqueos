@@ -52,14 +52,18 @@ final class BriefingReadModelTests: XCTestCase {
     }
 
     func testEveryBriefingKeepsItsCompleteEditorialSectionInventory() {
-        XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Photos", "Training", "Body Composition", "Coach's Take"])
+        // Founder-locked recurring family (Oct 4): Body Composition directly
+        // below Weight; no recurring Photos card (Photo Briefing stays its
+        // own event path) and no Still Unresolved section.
+        XCTAssertEqual(WeeklyBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Body Composition", "Training", "Coach's Take"])
         XCTAssertEqual(MidweekBriefingSections.sectionInventory, ["Integrated Lead", "Energy", "Weight", "Training", "Body Composition", "Coach's Take"])
         // Restored to the established Midweek format standard (verified:
         // last accepted screen `684a51c2`, shipped through Build 40
         // `cda5603d`): the V3 contract fills that same established module
         // order rather than collapsing into one undifferentiated
         // "Canonical Narrative" block.
-        XCTAssertEqual(MidweekBriefingSections.canonicalV3SectionInventory, ["Integrated Lead", "Energy", "Weight", "Body Composition", "Training", "Still Unresolved", "Coach's Take"])
+        XCTAssertEqual(MidweekBriefingSections.canonicalV3SectionInventory, ["Integrated Lead", "Energy", "Weight", "Body Composition", "Training", "Coach's Take"])
+        XCTAssertFalse(MidweekBriefingSections.canonicalV3SectionInventory.contains("Still Unresolved"))
         XCTAssertEqual(Array(DEXABriefingSections.sectionInventory.suffix(4)), ["What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"])
         XCTAssertEqual(PhotoBriefingSections.sectionInventory, ["Hero", "Snapshot", "Progress", "Interpretation", "Coach's Insight", "Completion Decision"])
     }
@@ -75,7 +79,9 @@ final class BriefingReadModelTests: XCTestCase {
     }
 
     func testMonthlyCompositionRemainsADistinctLongFormZineNotAWeeklyReskin() {
-        XCTAssertEqual(MonthlyBriefingSections.sectionInventory, ["Integrated Lead", "Goal Milestone", "Training Progress", "Energy Evolution", "New Baseline", "What Changed", "Defining Moments", "Month Ahead"])
+        // Founder-locked Monthly: Coach's Take closes the evidence body
+        // immediately before Month Ahead.
+        XCTAssertEqual(MonthlyBriefingSections.sectionInventory, ["Integrated Lead", "Goal Milestone", "Training Progress", "Energy Evolution", "New Baseline", "What Changed", "Defining Moments", "Coach's Take", "Month Ahead"])
         XCTAssertNotEqual(MonthlyBriefingSections.sectionInventory, WeeklyBriefingSections.sectionInventory)
         XCTAssertGreaterThanOrEqual(MonthlyBriefingSections.sectionInventory.count, 8)
     }
@@ -236,8 +242,8 @@ final class BriefingReadModelTests: XCTestCase {
     }
 
     func testMonthlyAndRecurringTrainingKeepDistinctPresentationCompositions() {
-        XCTAssertEqual(MonthlyBriefingSections.trainingPresentationStyle, "gold-featured-lift")
-        XCTAssertEqual(BriefingTrainingResponseCard.presentationStyle, "neutral-outlined-highlights")
+        XCTAssertEqual(MonthlyBriefingSections.trainingPresentationStyle, "record-rows")
+        XCTAssertEqual(BriefingTrainingResponseCard.presentationStyle, "dense-analytical-rows")
     }
 
     func testMonthlyOpeningRestoresThreeEvidenceFeatureCards() throws {

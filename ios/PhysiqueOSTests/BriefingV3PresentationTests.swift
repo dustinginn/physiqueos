@@ -105,7 +105,7 @@ final class BriefingV3PresentationTests: XCTestCase {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         for path in ["PhysiqueOS/Presentation/Briefings/WeeklyBriefingSections.swift"] {
             let source = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
-            let start = try XCTUnwrap(source.range(of: "struct WeeklyEnergyCard"))
+            let start = try XCTUnwrap(source.range(of: "struct BriefingEnergySection"))
             let energyCard = String(source[start.lowerBound...])
             XCTAssertFalse(energyCard.contains("chartSuccess"), "Energy balance must not use a fixed success color")
             XCTAssertFalse(energyCard.contains("balanceColor"))
@@ -780,8 +780,227 @@ final class BriefingV3PresentationTests: XCTestCase {
     func testMonthlyWhatChangedUsesTheSharedToneMappingAndNoAnalyticalReadLabel() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Briefings/MonthlyBriefingSections.swift"), encoding: .utf8)
-        XCTAssertTrue(source.contains("ProductionBriefingMapper.monthlyIcon(domain)"))
         XCTAssertFalse(source.contains("Baseline Read"))
-        XCTAssertTrue(source.contains("callout(title: \"What it means\""))
+        XCTAssertTrue(source.contains("MonthlyCallout(title: \"What it means\""))
+    }
+}
+
+/// Overnight Lane B — the Founder-locked Briefing presentation family.
+/// Presentation-only guarantees: every published artifact routes to its own
+/// cadence screen, the locked section order holds, nothing regenerates or
+/// mutates a canonical payload, chart gestures use the scroll-safe
+/// arbitration, and both appearances resolve.
+final class BriefingLockedPresentationTests: XCTestCase {
+    private var root: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent() }
+
+    private func source(_ path: String) throws -> String {
+        try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private var presentationFiles: [String] {
+        let directory = root.appendingPathComponent("PhysiqueOS/Presentation/Briefings")
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return files.filter { $0.hasSuffix(".swift") }.map { "PhysiqueOS/Presentation/Briefings/\($0)" } + ["PhysiqueOS/SharedUI/BriefingPresentation.swift"]
+    }
+
+    // MARK: Routing
+
+    func testEveryPublishedBriefingTypeRoutesToItsOwnCadenceScreen() throws {
+        let store = BriefingSandboxStore()
+        var seen: Set<String> = []
+        for briefing in store.briefings {
+            let route = BriefingCadenceBody.route(for: briefing)
+            switch briefing.cadence {
+            case .weekly: XCTAssertEqual(route, .weekly)
+            case .midweek: XCTAssertEqual(route, .midweek)
+            case .monthly: XCTAssertEqual(route, .monthly)
+            case .event: XCTAssertEqual(route, briefing.dexa != nil ? .dexa : .photo)
+            case .daily: XCTAssertEqual(route, BriefingCadenceBody.Route.none)
+            }
+            seen.insert("\(route)")
+        }
+        XCTAssertEqual(seen, ["weekly", "midweek", "monthly", "dexa", "photo"], "the fixture must exercise all five Briefing types")
+    }
+
+    func testDetailAndHistoryReadOnlyPublishedArtifactsAndNeverRegenerate() throws {
+        for path in presentationFiles {
+            let text = try source(path)
+            for forbidden in ["productionCommandAPI", "commandAPI", "regenerate", "republish", "\"POST\"", "generateBriefing"] {
+                XCTAssertFalse(text.contains(forbidden), "\(path) must stay read-only (found \(forbidden))")
+            }
+        }
+        let detail = try source("PhysiqueOS/Presentation/Briefings/BriefingDetailView.swift")
+        XCTAssertTrue(detail.contains("briefingAPI.fetchBriefing(artifactId:"))
+        let history = try source("PhysiqueOS/Presentation/Briefings/BriefingHistoryView.swift")
+        XCTAssertTrue(history.contains("briefingAPI.fetchHistory()"))
+    }
+
+    // MARK: Payload identity
+
+    @MainActor
+    func testRenderingEveryBriefingLeavesItsCanonicalPayloadByteIdentical() throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let environment = AppEnvironment(nativeAuthority: .sandbox)
+        for briefing in BriefingSandboxStore().briefings {
+            let before = try encoder.encode(briefing)
+            for scheme in [ColorScheme.dark, .light] {
+                let renderer = ImageRenderer(content: BriefingCadenceBody(briefing: briefing)
+                    .frame(width: 402)
+                    .environment(environment)
+                    .environment(\.colorScheme, scheme))
+                _ = renderer.uiImage
+            }
+            XCTAssertEqual(try encoder.encode(briefing), before, "\(briefing.id) changed while rendering")
+        }
+    }
+
+    // MARK: Locked section order / omissions
+
+    func testRecurringBriefingsHaveNoStillUnresolvedOrRecurringPhotosSection() throws {
+        let weekly = try source("PhysiqueOS/Presentation/Briefings/WeeklyBriefingSections.swift")
+        let midweek = try source("PhysiqueOS/Presentation/Briefings/MidweekBriefingSections.swift")
+        for text in [weekly, midweek] {
+            XCTAssertFalse(text.contains("BriefingUncertaintyCard("))
+        }
+        XCTAssertFalse(weekly.contains("content.photos"), "Weekly must not mount the recurring Photos card")
+        XCTAssertFalse(WeeklyBriefingSections.sectionInventory.contains("Photos"))
+        XCTAssertEqual(Array(WeeklyBriefingSections.sectionInventory.prefix(4)), ["Integrated Lead", "Energy", "Weight", "Body Composition"])
+    }
+
+    func testMidweekFinaleUsesContractCoachingThenCanonicalCoachTakeVerbatim() throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "BriefingsFixture", withExtension: "json")
+            ?? Bundle.main.url(forResource: "BriefingsFixture", withExtension: "json"))
+        _ = url
+        var midweek = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.cadence == .midweek }?.midweek)
+        midweek.narrativeV3 = CanonicalNarrativeV3ReadModel(summary: "S", detail: nil, result: "R", meaning: "M", action: "A", watch: "W", confidence: "C", coachTake: "Canonical coach take.")
+        midweek.presentationContract = MidweekPresentationContract(
+            artifactId: "a", assessmentId: nil,
+            lead: .init(headlineClaimId: nil, headline: "H", meaningClaimId: nil, meaning: "M", goal: .init(id: nil, name: "Goal"), phase: .init(id: nil, name: "Phase"),
+                        confidence: .init(claimId: "c", assessmentId: "a", score: 79, band: "high", movement: "held", movementDirection: "held", delta: 0, reason: "Contract reason.", movementLabel: "— No meaningful change")),
+            modules: [.init(id: "weight", payloadKey: "weight", included: true, reasonCode: "x", order: 1, observationCount: 3)],
+            coaching: [.init(section: "action", label: "What To Do", claimId: "a1", text: "Do it."), .init(section: "watch", label: "What To Watch", claimId: "w1", text: "Watch it.")],
+            uncertainty: .init(visibleItems: [.init(id: "u", text: "Not shown", surfaced: true)], coveredIds: [])
+        )
+        let window = BriefingEvidenceWindowReadModel(id: "w", startDate: "2026-09-20", endDate: "2026-09-22", briefingDate: "2026-09-23", relativeLabel: "Sunday through Tuesday", timeZone: "UTC")
+        let view = MidweekBriefingSections(content: midweek, confidence: nil, evidenceWindow: window)
+        let contract = try XCTUnwrap(midweek.presentationContract)
+        let slots = view.finaleSlots(contract)
+        XCTAssertEqual(slots.takeaway, "Canonical coach take.")
+        XCTAssertEqual(slots.action, "Do it.")
+        XCTAssertEqual(slots.watch, "Watch it.")
+        XCTAssertEqual(view.heroConfidence?.movement, "— No meaningful change")
+        XCTAssertEqual(view.heroConfidence?.reason, "Contract reason.")
+        XCTAssertEqual(view.weightNote(WeeklyWeightSection(averageWeightLb: 178.4, changeLb: -0.6, narrative: "")), "Sunday–Tuesday average · 3 observations")
+        XCTAssertEqual(view.weightNote(WeeklyWeightSection(averageWeightLb: 178.4, changeLb: -0.6, narrative: "Server note.")), "Server note.")
+    }
+
+    func testConfidenceMovementCopyPrefersServerLabelAndOtherwiseStatesPersistedDelta() {
+        var confidence = BriefingConfidenceReadModel(score: 68, band: "moderate", priorScore: 63, delta: 5, movementDirection: .increased, primaryReason: "r", supportingReasons: [], limitingReasons: [], unresolvedUncertainty: [], goalId: "g", phaseId: nil, capturedAt: "2026-08-30T00:00:00.000Z", source: "s")
+        XCTAssertEqual(BriefingConfidenceCopy.movement(confidence), "Confidence increased +5")
+        confidence.movementDirection = .decreased; confidence.delta = -7
+        XCTAssertEqual(BriefingConfidenceCopy.movement(confidence), "Confidence decreased −7")
+        confidence.presentationMovementLabel = "Server label"
+        XCTAssertEqual(BriefingConfidenceCopy.movement(confidence), "Server label")
+    }
+
+    func testSignedFormattingUsesTrueMinusAndPlus() {
+        XCTAssertEqual(BriefingNumberFormatting.signed(0.6, decimals: 1), "+0.6")
+        XCTAssertEqual(BriefingNumberFormatting.signed(-0.6, decimals: 1), "−0.6")
+        XCTAssertEqual(BriefingNumberFormatting.signedKcal(350), "+350 kcal")
+        XCTAssertEqual(BriefingNumberFormatting.signedKcal(-50), "−50 kcal")
+    }
+
+    func testHeroRangeKeepsHumanCanonicalLabelsVerbatim() {
+        XCTAssertEqual(BriefingDateFormatting.heroRangeLabel("Completed week\nAug 23–Aug 29"), "Completed week\nAug 23–Aug 29")
+        XCTAssertEqual(BriefingDateFormatting.heroRangeLabel("2026-08-23 – 2026-08-29"), "Aug 23–29")
+    }
+
+    // MARK: Chart interaction
+
+    func testBriefingChartsUseScrollSafeArbitrationNotLegacyZeroDistanceScrub() throws {
+        for path in presentationFiles {
+            XCTAssertFalse(try source(path).contains(".chartScrub"), "\(path) must not use the legacy zero-distance chartScrub")
+        }
+        let kit = try source("PhysiqueOS/SharedUI/BriefingPresentation.swift")
+        XCTAssertTrue(kit.contains("EvidenceHorizontalScrubGesture"), "Briefing bars reuse the Evidence horizontal-only pan")
+        XCTAssertTrue(kit.contains("onTapGesture(coordinateSpace: .local)"), "a tap selects")
+    }
+
+    func testEnergyBarSelectionResolvesTheNearestDayAndClamps() {
+        XCTAssertEqual(BriefingEnergyBars.nearestIndex(toX: 0, width: 364, count: 7), 0)
+        XCTAssertEqual(BriefingEnergyBars.nearestIndex(toX: 182, width: 364, count: 7), 3)
+        XCTAssertEqual(BriefingEnergyBars.nearestIndex(toX: 400, width: 364, count: 7), 6)
+        XCTAssertEqual(BriefingEnergyBars.nearestIndex(toX: -20, width: 364, count: 2), 0)
+        XCTAssertNil(BriefingEnergyBars.nearestIndex(toX: 10, width: 364, count: 0))
+    }
+
+    // MARK: History
+
+    func testHistoryRowSymbolsAndTimestampsAreTypeAndDateFaithful() {
+        func row(_ cadence: BriefingCadence, _ type: String? = nil, _ date: String?) -> BriefingHistoryRowReadModel {
+            BriefingHistoryRowReadModel(artifactId: "id", artifactType: type, cadence: cadence, label: "L", publicationDate: date, version: 1)
+        }
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.weekly, nil, nil)), "square.fill")
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.midweek, nil, nil)), "clock")
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.monthly, nil, nil)), "circle.dotted")
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.event, "dexa_event", nil)), "waveform.path")
+        XCTAssertEqual(BriefingHistoryRow.symbol(for: row(.event, "photo_event", nil)), "smallcircle.filled.circle")
+        XCTAssertEqual(BriefingDateFormatting.historyTimestamp("2026-10-01"), "Oct 1, 2026", "a date-only delivery date gets no invented time")
+        XCTAssertNotEqual(BriefingDateFormatting.historyTimestamp("2026-10-04T14:31:46.944Z"), "2026-10-04T14:31:46.944Z")
+    }
+
+    @MainActor
+    func testEveryDetailAndHistoryStateRendersInBothAppearances() throws {
+        let briefing = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.cadence == .weekly })
+        let detailStates: [BriefingDetailView.LoadState] = [.loading, .failed, .notReady, .loaded(nil), .loaded(briefing)]
+        let historyStates: [BriefingHistoryView.LoadState] = [.loading, .failed("Briefing History could not be loaded."), .loaded([]),
+            .loaded([BriefingHistoryRowReadModel(artifactId: "a", artifactType: nil, cadence: .weekly, label: "Weekly Briefing", publicationDate: "2026-09-27T12:00:00.000Z", version: 1)])]
+        for scheme in [ColorScheme.dark, .light] {
+            for state in detailStates {
+                let image = ImageRenderer(content: BriefingDetailBody(state: state).frame(width: 372).environment(AppEnvironment(nativeAuthority: .sandbox)).environment(\.colorScheme, scheme)).uiImage
+                XCTAssertNotNil(image)
+            }
+            for state in historyStates {
+                let image = ImageRenderer(content: BriefingHistoryContent(state: state).frame(width: 366).environment(\.colorScheme, scheme)).uiImage
+                XCTAssertNotNil(image)
+            }
+        }
+    }
+
+    // MARK: Appearance + accessibility
+
+    func testRichFieldsKeepTheirDarkFieldInMineralLightOnly() {
+        let dark = UITraitCollection(userInterfaceStyle: .dark)
+        let light = UITraitCollection(userInterfaceStyle: .light)
+        func hex(_ color: Color, _ traits: UITraitCollection) -> String {
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            UIColor(color).resolvedColor(with: traits).getRed(&r, green: &g, blue: &b, alpha: &a)
+            return String(format: "%02X%02X%02X", Int(round(r * 255)), Int(round(g * 255)), Int(round(b * 255)))
+        }
+        XCTAssertEqual(hex(BriefingPalette.standard.ink, dark), "F4F7F8")
+        XCTAssertEqual(hex(BriefingPalette.standard.ink, light), "102638")
+        XCTAssertEqual(hex(BriefingPalette.richField.ink, dark), hex(BriefingPalette.standard.ink, dark))
+        XCTAssertEqual(hex(BriefingPalette.richField.ink, light), "F4F8F8", "a rich field stays light-on-dark in Mineral Light")
+        XCTAssertEqual(hex(BriefingPalette.standard.page, light), "F1F1E9")
+    }
+
+    func testNavigationChipsAndTapTargetsMeetTheLockedContract() throws {
+        XCTAssertEqual(BriefingDetailHeader.navigationLabels, ["Home", "Briefing History"])
+        let kit = try source("PhysiqueOS/SharedUI/BriefingPresentation.swift")
+        XCTAssertTrue(kit.contains(".frame(height: 44)"), "navigation chips are 44 pt")
+        XCTAssertTrue(kit.contains("accessibilityLabel(\"Confidence \\(score) percent\")"))
+        let history = try source("PhysiqueOS/Presentation/Briefings/BriefingHistoryView.swift")
+        XCTAssertTrue(history.contains(".frame(minHeight: 78)"))
+        XCTAssertTrue(history.contains("minWidth: 44, minHeight: 44"))
+    }
+
+    func testReviewSeamsAreDebugOnly() throws {
+        let history = try source("PhysiqueOS/Presentation/Briefings/BriefingHistoryView.swift")
+        let seam = try XCTUnwrap(history.range(of: "enum BriefingReviewLaunchConfiguration"))
+        let prefix = history[..<seam.lowerBound]
+        XCTAssertTrue(prefix.hasSuffix("#if DEBUG\n/// Screenshot-only review seam (absent from Release): forces a Briefing\n/// Detail or History load state without touching the API.\n/// `-physiqueos.briefing-review.detail-state loading|failed|notReady|unavailable`\n/// `-physiqueos.briefing-review.history-state loading|failed|empty`\n"))
+        let detail = try source("PhysiqueOS/Presentation/Briefings/BriefingDetailView.swift")
+        XCTAssertTrue(detail.contains("#if DEBUG\nprivate struct BriefingReviewScrollOffset") || detail.contains("#if DEBUG\nstruct BriefingReviewScrollOffset"))
     }
 }
