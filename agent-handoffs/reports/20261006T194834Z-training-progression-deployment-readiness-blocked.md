@@ -16,7 +16,7 @@
 
 The Server candidate is a clean three-commit fast-forward from current remote Server lineage `b7eb1e397f0238df9ae904fd182ddbb51602e8d8`. Its progression-owned tests, broader Training compatibility suite, changed-file lint, deployment tooling tests, and diff checks pass. The source/contract audit found no migration, backfill, Native progression math, Native contract break, or unrelated Server behavior in the candidate delta.
 
-Deployment readiness is nevertheless **blocked**. The task requires a fresh bounded read of the real Founder Training Strategy, Cable Machine Front Raises history, and two production controls through the approved PC-only runner. This Codex session is on the Mac and exposed no already-established PC surface. `agent-handoffs/PRODUCTION_READONLY_ACCESS.md` explicitly forbids inventing a Mac credential path or weakening the boundary. Therefore the active DigitalOcean deployment, production rows, current-vs-candidate shadow calculation, and real Maintain/Opportunity controls were not reverified.
+Deployment readiness is nevertheless **blocked**. The task requires a fresh bounded read of the real Founder Training Strategy, Cable Machine Front Raises history, and two production controls through the approved PC-only runner. This Codex session is on the Mac and exposed no already-established PC surface. `agent-handoffs/PRODUCTION_READONLY_ACCESS.md` explicitly forbids inventing a Mac credential path or weakening the boundary. The public/runtime DigitalOcean authority was freshly reverified without accessing Founder data, but the production rows, current-vs-candidate shadow calculation, and real Maintain/Opportunity controls were not reverified.
 
 The fail-closed result is **DO NOT DEPLOY until the required PC read is complete and green**. This is an evidence/authority blocker, not a discovered candidate defect.
 
@@ -34,7 +34,20 @@ Fresh `git fetch --prune origin` results:
 
 No Server commit landed after `b7eb1e39` on `origin/combined-app-platform-cutover`. The clean deployment-candidate authority remains the existing exact candidate `999a225a`; no semantic rebase or merge was necessary.
 
-Production runtime authority could not be freshly queried from this Mac. The latest main-visible evidence available at report time says deployment `6fa4e887` was ACTIVE on `b7eb1e39`, with `/api/v1/health/live` returning 200 as of the Build 89 release report at 2026-10-06T18:45:37Z. That is useful prior evidence, **not** a substitute for the task-required fresh PC authority check.
+Fresh non-data authority verification through the saved DigitalOcean context and public health endpoints established:
+
+| Production fact | Fresh result |
+| --- | --- |
+| App | `bf57cf56-48cc-4cd6-90e4-a23ee5381741` / `physiqueos-foundation-staging` |
+| Active deployment | `6fa4e887-8849-450b-b068-5bdb11b90009`, `ACTIVE`, 9/9 |
+| In-progress deployment | none |
+| Web component/source | `web` / `b7eb1e397f0238df9ae904fd182ddbb51602e8d8` |
+| Worker component/source | `worker` / `b7eb1e397f0238df9ae904fd182ddbb51602e8d8` |
+| Source branch | `combined-app-platform-cutover` for both components |
+| `/api/v1/health/live` | 200, `status=ok`, build `physiqueos-b7eb1e39-20261005` |
+| `/api/v1/health/ready` | 200, `status=ready`, all nine checks ready, migration `000014` |
+
+This proves the current public/runtime Server authority and the absence of a transitional deployment. It does **not** substitute for the task-required PC-only Founder-data read.
 
 ## 2. Candidate delta and contract audit
 
@@ -140,6 +153,8 @@ These prove the candidate does not mechanically turn every movement into an oppo
 | `git diff --check b7eb1e39..999a225a` | PASS |
 | Candidate worktree | clean; detached exact SHA |
 
+An independent exact-candidate corroborating rerun also passed the six-file progression policy/protocol/Logger/Core read/Native/Postgres gate at **128/128** and Phase 6 Training at **167/167**. Its broader Operating Plan selection passed 67/68 with only the same absent private runtime fixture, and its deployment subset passed 21/22 with only the unchanged macOS `/var` versus `/private/var` assertion below.
+
 The wider failures are not hidden:
 
 - private `private/founder/runtime-store.json` / `migration-control.json` are absent from this isolated Server worktree;
@@ -154,7 +169,7 @@ The same four Phase 6 failure signatures reproduce from an archived exact `b7eb1
 
 - candidate: `999a225a38ced9ddb16a65bbe840896472265468`
 - expected pre-deploy source/rollback SHA: `b7eb1e397f0238df9ae904fd182ddbb51602e8d8`
-- expected current deployment hint: `6fa4e887` (must be freshly verified)
+- freshly verified current deployment: `6fa4e887-8849-450b-b068-5bdb11b90009` (must still be reverified immediately before deployment)
 - production ref: `refs/heads/combined-app-platform-cutover`
 - app hint: `bf57cf56-48cc-4cd6-90e4-a23ee5381741` (must be freshly verified)
 - migration/backfill: none
