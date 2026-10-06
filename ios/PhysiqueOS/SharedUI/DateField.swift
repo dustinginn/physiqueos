@@ -22,6 +22,11 @@ struct DateField: View {
     /// both bounds explicitly instead.
     var minimumDate: Date? = nil
     var label: String = "Date"
+    /// `.capture` renders the locked daily-capture date well (Final Design
+    /// Batch 2); the picker sheet, Today and Done behave identically.
+    var style: Style = .standard
+
+    enum Style { case standard, capture }
 
     @State private var isPresented = false
 
@@ -29,6 +34,18 @@ struct DateField: View {
         Button {
             isPresented = true
         } label: {
+            if style == .capture {
+                HStack {
+                    Text(Self.formatter.string(from: date))
+                        .captureFont(CaptureType.field)
+                        .foregroundStyle(PhysiqueOSTheme.captureInk)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Image(systemName: "calendar").foregroundStyle(PhysiqueOSTheme.captureSecondary)
+                }
+                .captureInputWell()
+                .contentShape(Rectangle())
+            } else {
             HStack(spacing: 10) {
                 Image(systemName: "calendar")
                     .font(.system(size: 16, weight: .semibold))
@@ -51,6 +68,7 @@ struct DateField: View {
                 RoundedRectangle(cornerRadius: 12)
                     .strokeBorder(PhysiqueOSTheme.divider, lineWidth: 1)
             )
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

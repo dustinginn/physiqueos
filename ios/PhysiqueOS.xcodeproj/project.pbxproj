@@ -447,8 +447,6 @@
 		000000000000000000001916 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001915 /* Assets.xcassets */; };
 		000000000000000000001F00 /* PlusJakartaSans.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F3 /* PlusJakartaSans.swift */; };
 		000000000000000000001F01 /* PlusJakartaSans[wght].ttf in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000120B /* PlusJakartaSans[wght].ttf */; };
-		000000000000000000001F02 /* PlusJakartaSans.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000010F3 /* PlusJakartaSans.swift */; };
-		000000000000000000001F03 /* PlusJakartaSans[wght].ttf in Resources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000120B /* PlusJakartaSans[wght].ttf */; };
 		000000000000000000001A09 /* WatchWorkoutFinishStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A08 /* WatchWorkoutFinishStateTests.swift */; };
 		000000000000000000001A0B /* WatchWorkoutNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A0A /* WatchWorkoutNavigationUITests.swift */; };
 /* End PBXBuildFile section */
@@ -1929,7 +1927,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				000000000000000000001F03 /* PlusJakartaSans[wght].ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2383,7 +2380,6 @@
 				00000000000000000000162A /* PhysiqueOSLiveActivityBundle.swift in Sources */,
 				00000000000000000000162C /* WorkoutLiveActivityWidget.swift in Sources */,
 				00000000000000000000162E /* HomeLoggedTodayWidget.swift in Sources */,
-				000000000000000000001F02 /* PlusJakartaSans.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

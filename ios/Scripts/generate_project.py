@@ -921,9 +921,6 @@ assert _counter[0] < LANE_A_WATCH_FONT_BLOCK, "Lane A Watch font ID block would 
 _counter[0] = LANE_A_WATCH_FONT_BLOCK
 for group, fname in lane_a_watch_font_source_files + lane_a_watch_font_resource_files:
     I(f"buildfile:watch:{group}/{fname}")
-# A3: the same font for the Live Activity (Widget Extension) target.
-for group, fname in lane_a_watch_font_source_files + lane_a_watch_font_resource_files:
-    I(f"buildfile:ext:{group}/{fname}")
 _counter[0] = _resume_counter
 
 # ---------------- PBXBuildFile ----------------
@@ -1597,9 +1594,7 @@ sources_phases = sources_phases.replace(
     f"{app_source_build_ids}\n", f"{app_source_build_ids}\n{_shared_app_ids}\n", 1)
 _ext_source_ids = "\n".join(
     f"\t\t\t\t{I(f'buildfile:ext:{g}/{f}')} /* {f} in Sources */,"
-    for g, f in live_activity_shared_files + home_widget_shared_files + live_activity_extension_files + home_widget_extension_files
-    + lane_a_watch_font_source_files
-)
+    for g, f in live_activity_shared_files + home_widget_shared_files + live_activity_extension_files + home_widget_extension_files)
 sources_phases += f"""
 \t\t{I('extSourcesPhase')} /* Sources */ = {{
 \t\t\tisa = PBXSourcesBuildPhase;
@@ -1609,15 +1604,11 @@ sources_phases += f"""
 \t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};"""
-_lane_a_ext_font_resource_ids = "\n".join(
-    f"\t\t\t\t{I(f'buildfile:ext:{g}/{f}')} /* {f} in Resources */," for g, f in lane_a_watch_font_resource_files
-)
 resources_phases += f"""
 \t\t{I('extResourcesPhase')} /* Resources */ = {{
 \t\t\tisa = PBXResourcesBuildPhase;
 \t\t\tbuildActionMask = 2147483647;
 \t\t\tfiles = (
-{_lane_a_ext_font_resource_ids}
 \t\t\t);
 \t\t\trunOnlyForDeploymentPostprocessing = 0;
 \t\t}};"""
@@ -1767,13 +1758,6 @@ for group, fname in lane_a_watch_font_source_files:
 for group, fname in lane_a_watch_font_resource_files:
     buildfile_lines.append(
         f"\t\t{I(f'buildfile:watch:{group}/{fname}')} /* {fname} in Resources */ = "
-        f"{{isa = PBXBuildFile; fileRef = {I(f'fileref:{group}/{fname}')} /* {fname} */; }};"
-    )
-for group, fname in lane_a_watch_font_source_files:
-    buildfile_lines.append(_bf_sources(f"buildfile:ext:{group}/{fname}", group, fname))
-for group, fname in lane_a_watch_font_resource_files:
-    buildfile_lines.append(
-        f"\t\t{I(f'buildfile:ext:{group}/{fname}')} /* {fname} in Resources */ = "
         f"{{isa = PBXBuildFile; fileRef = {I(f'fileref:{group}/{fname}')} /* {fname} */; }};"
     )
 

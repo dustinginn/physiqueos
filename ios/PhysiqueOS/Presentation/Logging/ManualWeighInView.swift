@@ -769,26 +769,11 @@ struct ManualWeighInView: View {
         Text(text).captureFont(CaptureType.fieldLabel).foregroundStyle(PhysiqueOSTheme.captureSecondary).padding(.bottom, 7)
     }
 
-    /// The date well shows the measured date; the system compact picker
-    /// (capped at today) sits over it as the real control.
+    /// The locked date well; the shared picker sheet (capped at today, with
+    /// Today and Done) is unchanged.
     private var dateField: some View {
-        HStack {
-            Text(Self.mediumDate.string(from: date)).captureFont(CaptureType.field).foregroundStyle(PhysiqueOSTheme.captureInk)
-            Spacer()
-            Image(systemName: "calendar").foregroundStyle(PhysiqueOSTheme.captureSecondary)
-        }
-        .captureInputWell()
-        .overlay {
-            DatePicker("Date measured", selection: $date, in: ...Date(), displayedComponents: .date)
-                .labelsHidden()
-                .datePickerStyle(.compact)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .blendMode(.destinationOver)
-                .opacity(0.02)
-                .accessibilityLabel("Date measured")
-        }
-        .accessibilityIdentifier("manualWeighIn.date")
+        DateField(date: $date, maximumDate: Date(), label: "Date measured", style: .capture)
+            .accessibilityIdentifier("manualWeighIn.date")
     }
 
     private var unitMenu: some View {

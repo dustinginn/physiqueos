@@ -1,6 +1,5 @@
 import AppIntents
 import SwiftUI
-import UIKit
 
 // SwiftUI for the Workout Logger Live Activity, shared by the Widget
 // Extension (which hosts it in ActivityKit) and by the app (unit tests and
@@ -53,12 +52,12 @@ struct WorkoutActivityTheme: Equatable {
     static func of(_ scheme: ColorScheme) -> Self { scheme == .light ? .mineralLight : .dark }
 }
 
-/// Fixed tokens kept for ActivityKit modifiers and test backdrops. The
-/// background is dynamic so the Lock Screen tint follows the appearance.
+/// Fixed tokens kept for ActivityKit modifiers and test backdrops. Every
+/// Live Activity color is a plain sRGB `Color`: ActivityKit archives the
+/// view's display list, and UIKit-backed (dynamic or descriptor-based)
+/// colors and fonts crash that encoder in the extension.
 enum WorkoutActivityPalette {
-    static let background = Color(uiColor: UIColor { trait in
-        trait.userInterfaceStyle == .light ? UIColor(activityHex: 0xE8ECE5) : UIColor(activityHex: 0x061019)
-    })
+    static let background = Color.activityHex(0x061019)
     static let elevated = Color.activityHex(0x132735)
     static let muted = Color.activityHex(0x172235)
     static let accent = Color.activityHex(0x3BD2CA)
@@ -70,23 +69,31 @@ enum WorkoutActivityPalette {
 }
 
 extension Color {
-    static func activityHex(_ hex: UInt32) -> Color { Color(uiColor: UIColor(activityHex: hex)) }
-}
-
-extension UIColor {
-    convenience init(activityHex hex: UInt32) {
-        self.init(
-            red: CGFloat((hex >> 16) & 0xFF) / 255,
-            green: CGFloat((hex >> 8) & 0xFF) / 255,
-            blue: CGFloat(hex & 0xFF) / 255,
-            alpha: 1
+    static func activityHex(_ hex: UInt32) -> Color {
+        Color(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: 1
         )
     }
 }
 
-/// Live Activity type: Plus Jakarta Sans (bundled in the Widget Extension).
+/// Live Activity type: SF system faces. The utility package allows SF where
+/// Apple owns the surface, and a custom variable font cannot be archived by
+/// ActivityKit's display-list encoder (it crashed the extension).
 enum WorkoutActivityType {
-    static func font(_ size: CGFloat, _ weight: CGFloat) -> Font { PlusJakartaSans.font(size: size, weight: weight) }
+    static func font(_ size: CGFloat, _ weight: CGFloat) -> Font {
+        let mapped: Font.Weight = switch weight {
+        case ..<450: .regular
+        case ..<550: .medium
+        case ..<650: .semibold
+        case ..<750: .bold
+        default: .heavy
+        }
+        return .system(size: size, weight: mapped)
+    }
 }
 
 typealias WorkoutActivityState = WorkoutActivityAttributes.ContentState
@@ -359,6 +366,9 @@ struct WorkoutLockScreenView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .foregroundStyle(theme.text)
+        // The page is drawn here (not as a dynamic activity tint) so the
+        // Lock Screen follows the system appearance with archivable colors.
+        .background(theme.page)
         .environment(\.workoutActivityStartedAt, attributes.startedAt)
         .accessibilityElement(children: .contain)
     }
