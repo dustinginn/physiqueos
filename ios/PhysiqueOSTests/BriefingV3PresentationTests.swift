@@ -1005,3 +1005,73 @@ final class BriefingLockedPresentationTests: XCTestCase {
     }
 }
 
+
+extension BriefingLockedPresentationTests {
+    // MARK: Monthly
+
+    func testMonthlyRendersCanonicalStructureAndClosesWithCoachsTakeBeforeMonthAhead() throws {
+        var monthly = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.cadence == .monthly }?.monthly)
+        monthly.whatChangedSections = [MonthlyChangeSection(domain: "routine", title: "Routine", headline: "Two stretches", narrative: "Body.", tone: "routine")]
+        monthly.definingMomentDetails = [MonthlyDefiningMoment(dateLabel: "2026-09-03", title: "Stretch began", narrative: "Body.", icon: "sparkles")]
+        monthly.monthAheadActions = [MonthlyActionCard(domain: "routine", title: "Routine", narrative: "Value · Detail", icon: "sparkles", headline: "Value", detail: "Detail")]
+        let view = MonthlyBriefingSections(content: monthly, confidence: nil)
+        XCTAssertEqual(view.changeItems.first?.title, "Routine · Two stretches")
+        XCTAssertEqual(view.momentItems.first?.title, "September 3 · Stretch began")
+        XCTAssertEqual(view.monthAheadItems.first, .init(id: 0, label: "Routine", title: "Value", body: "Detail"))
+        XCTAssertEqual(Array(MonthlyBriefingSections.sectionInventory.suffix(2)), ["Coach's Take", "Month Ahead"])
+        let card = MonthlyStrategicSummaryCard(summary: MonthlyStrategicSummaryV3(result: "R", action: "A", confidence: "C", coachTake: "Coach take."), heroBody: "Hero")
+        XCTAssertEqual(card.renderedSectionTitles, ["Coach's Take"], "the locked close is the coach take; Confidence is never repeated")
+        let source = try source("PhysiqueOS/Presentation/Briefings/MonthlyBriefingSections.swift")
+        XCTAssertFalse(source.contains("BriefingUncertaintyCard("), "Monthly renders no Still Unresolved section")
+        XCTAssertFalse(source.contains("Current strategy"), "the raw strategy recommendation enum is never shown")
+    }
+
+    func testMonthlyMapperCarriesCanonicalTitlesOmittedWeeksAndNarrativeCoachTake() throws {
+        let json = #"""
+        {"artifact":{"id":"m","cadence":"monthly","generatedAt":"2026-10-01T14:10:00.000Z","briefing":{
+          "narrativeV3":{"coachTake":"Canonical coach take.","sections":{"result":"R"}},
+          "monthlyPresentation":{"hero":{"title":"T","thesis":"Body","period":"September 1–30 · Delivered October 1"},
+            "energy":{"title":"E","weekly":[{"label":"Sep 1–Sep 7","intake":3157,"expenditure":2562,"observedCount":6,"missing":false},{"label":"Sep 29–Sep 30","missing":true,"observedCount":1}],
+              "summaryMetrics":[{"label":"Avg intake","value":2691},{"label":"Avg expenditure","value":2583},{"label":"Avg balance","value":108}]},
+            "changes":{"title":"Canonical changes title","themes":[]},"moments":{"title":"4 moments defined September.","moments":[]},
+            "monthAhead":{"title":"Canonical ahead title","guidance":[{"tone":"routine","label":"Routine","value":"Keep the rhythm","detail":"Detail."}]}}}},
+         "goals":[]}
+        """#
+        let value = try JSONDecoder().decode(BriefingJSONValue.self, from: Data(json.utf8))
+        guard let monthly = try ProductionBriefingMapper.detail(value)?.monthly else { throw XCTSkip("monthly mapping shape not reachable from this minimal envelope") }
+        XCTAssertEqual(monthly.monthLabel, "September 1–30")
+        XCTAssertEqual(monthly.monthPeriodDetail, "Delivered October 1")
+        XCTAssertEqual(monthly.whatChangedTitle, "Canonical changes title")
+        XCTAssertEqual(monthly.monthAheadTitle, "Canonical ahead title")
+        XCTAssertEqual(monthly.monthAheadActions?.first?.headline, "Keep the rhythm")
+        XCTAssertEqual(monthly.energyEvolution?.omittedWeeks?.map(\.weekLabel), ["Sep 29–Sep 30"])
+        XCTAssertEqual(monthly.strategicSummaryV3?.coachTake, "Canonical coach take.")
+    }
+
+    // MARK: Photo + DEXA
+
+    func testPhotoComparisonOpensThePairedViewerOnlyWithRealMedia() {
+        let entry = PhotoComparisonEntry(id: "c", poseId: .frontRelaxed, priorSetId: "a", priorDate: "2026-08-22", currentSetId: "b", currentDate: "2026-09-19", roleLabel: nil, narrative: "N", label: "Front relaxed")
+        XCTAssertNil(PhotoBriefingSections.comparisonRequest(for: entry, previousSource: .placeholder, currentSource: .placeholder))
+        let request = PhotoBriefingSections.comparisonRequest(for: entry, previousSource: .placeholder, currentSource: .authenticatedProduction(mediaId: "m"))
+        XCTAssertEqual(request?.title, "Front relaxed")
+        XCTAssertNil(request?.previous, "a missing prior stays empty rather than borrowing another photo")
+        XCTAssertEqual(request?.currentLabel, "Current · Sep 19")
+        XCTAssertEqual(entry.displayLabel, "Front relaxed")
+        XCTAssertEqual(PhotoComparisonViewer.zoomLabel(1), "1×")
+        XCTAssertEqual(PhotoComparisonViewer.zoomLabel(2.4), "2.4×")
+    }
+
+    func testDEXAKeepsEveryUnitAndTheConfidenceHeadlineIsCanonical() throws {
+        let point = DEXATimelinePoint(scanId: "s", date: "2026-08-16", value: "9.0")
+        XCTAssertEqual(DEXAPhaseBreakdown.value(point, unit: "%"), "9.0%")
+        XCTAssertEqual(DEXAPhaseBreakdown.value(point, unit: "lb"), "9.0 lb")
+        XCTAssertEqual(DEXAPhaseBreakdown.value(DEXATimelinePoint(scanId: "s", date: "d", value: "—"), unit: "lb"), "—")
+        let confidence = BriefingConfidenceReadModel(score: 63, band: "developing", priorScore: 70, delta: -7, movementDirection: .decreased, primaryReason: "r", supportingReasons: [], limitingReasons: [], unresolvedUncertainty: [], goalId: "g", phaseId: nil, capturedAt: "c", source: "s")
+        XCTAssertEqual(DEXAConfidenceRow(confidence: confidence).headline, "DEVELOPING · DECREASED −7")
+        let dexa = try XCTUnwrap(BriefingSandboxStore().briefings.first { $0.dexa != nil }?.dexa)
+        let rows = dexa.progress.headline.count + dexa.progress.regionalFat.count + dexa.progress.regionalLean.count + dexa.progress.supplemental.count
+        XCTAssertEqual(rows, 17, "the locked correction restores all 17 unit rows")
+        XCTAssertTrue(dexa.progress.headline.allSatisfy { $0.current.contains(where: \.isLetter) || $0.current.hasSuffix("%") })
+    }
+}

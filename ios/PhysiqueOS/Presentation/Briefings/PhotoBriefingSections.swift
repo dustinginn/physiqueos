@@ -692,6 +692,8 @@ struct BriefingEventCoach: View {
     var milestone: String?
     var milestoneLabel = "Next milestone"
     var rows: [(String, String)] = []
+    enum RowStyle { case stacked, dexa }
+    var rowStyle: RowStyle = .stacked
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -703,14 +705,29 @@ struct BriefingEventCoach: View {
                 BriefingParagraph(text, .j(14, 400, 1.55), color: BriefingPalette.fixed(0xF5F7F8))
                     .padding(.top, 12)
             }
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(row.0.uppercased())
-                        .briefingText(.j(9, 800, tracking: 0.08))
-                        .foregroundStyle(BriefingPalette.fixed(0xCBBCFF))
-                    BriefingParagraph(row.1, .j(13, 400, 1.5), color: BriefingPalette.fixed(0xF5F7F8, 0.88))
+            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                switch rowStyle {
+                case .stacked:
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(row.0.uppercased())
+                            .briefingText(.j(9, 800, tracking: 0.08))
+                            .foregroundStyle(BriefingPalette.fixed(0xCBBCFF))
+                        BriefingParagraph(row.1, .j(13, 400, 1.5), color: BriefingPalette.fixed(0xF5F7F8, 0.88))
+                    }
+                    .padding(.top, 14)
+                case .dexa:
+                    // `.coach-item`: 64 px label column + statement on a top rule.
+                    HStack(alignment: .top, spacing: 9) {
+                        BriefingParagraph(row.0, .jn(9, 800, uppercase: true), color: BriefingPalette.fixed(0x8FE5C1))
+                            .frame(width: 64, alignment: .leading)
+                        BriefingParagraph(row.1, .j(11, 700, 1.42), color: BriefingPalette.fixed(0xF5F7F8))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.vertical, 12)
+                    .briefingRule(.top, Color.white.opacity(0.14))
+                    .padding(.top, index == 0 ? 10 : 0)
+                    .accessibilityElement(children: .combine)
                 }
-                .padding(.top, 14)
             }
             if let milestone, !milestone.isEmpty {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {

@@ -105,7 +105,7 @@ struct BriefingDetailBody: View {
             VStack(alignment: .leading, spacing: 0) {
                 BriefingCadenceBody(briefing: briefing, onNavigate: onNavigate)
                 if let provenance = briefing.revisionProvenance {
-                    BriefingRevisionBanner(provenance: provenance, replacedHistory: briefing.replacedHistory)
+                    BriefingRevisionBanner(provenance: provenance, replacedHistory: briefing.replacedHistory, eventStyle: briefing.cadence == .event)
                 }
             }
         case .loaded(nil):
@@ -164,7 +164,7 @@ struct BriefingCadenceBody: View {
             }
         case .event:
             if let dexa = briefing.dexa {
-                DEXABriefingSections(content: dexa, confidence: briefing.confidence, onNavigate: onNavigate)
+                DEXABriefingSections(content: dexa, confidence: briefing.confidence, onNavigate: onNavigate, attribution: briefing.attribution)
             } else if let photo = briefing.photo {
                 PhotoBriefingSections(content: photo, onNavigate: onNavigate)
             }

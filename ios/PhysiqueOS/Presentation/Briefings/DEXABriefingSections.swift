@@ -1,20 +1,15 @@
 import SwiftUI
 
-/// DEXA Event Briefing's complete verified section order
-/// (`DEXAEventBriefingScreen.jsx`): Hero (title/body/results grid/optional
-/// milestones) → Snapshot → Progress (Since-Last-Scan headline, Regional
-/// Fat Change, Regional Lean Change, Other Notable Changes, the amber "Cut
-/// Timeline" module) → Interpretation → Coach's Insight → optional
-/// read-only Phase Review → optional Goal Completion Handoff CTA.
-///
-/// The web DEXA Event capture includes the persisted goal-confidence block
-/// inside the hero, so Native renders that same score, band, movement, and
-/// primary reason alongside the headline metrics.
-///
-/// Deliberately does NOT render a forecast section or any chart
-/// interaction — verified: no forecast fields are rendered on the real
-/// screen, and the "Cut Timeline" point grid is static (no hover/tap), so
-/// this view does not reuse `ChartInteraction.swift`'s scrub gesture.
+/// DEXA Event Briefing — a data-rich scan-to-scan review — in the
+/// Founder-locked event family with its two locked corrections (every
+/// canonical field-specific unit across the comparison tables, and the full
+/// Goal/Phase body-composition breakdown): Hero (title, body, the persisted
+/// Confidence ring, result grid, milestones) → Snapshot → What Measurably
+/// Changed (Since Last Scan, Regional Fat, Measured Lean Tissue, Other
+/// Notable Changes) → the phase breakdown → What This Scan Means → Coach's
+/// Insight → optional read-only Phase Review → optional Goal Completion
+/// handoff. Distinct from the recurring cadences; no Recovery. The tables
+/// and breakdown are static (no chart interaction to arbitrate).
 struct DEXABriefingSections: View {
     static let sectionInventory = ["Hero", "Current Scan", "What Measurably Changed", "Since Last Scan", "Regional Fat Change", "Measured Lean Tissue Change", "Other Notable Changes", "Cut Timeline", "What This Scan Means", "Coach's Insight", "Phase Review", "Goal Completion Handoff"]
     static let heroMetricPresentationStyle = "semantic-two-by-two"
@@ -23,462 +18,503 @@ struct DEXABriefingSections: View {
     let content: DEXABriefingContent
     let confidence: BriefingConfidenceReadModel?
     var onNavigate: (AppDestination) -> Void = { _ in }
+    /// The Goal/Phase the artifact was published under (frozen attribution).
+    var attribution: BriefingGoalAttribution? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 30) {
+        VStack(alignment: .leading, spacing: 0) {
             hero
-            snapshotCard
-            progressCard
-            interpretationCard
-            coachInsightCard
-            if let phaseReview = content.phaseReview { phaseReviewCard(phaseReview) }
-            if let handoff = content.goalCompletionHandoff { goalCompletionCard(handoff) }
+            snapshotSection
+            changesSection
+            interpretationSection
+            BriefingEventCoach(
+                label: "Coach's Insight",
+                text: "",
+                rows: [("Biggest Win", content.coachInsight.biggestWin), ("Protect", content.coachInsight.protect),
+                       ("Watch", content.coachInsight.watch), ("Next", content.coachInsight.next)].filter { !$0.1.isEmpty },
+                rowStyle: .dexa
+            )
+            .accessibilityIdentifier("briefing.dexa.coachInsight")
+            if let phaseReview = content.phaseReview { phaseReviewSection(phaseReview) }
+            if let handoff = content.goalCompletionHandoff { handoffSection(handoff) }
         }
+        .accessibilityIdentifier("briefing.dexa")
     }
+
+    // MARK: Hero
 
     private var hero: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 10) {
-                    IconBadge(systemImage: "scope", color: .primary, size: .md, isCircular: false)
-                    Text(Self.heroTypeLabel)
-                        .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                        .foregroundStyle(PhysiqueOSTheme.accent)
-                }
-                Text(content.hero.title)
-                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(content.hero.body)
-                    .physiqueOSFont(PhysiqueOSTypography.editorialBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                if let confidence {
-                    HStack(alignment: .center, spacing: 18) {
-                        ConfidenceRing(value: confidence.score, size: 112, lineWidth: 8)
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text(confidence.bandLabel.uppercased())
-                                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            Text(confidence.movementLabel)
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text(confidence.primaryReason)
-                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        }
+        BriefingEventHero(
+            eyebrow: Self.heroTypeLabel,
+            date: "Scan · \(BriefingDateFormatting.shortDate(content.scanDate))",
+            title: content.hero.title,
+            summary: content.hero.body
+        ) {
+            if let confidence { DEXAConfidenceRow(confidence: confidence) }
+            if !content.hero.results.isEmpty { DEXAHeroMetrics(results: content.hero.results) }
+            if !content.hero.milestones.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(content.hero.milestones, id: \.self) { milestone in
+                        Text("✓ \(milestone)").briefingText(.jn(11, 700))
                     }
                 }
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                    ForEach(content.hero.results) { result in
-                        heroMetric(result)
-                    }
-                }
-                if !content.hero.milestones.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(content.hero.milestones, id: \.self) { milestone in
-                            HStack(alignment: .top, spacing: 6) {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                                Text(milestone)
-                                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            }
-                        }
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(PhysiqueOSTheme.chartSuccess.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+                .padding(.top, 14)
             }
         }
     }
 
-    private var snapshotCard: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("SNAPSHOT")
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                BriefingEditorialHeading(title: "Current Scan")
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
-                    snapshotMetric("Date", BriefingDateFormatting.shortDate(content.scanDate))
-                    snapshotMetric("Interval", "\(content.daysBetweenScans) days")
-                    snapshotMetric("DEXA Weight", content.snapshot.weightLb)
-                    snapshotMetric("Body Fat", content.snapshot.bodyFatPercent)
-                    snapshotMetric("Fat Mass", content.snapshot.fatMassLb)
-                    snapshotMetric("Lean Tissue", content.snapshot.leanMassLb)
-                }
-                if let rmr = content.snapshot.restingMetabolicRateKcal {
-                    Text("Estimated RMR: \(rmr) cal/day")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
+    // MARK: Snapshot
+
+    private var snapshotSection: some View {
+        BriefingEventSection(bottomPadding: 5, identifier: "briefing.dexa.snapshot") {
+            BriefingEventSectionHead(label: "Snapshot", trailing: "Current Scan")
+            DEXASnapshotGrid(items: [
+                ("Date", BriefingDateFormatting.monthDay(content.scanDate)),
+                ("Window", "\(content.daysBetweenScans) days"),
+                ("DEXA Weight", content.snapshot.weightLb),
+                ("Body Fat", content.snapshot.bodyFatPercent),
+                ("Fat Mass", content.snapshot.fatMassLb),
+                ("Lean Tissue", content.snapshot.leanMassLb),
+            ] + (content.snapshot.restingMetabolicRateKcal.map { [("RMR", "\($0) cal/day")] } ?? []))
+            .padding(.bottom, 23)
+        }
+    }
+
+    // MARK: What Measurably Changed
+
+    private var changesSection: some View {
+        BriefingEventSection(bottomPadding: 5, identifier: "briefing.dexa.changes") {
+            BriefingEventSectionHead(label: "What Measurably Changed", trailing: content.isBaselineScan ? "Baseline Scan" : "Since Last Scan")
+            DEXAUnitTable(
+                title: "Since Last Scan",
+                firstColumn: "Metric",
+                rows: content.progress.headline.map { .init(label: $0.label, previous: $0.previous, current: $0.current, delta: $0.delta) }
+            )
+            if !content.progress.regionalFat.isEmpty {
+                DEXAUnitTable(title: "Regional Fat Change", firstColumn: "Metric", rows: content.progress.regionalFat.map { .init(label: $0.region, previous: $0.previous, current: $0.current, delta: $0.delta) })
+                    .accessibilityIdentifier("briefing.dexa.regionalFat")
             }
-        }
-    }
-
-    private var progressCard: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
-            VStack(alignment: .leading, spacing: 22) {
-                BriefingEditorialHeading(title: "What Measurably Changed")
-
-                comparisonGroup(title: "Since Last Scan", items: content.progress.headline)
-                if !content.progress.regionalFat.isEmpty {
-                    regionalGroup(title: "Regional Fat Change", items: content.progress.regionalFat)
-                }
-                if !content.progress.regionalLean.isEmpty {
-                    regionalGroup(title: "Measured Lean Tissue Change", items: content.progress.regionalLean)
-                }
-                if !content.progress.supplemental.isEmpty {
-                    supplementalGroup(title: "Other Notable Changes", items: content.progress.supplemental)
-                }
-                cutTimelineModule(content.progress.timeline)
+            if !content.progress.regionalLean.isEmpty {
+                DEXAUnitTable(title: "Measured Lean Tissue Change", firstColumn: "Metric", rows: content.progress.regionalLean.map { .init(label: $0.region, previous: $0.previous, current: $0.current, delta: $0.delta) })
+                    .accessibilityIdentifier("briefing.dexa.regionalLean")
             }
-        }
-    }
-
-    private func comparisonGroup(title: String, items: [DEXAComparisonMetric]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                .accessibilityIdentifier(title == "Regional Fat Change" ? "briefing.dexa.regionalFat" : title == "Measured Lean Tissue Change" ? "briefing.dexa.regionalLean" : "briefing.dexa.supplemental")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                ForEach(items) { item in
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(item.label)
-                            .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        Text(item.delta)
-                            .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
-                            .foregroundStyle(deltaColor(item.delta))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                        HStack(alignment: .center, spacing: 7) {
-                            comparisonValue("Previous", item.previous)
-                            Image(systemName: directionSymbol(item.delta))
-                                .foregroundStyle(deltaColor(item.delta))
-                            comparisonValue("Current", item.current)
-                        }
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, minHeight: 142, alignment: .topLeading)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(item.label): from \(item.previous) to \(item.current), a change of \(item.delta)")
-                }
+            if !content.progress.supplemental.isEmpty {
+                DEXAUnitTable(title: "Other Notable Changes", firstColumn: "Metric", rows: content.progress.supplemental.map { .init(label: $0.label, previous: $0.previous, current: $0.current, delta: $0.delta) })
+                    .accessibilityIdentifier("briefing.dexa.supplemental")
             }
+            DEXAPhaseBreakdown(timeline: content.progress.timeline, goal: attribution?.goalTitle, phase: attribution?.phaseName)
+                .padding(.bottom, 23)
         }
     }
 
-    private func regionalGroup(title: String, items: [DEXARegionalChangeMetric]) -> some View {
-        comparisonRows(
-            title: title,
-            items: items.map { DEXAInlineComparisonRow(label: $0.region, previous: $0.previous, current: $0.current, delta: $0.delta) }
-        )
-    }
+    // MARK: What This Scan Means
 
-    private func supplementalGroup(title: String, items: [DEXAComparisonMetric]) -> some View {
-        comparisonRows(
-            title: title,
-            items: items.map { DEXAInlineComparisonRow(label: $0.label, previous: $0.previous, current: $0.current, delta: $0.delta) }
-        )
-    }
-
-    private func comparisonRows(title: String, items: [DEXAInlineComparisonRow]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    comparisonColumnHeader("Metric", width: nil, alignment: .leading)
-                    comparisonColumnHeader("Previous", width: 58, alignment: .trailing)
-                    comparisonColumnHeader("", width: 18, alignment: .center)
-                    comparisonColumnHeader("Current", width: 58, alignment: .leading)
-                    comparisonColumnHeader("Delta", width: 62, alignment: .trailing)
-                }
-                .padding(.bottom, 8)
-                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                    if index > 0 { Divider().overlay(PhysiqueOSTheme.divider) }
-                    HStack(spacing: 6) {
-                        Text(item.label)
-                            .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(item.previous)
-                            .frame(width: 58, alignment: .trailing)
-                        Image(systemName: directionSymbol(item.delta))
-                            .frame(width: 18)
-                            .foregroundStyle(deltaColor(item.delta))
-                        Text(item.current)
-                            .frame(width: 58, alignment: .leading)
-                        Text(item.delta)
-                            .frame(width: 62, alignment: .trailing)
-                            .foregroundStyle(deltaColor(item.delta))
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .padding(.vertical, 12)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(item.label): from \(item.previous) to \(item.current), a change of \(item.delta)")
-                }
-            }
+    private var interpretationSection: some View {
+        let interpretation = content.interpretation
+        let paragraphs = [interpretation.opening, interpretation.fatLoss, interpretation.leanMass, interpretation.regional,
+                          interpretation.phaseMeaning, interpretation.stoodOut, interpretation.goalProgress, interpretation.guardrailStatus]
+            .compactMap { $0 }.filter { !$0.isEmpty }
+        return BriefingEventSection(bottomPadding: 5, identifier: "briefing.dexa.interpretation") {
+            BriefingEventLabel(text: "What This Scan Means")
+            BriefingEventDataParagraphs(paragraphs: paragraphs)
+                .padding(.top, 12)
+            DEXAEvidenceNote(items: [("Supporting evidence", interpretation.supportingEvidence), ("Uncertainty", interpretation.uncertainty)].filter { !$0.1.isEmpty })
+                .padding(.bottom, 23)
         }
     }
 
-    private func comparisonColumnHeader(_ text: String, width: CGFloat?, alignment: Alignment) -> some View {
-        Text(text)
-            .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-            .foregroundStyle(PhysiqueOSTheme.textMuted)
-            .frame(width: width, alignment: alignment)
-            .frame(maxWidth: width == nil ? .infinity : nil, alignment: alignment)
-    }
-
-    /// Verified non-interactive on the real screen — a static per-scan
-    /// point grid, no hover/tap/tooltip, so this deliberately does not use
-    /// `ChartInteraction.swift`'s scrub gesture.
-    private func cutTimelineModule(_ timeline: DEXACutTimeline) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 6) {
-                Text(timeline.timelineLabel.uppercased())
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    .accessibilityIdentifier("briefing.dexa.timeline")
-                if timeline.isSimulated { StatusChip(text: "Simulated", color: .warning) }
-                Spacer(minLength: 0)
-                Text("\(timeline.elapsedDays) days · \(timeline.scans.count) body-composition scans")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-            HStack {
-                Text(BriefingDateFormatting.shortDate(timeline.baselineDate))
-                Spacer()
-                Image(systemName: "arrow.right")
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                Spacer()
-                Text(BriefingDateFormatting.shortDate(timeline.currentDate))
-            }
-            .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-            .foregroundStyle(PhysiqueOSTheme.textMuted)
-            ForEach(timeline.metrics) { metric in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(metric.label)
-                            .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Spacer(minLength: 8)
-                        Text(metric.delta)
-                            .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                            .foregroundStyle(metric.delta.hasPrefix("-") ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.chartEffort)
-                    }
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(metric.points.first?.value ?? "—")
-                        Spacer()
-                        Text(metric.points.last?.value ?? "—")
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    .padding(12)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-            }
-            Text(timeline.summary)
-                .physiqueOSFont(PhysiqueOSTypography.briefingBody)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-        .padding(12)
-        .background(PhysiqueOSTheme.chartEffort.opacity(0.10))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .accessibilityElement(children: .combine)
-    }
-
-    private var interpretationCard: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.accent) {
-            VStack(alignment: .leading, spacing: 18) {
-                BriefingEditorialHeading(title: "What This Scan Means")
-                    .accessibilityIdentifier("briefing.dexa.interpretation")
-                Text(content.interpretation.opening)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                labeledParagraph(content.fatLossInterpretationLabel, content.interpretation.fatLoss)
-                labeledParagraph("Lean Tissue", content.interpretation.leanMass)
-                labeledParagraph("Where Change Occurred", content.interpretation.regional)
-                if let phaseMeaning = content.interpretation.phaseMeaning {
-                    labeledParagraph("Phase & Strategy", phaseMeaning)
-                }
-                if let stoodOut = content.interpretation.stoodOut {
-                    labeledParagraph("What Stood Out", stoodOut)
-                }
-                labeledParagraph("Supporting Context", content.interpretation.supportingEvidence)
-                labeledParagraph("Uncertainty", content.interpretation.uncertainty)
-            }
-        }
-    }
-
-    private func labeledParagraph(_ label: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(label.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.accent)
-            Text(text)
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted.opacity(0.55))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    private func snapshotMetric(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    private func heroMetric(_ result: DEXAHeroResult) -> some View {
-        let tint = heroMetricColor(result.label)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(result.emoji)
-                    .font(.system(size: 18))
-                    .frame(width: 36, height: 36)
-                    .background(tint.opacity(0.16))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                Text(result.label)
-                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                    .foregroundStyle(tint)
-            }
-            Text(result.value)
-                .physiqueOSFont(PhysiqueOSTypography.editorialHero)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                .lineLimit(1)
-            Text(result.context)
-                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 174, alignment: .topLeading)
-        .background(tint.opacity(0.09))
-        .clipShape(RoundedRectangle(cornerRadius: 17))
-        .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(tint.opacity(0.42), lineWidth: 1))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(result.label): \(result.value), \(result.context)")
-    }
-
-    private func heroMetricColor(_ label: String) -> Color {
-        let normalized = label.lowercased()
-        if normalized.contains("lean") { return PhysiqueOSTheme.chartEvidence }
-        if normalized.contains("body fat") { return PhysiqueOSTheme.chartEffort }
-        if normalized.contains("fat mass") { return PhysiqueOSTheme.macroProtein }
-        if normalized.contains("weight") { return PhysiqueOSTheme.accent }
-        return PhysiqueOSTheme.chartSuccess
-    }
-
-    private func comparisonValue(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-        }
-    }
-
-    private func deltaColor(_ delta: String) -> Color {
-        if delta.hasPrefix("-") { return PhysiqueOSTheme.chartSuccess }
-        if delta.hasPrefix("0") || delta.hasPrefix("No") { return PhysiqueOSTheme.textMuted }
-        return PhysiqueOSTheme.chartEffort
-    }
-
-    private func directionSymbol(_ delta: String) -> String {
-        if delta.hasPrefix("-") { return "arrow.down" }
-        if delta.hasPrefix("0") || delta.hasPrefix("No") { return "arrow.right" }
-        return "arrow.up"
-    }
-
-    private var coachInsightCard: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort, background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .leading, spacing: 18) {
-                BriefingEditorialHeading(title: "Coach's Insight")
-                    .accessibilityIdentifier("briefing.dexa.coachInsight")
-                labeledParagraph("🎉 Biggest Win", content.coachInsight.biggestWin)
-                labeledParagraph("💪 Protect", content.coachInsight.protect)
-                labeledParagraph("👀 What to Watch", content.coachInsight.watch)
-                labeledParagraph("🎯 Next Actions", content.coachInsight.next)
-            }
-        }
-    }
+    // MARK: Phase Review / handoff (read-only)
 
     /// Always read-only — mirrors the historical replay route's real
     /// behavior exactly (see `DEXAPhaseReviewSummary`'s doc comment).
-    private func phaseReviewCard(_ review: DEXAPhaseReviewSummary) -> some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartEffort) {
-            VStack(alignment: .leading, spacing: 16) {
-                BriefingEditorialHeading(title: "Phase Review")
-                Text(review.title)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(review.promptText)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                if let recorded = review.recordedDecisionLabel {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                        Text("This Phase Review decision has been recorded: \(recorded)")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(review.options, id: \.self) { option in
-                            Text("• \(option)")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        }
+    private func phaseReviewSection(_ review: DEXAPhaseReviewSummary) -> some View {
+        BriefingEventSection(identifier: "briefing.dexa.phaseReview") {
+            BriefingEventLabel(text: "Phase Review")
+            BriefingEventTitle(text: review.title)
+            BriefingEventBody(text: review.promptText)
+            if let recorded = review.recordedDecisionLabel {
+                Text("This Phase Review decision has been recorded: \(recorded)")
+                    .briefingText(.jn(11, 700))
+                    .foregroundStyle(BriefingEventPalette.green)
+                    .padding(.top, 12)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(review.options, id: \.self) { option in
+                        Text("• \(option)").briefingText(.jn(11, 600)).foregroundStyle(BriefingEventPalette.muted)
                     }
                 }
+                .padding(.top, 12)
             }
+            Color.clear.frame(height: 16)
         }
     }
 
-    private func goalCompletionCard(_ handoff: DEXAGoalCompletionHandoff) -> some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
-            VStack(alignment: .leading, spacing: 16) {
-                BriefingEditorialHeading(title: "One Qualified Check Remains")
-                Text(handoff.questionText)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                Button {
-                    onNavigate(handoff.actionDestination)
-                } label: {
-                    Text(handoff.actionLabel)
-                        .physiqueOSFont(PhysiqueOSTypography.primaryActionLabel)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(PhysiqueOSTheme.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+    private func handoffSection(_ handoff: DEXAGoalCompletionHandoff) -> some View {
+        BriefingEventSection(identifier: "briefing.dexa.handoff") {
+            BriefingEventLabel(text: "One Qualified Check Remains")
+            BriefingEventBody(text: handoff.questionText)
+            BriefingEventAction(text: handoff.actionLabel, prominent: true) { onNavigate(handoff.actionDestination) }
+            Color.clear.frame(height: 16)
+        }
+    }
+}
+
+/// `.confidence-row`: 116 px ring + band/movement + reason.
+struct DEXAConfidenceRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let confidence: BriefingConfidenceReadModel
+
+    /// "DEVELOPING · DECREASED −7" — the persisted band, direction and delta
+    /// (a Server-authored movement label wins).
+    var headline: String {
+        let movement: String
+        if let label = confidence.presentationMovementLabel, !label.isEmpty {
+            movement = label
+        } else {
+            switch confidence.movementDirection {
+            case .increased: movement = "Increased\(confidence.delta.map { " +\(abs($0))" } ?? "")"
+            case .decreased: movement = "Decreased\(confidence.delta.map { " −\(abs($0))" } ?? "")"
+            case .held: movement = "Held"
+            case .initial: movement = "Initial assessment"
+            }
+        }
+        return "\(confidence.band) · \(movement)".uppercased()
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 18) {
+            ZStack {
+                Circle().fill(colorScheme == .dark ? Color.white.opacity(0.17) : BriefingPalette.fixed(0x102638, 0.12))
+                Circle()
+                    .trim(from: 0, to: CGFloat(min(max(confidence.score, 0), 100)) / 100)
+                    .rotation(.degrees(-90))
+                    .fill(BriefingEventPalette.green)
+                Circle()
+                    .fill(colorScheme == .dark ? BriefingPalette.fixed(0x0B4050) : BriefingPalette.fixed(0xEAF2ED))
+                    .frame(width: 94, height: 94)
+                VStack(spacing: 3) {
+                    Text("\(confidence.score)%").briefingText(.j(31, 700, 1))
+                    Text("CONFIDENCE")
+                        .briefingText(.jn(8, 400))
+                        .foregroundStyle(colorScheme == .dark ? BriefingPalette.fixed(0xC7D7D9) : BriefingPalette.fixed(0x5D7078))
                 }
+            }
+            .frame(width: 116, height: 116)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Confidence \(confidence.score) percent")
+            VStack(alignment: .leading, spacing: 5) {
+                BriefingParagraph(headline, .jn(13, 700, tracking: 0.06), color: BriefingEventPalette.green)
+                BriefingParagraph(confidence.presentationExplanation ?? confidence.primaryReason, .j(11, 400, 1.45),
+                                  color: colorScheme == .dark ? BriefingPalette.fixed(0xD6E2E3) : BriefingPalette.fixed(0x3F5D62))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.top, 22)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("briefing.hero.confidence")
+    }
+}
+
+/// `.hero-metrics`: the canonical result grid (two columns on rules).
+struct DEXAHeroMetrics: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let results: [DEXAHeroResult]
+
+    var body: some View {
+        let rule = colorScheme == .dark ? Color.white.opacity(0.18) : BriefingPalette.fixed(0x102638, 0.14)
+        let rows = stride(from: 0, to: results.count, by: 2).map { Array(results[$0..<min($0 + 2, results.count)]) }
+        VStack(spacing: 0) {
+            ForEach(rows.indices, id: \.self) { row in
+                HStack(alignment: .top, spacing: 0) {
+                    ForEach(Array(rows[row].enumerated()), id: \.element.id) { column, result in
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(result.label.uppercased())
+                                .briefingStrutText(.jn(9, 400, tracking: 0.08), parentSize: 16, parentLineHeight: 21)
+                                .opacity(0.68)
+                            Text(result.value)
+                                .briefingText(.jn(19, 700))
+                                .padding(.top, 4)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                            if !result.context.isEmpty {
+                                Text(result.context)
+                                    .briefingStrutText(.jn(10, 400), parentSize: 16, parentLineHeight: 21)
+                                    .opacity(0.7)
+                            }
+                        }
+                        .padding(EdgeInsets(top: 13, leading: column == 1 ? 12 : 0, bottom: 10, trailing: 8))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .overlay(alignment: .leading) { if column == 1 { Rectangle().fill(rule).frame(width: 1) } }
+                        .accessibilityElement(children: .combine)
+                    }
+                    if rows[row].count == 1 { Color.clear.frame(maxWidth: .infinity, maxHeight: 0) }
+                }
+                .briefingRule(.bottom, rule)
+            }
+        }
+        .briefingRule(.top, rule)
+        .padding(.top, 22)
+    }
+}
+
+/// `.snapshot-grid`: two columns of facts on 1 px rule gutters.
+struct DEXASnapshotGrid: View {
+    let items: [(String, String)]
+
+    var body: some View {
+        let rows = stride(from: 0, to: items.count, by: 2).map { Array(items[$0..<min($0 + 2, items.count)]) }
+        VStack(spacing: 1) {
+            ForEach(rows.indices, id: \.self) { row in
+                HStack(spacing: 1) {
+                    ForEach(rows[row].indices, id: \.self) { index in
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(rows[row][index].0.uppercased())
+                                .briefingStrutText(.jn(9, 400, tracking: 0.08), parentSize: 16, parentLineHeight: 21)
+                                .foregroundStyle(BriefingEventPalette.muted)
+                            Text(rows[row][index].1)
+                                .briefingText(.jn(17, 700))
+                                .foregroundStyle(BriefingEventPalette.ink)
+                                .padding(.top, 5)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .background(BriefingPalette.standard.page)
+                        .accessibilityElement(children: .combine)
+                    }
+                    if rows[row].count == 1 { BriefingPalette.standard.page.frame(maxWidth: .infinity) }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .background(BriefingEventPalette.rule)
+        .padding(.horizontal, -8)
+        .padding(.top, 16)
+    }
+}
+
+/// `.table-field` + `.unit-table`: Metric / Previous / Current / Delta with
+/// every canonical unit, delta emphasized.
+struct DEXAUnitTable: View {
+    @Environment(\.colorScheme) private var colorScheme
+    struct Row: Equatable {
+        let label: String
+        let previous: String
+        let current: String
+        let delta: String
+    }
+
+    let title: String
+    let firstColumn: String
+    let rows: [Row]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .briefingText(.jn(16, 700))
+                .foregroundStyle(BriefingEventPalette.ink)
+                .accessibilityAddTraits(.isHeader)
+            BriefingFractionLayout(fractions: [1.25, 1, 1, 1], spacing: 6) {
+                header(firstColumn, alignment: .leading)
+                header("Previous", alignment: .trailing)
+                header("Current", alignment: .trailing)
+                header("Delta", alignment: .trailing)
+            }
+            .padding(.vertical, 7)
+            .padding(.top, 10)
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                BriefingFractionLayout(fractions: [1.25, 1, 1, 1], spacing: 6, centered: true) {
+                    cell(row.label, alignment: .leading)
+                    cell(row.previous, alignment: .trailing)
+                    cell(row.current, alignment: .trailing)
+                    cell(row.delta, alignment: .trailing, emphasized: true)
+                }
+                .padding(.vertical, 10)
+                .briefingRule(.top, BriefingEventPalette.rule)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(row.label): from \(row.previous) to \(row.current), a change of \(row.delta)")
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            BriefingAppearanceBackground {
+                BriefingEventPalette.surface
+            } light: {
+                BriefingCSSGradient(angle: 135, stops: [.init(color: BriefingPalette.fixed(0xD9E9E5), location: 0), .init(color: BriefingPalette.fixed(0xE3E0ED), location: 1)])
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .padding(.top, 14)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func header(_ text: String, alignment: Alignment) -> some View {
+        Text(text.uppercased())
+            .briefingText(.jn(8, 800, tracking: 0.07))
+            .foregroundStyle(BriefingEventPalette.muted)
+            .frame(maxWidth: .infinity, alignment: alignment)
+    }
+
+    private func cell(_ text: String, alignment: Alignment, emphasized: Bool = false) -> some View {
+        Text(text)
+            .briefingText(.jn(10, emphasized ? 800 : 400))
+            .foregroundStyle(emphasized ? BriefingEventPalette.green : BriefingEventPalette.ink)
+            .multilineTextAlignment(alignment == .leading ? .leading : .trailing)
+            .frame(maxWidth: .infinity, alignment: alignment)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// `.phase-panel`: the restored Goal/Phase body-composition breakdown.
+struct DEXAPhaseBreakdown: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let timeline: DEXACutTimeline
+    var goal: String? = nil
+    var phase: String? = nil
+
+    static func value(_ point: DEXATimelinePoint?, unit: String) -> String {
+        guard let raw = point?.value, raw != "—" else { return "—" }
+        if unit == "%" { return "\(raw)%" }
+        return unit.isEmpty ? raw : "\(raw) \(unit)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                BriefingEventLabel(text: timeline.timelineLabel)
+                if timeline.isSimulated {
+                    Text("SIMULATED").briefingText(.jn(8, 800, tracking: 0.07)).foregroundStyle(BriefingEventPalette.muted)
+                }
+            }
+            .accessibilityIdentifier("briefing.dexa.timeline")
+            if goal != nil || phase != nil {
+                HStack(alignment: .top, spacing: 8) {
+                    if let goal { context("Goal", goal, alignment: .leading) }
+                    Spacer(minLength: 0)
+                    if let phase { context("Active phase", phase, alignment: .trailing) }
+                }
+                .padding(.top, 10)
+                .padding(.bottom, 5)
+            }
+            VStack(spacing: 1) {
+                HStack(spacing: 1) {
+                    meta("Start", BriefingDateFormatting.monthDay(timeline.baselineDate))
+                    meta("Current scan", BriefingDateFormatting.monthDay(timeline.currentDate))
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 1) {
+                    meta("Elapsed", "\(timeline.elapsedDays) days")
+                    meta("Body-composition scans", "\(timeline.scans.count)")
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .background(BriefingEventPalette.rule)
+            .padding(.top, 10)
+            .padding(.bottom, 10)
+            ForEach(timeline.metrics) { metric in
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(metric.label).briefingText(.jn(12, 700)).foregroundStyle(BriefingEventPalette.ink)
+                        Spacer(minLength: 8)
+                        Text(metric.delta).briefingText(.jn(11, 800)).foregroundStyle(BriefingEventPalette.green)
+                    }
+                    HStack(alignment: .center, spacing: 8) {
+                        valueBox("Start", Self.value(metric.points.first, unit: metric.unit))
+                        Text("→").briefingText(.jn(14, 400)).foregroundStyle(BriefingEventPalette.muted)
+                        valueBox("Current", Self.value(metric.points.last, unit: metric.unit))
+                    }
+                    .padding(.top, 8)
+                }
+                .padding(.vertical, 13)
+                .briefingRule(.top, BriefingEventPalette.rule)
+                .accessibilityElement(children: .combine)
+            }
+            if !timeline.summary.isEmpty {
+                BriefingParagraph(timeline.summary, .j(11, 400, 1.48), color: BriefingEventPalette.muted)
+                    .padding(.top, 14)
+            }
+        }
+        .padding(.vertical, 18)
+        .padding(.leading, 18 + 3)
+        .padding(.trailing, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            BriefingCSSGradient(angle: 135, stops: [.init(color: BriefingPalette.fixed(0x35C8C1, 0.13), location: 0), .init(color: BriefingPalette.fixed(0xA68AF8, 0.12), location: 1)])
+        }
+        .overlay(alignment: .leading) { Rectangle().fill(BriefingEventPalette.teal).frame(width: 3) }
+        .padding(.top, 18)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func context(_ label: String, _ value: String, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 0) {
+            Text(label).briefingText(.jn(9, 400)).foregroundStyle(BriefingEventPalette.muted)
+            Text(value).briefingText(.jn(12, 700)).foregroundStyle(BriefingEventPalette.ink)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func meta(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased()).briefingText(.jn(8, 400)).foregroundStyle(BriefingEventPalette.muted)
+            Text(value).briefingText(.jn(12, 700)).foregroundStyle(BriefingEventPalette.ink)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(BriefingPalette.standard.page)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func valueBox(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased()).briefingText(.jn(8, 400)).foregroundStyle(BriefingEventPalette.muted)
+            Text(value).briefingText(.jn(17, 700)).foregroundStyle(BriefingEventPalette.ink).lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(colorScheme == .dark ? BriefingEventPalette.surface : Color.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+/// `.interpretation p` (DEXA): primary-ink paragraphs on top rules.
+struct BriefingEventDataParagraphs: View {
+    let paragraphs: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
+                BriefingParagraph(paragraph, .j(12, 400, 1.5), color: BriefingEventPalette.ink)
+                    .padding(.vertical, 12)
+                    .briefingRule(.top, BriefingEventPalette.rule)
             }
         }
     }
 }
 
-private struct DEXAInlineComparisonRow {
-    let label: String
-    let previous: String
-    let current: String
-    let delta: String
+/// `.evidence-note`: purple-ruled supporting context.
+struct DEXAEvidenceNote: View {
+    let items: [(String, String)]
+
+    var body: some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.0).briefingText(.j(11, 700, 1.45)).foregroundStyle(BriefingEventPalette.ink)
+                        BriefingParagraph(item.1, .j(11, 400, 1.45), color: BriefingEventPalette.ink)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            .padding(.vertical, 14)
+            .padding(.leading, 14 + 3)
+            .padding(.trailing, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(BriefingPalette.fixed(0xA68AF8, 0.1))
+            .overlay(alignment: .leading) { Rectangle().fill(BriefingEventPalette.purple).frame(width: 3) }
+            .padding(.top, 14)
+        }
+    }
 }

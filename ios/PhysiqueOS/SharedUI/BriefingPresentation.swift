@@ -1859,8 +1859,36 @@ struct BriefingRevisionBanner: View {
     @Environment(\.briefingPalette) private var c
     let provenance: BriefingRevisionProvenance
     let replacedHistory: [BriefingRevisionSnapshot]
+    /// Event briefings (Photo / DEXA) use the locked amber-ruled `.revision` note.
+    var eventStyle = false
 
     var body: some View {
+        if eventStyle { eventBody } else { recurringBody }
+    }
+
+    private var eventBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("This Briefing was revised")
+                .briefingText(.j(10, 700, 1.45))
+                .foregroundStyle(BriefingEventPalette.ink)
+            BriefingParagraph(provenance.reason, .j(10, 400, 1.45), color: BriefingEventPalette.muted)
+            if let original = replacedHistory.first {
+                BriefingParagraph("Replaced: \u{201C}\(original.headline)\u{201D}\n\(BriefingDateFormatting.compactTimestamp(original.generatedAt)) → \(BriefingDateFormatting.compactTimestamp(provenance.replacementTimestamp))", .j(10, 400, 1.45), color: BriefingEventPalette.muted)
+                    .padding(.top, 14.5)
+            }
+        }
+        .padding(.vertical, 14)
+        .padding(.leading, 14 + 2)
+        .padding(.trailing, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(BriefingPalette.fixed(0xF5BD4F, 0.06))
+        .overlay(alignment: .leading) { Rectangle().fill(BriefingPalette.d(0xF5BD4F, 0xB97912)).frame(width: 2) }
+        .padding(.top, 24)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("briefing.revision")
+    }
+
+    private var recurringBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("This Briefing was revised")
                 .briefingText(.j(14, 700))
@@ -1881,61 +1909,11 @@ struct BriefingRevisionBanner: View {
     }
 }
 
-// MARK: - Legacy components (pending migration in this lane)
+// MARK: - Uncertainty (not mounted by the locked family)
 
-// MARK: - Cadence badge
-
-struct BriefingCadenceBadge: View {
-    let briefing: BriefingReadModel
-
-    private var color: HomeColorToken {
-        switch briefing.cadence {
-        case .weekly: .evidence
-        case .midweek: .effort
-        case .monthly: .primary
-        case .daily: .evidence
-        case .event: .success
-        }
-    }
-
-    var body: some View {
-        StatusChip(text: briefing.displayCadenceLabel, color: color)
-    }
-}
-
-// MARK: - Confidence card (server-owned — displays only, never computes)
-
-struct BriefingEditorialCard<Content: View>: View {
-    var tint: Color = PhysiqueOSTheme.accent
-    var background: Color = PhysiqueOSTheme.surfaceElevated
-    var showsAccentBar = false
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(22)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 22))
-            .overlay(alignment: .leading) {
-                if showsAccentBar {
-                    RoundedRectangle(cornerRadius: 3).fill(tint).frame(width: 3).padding(.vertical, 18)
-                }
-            }
-            .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(tint.opacity(0.22), lineWidth: 1))
-    }
-}
-
-struct BriefingEditorialHeading: View {
-    let title: String
-    var body: some View {
-        Text(title)
-            .physiqueOSFont(PhysiqueOSTypography.editorialSection)
-            .foregroundStyle(PhysiqueOSTheme.accent)
-            .accessibilityAddTraits(.isHeader)
-    }
-}
-
+/// Server-authored uncertainty filter (kept for its tested presentable-text
+/// rules). The locked Briefing family renders no "Still Unresolved"
+/// section, so no cadence mounts this view.
 /// Server-authored uncertainty, shown verbatim. The Server decides what is
 /// surfaced (`surfaced` / high materiality); Native writes no uncertainty
 /// copy and never lets it alter Confidence. Renders nothing when the Server
@@ -1949,243 +1927,7 @@ struct BriefingUncertaintyCard: View {
         texts = (items ?? []).presentableTexts.filter { seen.insert($0).inserted }
     }
 
-    var body: some View {
-        if !texts.isEmpty {
-            BriefingEditorialCard(tint: PhysiqueOSTheme.textMuted) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(Self.title.uppercased())
-                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        .accessibilityAddTraits(.isHeader)
-                    ForEach(texts, id: \.self) { text in
-                        HStack(alignment: .top, spacing: 8) {
-                            Circle().fill(PhysiqueOSTheme.textMuted).frame(width: 5, height: 5).padding(.top, 8)
-                            Text(text)
-                                .physiqueOSFont(PhysiqueOSTypography.briefingBody)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        }
-                    }
-                }
-            }
-            .accessibilityIdentifier("briefing.uncertainty")
-        }
-    }
+    /// Never mounted by the locked family; kept inert.
+    var body: some View { EmptyView() }
 }
 
-/// One integrated opening composition for recurring Briefings. The live
-/// web lead places Confidence, editorial headline, narrative, and strategy
-/// context inside a single zine-style card; keeping those elements here
-/// prevents cadence screens from reintroducing a duplicate hero card.
-struct BriefingLeadCard: View {
-    let eyebrow: String
-    let rangeLabel: String
-    let headline: String
-    let narrative: String
-    let confidence: BriefingConfidenceReadModel?
-    var features: [BriefingLeadFeature] = []
-    var footerItems: [(String, String)] = []
-
-    var body: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.accent, background: PhysiqueOSTheme.surfaceAccent) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top) {
-                    Text(eyebrow)
-                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                        .foregroundStyle(PhysiqueOSTheme.accent)
-                    Spacer(minLength: 12)
-                    Text(rangeLabel)
-                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        .multilineTextAlignment(.trailing)
-                }
-                if let confidence {
-                    HStack(alignment: .center, spacing: 18) {
-                        ConfidenceRing(value: confidence.score, size: 112, lineWidth: 8)
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text(confidence.bandLabel)
-                                .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                            Text(confidence.movementLabel)
-                                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text(confidence.primaryReason)
-                                .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        }
-                    }
-                }
-                Divider().overlay(PhysiqueOSTheme.divider)
-                Text(headline)
-                    .physiqueOSFont(PhysiqueOSTypography.editorialHero)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Text(narrative)
-                    .physiqueOSFont(PhysiqueOSTypography.briefingBody)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                if !features.isEmpty {
-                    VStack(spacing: 10) {
-                        ForEach(features) { feature in
-                            HStack(alignment: .top, spacing: 13) {
-                                Image(systemName: feature.icon)
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(feature.tone.foreground)
-                                    .frame(width: 38, height: 38)
-                                    .background(feature.tone.background)
-                                    .clipShape(RoundedRectangle(cornerRadius: 11))
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(feature.label)
-                                        .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                                        .foregroundStyle(feature.tone.foreground)
-                                    Text(feature.value)
-                                        .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                    Text(feature.detail)
-                                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                }
-                            }
-                            .padding(14)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(feature.tone.foreground.opacity(0.07))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .strokeBorder(feature.tone.foreground.opacity(0.25))
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                        }
-                    }
-                }
-                if !footerItems.isEmpty {
-                    Divider().overlay(PhysiqueOSTheme.divider)
-                    HStack(alignment: .top, spacing: 18) {
-                        ForEach(Array(footerItems.enumerated()), id: \.offset) { _, item in
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.0)
-                                    .physiqueOSFont(PhysiqueOSTypography.briefingLabel)
-                                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                                Text(item.1)
-                                    .physiqueOSFont(PhysiqueOSTypography.briefingSecondaryValue)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct BriefingLeadFeature: Identifiable {
-    var id: String { label }
-    let icon: String
-    let label: String
-    let value: String
-    let detail: String
-    let tone: HomeColorToken
-}
-
-/// Displays a persisted `BriefingConfidenceReadModel` verbatim. Native never
-/// derives `score`/`band`/`delta`/reasons here — every value is exactly
-/// what the fixture (a stand-in for the real server-computed artifact
-/// field) already carries.
-struct BriefingConfidenceCard: View {
-    let confidence: BriefingConfidenceReadModel
-
-    var body: some View {
-        BriefingEditorialCard(tint: PhysiqueOSTheme.chartSuccess) {
-            VStack(alignment: .leading, spacing: 16) {
-                BriefingEditorialHeading(title: "Goal Confidence")
-                HStack(alignment: .top, spacing: 14) {
-                    ConfidenceRing(value: confidence.score, size: 92, lineWidth: 7)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(confidence.movementLabel)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        Text(confidence.primaryReason)
-                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    }
-                }
-                if !confidence.supportingReasons.isEmpty {
-                    reasonList(title: "What's supporting this", items: confidence.supportingReasons, tint: PhysiqueOSTheme.chartSuccess)
-                }
-                if !confidence.limitingReasons.isEmpty {
-                    reasonList(title: "What's limiting this", items: confidence.limitingReasons, tint: PhysiqueOSTheme.chartEffort)
-                }
-                if !confidence.unresolvedUncertainty.isEmpty {
-                    reasonList(title: "Still unresolved", items: confidence.unresolvedUncertainty, tint: PhysiqueOSTheme.textMuted)
-                }
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Goal Confidence: \(confidence.score) percent, \(confidence.bandLabel). \(confidence.movementLabel). \(confidence.primaryReason)")
-    }
-
-    private func reasonList(title: String, items: [String], tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            ForEach(items, id: \.self) { item in
-                HStack(alignment: .top, spacing: 6) {
-                    Circle().fill(tint).frame(width: 5, height: 5).padding(.top, 6)
-                    Text(item)
-                        .physiqueOSFont(PhysiqueOSTypography.briefingSupporting)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Stat item
-
-/// A plain label/value pair for Briefing stat rows (Energy averages,
-/// Training counts, Body Composition figures, Monthly's Defining Moments)
-/// — deliberately not `MetricRow`, which always renders a leading icon that
-/// none of these figures have a meaningful one for.
-struct BriefingStatItem: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.editorialMetric)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-// MARK: - Plain narrative list (Coach's Take / Priorities / Month Ahead)
-
-struct BriefingNarrativeList: View {
-    let title: String
-    let items: [String]
-    var numbered: Bool = true
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionHeading(title)
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
-                    HStack(alignment: .top, spacing: 8) {
-                        if numbered {
-                            Text("\(index + 1).")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.accent)
-                        }
-                        Text(item)
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                }
-            }
-        }
-    }
-}
