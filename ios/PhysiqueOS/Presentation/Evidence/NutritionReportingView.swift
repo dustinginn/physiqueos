@@ -425,11 +425,7 @@ extension NutritionReportingViewModel {
 // MARK: - Color helpers (shared macro/meal-slot tokens)
 
 private func macroColor(_ macro: NutritionMacroKey) -> Color {
-    switch macro {
-    case .protein: EvidencePalette.daily.protein
-    case .carbohydrates: EvidencePalette.daily.carbs
-    case .fat: EvidencePalette.daily.fat
-    }
+    NutritionEvidenceMacro(macro).color
 }
 
 private func mealSlotColor(_ slot: NutritionMealSlot) -> Color {

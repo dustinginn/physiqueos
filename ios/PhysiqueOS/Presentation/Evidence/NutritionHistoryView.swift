@@ -263,14 +263,19 @@ struct NutritionMacroGridView: View {
     let totals: NutritionMacroTotals
 
     var body: some View {
-        let c = EvidenceFamily.daily.palette
-        EvidenceDailyMetricGrid(items: [
-            .init(label: "Calories", value: Self.formatWhole(totals.calories, unit: nil), valueColor: c.amber),
-            .init(label: "Protein", value: Self.formatWhole(totals.proteinG, unit: "g"), valueColor: c.protein),
-            .init(label: "Carbohydrates", value: Self.formatWhole(totals.carbsG, unit: "g"), valueColor: c.carbs),
-            .init(label: "Fat", value: Self.formatWhole(totals.fatG, unit: "g"), valueColor: c.fat),
-            .init(label: "Fiber", value: Self.formatWhole(totals.fiberG, unit: "g")),
-        ])
+        EvidenceDailyMetricGrid(items: Self.macroItems(totals).map { .init(label: $0.label, value: $0.value, valueColor: $0.macro?.color) })
+    }
+
+    /// The grid's labels, values and macro identities in order; colors come
+    /// from `NutritionEvidenceMacro`, the shared Nutrition color authority.
+    static func macroItems(_ totals: NutritionMacroTotals) -> [(label: String, value: String, macro: NutritionEvidenceMacro?)] {
+        [
+            ("Calories", formatWhole(totals.calories, unit: nil), .calories),
+            ("Protein", formatWhole(totals.proteinG, unit: "g"), .protein),
+            ("Carbohydrates", formatWhole(totals.carbsG, unit: "g"), .carbohydrates),
+            ("Fat", formatWhole(totals.fatG, unit: "g"), .fat),
+            ("Fiber", formatWhole(totals.fiberG, unit: "g"), nil),
+        ]
     }
 
     static func formatWhole(_ value: Double?, unit: String?) -> String {

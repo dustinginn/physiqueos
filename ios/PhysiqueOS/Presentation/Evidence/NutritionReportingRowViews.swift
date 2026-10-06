@@ -109,9 +109,9 @@ struct NutritionRecurringMealRow: View {
                     .foregroundStyle(mealSlotColorFor(meal.slot))
                     .padding(.top, m.pt(3))
                 HStack(spacing: m.pt(12)) {
-                    macroValue("P", meal.averageProteinG, color: m.c.protein)
-                    macroValue("C", meal.averageCarbohydratesG, color: m.c.carbs)
-                    macroValue("F", meal.averageFatG, color: m.c.fat)
+                    macroValue("P", meal.averageProteinG, color: m.c[keyPath: NutritionEvidenceMacro.protein.paletteColor])
+                    macroValue("C", meal.averageCarbohydratesG, color: m.c[keyPath: NutritionEvidenceMacro.carbohydrates.paletteColor])
+                    macroValue("F", meal.averageFatG, color: m.c[keyPath: NutritionEvidenceMacro.fat.paletteColor])
                 }
                 .padding(.top, m.pt(4))
             }
@@ -225,12 +225,7 @@ private func mealSlotColorFor(_ slot: NutritionMealSlot) -> Color {
 }
 
 private func macroColorFor(_ macro: NutritionMacroKey) -> Color {
-    let c = EvidencePalette.daily
-    switch macro {
-    case .protein: return c.protein
-    case .carbohydrates: return c.carbs
-    case .fat: return c.fat
-    }
+    NutritionEvidenceMacro(macro).color
 }
 
 // MARK: - Sheets

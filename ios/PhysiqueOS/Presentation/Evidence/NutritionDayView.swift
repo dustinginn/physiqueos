@@ -168,9 +168,9 @@ private struct NutritionMealRowView: View {
                 .foregroundStyle(m.c.quiet)
                 .padding(.top, m.pt(3))
             HStack(spacing: m.pt(12)) {
-                macroLabel("P", meal.totals.proteinG, m.c.protein)
-                macroLabel("C", meal.totals.carbsG, m.c.carbs)
-                macroLabel("F", meal.totals.fatG, m.c.fat)
+                macroLabel("P", meal.totals.proteinG, m.c[keyPath: NutritionEvidenceMacro.protein.paletteColor])
+                macroLabel("C", meal.totals.carbsG, m.c[keyPath: NutritionEvidenceMacro.carbohydrates.paletteColor])
+                macroLabel("F", meal.totals.fatG, m.c[keyPath: NutritionEvidenceMacro.fat.paletteColor])
             }
             .padding(.top, m.pt(6))
             ForEach(meal.foods) { food in

@@ -465,7 +465,9 @@ struct WorkflowSelectField<Menu: View>: View {
 
 /// `.metric`: a 59-px tile on `--deep` with a toned micro label.
 struct WorkflowMetricTile: View {
-    enum Tone { case teal, amber, purple }
+    /// `nutrition` takes the shared Nutrition Evidence macro color, so a
+    /// review's macros read exactly as they do on the Nutrition page.
+    enum Tone: Equatable { case teal, amber, purple, nutrition(NutritionEvidenceMacro) }
     let label: String
     let value: String
     var tone: Tone = .teal
@@ -474,7 +476,7 @@ struct WorkflowMetricTile: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label.uppercased())
                 .evidenceText(WorkflowText.micro)
-                .foregroundStyle(tone == .amber ? WorkflowColor.amber : tone == .purple ? WorkflowColor.purple : WorkflowColor.teal)
+                .foregroundStyle(tint)
             Text(value)
                 .evidenceText(WorkflowText.value)
                 .foregroundStyle(WorkflowColor.text)
@@ -486,6 +488,15 @@ struct WorkflowMetricTile: View {
         .background(WorkflowColor.deep, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value)")
+    }
+
+    private var tint: Color {
+        switch tone {
+        case .teal: WorkflowColor.teal
+        case .amber: WorkflowColor.amber
+        case .purple: WorkflowColor.purple
+        case .nutrition(let macro): macro.color
+        }
     }
 }
 

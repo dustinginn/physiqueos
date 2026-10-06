@@ -167,5 +167,42 @@ final class EvidenceReviewHeaderDateTests: XCTestCase {
         XCTAssertEqual(EvidenceReviewDetailView.editableNumber(172.9), "172.9")
         XCTAssertEqual(EvidenceReviewDetailView.editableNumber(1774), "1774")
     }
+
+    /// Nutrition Evidence and generic Evidence Review resolve every macro
+    /// to the same `.daily` palette token through `NutritionEvidenceMacro`.
+    func testGenericReviewNutritionMacrosUseTheNutritionEvidenceColorAuthority() {
+        let grid = NutritionMacroGridView.macroItems(NutritionMacroTotals(calories: 2300, proteinG: 198, carbsG: 244, fatG: 73, fiberG: 30))
+        let gridMacros = Dictionary(uniqueKeysWithValues: grid.compactMap { item in item.macro.map { (item.label, $0) } })
+        XCTAssertEqual(gridMacros, ["Calories": .calories, "Protein": .protein, "Carbohydrates": .carbohydrates, "Fat": .fat])
+        XCTAssertNil(grid.last?.macro, "Fiber has no macro color.")
+
+        // The Server's review labels (EvidenceReviewPresentationService) map
+        // to the same macros the Nutrition Evidence grid uses.
+        let serverLabels = ["Calories": "Calories", "Protein": "Protein", "Carbs": "Carbohydrates", "Fat": "Fat"]
+        for (serverLabel, gridLabel) in serverLabels {
+            XCTAssertEqual(
+                EvidenceReviewDetailView.metricTone(serverLabel, itemType: "nutrition"),
+                .nutrition(gridMacros[gridLabel]!),
+                "\(serverLabel) must resolve to the Nutrition Evidence macro."
+            )
+        }
+
+        // Each macro is one palette token: the accepted Nutrition Evidence mapping.
+        XCTAssertEqual(NutritionEvidenceMacro.calories.paletteColor, \EvidencePalette.amber)
+        XCTAssertEqual(NutritionEvidenceMacro.protein.paletteColor, \EvidencePalette.protein)
+        XCTAssertEqual(NutritionEvidenceMacro.carbohydrates.paletteColor, \EvidencePalette.carbs)
+        XCTAssertEqual(NutritionEvidenceMacro.fat.paletteColor, \EvidencePalette.fat)
+        for key in NutritionMacroKey.allCases {
+            XCTAssertEqual(NutritionEvidenceMacro(key).label, key.label, "Reporting macro \(key) keeps its Nutrition identity.")
+        }
+    }
+
+    func testNonNutritionReviewMetricsKeepTheLockedReviewTones() {
+        XCTAssertEqual(EvidenceReviewDetailView.metricTone("Body fat", itemType: "dexa_scan"), .amber)
+        XCTAssertEqual(EvidenceReviewDetailView.metricTone("RMR", itemType: "dexa_scan"), .purple)
+        XCTAssertEqual(EvidenceReviewDetailView.metricTone("Goal relationship", itemType: "photo_session"), .purple)
+        XCTAssertEqual(EvidenceReviewDetailView.metricTone("Active calories", itemType: "activity"), .teal)
+        XCTAssertEqual(EvidenceReviewDetailView.metricTone("Source", itemType: "nutrition"), .teal)
+    }
 }
 

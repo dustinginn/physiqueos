@@ -277,6 +277,57 @@ struct EvidencePalette {
     }
 }
 
+// MARK: - Nutrition macro colors
+
+/// The one Nutrition macro → color authority, taken from the accepted
+/// Nutrition Evidence surface (Checkpoint C macro grid and reporting):
+/// Calories amber, Protein / Carbohydrates / Fat their macro tokens, all in
+/// the `.daily` palette. Nutrition Evidence and generic Evidence Review both
+/// resolve through it, so the two can never drift.
+enum NutritionEvidenceMacro: CaseIterable, Equatable {
+    case calories, protein, carbohydrates, fat
+
+    init(_ key: NutritionMacroKey) {
+        switch key {
+        case .protein: self = .protein
+        case .carbohydrates: self = .carbohydrates
+        case .fat: self = .fat
+        }
+    }
+
+    /// Server review metric labels ("Calories", "Protein", "Carbs", "Fat")
+    /// and the Nutrition Evidence labels ("Carbohydrates") both resolve.
+    init?(metricLabel: String) {
+        switch metricLabel.lowercased() {
+        case "calories": self = .calories
+        case "protein": self = .protein
+        case "carbs", "carbohydrates": self = .carbohydrates
+        case "fat": self = .fat
+        default: return nil
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .calories: "Calories"
+        case .protein: "Protein"
+        case .carbohydrates: "Carbohydrates"
+        case .fat: "Fat"
+        }
+    }
+
+    var paletteColor: KeyPath<EvidencePalette, Color> {
+        switch self {
+        case .calories: \.amber
+        case .protein: \.protein
+        case .carbohydrates: \.carbs
+        case .fat: \.fat
+        }
+    }
+
+    var color: Color { EvidencePalette.daily[keyPath: paletteColor] }
+}
+
 // MARK: - Typography
 
 /// One harness text style in CSS px / CSS weight. `lineHeight` is the CSS

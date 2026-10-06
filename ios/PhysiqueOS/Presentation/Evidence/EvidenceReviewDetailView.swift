@@ -1260,7 +1260,7 @@ extension EvidenceReviewDetailView {
             .padding(.bottom, 10)
             if !item.metrics.isEmpty {
                 WorkflowGrid(items: item.metrics) { metric in
-                    WorkflowMetricTile(label: metric.label, value: metric.value, tone: Self.metricTone(metric.label))
+                    WorkflowMetricTile(label: metric.label, value: metric.value, tone: Self.metricTone(metric.label, itemType: item.type))
                 }
             } else if let measurements = item.dexaMeasurements {
                 // Server metrics own the DEXA presentation; the measurement
@@ -1350,8 +1350,14 @@ extension EvidenceReviewDetailView {
         .accessibilityIdentifier("evidenceReview.photoSession")
     }
 
-    private static func metricTone(_ label: String) -> WorkflowMetricTile.Tone {
-        switch label.lowercased() {
+    /// Nutrition macros resolve through `NutritionEvidenceMacro`, the same
+    /// authority as the Nutrition Evidence page; other metrics keep the
+    /// locked review tones.
+    static func metricTone(_ label: String, itemType: String) -> WorkflowMetricTile.Tone {
+        if itemType == "nutrition", let macro = NutritionEvidenceMacro(metricLabel: label) {
+            return .nutrition(macro)
+        }
+        return switch label.lowercased() {
         case "protein", "rmr", "goal relationship": .purple
         case "fat", "body fat": .amber
         default: .teal
