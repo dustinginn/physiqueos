@@ -14,6 +14,8 @@ const SIDE_EFFECTING_SELECT = /\b(?:nextval|setval|pg_advisory|pg_notify|dblink|
 const CREDENTIAL_SHAPE = /(?:postgres(?:ql)?:\/\/|-----BEGIN [A-Z ]*PRIVATE KEY-----|-----BEGIN CERTIFICATE-----|\bBearer\s+[A-Za-z0-9._~-]+|\bdop_v1_[A-Za-z0-9]+|\bdoo_v1_[A-Za-z0-9]+)/i;
 const STRUCTURED_BEGIN = "__PHYSIQUEOS_STRUCTURED_BEGIN__";
 const STRUCTURED_END = "__PHYSIQUEOS_STRUCTURED_END__";
+const REMOTE_EXIT_PREFIX = "__PHYSIQUEOS_REMOTE_EXIT__:";
+const CONTROL_FAILURE = /PHYSIQUEOS_[A-Z0-9_]*FAILED:[A-Z0-9_:-]{1,160}/;
 const PTY_PROMPT_LINE = /^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9._-]+:[^\n]{0,180}[#$>] ?$/;
 const PTY_CONNECTION_LINE = /^(?:Connecting(?: to)?|Connected(?: to)?|Welcome|Last login:)[^\n]{0,180}$/i;
 // The first controlled command is necessarily echoed before it can disable PTY echo.
@@ -99,21 +101,38 @@ export function validateSanitizedConsoleOutput(output, {
   try { text = normalizePtyOutput(raw); } catch (error) {
     throw diagnosticFailure(error?.code ?? "AUDIT_OUTPUT_NORMALIZATION_FAILED", output, prefix, marker, "normalization", structuralDiagnostics);
   }
+  if (CREDENTIAL_SHAPE.test(text)) {
+    throw diagnosticFailure("AUDIT_OUTPUT_CREDENTIAL_SHAPE", output, prefix, marker, "output_validation", structuralDiagnostics);
+  }
   const markerCount = text.split("\n").filter((line) => line === marker).length;
-  if (markerCount !== 1) throw diagnosticFailure("AUDIT_SUCCESS_MARKER_MISSING", output, prefix, marker, "output_validation", structuralDiagnostics);
+  if (markerCount !== 1 || countOccurrences(text, marker) !== 1) {
+    throw diagnosticFailure("AUDIT_SUCCESS_MARKER_MISSING", output, prefix, marker, "output_validation", structuralDiagnostics);
+  }
   return raw;
 }
 
 export function parseFramedJson(output, prefix, {
   marker,
   maxBytes = MAX_SANITIZED_REPORT_BYTES,
+  maxOutputBytes = MAX_CONSOLE_OUTPUT_BYTES,
+  requireRemoteExit = true,
   structuralDiagnostics = false,
 } = {}) {
   if (!/^[A-Z0-9_]{12,120}$/.test(prefix ?? "")) throw coded("AUDIT_OUTPUT_PREFIX_INVALID");
   if (!SAFE_MARKER.test(marker ?? "")) throw coded("AUDIT_SUCCESS_MARKER_INVALID");
+  const consoleOutput = reassembleConsoleOutput(output);
+  if (Buffer.byteLength(consoleOutput) > maxOutputBytes) {
+    throw diagnosticFailure("AUDIT_OUTPUT_TOO_LARGE", output, prefix, marker, "output_validation", structuralDiagnostics);
+  }
+  if (CREDENTIAL_SHAPE.test(consoleOutput)) {
+    throw diagnosticFailure("AUDIT_OUTPUT_CREDENTIAL_SHAPE", output, prefix, marker, "output_validation", structuralDiagnostics);
+  }
   let text;
-  try { text = normalizePtyOutput(reassembleConsoleOutput(output)); } catch (error) {
+  try { text = normalizePtyOutput(consoleOutput); } catch (error) {
     throw diagnosticFailure(error?.code ?? "AUDIT_OUTPUT_NORMALIZATION_FAILED", output, prefix, marker, "normalization", structuralDiagnostics);
+  }
+  if (CREDENTIAL_SHAPE.test(text)) {
+    throw diagnosticFailure("AUDIT_OUTPUT_CREDENTIAL_SHAPE", output, prefix, marker, "output_validation", structuralDiagnostics);
   }
   const lines = text.split("\n");
   const beginPattern = new RegExp(`^${STRUCTURED_BEGIN}:${prefix}:(\\d{1,8})$`);
@@ -121,7 +140,10 @@ export function parseFramedJson(output, prefix, {
   const begins = lines.map((line, index) => ({ index, match: line.match(beginPattern) })).filter((entry) => entry.match);
   const ends = lines.map((line, index) => ({ index, line })).filter((entry) => entry.line === endLine);
   if (begins.length === 0 || ends.length === 0) throw diagnosticFailure("AUDIT_JSON_MISSING", output, prefix, marker, "sentinel_count", structuralDiagnostics);
-  if (begins.length !== 1 || ends.length !== 1) throw diagnosticFailure("AUDIT_JSON_DUPLICATE", output, prefix, marker, "sentinel_count", structuralDiagnostics);
+  if (begins.length !== 1 || ends.length !== 1 ||
+      countOccurrences(text, STRUCTURED_BEGIN) !== 1 || countOccurrences(text, STRUCTURED_END) !== 1) {
+    throw diagnosticFailure("AUDIT_JSON_DUPLICATE", output, prefix, marker, "sentinel_count", structuralDiagnostics);
+  }
   const begin = begins[0];
   const end = ends[0];
   if (end.index <= begin.index + 1) throw diagnosticFailure("AUDIT_JSON_FRAME_INVALID", output, prefix, marker, "frame_bounds", structuralDiagnostics);
@@ -142,10 +164,28 @@ export function parseFramedJson(output, prefix, {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw diagnosticFailure("AUDIT_JSON_INVALID", output, prefix, marker, "json_parse", structuralDiagnostics);
   }
-  const outside = [...lines.slice(0, begin.index), ...lines.slice(end.index + 1)];
-  if (outside.filter((line) => line === marker).length !== 1 || outside.some((line) => !isAllowedPtyFramingLine(line, marker))) {
-    throw diagnosticFailure("AUDIT_OUTPUT_UNEXPECTED", output, prefix, marker, "outside_validation", structuralDiagnostics);
+  const markerIndexes = indexesMatching(lines, (line) => line === marker);
+  if (markerIndexes.length !== 1 || countOccurrences(text, marker) !== 1) {
+    throw diagnosticFailure("AUDIT_SUCCESS_MARKER_MISSING", output, prefix, marker, "outside_validation", structuralDiagnostics);
   }
+  if (CONTROL_FAILURE.test(text)) {
+    throw diagnosticFailure("AUDIT_CONTROL_FAILURE_PRESENT", output, prefix, marker, "outside_validation", structuralDiagnostics);
+  }
+  if (end.index >= markerIndexes[0]) {
+    throw diagnosticFailure("AUDIT_OUTPUT_ORDER_INVALID", output, prefix, marker, "outside_validation", structuralDiagnostics);
+  }
+  if (requireRemoteExit) {
+    const zeroExitIndexes = indexesMatching(lines, (line) => line === `${REMOTE_EXIT_PREFIX}0`);
+    if (countOccurrences(text, REMOTE_EXIT_PREFIX) !== 1 || zeroExitIndexes.length !== 1) {
+      throw diagnosticFailure("AUDIT_REMOTE_EXIT_INVALID", output, prefix, marker, "outside_validation", structuralDiagnostics);
+    }
+    if (markerIndexes[0] >= zeroExitIndexes[0]) {
+      throw diagnosticFailure("AUDIT_OUTPUT_ORDER_INVALID", output, prefix, marker, "outside_validation", structuralDiagnostics);
+    }
+  }
+  // App Platform supplies a provider-owned PTY, so prompt/banner/echo bytes are
+  // non-authoritative. They are never parsed or returned. Acceptance is based
+  // only on the bounded canonical frame and the reserved controls above.
   return value;
 }
 
@@ -454,10 +494,6 @@ function stripTerminalSequences(value) {
     }
   }
   return { text: output, removedCount };
-}
-
-function isAllowedPtyFramingLine(line, marker) {
-  return classifyOutsideFrameLine(line, marker) !== "unknown";
 }
 
 function classifyOutsideFrameStructure(lines, exactBeginIndexes, endIndexes, marker) {

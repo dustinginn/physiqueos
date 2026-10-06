@@ -26,6 +26,8 @@ The file wrapper gzip-compresses and base64-encodes the task program. The remote
 
 The task must emit that exact marker as a standalone line only after its explicit rollback succeeds. A normal WebSocket closure, zero local process status, or partial output is not audit success. Missing or duplicate markers, non-zero remote status, stderr, timeout, output truncation, or unexpected closure fail closed.
 
+App Platform owns the interactive PTY wrapper. Prompt, banner, and command-echo bytes outside the task's canonical structured frame are non-authoritative transport noise: they are bounded and credential-scanned, but are neither parsed nor returned as audit data. Acceptance still fails on any additional frame sentinel, additional occurrence of the success marker, missing/non-zero/duplicate remote-exit control, explicit `PHYSIQUEOS_*FAILED` control, invalid ordering, malformed frame, oversized output, or credential-shaped bytes. Do not add provider prompt text to an acceptance allowlist.
+
 ## doctl configuration discovery
 
 The runner supports:
@@ -118,6 +120,10 @@ Stop immediately, without trying another context, PAT, component, console mechan
 - SQL error
 - rollback failure
 - missing or duplicate success marker
+- missing, duplicate, non-zero, or misordered remote exit
+- additional structured sentinel or reserved marker occurrence
+- explicit audit/runner failure control
+- malformed/oversized frame or credential-shaped output
 - unexpected mutation capability
 - platform/tool safety restriction
 

@@ -252,7 +252,11 @@ return {
     stdout: { write: (value) => { rawOutput += String(value); } },
   });
   validateSanitizedConsoleOutput(rawOutput, { marker, prefix: outputPrefix, structuralDiagnostics });
-  const consoleReport = parseFramedJson(rawOutput, outputPrefix, { marker, structuralDiagnostics });
+  const consoleReport = parseFramedJson(rawOutput, outputPrefix, {
+    marker,
+    requireRemoteExit: true,
+    structuralDiagnostics,
+  });
   if (consoleReport.runtime?.gitSha !== expectedSha || consoleReport.bindingPresence?.databaseUrl !== true ||
       consoleReport.bindingPresence?.databaseCa !== true || consoleReport.transaction?.readOnly !== "on" ||
       consoleReport.probe?.selectOne !== true) {

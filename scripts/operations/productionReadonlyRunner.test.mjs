@@ -211,6 +211,20 @@ describe("primary runner fail-closed transport", () => {
     );
   });
 
+  it("fails when more than one remote exit control is present", async () => {
+    await assert.rejects(
+      runRemoteConsole({
+        url: "wss://fake.invalid/exec",
+        encodedSource: VALID_PAYLOAD,
+        WebSocketImpl: DuplicateStatusWebSocket,
+        stdout: { write: () => {} },
+        timeoutMs: 100,
+        delays: zeroDelays(),
+      }),
+      { code: "REMOTE_EXIT_STATUS_MISSING" },
+    );
+  });
+
   it("fails on unexpected closure before remote exit", async () => {
     await assert.rejects(
       runRemoteConsole({
@@ -389,6 +403,25 @@ class NonzeroWebSocket extends FakeWebSocketBase {
     if (message.op === "stdin" && message.data.includes("PHYSIQUEOS_REMOTE_STATUS")) {
       queueMicrotask(() => {
         this.emit("message", { data: JSON.stringify({ data: "sanitized failure\n__PHYSIQUEOS_REMOTE_EXIT__:7\n" }) });
+        this.emit("close", { code: 1000 });
+      });
+    }
+  }
+}
+
+class DuplicateStatusWebSocket extends FakeWebSocketBase {
+  constructor() {
+    super();
+    queueMicrotask(() => this.emit("open"));
+  }
+
+  send(value) {
+    const message = JSON.parse(value);
+    if (message.op === "stdin" && message.data.includes("PHYSIQUEOS_REMOTE_STATUS")) {
+      queueMicrotask(() => {
+        this.emit("message", {
+          data: JSON.stringify({ data: "__PHYSIQUEOS_REMOTE_EXIT__:0\n__PHYSIQUEOS_REMOTE_EXIT__:0\n" }),
+        });
         this.emit("close", { code: 1000 });
       });
     }

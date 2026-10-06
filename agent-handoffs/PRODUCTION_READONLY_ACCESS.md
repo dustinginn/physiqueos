@@ -80,6 +80,12 @@ Every production SQL audit must:
 
 The DigitalOcean console transport is powerful and is **not** database-read-only. The runtime component has write-capable bindings. Transaction fencing, owner scoping, reviewed payload code, bounded output, and explicit task authorization remain mandatory.
 
+## PTY output acceptance boundary
+
+DigitalOcean supplies a provider-owned interactive PTY rather than a raw exec stream. Bytes outside the exact task frame can vary by provider/host and are not audit authority. The shared safety parser must discard that outside material after enforcing the total-output bound and raw credential-shape scan; it must never parse it as JSON or return it in the decoded report.
+
+Audit success is determined only by exactly one canonical length-declared base64 frame, the schema-bounded decoded report, exactly one post-rollback success marker, exactly one later zero remote-exit control, and successful transport closure. Additional sentinel/marker/exit tokens, explicit `PHYSIQUEOS_*FAILED` controls, invalid ordering, malformed/truncated frames, credential-shaped output, or size-limit violations fail closed. Prompt/banner/command-echo classification may be retained for sanitized diagnostics, but it is not an authorization or acceptance control.
+
 ## Stop conditions
 
 Stop immediately, without retrying another context, PAT, component, console mechanism, or credential, on:
@@ -93,7 +99,8 @@ Stop immediately, without retrying another context, PAT, component, console mech
 - missing database binding or owner mismatch;
 - `transaction_read_only` not equal to `on`;
 - non-SELECT requirement, SQL error, rollback/resource-close failure;
-- unexpected output or credential-shaped output;
+- credential-shaped or oversized output;
+- malformed/duplicate frame controls, reserved-marker ambiguity, explicit failure controls, or invalid marker/exit ordering;
 - missing/duplicate success marker;
 - any requirement for mutation.
 

@@ -50,7 +50,7 @@ describe("non-content structural diagnostics", () => {
     }
   });
 
-  it("reports full-frame-without-marker and unexpected payload without leaking either", () => {
+  it("reports full-frame-without-marker and treats arbitrary outside text as non-authoritative", () => {
     const withoutMarker = framed({ passed: true }).replace(`${MARKER}\n`, "");
     const markerDiagnostic = thrownDiagnostics(() => validateSanitizedConsoleOutput(withoutMarker, {
       marker: MARKER,
@@ -63,12 +63,14 @@ describe("non-content structural diagnostics", () => {
     assert.equal(markerDiagnostic.successMarkerCount, 0);
 
     const unexpected = "synthetic application payload that must never appear in diagnostics";
-    const unexpectedDiagnostic = thrownDiagnostics(() => parseFramedJson(`${unexpected}\n${framed({ passed: true })}`, PREFIX, {
-      marker: MARKER,
-      structuralDiagnostics: true,
-    }));
-    assert.equal(unexpectedDiagnostic.errorCode, "AUDIT_OUTPUT_UNEXPECTED");
-    assert.equal(JSON.stringify(unexpectedDiagnostic).includes(unexpected), false);
+    const output = `${unexpected}\n${framed({ passed: true })}`;
+    assert.deepEqual(parseFramedJson(output, PREFIX, { marker: MARKER }), { passed: true });
+    const diagnostics = collectStructuralDiagnostics(output, PREFIX, MARKER, {
+      parserStage: "complete",
+      errorCode: "AUDIT_DIAGNOSTIC",
+    });
+    assert.equal(diagnostics.unrecognizedOutsideLineCount, 1);
+    assert.equal(JSON.stringify(diagnostics).includes(unexpected), false);
   });
 
   it("counts only structure for ANSI, prompt, split chunks, and carriage overwrite", () => {
@@ -115,22 +117,26 @@ describe("non-content structural diagnostics", () => {
     assert.equal(diagnostics.controlledCommandEchoPatternPresent, true);
   });
 
-  it("classifies unknown outside lines by bounded position while keeping them rejected", () => {
+  it("classifies ignored unknown outside lines by bounded position without returning their content", () => {
     const singleUnknown = "synthetic unknown pre-frame line";
-    const singleDiagnostics = thrownDiagnostics(() => parseFramedJson(`${singleUnknown}\n${framed({ passed: true })}`, PREFIX, {
-      marker: MARKER,
-      structuralDiagnostics: true,
-    }));
-    assert.equal(singleDiagnostics.errorCode, "AUDIT_OUTPUT_UNEXPECTED");
+    const singleOutput = `${singleUnknown}\n${framed({ passed: true })}`;
+    assert.deepEqual(parseFramedJson(singleOutput, PREFIX, { marker: MARKER }), { passed: true });
+    const singleDiagnostics = collectStructuralDiagnostics(singleOutput, PREFIX, MARKER, {
+      parserStage: "complete",
+      errorCode: "AUDIT_DIAGNOSTIC",
+    });
     assert.equal(singleDiagnostics.unrecognizedOutsideLineCount, 1);
     assert.equal(singleDiagnostics.allUnrecognizedLinesPreBegin, true);
     assert.equal(singleDiagnostics.allUnrecognizedLinesPostEnd, false);
     assert.equal(singleDiagnostics.unrecognizedLineCountExactlyOne, true);
+    assert.equal(JSON.stringify(singleDiagnostics).includes(singleUnknown), false);
 
-    const multipleDiagnostics = thrownDiagnostics(() => parseFramedJson(`unknown one\nunknown two\n${framed({ passed: true })}`, PREFIX, {
-      marker: MARKER,
-      structuralDiagnostics: true,
-    }));
+    const multipleOutput = `unknown one\nunknown two\n${framed({ passed: true })}`;
+    assert.deepEqual(parseFramedJson(multipleOutput, PREFIX, { marker: MARKER }), { passed: true });
+    const multipleDiagnostics = collectStructuralDiagnostics(multipleOutput, PREFIX, MARKER, {
+      parserStage: "complete",
+      errorCode: "AUDIT_DIAGNOSTIC",
+    });
     assert.equal(multipleDiagnostics.unrecognizedOutsideLineCount, 2);
     assert.equal(multipleDiagnostics.allUnrecognizedLinesPreBegin, true);
     assert.equal(multipleDiagnostics.unrecognizedLineCountExactlyOne, false);
@@ -139,30 +145,32 @@ describe("non-content structural diagnostics", () => {
       `__PHYSIQUEOS_STRUCTURED_END__:${PREFIX}\n`,
       `__PHYSIQUEOS_STRUCTURED_END__:${PREFIX}\nsynthetic unknown post-frame line\n`,
     );
-    const postDiagnostics = thrownDiagnostics(() => parseFramedJson(postEnd, PREFIX, {
-      marker: MARKER,
-      structuralDiagnostics: true,
-    }));
+    assert.deepEqual(parseFramedJson(postEnd, PREFIX, { marker: MARKER }), { passed: true });
+    const postDiagnostics = collectStructuralDiagnostics(postEnd, PREFIX, MARKER, {
+      parserStage: "complete",
+      errorCode: "AUDIT_DIAGNOSTIC",
+    });
     assert.equal(postDiagnostics.unrecognizedOutsideLineCount, 1);
     assert.equal(postDiagnostics.allUnrecognizedLinesPreBegin, false);
     assert.equal(postDiagnostics.allUnrecognizedLinesPostEnd, true);
     assert.equal(postDiagnostics.unrecognizedLineCountExactlyOne, true);
   });
 
-  it("does not leak unknown outside content or credentials through structural classifications", () => {
+  it("rejects credential-shaped outside text and never returns arbitrary command-like text", () => {
     const sensitive = "postgresql://synthetic-user:synthetic-password@example.invalid/database";
     const arbitraryEcho = "web-host:/workspace# arbitrary unsafe command";
-    for (const fixture of [sensitive, arbitraryEcho]) {
-      const diagnostics = thrownDiagnostics(() => parseFramedJson(`${fixture}\n${framed({ passed: true })}`, PREFIX, {
-        marker: MARKER,
-        structuralDiagnostics: true,
-      }));
-      const serialized = JSON.stringify(diagnostics);
-      assert.equal(diagnostics.errorCode, "AUDIT_OUTPUT_UNEXPECTED");
-      assert.equal(diagnostics.unrecognizedOutsideLineCount, 1);
-      assert.equal(serialized.includes(fixture), false);
-      assert.equal(serialized.includes("synthetic-password"), false);
-    }
+    const diagnostics = thrownDiagnostics(() => parseFramedJson(`${sensitive}\n${framed({ passed: true })}`, PREFIX, {
+      marker: MARKER,
+      structuralDiagnostics: true,
+    }));
+    const serialized = JSON.stringify(diagnostics);
+    assert.equal(diagnostics.errorCode, "AUDIT_OUTPUT_CREDENTIAL_SHAPE");
+    assert.equal(serialized.includes(sensitive), false);
+    assert.equal(serialized.includes("synthetic-password"), false);
+
+    const report = parseFramedJson(`${arbitraryEcho}\n${framed({ passed: true })}`, PREFIX, { marker: MARKER });
+    assert.deepEqual(report, { passed: true });
+    assert.equal(JSON.stringify(report).includes(arbitraryEcho), false);
   });
 
   it("proves diagnostics cannot contain fixture text, JSON, base64, credentials, or extra fields", () => {
@@ -217,22 +225,75 @@ describe("production access safety primitives", () => {
     assert.deepEqual(parseFramedJson(chunks, PREFIX, { marker: MARKER }), { passed: true });
   });
 
-  it("rejects duplicate, missing, malformed, credential-bearing, and unexpectedly surrounded frames", () => {
+  it("rejects duplicate, missing, malformed, and credential-bearing frames", () => {
     const valid = framed({ passed: true });
     assert.throws(() => parseFramedJson(`${valid}${valid}`, PREFIX, { marker: MARKER }), { code: "AUDIT_JSON_DUPLICATE" });
     assert.throws(() => parseFramedJson(`${MARKER}\n`, PREFIX, { marker: MARKER }), { code: "AUDIT_JSON_MISSING" });
     assert.throws(() => parseFramedJson(framedRaw("not-json"), PREFIX, { marker: MARKER }), { code: "AUDIT_JSON_INVALID" });
     assert.throws(() => parseFramedJson(framed({ url: "postgresql://user:password@example/db" }), PREFIX, { marker: MARKER }),
       { code: "AUDIT_OUTPUT_CREDENTIAL_SHAPE" });
-    assert.throws(() => parseFramedJson(`unexpected application payload\n${valid}`, PREFIX, { marker: MARKER }),
-      { code: "AUDIT_OUTPUT_UNEXPECTED" });
     assert.throws(() => parseFramedJson(valid.replace(/:(\d+)\n/, ":999999\n"), PREFIX, { marker: MARKER }),
       { code: "AUDIT_JSON_FRAME_INVALID" });
+  });
+
+  it("accepts bounded PTY noise but rejects reserved-control ambiguity and explicit failures", () => {
+    const valid = framed({ passed: true });
+    const founderLike = "synthetic private-looking prose outside the controlled frame";
+    const fakeJson = '{"passed":false,"invented":"outside"}';
+    const accepted = parseFramedJson(`${founderLike}\n${fakeJson}\n${valid}`, PREFIX, { marker: MARKER });
+    assert.deepEqual(accepted, { passed: true });
+    assert.equal(JSON.stringify(accepted).includes(founderLike), false);
+    assert.equal(JSON.stringify(accepted).includes("invented"), false);
+
+    const duplicateBegin = `__PHYSIQUEOS_STRUCTURED_BEGIN__:SYNTHETIC_OTHER:4\n${valid}`;
+    assert.throws(() => parseFramedJson(duplicateBegin, PREFIX, { marker: MARKER }), { code: "AUDIT_JSON_DUPLICATE" });
+
+    const duplicateEnd = valid.replace(
+      `__PHYSIQUEOS_STRUCTURED_END__:${PREFIX}\n`,
+      `__PHYSIQUEOS_STRUCTURED_END__:${PREFIX}\ncommand __PHYSIQUEOS_STRUCTURED_END__:SYNTHETIC_OTHER\n`,
+    );
+    assert.throws(() => parseFramedJson(duplicateEnd, PREFIX, { marker: MARKER }), { code: "AUDIT_JSON_DUPLICATE" });
+
+    const duplicateMarker = valid.replace(MARKER, `${MARKER}\n${MARKER}`);
+    assert.throws(() => parseFramedJson(duplicateMarker, PREFIX, { marker: MARKER }), { code: "AUDIT_SUCCESS_MARKER_MISSING" });
+
+    const injectedMarker = `echo ${MARKER}\n${valid}`;
+    assert.throws(() => parseFramedJson(injectedMarker, PREFIX, { marker: MARKER }), { code: "AUDIT_SUCCESS_MARKER_MISSING" });
+
+    const nonzeroExit = valid.replace("__PHYSIQUEOS_REMOTE_EXIT__:0", "__PHYSIQUEOS_REMOTE_EXIT__:7");
+    assert.throws(() => parseFramedJson(nonzeroExit, PREFIX, { marker: MARKER }), { code: "AUDIT_REMOTE_EXIT_INVALID" });
+
+    const duplicateExit = valid.replace(
+      "__PHYSIQUEOS_REMOTE_EXIT__:0",
+      "__PHYSIQUEOS_REMOTE_EXIT__:0\n__PHYSIQUEOS_REMOTE_EXIT__:0",
+    );
+    assert.throws(() => parseFramedJson(duplicateExit, PREFIX, { marker: MARKER }), { code: "AUDIT_REMOTE_EXIT_INVALID" });
+
+    const earlyExit = valid.replace(
+      `${MARKER}\n__PHYSIQUEOS_REMOTE_EXIT__:0`,
+      `__PHYSIQUEOS_REMOTE_EXIT__:0\n${MARKER}`,
+    );
+    assert.throws(() => parseFramedJson(earlyExit, PREFIX, { marker: MARKER }), { code: "AUDIT_OUTPUT_ORDER_INVALID" });
+
+    const truncated = valid.replace(`__PHYSIQUEOS_STRUCTURED_END__:${PREFIX}\n`, "");
+    assert.throws(() => parseFramedJson(truncated, PREFIX, { marker: MARKER }), { code: "AUDIT_JSON_MISSING" });
+
+    const afterFailure = `PHYSIQUEOS_AUDIT_FAILED:SYNTHETIC_FAILURE\n${valid}`;
+    assert.throws(() => parseFramedJson(afterFailure, PREFIX, { marker: MARKER }), { code: "AUDIT_CONTROL_FAILURE_PRESENT" });
+    assert.throws(
+      () => parseFramedJson(`prompt PHYSIQUEOS_AUDIT_FAILED:SYNTHETIC_FAILURE\n${valid}`, PREFIX, { marker: MARKER }),
+      { code: "AUDIT_CONTROL_FAILURE_PRESENT" },
+    );
+
+    const oversized = `${"x".repeat(2_000)}\n${valid}`;
+    assert.throws(() => parseFramedJson(oversized, PREFIX, { marker: MARKER, maxOutputBytes: 1_024 }),
+      { code: "AUDIT_OUTPUT_TOO_LARGE" });
   });
 
   it("requires one marker and rejects raw credential-shaped output", () => {
     assert.throws(() => validateSanitizedConsoleOutput(`${MARKER}\n${MARKER}\n`, { marker: MARKER }));
     assert.throws(() => validateSanitizedConsoleOutput(`postgresql://user:password@example/db\n${MARKER}\n`, { marker: MARKER }));
+    assert.throws(() => validateSanitizedConsoleOutput(`postgre\u001b[31msql://user:password@example/db\n${MARKER}\n`, { marker: MARKER }));
   });
 });
 
@@ -243,7 +304,7 @@ describe("generated read-only payload", () => {
     assert.match(execution.stdout, new RegExp(`${PREFIX}:`));
     assert.match(execution.stdout, new RegExp(`${MARKER}\\n$`));
     assert.deepEqual(execution.events, ["connect", "begin", "show", "select", "rollback", "release", "pool_end"]);
-    const report = parseFramedJson(execution.stdout, PREFIX, { marker: MARKER });
+    const report = parseFramedJson(execution.stdout, PREFIX, { marker: MARKER, requireRemoteExit: false });
     assert.deepEqual(report, {
       bindingPresence: { databaseUrl: true, databaseCa: true },
       probe: { selectOne: true },
@@ -279,7 +340,7 @@ describe("generated read-only payload", () => {
       isolatedFrame.slice(beginSplit, markerSplit),
       isolatedFrame.slice(markerSplit),
     ];
-    assert.deepEqual(parseFramedJson(chunks, PREFIX, { marker: MARKER }), {
+    assert.deepEqual(parseFramedJson(chunks, PREFIX, { marker: MARKER, requireRemoteExit: false }), {
       bindingPresence: { databaseUrl: true, databaseCa: true },
       probe: { selectOne: true },
       runtime: { gitSha: SHA },
