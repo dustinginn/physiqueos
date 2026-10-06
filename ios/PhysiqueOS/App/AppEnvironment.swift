@@ -578,14 +578,30 @@ final class AppEnvironment {
     /// Sandbox alone and is never reachable from Production.
     /// The Goal scope selection shared by the Recovery landing, Trends and
     /// the night-history sheet (in memory; resets with the authority).
-    let recoverySleepScope = RecoverySleepScopeStore()
+    let recoverySleepScope: RecoverySleepScopeStore = {
+        let store = RecoverySleepScopeStore()
+#if DEBUG
+        if let scope = EnergyRecoveryRedesignReview.initialScope { store.select(scope) }
+#endif
+        return store
+    }()
 
     var recoverySleepAPI: RecoverySleepAPI {
-        nativeAuthority == .founderProduction ? ProductionRecoverySleepAPI(api: productionNativeAPI) : FixtureRecoverySleepAPI()
+        if nativeAuthority == .founderProduction { return ProductionRecoverySleepAPI(api: productionNativeAPI) }
+#if DEBUG
+        return EnergyRecoveryRedesignReview.recoverySleepAPI(wrapping: FixtureRecoverySleepAPI())
+#else
+        return FixtureRecoverySleepAPI()
+#endif
     }
 
     var energyAPI: EnergyAPI {
-        nativeAuthority == .founderProduction ? ProductionEnergyAPI(api: productionNativeAPI) : sandboxEnergyAPI
+        if nativeAuthority == .founderProduction { return ProductionEnergyAPI(api: productionNativeAPI) }
+#if DEBUG
+        return EnergyRecoveryRedesignReview.energyAPI(wrapping: sandboxEnergyAPI)
+#else
+        return sandboxEnergyAPI
+#endif
     }
 
     var priorityAPI: PriorityAPI {

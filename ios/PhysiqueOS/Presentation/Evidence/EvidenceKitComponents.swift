@@ -117,6 +117,9 @@ struct EvidenceScrollPage<Content: View>: View {
         }
         .physiqueOSScrollBottomClearance()
         .defaultScrollAnchor(Self.reviewScrollAnchor)
+#if DEBUG
+        .modifier(EvidenceReviewScrollOffset(y: EnergyRecoveryRedesignReview.scrollY))
+#endif
     }
 
     private static var reviewScrollAnchor: UnitPoint? {
@@ -127,6 +130,27 @@ struct EvidenceScrollPage<Content: View>: View {
 #endif
     }
 }
+
+#if DEBUG
+/// Capture-only: `-physiqueos.energy-recovery-review.scroll-y` holds the page
+/// at a fixed content offset so long pages can be reviewed frame by frame.
+struct EvidenceReviewScrollOffset: ViewModifier {
+    let y: CGFloat?
+    @State private var position = ScrollPosition(edge: .top)
+
+    func body(content: Content) -> some View {
+        if let y {
+            content
+                .scrollPosition($position)
+                .onScrollGeometryChange(for: CGFloat.self, of: \.contentSize.height) { _, _ in
+                    position.scrollTo(y: y)
+                }
+        } else {
+            content
+        }
+    }
+}
+#endif
 
 // MARK: - Header
 

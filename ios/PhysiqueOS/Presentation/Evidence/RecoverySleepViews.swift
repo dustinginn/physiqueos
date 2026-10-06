@@ -3,6 +3,12 @@ import SwiftUI
 // Recovery / Sleep Evidence screens (design report 20261001T032718Z, approved
 // prototype 20261001T040311Z). Descriptive only: no score, target, good/bad
 // language, coaching, Briefing, Goal or Confidence content.
+//
+// Presentation follows the Founder-locked Recovery design
+// (`energy-weight-recovery-evidence-style-translation-20261004` R1–R6 and
+// Founder correction `a21296ec` R1–R2) in the `.weight` harness family it
+// shares with Weight and Energy. Every value, status, scope rule, route and
+// read is unchanged.
 
 enum RecoverySleepDestination {
     static let trendsStreamId = "recovery/sleep/trends"
@@ -24,181 +30,167 @@ enum RecoverySleepDestination {
 
 // MARK: - Shared chrome and components
 
-private struct RecoverySleepChrome: ViewModifier {
-    let backLabel: String
-    @Environment(\.dismiss) private var dismiss
-
-    func body(content: Content) -> some View {
-        content
-            .physiqueOSScrollBottomClearance()
-            .background(PhysiqueOSTheme.background)
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(true)
-            .restoresInteractivePopGesture()
-            .suppressesContentAreaPopGesture()
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button { dismiss() } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.left").font(.system(size: 13, weight: .semibold))
-                            Text(backLabel).physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        }
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        .frame(minHeight: 44)
-                    }
-                }
-            }
-    }
-}
+private let rm = EvidenceMetrics(family: .weight)
 
 private extension View {
-    func recoverySleepChrome(backLabel: String) -> some View {
-        modifier(RecoverySleepChrome(backLabel: backLabel))
+    /// The locked flat navigation bar and page canvas. The back label comes
+    /// from the Evidence back trail (`‹ Evidence Hub`, `‹ Recovery`,
+    /// `‹ Sleep Trends`, `‹ All Nights`). Charts scrub horizontally, so the
+    /// content-area pop gesture stays suppressed; the edge swipe still pops.
+    func recoverySleepPage(_ trailTitle: String) -> some View {
+        self
+            .evidencePageChrome(trailTitle)
+            .evidenceFamily(.weight)
+            .suppressesContentAreaPopGesture()
     }
 }
 
-private struct SleepScreenHeader: View {
+/// `.report-head`: eyebrow, 30 px title, subtitle (locked R1/R2 have no mark).
+private struct SleepReportHeader: View {
     let eyebrow: String
     let title: String
     let subtitle: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "bed.double.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.sleepTotal)
-                .frame(width: 48, height: 48)
-                .background(PhysiqueOSTheme.sleepTotal.opacity(0.16))
-                .clipShape(Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(eyebrow)
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text(title)
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    .accessibilityAddTraits(.isHeader)
-                Text(subtitle)
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            Text(eyebrow)
+                .evidenceText(.normal(11, 800, jakarta: false, tracking: 1.43, uppercase: true))
+                .foregroundStyle(rm.c.accent)
+            Text(title)
+                .evidenceText(EvidenceTextStyle(size: 30, weight: 780, lineHeight: 31.5, tracking: -1.2))
+                .foregroundStyle(rm.c.ink)
+                .accessibilityAddTraits(.isHeader)
+            Text(subtitle)
+                .evidenceText(EvidenceTextStyle(size: 13, weight: 400, lineHeight: 17.55))
+                .foregroundStyle(rm.c.muted)
+                .padding(.top, rm.pt(4))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, rm.pt(3))
+        .padding(.bottom, rm.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("evidence.page.header")
     }
 }
 
-private struct SleepStatTile: View {
-    let label: String
-    let value: String
-    var detail: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            if let detail {
-                Text(detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-    }
-}
-
-private struct SleepStatusTag: View {
+/// The section action text (`See trends ›`, `12 nights`, `Oct 1`).
+private struct SleepSectionAction: View {
     let text: String
-    let systemImage: String
-
     var body: some View {
-        Label(text, systemImage: systemImage)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(PhysiqueOSTheme.surfaceMuted)
-            .clipShape(Capsule())
+        Text(text)
+            .evidenceText(.normal(10, 760, jakarta: false))
+            .foregroundStyle(rm.c.accent)
     }
 }
 
-private struct SleepNoteRow: View {
-    let systemImage: String
+/// `.section` (open, not contained): title + action above a top-ruled list.
+private struct SleepOpenSection<Trailing: View, Content: View>: View {
     let title: String
-    let detail: String
+    let identifier: String
+    @ViewBuilder var trailing: Trailing
+    @ViewBuilder var content: Content
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                .padding(.top, 1)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: rm.pt(8)) {
                 Text(title)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                Text(detail)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .evidenceText(.normal(16, 800, jakarta: false, tracking: -0.32))
+                    .foregroundStyle(rm.c.ink)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                trailing
             }
+            .padding(.bottom, rm.pt(10))
+            VStack(spacing: 0) { content }
+                .overlay(alignment: .top) { Rectangle().fill(rm.c.line).frame(height: rm.pt(1)) }
         }
-        .padding(10)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+/// A contained section whose trailing element is a view (a link or a
+/// status), not the plain toggle `WeightSection` takes.
+private struct SleepSection<Trailing: View, Content: View>: View {
+    let title: String
+    let identifier: String
+    @ViewBuilder var trailing: Trailing
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: rm.pt(8)) {
+                Text(title)
+                    .evidenceText(.normal(16, 800, jakarta: false, tracking: -0.32))
+                    .foregroundStyle(rm.c.ink)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                trailing
+            }
+            .padding(.bottom, rm.pt(10))
+            content
+        }
+        .padding(rm.pt(13 + 1))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .accessibilityElement(children: .combine)
+        .background(rm.c.surface, in: RoundedRectangle(cornerRadius: rm.pt(15)))
+        .overlay(RoundedRectangle(cornerRadius: rm.pt(15)).strokeBorder(rm.c.line, lineWidth: rm.pt(1)))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+extension SleepSection where Trailing == EmptyView {
+    init(title: String, identifier: String, @ViewBuilder content: () -> Content) {
+        self.init(title: title, identifier: identifier, trailing: { EmptyView() }, content: content)
+    }
+}
+
+/// `.footnote`: 10 px quiet copy.
+private struct SleepFootnote: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+            .foregroundStyle(rm.c.quiet)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, rm.pt(5))
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// `.notice`: amber-tinted factual note (recalculation, absence).
+private struct SleepNotice: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .evidenceText(EvidenceTextStyle(size: 9.5, weight: 500, lineHeight: 13.3))
+            .foregroundStyle(rm.c.muted)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, rm.pt(10))
+            .padding(.vertical, rm.pt(9))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(rm.c.amber.opacity(0.12), in: RoundedRectangle(cornerRadius: rm.pt(10)))
+            .accessibilityElement(children: .combine)
     }
 }
 
 private struct SleepRecalculatingNote: View {
     let detail: String
     var body: some View {
-        SleepNoteRow(systemImage: "arrow.triangle.2.circlepath", title: "Stage detail is being recalculated.", detail: detail)
+        VStack(alignment: .leading, spacing: rm.pt(2)) {
+            Text("Stage detail is being recalculated.")
+                .evidenceText(EvidenceTextStyle(size: 9.5, weight: 700, lineHeight: 13.3))
+                .foregroundStyle(rm.c.ink)
+            Text(detail)
+                .evidenceText(EvidenceTextStyle(size: 9.5, weight: 500, lineHeight: 13.3))
+                .foregroundStyle(rm.c.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, rm.pt(10))
+        .padding(.vertical, rm.pt(9))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(rm.c.amber.opacity(0.12), in: RoundedRectangle(cornerRadius: rm.pt(10)))
     }
-}
-
-private struct SleepStateMessage: View {
-    let text: String
-    var body: some View {
-        Text(text)
-            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 240)
-            .padding(.horizontal, 24)
-    }
-}
-
-private func legendSwatch(_ color: Color, _ label: String) -> some View {
-    HStack(spacing: 4) {
-        RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 10, height: 8)
-        Text(label)
-    }
-    .font(.system(size: 10, weight: .semibold))
-    .foregroundStyle(PhysiqueOSTheme.textMuted)
-    .accessibilityHidden(true)
-}
-
-private func legendDash(_ label: String) -> some View {
-    HStack(spacing: 4) {
-        Path { path in path.move(to: .init(x: 0, y: 4)); path.addLine(to: .init(x: 14, y: 4)) }
-            .stroke(PhysiqueOSTheme.textPrimary.opacity(0.72), style: StrokeStyle(lineWidth: 1.6, dash: [4, 3]))
-            .frame(width: 14, height: 8)
-        Text(label)
-    }
-    .font(.system(size: 10, weight: .semibold))
-    .foregroundStyle(PhysiqueOSTheme.textMuted)
-    .accessibilityHidden(true)
 }
 
 private let notAvailableText = "Sleep from Apple Health will appear here once it is available for your account."
@@ -212,9 +204,10 @@ private struct SleepScopeSelector: View {
 
     var body: some View {
         let store = environment.recoverySleepScope
-        TrainingScopeSelectorView(scope: store.scopeContext(today: environment.recoverySleepAPI.today())) { pillID in
+        WeightScopePills(scope: store.scopeContext(today: environment.recoverySleepAPI.today())) { pillID in
             if let scope = RecoverySleepScope(pillID: pillID) { store.select(scope) }
         }
+        .padding(.bottom, rm.pt(18))
     }
 }
 
@@ -226,76 +219,63 @@ private struct SleepScopeStateCard: View {
     let retry: () -> Void
 
     var body: some View {
-        CardContainer {
-            VStack(spacing: 10) {
-                if let range, range.isEmpty {
-                    SleepStateMessage(text: "No Sleep Evidence falls inside this Goal's dates.")
-                } else if store.windowsState == .failed {
-                    SleepStateMessage(text: "This Goal's dates could not be loaded.")
-                    Button("Try again", action: retry)
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.accent)
-                        .frame(minHeight: 44)
-                } else {
-                    ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 120)
-                }
-            }
+        if let range, range.isEmpty {
+            WeightStatePanel(title: "No Sleep Evidence falls inside this Goal's dates.", identifier: "sleep.scope.empty")
+        } else if store.windowsState == .failed {
+            WeightStatePanel(title: "This Goal's dates could not be loaded.", identifier: "sleep.scope.failed",
+                             actionLabel: "Try again", onAction: retry)
+        } else {
+            WeightStatePanel(title: "Loading Goal dates…", loading: true, identifier: "sleep.scope.loading")
         }
     }
 }
 
 // MARK: - Night row
 
+/// Locked `.row`: day + `Updating` tag, window (or status), trailing
+/// duration with the accent chevron.
 struct RecoverySleepNightRow: View {
     let night: RecoverySleepNightSummary
 
     var body: some View {
         let clock = night.clock
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+        HStack(alignment: .center, spacing: rm.pt(10)) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: rm.pt(6)) {
                     Text(SleepEvidenceFormat.sleepDay(night.sleepDay))
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    if night.windowOpen {
-                        Text("Updating")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(PhysiqueOSTheme.sleepTotal)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(PhysiqueOSTheme.sleepTotal.opacity(0.14))
-                            .clipShape(Capsule())
+                        .evidenceText(.normal(12, 790, jakarta: false))
+                        .foregroundStyle(rm.c.ink)
+                    if night.windowOpen { EnergyTag(text: "Updating", warn: true) }
+                }
+                Group {
+                    if let window = clock.window {
+                        Text(window + (!clock.isClockTimeCaution && clock.showsZone ? (clock.zoneLabel.map { " · \($0)" } ?? "") : ""))
+                    } else if let status = night.statusText {
+                        Text(status)
                     }
                 }
-                if let window = clock.window {
-                    HStack(spacing: 4) {
-                        Text(window)
-                        if !clock.isClockTimeCaution, clock.showsZone, let zone = clock.zoneLabel { Text(zone) }
-                    }
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else if let status = night.statusText {
-                    Text(status)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
+                .evidenceText(EvidenceTextStyle(size: 9.5, weight: 400, lineHeight: 12.825))
+                .foregroundStyle(rm.c.quiet)
+                .padding(.top, rm.pt(3))
                 if night.secondaryEpisodeCount > 0, let total = night.totalAsleepIncludingSecondarySeconds, let main = night.asleepSeconds {
                     Text("+ \(SleepEvidenceFormat.duration(total - main)) additional sleep")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .evidenceText(EvidenceTextStyle(size: 9.5, weight: 400, lineHeight: 12.825))
+                        .foregroundStyle(rm.c.quiet)
                 }
             }
-            Spacer(minLength: 8)
-            Text(night.hasSleep ? SleepEvidenceFormat.duration(night.asleepSeconds) : "–")
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
+            Spacer(minLength: 0)
+            Text(night.hasSleep ? SleepEvidenceFormat.duration(night.asleepSeconds) : "—")
+                .evidenceText(.normal(11, 760, jakarta: false, digits: true))
+                .foregroundStyle(rm.c.muted)
+            Text("›")
+                .evidenceText(.normal(16, 400, jakarta: false))
+                .foregroundStyle(rm.c.accent)
         }
-        .padding(12)
-        .frame(minHeight: 56)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, rm.pt(10))
+        .padding(.horizontal, rm.pt(2))
+        .padding(.bottom, rm.pt(1))
+        .frame(minHeight: 44)
+        .overlay(alignment: .bottom) { Rectangle().fill(rm.c.line).frame(height: rm.pt(1)) }
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
@@ -320,23 +300,27 @@ struct RecoverySleepNightRow: View {
 
 // MARK: - Paged night list (Show All)
 
+/// Locked R6 All Nights: flat bar with `Done` and a centered title, the
+/// paged newest-first open list, a footer indicator while the next page
+/// loads. Nights open inside the sheet with `‹ All Nights`.
 struct RecoverySleepNightsSheet: View {
     let range: RecoverySleepScopeRange
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: RecoverySleepNightsViewModel?
+    @State private var trail = EvidenceBackTrail(seed: ["All Nights"])
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 8) {
+                LazyVStack(spacing: 0) {
                     switch viewModel?.state {
                     case .none, .loading:
-                        ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 200)
+                        WeightStatePanel(title: "Loading Sleep Evidence…", loading: true, identifier: "sleep.nights.loading")
                     case .notAvailable:
-                        SleepStateMessage(text: notAvailableText)
+                        WeightStatePanel(title: notAvailableText, identifier: "sleep.nights.notAvailable")
                     case .failed(let message):
-                        SleepStateMessage(text: message)
+                        WeightStatePanel(title: message, identifier: "sleep.nights.failed")
                     case .loaded:
                         ForEach(viewModel?.items ?? []) { night in
                             NavigationLink(value: RecoverySleepDestination.night(night.sleepDay)) {
@@ -348,13 +332,21 @@ struct RecoverySleepNightsSheet: View {
                             }
                         }
                         if viewModel?.isLoadingMore == true {
-                            ProgressView().tint(PhysiqueOSTheme.accent).padding()
+                            ProgressView().tint(rm.c.accent).padding(rm.pt(14))
                         }
                     }
                 }
-                .padding(16)
+                .overlay(alignment: .top) {
+                    if case .loaded = viewModel?.state { Rectangle().fill(rm.c.line).frame(height: rm.pt(1)) }
+                }
+                .padding(.horizontal, rm.pt(16))
+                .padding(.top, rm.pt(10))
+                .padding(.bottom, rm.pt(30))
             }
-            .background(PhysiqueOSTheme.background)
+            .background(rm.c.page)
+#if DEBUG
+            .modifier(EvidenceReviewScrollOffset(y: EnergyRecoveryRedesignReview.sheetScrollY))
+#endif
             .navigationDestination(for: AppDestination.self) { destination in
                 if case .progressStream(let streamId) = destination, let sleepDay = RecoverySleepDestination.sleepDay(fromStreamId: streamId) {
                     RecoverySleepNightView(sleepDay: sleepDay)
@@ -362,8 +354,33 @@ struct RecoverySleepNightsSheet: View {
             }
             .navigationTitle("All Nights")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbarBackground(rm.c.page, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Text("Done")
+                            .evidenceText(.normal(12, 750, jakarta: false))
+                            .foregroundStyle(rm.c.muted)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("evidence.sheet.done")
+                }
+                .evidenceFlatToolbarItem()
+                ToolbarItem(placement: .principal) {
+                    Text("All Nights")
+                        .evidenceText(.normal(12, 800, jakarta: false))
+                        .foregroundStyle(rm.c.ink)
+                        .accessibilityAddTraits(.isHeader)
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) { Rectangle().fill(rm.c.line).frame(height: rm.pt(1)) }
         }
+        .environment(\.evidenceBackTrail, trail)
+        .evidenceFamily(.weight)
+        .accessibilityIdentifier("sleep.nights.sheet")
         .task {
             if viewModel == nil { viewModel = RecoverySleepNightsViewModel(api: environment.recoverySleepAPI, range: range) }
             await viewModel?.loadFirstPage()
@@ -385,13 +402,17 @@ struct RecoveryEvidenceView: View {
     private var scopeRange: RecoverySleepScopeRange? { store.range(today: environment.recoverySleepAPI.today()) }
     private var reloadKey: String { "\(environment.nativeAuthority.rawValue)|\(store.selected.rawValue)|\(retryNonce)" }
 
+    init() {
+#if DEBUG
+        _showsAllNights = State(initialValue: EnergyRecoveryRedesignReview.sheet == "sleep-nights")
+#endif
+    }
+
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage(spacing: 0, top: 10) {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .recoverySleepChrome(backLabel: "Evidence Hub")
+        .recoverySleepPage("Recovery")
         .task(id: reloadKey) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = RecoverySleepLandingViewModel(api: environment.recoverySleepAPI)
@@ -399,6 +420,9 @@ struct RecoveryEvidenceView: View {
             }
             selectedDay = nil
             await reload()
+#if DEBUG
+            selectedDay = EnergyRecoveryRedesignReview.selection
+#endif
         }
         .refreshable {
             if environment.nativeAuthority == .founderProduction {
@@ -424,98 +448,111 @@ struct RecoveryEvidenceView: View {
 
     @ViewBuilder
     private var content: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            SleepScreenHeader(eyebrow: "Evidence Report", title: "Recovery", subtitle: "Sleep from Apple Health")
-            SleepScopeSelector()
-            if scopeRange == nil || scopeRange?.isEmpty == true {
-                SleepScopeStateCard(store: store, range: scopeRange) { retryNonce += 1 }
-            } else {
-                landingContent
-            }
+        SleepReportHeader(eyebrow: "Evidence Report", title: "Recovery", subtitle: "Sleep from Apple Health")
+        SleepScopeSelector()
+        if scopeRange == nil || scopeRange?.isEmpty == true {
+            SleepScopeStateCard(store: store, range: scopeRange) { retryNonce += 1 }
+        } else {
+            landingContent
         }
     }
 
     @ViewBuilder
     private var landingContent: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            switch viewModel?.state(for: scopeRange) {
-            case .none, .loading:
-                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 300)
-            case .notAvailable:
-                CardContainer { SleepStateMessage(text: notAvailableText) }
-            case .failed(let message):
-                CardContainer { SleepStateMessage(text: message) }
-            case .loaded(let landing):
-                if landing.state == .noData || landing.lastNight == nil {
-                    CardContainer { SleepStateMessage(text: noDataText) }
-                } else {
-                    loaded(landing)
-                }
+        switch viewModel?.state(for: scopeRange) {
+        case .none, .loading:
+            WeightStatePanel(title: "Loading Sleep Evidence…", loading: true, identifier: "sleep.loading")
+        case .notAvailable:
+            WeightStatePanel(title: notAvailableText, identifier: "sleep.notAvailable")
+        case .failed(let message):
+            WeightStatePanel(title: message, detail: "Pull to refresh, or try again.", identifier: "sleep.failed",
+                             actionLabel: "Try again") { retryNonce += 1 }
+        case .loaded(let landing):
+            if landing.state == .noData || landing.lastNight == nil {
+                WeightStatePanel(title: noDataText, identifier: "sleep.noData")
+            } else {
+                loaded(landing)
             }
         }
     }
 
     @ViewBuilder
     private func loaded(_ landing: RecoverySleepLanding) -> some View {
-        if let lastNight = landing.lastNight { lastNightCard(lastNight, average: landing.sevenNightAverage, isCurrent: scopeRange?.isCurrent ?? true) }
-        sleepChartCard(landing)
-        sleepWindowCard(landing)
-        recentNightsCard(landing)
-        dataSourcesCard(landing.sources)
+        if let lastNight = landing.lastNight {
+            lastNightSection(lastNight, average: landing.sevenNightAverage, isCurrent: scopeRange?.isCurrent ?? true)
+                .padding(.bottom, rm.pt(19))
+        }
+        sleepChartSection(landing)
+            .padding(.bottom, rm.pt(19))
+        sleepWindowSection(landing)
+            .padding(.bottom, rm.pt(19))
+        recentNightsSection(landing)
+            .padding(.bottom, rm.pt(19))
+        dataSourcesSection(landing.sources)
     }
 
-    private func lastNightCard(_ night: RecoverySleepNightSummary, average: RecoverySleepAverage, isCurrent: Bool) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: isCurrent ? "Last Night" : "Final Night") {
-                    Text(SleepEvidenceFormat.sleepDay(night.sleepDay))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
+    /// Locked R1 Last Night: date action, 25 px duration row into the night,
+    /// 7-night average row, `Still updating` tag while the window is open.
+    private func lastNightSection(_ night: RecoverySleepNightSummary, average: RecoverySleepAverage, isCurrent: Bool) -> some View {
+        SleepSection(title: isCurrent ? "Last Night" : "Final Night", identifier: "sleep.lastNight.section") {
+            SleepSectionAction(text: SleepEvidenceFormat.sleepDay(night.sleepDay, style: "MMM d"))
+        } content: {
+            VStack(alignment: .leading, spacing: 0) {
                 NavigationLink(value: RecoverySleepDestination.night(night.sleepDay)) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(night.hasSleep ? SleepEvidenceFormat.duration(night.asleepSeconds) : "–")
-                                .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Text(night.hasSleep ? "asleep" : (night.statusText ?? ""))
-                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(PhysiqueOSTheme.accent)
+                    HStack(alignment: .center, spacing: rm.pt(10)) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(night.hasSleep ? SleepEvidenceFormat.duration(night.asleepSeconds) : "—")
+                                .evidenceText(EvidenceTextStyle(size: 25, weight: 780, lineHeight: 26.25, tracking: -1, monospacedDigits: true))
+                                .foregroundStyle(rm.c.ink)
+                            Text(lastNightCopy(night))
+                                .evidenceText(EvidenceTextStyle(size: 9.5, weight: 400, lineHeight: 12.825))
+                                .foregroundStyle(rm.c.quiet)
+                                .padding(.top, rm.pt(3))
                         }
-                        if let window = night.clock.window {
-                            Text(window + (night.clock.showsZone && !night.clock.isClockTimeCaution ? " · \(night.clock.zoneLabel ?? "")" : ""))
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        }
-                        Divider().overlay(PhysiqueOSTheme.divider)
-                        HStack {
-                            Text("7-night average")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                            Text(average.asleepSeconds.map { SleepEvidenceFormat.duration($0) } ?? "–")
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Spacer()
-                            Text("\(average.nightCount) recorded \(average.nightCount == 1 ? "night" : "nights")")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
-                        }
-                        if night.windowOpen {
-                            SleepStatusTag(text: "Still updating from Apple Health", systemImage: "clock.arrow.circlepath")
-                        }
+                        Spacer(minLength: 0)
+                        Text("›")
+                            .evidenceText(.normal(16, 400, jakarta: false))
+                            .foregroundStyle(rm.c.accent)
                     }
-                    .padding(12)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.vertical, rm.pt(10))
+                    .padding(.horizontal, rm.pt(2))
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("sleep.lastNight")
+                Rectangle().fill(rm.c.line).frame(height: rm.pt(1))
+                HStack(alignment: .center) {
+                    Text("7-night average")
+                        .evidenceText(EvidenceTextStyle(size: 9.5, weight: 400, lineHeight: 12.825))
+                        .foregroundStyle(rm.c.quiet)
+                    Spacer(minLength: 0)
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text(average.asleepSeconds.map { SleepEvidenceFormat.duration($0) } ?? "—")
+                            .evidenceText(.normal(10, 800, jakarta: false, digits: true))
+                            .foregroundStyle(rm.c.ink)
+                        Text("\(average.nightCount) recorded \(average.nightCount == 1 ? "night" : "nights")")
+                            .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 13.5))
+                            .foregroundStyle(rm.c.muted)
+                    }
+                }
+                .padding(.vertical, rm.pt(10))
+                .padding(.horizontal, rm.pt(2))
+                .accessibilityElement(children: .combine)
+                if night.windowOpen {
+                    Rectangle().fill(rm.c.line).frame(height: rm.pt(1))
+                    EnergyTag(text: "Still updating from Apple Health", warn: true)
+                        .padding(.top, rm.pt(10))
+                }
             }
         }
+    }
+
+    private func lastNightCopy(_ night: RecoverySleepNightSummary) -> String {
+        guard night.hasSleep else { return night.statusText ?? "" }
+        var parts = ["asleep"]
+        if let window = night.clock.window { parts.append(window) }
+        if night.clock.showsZone, !night.clock.isClockTimeCaution, let zone = night.clock.zoneLabel { parts.append(zone) }
+        return parts.joined(separator: " · ")
     }
 
     /// The landing's 14-night snapshot always uses the 2W label density.
@@ -523,154 +560,152 @@ struct RecoveryEvidenceView: View {
         SleepAxisPolicy.plan(selector: .twoWeeks, pointDates: landing.nights.compactMap { SleepEvidenceFormat.chartDate($0.sleepDay) })
     }
 
-    private func sleepChartCard(_ landing: RecoverySleepLanding) -> some View {
+    private func sleepChartSection(_ landing: RecoverySleepLanding) -> some View {
         let points = SleepTotalChartPoint.fromLanding(landing)
         let selected = selectedDay.flatMap { day in landing.nights.first { $0.sleepDay == day } }
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Sleep") {
-                    NavigationLink(value: RecoverySleepDestination.trends) {
-                        TrainingCompactActionLabel(label: "See trends").frame(minHeight: 44)
+        return SleepSection(title: "Sleep", identifier: "sleep.chart.section") {
+            NavigationLink(value: RecoverySleepDestination.trends) {
+                SleepSectionAction(text: "See trends ›")
+                    .evidenceHitTarget(visualHeight: rm.pt(12))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sleep.trends")
+        } content: {
+            HStack(spacing: rm.pt(11)) {
+                SleepLegendItem(color: SleepPalette.total, label: "Nightly total")
+                SleepLegendItem(color: rm.c.ink.opacity(0.72), label: "7-night average", dashed: true)
+                Text("\(landing.nights.count) nights")
+                    .evidenceText(.normal(9, 700, jakarta: false))
+                    .foregroundStyle(rm.c.quiet)
+                Spacer(minLength: 0)
+            }
+            .padding(.bottom, rm.pt(8))
+            .accessibilityHidden(true)
+            SleepTotalChart(points: points, plan: axisPlan(landing), selectedId: $selectedDay, height: rm.pt(150))
+            if let selected {
+                NavigationLink(value: RecoverySleepDestination.night(selected.sleepDay)) {
+                    HStack(alignment: .firstTextBaseline, spacing: rm.pt(10)) {
+                        Text("\(SleepEvidenceFormat.sleepDay(selected.sleepDay)) · \(SleepEvidenceFormat.duration(selected.asleepSeconds)) asleep")
+                            .evidenceText(.normal(12, 790, jakarta: false))
+                            .foregroundStyle(rm.c.ink)
+                        Spacer(minLength: 0)
+                        SleepSectionAction(text: "Open night ›")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("sleep.trends")
+                    .padding(.vertical, rm.pt(10))
+                    .padding(.horizontal, rm.pt(2))
+                    .frame(minHeight: 44)
+                    .overlay(alignment: .top) { Rectangle().fill(rm.c.line).frame(height: rm.pt(1)) }
+                    .contentShape(Rectangle())
                 }
-                HStack(spacing: 10) {
-                    legendSwatch(PhysiqueOSTheme.sleepTotal, "Nightly total")
-                    legendDash("7-night average")
-                    Spacer()
-                    Text("\(landing.nights.count) nights")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                .buttonStyle(.plain)
+                .padding(.top, rm.pt(10))
+                .accessibilityIdentifier("sleep.chart.openNight")
+            } else {
+                HStack(alignment: .top, spacing: rm.pt(7)) {
+                    WeightStatTile(label: "Last 7 nights",
+                                   value: landing.sevenNightAverage.asleepSeconds.map { SleepEvidenceFormat.duration($0) } ?? "—",
+                                   detail: "average")
+                    WeightStatTile(label: "Prior 7 nights",
+                                   value: landing.priorSevenNightAverage.asleepSeconds.map { SleepEvidenceFormat.duration($0) } ?? "—",
+                                   detail: "average")
                 }
-                SleepTotalChart(points: points, plan: axisPlan(landing), selectedId: $selectedDay)
-                if let selected {
-                    NavigationLink(value: RecoverySleepDestination.night(selected.sleepDay)) {
-                        HStack {
-                            Text("\(SleepEvidenceFormat.sleepDay(selected.sleepDay)) · \(SleepEvidenceFormat.duration(selected.asleepSeconds)) asleep")
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                            Spacer()
-                            TrainingCompactActionLabel(label: "Open night")
-                        }
-                        .padding(10)
-                        .frame(minHeight: 44)
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    HStack(spacing: 8) {
-                        SleepStatTile(label: "Last 7 nights",
-                                      value: landing.sevenNightAverage.asleepSeconds.map { SleepEvidenceFormat.duration($0) } ?? "–",
-                                      detail: "average")
-                        SleepStatTile(label: "Prior 7 nights",
-                                      value: landing.priorSevenNightAverage.asleepSeconds.map { SleepEvidenceFormat.duration($0) } ?? "–",
-                                      detail: "average")
-                    }
-                }
+                .padding(.top, rm.pt(10))
             }
         }
     }
 
-    private func sleepWindowCard(_ landing: RecoverySleepLanding) -> some View {
+    private func sleepWindowSection(_ landing: RecoverySleepLanding) -> some View {
         let window = landing.sleepWindow
         let rows = SleepWindowChartRow.fromNights(landing.nights)
         let plausible = window.isPlausible(against: rows)
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Sleep Window") {
-                    Text("\(rows.count) nights")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
-                if rows.isEmpty {
-                    Text("Sleep windows will appear after your first synced nights.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    SleepWindowChart(rows: rows, summary: plausible ? window : nil, plan: axisPlan(landing))
-                    windowStats(window, plausible: plausible)
-                }
+        return SleepSection(title: "Sleep Window", identifier: "sleep.window.section") {
+            SleepSectionAction(text: "\(rows.count) nights")
+        } content: {
+            if rows.isEmpty {
+                WeightEmptyLine(text: "Sleep windows will appear after your first synced nights.")
+            } else {
+                SleepWindowChart(rows: rows, summary: plausible ? window : nil, plan: axisPlan(landing))
+                windowStats(window, plausible: plausible)
+                    .padding(.top, rm.pt(8))
             }
         }
     }
 
     @ViewBuilder
     private func windowStats(_ window: RecoverySleepWindowSummary, plausible: Bool) -> some View {
-        if plausible, let start = window.typicalStartMinutes, let end = window.typicalEndMinutes {
-            SleepStatTile(label: "Typical window", value: "\(SleepEvidenceFormat.clockFromMinutes(start)) – \(SleepEvidenceFormat.clockFromMinutes(end))",
-                          detail: "from \(window.nightsIncluded) \(window.nightsIncluded == 1 ? "night" : "nights")")
-            HStack(spacing: 8) {
-                SleepStatTile(label: "Fell asleep", value: window.startSpreadMinutes.map { "within ±\($0)m" } ?? "–")
-                SleepStatTile(label: "Woke up", value: window.endSpreadMinutes.map { "within ±\($0)m" } ?? "–")
+        VStack(alignment: .leading, spacing: rm.pt(7)) {
+            if plausible, let start = window.typicalStartMinutes, let end = window.typicalEndMinutes {
+                WeightStatTile(label: "Typical window", value: "\(SleepEvidenceFormat.clockFromMinutes(start)) – \(SleepEvidenceFormat.clockFromMinutes(end))",
+                               detail: "from \(window.nightsIncluded) \(window.nightsIncluded == 1 ? "night" : "nights")")
+                HStack(alignment: .top, spacing: rm.pt(7)) {
+                    WeightStatTile(label: "Fell asleep", value: window.startSpreadMinutes.map { "within ±\($0)m" } ?? "—")
+                    WeightStatTile(label: "Woke up", value: window.endSpreadMinutes.map { "within ±\($0)m" } ?? "—")
+                }
+            } else {
+                SleepFootnote(text: "A typical window appears once enough nights have reliable clock times.")
             }
-        } else {
-            Text("A typical window appears once enough nights have reliable clock times.")
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-        }
-        if window.nightsExcludedUncertainTime > 0 {
-            Text(SleepEvidenceCopy.approximateClockTimes)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-        }
-    }
-
-    private func recentNightsCard(_ landing: RecoverySleepLanding) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Recent Nights") {
-                    Button { showsAllNights = true } label: { TrainingCompactActionLabel(label: "Show All").frame(minHeight: 44) }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("sleep.showAll")
-                }
-                VStack(spacing: 8) {
-                    ForEach(landing.nights.prefix(3)) { night in
-                        NavigationLink(value: RecoverySleepDestination.night(night.sleepDay)) { RecoverySleepNightRow(night: night) }
-                            .buttonStyle(.plain)
-                    }
-                }
+            if window.nightsExcludedUncertainTime > 0 {
+                SleepFootnote(text: SleepEvidenceCopy.approximateClockTimes)
             }
         }
     }
 
-    private func dataSourcesCard(_ sources: [RecoverySleepSource]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Data Sources")
-                VStack(spacing: 8) {
-                    ForEach(sources) { source in sourceRow(source) }
-                }
-                Text("One source is counted per night, so nothing is double counted.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+    private func recentNightsSection(_ landing: RecoverySleepLanding) -> some View {
+        SleepOpenSection(title: "Recent Nights", identifier: "sleep.recent") {
+            Button { showsAllNights = true } label: {
+                SleepSectionAction(text: "Show All ›")
+                    .evidenceHitTarget(visualHeight: rm.pt(12))
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sleep.showAll")
+        } content: {
+            ForEach(landing.nights.prefix(3)) { night in
+                NavigationLink(value: RecoverySleepDestination.night(night.sleepDay)) { RecoverySleepNightRow(night: night) }
+                    .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func dataSourcesSection(_ sources: [RecoverySleepSource]) -> some View {
+        SleepSection(title: "Data Sources", identifier: "sleep.sources") {
+            VStack(spacing: 0) {
+                ForEach(Array(sources.enumerated()), id: \.element.id) { index, source in
+                    sourceRow(source)
+                        .overlay(alignment: .bottom) {
+                            if index < sources.count - 1 { Rectangle().fill(rm.c.line).frame(height: rm.pt(1)) }
+                        }
+                }
+            }
+            SleepFootnote(text: "One source is counted per night, so nothing is double counted.")
         }
     }
 
     private func sourceRow(_ source: RecoverySleepSource) -> some View {
         let counted = source.role == .counted
-        return HStack {
-            VStack(alignment: .leading, spacing: 2) {
+        return HStack(alignment: .center, spacing: rm.pt(10)) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(source.label)
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .evidenceText(.normal(12, 790, jakarta: false))
+                    .foregroundStyle(rm.c.ink)
                 Text(counted ? "Counted on recent nights" : "Recorded in the last 30 days")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .evidenceText(EvidenceTextStyle(size: 9.5, weight: 400, lineHeight: 12.825))
+                    .foregroundStyle(rm.c.quiet)
+                    .padding(.top, rm.pt(3))
             }
-            Spacer()
-            Text(counted ? "Counted" : "Recorded")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(counted ? PhysiqueOSTheme.sleepTotal : PhysiqueOSTheme.textMuted)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(counted ? PhysiqueOSTheme.sleepTotal.opacity(0.14) : PhysiqueOSTheme.surfaceElevated)
-                .clipShape(Capsule())
+            Spacer(minLength: 0)
+            if counted {
+                EnergyTag(text: "Counted")
+            } else {
+                Text("Recorded")
+                    .evidenceText(.normal(8, 850, jakarta: false, tracking: 0.24))
+                    .foregroundStyle(rm.c.quiet)
+                    .padding(.horizontal, rm.pt(6))
+                    .padding(.vertical, rm.pt(3))
+                    .background(rm.c.surface2, in: Capsule())
+            }
         }
-        .padding(10)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, rm.pt(10))
+        .padding(.horizontal, rm.pt(2))
         .accessibilityElement(children: .combine)
     }
 }
@@ -692,31 +727,34 @@ struct RecoverySleepTrendsView: View {
 
     private let ranges: [RecoverySleepTrendRange] = [.twoWeeks, .oneMonth, .threeMonths, .sixMonths, .all]
 
+    init() {
+#if DEBUG
+        _showsStageMix = State(initialValue: EnergyRecoveryRedesignReview.expands("stage-mix"))
+#endif
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                SleepScreenHeader(eyebrow: "Recovery", title: "Sleep Trends", subtitle: "Inspect nights over time")
-                SleepScopeSelector()
-                if scopeRange == nil || scopeRange?.isEmpty == true {
-                    SleepScopeStateCard(store: store, range: scopeRange) { retryNonce += 1 }
-                } else {
-                    rangeSelector
-                    switch viewModel?.state(for: scopeRange) {
-                    case .none, .loading:
-                        ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 300)
-                    case .notAvailable:
-                        CardContainer { SleepStateMessage(text: notAvailableText) }
-                    case .failed(let message):
-                        CardContainer { SleepStateMessage(text: message) }
-                    case .loaded(let trends):
-                        loaded(trends)
-                    }
+        EvidenceScrollPage(spacing: 0, top: 10) {
+            SleepReportHeader(eyebrow: "Recovery", title: "Sleep Trends", subtitle: "Inspect nights over time")
+            SleepScopeSelector()
+            if scopeRange == nil || scopeRange?.isEmpty == true {
+                SleepScopeStateCard(store: store, range: scopeRange) { retryNonce += 1 }
+            } else {
+                rangeSelector
+                    .padding(.bottom, rm.pt(19))
+                switch viewModel?.state(for: scopeRange) {
+                case .none, .loading:
+                    WeightStatePanel(title: "Loading Sleep Evidence…", loading: true, identifier: "sleep.trends.loading")
+                case .notAvailable:
+                    WeightStatePanel(title: notAvailableText, identifier: "sleep.trends.notAvailable")
+                case .failed(let message):
+                    WeightStatePanel(title: message, identifier: "sleep.trends.failed", actionLabel: "Try again") { retryNonce += 1 }
+                case .loaded(let trends):
+                    loaded(trends)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
         }
-        .recoverySleepChrome(backLabel: "Recovery")
+        .recoverySleepPage("Sleep Trends")
         .task(id: reloadKey) {
             if viewModelAuthority != environment.nativeAuthority || viewModel == nil {
                 viewModel = RecoverySleepTrendsViewModel(api: environment.recoverySleepAPI)
@@ -727,6 +765,10 @@ struct RecoverySleepTrendsView: View {
             if store.selected.isGoal { await store.loadWindows(api: api, authority: environment.nativeAuthority.rawValue) }
             guard let range = store.range(today: api.today()), !range.isEmpty else { return }
             await viewModel?.load(range: range)
+#if DEBUG
+            if let review = EnergyRecoveryRedesignReview.argumentRange { await viewModel?.select(review, range: range) }
+            selectedId = EnergyRecoveryRedesignReview.selection
+#endif
         }
         .sheet(isPresented: $showsAllNights) {
             if let range = scopeRange { RecoverySleepNightsSheet(range: range) }
@@ -734,8 +776,10 @@ struct RecoverySleepTrendsView: View {
         .accessibilityIdentifier("sleep.trends.screen")
     }
 
+    /// Locked `.range` pills (2W / 1M / 3M / 6M / All), one selector for
+    /// every chart on the page and All Nights.
     private var rangeSelector: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: rm.pt(5)) {
             ForEach(ranges) { option in
                 let isSelected = viewModel?.selector == option
                 Button {
@@ -744,20 +788,23 @@ struct RecoverySleepTrendsView: View {
                     Task { await viewModel?.select(option, range: range) }
                 } label: {
                     Text(option.label)
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(isSelected ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textMuted)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(isSelected ? PhysiqueOSTheme.surfaceElevated : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .evidenceText(.normal(9, 760, jakarta: false))
+                        .foregroundStyle(isSelected ? rm.c.accent : rm.c.quiet)
+                        .padding(.horizontal, rm.pt(9))
+                        .padding(.vertical, rm.pt(7))
+                        .background(isSelected ? rm.c.surface2 : rm.c.surface, in: RoundedRectangle(cornerRadius: rm.pt(9)))
+                        .overlay {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: rm.pt(9)).strokeBorder(rm.c.accent.opacity(0.35), lineWidth: rm.pt(1))
+                            }
+                        }
+                        .evidenceHitTarget(visualHeight: rm.pt(25))
                 }
                 .buttonStyle(.plain)
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
                 .accessibilityIdentifier("sleep.range.\(option.rawValue)")
             }
         }
-        .padding(4)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Sleep trends date range")
     }
@@ -765,18 +812,26 @@ struct RecoverySleepTrendsView: View {
     @ViewBuilder
     private func loaded(_ trends: RecoverySleepTrends) -> some View {
         let plan = axisPlan(trends)
-        totalCard(trends, plan: plan)
+        totalSection(trends, plan: plan)
+            .padding(.bottom, rm.pt(19))
         if trends.granularity == .week {
-            CardContainer {
-                SleepNoteRow(systemImage: "calendar", title: "Weekly view",
-                             detail: "Longer ranges show weekly averages. Sleep window, continuity and stage mix are shown for ranges up to 3 months.")
-            }
+            weeklyNote
+                .padding(.bottom, rm.pt(19))
         } else {
-            if let rows = trends.windowRows, !rows.isEmpty { windowCard(rows, summary: nil, plan: plan) }
-            if let continuity = trends.continuity { continuityCard(continuity, plan: plan) }
-            if let stageMix = trends.stageMix { stageMixCard(stageMix, plan: plan) }
+            if let rows = trends.windowRows, !rows.isEmpty {
+                windowSection(rows, summary: nil, plan: plan)
+                    .padding(.bottom, rm.pt(19))
+            }
+            if let continuity = trends.continuity {
+                continuitySection(continuity, plan: plan)
+                    .padding(.bottom, rm.pt(19))
+            }
+            if let stageMix = trends.stageMix {
+                stageMixSection(stageMix, plan: plan)
+                    .padding(.bottom, rm.pt(19))
+            }
         }
-        allNightsCard
+        allNightsSection
     }
 
     /// One plan for every chart on the screen: the selected range's label
@@ -789,83 +844,91 @@ struct RecoverySleepTrendsView: View {
         )
     }
 
-    private func totalCard(_ trends: RecoverySleepTrends, plan: SleepAxisPolicy.Plan) -> some View {
+    private func totalSection(_ trends: RecoverySleepTrends, plan: SleepAxisPolicy.Plan) -> some View {
         let points = SleepTotalChartPoint.fromTrends(trends)
         let isWeekly = trends.granularity == .week
         let selected = selectedId.flatMap { id in trends.totalSleep.first { $0.periodStart == id } }
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Total Sleep") {
-                    Text("avg \(SleepEvidenceFormat.duration(trends.averageAsleepSeconds))")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-                HStack(spacing: 10) {
-                    legendSwatch(PhysiqueOSTheme.sleepTotal, isWeekly ? "Weekly average" : "Nightly total")
-                    if !isWeekly { legendDash("7-night average") }
-                    Spacer()
-                    Text("\(trends.nightsWithData) nights")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
-                SleepTotalChart(points: points, isWeekly: isWeekly, plan: plan, selectedId: $selectedId, height: 190)
-                if trends.isTruncated {
-                    Text("Showing the latest \(trends.totalSleep.count) nights. Choose 6M for weekly averages of a longer span.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
-                if let selected {
-                    HStack(spacing: 8) {
-                        SleepStatTile(label: isWeekly ? "Week of \(SleepEvidenceFormat.sleepDay(selected.periodStart, style: "MMM d"))" : SleepEvidenceFormat.sleepDay(selected.periodStart),
-                                      value: SleepEvidenceFormat.duration(selected.asleepSeconds),
-                                      detail: isWeekly ? "average of \(selected.nightCount) nights" : "asleep")
-                        if !isWeekly {
-                            SleepStatTile(label: "7-night average", value: SleepEvidenceFormat.duration(selected.trailingAverageSeconds), detail: "through this night")
-                        }
+        return SleepSection(title: "Total Sleep", identifier: "sleep.trends.total") {
+            SleepSectionAction(text: "avg \(SleepEvidenceFormat.duration(trends.averageAsleepSeconds))")
+        } content: {
+            HStack(spacing: rm.pt(11)) {
+                SleepLegendItem(color: SleepPalette.total, label: isWeekly ? "Weekly average" : "Nightly total")
+                if !isWeekly { SleepLegendItem(color: rm.c.ink.opacity(0.72), label: "7-night average", dashed: true) }
+                Text("\(trends.nightsWithData) nights")
+                    .evidenceText(.normal(9, 700, jakarta: false))
+                    .foregroundStyle(rm.c.quiet)
+                Spacer(minLength: 0)
+            }
+            .padding(.bottom, rm.pt(8))
+            .accessibilityHidden(true)
+            SleepTotalChart(points: points, isWeekly: isWeekly, style: isWeekly ? .bars : .area, plan: plan, selectedId: $selectedId, height: rm.pt(isWeekly ? 150 : 170))
+            if trends.isTruncated {
+                SleepFootnote(text: "Showing the latest \(trends.totalSleep.count) nights. Choose 6M for weekly averages of a longer span.")
+            }
+            if let selected {
+                HStack(alignment: .top, spacing: rm.pt(7)) {
+                    WeightStatTile(label: isWeekly ? "Week of \(SleepEvidenceFormat.sleepDay(selected.periodStart, style: "MMM d"))" : SleepEvidenceFormat.sleepDay(selected.periodStart),
+                                   value: SleepEvidenceFormat.duration(selected.asleepSeconds),
+                                   detail: isWeekly ? "average of \(selected.nightCount) nights" : "asleep")
+                    if !isWeekly {
+                        WeightStatTile(label: "7-night average", value: SleepEvidenceFormat.duration(selected.trailingAverageSeconds), detail: "through this night")
                     }
                 }
+                .padding(.top, rm.pt(10))
+                .accessibilityIdentifier("sleep.trends.selected")
             }
         }
     }
 
-    private func windowCard(_ rows: [RecoverySleepTrends.WindowRow], summary: RecoverySleepWindowSummary?, plan: SleepAxisPolicy.Plan) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Sleep Window") {
-                    if let start = summary?.typicalStartMinutes, let end = summary?.typicalEndMinutes {
-                        Text("\(SleepEvidenceFormat.clockFromMinutes(start)) – \(SleepEvidenceFormat.clockFromMinutes(end))")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                }
-                SleepWindowChart(rows: SleepWindowChartRow.fromTrends(rows), summary: summary, plan: plan, rowHeight: rows.count > 14 ? 11 : 13)
-                if let summary, let startSpread = summary.startSpreadMinutes, let endSpread = summary.endSpreadMinutes {
-                    Text("Fell asleep within ±\(startSpread)m · woke within ±\(endSpread)m of the typical window, from \(summary.nightsIncluded) nights.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
-                let excluded = summary?.nightsExcludedUncertainTime ?? rows.filter { !$0.includedInConsistency }.count
-                if excluded > 0 {
-                    Text(SleepEvidenceCopy.approximateClockTimes)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
+    /// Locked R3 `.timeline-note`: why the detailed charts are withheld.
+    private var weeklyNote: some View {
+        HStack(alignment: .top, spacing: rm.pt(8)) {
+            Text("▦")
+                .evidenceText(.normal(10, 400, jakarta: false))
+                .foregroundStyle(rm.c.quiet)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: rm.pt(2)) {
+                Text("Weekly view")
+                    .evidenceText(.normal(10, 800, jakarta: false))
+                    .foregroundStyle(rm.c.ink)
+                Text("Longer ranges show weekly averages. Sleep window, continuity and stage mix are shown for ranges up to 3 months.")
+                    .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+                    .foregroundStyle(rm.c.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(rm.pt(13 + 1))
+        .background(rm.c.surface, in: RoundedRectangle(cornerRadius: rm.pt(15)))
+        .overlay(RoundedRectangle(cornerRadius: rm.pt(15)).strokeBorder(rm.c.line, lineWidth: rm.pt(1)))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("sleep.trends.weeklyNote")
+    }
+
+    private func windowSection(_ rows: [RecoverySleepTrends.WindowRow], summary: RecoverySleepWindowSummary?, plan: SleepAxisPolicy.Plan) -> some View {
+        SleepSection(title: "Sleep Window", identifier: "sleep.trends.window") {
+            if let start = summary?.typicalStartMinutes, let end = summary?.typicalEndMinutes {
+                SleepSectionAction(text: "\(SleepEvidenceFormat.clockFromMinutes(start)) – \(SleepEvidenceFormat.clockFromMinutes(end))")
+            }
+        } content: {
+            SleepWindowChart(rows: SleepWindowChartRow.fromTrends(rows), summary: summary, plan: plan, rowHeight: rows.count > 14 ? 11 : 13)
+            if let summary, let startSpread = summary.startSpreadMinutes, let endSpread = summary.endSpreadMinutes {
+                SleepFootnote(text: "Fell asleep within ±\(startSpread)m · woke within ±\(endSpread)m of the typical window, from \(summary.nightsIncluded) nights.")
+            }
+            let excluded = summary?.nightsExcludedUncertainTime ?? rows.filter { !$0.includedInConsistency }.count
+            if excluded > 0 {
+                SleepFootnote(text: SleepEvidenceCopy.approximateClockTimes)
             }
         }
     }
 
-    private func continuityCard(_ rows: [RecoverySleepTrends.ContinuityRow], plan: SleepAxisPolicy.Plan) -> some View {
+    private func continuitySection(_ rows: [RecoverySleepTrends.ContinuityRow], plan: SleepAxisPolicy.Plan) -> some View {
         let pending = rows.filter { $0.status == .pendingCorrection }.count
         let absent = rows.filter { $0.status == .absent }.count
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Continuity")
-                SleepContinuityChart(rows: rows, plan: plan)
-                if pending + absent > 0 {
-                    Text(continuityGapText(pending: pending, absent: absent))
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                }
+        return SleepSection(title: "Continuity", identifier: "sleep.trends.continuity") {
+            SleepContinuityChart(rows: rows, plan: plan)
+            if pending + absent > 0 {
+                SleepFootnote(text: continuityGapText(pending: pending, absent: absent))
             }
         }
     }
@@ -877,47 +940,34 @@ struct RecoverySleepTrendsView: View {
         return parts.joined(separator: " and ") + "; shown as gaps."
     }
 
-    private func stageMixCard(_ rows: [RecoverySleepTrends.StageMixRow], plan: SleepAxisPolicy.Plan) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                Button { withAnimation(.easeInOut(duration: 0.2)) { showsStageMix.toggle() } } label: {
-                    HStack {
-                        Text("Stage Mix")
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Spacer()
-                        Text(showsStageMix ? "Hide" : "Show stage mix")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                        Image(systemName: showsStageMix ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                    }
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("sleep.stageMix.toggle")
-                .accessibilityValue(showsStageMix ? "Expanded" : "Collapsed")
-                if showsStageMix { SleepStageMixChart(rows: rows, plan: plan) }
-                Text("Stage estimates come from your sleep source and vary between devices.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+    private func stageMixSection(_ rows: [RecoverySleepTrends.StageMixRow], plan: SleepAxisPolicy.Plan) -> some View {
+        SleepSection(title: "Stage Mix", identifier: "sleep.trends.stageMix") {
+            Button { withAnimation(.easeInOut(duration: 0.2)) { showsStageMix.toggle() } } label: {
+                SleepSectionAction(text: showsStageMix ? "Hide" : "Show stage mix")
+                    .evidenceHitTarget(visualHeight: rm.pt(12))
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sleep.stageMix.toggle")
+            .accessibilityValue(showsStageMix ? "Expanded" : "Collapsed")
+        } content: {
+            if showsStageMix {
+                SleepStageMixChart(rows: rows, plan: plan)
+                    .padding(.bottom, rm.pt(4))
+            }
+            SleepFootnote(text: "Stage estimates come from your sleep source and vary between devices.")
         }
     }
 
-    private var allNightsCard: some View {
-        CardContainer {
-            HStack {
-                Text("All Nights")
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Spacer()
-                Button { showsAllNights = true } label: { TrainingCompactActionLabel(label: "Show All").frame(minHeight: 44) }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("sleep.trends.showAll")
+    private var allNightsSection: some View {
+        SleepSection(title: "All Nights", identifier: "sleep.trends.allNights") {
+            Button { showsAllNights = true } label: {
+                SleepSectionAction(text: "Show All ›")
+                    .evidenceHitTarget(visualHeight: rm.pt(12))
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sleep.trends.showAll")
+        } content: {
+            EmptyView()
         }
     }
 }
@@ -930,26 +980,31 @@ struct RecoverySleepNightView: View {
     @State private var viewModel: RecoverySleepNightViewModel?
     @State private var showsSourceDetails = false
 
+    init(sleepDay: String) {
+        self.sleepDay = sleepDay
+#if DEBUG
+        _showsSourceDetails = State(initialValue: EnergyRecoveryRedesignReview.expands("source"))
+#endif
+    }
+
     var body: some View {
-        ScrollView {
-            Group {
-                switch viewModel?.state {
-                case .none, .loading:
-                    ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 300)
-                case .notFound:
-                    SleepStateMessage(text: "No sleep was recorded for this night.")
-                case .notAvailable:
-                    SleepStateMessage(text: notAvailableText)
-                case .failed(let message):
-                    SleepStateMessage(text: message)
-                case .loaded(let detail):
-                    loaded(detail)
+        EvidenceScrollPage(spacing: 0, top: 10) {
+            switch viewModel?.state {
+            case .none, .loading:
+                WeightStatePanel(title: "Loading this night…", loading: true, identifier: "sleep.night.loading")
+            case .notFound:
+                WeightStatePanel(title: "No sleep was recorded for this night.", identifier: "sleep.night.notFound")
+            case .notAvailable:
+                WeightStatePanel(title: notAvailableText, identifier: "sleep.night.notAvailable")
+            case .failed(let message):
+                WeightStatePanel(title: message, identifier: "sleep.night.failed", actionLabel: "Try again") {
+                    Task { await viewModel?.load() }
                 }
+            case .loaded(let detail):
+                loaded(detail)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
         }
-        .recoverySleepChrome(backLabel: "Recovery")
+        .recoverySleepPage("Night of \(SleepEvidenceFormat.sleepDay(sleepDay, style: "MMM d"))")
         .task(id: sleepDay) {
             if viewModel?.sleepDay != sleepDay { viewModel = RecoverySleepNightViewModel(sleepDay: sleepDay, api: environment.recoverySleepAPI) }
             await viewModel?.load()
@@ -961,232 +1016,215 @@ struct RecoverySleepNightView: View {
     @ViewBuilder
     private func loaded(_ detail: RecoverySleepNightDetail) -> some View {
         let night = detail.night
-        VStack(alignment: .leading, spacing: 24) {
-            header(night)
-            if let main = detail.main {
-                timelineCard(main, night: night)
-                stagesCard(main.stages)
-                continuityCard(main.continuity)
-                if main.inBedSeconds != nil { timeInBedCard(main, night: night) }
-            } else {
-                CardContainer { SleepStateMessage(text: night.statusText ?? "No sleep was recorded for this night.") }
+        header(night)
+            .padding(.bottom, rm.pt(17))
+        if let main = detail.main {
+            timelineSection(main, night: night)
+                .padding(.bottom, rm.pt(19))
+            stagesSection(main.stages)
+                .padding(.bottom, rm.pt(19))
+            continuitySection(main.continuity)
+                .padding(.bottom, rm.pt(19))
+            if main.inBedSeconds != nil {
+                timeInBedSection(main, night: night)
+                    .padding(.bottom, rm.pt(19))
             }
-            if !detail.secondary.isEmpty { additionalSleepCard(detail, night: night) }
-            sourceCard(detail)
+        } else {
+            WeightStatePanel(title: night.statusText ?? "No sleep was recorded for this night.", identifier: "sleep.night.absent")
+                .padding(.bottom, rm.pt(19))
         }
+        if !detail.secondary.isEmpty {
+            additionalSleepSection(detail, night: night)
+                .padding(.bottom, rm.pt(19))
+        }
+        sourceSection(detail)
     }
 
+    /// Locked R4/R5 head: `Night of …` eyebrow, 30 px duration + `asleep`,
+    /// window line, open-window tag, approximate-time footnote.
     private func header(_ night: RecoverySleepNightSummary) -> some View {
         let clock = night.clock
-        return VStack(alignment: .leading, spacing: 6) {
-            Text("Night of \(SleepEvidenceFormat.sleepDay(night.sleepDay))")
-                .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                .foregroundStyle(PhysiqueOSTheme.accent)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(night.hasSleep ? SleepEvidenceFormat.duration(night.asleepSeconds) : "–")
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        return VStack(alignment: .leading, spacing: 0) {
+            Text("Night of \(SleepEvidenceFormat.sleepDay(night.sleepDay, style: "MMM d"))")
+                .evidenceText(.normal(11, 800, jakarta: false, tracking: 1.43, uppercase: true))
+                .foregroundStyle(rm.c.accent)
+            HStack(alignment: .firstTextBaseline, spacing: rm.pt(6)) {
+                Text(night.hasSleep ? SleepEvidenceFormat.duration(night.asleepSeconds) : "—")
+                    .evidenceText(EvidenceTextStyle(size: 30, weight: 780, lineHeight: 31.5, tracking: -1.2, monospacedDigits: true))
+                    .foregroundStyle(rm.c.ink)
                     .accessibilityAddTraits(.isHeader)
-                Text("asleep")
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                Text(night.hasSleep ? "asleep" : (night.statusText ?? ""))
+                    .evidenceText(EvidenceTextStyle(size: 13, weight: 400, lineHeight: 17.55))
+                    .foregroundStyle(rm.c.muted)
             }
             if let window = clock.window {
                 Text(window + (!clock.isClockTimeCaution ? (clock.zoneLabel.map { " · \($0)" } ?? "") : ""))
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .evidenceText(EvidenceTextStyle(size: 13, weight: 400, lineHeight: 17.55))
+                    .foregroundStyle(rm.c.muted)
+                    .padding(.top, rm.pt(4))
             }
             if night.windowOpen, let closes = SleepEvidenceFormat.instant(night.windowClosesAt) {
-                SleepStatusTag(text: "Still updating until \(SleepEvidenceFormat.clock(closes, in: clock.zone))", systemImage: "clock.arrow.circlepath")
+                EnergyTag(text: "Still updating until \(SleepEvidenceFormat.clock(closes, in: clock.zone))", warn: true)
+                    .padding(.top, rm.pt(7))
             }
             if clock.isClockTimeCaution {
-                Text(SleepEvidenceCopy.approximateClockTimes)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                SleepFootnote(text: SleepEvidenceCopy.approximateClockTimes)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, rm.pt(3))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("sleep.night.header")
     }
 
-    private func timelineCard(_ main: RecoverySleepNightDetail.Main, night: RecoverySleepNightSummary) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Timeline")
-                switch main.timeline.status {
-                case .available, .absent:
-                    SleepHypnogramView(segments: main.timeline.segments, zone: night.clock.zone,
-                                       inBedStart: SleepEvidenceFormat.instant(main.inBedStart), inBedEnd: SleepEvidenceFormat.instant(main.inBedEnd),
-                                       approximate: night.clock.isClockTimeCaution)
-                    if main.timeline.status == .absent {
-                        Text("This source recorded sleep without stages for this night.")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    }
-                case .pendingCorrection, .unknown:
-                    SleepHypnogramView(segments: [.init(stage: .unspecified, start: main.start, end: main.end)], zone: night.clock.zone,
-                                       inBedStart: SleepEvidenceFormat.instant(main.inBedStart), inBedEnd: SleepEvidenceFormat.instant(main.inBedEnd),
-                                       approximate: night.clock.isClockTimeCaution)
-                    SleepRecalculatingNote(detail: "The stage timeline will appear once this night is recalculated.")
+    private func timelineSection(_ main: RecoverySleepNightDetail.Main, night: RecoverySleepNightSummary) -> some View {
+        SleepSection(title: "Timeline", identifier: "sleep.night.timeline") {
+            switch main.timeline.status {
+            case .available, .absent:
+                SleepHypnogramView(segments: main.timeline.segments, zone: night.clock.zone,
+                                   inBedStart: SleepEvidenceFormat.instant(main.inBedStart), inBedEnd: SleepEvidenceFormat.instant(main.inBedEnd),
+                                   approximate: night.clock.isClockTimeCaution)
+                if main.timeline.status == .absent {
+                    SleepFootnote(text: "This source recorded sleep without stages for this night.")
                 }
+            case .pendingCorrection, .unknown:
+                SleepHypnogramView(segments: [.init(stage: .unspecified, start: main.start, end: main.end)], zone: night.clock.zone,
+                                   inBedStart: SleepEvidenceFormat.instant(main.inBedStart), inBedEnd: SleepEvidenceFormat.instant(main.inBedEnd),
+                                   approximate: night.clock.isClockTimeCaution)
+                SleepRecalculatingNote(detail: "The stage timeline will appear once this night is recalculated.")
+                    .padding(.top, rm.pt(8))
             }
         }
     }
 
-    private func stagesCard(_ stages: RecoverySleepNightDetail.Stages) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Stages")
-                switch stages.status {
-                case .available:
-                    if let deep = stages.deepSeconds, let core = stages.coreSeconds, let rem = stages.remSeconds {
-                        SleepStageBar(deep: deep, core: core, rem: rem)
-                        VStack(spacing: 8) {
-                            stageRow(.deep, deep)
-                            stageRow(.core, core)
-                            stageRow(.rem, rem)
-                            if let awake = stages.awakeSeconds {
-                                Divider().overlay(PhysiqueOSTheme.divider)
-                                stageRow(.awake, awake, label: "Awake in sleep window")
-                            }
+    private func stagesSection(_ stages: RecoverySleepNightDetail.Stages) -> some View {
+        SleepSection(title: "Stages", identifier: "sleep.night.stages") {
+            switch stages.status {
+            case .available:
+                if let deep = stages.deepSeconds, let core = stages.coreSeconds, let rem = stages.remSeconds {
+                    SleepStageBar(deep: deep, core: core, rem: rem)
+                        .padding(.top, rm.pt(-2))
+                        .padding(.bottom, rm.pt(10))
+                    VStack(spacing: 0) {
+                        stageRow(.deep, deep)
+                        stageRow(.core, core)
+                        stageRow(.rem, rem)
+                        if let awake = stages.awakeSeconds {
+                            stageRow(.awake, awake, label: "Awake in sleep window")
                         }
                     }
-                    Text("Stage estimates come from your sleep source and vary between devices. Core is shown as Light in some apps.")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
-                case .pendingCorrection, .unknown:
-                    SleepRecalculatingNote(detail: "Total sleep and timing are final. Stage and awake minutes will appear once this night is recalculated.")
-                case .absent:
-                    Text("Stage detail is not available from this source for this night.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
+                SleepFootnote(text: "Stage estimates come from your sleep source and vary between devices. Core is shown as Light in some apps.")
+            case .pendingCorrection, .unknown:
+                SleepNotice(text: "Total sleep and timing are final. Stage and awake minutes will appear once this night is recalculated.")
+            case .absent:
+                SleepNotice(text: "Stage detail is not available from this source for this night.")
             }
         }
     }
 
+    /// Locked `.stage-row`: swatch, label, bold trailing duration, 1 px rule.
     private func stageRow(_ stage: RecoverySleepStage, _ seconds: Int, label: String? = nil) -> some View {
-        HStack {
-            RoundedRectangle(cornerRadius: 2).fill(PhysiqueOSTheme.sleepColor(stage)).frame(width: 10, height: 10).accessibilityHidden(true)
+        HStack(spacing: rm.pt(7)) {
+            RoundedRectangle(cornerRadius: rm.pt(2)).fill(SleepPalette.stage(stage)).frame(width: rm.pt(8), height: rm.pt(8)).accessibilityHidden(true)
             Text(label ?? stage.label)
-                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            Spacer()
+                .evidenceText(.normal(10, 500, jakarta: false))
+                .foregroundStyle(rm.c.muted)
+            Spacer(minLength: 0)
             Text(SleepEvidenceFormat.duration(seconds))
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .evidenceText(.normal(10, 800, jakarta: false, digits: true))
+                .foregroundStyle(rm.c.ink)
         }
+        .padding(.vertical, rm.pt(7))
+        .overlay(alignment: .bottom) { Rectangle().fill(rm.c.line).frame(height: rm.pt(1)) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label ?? stage.label): \(SleepEvidenceFormat.spokenDuration(seconds))")
     }
 
-    private func continuityCard(_ continuity: RecoverySleepNightDetail.Continuity) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Continuity")
-                switch continuity.status {
-                case .available:
-                    HStack(spacing: 8) {
-                        SleepStatTile(label: "Longest continuous", value: SleepEvidenceFormat.duration(continuity.longestAsleepStretchSeconds), detail: "asleep")
-                        SleepStatTile(label: "Awake in window", value: SleepEvidenceFormat.duration(continuity.awakeInWindowSeconds), detail: "between sleep")
-                    }
-                case .pendingCorrection, .unknown:
-                    SleepRecalculatingNote(detail: "Continuity uses awake time, which is recalculated with stages.")
-                case .absent:
-                    Text("Continuity needs stage detail, which this source didn't record for this night.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+    private func continuitySection(_ continuity: RecoverySleepNightDetail.Continuity) -> some View {
+        SleepSection(title: "Continuity", identifier: "sleep.night.continuity") {
+            switch continuity.status {
+            case .available:
+                HStack(alignment: .top, spacing: rm.pt(7)) {
+                    WeightStatTile(label: "Longest continuous", value: SleepEvidenceFormat.duration(continuity.longestAsleepStretchSeconds), detail: "asleep")
+                    WeightStatTile(label: "Awake in window", value: SleepEvidenceFormat.duration(continuity.awakeInWindowSeconds), detail: "between sleep")
                 }
+            case .pendingCorrection, .unknown:
+                SleepNotice(text: "Continuity uses awake time, which is recalculated with stages.")
+            case .absent:
+                SleepNotice(text: "Continuity needs stage detail, which this source didn't record for this night.")
             }
         }
     }
 
-    private func timeInBedCard(_ main: RecoverySleepNightDetail.Main, night: RecoverySleepNightSummary) -> some View {
+    private func timeInBedSection(_ main: RecoverySleepNightDetail.Main, night: RecoverySleepNightSummary) -> some View {
         let zone = night.clock.zone
         let start = SleepEvidenceFormat.instant(main.inBedStart)
         let end = SleepEvidenceFormat.instant(main.inBedEnd)
-        return CardContainer {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Time in Bed")
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    if let start, let end {
-                        Text("In bed \(night.clock.isClockTimeCaution ? "≈ " : "")\(SleepEvidenceFormat.clock(start, in: zone)) – \(SleepEvidenceFormat.clock(end, in: zone))")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                }
-                Spacer()
-                Text(SleepEvidenceFormat.duration(main.inBedSeconds))
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+        return SleepSection(title: "Time in Bed", identifier: "sleep.night.inBed") {
+            SleepSectionAction(text: SleepEvidenceFormat.duration(main.inBedSeconds))
+        } content: {
+            if let start, let end {
+                Text("In bed \(night.clock.isClockTimeCaution ? "≈ " : "")\(SleepEvidenceFormat.clock(start, in: zone)) – \(SleepEvidenceFormat.clock(end, in: zone))")
+                    .evidenceText(EvidenceTextStyle(size: 9.5, weight: 400, lineHeight: 12.825))
+                    .foregroundStyle(rm.c.quiet)
             }
-            .accessibilityElement(children: .combine)
         }
     }
 
-    private func additionalSleepCard(_ detail: RecoverySleepNightDetail, night: RecoverySleepNightSummary) -> some View {
+    private func additionalSleepSection(_ detail: RecoverySleepNightDetail, night: RecoverySleepNightSummary) -> some View {
         let zone = night.clock.zone
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                TrainingSectionHeaderView(title: "Additional Sleep")
+        return SleepSection(title: "Additional Sleep", identifier: "sleep.additional") {
+            VStack(spacing: 0) {
                 ForEach(detail.secondary) { episode in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .center, spacing: rm.pt(10)) {
+                        VStack(alignment: .leading, spacing: 0) {
                             if let start = SleepEvidenceFormat.instant(episode.start), let end = SleepEvidenceFormat.instant(episode.end) {
                                 Text("\(night.clock.isClockTimeCaution ? "≈ " : "")\(SleepEvidenceFormat.clock(start, in: zone)) – \(SleepEvidenceFormat.clock(end, in: zone))")
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .evidenceText(.normal(12, 790, jakarta: false))
+                                    .foregroundStyle(rm.c.ink)
                             }
                             Text(episode.sourceLabel ?? "Another source")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textMuted)
+                                .evidenceText(EvidenceTextStyle(size: 9.5, weight: 400, lineHeight: 12.825))
+                                .foregroundStyle(rm.c.quiet)
+                                .padding(.top, rm.pt(3))
                         }
-                        Spacer()
+                        Spacer(minLength: 0)
                         Text(SleepEvidenceFormat.duration(episode.asleepSeconds))
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .evidenceText(.normal(10, 760, jakarta: false, digits: true))
+                            .foregroundStyle(rm.c.muted)
                     }
-                    .padding(10)
-                    .background(PhysiqueOSTheme.surfaceMuted)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.vertical, rm.pt(10))
+                    .padding(.horizontal, rm.pt(2))
+                    .overlay(alignment: .bottom) { Rectangle().fill(rm.c.line).frame(height: rm.pt(1)) }
                     .accessibilityElement(children: .combine)
                 }
-                if let total = night.totalAsleepIncludingSecondarySeconds {
-                    Text("Total including additional sleep \(SleepEvidenceFormat.duration(total))")
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
+            }
+            if let total = night.totalAsleepIncludingSecondarySeconds {
+                SleepFootnote(text: "Total including additional sleep \(SleepEvidenceFormat.duration(total))")
             }
         }
-        .accessibilityIdentifier("sleep.additional")
     }
 
-    private func sourceCard(_ detail: RecoverySleepNightDetail) -> some View {
+    private func sourceSection(_ detail: RecoverySleepNightDetail) -> some View {
         let night = detail.night
         let clock = night.clock
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 12) {
-                Button { withAnimation(.easeInOut(duration: 0.2)) { showsSourceDetails.toggle() } } label: {
-                    HStack {
-                        Text("Source & Data")
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Spacer()
-                        Image(systemName: showsSourceDetails ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                    }
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("sleep.sourceData.toggle")
-                .accessibilityValue(showsSourceDetails ? "Expanded" : "Collapsed")
-                if let provenance = detail.provenance {
+        return SleepSection(title: "Source & Data", identifier: "sleep.night.source") {
+            Button { withAnimation(.easeInOut(duration: 0.2)) { showsSourceDetails.toggle() } } label: {
+                Text(showsSourceDetails ? "Hide ⌃" : "Details ⌄")
+                    .evidenceText(.normal(10, 760, jakarta: false))
+                    .foregroundStyle(rm.c.accent)
+                    .evidenceHitTarget(visualHeight: rm.pt(12))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sleep.sourceData.toggle")
+            .accessibilityValue(showsSourceDetails ? "Expanded" : "Collapsed")
+        } content: {
+            if let provenance = detail.provenance {
+                VStack(alignment: .leading, spacing: 0) {
                     Text("Counted from \(provenance.primarySourceLabel) (via Apple Health)")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .evidenceText(.normal(10, 500, jakarta: false))
+                        .foregroundStyle(rm.c.muted)
                     if showsSourceDetails {
                         VStack(spacing: 0) {
                             detailRow("Also recorded", provenance.corroboratingLabels.isEmpty ? "No other source this night"
@@ -1200,17 +1238,17 @@ struct RecoverySleepNightView: View {
                             }
                             detailRow("Calculation", provenance.algorithmVersion, last: true)
                         }
-                        .background(PhysiqueOSTheme.surfaceMuted)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        Text(clock.provenanceText + ". Total sleep never depends on the time zone.")
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .padding(.top, rm.pt(4))
                     }
-                } else {
-                    Text("No source recorded this night.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
                 }
+                .padding(rm.pt(10))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(rm.c.surface2, in: RoundedRectangle(cornerRadius: rm.pt(11)))
+                if showsSourceDetails {
+                    SleepFootnote(text: clock.provenanceText + ". Total sleep never depends on the time zone.")
+                }
+            } else {
+                WeightEmptyLine(text: "No source recorded this night.")
             }
         }
     }
@@ -1224,22 +1262,22 @@ struct RecoverySleepNightView: View {
         }
     }
 
+    /// Locked `.detail-row`: 9 px label / value, 1 px rule.
     private func detailRow(_ label: String, _ value: String, last: Bool = false) -> some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top) {
-                Text(label)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                Spacer(minLength: 12)
-                Text(value)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                    .multilineTextAlignment(.trailing)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .accessibilityElement(children: .combine)
-            if !last { Divider().overlay(PhysiqueOSTheme.divider) }
+        HStack(alignment: .top, spacing: rm.pt(14)) {
+            Text(label)
+                .evidenceText(.normal(9, 500, jakarta: false))
+                .foregroundStyle(rm.c.quiet)
+            Spacer(minLength: 0)
+            Text(value)
+                .evidenceText(.normal(9, 600, jakarta: false))
+                .foregroundStyle(rm.c.ink)
+                .multilineTextAlignment(.trailing)
         }
+        .padding(.vertical, rm.pt(7))
+        .overlay(alignment: .bottom) {
+            if !last { Rectangle().fill(rm.c.line).frame(height: rm.pt(1)) }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
