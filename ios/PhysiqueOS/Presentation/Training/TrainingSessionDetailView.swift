@@ -79,7 +79,14 @@ struct TrainingSessionDetailView: View {
             }
             if session.showsGeneratedSummaryInsteadOfStructuredExercises {
                 summarySection(for: session, parsed: cardio)
-            } else if !session.exercises.isEmpty {
+            }
+            if let records = TrainingSessionPerformanceRecordsPresentation(
+                performanceRecords: session.performanceRecords
+            ) {
+                performanceRecordsSection(records)
+            }
+            if !session.showsGeneratedSummaryInsteadOfStructuredExercises,
+               !session.exercises.isEmpty {
                 exercisesSection(for: session)
             }
             if let media = session.supportingMedia, !media.isEmpty {
@@ -163,6 +170,60 @@ struct TrainingSessionDetailView: View {
                 Text(session.detail)
                     .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
                     .foregroundStyle(m.c.ink)
+            }
+        }
+    }
+
+    /// The exact canonical records attached to this finalized workout. The
+    /// card is intentionally read-only and compact; historical detail never
+    /// runs the completion celebration or performs a second PR calculation.
+    private func performanceRecordsSection(
+        _ presentation: TrainingSessionPerformanceRecordsPresentation
+    ) -> some View {
+        EvidenceSection(
+            title: "Performance Records",
+            style: .analytical,
+            identifier: "training.session.performanceRecords"
+        ) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: m.pt(6)) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: m.pt(11), weight: .bold))
+                        .accessibilityHidden(true)
+                    Text("Earned in this workout")
+                        .evidenceText(.normal(9, 800, tracking: 0.45, uppercase: true))
+                }
+                .foregroundStyle(m.c.green)
+                .padding(.bottom, m.pt(4))
+
+                ForEach(Array(presentation.groups.enumerated()), id: \.element.id) { index, group in
+                    VStack(alignment: .leading, spacing: m.pt(3)) {
+                        Text(group.canonicalExerciseName)
+                            .evidenceText(.normal(11, 800))
+                            .foregroundStyle(m.c.ink)
+                        ForEach(group.records) { record in
+                            VStack(alignment: .leading, spacing: m.pt(1)) {
+                                Text("\(record.title) · \(record.value)")
+                                    .evidenceText(.normal(10, 750))
+                                    .foregroundStyle(m.c.green)
+                                if let detail = record.detail {
+                                    Text(detail)
+                                        .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.6))
+                                        .foregroundStyle(m.c.muted)
+                                }
+                            }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(
+                                TrainingSessionPerformanceRecordsPresentation.accessibilityLabel(for: record)
+                            )
+                        }
+                    }
+                    .padding(.vertical, m.pt(7))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .top) {
+                        if index > 0 { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
+                    }
+                }
             }
         }
     }

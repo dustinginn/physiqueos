@@ -104,7 +104,7 @@ struct HomeLoggedTodayWidgetView: View {
                 )) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(palette.accent)
+                        .foregroundStyle(palette.refreshAccent)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
                 }
@@ -166,7 +166,7 @@ struct HomeLoggedTodayWidgetView: View {
             ).url) {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(palette.accent)
+                    .foregroundStyle(palette.refreshAccent)
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
@@ -463,19 +463,23 @@ private extension View {
 
 /// Widget-owned paired tokens. WidgetKit supplies its own environment and
 /// does not inherit the iPhone app's device-local preference.
-private struct HomeWidgetPalette {
+struct HomeWidgetPalette {
     let background: Color
     let text: Color
     let secondary: Color
     let tertiary: Color
     let divider: Color
-    let accent: Color
+    let actionAccent: Color
     let warning: Color
     let training: Color
     let nutrition: Color
     let activity: Color
     let weight: Color
     let actionGradient: LinearGradient
+
+    /// Refresh and Start Logger intentionally share one widget-owned action
+    /// semantic instead of maintaining independent presentation colors.
+    var refreshAccent: Color { actionAccent }
 
     init(colorScheme: ColorScheme) {
         if colorScheme == .dark {
@@ -484,26 +488,26 @@ private struct HomeWidgetPalette {
             secondary = Color(hex: 0x91A6AE)
             tertiary = Color(hex: 0x647A84)
             divider = Color(hex: 0x203441)
-            accent = Color(hex: 0x9F7CFF)
+            actionAccent = Color(hex: 0x20BDB2)
             warning = Color(hex: 0xF3BA49)
             training = Color(hex: 0x9F7CFF)
             nutrition = Color(hex: 0x4EE09A)
             activity = Color(hex: 0xF3BA49)
             weight = Color(hex: 0x40C7D7)
-            actionGradient = LinearGradient(colors: [Color(hex: 0x20BDB2), Color(hex: 0x123D61)], startPoint: .leading, endPoint: .trailing)
+            actionGradient = LinearGradient(colors: [actionAccent, Color(hex: 0x123D61)], startPoint: .leading, endPoint: .trailing)
         } else {
             background = Color(hex: 0xEEF1EB)
             text = Color(hex: 0x0A1C29)
             secondary = Color(hex: 0x60737C)
             tertiary = Color(hex: 0x7A8B91)
             divider = Color(hex: 0xCAD4CF)
-            accent = Color(hex: 0x7255DC)
+            actionAccent = Color(hex: 0x0B817F)
             warning = Color(hex: 0xB47510)
             training = Color(hex: 0x7255DC)
             nutrition = Color(hex: 0x0C9363)
             activity = Color(hex: 0xB47510)
             weight = Color(hex: 0x0E8CA7)
-            actionGradient = LinearGradient(colors: [Color(hex: 0x0B817F), Color(hex: 0x163F62)], startPoint: .leading, endPoint: .trailing)
+            actionGradient = LinearGradient(colors: [actionAccent, Color(hex: 0x163F62)], startPoint: .leading, endPoint: .trailing)
         }
     }
 }

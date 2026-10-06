@@ -763,9 +763,30 @@ final class TrainingLoggerViewModel {
             Set(draft.selectedAreaIds) == Set(suggestion.categoryIds)
     }
 
+    func isAreaSelected(_ areaId: String) -> Bool {
+        draft?.selectedAreaIds.contains(areaId) == true
+    }
+
     func acceptCategorySuggestion() {
         guard let suggestion = availableCategorySuggestion else { return }
         update { $0.selectedAreaIds = suggestion.categoryIds }
+    }
+
+    /// The Suggested Today card is a second presentation of the same
+    /// canonical Training Area selection held by the draft. Selecting keeps
+    /// the existing suggestion behavior; deselecting applies the same
+    /// per-area toggle semantics as the corresponding area tiles.
+    func toggleCategorySuggestion() {
+        guard let suggestion = availableCategorySuggestion else { return }
+        guard isCategorySuggestionAccepted else {
+            acceptCategorySuggestion()
+            return
+        }
+        update { draft in
+            for areaId in suggestion.categoryIds where draft.selectedAreaIds.contains(areaId) {
+                draft.toggleArea(areaId)
+            }
+        }
     }
 
     func savedDraftPresentation(_ draft: TrainingLoggerDraft) -> SavedDraftPresentation {

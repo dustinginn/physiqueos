@@ -4,13 +4,16 @@ import XCTest
 final class TrainingAcceptanceUITests: XCTestCase {
     private let app = XCUIApplication()
 
-    private func launchInSandbox() {
+    private func launchInSandbox(appearance: String? = nil) {
         continueAfterFailure = false
         // The app deliberately persists its selected Native authority.
         // Acceptance journeys verify the bundled Sandbox presentation, so
         // pin that authority in the process argument domain instead of
         // inheriting a prior Founder Production selection from Simulator.
         app.launchArguments += ["-physiqueos.native.authority-selection.v1", "sandbox"]
+        if let appearance {
+            app.launchArguments += ["-physiqueos.appearance.preference.v1", appearance]
+        }
         app.launch()
     }
 
@@ -116,15 +119,21 @@ final class TrainingAcceptanceUITests: XCTestCase {
         assertText("WORKOUT DETAIL")
         assertText("Workout Summary")
         assertText("420 active cal")
+        scrollToText("Performance Records")
+        scrollToLabel(containing: "6 reps at 155 lb")
+        scrollToLabel(containing: "10 reps at 40 lb")
+        attachScreenshot("11-workout-detail")
         // Structured workouts show the unified exercise/set breakdown,
         // not a second generated serialization under Session Details.
-        assertText("Exercises")
+        scrollToText("Exercises")
         assertText("Bench Press")
         XCTAssertFalse(app.staticTexts["Session Details"].exists, "The generated workout summary duplicated the structured breakdown.")
-        XCTAssertEqual(app.staticTexts.matching(identifier: "Bench Press").count, 1, "The exercise was rendered more than once.")
+        XCTAssertEqual(
+            app.staticTexts.matching(identifier: "Bench Press").count,
+            2,
+            "Bench Press should appear once in its canonical PR group and once in the Exercises breakdown."
+        )
         XCTAssertEqual(app.staticTexts.matching(identifier: "420 active cal").count, 1, "Workout calories were duplicated in the header or generated summary.")
-        attachScreenshot("11-workout-detail")
-
         scrollToText("Add / Correct Workout Details")
         let editor = app.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 3), "Correction editor was not reachable.")
@@ -142,6 +151,48 @@ final class TrainingAcceptanceUITests: XCTestCase {
         XCTAssertFalse((editor.value as? String)?.contains("Cable row") == true, "The local correction was not accepted.")
         scrollToText("Saved to this device only. Your original workout is unchanged.")
         attachScreenshot("12-add-correct-workout-details")
+    }
+
+    func testBuild89TrainingDetailReviewDark() throws {
+        try captureBuild89TrainingDetail(appearance: "dark")
+    }
+
+    func testBuild89TrainingDetailReviewMineralLight() throws {
+        try captureBuild89TrainingDetail(appearance: "light")
+    }
+
+    func testBuild89NutritionCaloriesReviewDark() throws {
+        try captureBuild89Nutrition(appearance: "dark")
+    }
+
+    func testBuild89NutritionCaloriesReviewMineralLight() throws {
+        try captureBuild89Nutrition(appearance: "light")
+    }
+
+    private func captureBuild89Nutrition(appearance: String) throws {
+        launchInSandbox(appearance: appearance)
+        openEvidenceStream(named: "Nutrition")
+        assertText("Latest Nutrition Day")
+        XCTAssertTrue(app.descendants(matching: .any)["nutrition.latestDay"].waitForExistence(timeout: 5))
+        assertText("Calories")
+        try captureBuild89("C2-nutrition-calories-\(appearance)")
+    }
+
+    private func captureBuild89TrainingDetail(appearance: String) throws {
+        launchInSandbox(appearance: appearance)
+        openTrainingLanding()
+        scrollToText("Recent Training History")
+        tapText("Show All >")
+        let august26 = assertText("Wednesday, August 26")
+        august26.tap()
+        assertText("TRAINING DAY")
+        tapText("Traditional Strength Training")
+        assertText("WORKOUT DETAIL")
+        scrollToText("Performance Records")
+        scrollToLabel(containing: "6 reps at 155 lb")
+        scrollToLabel(containing: "10 reps at 40 lb")
+        app.swipeDown(velocity: .slow)
+        try captureBuild89("C1-training-detail-prs-\(appearance)")
     }
 
     func testCorrectedEvidenceJourneys() throws {
@@ -778,6 +829,18 @@ final class TrainingAcceptanceUITests: XCTestCase {
     }
 
     private func attachScreenshot(_: String) {}
+
+    private func captureBuild89(_ name: String) throws {
+        Thread.sleep(forTimeInterval: 0.8)
+        let screenshot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        let directory = URL(fileURLWithPath: "/private/tmp/physiqueos-build89-review", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try screenshot.pngRepresentation.write(to: directory.appendingPathComponent("\(name).png"))
+    }
 }
 
 /// Batch 2 locked-design parity captures. Drives the real sandbox Logger

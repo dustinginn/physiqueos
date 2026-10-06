@@ -4,6 +4,13 @@ import XCTest
 @testable import PhysiqueOS
 
 final class HomeWidgetTests: XCTestCase {
+    func testRefreshAccentUsesTheStartLoggerActionSemanticInBothAppearances() {
+        for colorScheme in [ColorScheme.dark, .light] {
+            let palette = HomeWidgetPalette(colorScheme: colorScheme)
+            XCTAssertEqual(palette.refreshAccent, palette.actionAccent)
+        }
+    }
+
     func testSnapshotRoundTripAndAuthorityAccountFences() throws {
         let url = temporaryFileURL()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }

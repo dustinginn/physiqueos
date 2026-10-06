@@ -1791,7 +1791,58 @@
             "fly"
           ]
         }
-      ]
+      ],
+      "performanceRecords": {
+        "status": "completed",
+        "records": [
+          {
+            "id": "training_library_record_training_performance_event_c0b5699ddde84b3a70deeffa551e92b8",
+            "canonicalExerciseId": "bench_press",
+            "canonicalExerciseName": "Bench Press",
+            "title": "Reps-at-load record",
+            "value": "6 reps at 155 lb",
+            "previousBaseline": "Previous: 5 reps at this load",
+            "improvement": null,
+            "detail": "Previous: 5 reps at this load",
+            "workoutDate": "2026-08-26",
+            "executionVariant": null,
+            "relationshipContext": {
+              "relationshipType": "superset",
+              "memberIndex": 0,
+              "orderedPartners": [
+                {
+                  "canonicalExerciseId": "cable_fly",
+                  "name": "Cable Fly"
+                }
+              ],
+              "comparisonKey": "superset|partners:cable_fly"
+            },
+            "achievedValue": 6,
+            "achievementType": "reps_at_load_pr",
+            "sourceEventId": "training_performance_event_c0b5699ddde84b3a70deeffa551e92b8"
+          },
+          {
+            "id": "training_library_record_training_performance_event_f53c19ba03f0c51a1dd67aa4ee883385",
+            "canonicalExerciseId": "overhead_triceps_extension",
+            "canonicalExerciseName": "Overhead Triceps Extension",
+            "title": "Reps-at-load record",
+            "value": "10 reps at 40 lb",
+            "previousBaseline": "Previous: 8 reps at this load",
+            "improvement": null,
+            "detail": "Previous: 8 reps at this load",
+            "workoutDate": "2026-08-26",
+            "executionVariant": {
+              "key": "static_hold",
+              "label": "Static Hold",
+              "rawLabel": "Static Hold"
+            },
+            "relationshipContext": null,
+            "achievedValue": 10,
+            "achievementType": "reps_at_load_pr",
+            "sourceEventId": "training_performance_event_f53c19ba03f0c51a1dd67aa4ee883385"
+          }
+        ]
+      }
     },
     {
       "id": "session-fixture-004",

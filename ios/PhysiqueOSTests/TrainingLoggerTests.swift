@@ -1,4 +1,6 @@
 import XCTest
+import SwiftUI
+import UIKit
 @testable import PhysiqueOS
 
 final class TrainingLoggerTests: XCTestCase {
@@ -707,14 +709,124 @@ final class TrainingLoggerTests: XCTestCase {
         let viewModel = TrainingLoggerViewModel(api: SuggestionAPI(base: config), draftStore: MemoryTrainingLoggerDraftStore())
         await viewModel.load()
         viewModel.start(mode: .live)
-        XCTAssertEqual(viewModel.availableCategorySuggestion?.label, "Biceps + Triceps")
+        let originalSuggestion = try XCTUnwrap(viewModel.availableCategorySuggestion)
+        XCTAssertEqual(originalSuggestion.label, "Biceps + Triceps")
         XCTAssertFalse(viewModel.isCategorySuggestionAccepted)
-        viewModel.acceptCategorySuggestion()
+        XCTAssertFalse(viewModel.isAreaSelected("biceps"))
+        XCTAssertFalse(viewModel.isAreaSelected("triceps"))
+
+        // The card action selects the exact same canonical draft fields read
+        // by the corresponding Training Area tiles.
+        viewModel.toggleCategorySuggestion()
         XCTAssertEqual(viewModel.draft?.selectedAreaIds, ["biceps", "triceps"])
         XCTAssertTrue(viewModel.isCategorySuggestionAccepted)
+        XCTAssertTrue(viewModel.isAreaSelected("biceps"))
+        XCTAssertTrue(viewModel.isAreaSelected("triceps"))
+
+        // Toggling a tile immediately updates the card's selected state.
         viewModel.update { $0.toggleArea("triceps") }
         XCTAssertEqual(viewModel.draft?.selectedAreaIds, ["biceps"], "Founder override must remain authoritative.")
         XCTAssertFalse(viewModel.isCategorySuggestionAccepted)
+        XCTAssertTrue(viewModel.isAreaSelected("biceps"))
+        XCTAssertFalse(viewModel.isAreaSelected("triceps"))
+        viewModel.update { $0.toggleArea("triceps") }
+        XCTAssertTrue(viewModel.isCategorySuggestionAccepted)
+
+        // Tapping the selected card applies the same multi-select toggles and
+        // both the card and its tiles become unselected from one draft state.
+        viewModel.toggleCategorySuggestion()
+        XCTAssertEqual(viewModel.draft?.selectedAreaIds, [])
+        XCTAssertFalse(viewModel.isCategorySuggestionAccepted)
+        XCTAssertFalse(viewModel.isAreaSelected("biceps"))
+        XCTAssertFalse(viewModel.isAreaSelected("triceps"))
+        XCTAssertEqual(viewModel.availableCategorySuggestion, originalSuggestion, "Selection must not mutate suggestion calculation or evidence.")
+    }
+
+    func testSuggestedTodaySelectionControlHasExplicitAccessibleStatesAndCanonicalWiring() throws {
+        let unselected = TrainingLoggerSuggestedAreaSelectionPresentation(
+            suggestionLabel: "Shoulders",
+            isSelected: false
+        )
+        XCTAssertEqual(unselected.systemImage, "circle")
+        XCTAssertEqual(unselected.accessibilityLabel, "Select suggested Shoulders")
+        XCTAssertEqual(unselected.accessibilityValue, "Not selected")
+        XCTAssertGreaterThanOrEqual(TrainingLoggerSuggestedAreaSelectionPresentation.minimumControlTarget, 44)
+
+        let selected = TrainingLoggerSuggestedAreaSelectionPresentation(
+            suggestionLabel: "Shoulders",
+            isSelected: true
+        )
+        XCTAssertEqual(selected.systemImage, "checkmark.circle.fill")
+        XCTAssertEqual(selected.accessibilityLabel, "Deselect suggested Shoulders")
+        XCTAssertEqual(selected.accessibilityValue, "Selected")
+
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let view = try String(
+            contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(view.contains("action: { viewModel.toggleCategorySuggestion() }"))
+        XCTAssertTrue(view.contains("let selected = viewModel.isAreaSelected(area.id)"))
+    }
+
+    @MainActor
+    func testSuggestedTodaySelectionControlRendersDarkAndMineralUnselectedAndSelected() throws {
+        let suggestion = TrainingLoggerCategorySuggestion(
+            id: "review-shoulders",
+            date: "2026-10-06",
+            label: "Shoulders",
+            categoryIds: ["shoulders"],
+            reason: "Repeated on Tuesdays across confirmed workouts",
+            source: "confirmed_training_evidence_history",
+            historyReferences: ["session-1", "session-2", "session-3"]
+        )
+        let directory = ProcessInfo.processInfo.environment["BUILD89_LOGGER_SCREENSHOT_DIR"].map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        }
+        if let directory {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+
+        for (appearance, scheme) in [("dark", ColorScheme.dark), ("light", ColorScheme.light)] {
+            for selected in [false, true] {
+                let state = selected ? "selected" : "unselected"
+                let surface = VStack(alignment: .leading, spacing: 12) {
+                    Text("WHAT ARE YOU TRAINING?")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
+                    TrainingLoggerSuggestedAreaCard(
+                        suggestion: suggestion,
+                        isSelected: selected,
+                        action: {}
+                    )
+                    HStack(spacing: 9) {
+                        TrainingLoggerAreaChoiceLabel(title: "Shoulders", isSelected: selected)
+                        TrainingLoggerAreaChoiceLabel(title: "Biceps", isSelected: false)
+                    }
+                }
+                .padding(16)
+                .frame(width: 390)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(PhysiqueOSTheme.redesignCanvas)
+                .environment(\.colorScheme, scheme)
+
+                let renderer = ImageRenderer(content: surface)
+                renderer.scale = 3
+                let image = try XCTUnwrap(renderer.uiImage)
+                let data = try XCTUnwrap(image.pngData())
+                XCTAssertGreaterThan(data.count, 12_000, "\(appearance) \(state) render was unexpectedly empty")
+                let attachment = XCTAttachment(image: image)
+                attachment.name = "C5-logger-suggested-\(appearance)-\(state)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+                if let directory {
+                    try data.write(
+                        to: directory.appendingPathComponent("C5-logger-suggested-\(appearance)-\(state).png"),
+                        options: .atomic
+                    )
+                }
+            }
+        }
     }
 
     @MainActor
@@ -2003,6 +2115,222 @@ extension TrainingLoggerTests {
         XCTAssertTrue(logger.contains("viewModel.acknowledgeCompletion()\n                dismiss()"))
         XCTAssertFalse(logger.contains("UIImpactFeedbackGenerator") || logger.contains("UINotificationFeedbackGenerator"),
                        "Haptics go through the feedback client only.")
+    }
+
+    private struct LoggerSetTypographyReviewSpec: Identifiable {
+        let id: String
+        let title: String
+        let valueSize: CGFloat
+        let valueWeight: CGFloat
+        let setSize: CGFloat
+        let setWeight: CGFloat
+
+        var valueFont: UIFont {
+            PlusJakartaSans.uiFont(size: UIFontMetrics.default.scaledValue(for: valueSize), weight: valueWeight)
+        }
+
+        var setFont: Font {
+            PlusJakartaSans.font(size: UIFontMetrics.default.scaledValue(for: setSize), weight: setWeight)
+        }
+    }
+
+    private static let loggerSetTypographyReviewSpecs = [
+        LoggerSetTypographyReviewSpec(id: "current", title: "Current · 12 Regular", valueSize: 12, valueWeight: 400, setSize: 12, setWeight: 700),
+        LoggerSetTypographyReviewSpec(id: "option-a", title: "Option A · 14 Regular", valueSize: 14, valueWeight: 400, setSize: 12, setWeight: 700),
+        LoggerSetTypographyReviewSpec(id: "option-b", title: "Option B · 16 Semibold", valueSize: 16, valueWeight: 600, setSize: 12, setWeight: 700),
+        LoggerSetTypographyReviewSpec(id: "option-c", title: "Option C · 15 Medium + 13 Set", valueSize: 15, valueWeight: 500, setSize: 13, setWeight: 700),
+    ]
+
+    func testLoggerSetTypographyOptionsAreRestrainedAndFitRepresentativeValues() throws {
+        let specs = Self.loggerSetTypographyReviewSpecs
+        XCTAssertEqual(specs.map(\.valueSize), [12, 14, 16, 15])
+        XCTAssertEqual(LoggerType.fieldValuePointSize, specs[2].valueSize, "Founder-selected Option B must remain the shipping Logger value size.")
+        XCTAssertEqual(LoggerType.fieldValueWeight, specs[2].valueWeight, "Founder-selected Option B must remain the shipping Logger value weight.")
+        XCTAssertEqual(specs[2].valueFont.pointSize, LoggerType.fieldValueFont.pointSize, accuracy: 0.01)
+        XCTAssertTrue(specs[0...2].map(\.valueSize).elementsEqual([12, 14, 16]))
+        XCTAssertEqual(specs[3].setSize, 13, "Only balanced Option C explores a proportional SET-number increase.")
+
+        // The real 390 pt Logger grid leaves roughly 103 pt per numeric
+        // field. Keep generous insets while checking all requested shapes.
+        for spec in specs {
+            for value in ["1", "12", "125", "1250", "102.5"] {
+                let width = (value as NSString).size(withAttributes: [.font: spec.valueFont]).width
+                XCTAssertLessThan(width, 84, "\(spec.title) clips representative value \(value)")
+            }
+        }
+    }
+
+    @MainActor
+    func testLoggerSetTypographyOptionsRenderFromShippingNumericFieldsInDarkAndMineral() throws {
+        for (appearance, scheme) in [("light", ColorScheme.light), ("dark", ColorScheme.dark)] {
+            for spec in Self.loggerSetTypographyReviewSpecs {
+                let view = LoggerSetTypographyReviewSurface(spec: spec)
+                    .frame(width: 390, height: 430)
+                    .environment(\.colorScheme, scheme)
+                let image = renderLoggerTypographyReview(view)
+                let data = try XCTUnwrap(image.pngData())
+                XCTAssertGreaterThan(data.count, 25_000, "\(appearance) \(spec.title) render was unexpectedly empty")
+                let attachment = XCTAttachment(image: image)
+                attachment.name = "logger-set-type-\(appearance)-\(spec.id)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+        }
+    }
+
+    @MainActor
+    private func renderLoggerTypographyReview<V: View>(_ view: V) -> UIImage {
+        let size = CGSize(width: 390, height: 430)
+        let host = UIHostingController(rootView: view)
+        host.safeAreaRegions = []
+        host.view.bounds = CGRect(origin: .zero, size: size)
+        host.view.backgroundColor = .clear
+        let window = UIWindow(frame: CGRect(origin: .zero, size: size))
+        window.rootViewController = host
+        window.isHidden = false
+        host.view.layoutIfNeeded()
+        return UIGraphicsImageRenderer(size: size).image { _ in
+            host.view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: true)
+        }
+    }
+
+    private struct LoggerSetTypographyReviewSurface: View {
+        let spec: LoggerSetTypographyReviewSpec
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("ACTIVE WORKOUT")
+                    .logText(LoggerType.eyebrow10)
+                    .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+                Text("Shoulder Press Machine")
+                    .logText(LoggerType.cardTitle15)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                Text("Ordinary · Standalone · Previous 10 × 90 lb")
+                    .logText(LoggerType.context10)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                VStack(spacing: 0) {
+                    LoggerSetTypographyReviewHeader()
+                    LoggerSetTypographyReviewRow(spec: spec, number: 1, reps: "12", load: "160", completed: true)
+                    LoggerSetTypographyReviewRow(spec: spec, number: 2, reps: "10", load: "90", completed: false)
+                    LoggerSetTypographyReviewRow(spec: spec, number: 3, reps: "8", load: "102.5", completed: false)
+                    LoggerSetTypographyReviewRow(spec: spec, number: 4, reps: "3", load: "1250", completed: false)
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus").font(.system(size: 10, weight: .bold))
+                        Text("Add set").logText(LoggerType.addSet11)
+                    }
+                    .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .background(PhysiqueOSTheme.redesignPaper, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(PhysiqueOSTheme.redesignCanvas)
+        }
+    }
+
+    private struct LoggerSetTypographyReviewHeader: View {
+        var body: some View {
+            LoggerSetTypographyReviewGrid {
+                Text("Set")
+            } primary: {
+                Text("Reps")
+            } load: {
+                Text("Load (lb)")
+            } done: {
+                Text("Done").frame(maxWidth: .infinity)
+            } remove: {
+                Color.clear
+            }
+            .logText(LoggerType.columnHeader8)
+            .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
+            .frame(height: 28)
+            .background(PhysiqueOSTheme.redesignSoft)
+        }
+    }
+
+    private struct LoggerSetTypographyReviewRow: View {
+        let spec: LoggerSetTypographyReviewSpec
+        let number: Int
+        @State var reps: String
+        @State var load: String
+        let completed: Bool
+
+        init(spec: LoggerSetTypographyReviewSpec, number: Int, reps: String, load: String, completed: Bool) {
+            self.spec = spec
+            self.number = number
+            _reps = State(initialValue: reps)
+            _load = State(initialValue: load)
+            self.completed = completed
+        }
+
+        var body: some View {
+            LoggerSetTypographyReviewGrid {
+                Text("\(number)")
+                    .font(spec.setFont)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
+            } primary: {
+                NumericEditField(
+                    text: $reps,
+                    accessibilityLabel: "Set \(number) reps",
+                    fieldBackground: PhysiqueOSTheme.redesignSoft,
+                    font: spec.valueFont,
+                    textColor: PhysiqueOSTheme.redesignInk,
+                    placeholderColor: PhysiqueOSTheme.redesignUtilityMuted
+                )
+                .frame(height: 36)
+            } load: {
+                NumericEditField(
+                    text: $load,
+                    accessibilityLabel: "Set \(number) optional external load",
+                    fieldBackground: PhysiqueOSTheme.redesignSoft,
+                    font: spec.valueFont,
+                    textColor: PhysiqueOSTheme.redesignInk,
+                    placeholderColor: PhysiqueOSTheme.redesignInkSecondary
+                )
+                .frame(height: 36)
+            } done: {
+                Image(systemName: completed ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 32, weight: .regular))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(
+                        completed ? PhysiqueOSTheme.redesignCanvas : PhysiqueOSTheme.redesignUtilityMuted,
+                        completed ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignUtilityMuted
+                    )
+                    .frame(width: 44, height: 44)
+            } remove: {
+                Image(systemName: "delete.left")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
+                    .frame(width: 32, height: 44)
+            }
+            .frame(minHeight: 52)
+            .background(completed ? PhysiqueOSTheme.redesignGreen.opacity(0.09) : Color.clear)
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(PhysiqueOSTheme.redesignHairline).frame(height: 1)
+            }
+        }
+    }
+
+    private struct LoggerSetTypographyReviewGrid<Number: View, Primary: View, Load: View, Done: View, Remove: View>: View {
+        @ViewBuilder let number: () -> Number
+        @ViewBuilder let primary: () -> Primary
+        @ViewBuilder let load: () -> Load
+        @ViewBuilder let done: () -> Done
+        @ViewBuilder let remove: () -> Remove
+
+        var body: some View {
+            HStack(spacing: 6) {
+                number().frame(width: 28)
+                primary().frame(maxWidth: .infinity)
+                load().frame(maxWidth: .infinity)
+                done().frame(width: 48, alignment: .leading)
+                remove().frame(width: 36, alignment: .leading)
+            }
+            .padding(.horizontal, 8)
+        }
     }
 }
 

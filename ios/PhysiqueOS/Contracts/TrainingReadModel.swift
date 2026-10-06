@@ -911,6 +911,33 @@ struct NewPerformanceRecordsPresentation: Equatable {
     }
 }
 
+/// Historical workout-detail presentation over the exact Server-owned
+/// records attached to that canonical session. This deliberately reuses the
+/// Workout Complete grouping authority and never derives a record from sets,
+/// exercise relationships, or training history on-device.
+struct TrainingSessionPerformanceRecordsPresentation: Equatable {
+    let records: [TrainingPerformanceRecord]
+    let groups: [NewPerformanceRecordsPresentation.ExerciseGroup]
+
+    init?(performanceRecords: TrainingSessionPerformanceRecords?) {
+        guard let performanceRecords,
+              performanceRecords.isAuthoritative,
+              !performanceRecords.records.isEmpty
+        else { return nil }
+        records = performanceRecords.records
+        groups = NewPerformanceRecordsPresentation(
+            records: performanceRecords.records,
+            visibleLimit: performanceRecords.records.count
+        ).groups
+    }
+
+    static func accessibilityLabel(for record: TrainingPerformanceRecord) -> String {
+        [record.canonicalExerciseName, record.title, record.value, record.detail]
+            .compactMap { $0 }
+            .joined(separator: ". ")
+    }
+}
+
 /// One-shot celebration gate: the confetti plays once per completed
 /// session with records (never again on reappearance or a later revisit).
 /// Reduce Motion consumes that first appearance without animating, so turning
