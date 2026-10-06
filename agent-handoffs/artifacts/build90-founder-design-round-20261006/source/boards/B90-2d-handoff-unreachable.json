@@ -1,0 +1,27 @@
+{
+ "out": "boards/B90-2d-handoff-unreachable.png",
+ "title": "B90-2d \u00b7 Watch handoff \u00b7 paired but unreachable fallback",
+ "subtitle": "startWatchApp failed or no acknowledgment within a bounded wait. Truthful instruction instead of promising automatic launch.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-2/b90-2-a-light-unreachable.png",
+     "caption": "Option A \u00b7 bottom sheet",
+     "note": "System sheet, compact detent"
+    },
+    {
+     "file": "captures/b90-2/b90-2-b-light-unreachable.png",
+     "caption": "Option B \u00b7 centered card",
+     "note": "Card over a dimmed Logger"
+    },
+    {
+     "file": "captures/b90-2/b90-2-c-light-unreachable.png",
+     "caption": "Option C \u00b7 docked panel",
+     "note": "Replaces the sticky bar; Logger stays live"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

@@ -1,0 +1,32 @@
+{
+ "out": "boards/B90-3a-photo-front-mineral.png",
+ "title": "B90-3a \u00b7 Photo viewer \u00b7 Front Relaxed \u00b7 Mineral Light",
+ "subtitle": "Expanded paired viewer on the safe synthetic review photos (no Founder media). The interpretation is the canonical persisted per-pose narrative from the briefing record, not hard-coded. Pinch zoom and synchronized pan are unchanged and bounded to the stage.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-3/b90-3-current-light-front.png",
+     "caption": "Current (Build 89)",
+     "note": "Full-height panes"
+    },
+    {
+     "file": "captures/b90-3/b90-3-a-light-front.png",
+     "caption": "Option A \u00b7 captioned stage",
+     "note": "Top stage, dated captions, text below"
+    },
+    {
+     "file": "captures/b90-3/b90-3-b-light-front.png",
+     "caption": "Option B \u00b7 centered group",
+     "note": "Labels on photos, text card, zoom pill"
+    },
+    {
+     "file": "captures/b90-3/b90-3-c-light-front.png",
+     "caption": "Option C \u00b7 framed panel",
+     "note": "Column headers, zoom row, text below"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

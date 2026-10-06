@@ -1,0 +1,27 @@
+{
+ "out": "boards/B90-2c-handoff-acknowledged.png",
+ "title": "B90-2c \u00b7 Watch handoff \u00b7 Watch acknowledged",
+ "subtitle": "Shown when the phone authority applies the Watch\u2019s Start (draft.watchStartedAt becomes non-nil), then auto-dismisses into the normal Logger.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-2/b90-2-a-light-acknowledged.png",
+     "caption": "Option A \u00b7 bottom sheet",
+     "note": "System sheet, compact detent"
+    },
+    {
+     "file": "captures/b90-2/b90-2-b-light-acknowledged.png",
+     "caption": "Option B \u00b7 centered card",
+     "note": "Card over a dimmed Logger"
+    },
+    {
+     "file": "captures/b90-2/b90-2-c-light-acknowledged.png",
+     "caption": "Option C \u00b7 docked panel",
+     "note": "Replaces the sticky bar; Logger stays live"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

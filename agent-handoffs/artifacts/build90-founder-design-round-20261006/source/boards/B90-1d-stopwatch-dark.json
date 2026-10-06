@@ -1,0 +1,27 @@
+{
+ "out": "boards/B90-1d-stopwatch-dark.png",
+ "title": "B90-1d \u00b7 Logger stopwatch \u00b7 Dark",
+ "subtitle": "Same active-rest state in Dark.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-1/b90-1-a-dark-rest.png",
+     "caption": "Option A \u00b7 docked tile",
+     "note": "Stopwatch tile beside Finish Workout"
+    },
+    {
+     "file": "captures/b90-1/b90-1-b-dark-rest.png",
+     "caption": "Option B \u00b7 floating pill",
+     "note": "Pill above the bar, only while resting"
+    },
+    {
+     "file": "captures/b90-1/b90-1-c-dark-rest.png",
+     "caption": "Option C \u00b7 footer status line",
+     "note": "Quiet line inside the bar above Finish"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

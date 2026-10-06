@@ -1,0 +1,32 @@
+{
+ "out": "boards/B90-1b-stopwatch-active-rest.png",
+ "title": "B90-1b \u00b7 Logger stopwatch \u00b7 active stopwatch rest",
+ "subtitle": "Real shipping Logger (Sandbox, iPhone 17 Pro) with the same Chest + Core workout in every column. The clock reads the canonical draft.rest anchor (the Watch and Live Activity source); values are frozen at 1:24 rest / 12:34 workout for comparison. Two sets complete; rest started by the authority on Complete Set.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-1/b90-1-current-light-rest.png",
+     "caption": "Current (Build 89)",
+     "note": "No phone stopwatch; Live Activity only"
+    },
+    {
+     "file": "captures/b90-1/b90-1-a-light-rest.png",
+     "caption": "Option A \u00b7 docked tile",
+     "note": "Stopwatch tile beside Finish Workout"
+    },
+    {
+     "file": "captures/b90-1/b90-1-b-light-rest.png",
+     "caption": "Option B \u00b7 floating pill",
+     "note": "Pill above the bar, only while resting"
+    },
+    {
+     "file": "captures/b90-1/b90-1-c-light-rest.png",
+     "caption": "Option C \u00b7 footer status line",
+     "note": "Quiet line inside the bar above Finish"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

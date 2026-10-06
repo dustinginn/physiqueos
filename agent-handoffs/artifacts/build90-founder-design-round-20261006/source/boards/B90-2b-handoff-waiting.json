@@ -1,0 +1,27 @@
+{
+ "out": "boards/B90-2b-handoff-waiting.png",
+ "title": "B90-2b \u00b7 Watch handoff \u00b7 connecting / waiting",
+ "subtitle": "After Ready on Watch. The phone asks watchOS to open PhysiqueOS (HKHealthStore.startWatchApp) but cannot guarantee the Watch comes to the front, so the instruction is always shown. Use without Watch stays available.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-2/b90-2-a-light-waiting.png",
+     "caption": "Option A \u00b7 bottom sheet",
+     "note": "System sheet, compact detent"
+    },
+    {
+     "file": "captures/b90-2/b90-2-b-light-waiting.png",
+     "caption": "Option B \u00b7 centered card",
+     "note": "Card over a dimmed Logger"
+    },
+    {
+     "file": "captures/b90-2/b90-2-c-light-waiting.png",
+     "caption": "Option C \u00b7 docked panel",
+     "note": "Replaces the sticky bar; Logger stays live"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

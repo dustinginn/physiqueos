@@ -1,0 +1,27 @@
+{
+ "out": "boards/B90-2f-handoff-after-flow.png",
+ "title": "B90-2f \u00b7 After the flow: what replaces the Ready for Watch card",
+ "subtitle": "The large card is removed in both outcomes. Shown with B90-1 Option A so the phone-only path is visible. Use without Watch is not asked again during this workout.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-1/b90-1-current-light-norest.png",
+     "caption": "Current (Build 89)",
+     "note": "Ready for Watch card before first set"
+    },
+    {
+     "file": "captures/b90-2/b90-2-a-light-on-watch.png",
+     "caption": "After Watch acknowledged",
+     "note": "Quiet \"On Watch\" chip in the nav bar"
+    },
+    {
+     "file": "captures/b90-2/b90-2-a-light-without.png",
+     "caption": "After Use without Watch",
+     "note": "Normal Logger; no card, no re-prompt"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

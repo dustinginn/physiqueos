@@ -1,0 +1,27 @@
+{
+ "out": "boards/B90-2e-handoff-dark.png",
+ "title": "B90-2e \u00b7 Watch handoff \u00b7 Dark",
+ "subtitle": "Initial state in Dark for all three treatments.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-2/b90-2-a-dark-offer.png",
+     "caption": "Option A \u00b7 bottom sheet",
+     "note": "System sheet, compact detent"
+    },
+    {
+     "file": "captures/b90-2/b90-2-b-dark-offer.png",
+     "caption": "Option B \u00b7 centered card",
+     "note": "Card over a dimmed Logger"
+    },
+    {
+     "file": "captures/b90-2/b90-2-c-dark-offer.png",
+     "caption": "Option C \u00b7 docked panel",
+     "note": "Replaces the sticky bar; Logger stays live"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}
