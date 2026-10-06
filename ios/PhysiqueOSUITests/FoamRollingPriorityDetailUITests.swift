@@ -27,6 +27,47 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Priority skipped for today."].exists)
     }
 
+    /// Overnight Lane A: every locked Priority Detail variant renders its
+    /// own action set (and never an invalid one) on the shipping screen.
+    func testPriorityFamilyVariantsRenderTheirLockedActionsOnly() {
+        let expectations: [(variant: String, present: [String], absent: [String])] = [
+            ("peptide", ["priorityDetail.amountTaken", "priorityDetail.markComplete", "priorityDetail.markSkipped"], []),
+            ("supplement", ["priorityDetail.markComplete"], ["priorityDetail.amountTaken", "priorityDetail.markSkipped"]),
+            ("paused", ["priorityDetail.goToPeptide", "priorityDetail.paused"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
+            ("morning", ["priorityDetail.logWeight"], ["priorityDetail.markComplete"]),
+            ("morning-completed", ["priorityDetail.viewWeight"], ["priorityDetail.markComplete", "priorityDetail.logWeight"]),
+            ("photos", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner"], ["priorityDetail.markComplete"]),
+            ("dexa", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner"], ["priorityDetail.markComplete"]),
+            ("completed", ["priorityDetail.completed"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
+            ("skipped", ["priorityDetail.skipped"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
+            ("setup", ["priorityDetail.reviewSupport"], ["priorityDetail.markComplete"]),
+            ("failed", ["priorityDetail.retry"], ["priorityDetail.markComplete"]),
+            ("not-found", ["priorityDetail.retry"], ["priorityDetail.markComplete"]),
+        ]
+        for (index, expectation) in expectations.enumerated() {
+            app.terminate()
+            app.launchArguments = [
+                "-physiqueos.native.authority-selection.v1", "sandbox",
+                "-physiqueos.priority-pilot.enabled", "YES",
+                "-physiqueos.priority-pilot.appearance", index.isMultiple(of: 2) ? "dark" : "light",
+                "-physiqueos.priority-pilot.variant", expectation.variant,
+            ]
+            app.launch()
+            XCTAssertTrue(app.staticTexts["PRIORITY"].waitForExistence(timeout: 8), expectation.variant)
+            for identifier in expectation.present {
+                let element = app.descendants(matching: .any)[identifier]
+                XCTAssertTrue(element.waitForExistence(timeout: 3), "\(expectation.variant): missing \(identifier)")
+            }
+            for identifier in expectation.absent {
+                XCTAssertFalse(app.descendants(matching: .any)[identifier].exists, "\(expectation.variant): unexpected \(identifier)")
+            }
+            for identifier in expectation.present where identifier.hasSuffix("markComplete") || identifier.hasSuffix("evidenceAction") {
+                XCTAssertGreaterThanOrEqual(app.buttons[identifier].frame.height, 52, "\(expectation.variant) primary action height")
+            }
+            XCTAssertFalse(app.tabBars.firstMatch.exists, "\(expectation.variant): no persistent tab bar")
+        }
+    }
+
     func testLockedMineralLightParity() {
         launch(appearance: "light")
         assertLockedContentAndGeometry()

@@ -196,6 +196,29 @@ enum PhysiqueOSTheme {
     /// deep teal ink on the light field so it stays legible).
     static let redesignSuggestionInk = dynamic(dark: 0xE9FFFF, light: 0x087E78)
 
+    // MARK: Locked Priority Detail family
+    // Founder-locked 2026-10-04 (`priority-detail-ui-style-translation-20261004`).
+    // Migrated from the accepted Foam Rolling pilot's private palette into
+    // this shared authority at the exact locked values; they differ subtly
+    // from the Home/utility `redesign*` set by design of that lock.
+    static let priorityCanvas = dynamic(dark: 0x06121D, light: 0xF0EEE6)
+    static let priorityInk = dynamic(dark: 0xF4F7F5, light: 0x0A1B2C)
+    static let priorityMuted = dynamic(dark: 0x95A6AE, light: 0x65767D)
+    static let priorityRule = dynamic(dark: 0x203441, light: 0xCAD4CF)
+    static let prioritySurface = dynamic(dark: 0x102432, light: 0xFBFAF6)
+    static let prioritySurfaceRaised = dynamic(dark: 0x142E3A, light: 0xDCEBE8)
+    static let priorityTeal = dynamic(dark: 0x20C5B7, light: 0x0E9186)
+    static let priorityGreen = dynamic(dark: 0x4EE09A, light: 0x138C60)
+    static let priorityAmber = dynamic(dark: 0xF3BA49, light: 0xB9780D)
+    static let priorityCyan = dynamic(dark: 0x40C7D7, light: 0x168D9D)
+    static let priorityPurple = dynamic(dark: 0x9F7CFF, light: 0x7655DC)
+    static let priorityRed = dynamic(dark: 0xEF6F82, light: 0xC44F64)
+    static let priorityNavy = dynamic(dark: 0x123D61, light: 0x143E60)
+    /// Evidence-driven banner field (teal → navy); light keeps ink text.
+    static let priorityEvidenceStart = dynamic(dark: 0x16A69C, light: 0xD5EEE8)
+    static let priorityEvidenceEnd = dynamic(dark: 0x17436D, light: 0xC9DFE9)
+    static let priorityEvidenceInk = dynamic(dark: 0xFFFFFF, light: 0x0A1B2C)
+
     private static func dynamic(
         dark: UInt32,
         light: UInt32,

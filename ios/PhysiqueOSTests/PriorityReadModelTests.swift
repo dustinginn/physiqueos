@@ -78,6 +78,123 @@ final class PriorityReadModelTests: XCTestCase {
         )
     }
 
+    // MARK: Overnight Lane A — locked Priority Detail family
+
+    private func familyFixture(_ variant: String) throws -> PriorityOccurrence {
+        try XCTUnwrap(PriorityFamilyReviewFixtures.occurrence(variant, foam: plainFoam()))
+    }
+
+    private func plainFoam() -> PriorityOccurrence {
+        var foam = PriorityOccurrence(
+            id: "reminder_foam_roll_daily", routePriorityId: "reminder_foam_roll_daily",
+            executionItemId: "execution_foam_roll", date: "2026-10-04", title: "Foam Rolling",
+            subtitle: "Today · 7:15 PM", metadata: nil, changeLabel: nil, icon: .activity, color: .evidence,
+            urgency: .available, completed: false, completable: true, expectedVersion: 53,
+            actionLabel: "View Support", completionContext: .init(occurrenceDate: "2026-10-04", protocolId: "recovery"),
+            continueActionDestination: .operatingPlanRecoverySupport(executionId: "execution_foam_roll"),
+            detailSections: [.init(title: "What", items: [.init(label: "Foam Rolling", detail: "Complete the scheduled recovery support.")])]
+        )
+        foam.skippable = true
+        return foam
+    }
+
+    func testEveryProductionVariantSelectsItsLockedTemplate() throws {
+        typealias T = PriorityDetailPresentation.Template
+        let expected: [(String, T)] = [
+            ("generic", .manual), ("peptide", .doseAware), ("paused", .paused), ("supplement", .manual),
+            ("morning", .morningEvidence), ("morning-completed", .morningEvidence), ("photos", .photoEvidence),
+            ("dexa", .dexaEvidence), ("completed", .completed), ("skipped", .skipped), ("setup", .continueAction),
+        ]
+        for (variant, template) in expected {
+            XCTAssertEqual(PriorityDetailPresentation.template(try familyFixture(variant)), template, variant)
+        }
+        XCTAssertEqual(PriorityDetailPresentation.template(plainFoam()), .manual, "Foam keeps Mark Complete + Mark Skipped")
+    }
+
+    func testMarkCompleteIsNeverOfferedForPausedSkippedCompletedOrEvidenceDrivenPriorities() throws {
+        for variant in ["paused", "skipped", "completed", "morning", "morning-completed", "photos", "dexa", "setup"] {
+            let template = PriorityDetailPresentation.template(try familyFixture(variant))
+            let completing: [PriorityDetailPresentation.Template] = [.manual, .doseAware]
+            XCTAssertFalse(completing.contains(template), "\(variant) must not render Mark Complete")
+        }
+    }
+
+    func testOnlyAPeptideWithAPlannedDoseIsDoseAware() throws {
+        var supplement = try familyFixture("supplement")
+        supplement.completionContext = .init(occurrenceDate: "2026-10-04", dose: "500 mg", protocolId: "fadogia")
+        XCTAssertEqual(PriorityDetailPresentation.template(supplement), .manual, "A supplement's quantity is never editable")
+        var peptide = try familyFixture("peptide")
+        XCTAssertEqual(PriorityDetailPresentation.template(peptide), .doseAware)
+        peptide.completionContext?.dose = nil
+        XCTAssertEqual(PriorityDetailPresentation.template(peptide), .manual, "No planned dose, no amount editor")
+    }
+
+    func testStateWordAndToneAreTruthfulAndNeverColorOnly() throws {
+        let cases: [(String, String, PriorityDetailPresentation.StateTone)] = [
+            ("generic", "Open", .green), ("paused", "Paused", .amber), ("morning", "Open", .green),
+            ("morning-completed", "Completed", .green), ("photos", "Open", .green), ("dexa", "Upcoming", .cyan),
+            ("completed", "Completed", .green), ("skipped", "Skipped", .muted), ("setup", "Setup required", .amber),
+        ]
+        for (variant, word, tone) in cases {
+            let occurrence = try familyFixture(variant)
+            XCTAssertEqual(PriorityDetailPresentation.stateLabel(occurrence), word, variant)
+            XCTAssertEqual(PriorityDetailPresentation.stateTone(occurrence), tone, variant)
+        }
+    }
+
+    /// The locked Tesamorelin correction: one Preparation section with both
+    /// canonical instructions; retired informational cards stay filtered.
+    func testRepeatedSectionsConsolidateWithoutDroppingAnyCanonicalField() {
+        let sections: [PrioritySectionReadModel] = [
+            .init(title: "What", items: [.init(label: "Tesamorelin", detail: nil)]),
+            .init(title: "Preparation", items: [.init(label: "Finish eating approximately 2–3 hours before injection", detail: nil)]),
+            .init(title: "Preparation", items: [.init(label: "Take fasted before bed", detail: nil)]),
+            .init(title: "Related Goals", items: [.init(label: "Lean Mass Build", detail: nil)]),
+            .init(title: "Completion", items: [.init(label: "Mark complete", detail: nil)]),
+            .init(title: "Why it matters", items: [.init(label: "Supports the plan", detail: nil)]),
+            .init(title: "What", items: [.init(label: "Late duplicate", detail: nil)]),
+        ]
+        let grouped = PriorityDetailPresentation.groupedSections(sections)
+        XCTAssertEqual(grouped.map(\.title), ["What", "Preparation", "Why it matters"])
+        XCTAssertEqual(grouped[1].items.map(\.label), [
+            "Finish eating approximately 2–3 hours before injection", "Take fasted before bed",
+        ])
+        XCTAssertEqual(grouped[0].items.count, 2, "A non-adjacent repeat keeps its field instead of colliding")
+        XCTAssertEqual(Set(grouped.map(\.id)).count, grouped.count, "Section identities stay unique")
+    }
+
+    func testSectionKindsDriveTheLockedGlyphTints() {
+        XCTAssertEqual(PriorityDetailPresentation.sectionKind("When"), .when)
+        XCTAssertEqual(PriorityDetailPresentation.sectionKind("Dose"), .dose)
+        XCTAssertEqual(PriorityDetailPresentation.sectionKind("Dose / Quantity"), .dose)
+        XCTAssertEqual(PriorityDetailPresentation.sectionKind("Preparation"), .preparation)
+        XCTAssertEqual(PriorityDetailPresentation.sectionKind("Next Execution Change"), .nextChange)
+        XCTAssertEqual(PriorityDetailPresentation.sectionKind("Execution Notes"), .notes)
+        XCTAssertEqual(PriorityDetailPresentation.sectionKind("Why it matters"), .why)
+        XCTAssertEqual(PriorityDetailPresentation.sectionKind("What"), .plain)
+    }
+
+    /// The Server's verified evidence-priority hrefs reach existing Native
+    /// screens; anything else stays unmapped (no general web router).
+    func testEvidencePriorityActionHrefsMapToExistingNativeDestinations() {
+        XCTAssertEqual(ProductionPriorityAPI.destination(forActionHref: "/evidence/photos"), .photoUpload)
+        XCTAssertEqual(ProductionPriorityAPI.destination(forActionHref: "/evidence/dexa"), .dexaUpload)
+        XCTAssertEqual(ProductionPriorityAPI.destination(forActionHref: "/profile/operating-plan/execution/dexa"), .operatingPlanDexaAppointment)
+        XCTAssertEqual(ProductionPriorityAPI.destination(forActionHref: "/check-in/morning"), .checkIn(checkInType: "morning"))
+        XCTAssertEqual(ProductionPriorityAPI.destination(forActionHref: "/profile/operating-plan/execution/execution_foam_roll"),
+                       .operatingPlanRecoverySupport(executionId: "execution_foam_roll"))
+        XCTAssertNil(ProductionPriorityAPI.destination(forActionHref: "/evidence/photos/compare"))
+        XCTAssertNil(ProductionPriorityAPI.destination(forActionHref: nil))
+    }
+
+    func testUnavailableCopySplitsIntoTheLockedTitleAndSupportingLine() {
+        let message = "This priority could not be loaded. Pull to refresh and try again."
+        XCTAssertEqual(PriorityDetailView.failureTitle(message), "This priority could not be loaded.")
+        XCTAssertEqual(PriorityDetailView.failureDetail(message), "Pull to refresh and try again.")
+        XCTAssertEqual(PriorityDetailView.failureTitle("Offline"), "Offline")
+        XCTAssertNil(PriorityDetailView.failureDetail("Offline"))
+    }
+
     func testTookADifferentAmountParsesThePlannedDoseAndKeepsTheDefaultPathWhenUntouched() {
         XCTAssertEqual(PriorityDoseEntry.components(of: "1.5 mg")?.amount, "1.5")
         XCTAssertEqual(PriorityDoseEntry.components(of: "1.5 mg")?.unit, "mg")
