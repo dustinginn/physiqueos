@@ -225,7 +225,7 @@ struct SettingsView: View {
                         icon: "circle.lefthalf.filled",
                         tint: PhysiqueOSTheme.redesignPurple,
                         title: "Appearance",
-                        detail: appearance.selection == .light ? "Mineral Light" : appearance.selection.title
+                        detail: "iPhone \(appearance.selection.title) · Watch \(appearance.watchSelection.title)"
                     ) { onNavigate(.appearance) }
                     .background(PhysiqueOSTheme.redesignPaper)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -260,42 +260,115 @@ struct AppearanceView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                RedesignPageHeader(eyebrow: "APPEARANCE", title: "Choose how PhysiqueOS looks.", subtitle: "System is the default. Light uses the locked Mineral Light palette.")
-                VStack(spacing: 12) {
-                    ForEach(AppAppearance.allCases) { option in
-                        Button { appearance.select(option) } label: {
-                            HStack(spacing: 14) {
+                RedesignPageHeader(eyebrow: "APPEARANCE", title: "Choose how PhysiqueOS looks.", subtitle: "iPhone and Apple Watch are set separately. Mineral Light uses the locked Mineral Light palette.")
+                VStack(alignment: .leading, spacing: 8) {
+                    AppearanceSectionLabel(title: "IPHONE", icon: "iphone")
+                    VStack(spacing: 12) {
+                        ForEach(AppAppearance.allCases) { option in
+                            AppearanceOptionCard(
+                                title: option.title,
+                                detail: option.detail,
+                                isSelected: appearance.selection == option,
+                                identifier: "appearance.\(option.rawValue)"
+                            ) {
                                 AppearancePreview(option: option)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(option.title).font(.system(size: 17, weight: .heavy)).foregroundStyle(PhysiqueOSTheme.redesignInk)
-                                    Text(option.detail).font(.system(size: 12, weight: .medium)).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary).multilineTextAlignment(.leading)
-                                }
-                                Spacer(minLength: 4)
-                                Image(systemName: appearance.selection == option ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 23, weight: .semibold))
-                                    .foregroundStyle(appearance.selection == option ? PhysiqueOSTheme.redesignPurple : PhysiqueOSTheme.redesignInkSecondary.opacity(0.5))
+                            } action: {
+                                appearance.select(option)
                             }
-                            .padding(14)
-                            .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-                            .background(PhysiqueOSTheme.redesignPaper)
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(appearance.selection == option ? PhysiqueOSTheme.redesignPurple : PhysiqueOSTheme.redesignRule, lineWidth: appearance.selection == option ? 2 : 1))
-                            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("appearance.\(option.rawValue)")
-                        .accessibilityValue(appearance.selection == option ? "Selected" : "Not selected")
-                        .accessibilityAddTraits(appearance.selection == option ? .isSelected : [])
                     }
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    AppearanceSectionLabel(title: "APPLE WATCH", icon: "applewatch")
+                    VStack(spacing: 12) {
+                        ForEach(WatchAppearancePreference.allCases) { option in
+                            AppearanceOptionCard(
+                                title: option.title,
+                                detail: option.watchDetail,
+                                isSelected: appearance.watchSelection == option,
+                                identifier: "appearance.watch.\(option.rawValue)"
+                            ) {
+                                WatchAppearancePreview(option: option)
+                            } action: {
+                                appearance.selectWatch(option)
+                            }
+                        }
+                    }
+                    Text("Applies the next time your Apple Watch connects. Doesn't change the iPhone or the Live Activity.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
+                        .accessibilityIdentifier("appearance.watch.note")
                 }
             }
             .padding(.horizontal, 18)
             .padding(.top, 12)
+            .padding(.bottom, 24)
         }
         .background(PhysiqueOSTheme.redesignCanvas)
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
+    }
+}
+
+extension WatchAppearancePreference {
+    var watchDetail: String {
+        switch self {
+        case .dark: "OLED navy, the default on Apple Watch."
+        case .mineralLight: "Mineral Light surfaces with dark readable type."
+        }
+    }
+}
+
+private struct AppearanceSectionLabel: View {
+    let title: String
+    let icon: String
+
+    var body: some View {
+        Label(title, systemImage: icon)
+            .font(.system(size: 10, weight: .bold)).tracking(0.9)
+            .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+            .padding(.horizontal, 4)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// One selectable appearance card (the accepted Appearance grammar): preview,
+/// title, detail, and a selection circle; the whole card is the target.
+private struct AppearanceOptionCard<Preview: View>: View {
+    let title: String
+    let detail: String
+    let isSelected: Bool
+    let identifier: String
+    @ViewBuilder let preview: () -> Preview
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                preview()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.system(size: 17, weight: .heavy)).foregroundStyle(PhysiqueOSTheme.redesignInk)
+                    Text(detail).font(.system(size: 12, weight: .medium)).foregroundStyle(PhysiqueOSTheme.redesignInkSecondary).multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(isSelected ? PhysiqueOSTheme.redesignPurple : PhysiqueOSTheme.redesignInkSecondary.opacity(0.5))
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+            .background(PhysiqueOSTheme.redesignPaper)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(isSelected ? PhysiqueOSTheme.redesignPurple : PhysiqueOSTheme.redesignRule, lineWidth: isSelected ? 2 : 1))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -314,6 +387,30 @@ private struct AppearancePreview: View {
         }
         .frame(width: 58, height: 58)
         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(PhysiqueOSTheme.redesignRule))
+        .accessibilityHidden(true)
+    }
+}
+
+/// A miniature Watch face in the chosen Watch palette (the locked utility
+/// board's screen, cell, progress and primary-action tokens).
+private struct WatchAppearancePreview: View {
+    let option: WatchAppearancePreference
+    var body: some View {
+        let dark = option == .dark
+        ZStack {
+            RoundedRectangle(cornerRadius: 14).fill(Color(hex: dark ? 0x061019 : 0xE8ECE5))
+            VStack(spacing: 4) {
+                Capsule().fill(Color(hex: dark ? 0x55E39A : 0x16875F)).frame(width: 30, height: 3)
+                HStack(spacing: 3) {
+                    RoundedRectangle(cornerRadius: 3).fill(Color(hex: dark ? 0x0F1C2A : 0xFBFAF4)).frame(width: 14, height: 13)
+                    RoundedRectangle(cornerRadius: 3).fill(Color(hex: dark ? 0x0F1C2A : 0xFBFAF4)).frame(width: 14, height: 13)
+                }
+                Capsule().fill(Color(hex: dark ? 0xAA98FF : 0x5C3FD2)).frame(width: 31, height: 8)
+            }
+        }
+        .frame(width: 46, height: 56)
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(PhysiqueOSTheme.redesignRule))
+        .frame(width: 58, height: 58)
         .accessibilityHidden(true)
     }
 }

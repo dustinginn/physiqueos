@@ -22,6 +22,37 @@ enum WatchWorkoutContract {
     /// Separate slot for the compact Daily Totals snapshot. Application
     /// context is replaced as a whole, so the phone always publishes both.
     static let applicationContextDailyTotalsKey = "physiqueos.watchWorkout.dailyTotals.v1"
+    /// The Founder's Apple Watch appearance (independent of the iPhone's),
+    /// a plain raw string. Absent (older phone) or unknown values leave the
+    /// Watch on its last stored choice, which itself defaults to Dark.
+    static let applicationContextAppearanceKey = "physiqueos.watch.appearance.v1"
+}
+
+/// The Apple Watch app's own appearance: a PhysiqueOS palette choice, not a
+/// watchOS system mode (watchOS has no system light appearance to follow,
+/// so there is deliberately no `system` case). Configured on the iPhone's
+/// Appearance page, independent of the iPhone appearance.
+enum WatchAppearancePreference: String, CaseIterable, Codable, Identifiable, Sendable {
+    case dark
+    case mineralLight
+
+    /// Unset, missing or unrecognized preferences are Dark.
+    static let fallback: Self = .dark
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .dark: "Dark"
+        case .mineralLight: "Mineral Light"
+        }
+    }
+
+    /// Bounded decoding for an application-context value of any type.
+    static func decode(_ value: Any?) -> Self? {
+        guard let raw = value as? String, raw.count <= 32 else { return nil }
+        return Self(rawValue: raw)
+    }
 }
 
 protocol WatchWorkoutSafeStringEnum: RawRepresentable, Codable where RawValue == String {

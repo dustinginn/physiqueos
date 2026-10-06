@@ -394,6 +394,9 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
     }
 
     func testLockedUtilityTokensAndRetainedMetricIdentity() {
+        let saved = WatchPhysiqueOSTheme.current
+        defer { WatchPhysiqueOSTheme.current = saved }
+        WatchPhysiqueOSTheme.current = .dark
         XCTAssertEqual(WatchPhysiqueOSTheme.background, Color(watchHex: 0x061019))
         XCTAssertEqual(WatchPhysiqueOSTheme.purple, Color(watchHex: 0xAA98FF))
         XCTAssertEqual(WatchPhysiqueOSTheme.progress, Color(watchHex: 0x55E39A))
@@ -403,6 +406,62 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         XCTAssertEqual(WatchPhysiqueOSTheme.totalEnergyAccent, Color(watchHex: 0x4ADE80))
         XCTAssertEqual(WatchPhysiqueOSTheme.nutritionAccent, Color(watchHex: 0xC084FC))
         XCTAssertEqual(WatchPhysiqueOSTheme.heartRateAccent, Color(watchHex: 0xFF697A))
+    }
+
+    // MARK: Independent Watch appearance (Lane A addendum)
+
+    @MainActor
+    func testWatchAppearanceDefaultsToDarkPersistsAndSurvivesAnOfflineLaunch() throws {
+        let (store, defaults) = makeStore("laneA.appearance")
+        XCTAssertEqual(store.appearance, .dark, "Unset is Dark")
+
+        store.receiveApplicationContext([WatchWorkoutContract.applicationContextAppearanceKey: "mineralLight"])
+        XCTAssertEqual(store.appearance, .mineralLight)
+        XCTAssertEqual(defaults.string(forKey: WatchWorkoutStore.appearanceKey), "mineralLight")
+
+        // Relaunch with no phone: the stored choice renders immediately.
+        let relaunched = WatchWorkoutStore(session: nil, defaults: defaults, now: { self.now }, health: FakeWatchHealth(startDate: now))
+        XCTAssertEqual(relaunched.appearance, .mineralLight)
+    }
+
+    @MainActor
+    func testReconnectWithoutOrWithAnUnknownAppearanceKeepsTheStoredChoice() throws {
+        let (store, defaults) = makeStore("laneA.appearance.reconnect")
+        store.receiveAppearance("mineralLight")
+        // An older phone omits the slot; a future one may send a new value.
+        store.receiveApplicationContext([:])
+        XCTAssertEqual(store.appearance, .mineralLight, "No reset or flash on reconnect")
+        store.receiveAppearance("sepia")
+        store.receiveAppearance(7)
+        XCTAssertEqual(store.appearance, .mineralLight)
+        store.receiveApplicationContext([
+            WatchWorkoutContract.applicationContextProjectionKey: try WatchWorkoutWireCodec.encode(try fixture("normal")),
+            WatchWorkoutContract.applicationContextAppearanceKey: "dark",
+        ])
+        XCTAssertEqual(store.appearance, .dark)
+        XCTAssertEqual(defaults.string(forKey: WatchWorkoutStore.appearanceKey), "dark")
+    }
+
+    func testEveryWatchScreenResolvesTheSelectedPalette() {
+        let saved = WatchPhysiqueOSTheme.current
+        defer { WatchPhysiqueOSTheme.current = saved }
+        XCTAssertEqual(WatchPalette.of(.dark), .dark)
+        XCTAssertEqual(WatchPalette.of(.mineralLight), .mineralLight)
+        XCTAssertNil(WatchPalette.dark.clockBand)
+        XCTAssertNotNil(WatchPalette.mineralLight.clockBand, "The white system clock stays legible on Mineral")
+
+        WatchPhysiqueOSTheme.current = .of(.mineralLight)
+        XCTAssertEqual(WatchPhysiqueOSTheme.background, Color(watchHex: 0xE8ECE5))
+        XCTAssertEqual(WatchPhysiqueOSTheme.surface, Color(watchHex: 0xFBFAF4))
+        XCTAssertEqual(WatchPhysiqueOSTheme.purple, Color(watchHex: 0x5C3FD2))
+        XCTAssertEqual(WatchPhysiqueOSTheme.text, Color(watchHex: 0x102431))
+        XCTAssertEqual(WatchPhysiqueOSTheme.onPrimary, .white)
+        XCTAssertEqual(WatchPhysiqueOSTheme.timeAccent, Color(watchHex: 0x2563B8))
+        XCTAssertEqual(WatchPhysiqueOSTheme.heartRateAccent, Color(watchHex: 0xC73850))
+
+        WatchPhysiqueOSTheme.current = .of(.dark)
+        XCTAssertEqual(WatchPhysiqueOSTheme.background, Color(watchHex: 0x061019))
+        XCTAssertEqual(WatchPhysiqueOSTheme.onPrimary, Color(watchHex: 0x061019))
     }
 
     // MARK: Fixed execution layout

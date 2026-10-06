@@ -14,7 +14,7 @@ enum AppAppearance: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .system: "System"
         case .dark: "Dark"
-        case .light: "Light"
+        case .light: "Mineral Light"
         }
     }
 
@@ -35,26 +35,40 @@ enum AppAppearance: String, CaseIterable, Codable, Identifiable {
     }
 }
 
-/// App-level observable preference with injectable persistence for tests.
-/// System removes the key, so fresh install and an explicit reset are equal.
+/// App-level observable preferences with injectable persistence for tests.
+/// The iPhone appearance and the Apple Watch appearance are independent:
+/// separate keys, separate setters, and neither is ever derived from the
+/// other. iPhone System removes its key, so fresh install and an explicit
+/// reset are equal; an unset Watch appearance is Dark.
 @MainActor
 @Observable
 final class AppAppearanceStore {
     static let persistenceKey = "physiqueos.appearance.preference.v1"
+    static let watchPersistenceKey = "physiqueos.appearance.watch.v1"
 
     private let defaults: UserDefaults
     private let key: String
+    private let watchKey: String
     private let initialOverride: AppAppearance?
+    private let initialWatchOverride: WatchAppearancePreference?
     private(set) var selection: AppAppearance
+    private(set) var watchSelection: WatchAppearancePreference
 
     init(
         defaults: UserDefaults = .standard,
         key: String = AppAppearanceStore.persistenceKey,
-        initialOverride: AppAppearance? = nil
+        watchKey: String = AppAppearanceStore.watchPersistenceKey,
+        initialOverride: AppAppearance? = nil,
+        initialWatchOverride: WatchAppearancePreference? = nil
     ) {
         self.defaults = defaults
         self.key = key
+        self.watchKey = watchKey
         self.initialOverride = initialOverride
+        self.initialWatchOverride = initialWatchOverride
+        watchSelection = initialWatchOverride
+            ?? WatchAppearancePreference.decode(defaults.string(forKey: watchKey))
+            ?? .fallback
         if let initialOverride {
             selection = initialOverride
         } else if let rawValue = defaults.string(forKey: key),
@@ -69,6 +83,13 @@ final class AppAppearanceStore {
     }
 
     var preferredColorScheme: ColorScheme? { selection.preferredColorScheme }
+
+    /// The Apple Watch appearance. Never touches the iPhone selection.
+    func selectWatch(_ appearance: WatchAppearancePreference) {
+        watchSelection = appearance
+        guard initialWatchOverride == nil else { return }
+        defaults.set(appearance.rawValue, forKey: watchKey)
+    }
 
     func select(_ appearance: AppAppearance) {
         selection = appearance

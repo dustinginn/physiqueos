@@ -267,6 +267,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     /// When the Watch first saw the confirmed finish of the shown session.
     private(set) var finishingObservedAt: Date?
     private(set) var dailyTotals: WatchDailyTotals?
+    /// The Founder's Watch appearance, as last received from the iPhone and
+    /// persisted here so launch, an active workout and reconnects render it
+    /// with no phone contact. Unset is Dark.
+    private(set) var appearance: WatchAppearancePreference
     let health: any WatchWorkoutHealthRecording
     /// The read-only refresh in flight. Deliberately outside `gate`: a
     /// refresh never mutates, so it never disables Complete Set (Build 86).
@@ -314,6 +318,22 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     private var deferredKind: WatchWorkoutCommand.Kind?
     static let maximumSendAttempts = 4
 
+    static let appearanceKey = "physiqueos.watch.appearance.v1"
+
+    static func storedAppearance(_ defaults: UserDefaults) -> WatchAppearancePreference {
+        WatchAppearancePreference.decode(defaults.string(forKey: appearanceKey)) ?? .fallback
+    }
+
+    /// Applies a phone-sent appearance. Absent or unrecognized values keep
+    /// the stored choice (no reset or flash on reconnect).
+    func receiveAppearance(_ value: Any?) {
+        guard let incoming = WatchAppearancePreference.decode(value) else { return }
+        if defaults.string(forKey: Self.appearanceKey) != incoming.rawValue {
+            defaults.set(incoming.rawValue, forKey: Self.appearanceKey)
+        }
+        if appearance != incoming { appearance = incoming }
+    }
+
     private static let dismissedSummariesKey = "physiqueos.watchWorkout.dismissedSummaries.v1"
     private static let finishKnowledgeKey = "physiqueos.watchWorkout.finishKnowledge.v1"
     /// A Workout Saved summary older than this never comes back.
@@ -333,6 +353,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         self.defaults = defaults
         self.now = now
         self.health = health ?? WatchWorkoutHealthController()
+        appearance = Self.storedAppearance(defaults)
         super.init()
     }
 
@@ -517,6 +538,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
                 pendingIssuedAt = fixture.pendingIssuedAt
             }
             debugSurface = fixtureName
+            if let review = ProcessInfo.processInfo.argumentValue(after: "-watchAppearance") {
+                appearance = WatchAppearancePreference(rawValue: review) ?? .fallback
+            }
             cancelConfirmationVisible = fixture.cancelConfirmationVisible
             debugOrphanedHealthSessionId = fixture.orphanedHealthSessionId
             health.installDebugMetrics(
@@ -1336,6 +1360,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         _ context: [String: Any],
         recordsAuthoritativeContact: Bool = true
     ) {
+        receiveAppearance(context[WatchWorkoutContract.applicationContextAppearanceKey])
         // The phone always publishes both slots: an absent totals slot means
         // the canonical snapshot was cleared (sign-out, authority switch).
         if let data = context[WatchWorkoutContract.applicationContextDailyTotalsKey] as? Data,

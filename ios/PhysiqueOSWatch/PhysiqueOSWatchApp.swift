@@ -8,7 +8,8 @@ struct PhysiqueOSWatchApp: App {
     var body: some Scene {
         WindowGroup {
             WatchWorkoutRootView(store: store)
-                .preferredColorScheme(.dark)
+                // The Founder's PhysiqueOS Watch appearance (Dark default).
+                .preferredColorScheme(store.appearance == .mineralLight ? .light : .dark)
                 .task { store.install() }
                 .onChange(of: scenePhase, initial: true) {
                     store.setDisplayActive(scenePhase == .active)

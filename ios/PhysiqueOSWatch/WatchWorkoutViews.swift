@@ -1,32 +1,122 @@
 import SwiftUI
 
-/// Locked Watch utility translation (Founder lock 2026-10-04, design package
-/// `utility-surfaces-design-20261004` + acceptance corrections): the OLED
-/// dark token set. The Watch stays dark-only; the mineral-light boards were
-/// review translations, not a light Watch.
-enum WatchPhysiqueOSTheme {
-    static let background = Color(watchHex: 0x061019)
+/// One complete Watch palette: the locked utility translation's semantic
+/// tokens (`utility-surfaces-design-20261004` + acceptance corrections).
+/// Every screen reads these roles; no screen swaps colors by appearance.
+struct WatchPalette: Equatable {
+    var background: Color
     /// Quiet cell (`utility.surface`).
-    static let surface = Color(watchHex: 0x0F1C2A)
-    /// The current set's cell (`utility.surface.soft`).
-    static let secondarySurface = Color(watchHex: 0x132735)
-    static let progressTrack = Color(watchHex: 0x20303C)
-    static let purple = Color(watchHex: 0xAA98FF)
-    static let text = Color(watchHex: 0xF3F8FA)
-    static let secondaryText = Color(watchHex: 0xC3D2D9)
-    static let muted = Color(watchHex: 0x92A5AF)
-    static let success = Color(watchHex: 0x55E39A)
-    static let warning = Color(watchHex: 0xEFB84F)
-    static let destructive = Color(watchHex: 0xFF697A)
+    var surface: Color
+    /// The current set's cell.
+    var secondarySurface: Color
+    var progressTrack: Color
+    var purple: Color
+    var text: Color
+    var secondaryText: Color
+    var muted: Color
+    var success: Color
+    var warning: Color
+    var destructive: Color
+    /// Label color on filled purple / amber actions.
+    var onPrimary: Color
+    /// Metric icon accents: the shipping production identity, retained by
+    /// the Founder's acceptance correction (light: same hue, darkened).
+    var timeAccent: Color
+    var activeEnergyAccent: Color
+    var totalEnergyAccent: Color
+    var nutritionAccent: Color
+    var heartRateAccent: Color
+    /// Always-On / display-inactive treatment (same content, dimmer).
+    var reducedSaturation: Double
+    var reducedBrightness: Double
+    /// watchOS always draws the system time in white. On a light palette a
+    /// band behind the clock zone keeps it legible on the physical Watch.
+    var clockBand: Color? = nil
+
+    /// OLED Dark (the default).
+    static let dark = WatchPalette(
+        background: Color(watchHex: 0x061019),
+        surface: Color(watchHex: 0x0F1C2A),
+        secondarySurface: Color(watchHex: 0x132735),
+        progressTrack: Color(watchHex: 0x20303C),
+        purple: Color(watchHex: 0xAA98FF),
+        text: Color(watchHex: 0xF3F8FA),
+        secondaryText: Color(watchHex: 0xC3D2D9),
+        muted: Color(watchHex: 0x92A5AF),
+        success: Color(watchHex: 0x55E39A),
+        warning: Color(watchHex: 0xEFB84F),
+        destructive: Color(watchHex: 0xFF697A),
+        onPrimary: Color(watchHex: 0x061019),
+        timeAccent: Color(watchHex: 0x60A5FA),
+        activeEnergyAccent: Color(watchHex: 0xFBBF24),
+        totalEnergyAccent: Color(watchHex: 0x4ADE80),
+        nutritionAccent: Color(watchHex: 0xC084FC),
+        heartRateAccent: Color(watchHex: 0xFF697A),
+        reducedSaturation: 0.45,
+        reducedBrightness: -0.08
+    )
+
+    /// Mineral Light: the locked light Watch board (paper cells on mineral,
+    /// ink text, white labels on filled actions). Quiet labels use the
+    /// acceptance board's #5B7179, which stays legible on paper.
+    static let mineralLight = WatchPalette(
+        background: Color(watchHex: 0xE8ECE5),
+        surface: Color(watchHex: 0xFBFAF4),
+        secondarySurface: Color(watchHex: 0xD5ECE6),
+        progressTrack: Color(watchHex: 0xCBD5D1),
+        purple: Color(watchHex: 0x5C3FD2),
+        text: Color(watchHex: 0x102431),
+        secondaryText: Color(watchHex: 0x526970),
+        muted: Color(watchHex: 0x5B7179),
+        success: Color(watchHex: 0x16875F),
+        warning: Color(watchHex: 0xC88228),
+        destructive: Color(watchHex: 0xB83D4B),
+        onPrimary: .white,
+        timeAccent: Color(watchHex: 0x2563B8),
+        activeEnergyAccent: Color(watchHex: 0xA85A00),
+        totalEnergyAccent: Color(watchHex: 0x137847),
+        nutritionAccent: Color(watchHex: 0x7540B8),
+        heartRateAccent: Color(watchHex: 0xC73850),
+        reducedSaturation: 0.5,
+        reducedBrightness: -0.05,
+        clockBand: Color(watchHex: 0x102431)
+    )
+
+    static func of(_ appearance: WatchAppearancePreference) -> WatchPalette {
+        switch appearance {
+        case .dark: .dark
+        case .mineralLight: .mineralLight
+        }
+    }
+
+    var colorScheme: ColorScheme { self == .mineralLight ? .light : .dark }
+}
+
+/// Semantic Watch tokens resolved against the active palette. The root view
+/// sets `current` from the Founder's Watch appearance and rebuilds the tree
+/// when it changes, so every screen resolves the same roles.
+enum WatchPhysiqueOSTheme {
+    nonisolated(unsafe) static var current: WatchPalette = .dark
+
+    static var background: Color { current.background }
+    static var surface: Color { current.surface }
+    static var secondarySurface: Color { current.secondarySurface }
+    static var progressTrack: Color { current.progressTrack }
+    static var purple: Color { current.purple }
+    static var text: Color { current.text }
+    static var secondaryText: Color { current.secondaryText }
+    static var muted: Color { current.muted }
+    static var success: Color { current.success }
+    static var warning: Color { current.warning }
+    static var destructive: Color { current.destructive }
+    static var onPrimary: Color { current.onPrimary }
     /// Set progress shares the success green.
-    static let progress = success
-    /// Metric icon accents: the shipping production identity, retained
-    /// exactly by the Founder's acceptance correction (never normalized).
-    static let timeAccent = Color(red: 96 / 255, green: 165 / 255, blue: 250 / 255)
-    static let activeEnergyAccent = Color(red: 251 / 255, green: 191 / 255, blue: 36 / 255)
-    static let totalEnergyAccent = Color(red: 74 / 255, green: 222 / 255, blue: 128 / 255)
-    static let nutritionAccent = Color(red: 192 / 255, green: 132 / 255, blue: 252 / 255)
-    static let heartRateAccent = destructive
+    static var progress: Color { current.success }
+    static var timeAccent: Color { current.timeAccent }
+    static var activeEnergyAccent: Color { current.activeEnergyAccent }
+    static var totalEnergyAccent: Color { current.totalEnergyAccent }
+    static var nutritionAccent: Color { current.nutritionAccent }
+    static var heartRateAccent: Color { current.heartRateAccent }
 }
 
 extension Color {
@@ -218,7 +308,7 @@ struct WatchActionButton: View {
 
     private var foreground: Color {
         switch style {
-        case .primary, .warning: return WatchPhysiqueOSTheme.background
+        case .primary, .warning: return WatchPhysiqueOSTheme.onPrimary
         case .destructive: return .white
         case .quiet: return WatchPhysiqueOSTheme.text
         case .quietDestructive: return WatchPhysiqueOSTheme.destructive
@@ -316,7 +406,9 @@ struct WatchWorkoutRootView: View {
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
     var body: some View {
-        ZStack {
+        let palette = WatchPalette.of(store.appearance)
+        WatchPhysiqueOSTheme.current = palette
+        return ZStack {
             WatchPhysiqueOSTheme.background.ignoresSafeArea()
             if let projection = store.projection {
                 switch store.presentedPhase {
@@ -334,6 +426,12 @@ struct WatchWorkoutRootView: View {
             }
         }
         .foregroundStyle(WatchPhysiqueOSTheme.text)
+        .overlay(alignment: .top) {
+            if let band = palette.clockBand { WatchClockBand(color: band) }
+        }
+        .environment(\.colorScheme, palette.colorScheme)
+        // A different appearance rebuilds every screen against its palette.
+        .id(store.appearance)
     }
 
     /// Controls are the page to the LEFT of the workout: a physical swipe
@@ -379,6 +477,23 @@ struct WatchWorkoutRootView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("watch.idle")
+    }
+}
+
+/// The band behind the system clock on a light palette: it ends just above
+/// where every page's content starts (the shared below-clock inset).
+struct WatchClockBand: View {
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geometry in
+            color
+                .frame(height: max(0, WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top) - 3))
+                .frame(maxWidth: .infinity, alignment: .top)
+                .ignoresSafeArea(edges: .top)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -531,8 +646,8 @@ struct WatchWorkoutExecutionView: View {
                 .padding(.top, topInset)
                 .frame(width: geometry.size.width, height: fullHeight, alignment: .top)
                 // Always-On: the same content at reduced luminance/saturation.
-                .saturation(reduced ? 0.45 : 1)
-                .brightness(reduced ? -0.08 : 0)
+                .saturation(reduced ? WatchPhysiqueOSTheme.current.reducedSaturation : 1)
+                .brightness(reduced ? WatchPhysiqueOSTheme.current.reducedBrightness : 0)
                 .overlay(alignment: .topLeading) {
                     if store.debugSurface == "geometry" {
                         Text("avail \(Int(available.width))x\(Int(available.height)) need \(Int(layout.requiredHeight(hasRest: store.visibleRest != nil))) top \(Int(topInset))")
@@ -770,7 +885,7 @@ struct WatchEdgeCapsuleButton: View {
     let layout: WatchExecutionLayout
     var enabled = true
     var tint: Color = WatchPhysiqueOSTheme.purple
-    var foreground: Color = WatchPhysiqueOSTheme.background
+    var foreground: Color = WatchPhysiqueOSTheme.onPrimary
     let action: () -> Void
 
     var body: some View {
