@@ -8,11 +8,13 @@ This package contains compact review boards captured from shipping PhysiqueOS vi
 - `boards/C2-nutrition-calories-green.png` — Calories uses semantic green without changing the other macro colors.
 - `boards/C3-home-timeline-copy.png` — approved headline and compact Remaining copy; phase detail remains unchanged.
 - `boards/C4-widget-refresh-accent.png` — refresh uses the same teal/cyan action authority as Start Logger.
+- `boards/C5-logger-suggested-selection.png` — Suggested Today’s explicit target transitions to the selected checkmark while its Training Area tile stays synchronized.
 
 ## Capture provenance
 
 - C1 and C2: focused `TrainingAcceptanceUITests` against the real sandbox navigation and shipping screens.
 - C3: existing `FoamRollingPriorityDetailUITests` physical-parity journeys against the shipping Home screen.
 - C4: `HomeWidgetTests.testShippingViewsRenderAllRequiredStates` against `HomeLoggedTodayWidgetView`.
+- C5: focused real-SwiftUI component renders plus canonical `TrainingLoggerViewModel` selection tests.
 
 Raw screenshots live in `captures/`. `source/render-boards.swift` deterministically composes the boards without altering app code or runtime behavior.

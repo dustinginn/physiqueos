@@ -17,6 +17,107 @@ enum PerformanceRecordConfettiStyle {
     }
 }
 
+struct TrainingLoggerSuggestedAreaSelectionPresentation: Equatable {
+    static let minimumControlTarget: CGFloat = 44
+
+    let suggestionLabel: String
+    let isSelected: Bool
+
+    var systemImage: String { isSelected ? "checkmark.circle.fill" : "circle" }
+    var accessibilityLabel: String {
+        "\(isSelected ? "Deselect" : "Select") suggested \(suggestionLabel)"
+    }
+    var accessibilityValue: String { isSelected ? "Selected" : "Not selected" }
+}
+
+/// Suggested Today and the Training Area grid are two presentations of the
+/// same draft selection. This card owns no state: its action mutates the
+/// Logger's canonical draft through `TrainingLoggerViewModel`.
+struct TrainingLoggerSuggestedAreaCard: View {
+    let suggestion: TrainingLoggerCategorySuggestion
+    let isSelected: Bool
+    let action: () -> Void
+
+    private var presentation: TrainingLoggerSuggestedAreaSelectionPresentation {
+        .init(suggestionLabel: suggestion.label, isSelected: isSelected)
+    }
+
+    private var field: LinearGradient {
+        LinearGradient(
+            colors: [PhysiqueOSTheme.redesignUtilityField, PhysiqueOSTheme.redesignUtilityNavy],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "sparkle").font(.system(size: 8, weight: .bold))
+                        Text("Suggested Today").logText(LoggerType.eyebrow10)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: presentation.systemImage)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(PhysiqueOSTheme.redesignSuggestionInk)
+                        .frame(
+                            width: TrainingLoggerSuggestedAreaSelectionPresentation.minimumControlTarget,
+                            height: TrainingLoggerSuggestedAreaSelectionPresentation.minimumControlTarget
+                        )
+                        .contentShape(Circle())
+                        .accessibilityHidden(true)
+                }
+                .foregroundStyle(PhysiqueOSTheme.redesignSuggestionInk)
+                Text(suggestion.label)
+                    .logText(LoggerType.surfaceTitle16)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                    .padding(.top, 2)
+                    .padding(.bottom, 4)
+                Text(suggestion.reason)
+                    .logText(LoggerType.body11)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(field, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(presentation.accessibilityLabel)
+        .accessibilityValue(presentation.accessibilityValue)
+        .accessibilityHint(suggestion.reason)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("trainingLogger.suggestedToday")
+    }
+}
+
+struct TrainingLoggerAreaChoiceLabel: View {
+    let title: String
+    let isSelected: Bool
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        HStack {
+            Text(title).logText(LoggerType.choice12)
+            Spacer(minLength: 4)
+            Image(systemName: isSelected ? "circle.fill" : "circle")
+                .font(.system(size: 9, weight: .bold))
+                .accessibilityHidden(true)
+        }
+        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+        .padding(.horizontal, 11)
+        .frame(maxWidth: .infinity, minHeight: 54)
+        .background {
+            shape.fill(PhysiqueOSTheme.redesignPaper)
+            if isSelected { shape.fill(PhysiqueOSTheme.redesignPurple.opacity(0.12)) }
+        }
+        .overlay(shape.strokeBorder(isSelected ? PhysiqueOSTheme.redesignPurple : PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+        .contentShape(shape)
+    }
+}
+
 struct TrainingLoggerView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -410,39 +511,15 @@ struct TrainingLoggerView: View {
                 infoRow(icon: "calendar", title: "Workout date", value: draft.workoutDate)
             }
             if let suggestion = viewModel.availableCategorySuggestion {
-                Button { viewModel.acceptCategorySuggestion() } label: {
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "sparkle").font(.system(size: 8, weight: .bold))
-                            Text("Suggested Today").logText(LoggerType.eyebrow10)
-                            Spacer()
-                            if viewModel.isCategorySuggestionAccepted {
-                                Image(systemName: "checkmark.circle.fill").font(.system(size: 13, weight: .bold))
-                                    .accessibilityLabel("Accepted")
-                            }
-                        }
-                        .foregroundStyle(PhysiqueOSTheme.redesignSuggestionInk)
-                        Text(suggestion.label)
-                            .logText(LoggerType.surfaceTitle16)
-                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
-                            .padding(.top, 2)
-                            .padding(.bottom, 4)
-                        Text(suggestion.reason)
-                            .logText(LoggerType.body11)
-                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(loggerTealField, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(viewModel.isCategorySuggestionAccepted ? .isSelected : [])
-                .accessibilityIdentifier("trainingLogger.suggestedToday")
+                TrainingLoggerSuggestedAreaCard(
+                    suggestion: suggestion,
+                    isSelected: viewModel.isCategorySuggestionAccepted,
+                    action: { viewModel.toggleCategorySuggestion() }
+                )
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 9), GridItem(.flexible(), spacing: 9)], spacing: 9) {
                 ForEach(viewModel.configuration?.areas ?? []) { area in
-                    let selected = viewModel.draft?.selectedAreaIds.contains(area.id) == true
+                    let selected = viewModel.isAreaSelected(area.id)
                     Button {
                         viewModel.update { $0.toggleArea(area.id) }
                     } label: {
@@ -462,23 +539,7 @@ struct TrainingLoggerView: View {
     /// Locked selection chip: 54 pt, 12 pt radius; selected adds the purple
     /// rule and 12% purple tint plus a filled marker (never color alone).
     private func loggerChoice(_ title: String, selected: Bool) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-        return HStack {
-            Text(title).logText(LoggerType.choice12)
-            Spacer(minLength: 4)
-            Image(systemName: selected ? "circle.fill" : "circle")
-                .font(.system(size: 9, weight: .bold))
-                .accessibilityHidden(true)
-        }
-        .foregroundStyle(PhysiqueOSTheme.redesignInk)
-        .padding(.horizontal, 11)
-        .frame(maxWidth: .infinity, minHeight: 54)
-        .background {
-            shape.fill(PhysiqueOSTheme.redesignPaper)
-            if selected { shape.fill(PhysiqueOSTheme.redesignPurple.opacity(0.12)) }
-        }
-        .overlay(shape.strokeBorder(selected ? PhysiqueOSTheme.redesignPurple : PhysiqueOSTheme.redesignHairline, lineWidth: 1))
-        .contentShape(shape)
+        TrainingLoggerAreaChoiceLabel(title: title, isSelected: selected)
     }
 
     private func exercisePicker(_ viewModel: TrainingLoggerViewModel) -> some View {
@@ -2059,4 +2120,3 @@ enum LoggerReviewSeam {
     }
 #endif
 }
-

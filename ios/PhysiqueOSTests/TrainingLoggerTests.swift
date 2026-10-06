@@ -1,4 +1,6 @@
 import XCTest
+import SwiftUI
+import UIKit
 @testable import PhysiqueOS
 
 final class TrainingLoggerTests: XCTestCase {
@@ -707,14 +709,124 @@ final class TrainingLoggerTests: XCTestCase {
         let viewModel = TrainingLoggerViewModel(api: SuggestionAPI(base: config), draftStore: MemoryTrainingLoggerDraftStore())
         await viewModel.load()
         viewModel.start(mode: .live)
-        XCTAssertEqual(viewModel.availableCategorySuggestion?.label, "Biceps + Triceps")
+        let originalSuggestion = try XCTUnwrap(viewModel.availableCategorySuggestion)
+        XCTAssertEqual(originalSuggestion.label, "Biceps + Triceps")
         XCTAssertFalse(viewModel.isCategorySuggestionAccepted)
-        viewModel.acceptCategorySuggestion()
+        XCTAssertFalse(viewModel.isAreaSelected("biceps"))
+        XCTAssertFalse(viewModel.isAreaSelected("triceps"))
+
+        // The card action selects the exact same canonical draft fields read
+        // by the corresponding Training Area tiles.
+        viewModel.toggleCategorySuggestion()
         XCTAssertEqual(viewModel.draft?.selectedAreaIds, ["biceps", "triceps"])
         XCTAssertTrue(viewModel.isCategorySuggestionAccepted)
+        XCTAssertTrue(viewModel.isAreaSelected("biceps"))
+        XCTAssertTrue(viewModel.isAreaSelected("triceps"))
+
+        // Toggling a tile immediately updates the card's selected state.
         viewModel.update { $0.toggleArea("triceps") }
         XCTAssertEqual(viewModel.draft?.selectedAreaIds, ["biceps"], "Founder override must remain authoritative.")
         XCTAssertFalse(viewModel.isCategorySuggestionAccepted)
+        XCTAssertTrue(viewModel.isAreaSelected("biceps"))
+        XCTAssertFalse(viewModel.isAreaSelected("triceps"))
+        viewModel.update { $0.toggleArea("triceps") }
+        XCTAssertTrue(viewModel.isCategorySuggestionAccepted)
+
+        // Tapping the selected card applies the same multi-select toggles and
+        // both the card and its tiles become unselected from one draft state.
+        viewModel.toggleCategorySuggestion()
+        XCTAssertEqual(viewModel.draft?.selectedAreaIds, [])
+        XCTAssertFalse(viewModel.isCategorySuggestionAccepted)
+        XCTAssertFalse(viewModel.isAreaSelected("biceps"))
+        XCTAssertFalse(viewModel.isAreaSelected("triceps"))
+        XCTAssertEqual(viewModel.availableCategorySuggestion, originalSuggestion, "Selection must not mutate suggestion calculation or evidence.")
+    }
+
+    func testSuggestedTodaySelectionControlHasExplicitAccessibleStatesAndCanonicalWiring() throws {
+        let unselected = TrainingLoggerSuggestedAreaSelectionPresentation(
+            suggestionLabel: "Shoulders",
+            isSelected: false
+        )
+        XCTAssertEqual(unselected.systemImage, "circle")
+        XCTAssertEqual(unselected.accessibilityLabel, "Select suggested Shoulders")
+        XCTAssertEqual(unselected.accessibilityValue, "Not selected")
+        XCTAssertGreaterThanOrEqual(TrainingLoggerSuggestedAreaSelectionPresentation.minimumControlTarget, 44)
+
+        let selected = TrainingLoggerSuggestedAreaSelectionPresentation(
+            suggestionLabel: "Shoulders",
+            isSelected: true
+        )
+        XCTAssertEqual(selected.systemImage, "checkmark.circle.fill")
+        XCTAssertEqual(selected.accessibilityLabel, "Deselect suggested Shoulders")
+        XCTAssertEqual(selected.accessibilityValue, "Selected")
+
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let view = try String(
+            contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(view.contains("action: { viewModel.toggleCategorySuggestion() }"))
+        XCTAssertTrue(view.contains("let selected = viewModel.isAreaSelected(area.id)"))
+    }
+
+    @MainActor
+    func testSuggestedTodaySelectionControlRendersDarkAndMineralUnselectedAndSelected() throws {
+        let suggestion = TrainingLoggerCategorySuggestion(
+            id: "review-shoulders",
+            date: "2026-10-06",
+            label: "Shoulders",
+            categoryIds: ["shoulders"],
+            reason: "Repeated on Tuesdays across confirmed workouts",
+            source: "confirmed_training_evidence_history",
+            historyReferences: ["session-1", "session-2", "session-3"]
+        )
+        let directory = ProcessInfo.processInfo.environment["BUILD89_LOGGER_SCREENSHOT_DIR"].map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        }
+        if let directory {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+
+        for (appearance, scheme) in [("dark", ColorScheme.dark), ("light", ColorScheme.light)] {
+            for selected in [false, true] {
+                let state = selected ? "selected" : "unselected"
+                let surface = VStack(alignment: .leading, spacing: 12) {
+                    Text("WHAT ARE YOU TRAINING?")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
+                    TrainingLoggerSuggestedAreaCard(
+                        suggestion: suggestion,
+                        isSelected: selected,
+                        action: {}
+                    )
+                    HStack(spacing: 9) {
+                        TrainingLoggerAreaChoiceLabel(title: "Shoulders", isSelected: selected)
+                        TrainingLoggerAreaChoiceLabel(title: "Biceps", isSelected: false)
+                    }
+                }
+                .padding(16)
+                .frame(width: 390)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(PhysiqueOSTheme.redesignCanvas)
+                .environment(\.colorScheme, scheme)
+
+                let renderer = ImageRenderer(content: surface)
+                renderer.scale = 3
+                let image = try XCTUnwrap(renderer.uiImage)
+                let data = try XCTUnwrap(image.pngData())
+                XCTAssertGreaterThan(data.count, 12_000, "\(appearance) \(state) render was unexpectedly empty")
+                let attachment = XCTAttachment(image: image)
+                attachment.name = "C5-logger-suggested-\(appearance)-\(state)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+                if let directory {
+                    try data.write(
+                        to: directory.appendingPathComponent("C5-logger-suggested-\(appearance)-\(state).png"),
+                        options: .atomic
+                    )
+                }
+            }
+        }
     }
 
     @MainActor
