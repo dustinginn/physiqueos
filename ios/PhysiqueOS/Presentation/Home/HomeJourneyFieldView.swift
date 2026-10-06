@@ -298,6 +298,9 @@ enum HomeJourneyTimingPresentation {
         if value.lowercased().hasSuffix(" remaining") {
             value.removeLast(" remaining".count)
         }
+        if value.lowercased().hasSuffix(" to goal target") {
+            value.removeLast(" to goal target".count)
+        }
         return value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

@@ -13,7 +13,7 @@
       "clarifyingFactors": ["Four weeks remain in the current phase."],
       "uncertaintyStatement": "Confidence reflects the current evidence, not a guaranteed outcome."
     },
-    "primaryTimeline": "On track",
+    "primaryTimeline": "4 weeks to goal target",
     "projectedFinish": "Oct 31",
     "daysRemaining": "4 weeks",
     "actionLabel": null,
@@ -69,7 +69,7 @@
         "progressStatus": "in_progress",
         "startDate": "2026-08-15",
         "calculatedPlannedReviewDate": "2026-10-31",
-        "friendlyTimeline": "4 weeks remaining"
+        "friendlyTimeline": "about 4 weeks to goal target remaining"
       }]
     },
     "destination": { "id": "goal.detail", "parameters": { "goalId": "goal_fixture_build_lean_mass" } }

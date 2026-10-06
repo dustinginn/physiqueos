@@ -66,6 +66,7 @@ final class HomeReadModelTests: XCTestCase {
         let url = try XCTUnwrap(Bundle.main.url(forResource: "HomeRedesignReviewFixture", withExtension: "json"))
         let model = try JSONDecoder().decode(HomeReadModel.self, from: Data(contentsOf: url))
         XCTAssertEqual(model.hero.confidence, 79)
+        XCTAssertEqual(model.hero.primaryTimeline, "4 weeks to goal target")
         XCTAssertEqual(model.briefingCards.count, 1)
         XCTAssertEqual(model.todaysFocus.count, 3)
         guard case .phaseTrajectory(let trajectory) = try XCTUnwrap(model.goals.first).presentation else {
@@ -92,6 +93,7 @@ final class HomeReadModelTests: XCTestCase {
             supportLine: "Execution is aligned with the current plan.",
             confidence: 79,
             confidenceDetail: nil,
+            primaryTimeline: "4 weeks to goal target",
             projectedFinish: nil,
             daysRemaining: nil
         )
@@ -108,7 +110,7 @@ final class HomeReadModelTests: XCTestCase {
             startDate: "2026-08-15",
             calculatedPlannedReviewDate: "2026-10-31",
             timelineProgressState: "active",
-            friendlyTimeline: "4 weeks remaining"
+            friendlyTimeline: "about 4 weeks to goal target remaining"
         )
         let trajectory = HomePhaseTrajectory(
             targetDescription: "+10 lb lean",
@@ -118,12 +120,15 @@ final class HomeReadModelTests: XCTestCase {
         )
 
         let remaining = HomeJourneyTimingPresentation.remainingPeriod(hero: hero, trajectory: trajectory)
+        XCTAssertEqual(hero.primaryTimeline, "4 weeks to goal target", "The green status line keeps the Founder-approved canonical copy.")
         XCTAssertEqual(remaining, "4 weeks")
         XCTAssertNotEqual(remaining, "—")
         XCTAssertEqual(
             HomeJourneyTimingPresentation.phaseDetail(for: active, remainingPeriod: remaining),
             "Aug 15 – Oct 31 · about 4 weeks remaining"
         )
+        XCTAssertEqual(trajectory.overallTargetDate, "2026-10-31")
+        XCTAssertEqual(active.clampedProgressPercentage, 58)
     }
 
     func testBriefingTileUsesFreedEyebrowSpaceForRealCadenceTitles() {
