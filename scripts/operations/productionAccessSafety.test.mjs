@@ -88,6 +88,83 @@ describe("non-content structural diagnostics", () => {
     assert.equal(diagnostics.carriageReturnEventCount, 2);
   });
 
+  it("classifies only bounded outside-frame prompt, connection, command-echo, marker, and exit forms", () => {
+    const outside = [
+      "web-host:/workspace# ",
+      "Connected to bounded synthetic console",
+      "stty -echo",
+      "web-host:/workspace# stty -echo",
+    ].join("\n");
+    const output = `${outside}\n${framed({ passed: true })}`;
+    assert.deepEqual(parseFramedJson(output, PREFIX, { marker: MARKER }), { passed: true });
+
+    const diagnostics = collectStructuralDiagnostics(output, PREFIX, MARKER, {
+      parserStage: "complete",
+      errorCode: "AUDIT_DIAGNOSTIC",
+    });
+    assert.equal(diagnostics.outsideLineCount, 7);
+    assert.equal(diagnostics.preBeginOutsideLineCount, 4);
+    assert.equal(diagnostics.postEndOutsideLineCount, 3);
+    assert.equal(diagnostics.emptyLineCount, 1);
+    assert.equal(diagnostics.recognizedPromptLineCount, 1);
+    assert.equal(diagnostics.recognizedConnectionLineCount, 1);
+    assert.equal(diagnostics.recognizedCommandEchoLineCount, 2);
+    assert.equal(diagnostics.recognizedMarkerLineCount, 1);
+    assert.equal(diagnostics.recognizedZeroExitLineCount, 1);
+    assert.equal(diagnostics.unrecognizedOutsideLineCount, 0);
+    assert.equal(diagnostics.controlledCommandEchoPatternPresent, true);
+  });
+
+  it("classifies unknown outside lines by bounded position while keeping them rejected", () => {
+    const singleUnknown = "synthetic unknown pre-frame line";
+    const singleDiagnostics = thrownDiagnostics(() => parseFramedJson(`${singleUnknown}\n${framed({ passed: true })}`, PREFIX, {
+      marker: MARKER,
+      structuralDiagnostics: true,
+    }));
+    assert.equal(singleDiagnostics.errorCode, "AUDIT_OUTPUT_UNEXPECTED");
+    assert.equal(singleDiagnostics.unrecognizedOutsideLineCount, 1);
+    assert.equal(singleDiagnostics.allUnrecognizedLinesPreBegin, true);
+    assert.equal(singleDiagnostics.allUnrecognizedLinesPostEnd, false);
+    assert.equal(singleDiagnostics.unrecognizedLineCountExactlyOne, true);
+
+    const multipleDiagnostics = thrownDiagnostics(() => parseFramedJson(`unknown one\nunknown two\n${framed({ passed: true })}`, PREFIX, {
+      marker: MARKER,
+      structuralDiagnostics: true,
+    }));
+    assert.equal(multipleDiagnostics.unrecognizedOutsideLineCount, 2);
+    assert.equal(multipleDiagnostics.allUnrecognizedLinesPreBegin, true);
+    assert.equal(multipleDiagnostics.unrecognizedLineCountExactlyOne, false);
+
+    const postEnd = framed({ passed: true }).replace(
+      `__PHYSIQUEOS_STRUCTURED_END__:${PREFIX}\n`,
+      `__PHYSIQUEOS_STRUCTURED_END__:${PREFIX}\nsynthetic unknown post-frame line\n`,
+    );
+    const postDiagnostics = thrownDiagnostics(() => parseFramedJson(postEnd, PREFIX, {
+      marker: MARKER,
+      structuralDiagnostics: true,
+    }));
+    assert.equal(postDiagnostics.unrecognizedOutsideLineCount, 1);
+    assert.equal(postDiagnostics.allUnrecognizedLinesPreBegin, false);
+    assert.equal(postDiagnostics.allUnrecognizedLinesPostEnd, true);
+    assert.equal(postDiagnostics.unrecognizedLineCountExactlyOne, true);
+  });
+
+  it("does not leak unknown outside content or credentials through structural classifications", () => {
+    const sensitive = "postgresql://synthetic-user:synthetic-password@example.invalid/database";
+    const arbitraryEcho = "web-host:/workspace# arbitrary unsafe command";
+    for (const fixture of [sensitive, arbitraryEcho]) {
+      const diagnostics = thrownDiagnostics(() => parseFramedJson(`${fixture}\n${framed({ passed: true })}`, PREFIX, {
+        marker: MARKER,
+        structuralDiagnostics: true,
+      }));
+      const serialized = JSON.stringify(diagnostics);
+      assert.equal(diagnostics.errorCode, "AUDIT_OUTPUT_UNEXPECTED");
+      assert.equal(diagnostics.unrecognizedOutsideLineCount, 1);
+      assert.equal(serialized.includes(fixture), false);
+      assert.equal(serialized.includes("synthetic-password"), false);
+    }
+  });
+
   it("proves diagnostics cannot contain fixture text, JSON, base64, credentials, or extra fields", () => {
     const sensitive = "postgresql://synthetic-user:synthetic-password@example.invalid/database";
     const rawJson = JSON.stringify({ sensitive, fixtureText: "NEVER_EXPOSE_THIS_FIXTURE_TEXT" });

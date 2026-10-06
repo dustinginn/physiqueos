@@ -14,7 +14,15 @@ const SIDE_EFFECTING_SELECT = /\b(?:nextval|setval|pg_advisory|pg_notify|dblink|
 const CREDENTIAL_SHAPE = /(?:postgres(?:ql)?:\/\/|-----BEGIN [A-Z ]*PRIVATE KEY-----|-----BEGIN CERTIFICATE-----|\bBearer\s+[A-Za-z0-9._~-]+|\bdop_v1_[A-Za-z0-9]+|\bdoo_v1_[A-Za-z0-9]+)/i;
 const STRUCTURED_BEGIN = "__PHYSIQUEOS_STRUCTURED_BEGIN__";
 const STRUCTURED_END = "__PHYSIQUEOS_STRUCTURED_END__";
+const PTY_PROMPT_LINE = /^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9._-]+:[^\n]{0,180}[#$>] ?$/;
+const PTY_CONNECTION_LINE = /^(?:Connecting(?: to)?|Connected(?: to)?|Welcome|Last login:)[^\n]{0,180}$/i;
+// The first controlled command is necessarily echoed before it can disable PTY echo.
+// Accept only its exact composition with the already bounded prompt grammar.
+const PTY_PROMPT_ECHO_DISABLE_LINE = /^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9._-]+:[^\n]{0,180}[#$>] ?stty -echo$/;
+const CONTROLLED_COMMAND_ECHO_LINES = new Set(["stty -echo", "exit"]);
 const DIAGNOSTIC_KEYS = Object.freeze([
+  "allUnrecognizedLinesPostEnd",
+  "allUnrecognizedLinesPreBegin",
   "ansiSequenceCount",
   "backspaceEventCount",
   "beginBeforeEnd",
@@ -22,6 +30,8 @@ const DIAGNOSTIC_KEYS = Object.freeze([
   "beginSentinelCount",
   "carriageReturnEventCount",
   "chunkCount",
+  "controlledCommandEchoPatternPresent",
+  "emptyLineCount",
   "endBeforeMarker",
   "endContiguous",
   "endSentinelCount",
@@ -30,9 +40,19 @@ const DIAGNOSTIC_KEYS = Object.freeze([
   "markerOrderingValid",
   "normalizedByteCount",
   "normalizedLineCount",
+  "outsideLineCount",
   "parserStage",
+  "postEndOutsideLineCount",
+  "preBeginOutsideLineCount",
   "rawByteCount",
+  "recognizedCommandEchoLineCount",
+  "recognizedConnectionLineCount",
+  "recognizedMarkerLineCount",
+  "recognizedPromptLineCount",
+  "recognizedZeroExitLineCount",
   "successMarkerCount",
+  "unrecognizedLineCountExactlyOne",
+  "unrecognizedOutsideLineCount",
   "zeroExitMarkerCount",
 ]);
 const DIAGNOSTIC_STAGES = new Set([
@@ -154,6 +174,7 @@ export function collectStructuralDiagnostics(output, prefix, marker, {
   const zeroExitIndexes = indexesMatching(lines, (line) => line === "__PHYSIQUEOS_REMOTE_EXIT__:0");
   const beginBeforeEnd = beginIndexes.length > 0 && endIndexes.length > 0 && beginIndexes[0] < endIndexes[0];
   const endBeforeMarker = endIndexes.length > 0 && markerIndexes.length > 0 && endIndexes[0] < markerIndexes[0];
+  const outsideStructure = classifyOutsideFrameStructure(lines, exactBeginIndexes, endIndexes, marker);
   const diagnostics = {
     rawByteCount: boundedCount(Buffer.byteLength(raw)),
     normalizedByteCount: boundedCount(Buffer.byteLength(normalized)),
@@ -172,6 +193,7 @@ export function collectStructuralDiagnostics(output, prefix, marker, {
     ansiSequenceCount: boundedCount(normalization.ansiSequenceCount),
     carriageReturnEventCount: boundedCount(normalization.carriageReturnEventCount),
     backspaceEventCount: boundedCount(normalization.backspaceEventCount),
+    ...outsideStructure,
     parserStage,
     errorCode: sanitizeDiagnosticCode(errorCode),
   };
@@ -435,12 +457,75 @@ function stripTerminalSequences(value) {
 }
 
 function isAllowedPtyFramingLine(line, marker) {
-  if (line === "" || line === marker || /^__PHYSIQUEOS_REMOTE_EXIT__:0$/.test(line)) return true;
-  if (/^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9._-]+:[^\n]{0,180}[#$>] ?$/.test(line)) return true;
-  if (/^[#$>] ?$/.test(line)) return true;
-  if (/^(?:Connecting(?: to)?|Connected(?: to)?|Welcome|Last login:)[^\n]{0,180}$/i.test(line)) return true;
-  if (new Set(["stty -echo", "exit"]).has(line)) return true;
-  return false;
+  return classifyOutsideFrameLine(line, marker) !== "unknown";
+}
+
+function classifyOutsideFrameStructure(lines, exactBeginIndexes, endIndexes, marker) {
+  if (exactBeginIndexes.length !== 1 || endIndexes.length !== 1 || endIndexes[0] <= exactBeginIndexes[0]) {
+    return emptyOutsideFrameStructure();
+  }
+  const beginIndex = exactBeginIndexes[0];
+  const endIndex = endIndexes[0];
+  const entries = [
+    ...lines.slice(0, beginIndex).map((line) => ({ line, position: "pre" })),
+    ...lines.slice(endIndex + 1).map((line) => ({ line, position: "post" })),
+  ];
+  const classes = entries.map(({ line, position }) => ({
+    classification: classifyOutsideFrameLine(line, marker),
+    controlledCommandEchoPattern: hasControlledCommandEchoPattern(line),
+    position,
+  }));
+  const unrecognized = classes.filter(({ classification }) => classification === "unknown");
+  const countClass = (classification) => boundedCount(classes.filter((entry) => entry.classification === classification).length);
+  return {
+    outsideLineCount: boundedCount(entries.length),
+    preBeginOutsideLineCount: boundedCount(entries.filter(({ position }) => position === "pre").length),
+    postEndOutsideLineCount: boundedCount(entries.filter(({ position }) => position === "post").length),
+    emptyLineCount: countClass("empty"),
+    recognizedPromptLineCount: countClass("prompt"),
+    recognizedConnectionLineCount: countClass("connection"),
+    recognizedCommandEchoLineCount: countClass("command_echo"),
+    recognizedMarkerLineCount: countClass("marker"),
+    recognizedZeroExitLineCount: countClass("zero_exit"),
+    unrecognizedOutsideLineCount: boundedCount(unrecognized.length),
+    allUnrecognizedLinesPreBegin: unrecognized.length > 0 && unrecognized.every(({ position }) => position === "pre"),
+    allUnrecognizedLinesPostEnd: unrecognized.length > 0 && unrecognized.every(({ position }) => position === "post"),
+    unrecognizedLineCountExactlyOne: unrecognized.length === 1,
+    controlledCommandEchoPatternPresent: classes.some(({ controlledCommandEchoPattern }) => controlledCommandEchoPattern),
+  };
+}
+
+function emptyOutsideFrameStructure() {
+  return {
+    outsideLineCount: 0,
+    preBeginOutsideLineCount: 0,
+    postEndOutsideLineCount: 0,
+    emptyLineCount: 0,
+    recognizedPromptLineCount: 0,
+    recognizedConnectionLineCount: 0,
+    recognizedCommandEchoLineCount: 0,
+    recognizedMarkerLineCount: 0,
+    recognizedZeroExitLineCount: 0,
+    unrecognizedOutsideLineCount: 0,
+    allUnrecognizedLinesPreBegin: false,
+    allUnrecognizedLinesPostEnd: false,
+    unrecognizedLineCountExactlyOne: false,
+    controlledCommandEchoPatternPresent: false,
+  };
+}
+
+function classifyOutsideFrameLine(line, marker) {
+  if (line === "") return "empty";
+  if (line === marker) return "marker";
+  if (line === "__PHYSIQUEOS_REMOTE_EXIT__:0") return "zero_exit";
+  if (PTY_PROMPT_LINE.test(line) || /^[#$>] ?$/.test(line)) return "prompt";
+  if (PTY_CONNECTION_LINE.test(line)) return "connection";
+  if (CONTROLLED_COMMAND_ECHO_LINES.has(line) || PTY_PROMPT_ECHO_DISABLE_LINE.test(line)) return "command_echo";
+  return "unknown";
+}
+
+function hasControlledCommandEchoPattern(line) {
+  return CONTROLLED_COMMAND_ECHO_LINES.has(line) || PTY_PROMPT_ECHO_DISABLE_LINE.test(line);
 }
 
 function diagnosticFailure(code, output, prefix, marker, parserStage, enabled) {
