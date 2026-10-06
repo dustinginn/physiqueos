@@ -8,6 +8,9 @@ import {
   deriveTrainingExerciseRelationshipContext,
   getTrainingExerciseRelationshipComparisonKey,
 } from "../models/trainingExerciseRelationship";
+import {
+  resolveExecutableTrainingProgressionPolicy,
+} from "./TrainingProgressionPolicy.js";
 
 export const TRAINING_LOGGER_PROGRESSION_STATUS = Object.freeze({
   INSUFFICIENT: "insufficient_evidence",
@@ -30,126 +33,147 @@ export function createTrainingLoggerProgressionRecommendation({
   nowDate,
   relationshipContext = null,
   sessions = [],
+  trainingStrategy = null,
   variant = null,
 } = {}) {
+  const comparisonContext = createComparisonContext({
+    canonicalExerciseId,
+    relationshipContext,
+    variant,
+  });
+  const policy = resolveExecutableTrainingProgressionPolicy({
+    canonicalExerciseId,
+    trainingStrategy,
+  });
+  const nowDateKey = String(nowDate ?? "").slice(0, 10);
   const comparable = listComparablePerformances({
     canonicalExerciseId,
     relationshipContext,
     sessions,
     variant,
-  }).filter((entry) => !nowDate || entry.date < String(nowDate).slice(0, 10));
+  }).filter((entry) => !nowDateKey || entry.date <= nowDateKey);
   const phase = resolveTrainingProgressionPhase(goalContext);
   const phaseExpectation = PHASE_EXPECTATIONS[phase];
 
-  if (comparable.length < 2) {
-    return {
-      status: TRAINING_LOGGER_PROGRESSION_STATUS.INSUFFICIENT,
-      confidence: "low",
-      reason: "More comparable confirmed sessions are needed before recommending progression.",
-      recommendedAction: "manual_or_previous",
-      recommendedLoad: null,
-      recommendedLoadType: null,
-      recommendedReps: null,
-      recommendedUnit: null,
-      comparisonContext: createComparisonContext({ canonicalExerciseId, relationshipContext, variant }),
-      historyReferences: comparable.map(toHistoryReference),
-      calibration: { phase, movementCadenceDays: null, userCadenceDays: null },
-    };
+  if (!policy.executable) {
+    return insufficient({
+      calibration: diagnosticCalibration({ comparable, phase, phaseExpectation, sessions }),
+      comparisonContext,
+      comparable,
+      policy,
+      reason: "The active Training Strategy progression rule cannot be executed safely.",
+      reasonCode: policy.reasonCode,
+    });
   }
 
-  const allPerformances = listAllPerformances(sessions);
-  const movementCadenceDays = inferProgressionCadenceDays(comparable, 3);
-  const userCadenceDays = inferUserProgressionCadenceDays(allPerformances, 4);
-  const calibratedDays = movementCadenceDays ?? userCadenceDays ?? phaseExpectation.opportunityDays;
+  if (comparable.length < 2) {
+    return insufficient({
+      calibration: diagnosticCalibration({ comparable, phase, phaseExpectation, sessions }),
+      comparisonContext,
+      comparable,
+      policy,
+      reason: "More comparable finalized sessions are needed before recommending progression.",
+      reasonCode: "insufficient_comparable_finalized_sessions",
+    });
+  }
+
   const latest = comparable[0];
-  const previous = comparable[1];
-  const daysSinceLatest = daysBetween(nowDate, latest.date);
-  const stableAcrossRecent = comparable.slice(0, 3).every((entry) =>
-    samePerformance(entry, latest)
-  );
-  const regression = comparePerformance(latest, previous) < 0;
-  const progress = comparePerformance(latest, previous) > 0;
+  const previous = comparable[1] ?? null;
+  const calibration = diagnosticCalibration({ comparable, phase, phaseExpectation, sessions });
+  const currentLoadRun = listCurrentLoadRun(comparable, latest);
+  const qualifyingRun = listCurrentQualifyingRun(currentLoadRun, policy);
+  const exposureStartDate = qualifyingRun.at(-1)?.date ?? null;
+  const exposureDays = exposureStartDate ? daysBetween(nowDateKey, exposureStartDate) : 0;
+  const qualifyingSuccessfulSessions = qualifyingRun.length;
+  const sessionCountGateSatisfied = qualifyingSuccessfulSessions >= policy.successfulSessionsRequired;
+  const exposureGateSatisfied = exposureStartDate !== null && exposureDays >= policy.minimumExposureDays;
+  const gates = Object.freeze({
+    eligible: sessionCountGateSatisfied && exposureGateSatisfied,
+    exposureGateSatisfied,
+    sessionCountGateSatisfied,
+  });
   const confidence = comparable.length >= 5 ? "high" : comparable.length >= 3 ? "moderate" : "low";
   const common = {
     confidence,
-    comparisonContext: createComparisonContext({ canonicalExerciseId, relationshipContext, variant }),
+    comparisonContext,
     historyReferences: comparable.slice(0, 6).map(toHistoryReference),
-    calibration: {
-      phase,
-      phaseExpectationDays: phaseExpectation.opportunityDays,
-      movementCadenceDays,
-      userCadenceDays,
-      effectiveCadenceDays: calibratedDays,
-    },
+    calibration,
+    progressionPolicy: projectPolicy(policy),
+    successfulSessionsRequired: policy.successfulSessionsRequired,
+    qualifyingSuccessfulSessions,
+    exposureStartDate,
+    minimumExposureDays: policy.minimumExposureDays,
+    exposureDays,
+    progressionGates: gates,
   };
 
-  if (regression) {
+  if (previous && comparePerformance(latest, previous) < 0) {
     return {
       ...common,
       status: TRAINING_LOGGER_PROGRESSION_STATUS.RECOVER,
       reason: "The latest comparable session was below the prior performance.",
+      reasonCode: "latest_performance_regressed",
       recommendedAction: "keep_previous",
       recommendedLoad: previous.load,
       recommendedLoadType: previous.loadType,
       recommendedReps: previous.reps,
       recommendedUnit: previous.unit,
+      targetSelection: Object.freeze({ status: "recovery_target", policy: "prior_comparable_performance" }),
     };
   }
 
-  if (progress && daysSinceLatest < calibratedDays) {
-    return {
-      ...common,
-      status: TRAINING_LOGGER_PROGRESSION_STATUS.ON_PACE,
-      reason: `Recent comparable performance progressed and remains on pace for the ${phaseExpectation.label}.`,
-      recommendedAction: "maintain",
-      recommendedLoad: latest.load,
-      recommendedLoadType: latest.loadType,
-      recommendedReps: latest.reps,
-      recommendedUnit: latest.unit,
-    };
-  }
-
-  if (stableAcrossRecent && comparable.length >= 3 && daysSinceLatest >= calibratedDays) {
-    const target = deriveEvidenceSupportedTarget(comparable);
+  if (gates.eligible) {
+    const target = deriveEvidenceSupportedTarget(comparable, policy);
     return {
       ...common,
       status: TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY,
-      reason: `Comparable performance has held long enough to consider progression for the ${phaseExpectation.label}.`,
+      reason: `The current prescription has ${qualifyingSuccessfulSessions} qualifying successful sessions and ${exposureDays} days of exposure.`,
+      reasonCode: "strategy_eligibility_gates_satisfied",
       recommendedAction: target ? "use_suggestion" : "consider_progression",
       recommendedLoad: target?.load ?? null,
       recommendedLoadType: target ? latest.loadType : null,
       recommendedReps: target?.reps ?? null,
       recommendedUnit: target ? latest.unit : null,
+      targetSelection: target
+        ? Object.freeze({ status: "available", policy: target.policy })
+        : Object.freeze({ status: "unavailable", policy: "no_evidence_supported_load_increment" }),
     };
   }
 
+  const progressed = previous && comparePerformance(latest, previous) > 0;
+  const reasonCode = !sessionCountGateSatisfied
+    ? "successful_session_gate_pending"
+    : "minimum_exposure_gate_pending";
   return {
     ...common,
-    status: TRAINING_LOGGER_PROGRESSION_STATUS.MAINTAIN,
-    reason: phase === "cut"
-      ? "Preserving comparable performance is productive during a cut."
-      : "The available history supports repeating the latest comparable performance.",
+    status: progressed
+      ? TRAINING_LOGGER_PROGRESSION_STATUS.ON_PACE
+      : TRAINING_LOGGER_PROGRESSION_STATUS.MAINTAIN,
+    reason: !sessionCountGateSatisfied
+      ? `${policy.successfulSessionsRequired - qualifyingSuccessfulSessions} more qualifying successful session${policy.successfulSessionsRequired - qualifyingSuccessfulSessions === 1 ? " is" : "s are"} required at the current prescription.`
+      : `${policy.minimumExposureDays - exposureDays} more exposure day${policy.minimumExposureDays - exposureDays === 1 ? " is" : "s are"} required from the first qualifying success.`,
+    reasonCode,
     recommendedAction: "maintain",
     recommendedLoad: latest.load,
     recommendedLoadType: latest.loadType,
     recommendedReps: latest.reps,
     recommendedUnit: latest.unit,
+    targetSelection: Object.freeze({ status: "not_eligible", policy: null }),
   };
 }
 
 export function resolveTrainingProgressionPhase(goalContext = null) {
-  const text = [
+  const explicitPhase = [
     goalContext?.phase?.type,
     goalContext?.phase?.label,
     goalContext?.phase?.name,
+  ].filter(Boolean).join(" ").toLowerCase();
+  const fallback = [
     goalContext?.type,
     goalContext?.title,
     goalContext?.strategy,
   ].filter(Boolean).join(" ").toLowerCase();
-  if (/gain|surplus|build|hypertrophy|mass/.test(text)) return "gain";
-  if (/cut|deficit|fat loss|lean out/.test(text)) return "cut";
-  if (/maintain|maintenance|stabil/.test(text)) return "maintenance";
-  return "unknown";
+  return phaseFromText(explicitPhase) ?? phaseFromText(fallback) ?? "unknown";
 }
 
 export function listComparablePerformances({
@@ -162,40 +186,61 @@ export function listComparablePerformances({
   const requestedRelationshipKey = getTrainingExerciseRelationshipComparisonKey(
     relationshipContext
   );
-  return listAllPerformances(sessions)
+  const matches = listAllPerformances(sessions)
     .filter((entry) => entry.canonicalExerciseId === canonicalExerciseId)
     .filter((entry) => entry.variantKey === requestedVariantKey)
     .filter((entry) => entry.relationshipKey === requestedRelationshipKey)
-    .sort((left, right) => String(right.date).localeCompare(String(left.date)));
+    .sort(compareOccurrenceOrder);
+  const bySession = new Map();
+  matches.forEach((entry) => {
+    const existing = bySession.get(entry.sessionKey);
+    if (!existing || entry.sets.length > existing.sets.length ||
+      (entry.sets.length === existing.sets.length && comparePerformance(entry, existing) > 0)) {
+      bySession.set(entry.sessionKey, entry);
+    }
+  });
+  return [...bySession.values()].sort(compareOccurrenceOrder);
 }
 
 function listAllPerformances(sessions = []) {
-  return sessions
-    .map((candidate) => candidate?.payload ?? candidate)
-    .filter((session) => session?.evidence_type === "training")
-    .flatMap((session) => (session.exercises ?? []).map((exercise) => {
-      const best = getBestComparableSet(exercise.sets);
+  return sessions.flatMap((candidate, sessionIndex) => {
+    const session = candidate?.payload ?? candidate;
+    const qualityStatus = String(candidate?.quality?.status ?? session?.quality?.status ?? "").toLowerCase();
+    if (session?.evidence_type !== "training" ||
+      ["draft", "pending", "partial", "superseded"].includes(qualityStatus)) return [];
+    const observedAt = String(session.observed_at ?? session.date ?? "");
+    const sessionId = session.id ?? candidate?.canonicalId ?? null;
+    const sessionKey = String(sessionId ?? `legacy_session_${sessionIndex}_${observedAt}`);
+    return (session.exercises ?? []).map((exercise, exerciseIndex) => {
+      const sets = normalizeComparableSets(exercise.sets);
+      const best = getBestComparableSet(sets);
       if (!best) return null;
       return {
         canonicalExerciseId: exercise.canonicalExerciseId ??
           getCanonicalTrainingExerciseSlug(exercise.name),
-        date: String(session.observed_at ?? session.date ?? "").slice(0, 10),
+        date: observedAt.slice(0, 10),
         load: best.load,
         loadType: best.loadType,
+        occurrenceId: exercise.id ?? `occurrence_${exerciseIndex}`,
+        observedAt,
         reps: best.reps,
         relationshipKey: getTrainingExerciseRelationshipComparisonKey(
           deriveTrainingExerciseRelationshipContext({ exercise, session })
         ),
-        sessionId: session.id ?? session.canonicalId ?? null,
+        sessionId,
+        sessionKey,
+        setProfileKey: sets.map(setProfilePart).join(";"),
+        sets,
         unit: best.unit,
         variantKey: getTrainingExecutionVariantKey(exercise),
       };
-    }))
-    .filter((entry) => entry?.date);
+    }).filter((entry) => entry?.date);
+  });
 }
 
-function getBestComparableSet(sets = []) {
+function normalizeComparableSets(sets = []) {
   return (sets ?? [])
+    .filter((set) => set?.completed !== false && set?.isCompleted !== false)
     .map((set) => {
       const loadType = set.load_type ?? set.loadType ??
         (set.weight_unit === "bodyweight" || set.unit === "bodyweight"
@@ -208,8 +253,55 @@ function getBestComparableSet(sets = []) {
         unit: loadType === "bodyweight" ? "bodyweight" : set.weight_unit ?? set.unit ?? "lb",
       };
     })
-    .filter((set) => set.load !== null && set.reps !== null)
-    .sort((left, right) => comparePerformance(right, left))[0] ?? null;
+    .filter((set) => set.load !== null && set.reps !== null);
+}
+
+function getBestComparableSet(sets = []) {
+  return [...sets].sort((left, right) => comparePerformance(right, left))[0] ?? null;
+}
+
+function listCurrentLoadRun(entries, latest) {
+  const run = [];
+  for (const entry of entries) {
+    if (!sameLoadContext(entry, latest)) break;
+    run.push(entry);
+  }
+  return run;
+}
+
+function listCurrentQualifyingRun(entries, policy) {
+  if (!entries.length) return [];
+  const latestProfile = entries[0].setProfileKey;
+  const run = [];
+  for (const entry of entries) {
+    const qualifies = policy.qualificationMode === "prescribed_top_of_rep_range"
+      ? qualifiesAtConfiguredTopOfRange(entry, policy)
+      : entry.setProfileKey === latestProfile;
+    if (!qualifies) break;
+    run.push(entry);
+  }
+  return run;
+}
+
+function qualifiesAtConfiguredTopOfRange(entry, policy) {
+  if (!entry.sets.length) return false;
+  if (policy.workingSetsRequired !== null && entry.sets.length !== policy.workingSetsRequired) return false;
+  return entry.sets.every((set) =>
+    sameLoadContext(set, entry) && set.reps >= policy.repRange.maximum
+  );
+}
+
+function diagnosticCalibration({ comparable, phase, phaseExpectation, sessions }) {
+  const movementCadenceDays = inferProgressionCadenceDays(comparable, 3);
+  const userCadenceDays = inferUserProgressionCadenceDays(listAllPerformances(sessions), 4);
+  return Object.freeze({
+    phase,
+    phaseExpectationDays: phaseExpectation.opportunityDays,
+    movementCadenceDays,
+    userCadenceDays,
+    effectiveCadenceDays: movementCadenceDays ?? userCadenceDays ?? phaseExpectation.opportunityDays,
+    eligibilityRole: "diagnostic_only",
+  });
 }
 
 function inferProgressionCadenceDays(entries = [], minimumEvents) {
@@ -233,7 +325,7 @@ function inferUserProgressionCadenceDays(entries = [], minimumEvents) {
 }
 
 function listProgressionIntervals(entries = []) {
-  const ordered = [...entries].sort((left, right) => String(left.date).localeCompare(String(right.date)));
+  const ordered = [...entries].sort((left, right) => compareOccurrenceOrder(right, left));
   const intervals = [];
   for (let index = 1; index < ordered.length; index += 1) {
     if (comparePerformance(ordered[index], ordered[index - 1]) > 0) {
@@ -244,21 +336,79 @@ function listProgressionIntervals(entries = []) {
   return intervals;
 }
 
-function deriveEvidenceSupportedTarget(entries = []) {
-  const ordered = [...entries].sort((left, right) => String(left.date).localeCompare(String(right.date)));
+function deriveEvidenceSupportedTarget(entries = [], policy) {
+  const ordered = [...entries].sort((left, right) => compareOccurrenceOrder(right, left));
   const increments = [];
   for (let index = 1; index < ordered.length; index += 1) {
-    const increment = ordered[index].load - ordered[index - 1].load;
+    const current = ordered[index];
+    const prior = ordered[index - 1];
+    if (current.loadType !== prior.loadType || current.unit !== prior.unit) continue;
+    const increment = current.load - prior.load;
     if (increment > 0 && increment <= 50) increments.push(increment);
   }
   const latest = entries[0];
-  if (increments.length >= 2 && latest.load > 0) {
-    return { load: latest.load + Math.min(...increments), reps: Math.max(1, latest.reps - 2) };
+  if (increments.length < 2 || latest.load <= 0) return null;
+  return {
+    load: latest.load + Math.min(...increments),
+    reps: policy.repRange?.minimum ?? Math.max(1, latest.reps - 2),
+    policy: "historical_minimum_load_increment",
+  };
+}
+
+function insufficient({ calibration, comparisonContext, comparable, policy, reason, reasonCode }) {
+  return {
+    status: TRAINING_LOGGER_PROGRESSION_STATUS.INSUFFICIENT,
+    confidence: "low",
+    reason,
+    reasonCode,
+    recommendedAction: "manual_or_previous",
+    recommendedLoad: null,
+    recommendedLoadType: null,
+    recommendedReps: null,
+    recommendedUnit: null,
+    comparisonContext,
+    historyReferences: comparable.slice(0, 6).map(toHistoryReference),
+    calibration,
+    progressionPolicy: projectPolicy(policy),
+    successfulSessionsRequired: policy.successfulSessionsRequired ?? null,
+    qualifyingSuccessfulSessions: 0,
+    exposureStartDate: null,
+    minimumExposureDays: policy.minimumExposureDays ?? null,
+    exposureDays: 0,
+    progressionGates: Object.freeze({
+      eligible: false,
+      exposureGateSatisfied: false,
+      sessionCountGateSatisfied: false,
+    }),
+    targetSelection: Object.freeze({ status: "not_eligible", policy: null }),
+  };
+}
+
+function projectPolicy(policy) {
+  if (!policy.executable) {
+    return Object.freeze({
+      executable: false,
+      version: policy.version,
+      reasonCode: policy.reasonCode,
+    });
   }
-  if (latest.reps > 0 && latest.reps < 20) {
-    return { load: latest.load, reps: latest.reps + 1 };
-  }
-  return null;
+  return Object.freeze({
+    executable: true,
+    version: policy.version,
+    source: policy.source,
+    ruleType: policy.ruleType,
+    condition: policy.condition,
+    action: policy.action,
+    qualificationMode: policy.qualificationMode,
+    minimumExposureSource: policy.minimumExposureSource,
+    limitation: policy.limitation,
+  });
+}
+
+function compareOccurrenceOrder(left, right) {
+  const observed = String(right.observedAt).localeCompare(String(left.observedAt));
+  if (observed !== 0) return observed;
+  return String(right.sessionKey).localeCompare(String(left.sessionKey));
 }
 
 function comparePerformance(left, right) {
@@ -266,8 +416,8 @@ function comparePerformance(left, right) {
   return left.reps - right.reps;
 }
 
-function samePerformance(left, right) {
-  return left.load === right.load && left.reps === right.reps;
+function sameLoadContext(left, right) {
+  return left.load === right.load && left.loadType === right.loadType && left.unit === right.unit;
 }
 
 function daysBetween(later, earlier) {
@@ -290,6 +440,18 @@ function toHistoryReference(entry) {
     date: entry.date,
     sessionId: entry.sessionId,
   };
+}
+
+function setProfilePart(set) {
+  return [set.loadType, set.load, set.unit, set.reps].join("|");
+}
+
+function phaseFromText(text) {
+  if (!text) return null;
+  if (/cut|deficit|fat loss|lean out/.test(text)) return "cut";
+  if (/maintain|maintenance|stabil/.test(text)) return "maintenance";
+  if (/gain|surplus|build|hypertrophy|mass/.test(text)) return "gain";
+  return null;
 }
 
 function finite(value) {

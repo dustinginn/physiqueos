@@ -301,6 +301,7 @@ describe("provider-native core navigation reads", () => {
 
   it("projects canonical progression recommendations and bodyweight loading semantics for Native", async () => {
     const { narrow, runtime } = services();
+    installTrainingProgressionStrategy(runtime);
     for (const [index, date] of ["2026-08-01", "2026-08-08", "2026-08-15"].entries()) {
       runtime.canonicalEvidenceObjects.push({
         canonicalId: `training-pull-up-${index}`,
@@ -324,10 +325,23 @@ describe("provider-native core navigation reads", () => {
       expect.objectContaining({
         canonicalExerciseId: "pull_up",
         eyebrow: "Progression opportunity",
-        prescription: "25 lb x 7",
-        suggestedLoad: 25,
-        suggestedLoadType: "external_load",
-        suggestedReps: 7,
+        prescription: "Progress manually if today’s performance supports it",
+        suggestedLoad: null,
+        suggestedLoadType: null,
+        suggestedReps: null,
+        reasonCode: "strategy_eligibility_gates_satisfied",
+        successfulSessionsRequired: 2,
+        qualifyingSuccessfulSessions: 3,
+        exposureStartDate: "2026-08-01",
+        minimumExposureDays: 14,
+        exposureDays: 28,
+        progressionGates: expect.objectContaining({ eligible: true }),
+        progressionPolicy: expect.objectContaining({
+          executable: true,
+          source: "active_training_strategy_default_rule",
+          qualificationMode: "stable_completed_set_profile_transitional",
+        }),
+        targetSelection: expect.objectContaining({ status: "unavailable" }),
       }),
     ]));
     const set = logger.initialHistorySessions
@@ -339,6 +353,7 @@ describe("provider-native core navigation reads", () => {
 
   it("projects additive superset-context progression recommendations from the separate superset pool", async () => {
     const { narrow, runtime } = services();
+    installTrainingProgressionStrategy(runtime);
     const session = (canonicalId, date, exercises, groups = []) => ({
       canonicalId,
       quality: { status: "complete" },
@@ -370,7 +385,7 @@ describe("provider-native core navigation reads", () => {
     const logger = await narrow.getTrainingLogger();
     // Standalone is unchanged: only the standalone pool (90 x 15).
     expect(logger.initialProgressionRecommendations.find((item) => item.canonicalExerciseId === "leg_extension"))
-      .toMatchObject({ suggestedLoad: 90, suggestedReps: 15 });
+      .toMatchObject({ state: "opportunity", suggestedLoad: null, suggestedReps: null });
     expect(logger.initialProgressionRecommendations.find((item) => item.canonicalExerciseId === "leg_extension"))
       .not.toHaveProperty("relationship");
 
@@ -378,13 +393,15 @@ describe("provider-native core navigation reads", () => {
     const legWithSissy = contextual.filter((item) =>
       item.canonicalExerciseId === "leg_extension" && item.relationship.relationshipKey === "superset|partners:sissy_squat");
     expect(legWithSissy).toEqual([expect.objectContaining({
-      suggestedLoad: 80,
-      suggestedReps: 15,
+      state: "opportunity",
+      suggestedLoad: null,
+      suggestedReps: null,
       relationship: { relationshipType: "superset", relationshipKey: "superset|partners:sissy_squat", partnerCanonicalExerciseIds: ["sissy_squat"] },
     })]);
     expect(contextual.find((item) => item.canonicalExerciseId === "sissy_squat")).toMatchObject({
-      suggestedLoad: 50,
-      suggestedReps: 12,
+      state: "opportunity",
+      suggestedLoad: null,
+      suggestedReps: null,
       relationship: { relationshipKey: "superset|partners:leg_extension", partnerCanonicalExerciseIds: ["leg_extension"] },
     });
     // One comparable session in a context is insufficient: no claim at all.
@@ -525,7 +542,9 @@ describe("provider-native core navigation reads", () => {
     expect(CORE_NAVIGATION_COLLECTIONS.goals).not.toContain("executionItems");
     expect(CORE_NAVIGATION_COLLECTIONS.operatingPlan).not.toContain("dailyBriefings");
     expect(CORE_NAVIGATION_COLLECTIONS.operatingPlan).not.toContain("analyses");
-    expect(CORE_NAVIGATION_COLLECTIONS.trainingLogger).toEqual(["user", "goals", "canonicalEvidenceObjects", "myLibraryMemberships"]);
+    expect(CORE_NAVIGATION_COLLECTIONS.trainingLogger).toEqual([
+      "user", "goals", "canonicalEvidenceObjects", "myLibraryMemberships", "protocols", "protocolVersions",
+    ]);
     expect(CORE_NAVIGATION_COLLECTIONS.profile).not.toContain("canonicalEvidenceObjects");
     expect(CORE_NAVIGATION_COLLECTIONS.tracking).toEqual(["user", "executionItems", "protocols", "reminders"]);
   });
@@ -789,6 +808,38 @@ function services({ readCanonicalExerciseRegistry = null } = {}) {
       readCanonicalExerciseRegistry,
     }),
   };
+}
+
+function installTrainingProgressionStrategy(runtime, rule = {}) {
+  const protocolId = "training-progression-test-protocol";
+  const versionId = `${protocolId}_v1`;
+  runtime.protocols.push({
+    id: protocolId,
+    userId: runtime.user.id,
+    category: "training",
+    protocolType: "training",
+    status: "active",
+    currentVersionId: versionId,
+  });
+  runtime.protocolVersions.push({
+    id: versionId,
+    protocolId,
+    status: "active",
+    endedAt: null,
+    trainingStrategy: {
+      progression: {
+        defaultRule: {
+          type: "double_progression_confirmed_sessions",
+          condition: "reach_top_of_rep_range",
+          action: "increase_load",
+          successfulSessionsRequired: 2,
+          minimumExposureDays: 14,
+          ...rule,
+        },
+        exerciseOverrides: [],
+      },
+    },
+  });
 }
 
 describe("peptide Support next due honours pause windows (S3)", () => {

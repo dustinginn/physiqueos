@@ -1,3 +1,5 @@
+import { createDefaultTrainingProgressionRule } from "./TrainingProgressionPolicy.js";
+
 export const TRAINING_PROTOCOL_TYPE = "training";
 export const TRAINING_PROTOCOL_ID = "protocol_training_founder_maintenance";
 export const TRAINING_GOAL_ID = "goal_visible_abs_at_rest";
@@ -137,12 +139,7 @@ export function createFounderTrainingProtocolActivation({
         preferredRhythm: structuredClone(rhythm),
         progression: {
           pace: progressionPace,
-          defaultRule: {
-            type: "double_progression_confirmed_sessions",
-            successfulSessionsRequired: 2,
-            condition: "reach_top_of_rep_range",
-            action: "increase_load",
-          },
+          defaultRule: createDefaultTrainingProgressionRule(),
           exerciseOverrides: [],
         },
         nutritionPhase,

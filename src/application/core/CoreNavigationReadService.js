@@ -79,7 +79,10 @@ export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
     "user", "goals", "operatingPlan", "protocols", "protocolVersions",
     "executionItems", "reminders", "nutritionContext", "canonicalEvidenceObjects",
   ]),
-  trainingLogger: Object.freeze(["user", "goals", "canonicalEvidenceObjects", "myLibraryMemberships"]),
+  trainingLogger: Object.freeze([
+    "user", "goals", "canonicalEvidenceObjects", "myLibraryMemberships",
+    "protocols", "protocolVersions",
+  ]),
   morningCheckIn: Object.freeze([
     "user", "weightEntries", "reminders", "dailyCheckIns", "dexaScans",
     "progressPhotos", "canonicalEvidenceObjects", "evidenceReviews", "executionItems",
@@ -220,12 +223,14 @@ export function createCoreNavigationReadService({
         const goalContext = projectGoalContext(selectCanonicalActiveGoal(runtime.goals ?? [], {
           ownerUserId: runtime.user?.id,
         }), initialDate);
+        const trainingStrategy = resolveActiveTrainingProgressionStrategy(runtime);
         const initialProgressionRecommendations = canonicalExercises
           .map((exercise) => projectTrainingLoggerRecommendation({
             exercise,
             goalContext,
             initialDate,
             sessions: confirmedTrainingRecords,
+            trainingStrategy,
           }))
           .filter(Boolean);
         // Additive: Suggested/Maintain for each superset relationship context
@@ -237,6 +242,7 @@ export function createCoreNavigationReadService({
           goalContext,
           initialDate,
           sessions: confirmedTrainingRecords,
+          trainingStrategy,
         });
         return Object.freeze({
           goalContext,
@@ -885,12 +891,13 @@ function projectTrainingHistorySession(record) {
   };
 }
 
-function projectTrainingLoggerRecommendation({ exercise, goalContext, initialDate, sessions }) {
+function projectTrainingLoggerRecommendation({ exercise, goalContext, initialDate, sessions, trainingStrategy }) {
   const result = createTrainingLoggerProgressionRecommendation({
     canonicalExerciseId: exercise.id,
     goalContext,
     nowDate: initialDate,
     sessions,
+    trainingStrategy,
   });
   return projectTrainingLoggerRecommendationResult(result, exercise.id);
 }
@@ -907,6 +914,7 @@ export function projectTrainingLoggerContextualRecommendations({
   goalContext,
   initialDate,
   sessions,
+  trainingStrategy,
 }) {
   const ordinaryVariantKey = getTrainingExecutionVariantKey(null);
   const contexts = new Map();
@@ -931,6 +939,7 @@ export function projectTrainingLoggerContextualRecommendations({
           nowDate: initialDate,
           relationshipContext,
           sessions,
+          trainingStrategy,
         }),
         canonicalExerciseId,
       );
@@ -986,7 +995,33 @@ function projectTrainingLoggerRecommendationResult(result, canonicalExerciseId) 
     suggestedLoadType: result.recommendedLoadType,
     suggestedReps: result.recommendedReps,
     suggestedUnit: bodyweight ? null : result.recommendedUnit,
+    reasonCode: result.reasonCode,
+    successfulSessionsRequired: result.successfulSessionsRequired,
+    qualifyingSuccessfulSessions: result.qualifyingSuccessfulSessions,
+    exposureStartDate: result.exposureStartDate,
+    minimumExposureDays: result.minimumExposureDays,
+    exposureDays: result.exposureDays,
+    progressionGates: result.progressionGates,
+    progressionPolicy: result.progressionPolicy,
+    targetSelection: result.targetSelection,
   });
+}
+
+function resolveActiveTrainingProgressionStrategy(runtime = {}) {
+  const ownerUserId = runtime.user?.id;
+  const active = (runtime.protocols ?? []).filter((protocol) =>
+    protocol?.userId === ownerUserId &&
+    protocol?.status === "active" &&
+    (protocol?.category === "training" || protocol?.protocolType === "training")
+  );
+  if (active.length !== 1 || !active[0].currentVersionId) return null;
+  const versions = (runtime.protocolVersions ?? []).filter((version) =>
+    version?.id === active[0].currentVersionId &&
+    version?.protocolId === active[0].id &&
+    version?.status !== "superseded" &&
+    !version?.endedAt
+  );
+  return versions.length === 1 ? versions[0].trainingStrategy ?? null : null;
 }
 
 function projectGoalContext(goal, date) {
