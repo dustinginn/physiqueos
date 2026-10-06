@@ -385,6 +385,7 @@
 		000000000000000000001D03 /* EvidenceKitComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D02 /* EvidenceKitComponents.swift */; };
 		000000000000000000001D05 /* EvidenceRecordComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D04 /* EvidenceRecordComponents.swift */; };
 		000000000000000000001D07 /* EvidenceWorkflowKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D06 /* EvidenceWorkflowKit.swift */; };
+		000000000000000000001D09 /* EvidenceReviewWorkflowFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D08 /* EvidenceReviewWorkflowFixture.swift */; };
 		0000000000000000000012D9 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D8 /* HealthKitSynchronizationTests.swift */; };
 		0000000000000000000012DB /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DA /* HealthKitSleepIngestionTests.swift */; };
 		0000000000000000000012DD /* HealthKitSleepHistoricalValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DC /* HealthKitSleepHistoricalValidationTests.swift */; };
@@ -825,6 +826,7 @@
 		000000000000000000001D02 /* EvidenceKitComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceKitComponents.swift"; sourceTree = "<group>"; };
 		000000000000000000001D04 /* EvidenceRecordComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceRecordComponents.swift"; sourceTree = "<group>"; };
 		000000000000000000001D06 /* EvidenceWorkflowKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceWorkflowKit.swift"; sourceTree = "<group>"; };
+		000000000000000000001D08 /* EvidenceReviewWorkflowFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReviewWorkflowFixture.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* HomeRedesignReviewFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeRedesignReviewFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011ED /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
@@ -1359,6 +1361,7 @@
 				000000000000000000001D02 /* EvidenceKitComponents.swift */,
 				000000000000000000001D04 /* EvidenceRecordComponents.swift */,
 				000000000000000000001D06 /* EvidenceWorkflowKit.swift */,
+				000000000000000000001D08 /* EvidenceReviewWorkflowFixture.swift */,
 			);
 			path = Evidence;
 			sourceTree = "<group>";
@@ -2259,6 +2262,7 @@
 				000000000000000000001D03 /* EvidenceKitComponents.swift in Sources */,
 				000000000000000000001D05 /* EvidenceRecordComponents.swift in Sources */,
 				000000000000000000001D07 /* EvidenceWorkflowKit.swift in Sources */,
+				000000000000000000001D09 /* EvidenceReviewWorkflowFixture.swift in Sources */,
 				000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */,
 				000000000000000000001618 /* CompleteWorkoutSetIntent.swift in Sources */,
 				00000000000000000000161B /* WorkoutLiveActivityViews.swift in Sources */,

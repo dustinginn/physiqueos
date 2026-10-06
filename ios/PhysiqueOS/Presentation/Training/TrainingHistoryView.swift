@@ -19,6 +19,7 @@ import SwiftUI
 /// unchanged in this patch — see `TrainingDayView`/`TrainingSessionDetailView`.
 struct TrainingHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var viewModel: TrainingHistoryViewModel?
 
     @State private var isLatestDayExpanded = false
@@ -82,7 +83,7 @@ struct TrainingHistoryView: View {
                 EvidenceField {
                     VStack(alignment: .leading, spacing: 0) {
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) { isLatestDayExpanded.toggle() }
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { isLatestDayExpanded.toggle() }
                         } label: {
                             VStack(alignment: .leading, spacing: 0) {
                                 Text(day.label)
@@ -164,32 +165,27 @@ struct TrainingHistoryView: View {
     private func reportingSection(_ links: [TrainingReportingLink]) -> some View {
         EvidenceSection(title: "Reporting", identifier: "training.reporting") {
             EvidenceField {
-                VStack(alignment: .leading, spacing: 0) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { isReportingExpanded.toggle() }
-                    } label: {
-                        EvidenceKitDisclosureRow(
-                            label: "Review trends and summaries",
-                            detail: "Resistance, cardio, volume, frequency, consistency, and history.",
-                            isExpanded: isReportingExpanded
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Review trends and summaries")
-                    .accessibilityHint("Resistance, cardio, volume, frequency, consistency, and history.")
-                    .accessibilityValue(isReportingExpanded ? "Expanded" : "Collapsed")
-                    .accessibilityIdentifier("training-reporting-disclosure")
-
-                    if isReportingExpanded {
-                        EvidenceDividedList(data: links) { link in
-                            NavigationLink(value: link.destination) {
-                                EvidenceLinkRow(label: link.label, detail: link.detail)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("training-report-\(link.id)")
+                PhysiqueOSDisclosureRow(
+                    isExpanded: $isReportingExpanded,
+                    chrome: .none,
+                    toggleLabel: "Review trends and summaries",
+                    toggleHint: "Resistance, cardio, volume, frequency, consistency, and history.",
+                    toggleIdentifier: "training-reporting-disclosure"
+                ) {
+                    EvidenceKitDisclosureRow(
+                        label: "Review trends and summaries",
+                        detail: "Resistance, cardio, volume, frequency, consistency, and history.",
+                        isExpanded: isReportingExpanded
+                    )
+                } expanded: {
+                    EvidenceDividedList(data: links) { link in
+                        NavigationLink(value: link.destination) {
+                            EvidenceLinkRow(label: link.label, detail: link.detail)
                         }
-                        .overlay(alignment: .top) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("training-report-\(link.id)")
                     }
+                    .overlay(alignment: .top) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
                 }
             }
         }
@@ -228,30 +224,22 @@ struct TrainingHistoryView: View {
     private func currentProtocolSection(_ protocolSummary: TrainingProtocolSummary) -> some View {
         EvidenceSection(title: "Current Protocol", identifier: "training.protocol") {
             EvidenceField {
-                VStack(alignment: .leading, spacing: 0) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { isProtocolExpanded.toggle() }
-                    } label: {
-                        EvidenceKitDisclosureRow(
-                            label: protocolSummary.sourceOfTruth,
-                            detail: protocolSummary.goal,
-                            isExpanded: isProtocolExpanded,
-                            trailingText: "View protocol details"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityValue(isProtocolExpanded ? "Expanded" : "Collapsed")
-
-                    if isProtocolExpanded {
-                        EvidenceDefinitionList(rows: [
-                            ("Source of truth", protocolSummary.sourceOfTruth),
-                            ("Daily activity target", protocolSummary.dailyActivityTarget),
-                            ("Training objective", protocolSummary.trainingObjective),
-                            ("Goal", protocolSummary.goal),
-                            ("Future protocol settings", "Coming soon"),
-                        ])
-                        .padding(.top, m.pt(4))
-                    }
+                PhysiqueOSDisclosureRow(isExpanded: $isProtocolExpanded, chrome: .none) {
+                    EvidenceKitDisclosureRow(
+                        label: protocolSummary.sourceOfTruth,
+                        detail: protocolSummary.goal,
+                        isExpanded: isProtocolExpanded,
+                        trailingText: "View protocol details"
+                    )
+                } expanded: {
+                    EvidenceDefinitionList(rows: [
+                        ("Source of truth", protocolSummary.sourceOfTruth),
+                        ("Daily activity target", protocolSummary.dailyActivityTarget),
+                        ("Training objective", protocolSummary.trainingObjective),
+                        ("Goal", protocolSummary.goal),
+                        ("Future protocol settings", "Coming soon"),
+                    ])
+                    .padding(.top, m.pt(4))
                 }
             }
         }
