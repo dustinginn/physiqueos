@@ -11,9 +11,9 @@ Scope: cleanup only; no source changes, builds, deploys, TestFlight actions, or 
 ## Result
 
 - Free space before: **30.83 GiB** (`32,326,888 KiB`; `df -h`: 31 GiB).
-- Free space after cleanup: **38.02 GiB** (`39,864,544 KiB`; `df -h`: 38 GiB).
-- Net free-space increase: **7.19 GiB**.
-- Logical size deleted: **7.79 GiB** (`8,171,268 KiB`). The difference from the net measurement is APFS/accounting activity while the two overnight Claude lanes remained active.
+- Free space immediately after cleanup: **38.02 GiB** (`39,864,544 KiB`; `df -h`: 38 GiB), an immediate net increase of **7.19 GiB**.
+- Final validation snapshot after report publication: **36.70 GiB** (`38,481,828 KiB`; `df -h`: 37 GiB), still **5.87 GiB** above the baseline. The two active overnight Claude lanes consumed about 1.32 GiB between the immediate and final snapshots.
+- Logical size deleted: **7.79 GiB** (`8,171,268 KiB`). APFS/accounting and concurrent lane writes explain the difference from measured net free space.
 - Standing floor satisfied: final free space is above both the 15 GiB hard floor and 20 GiB preferred reserve.
 
 ## Audit before deletion
