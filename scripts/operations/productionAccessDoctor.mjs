@@ -11,7 +11,7 @@ import {
   APPROVED_READ_CONTEXT,
   assertApprovedReadContext,
   buildGuardedReadOnlyPayload,
-  parsePrefixedJson,
+  parseFramedJson,
   validateSanitizedConsoleOutput,
 } from "./productionAccessSafety.mjs";
 import {
@@ -243,7 +243,7 @@ return {
     stdout: { write: (value) => { rawOutput += String(value); } },
   });
   validateSanitizedConsoleOutput(rawOutput, { marker });
-  const consoleReport = parsePrefixedJson(rawOutput, outputPrefix);
+  const consoleReport = parseFramedJson(rawOutput, outputPrefix, { marker });
   if (consoleReport.runtime?.gitSha !== expectedSha || consoleReport.bindingPresence?.databaseUrl !== true ||
       consoleReport.bindingPresence?.databaseCa !== true || consoleReport.transaction?.readOnly !== "on" ||
       consoleReport.probe?.selectOne !== true) {

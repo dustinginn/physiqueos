@@ -12,6 +12,8 @@ const FORBIDDEN_CONTEXT = /(?:deploy|migration|migrate|write)/i;
 const FORBIDDEN_SQL = /\b(?:insert|update|delete|merge|upsert|alter|create|drop|truncate|grant|revoke|copy|call|do|vacuum|analyze|refresh|reindex|cluster|comment|lock|set|reset|listen|notify|unlisten|discard|prepare|execute|deallocate)\b/i;
 const SIDE_EFFECTING_SELECT = /\b(?:nextval|setval|pg_advisory|pg_notify|dblink|lo_(?:create|import|export|unlink)|set_config)\s*\(/i;
 const CREDENTIAL_SHAPE = /(?:postgres(?:ql)?:\/\/|-----BEGIN [A-Z ]*PRIVATE KEY-----|-----BEGIN CERTIFICATE-----|\bBearer\s+[A-Za-z0-9._~-]+|\bdop_v1_[A-Za-z0-9]+|\bdoo_v1_[A-Za-z0-9]+)/i;
+const STRUCTURED_BEGIN = "__PHYSIQUEOS_STRUCTURED_BEGIN__";
+const STRUCTURED_END = "__PHYSIQUEOS_STRUCTURED_END__";
 
 export function assertApprovedReadContext(context) {
   if (context !== APPROVED_READ_CONTEXT || FORBIDDEN_CONTEXT.test(String(context))) {
@@ -34,23 +36,81 @@ export function assertSelectOnlySql(text) {
 
 export function validateSanitizedConsoleOutput(output, { marker, maxBytes = MAX_CONSOLE_OUTPUT_BYTES } = {}) {
   if (!SAFE_MARKER.test(marker ?? "")) throw coded("AUDIT_SUCCESS_MARKER_INVALID");
-  const text = String(output ?? "");
-  if (Buffer.byteLength(text) > maxBytes) throw coded("AUDIT_OUTPUT_TOO_LARGE");
-  if (CREDENTIAL_SHAPE.test(text)) throw coded("AUDIT_OUTPUT_CREDENTIAL_SHAPE");
-  const markerCount = text.split(/\r?\n/).filter((line) => line.replace(/\r$/, "") === marker).length;
+  const raw = reassembleConsoleOutput(output);
+  if (Buffer.byteLength(raw) > maxBytes) throw coded("AUDIT_OUTPUT_TOO_LARGE");
+  if (CREDENTIAL_SHAPE.test(raw)) throw coded("AUDIT_OUTPUT_CREDENTIAL_SHAPE");
+  const text = normalizePtyOutput(raw);
+  const markerCount = text.split("\n").filter((line) => line === marker).length;
   if (markerCount !== 1) throw coded("AUDIT_SUCCESS_MARKER_MISSING");
-  return text;
+  return raw;
 }
 
-export function parsePrefixedJson(output, prefix, { maxBytes = MAX_SANITIZED_REPORT_BYTES } = {}) {
-  const line = String(output ?? "").split(/\r?\n/).find((item) => item.startsWith(`${prefix}:`));
-  if (!line) throw coded("AUDIT_JSON_MISSING");
-  const raw = line.slice(prefix.length + 1);
+export function parseFramedJson(output, prefix, { marker, maxBytes = MAX_SANITIZED_REPORT_BYTES } = {}) {
+  if (!/^[A-Z0-9_]{12,120}$/.test(prefix ?? "")) throw coded("AUDIT_OUTPUT_PREFIX_INVALID");
+  if (!SAFE_MARKER.test(marker ?? "")) throw coded("AUDIT_SUCCESS_MARKER_INVALID");
+  const text = normalizePtyOutput(reassembleConsoleOutput(output));
+  const lines = text.split("\n");
+  const beginPattern = new RegExp(`^${STRUCTURED_BEGIN}:${prefix}:(\\d{1,8})$`);
+  const endLine = `${STRUCTURED_END}:${prefix}`;
+  const begins = lines.map((line, index) => ({ index, match: line.match(beginPattern) })).filter((entry) => entry.match);
+  const ends = lines.map((line, index) => ({ index, line })).filter((entry) => entry.line === endLine);
+  if (begins.length === 0 || ends.length === 0) throw coded("AUDIT_JSON_MISSING");
+  if (begins.length !== 1 || ends.length !== 1) throw coded("AUDIT_JSON_DUPLICATE");
+  const begin = begins[0];
+  const end = ends[0];
+  if (end.index <= begin.index + 1) throw coded("AUDIT_JSON_FRAME_INVALID");
+  const encodedLines = lines.slice(begin.index + 1, end.index);
+  if (encodedLines.some((line) => !/^[A-Za-z0-9+/]+={0,2}$/.test(line))) throw coded("AUDIT_JSON_FRAME_INVALID");
+  const encoded = encodedLines.join("");
+  const declaredLength = Number(begin.match[1]);
+  if (encoded.length !== declaredLength || encoded.length % 4 !== 0 || Buffer.from(encoded, "base64").toString("base64") !== encoded) {
+    throw coded("AUDIT_JSON_FRAME_INVALID");
+  }
+  const raw = Buffer.from(encoded, "base64").toString("utf8");
   if (Buffer.byteLength(raw) > maxBytes) throw coded("AUDIT_JSON_TOO_LARGE");
+  if (CREDENTIAL_SHAPE.test(raw)) throw coded("AUDIT_OUTPUT_CREDENTIAL_SHAPE");
   let value;
   try { value = JSON.parse(raw); } catch { throw coded("AUDIT_JSON_INVALID"); }
   if (!value || typeof value !== "object" || Array.isArray(value)) throw coded("AUDIT_JSON_INVALID");
+  const outside = [...lines.slice(0, begin.index), ...lines.slice(end.index + 1)];
+  if (outside.filter((line) => line === marker).length !== 1 || outside.some((line) => !isAllowedPtyFramingLine(line, marker))) {
+    throw coded("AUDIT_OUTPUT_UNEXPECTED");
+  }
   return value;
+}
+
+export function normalizePtyOutput(output) {
+  const stripped = stripTerminalSequences(String(output ?? ""));
+  let normalized = "";
+  let line = "";
+  for (let index = 0; index < stripped.length; index += 1) {
+    const character = stripped[index];
+    const code = stripped.charCodeAt(index);
+    if (character === "\r") {
+      if (stripped[index + 1] === "\n") {
+        normalized += `${line}\n`;
+        line = "";
+        index += 1;
+      } else {
+        line = "";
+      }
+    } else if (character === "\n") {
+      normalized += `${line}\n`;
+      line = "";
+    } else if (character === "\b") {
+      line = line.slice(0, -1);
+    } else if (character === "\t" || code >= 0x20) {
+      line += character;
+    } else {
+      throw coded("AUDIT_OUTPUT_CONTROL_CHARACTER");
+    }
+  }
+  return normalized + line;
+}
+
+export function reassembleConsoleOutput(output) {
+  if (Array.isArray(output)) return output.map((chunk) => String(chunk)).join("");
+  return String(output ?? "");
 }
 
 export function sha256Text(value) {
@@ -194,14 +254,56 @@ if (failure || !report) {
 } else {
   try {
     const json = validateReport(report, [rawUrl, certificate, CONFIG.ownerUserId]);
-    process.stdout.write(CONFIG.outputPrefix + ":" + json + "\\n");
+    const encoded = Buffer.from(json).toString("base64");
+    process.stdout.write("${STRUCTURED_BEGIN}:" + CONFIG.outputPrefix + ":" + encoded.length + "\\n");
+    process.stdout.write(encoded + "\\n");
+    process.stdout.write("${STRUCTURED_END}:" + CONFIG.outputPrefix + "\\n");
     process.stdout.write(CONFIG.marker + "\\n");
   } catch (error) {
     process.stderr.write("PHYSIQUEOS_AUDIT_FAILED:" + fail(error?.code ?? error?.message) + "\\n");
     process.exitCode = 1;
   }
 }
+
 `;
+}
+
+function stripTerminalSequences(value) {
+  let output = "";
+  for (let index = 0; index < value.length; index += 1) {
+    if (value.charCodeAt(index) !== 0x1b) {
+      output += value[index];
+      continue;
+    }
+    const next = value[index + 1];
+    if (next === "[") {
+      index += 2;
+      while (index < value.length && !(value.charCodeAt(index) >= 0x40 && value.charCodeAt(index) <= 0x7e)) index += 1;
+      if (index >= value.length) throw coded("AUDIT_OUTPUT_ANSI_INCOMPLETE");
+    } else if (next === "]") {
+      index += 2;
+      let terminated = false;
+      for (; index < value.length; index += 1) {
+        if (value.charCodeAt(index) === 0x07) { terminated = true; break; }
+        if (value.charCodeAt(index) === 0x1b && value[index + 1] === "\\") { index += 1; terminated = true; break; }
+      }
+      if (!terminated) throw coded("AUDIT_OUTPUT_ANSI_INCOMPLETE");
+    } else if (next && next.charCodeAt(0) >= 0x40 && next.charCodeAt(0) <= 0x5f) {
+      index += 1;
+    } else {
+      throw coded("AUDIT_OUTPUT_ANSI_INVALID");
+    }
+  }
+  return output;
+}
+
+function isAllowedPtyFramingLine(line, marker) {
+  if (line === "" || line === marker || /^__PHYSIQUEOS_REMOTE_EXIT__:0$/.test(line)) return true;
+  if (/^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9._-]+:[^\n]{0,180}[#$>] ?$/.test(line)) return true;
+  if (/^[#$>] ?$/.test(line)) return true;
+  if (/^(?:Connecting(?: to)?|Connected(?: to)?|Welcome|Last login:)[^\n]{0,180}$/i.test(line)) return true;
+  if (new Set(["stty -echo", "exit"]).has(line)) return true;
+  return false;
 }
 
 function coded(code) {

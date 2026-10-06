@@ -98,8 +98,7 @@ describe("console doctor", () => {
       controlPlaneDoctor: async () => { checks += 1; return authority; },
       primaryRunner: async ({ args, stdout }) => {
         assert.equal(args[0], CONTEXT);
-        stdout.write(`PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_JSON:{"bindingPresence":{"databaseUrl":true,"databaseCa":true},"probe":{"selectOne":true},"runtime":{"gitSha":"${SHA}"},"transaction":{"readOnly":"on"}}\n`);
-        stdout.write(`PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_OK_${SHA.slice(0, 12)}\n`);
+        stdout.write(doctorFrame({ databaseUrl: true, deploymentNoise: true }));
       },
     });
     assert.equal(checks, 2);
@@ -113,8 +112,7 @@ describe("console doctor", () => {
       expectedSha: SHA,
       controlPlaneDoctor: async () => authority,
       primaryRunner: async ({ stdout }) => {
-        stdout.write(`PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_JSON:{"bindingPresence":{"databaseUrl":false,"databaseCa":true},"probe":{"selectOne":true},"runtime":{"gitSha":"${SHA}"},"transaction":{"readOnly":"on"}}\n`);
-        stdout.write(`PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_OK_${SHA.slice(0, 12)}\n`);
+        stdout.write(doctorFrame({ databaseUrl: false }));
       },
     }), { code: "DOCTOR_CONSOLE_REPORT_INVALID" });
 
@@ -126,8 +124,7 @@ describe("console doctor", () => {
         return checks === 1 ? authority : { ...authority, deployment: { ...authority.deployment, id: "changed" } };
       },
       primaryRunner: async ({ stdout }) => {
-        stdout.write(`PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_JSON:{"bindingPresence":{"databaseUrl":true,"databaseCa":true},"probe":{"selectOne":true},"runtime":{"gitSha":"${SHA}"},"transaction":{"readOnly":"on"}}\n`);
-        stdout.write(`PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_OK_${SHA.slice(0, 12)}\n`);
+        stdout.write(doctorFrame({ databaseUrl: true }));
       },
     }), { code: "DOCTOR_POST_CONSOLE_AUTHORITY_DRIFT" });
   });
@@ -168,4 +165,25 @@ function controlPlaneResult() {
     components: { web: { name: "web", sourceSha: SHA }, worker: { name: "worker", sourceSha: SHA } },
     health: { status: "ok", buildId: `physiqueos-${SHA.slice(0, 8)}-test` },
   };
+}
+
+function doctorFrame({ databaseUrl, deploymentNoise = false }) {
+  const prefix = "PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_JSON";
+  const marker = `PHYSIQUEOS_PRODUCTION_ACCESS_DOCTOR_CONSOLE_OK_${SHA.slice(0, 12)}`;
+  const json = JSON.stringify({
+    bindingPresence: { databaseUrl, databaseCa: true },
+    probe: { selectOne: true },
+    runtime: { gitSha: SHA },
+    transaction: { readOnly: "on" },
+  });
+  const encoded = Buffer.from(json).toString("base64");
+  return [
+    deploymentNoise ? "\u001b[32mweb-host:/workspace#\u001b[0m" : "",
+    `__PHYSIQUEOS_STRUCTURED_BEGIN__:${prefix}:${encoded.length}`,
+    encoded,
+    `__PHYSIQUEOS_STRUCTURED_END__:${prefix}`,
+    marker,
+    "__PHYSIQUEOS_REMOTE_EXIT__:0",
+    "",
+  ].filter((line, index) => line || index === 0).join("\r\n");
 }

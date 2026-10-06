@@ -9,7 +9,8 @@ import {
   assertApprovedReadContext,
   assertSelectOnlySql,
   buildGuardedReadOnlyPayload,
-  parsePrefixedJson,
+  normalizePtyOutput,
+  parseFramedJson,
   validateSanitizedConsoleOutput,
 } from "./productionAccessSafety.mjs";
 
@@ -40,10 +41,36 @@ describe("production access safety primitives", () => {
     ]) assert.throws(() => assertSelectOnlySql(sql));
   });
 
-  it("requires one marker, rejects credential-shaped output, and parses bounded JSON", () => {
-    const output = `${PREFIX}:{"passed":true}\n${MARKER}\n`;
+  it("normalizes bounded ANSI, CRLF, carriage overwrite, and prompt framing", () => {
+    const output = `\u001b[32mweb-host:/workspace#\u001b[0m\r\nprogress 99%\r${framed({ passed: true }, { lineEnding: "\r\n" })}\u001b[?25h`;
     assert.equal(validateSanitizedConsoleOutput(output, { marker: MARKER }), output);
-    assert.deepEqual(parsePrefixedJson(output, PREFIX), { passed: true });
+    assert.deepEqual(parseFramedJson(output, PREFIX, { marker: MARKER }), { passed: true });
+    assert.doesNotMatch(normalizePtyOutput(output), /progress 99%|\u001b/);
+  });
+
+  it("reassembles a structured prefix and exact marker split across chunks", () => {
+    const output = framed({ passed: true });
+    const prefixSplit = output.indexOf("STRUCTURED_BEGIN") + 7;
+    const markerSplit = output.indexOf(MARKER) + 11;
+    const chunks = [output.slice(0, prefixSplit), output.slice(prefixSplit, markerSplit), output.slice(markerSplit)];
+    assert.equal(validateSanitizedConsoleOutput(chunks, { marker: MARKER }), output);
+    assert.deepEqual(parseFramedJson(chunks, PREFIX, { marker: MARKER }), { passed: true });
+  });
+
+  it("rejects duplicate, missing, malformed, credential-bearing, and unexpectedly surrounded frames", () => {
+    const valid = framed({ passed: true });
+    assert.throws(() => parseFramedJson(`${valid}${valid}`, PREFIX, { marker: MARKER }), { code: "AUDIT_JSON_DUPLICATE" });
+    assert.throws(() => parseFramedJson(`${MARKER}\n`, PREFIX, { marker: MARKER }), { code: "AUDIT_JSON_MISSING" });
+    assert.throws(() => parseFramedJson(framedRaw("not-json"), PREFIX, { marker: MARKER }), { code: "AUDIT_JSON_INVALID" });
+    assert.throws(() => parseFramedJson(framed({ url: "postgresql://user:password@example/db" }), PREFIX, { marker: MARKER }),
+      { code: "AUDIT_OUTPUT_CREDENTIAL_SHAPE" });
+    assert.throws(() => parseFramedJson(`unexpected application payload\n${valid}`, PREFIX, { marker: MARKER }),
+      { code: "AUDIT_OUTPUT_UNEXPECTED" });
+    assert.throws(() => parseFramedJson(valid.replace(/:(\d+)\n/, ":999999\n"), PREFIX, { marker: MARKER }),
+      { code: "AUDIT_JSON_FRAME_INVALID" });
+  });
+
+  it("requires one marker and rejects raw credential-shaped output", () => {
     assert.throws(() => validateSanitizedConsoleOutput(`${MARKER}\n${MARKER}\n`, { marker: MARKER }));
     assert.throws(() => validateSanitizedConsoleOutput(`postgresql://user:password@example/db\n${MARKER}\n`, { marker: MARKER }));
   });
@@ -56,7 +83,7 @@ describe("generated read-only payload", () => {
     assert.match(execution.stdout, new RegExp(`${PREFIX}:`));
     assert.match(execution.stdout, new RegExp(`${MARKER}\\n$`));
     assert.deepEqual(execution.events, ["connect", "begin", "show", "select", "rollback", "release", "pool_end"]);
-    const report = parsePrefixedJson(execution.stdout, PREFIX);
+    const report = parseFramedJson(execution.stdout, PREFIX, { marker: MARKER });
     assert.deepEqual(report, {
       bindingPresence: { databaseUrl: true, databaseCa: true },
       probe: { selectOne: true },
@@ -135,4 +162,20 @@ return {
     ...result,
     events: fs.existsSync(eventPath) ? JSON.parse(fs.readFileSync(eventPath, "utf8")) : [],
   };
+}
+
+function framed(value, { lineEnding = "\n" } = {}) {
+  return framedRaw(JSON.stringify(value), { lineEnding });
+}
+
+function framedRaw(raw, { lineEnding = "\n" } = {}) {
+  const encoded = Buffer.from(raw).toString("base64");
+  return [
+    `__PHYSIQUEOS_STRUCTURED_BEGIN__:${PREFIX}:${encoded.length}`,
+    encoded,
+    `__PHYSIQUEOS_STRUCTURED_END__:${PREFIX}`,
+    MARKER,
+    "__PHYSIQUEOS_REMOTE_EXIT__:0",
+    "",
+  ].join(lineEnding);
 }
