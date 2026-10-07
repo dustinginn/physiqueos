@@ -15,6 +15,39 @@ Before proposing or reconstructing the PhysiqueOS backlog:
 
 Agent handoff reports describe implementation state. This backlog describes what still needs product attention.
 
+
+FOUNDER NEXT-BUILD DECISIONS AND ACCEPTANCE — 2026-10-07 (SUPERSEDES STALE HISTORICAL SCHEDULES)
+
+Latest Native authority: Build 91, release SHA 106f05183ea3e2328496acce0636dc087116bbce, TestFlight VALID; live production Server 738ce66849a1361b4ce0ed069a4a04eac6abc4ef. The next Native build number is 92. These are planning decisions and Founder acceptance expectations, NOT authorization to deploy, build, release, change production state or start other unapproved scope.
+
+BUILD 91 — PHYSICAL ACCEPTANCE
+Status: In progress, Founder plans to finish Thursday 2026-10-08 during the next real Watch workout. Do not mark accepted in advance; capture real-world Watch footer, once-per-preparation ready haptic, execution and any remaining Evidence/OP/Skip findings. Preserve Build 91 unchanged.
+
+BUILD 92 — FOUNDER-APPROVED NEXT-BUILD SCOPE (pending scoped implementation and integration gates)
+A. Training Execution Variants — INCLUDE. Initial Server foundation already implemented but remains isolated, NOT deployed: exact candidate 6ac19b8c2e224a91a04e53aa5029ad14d2f3e2a3. It was based on older Server e7ffc671; fresh compare/rebase/semantic conflict audit against live Server 738ce668 required. Native Create + Select per-exercise variant UI and contract, canonical partitioning, compatible Web projection, plus legacy Static Hold seed gated by separate explicit operational authorization. No timed logging for V1; no fabricated durations; do not seed real Founder history without separate authorization. Verify full compatibility before deployment, and preserve separately issued Server and Native release controls.
+B. Home Priority Skip + feedback — INCLUDE. Founder asks for a red circular, immediately tappable 44pt effective Skip action replacing ellipsis/menu/dialog and for a short in-page confirmed-only fading Skipped/Completed indication, including eligible grouped rows. Staged task at c961acb789c8cbbceb3baa59b08814a61ee2d976. No change to canonical priority.skip.v1 semantics.
+C. Apple Health repeated authorization repair — INCLUDE. Audit report on main 0fee162b2f64c427053acdd5a05e219d51ef2c6b identifies redundant requests, phone race, Watch per-workout raw request. OS-status exact-scope preflight, per-target coalescing and foreground-only deliberate UI, with no invented read-grant status or request scope broadening; must preserve Watch HealthKit workout start/save. No automatic permission reset.
+D. Home Screen widget refresh accessibility — INCLUDE. Enlarge effective refresh hit region to >=44x44 pt for small and large without changing visible glyph, widget routing, current Start/Resume workout behavior, or source authority.
+
+FINAL REDESIGN CLOSEOUT — CLARIFICATION REQUESTED, NOT YET FULLY SCOPED FOR BUILD 92
+The final 98-group audit (report on main 65e221d10a52d9ef89ae19e4dcf528ca2c66de07) declared DESIGN COMPLETE with no undesigned surfaces. Most approved designs ship in Build 91. Founder wants clarity about remaining implementation before confirming the bounded state-tail changes for Build 92. Required finishing items from the audit: Home secondary/no-goal/older-briefing state styling, Workout Match confirmation/refresh/processing/failure/dismissed states, DEXA PDF app-owned wrapper chrome, evidence intake date-sheet wrapper, training supporting-media placeholders, and truthful Logger validation/refusal displays. Treat as proposed closeout batch; do not silently assume Founder approved every tail change. Approved Home direct Skip and Widget touch fix already tracked explicitly above. No new design boards needed.
+
+OPERATING PLAN ENERGY PHASE HISTORY — EXPLANATION REQUESTED, NOT YET AUTHORIZED FOR NEXT BUILD
+Active Energy Strategy shows today; historical earlier goal-phase strategy snapshots do not project from Server. Accepted target is original immutable prior-phase calorie/activity targets, timeframes and phase identity shown read-only beneath the active phase, never reconstructed from current numbers. Requires additive canonical Server projection plus Native decode/presentation. Current active Energy Strategy is not broken by this gap. Pending Founder scope decision: whether to include in Build 92 if ready or defer to a later independent change; do not silently add it or block Variant work for it.
+
+RECOVERY BRIEFING V1 — WAIT FOR RELIABLE BASELINE AND FIRST ELIGIBLE WEEKLY
+Founder confirms the Sleep V3 prospective canary validation is complete. Waiting for >=14 reliable prospective nights under the accepted algorithm, then the first Weekly briefing eligible after that threshold. Earliest possible eligibility is mid-October, but do not infer readiness just from elapsed calendar days. Shadow interpretation, cautious Recovery assessment in future briefing artifacts and any strategic Sleep graduation remain separate authorization/verification gates; do not publish Recovery on a date assumption. Do not reopen the closed Sleep canary.
+
+BRIEFING NARRATIVE / GOAL CONFIDENCE
+Founder reports current quality is good and wants ongoing observation over time. Deprioritize proactive narrative-tuning project; reopen only for concrete examples, calibration drift or meaningful regression. No active rewrite authorized.
+
+DEXA -> APPLE HEALTH
+Existing prospective policy already active for canonical DEXA dates >= Friday 2026-10-09. Founder expects confirmation after the actual 2026-10-09 scan, NOT a new implementation. Validate exactly the two authorized output types (Body Fat Percentage and fat-free Lean Body Mass, NOT Weight), canonical acceptance, deduplication, provenance and no feedback loop. No historical backfill or synthetic writes. Set the appointment time before the scan when applicable. Keep existing protection until the first real prospective verification.
+
+RELEASE, STORAGE AND REPORT RULES
+Build 92 planning does not itself authorize merges, production deployment, Founder data changes or TestFlight. Future coder tasks must specify the exact branch/commit publication authorization for dustinginn/physiqueos and authorize bounded additive report-only publication through the guarded installed publisher, leaving latest.json/latest.md unchanged for non-release work; only a VALID new TestFlight release may move latest under --release-authority. Reuse existing approved worktrees/sessions when relevant; no child chats/extra worktrees. Maintain safe disk headroom via addendum 4bcfe4d861eb5abeb0cdfef1dead1fdc1d926217 and protect all archives, credentials, active lanes and unreproducible artifacts.
+
+
 FOUNDER COMPLETION RECONCILIATION — 2026-10-07 (CURRENT AUTHORITY)
 Founder explicitly confirmed the following SIX as completed; they are CLOSED and must not recur in active planning merely because older report/issue text still says pending:
 - Training Detail workout PR card below Workout Summary (GitHub #6; Founder confirmed complete).
