@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-06T18:46:12Z",
+  "generated_at_utc": "2026-10-07T02:59:54Z",
   "task": {
-    "id": "build89-testflight-release-20261006",
-    "title": "Build 89 VALID in TestFlight from Founder-authorized integrated candidate 4d4ca187",
+    "id": "build90-testflight-release-20261007",
+    "title": "Build 90 VALID in TestFlight from Founder-authorized integration candidate 8fab4fcb",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "4d4ca18711d3065536cc71d0555118fd969dd409",
-    "final_sha": "51399425b683d6a6e36b5c91836290259e31a7e0",
-    "native_sha": "51399425b683d6a6e36b5c91836290259e31a7e0",
-    "production_server_sha": "b7eb1e397f0238df9ae904fd182ddbb51602e8d8",
-    "production_deployment": "6fa4e887",
-    "native_build": 89
+    "base_sha": "8fab4fcb6be2c2c9d9f0f87b1123a6e49337fdbd",
+    "final_sha": "32baf1d5f43120cd07088df1210e1dc84ed26a78",
+    "native_sha": "32baf1d5f43120cd07088df1210e1dc84ed26a78",
+    "production_server_sha": "1b6687ffbf016575e674d12406200c3792eb90a7",
+    "production_deployment": "cbe6be96",
+    "native_build": 90
   },
   "result": {
-    "summary": "Build 89 (com.physiqueos.native.dev 1.0 (89)) from 51399425 (= Founder-authorized integrated candidate 4d4ca187 + build-number bump only; Claude A f3579d87 + Live Activity stopwatch fix + Claude B 156808fa + Codex 5b79118f on Build 88) uploaded via the guarded API-key tool; delivery cc70050d-b573-4cb8-98d0-e163b76b205a VALID (build/import VALID, on App Store Connect). Post-bump gates green. Training progression correction lane excluded. Server b7eb1e39/6fa4e887 unchanged and healthy. No deploy, no production mutation. Archive PhysiqueOS-Build89-51399425.xcarchive (2026-10-06); next build 90.",
+    "summary": "Build 90 (com.physiqueos.native.dev 1.0 (90)) from 32baf1d5 (= validated integration 8fab4fcb [Build 89 + Claude A a14eb4c4 Founder-selected Logger clock/Watch handoff/Photo viewer/Watch centering + Claude B 8c3172e1 Energy + Recovery/Sleep] + build-number bump only) uploaded via the guarded API-key tool; delivery 68dc945f-cfaa-43bb-a1ff-d0020fed54ff VALID. Archive PhysiqueOS-Build90-32baf1d5.xcarchive (2026-10-06); next build 91. Server 1b6687ff/cbe6be96 unchanged by this task.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
@@ -26,32 +26,28 @@
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Pre-bump 4d4ca187: unit 2132/0, focused 848/0, iPhone UI 73/0, Watch unit 57/0, Watch UI 6/7 (Build 88-identical WCSession harness limitation), Release OK, seams 0. Post-bump 51399425: release-contract unit 142/0 incl CFBundleVersion 89 pin + extension build parity, verify_release_configuration OK, app/Watch/extension all 1.0 (89), Release OK, seams 0, generator stable, diff-check clean, archive verified, guarded dry-run all PASS."
+      "summary": "Post-bump 32baf1d5: release-contract 142/0, full unit 2159/0, Watch unit 59/0, verify_release_configuration 1.0 (90) OK, clean generic Release OK (app/Watch/extension 1.0 (90)), seams 0, generator deterministic, diff-check clean, archive verified, guarded dry-run all PASS. Pre-bump 8fab4fcb: focused 502/0, full iPhone UI all classes passed, Watch UI 6/7 identical to Build 89 baseline."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder physical acceptance of Build 89 pending (checklist in report)."
+      "summary": "Founder physical acceptance of Build 90 pending (checklist in report)."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Native release only; no Server deploy or production data mutation; Server authority and health checked read-only."
+      "summary": "Native release only; no Server deploy or production data mutation; Server checked read-only."
     }
   },
   "decisions_required": [
-    "Founder: install Build 89 from TestFlight and run the physical acceptance checklist (Watch, Live Activity, Daily Capture/Priorities, Briefings, Build 89 small fixes, general smoke)"
+    "Founder: install Build 90 from TestFlight and run the physical acceptance checklist"
   ],
   "blockers": [],
-  "unexpected_findings": [
-    "physiqueos-audit doctl context now returns 401; read-only physiqueos-final-cutover-config context works"
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Post-Build-89 Training progression authority correction (Server lane, isolated, not deployed)",
-    "GitHub issue #7 iPhone Logger rest stopwatch for phone-only workouts",
-    "Watch UI no-WCSession harness limitation (testFinalSetFinish)",
-    "Speculative Watch reply-before-side-effects optimization"
+    "DEXA appointment dead end (OP-A first fix)",
+    "Watch UI no-WCSession harness limitation (testFinalSetFinish)"
   ],
-  "recommended_next_step": "Founder installs Build 89 via TestFlight and completes physical acceptance.",
-  "full_report_path": "agent-handoffs/reports/20261006T184556Z-build89-testflight-valid.md",
+  "recommended_next_step": "Founder installs Build 90 via TestFlight and completes physical acceptance.",
+  "full_report_path": "agent-handoffs/reports/20261007T025954Z-build90-testflight-valid.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
