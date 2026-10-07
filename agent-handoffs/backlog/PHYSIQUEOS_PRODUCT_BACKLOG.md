@@ -1,6 +1,6 @@
 PhysiqueOS product backlog — durable authority
 
-Last updated: 2026-10-03
+Last updated: 2026-10-07
 Owner: Founder
 Purpose: durable cross-chat authority for outstanding product work, accepted deferrals, natural acceptance gates, and next-build integration items.
 
@@ -14,6 +14,18 @@ Before proposing or reconstructing the PhysiqueOS backlog:
 3. do not resurrect items listed under Completed / Removed from backlog unless the Founder explicitly reopens them.
 
 Agent handoff reports describe implementation state. This backlog describes what still needs product attention.
+
+FOUNDER COMPLETION RECONCILIATION — 2026-10-07 (CURRENT AUTHORITY)
+Founder explicitly confirmed the following SIX as completed; they are CLOSED and must not recur in active planning merely because older report/issue text still says pending:
+- Training Detail workout PR card below Workout Summary (GitHub #6; Founder confirmed complete).
+- iPhone Logger rest stopwatch for phone-only workouts (GitHub #7; Founder confirmed complete).
+- Guided iPhone-to-Watch workout handoff (GitHub #8; Founder confirmed complete).
+- Workout Live Activities + Dynamic Island physical feature acceptance (prior active item 1; Founder confirmed complete).
+- HealthKit Sleep V3 prospective canary validation (prior active item 4; Founder confirmed complete). This does NOT activate strategic Sleep interpretation, certify 14+ reliable nights for a Recovery baseline, or complete Recovery Briefing V1.
+- Mac automated iCloud backup/recovery verification (previous local/remote-proof backlog; Founder confirmed complete). Earlier Oct 3 remote durability UNKNOWN/partial archive-tier text remains historical audit evidence, not an open user-directed project. This reconciliation did not independently re-query iCloud or newly prove third-party remote durability; operational health can be checked if a future backup incident arises.
+
+These six closures are Founder-reported acceptance, not independently rerun technical/device tests in this backlog-maintenance step. Preserve technical report histories and never invent missing run IDs, logs or proof. On 2026-10-07, shipped Native Build 91 (106f05183ea3e2328496acce0636dc087116bbce) is VALID in TestFlight; future backlog planning starts from its shipped authority, not the historical Build 77–85 roadmap snapshots. Current other work remains open, including Build 91 physical acceptance of NEW changes, post-Build-91 redesign closeout, HealthKit repeat-authorization fix, Training Variants Build 92, Recovery Briefing shadow work and beta readiness.
+
 
 DELIVERY WORKFLOW RULE (durable, 2026-10-02)
 - Normal Native distribution is TestFlight-first: Claude/Codex archive on the Mac -> guarded App Store Connect upload -> TestFlight VALID -> Founder installs remotely -> physical acceptance.
@@ -46,15 +58,13 @@ What changed:
 Acceptance (Build 81): Every 2 weeks loads; 3 weeks and 1 month save/reopen retained; set the wanted cadence before Saturday; specific time, reminder toggle, Photo Event toggle unchanged; exactly one pending Progress Photos reminder.
 Note: after a 3+ week or monthly cadence is saved, Builds <=80 cannot open Coaching Updates (fail closed by design).
 
-1. Workout Logger Live Activities — physical-device acceptance
-Status: Build 77 VALID; implementation complete; natural workout acceptance pending. Builds 78 and 79 (both VALID) carry the same Live Activity behavior unchanged (in Build 79 the same extension also hosts the Home Screen widget); acceptance can be done on Build 79.
+1. Workout Logger Live Activities — FOUNDER CONFIRMED COMPLETE 2026-10-07
+Status: Shipped in Build 77 and carried through Build 91; Founder confirms iPhone Live Activities and Dynamic Island complete. No remaining acceptance gate for this item.
 Authority:
 - shipping source c299fa29
 - final report agent-handoffs/reports/20261001T220947Z-workout-live-activities-phase1-implementation.md
-Next:
-- Founder puts Build 77 through a normal workout.
-- Observe Lock Screen/Dynamic Island rendering, load/reps legibility, Complete Set, Stopwatch, final-set transitions, supersets, deep link, and lifecycle behavior.
-- Do not patch typography/density until real-workout feedback unless correctness is broken.
+Historical acceptance checklist (completed by Founder confirmation; not a new task):
+- Lock Screen/Dynamic Island, load/reps, Complete Set, Stopwatch, finishing, supersets, deep link and lifecycle behavior.
 
 2. Performance Record celebration — PHYSICAL ACCEPTANCE PASS; larger polish shipped in Build 85 (VALID)
 Status: the Build 84 real workout physically passed both session-volume (7,500 lb) and reps-at-load (15 reps at 125 lb) records. Exact Build 85 source `b8ee8690b194cb90086b62816b9a2c8c400dc026`, delivery `a8c393e7-7d2c-41f0-9ba0-d37f43e53dc1` VALID, makes the confetti noticeably larger while preserving one-time persistence and Reduce Motion.
@@ -96,18 +106,18 @@ Acceptance:
 - repeated/stale action is safe;
 - notification clears/updates appropriately.
 
-4. HealthKit Sleep — prospective canary acceptance
-Status: HOLD (not PASS) since 2026-10-02 22:00Z. sleep-canon-v3 ACTIVE for ordinary prospective Sleep (effective 2026-10-02; policy healthkit_sleep_canonical_algorithm_policy). P2 Oura copy splice resolved prospectively: Oct 2 corrected v2 rev2 -> v3 rev3 (asleep ~455, deep ~98.5, REM ~117.5, core ~239, awake ~25 min, 73 segments; one coherent revision, 0 ambiguity). Activation changed exactly 2 of 52 collections (config + Oct 2 day); historical mutation 0; strategic mutation 0. Founder accepted the rare out-of-order Oura revision ambiguity as a known residual (visible via ambiguousContinuationCount). D0 2026-10-02 validation_only. Strategic Sleep OFF.
+4. HealthKit Sleep — prospective canary FOUNDER CONFIRMED COMPLETE 2026-10-07
+Status: Founder explicitly confirms completion of this V3 prospective-canary milestone. Historical 2026-10-02 audit was HOLD, prior to this confirmation; no new per-night telemetry/audit logs were independently retrieved in this reconciliation. sleep-canon-v3 ACTIVE for ordinary prospective Sleep (effective 2026-10-02; policy healthkit_sleep_canonical_algorithm_policy). P2 Oura copy splice resolved prospectively: Oct 2 corrected v2 rev2 -> v3 rev3 (asleep ~455, deep ~98.5, REM ~117.5, core ~239, awake ~25 min, 73 segments; one coherent revision, 0 ambiguity). Activation changed exactly 2 of 52 collections (config + Oct 2 day); historical mutation 0; strategic mutation 0. Founder accepted the rare out-of-order Oura revision ambiguity as a known residual (visible via ambiguousContinuationCount). D0 2026-10-02 validation_only. Strategic Sleep OFF.
 Authority:
 - Server `89fe0a0340adee22d15b92a1f074a0bbd348ac77` (deployment `28678d4a-e3cc-4b2b-a479-1851ab7093bf`) carries Sleep v3 unchanged; Native Build 83 `3e61dd215e8474c52bd54230d2d9dfb2f3a93534` (TestFlight delivery `507b409f-a29f-48a0-93b4-49ab46b5ad6d`, VALID) remains v2+v3 stage-capable.
 - activation report agent-handoffs/reports/20261002T220000Z-healthkit-sleep-canon-v3-prospective-activation.md
 - v3 design report agent-handoffs/reports/20261002T201500Z-healthkit-sleep-canon-v3-copy-coherence.md
 - canary audit agent-handoffs/reports/20261002T182755Z-healthkit-sleep-prospective-canary-audit.md
-Remaining natural gates (canary -> PASS only after all):
+Historical validation plan from the earlier HOLD audit (retained for traceability, not an active canary task after Founder's completion confirmation):
 1. >=2 (prefer 3) natural prospective nights (Oct 3+) accepted under sleep-canon-v3; ideally one Oura duplicate-revision night (check copySelection diagnostics).
 2. Closed-app background delivery: Oura syncs while PhysiqueOS stays unopened >=75 min; Sleep receipt precedes any Founder command.
 3. Post-boundary strategic-leakage checks: Sun Oct 4 Weekly (and Wed Oct 7 Midweek if needed) scanned — zero Sleep/Recovery markers; Goal/Strategy Confidence unmoved by Sleep.
-4. 14 reliable prospective nights before any Recovery baseline interpretation (~Oct 15 at the earliest).
+4. Separately, 14 reliable prospective nights are still needed before Recovery baseline interpretation; this is a Recovery Briefing prerequisite, not a reason to reopen the Founder-closed Sleep canary.
 - no manual Sleep import; no backfill; no historical recanonicalization (historical stays sleep-canon-v2).
 After acceptance:
 - authorize prospective validation-only Sleep as input to Recovery shadow assessment through a separately reviewed non-strategic composition boundary.
@@ -128,7 +138,7 @@ Accepted product direction:
 - Recovery status does not automatically move Goal Confidence;
 - training corroboration is non-causal.
 Next:
-- wait for prospective Sleep canary acceptance (HOLD since 2026-10-02: v3 active, natural-night/background/leakage gates pending; see item 4);
+- Sleep V3 canary acceptance was confirmed by Founder 2026-10-07; proceed with separate, explicitly authorized Recovery shadow-input boundary review instead of reopening the canary;
 - note: a prospective-only prior-28 baseline needs >=14 reliable nights, so non-"Not enough data" shadow output is not possible before ~Oct 15 even once authorized;
 - review/authorize prospective-only non-strategic shadow input boundary;
 - run shadow calibration;
@@ -139,7 +149,7 @@ Next:
 FUTURE MAJOR PROJECTS (roadmap only — NOT started; do not implement without a separate Founder-authorized prompt)
 
 F1. App-wide UI/design polish
-Position: design exploration active; shipping implementation not started.
+Position: DESIGN COMPLETE by 2026-10-07 Build 91 closeout audit (main report 65e221d10a52d9ef89ae19e4dcf528ca2c66de07). Most approved designs ship in Build 91; a bounded final implementation/acceptance tail remains: Home one-tap Skip + transient feedback, Energy phase history, widget refresh target, and limited UI state surfaces. The narrative below records historical design exploration and should not be interpreted as a current not-started status.
 Current state: Home, Log Compact Command Center, Weekly, Midweek, Monthly, DEXA, Photo, the complete Goals hierarchy and Priority Detail are design-direction locked in dark/mineral light under their accepted corrections. Tesamorelin now has one Preparation section preserving both canonical instructions. Nutrition and Activity are accepted as good in their separate lane. Operating Plan root plus Energy, Nutrition, Training, Recovery, Peptides and Supplements are accepted and locked. The exact final Server-ordered rows — Tracking and conditional Coaching Updates — now have complete dark/mineral review artifacts covering their root continuity, detail/support, complete editor, schedule/timing and material conditional states; these final surfaces are pending Founder review. The source audit also preserves the current non-root Founder Production DEXA appointment unavailable state and records its usability gap. Recovery remains graph-driven, future-only and uncoupled from Confidence. Photo's simultaneous paired comparison viewer with synchronized zoom/pan, production Energy phase-history projection and usable production DEXA appointment destination remain required implementation work. No implementation has started. Authority: `agent-handoffs/backlog/20261003-app-wide-ui-design-polish-home-exploration.md`.
 Scope boundary: no Native implementation, Server behavior, production content projection, Recovery activation, build or TestFlight work is authorized by the exploration.
 
@@ -510,7 +520,9 @@ Completion result:
 - physical TestFlight acceptance remains observational and is listed in the final report.
 
 
-## Mac disaster-recovery / iCloud backup V1 — SMALL TIER IMPLEMENTED / ARCHIVE COPY + INDEPENDENT REMOTE PROOF PENDING (2026-10-03)
+## Mac disaster-recovery / iCloud backup V1 — FOUNDER CONFIRMED COMPLETE (2026-10-07)
+
+Founder confirms automated iCloud backup and recovery verification completed and closes this item. The detailed October 3 provisional small-tier/remote-proof limitations below are historical evidence only; this maintenance step did not query the live Mac/iCloud status or retroactively certify independent remote state. Routine backup maintenance or a new observed failure is not an open V1 implementation backlog item.
 
 Audit authority:
 - `agent-handoffs/reports/20261003T174554Z-mac-icloud-backup-disaster-recovery-audit-plan.md`
