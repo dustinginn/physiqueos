@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-10-07T15:59:22Z",
+  "task": {
+    "id": "build92-training-variant-server-foundation-20261007",
+    "title": "Build 92 Training Execution Variant Server foundation candidate",
+    "agent": "claude",
+    "status": "completed"
+  },
+  "repository": "dustinginn/physiqueos",
+  "authority": {
+    "base_sha": "e7ffc6716706ae4d2140008a1655bfed95a93889",
+    "final_sha": "6ac19b8c2e224a91a04e53aa5029ad14d2f3e2a3",
+    "native_sha": "32baf1d5f43120cd07088df1210e1dc84ed26a78",
+    "production_server_sha": "e7ffc6716706ae4d2140008a1655bfed95a93889",
+    "production_deployment": "b98c26e4",
+    "native_build": 90
+  },
+  "result": {
+    "summary": "Build 92 Training Variant Server Foundation ready for Founder review. Candidate 6ac19b8c on branch claude/build92-training-variant-server-foundation (based on prod e7ffc671): canonical per-exercise trainingExecutionVariants definitions (immutable tev_ ids, legacyKeys, active/retired, provenance; no DDL; no timing fields), create/rename/retire/reactivate commands (training-catalog.execution-variant.*.v1; duplicate returns existing, retired name reactivates, Ordinary/Superset reserved), additive executionVariantsByExercise Logger projection (never history-inferred; Super Set excluded), finalize validates/stamps variantId and keeps the Build 90 legacy shape, one resolver partitions progression/records/PR baselines/previous performance (identical to legacy when no definitions), Web Logger consumes the projection instead of hard-coded options. Legacy Static Hold seed (spider_curl, pendulum_squat_machine) runner/entry/payload builder prepared and tested, NOT executed.",
+    "success": true,
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
+  },
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "summary": "New suites 27/27; focused Training gate 849/850 (1 pre-existing phase7b); full unit 9819 passed / 303 failed vs base e7ffc671 302 failed with identical set except one load-timeout test (productionEsmSyntaxIntegrity, passes in isolation at load avg ~335); phase6.training 186/186; phase4 156/156; migration-safety and phase3 failures all pre-existing; ESLint clean; git diff --check clean. next build not run; Native unchanged."
+    },
+    "review": {
+      "status": "not_run",
+      "summary": "Founder review of candidate 6ac19b8c pending."
+    },
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "No production read, write, deploy or seed in this task; prod re-verified at e7ffc671 via health endpoint."
+    }
+  },
+  "decisions_required": [
+    "Founder: authorize Server deploy of 6ac19b8c (invisible to Build 90 until definitions exist)",
+    "Founder: authorize legacy Static Hold seed dry run, then separately the apply (<=2 definition records)",
+    "Founder: schedule the separate Super Set evidence cleanup task if wanted"
+  ],
+  "blockers": [],
+  "unexpected_findings": [
+    "Non-Logger report consumers (briefings, V3 observations) stay key-based; they diverge from stable identity only after a rename, which Native V1 does not expose"
+  ],
+  "backlog": [
+    "Native Build 92 Create + Select (exact task in report section 13)",
+    "Watch WatchWorkoutProjection.Row optional variantLabel",
+    "Super Set misfiled-variant evidence cleanup (separate authorization)"
+  ],
+  "recommended_next_step": "Founder reviews 6ac19b8c and authorizes Server deploy, then the seed dry run, then the Native Build 92 Create + Select task.",
+  "full_report_path": "agent-handoffs/reports/20261007T155922Z-build92-training-variant-server-foundation.md",
+  "safety": {
+    "contains_secrets": false,
+    "contains_credentials": false,
+    "contains_production_exports": false,
+    "contains_founder_evidence": false,
+    "safe_for_chatgpt_retrieval": true
+  }
+}

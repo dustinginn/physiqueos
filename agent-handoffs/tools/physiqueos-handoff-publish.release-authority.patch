@@ -1,0 +1,124 @@
+--- a/physiqueos-handoff-publish
++++ b/physiqueos-handoff-publish
+@@ -6,9 +6,16 @@
+ throwaway worktree (never touches an active worktree), pushes without force, and
+ verifies the remote commit.
+ 
+-  physiqueos-handoff-publish --latest L.json --report R.md [--readme README.md]
++  physiqueos-handoff-publish --latest L.json --report R.md [--release-authority]
+                              [--inbox-task-id ID] [--dry-run]
+ 
++Default (report-only): publishes ONLY the immutable report (+ the inbox completion flip with
++                     --inbox-task-id). agent-handoffs/latest.json and latest.md are NOT touched:
++                     they are the accepted Native release authority (agent-handoffs/RELEASE_AUTHORITY.md).
++--release-authority  Accepted Native release workflow only (guarded TestFlight delivery VALID).
++                     Also writes latest.json/latest.md, after release_pointer_guard accepts the
++                     transition from the current origin/main pointer.
++
+ --inbox-task-id ID   The task came from the GitHub inbox. Enforces task.id == ID, refuses if
+                      the inbox task is already completed/cancelled or superseded (replay
+                      safety), and marks agent-handoffs/inbox/latest.json completed in the
+@@ -26,6 +33,7 @@
+ import sys
+ 
+ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib"))
++import release_pointer_guard  # noqa: E402  (copied from agent-handoffs/tools/ in the repo)
+ from physiqueos_handoff_lib import (  # noqa: E402
+     BRANCH, HD, INBOX_LATEST, REPO, SHA_RE, SLUG, TS_RE, age_seconds, git, is_str, now_utc,
+     only_keys, read_file, remote_exists, remote_show, scan_text, stage_commit_push,
+@@ -170,12 +178,17 @@
+     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+     ap.add_argument("--latest", required=True)
+     ap.add_argument("--report", required=True)
+-    ap.add_argument("--readme")
++    ap.add_argument("--readme", help=argparse.SUPPRESS)
++    ap.add_argument("--release-authority", action="store_true")
+     ap.add_argument("--inbox-task-id")
+     ap.add_argument("--dry-run", action="store_true")
+     args = ap.parse_args()
+ 
+     print("== Handoff sanitization gate ==")
++    if args.readme:
++        print("REFUSED: --readme is retired; agent-handoffs/README.md is the protocol and changes only "
++              "through a reviewed commit. Nothing published.")
++        return 1
+     rc, url = git(["remote", "get-url", "origin"])
+     if rc != 0 or SLUG not in url:
+         print("REFUSED: %s is not a clone of %s" % (REPO, SLUG))
+@@ -190,6 +203,8 @@
+     errs = validate(doc)
+     if not errs and doc["task"]["id"] not in report_txt:
+         errs.append("report must mention task.id (%s)" % doc["task"]["id"])
++    if not errs and args.release_authority:
++        errs += ["--release-authority: %s" % e for e in release_pointer_guard.release_authority_errors(doc)]
+     if not errs and args.inbox_task_id and doc["task"]["id"] != args.inbox_task_id:
+         errs.append("task.id (%s) must equal --inbox-task-id (%s): completion must record the inbox task id"
+                     % (doc["task"]["id"], args.inbox_task_id))
+@@ -212,11 +227,18 @@
+     rpath = doc["full_report_path"]
+ 
+     def build_files():
+-        files = {LATEST: latest_txt if latest_txt.endswith("\n") else latest_txt + "\n",
+-                 POINTER: pointer_text(doc),
+-                 rpath: report_txt if report_txt.endswith("\n") else report_txt + "\n"}
+-        if readme_txt is not None:
+-            files[README] = readme_txt if readme_txt.endswith("\n") else readme_txt + "\n"
++        files = {rpath: report_txt if report_txt.endswith("\n") else report_txt + "\n"}
++        if args.release_authority:
++            cur = remote_show(LATEST)
++            try:
++                old_doc = json.loads(cur) if cur is not None else None
++            except ValueError:
++                old_doc = None
++            errs = release_pointer_guard.transition_errors(old_doc, doc, pointer_text(doc))
++            if errs:
++                return None, "release-pointer guard: " + "; ".join(errs)
++            files[LATEST] = latest_txt if latest_txt.endswith("\n") else latest_txt + "\n"
++            files[POINTER] = pointer_text(doc)
+         if args.inbox_task_id:
+             new_inbox, err = inbox_completion_update(doc, args.inbox_task_id, rpath)
+             if err:
+@@ -232,11 +254,13 @@
+     print("  [PASS] immutability: report path is new on origin/%s" % BRANCH)
+     files, err = build_files()
+     if err:
+-        print("  [FAIL] inbox: %s" % err)
+-        print("REFUSED: inbox identity/replay check failed. Nothing published.")
++        print("  [FAIL] %s" % err)
++        print("REFUSED: release-pointer or inbox identity/replay check failed. Nothing published.")
+         return 1
+     if args.inbox_task_id:
+         print("  [PASS] inbox: %s is current and open; completion id matches; will mark completed" % args.inbox_task_id)
++    print("  mode: %s" % ("RELEASE AUTHORITY (moves latest.json/latest.md)" if args.release_authority
++                          else "report-only (latest.json/latest.md unchanged)"))
+     print("  files to publish: %s" % ", ".join(sorted(files)))
+     if args.dry_run:
+         print("DRY RUN: gate passed; nothing committed or pushed.")
+@@ -274,15 +298,19 @@
+ 
+     print("== Remote verification ==")
+     ok = verify_remote_commit(sha, files, set(files))
+-    rc, body = git(["show", "%s:%s" % (sha, LATEST)])
+-    try:
+-        remote_doc = json.loads(body)
+-        good = remote_doc == doc and git(["cat-file", "-e", "%s:%s" % (sha, remote_doc["full_report_path"])])[0] == 0
+-    except ValueError:
+-        good = False
++    if args.release_authority:
++        rc, body = git(["show", "%s:%s" % (sha, LATEST)])
++        try:
++            remote_doc = json.loads(body)
++            good = remote_doc == doc and git(["cat-file", "-e", "%s:%s" % (sha, remote_doc["full_report_path"])])[0] == 0
++        except ValueError:
++            good = False
++        print("  [%s] remote latest.json valid JSON; full_report_path resolves; safety fields %s" % (
++            "PASS" if good else "FAIL", "true/false as required" if good else "UNVERIFIED"))
++    else:
++        good = git(["cat-file", "-e", "%s:%s" % (sha, rpath)])[0] == 0
++        print("  [%s] remote report resolves; latest.json/latest.md untouched" % ("PASS" if good else "FAIL"))
+     ok &= good
+-    print("  [%s] remote latest.json valid JSON; full_report_path resolves; safety fields %s" % (
+-        "PASS" if good else "FAIL", "true/false as required" if good else "UNVERIFIED"))
+     if args.inbox_task_id:
+         rc, body = git(["show", "%s:%s" % (sha, INBOX_LATEST)])
+         try:

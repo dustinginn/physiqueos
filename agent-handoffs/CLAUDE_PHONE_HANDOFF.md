@@ -87,7 +87,7 @@ Every Codex/Claude review, deployment, upload, repair, or acceptance completion 
 
 If publication fails, say REPORT NOT PUBLISHED and do not represent the chunk as complete.
 
-For parallel lanes, secondary agents publish timestamped reports to main but must not overwrite `agent-handoffs/latest.json` or `latest.md` when another workstream owns the primary lane.
+Every agent (primary or parallel lane) publishes timestamped reports to main and must not modify `agent-handoffs/latest.json` or `latest.md` unless the task is the accepted Native release (`agent-handoffs/RELEASE_AUTHORITY.md`).
 
 ## Existing PhysiqueOS safety rules remain in force
 
