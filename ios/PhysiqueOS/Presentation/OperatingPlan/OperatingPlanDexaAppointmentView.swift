@@ -224,11 +224,15 @@ struct OperatingPlanDexaAppointmentView: View {
     }
 
     /// Best effort: the most recent scan for the not-scheduled state. A
-    /// failure only hides the row.
+    /// failed read only hides the row (it is never shown as a schedule).
     @MainActor
     private func loadLastScan() async {
-        guard let report = try? await environment.dexaAPI.fetchDEXAReport() else { return }
-        lastScanDate = report.latestScan.map { OperatingPlanDateValues.readableDate($0.date) }
+        do {
+            let report = try await environment.dexaAPI.fetchDEXAReport()
+            lastScanDate = report.latestScan.map { OperatingPlanDateValues.readableDate($0.date) }
+        } catch {
+            lastScanDate = nil
+        }
     }
 }
 
