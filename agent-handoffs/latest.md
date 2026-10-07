@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Training execution variant authority audit + Build 92 Create Variant architecture (`training-variant-audit-build92-design-20261007`)
+- Task: Build 92 Training Execution Variant Server foundation candidate (`build92-training-variant-server-foundation-20261007`)
 - Agent: claude
 - Status: completed
-- Generated (UTC): 2026-10-07T15:15:37Z
+- Generated (UTC): 2026-10-07T15:59:22Z
 - Success: true
 
-Summary: Training execution variant audit complete — Build 92 Create Variant architecture ready for Founder review. Static Hold still exists only as occurrence-level data in historical canonical Training evidence (spider_curl x4 active + 1 retracted, pendulum_squat_machine x1; all reps+load, last 2026-08-29); no variant registry/definition ever existed. Build 90 shows only Ordinary because ProductionTrainingLoggerAPI hard-codes variants: [] (since Founder Production wiring 81467f25, 2026-09-10) and the Server training-logger read has no choice projection; fixture-era Native (<=Build 18) and the web Logger offered hard-coded Static Hold / 3-Second Pause / Slow Eccentric. Classification: DATA/PROJECTION GAP on a LEGACY MODEL LIMITATION (not a Server regression). Build 91 restoration not recommended; Build 92 design: per-exercise trainingExecutionVariants definitions (immutable id, legacyKeys alias, loggingMode inherit|timed), create/rename/retire commands, additive per-exercise Logger projection, variant-identity partition for progression/records. Also found legacy 'Super Set' recorded as an execution variant on 3 sessions.
+Summary: Build 92 Training Variant Server Foundation ready for Founder review. Candidate 6ac19b8c on branch claude/build92-training-variant-server-foundation (based on prod e7ffc671): canonical per-exercise trainingExecutionVariants definitions (immutable tev_ ids, legacyKeys, active/retired, provenance; no DDL; no timing fields), create/rename/retire/reactivate commands (training-catalog.execution-variant.*.v1; duplicate returns existing, retired name reactivates, Ordinary/Superset reserved), additive executionVariantsByExercise Logger projection (never history-inferred; Super Set excluded), finalize validates/stamps variantId and keeps the Build 90 legacy shape, one resolver partitions progression/records/PR baselines/previous performance (identical to legacy when no definitions), Web Logger consumes the projection instead of hard-coded options. Legacy Static Hold seed (spider_curl, pendulum_squat_machine) runner/entry/payload builder prepared and tested, NOT executed.
 
-Detailed report: `agent-handoffs/reports/20261007T151537Z-training-variant-audit-build92-design.md`
+Detailed report: `agent-handoffs/reports/20261007T155922Z-build92-training-variant-server-foundation.md`
 
 Protocol: `agent-handoffs/README.md`
