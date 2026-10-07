@@ -9,7 +9,13 @@ import SwiftUI
 /// header → scope selector ("Viewing") → Period Summary (4 cards) →
 /// Energy Over Time (dual-series chart + range selector) → Weekly Energy
 /// Balance (latest-4-weeks bar chart) → Weekly History ("Show All" sheet) →
-/// Recent Daily Energy ("Show All" sheet) → Data Sources.
+/// Recent Daily Energy ("Show All" sheet).
+///
+/// Presentation follows the Founder-locked Energy design
+/// (`energy-weight-recovery-evidence-style-translation-20261004` E1–E2 +
+/// Founder correction `a21296ec` E1–E3) in the `.weight` harness family it
+/// shares with Weight and Recovery. Values, completeness labels, both
+/// sheets and the conditional Nutrition/Activity links are unchanged.
 ///
 /// A separate, real live surface — **Operating Plan → Energy Strategy**
 /// ("Current Energy Strategy" / "Maintenance Calibration" phase copy,
@@ -20,7 +26,6 @@ import SwiftUI
 /// doc comment.
 struct EnergyHistoryView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: EnergyHistoryViewModel?
     @State private var viewModelAuthority: NativeAPIEnvironment?
 
@@ -30,34 +35,14 @@ struct EnergyHistoryView: View {
     @State private var isDailyHistorySheetPresented = false
 
     static let historyPreviewLimit = 3
+    private let m = EvidenceMetrics(family: .weight)
 
     var body: some View {
-        ScrollView {
+        EvidenceScrollPage(spacing: 0, top: 10) {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 13, weight: .semibold))
-                        Text("Evidence Hub")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    }
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .evidencePageChrome("Energy")
+        .evidenceFamily(.weight)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = EnergyHistoryViewModel(api: environment.energyAPI)
@@ -72,268 +57,146 @@ struct EnergyHistoryView: View {
             await viewModel?.load()
         }
         .refreshesOnForegroundWhenVisible { await viewModel?.load() }
+        .accessibilityIdentifier("energy.screen")
     }
 
     @ViewBuilder
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            WeightStatePanel(title: "Loading Energy Evidence…", loading: true, identifier: "energy.loading")
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            WeightStatePanel(title: message, detail: "Pull to refresh, or try again.", identifier: "energy.failure",
+                             actionLabel: "Try again") { Task { await viewModel?.load() } }
         case .loaded(let report):
-            VStack(alignment: .leading, spacing: 24) {
-                header(for: report)
-                TrainingScopeSelectorView(scope: report.scope) { pillID in
-                    Task { await viewModel?.selectScope(pillID: pillID) }
-                }
-                summaryGrid(report.summary)
-                overTimeCard(report.weeklyTrend)
-                recentWeeksCard(report.recentFourWeeks)
-                weeklyHistoryCard(report.weeklyHistory)
-                dailyHistoryCard(report.dailyHistory)
+            header(for: report)
+                .padding(.top, m.pt(4))
+                .padding(.bottom, m.pt(18))
+            WeightScopePills(scope: report.scope) { pillID in
+                Task { await viewModel?.selectScope(pillID: pillID) }
             }
+            .padding(.bottom, m.pt(18))
+            summarySection(report.summary)
+                .padding(.bottom, m.pt(19))
+            WeightSection(title: "Energy Over Time", identifier: "energy.overTime") {
+                EnergyOverTimeChartView(weeksAscending: report.weeklyTrend, selectedWeekID: $selectedOverTimeWeekID)
+            }
+            .padding(.bottom, m.pt(19))
+            WeightSection(title: "Weekly Energy Balance", identifier: "energy.weeklyBalance") {
+                EnergyWeeklyBarChartView(weeksAscending: report.recentFourWeeks, selectedWeekID: $selectedRecentWeekID)
+            }
+            .padding(.bottom, m.pt(19))
+            weeklyHistorySection(report.weeklyHistory)
+                .padding(.bottom, m.pt(19))
+            dailyHistorySection(report.dailyHistory)
         }
     }
 
+    /// Locked E1 header: 38 px lime `ϟ` mark, eyebrow, title, subtitle.
     private func header(for report: EnergyReportReadModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            IconBadge(systemImage: "bolt.fill", color: .primary, size: .lg, isCircular: true)
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .top, spacing: m.pt(12)) {
+            Text("ϟ")
+                .evidenceText(.normal(16, 900, jakarta: false))
+                .foregroundStyle(m.c.accent)
+                .frame(width: m.pt(38), height: m.pt(38))
+                .background(m.c.accent.opacity(0.16), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("EVIDENCE REPORT")
+                    .evidenceText(.normal(11, 800, jakarta: false, tracking: 1.43, uppercase: true))
+                    .foregroundStyle(m.c.accent)
                 Text(report.title)
-                    .physiqueOSFont(PhysiqueOSTypography.screenEyebrow)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
-                Text(report.heading)
-                    .physiqueOSFont(PhysiqueOSTypography.screenTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .evidenceText(EvidenceTextStyle(size: 30, weight: 780, lineHeight: 31.5, tracking: -1.2))
+                    .foregroundStyle(m.c.ink)
+                    .accessibilityAddTraits(.isHeader)
                 Text(report.subtitle)
-                    .physiqueOSFont(PhysiqueOSTypography.screenSubtitle)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .evidenceText(EvidenceTextStyle(size: 13, weight: 400, lineHeight: 17.55))
+                    .foregroundStyle(m.c.muted)
+                    .padding(.top, m.pt(4))
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("evidence.page.header")
     }
 
-    private func summaryGrid(_ summary: EnergySummary) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TrainingSectionHeaderView(title: "Period Summary")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                summaryCard("Average Intake", EnergyEvidenceCalculator.formatCalories(summary.averageIntake), supporting: nil)
-                summaryCard("Average Expenditure", EnergyEvidenceCalculator.formatCalories(summary.averageExpenditure), supporting: nil)
-                summaryCard("Average Balance", EnergyEvidenceCalculator.formatSignedCalories(summary.averageBalance), supporting: nil)
-                summaryCard("Complete Days", "\(summary.completeDays)", supporting: "\(summary.completeDays) of \(summary.evidenceDays) evidence days")
+    /// Period Summary (locked E1). Expenditure is labeled as an estimate
+    /// everywhere it appears, and the footnote states what it is made of,
+    /// so a small signed balance never reads as measured precision.
+    private func summarySection(_ summary: EnergySummary) -> some View {
+        WeightSection(title: "Period Summary", identifier: "energy.summary") {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(7), alignment: .top), GridItem(.flexible(), spacing: m.pt(7), alignment: .top)], spacing: m.pt(7)) {
+                WeightStatTile(label: "Average Intake", value: EnergyEvidenceCalculator.formatCalories(summary.averageIntake))
+                WeightStatTile(label: EnergyEvidenceCopy.summaryExpenditureLabel, value: EnergyEvidenceCalculator.formatCalories(summary.averageExpenditure))
+                WeightStatTile(label: "Average Balance", value: EnergyEvidenceCalculator.formatSignedCalories(summary.averageBalance))
+                WeightStatTile(label: "Complete Days", value: "\(summary.completeDays) of \(summary.evidenceDays)", detail: "evidence days")
             }
-        }
-    }
-
-    private func summaryCard(_ label: String, _ value: String, supporting: String?) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            if let supporting {
-                Text(supporting)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label): \(value)\(supporting.map { ". \($0)" } ?? "")")
-    }
-
-    private func overTimeCard(_ weeksAscending: [EnergyWeekRecord]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 8) {
-                TrainingSectionHeaderView(title: "Energy Over Time")
-                Text("Weekly average intake and estimated expenditure over time.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                EnergyOverTimeChartView(weeksAscending: weeksAscending, selectedWeekID: $selectedOverTimeWeekID)
-            }
+            EnergyEstimateFootnote()
+                .padding(.top, m.pt(9))
         }
     }
 
-    private func recentWeeksCard(_ recentFourWeeks: [EnergyWeekRecord]) -> some View {
-        CardContainer {
-            VStack(alignment: .leading, spacing: 8) {
-                TrainingSectionHeaderView(title: "Weekly Energy Balance")
-                Text("Average daily intake and estimated expenditure across the latest four weeks.")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                EnergyWeeklyBarChartView(weeksAscending: recentFourWeeks, selectedWeekID: $selectedRecentWeekID)
-            }
-        }
-    }
-
-    private func weeklyHistoryCard(_ weeks: [EnergyWeekRecord]) -> some View {
+    private func weeklyHistorySection(_ weeks: [EnergyWeekRecord]) -> some View {
         let preview = Array(weeks.prefix(Self.historyPreviewLimit))
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 8) {
-                TrainingSectionHeaderView(title: "Weekly History") {
-                    if weeks.count > Self.historyPreviewLimit {
-                        Button {
-                            isWeeklyHistorySheetPresented = true
-                        } label: {
-                            TrainingCompactActionLabel(label: "Show All")
-                        }
-                    }
-                }
-                if preview.isEmpty {
-                    Text("No weekly evidence available.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(preview) { week in EnergyWeekHistoryRow(week: week) }
-                    }
-                }
+        return WeightSection(
+            title: "Weekly History",
+            identifier: "energy.weeklyHistory",
+            action: weeks.count > Self.historyPreviewLimit ? "Show All ›" : nil,
+            onAction: { isWeeklyHistorySheetPresented = true }
+        ) {
+            if preview.isEmpty {
+                WeightEmptyLine(text: "No weekly evidence available.")
+            } else {
+                EnergyRowList(data: preview) { EnergyWeekHistoryRow(week: $0) }
             }
         }
         .sheet(isPresented: $isWeeklyHistorySheetPresented) {
-            EnergyWeeklyHistorySheet(weeks: weeks)
+            EnergyHistorySheet(title: "Weekly History", identifier: "energy.weeklyHistory.sheet") {
+                EnergyRowList(data: weeks) { EnergyWeekHistoryRow(week: $0) }
+            }
         }
     }
 
-    private func dailyHistoryCard(_ days: [EnergyDayRecord]) -> some View {
+    private func dailyHistorySection(_ days: [EnergyDayRecord]) -> some View {
         let preview = Array(days.prefix(Self.historyPreviewLimit))
-        return CardContainer {
-            VStack(alignment: .leading, spacing: 8) {
-                TrainingSectionHeaderView(title: "Recent Daily Energy") {
-                    if days.count > Self.historyPreviewLimit {
-                        Button {
-                            isDailyHistorySheetPresented = true
-                        } label: {
-                            TrainingCompactActionLabel(label: "Show All")
-                        }
-                    }
-                }
-                if preview.isEmpty {
-                    Text("No daily energy evidence available.")
-                        .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                } else {
-                    VStack(spacing: 8) {
-                        ForEach(preview) { day in EnergyDayHistoryRow(day: day) }
-                    }
-                }
+        return WeightSection(
+            title: "Recent Daily Energy",
+            identifier: "energy.dailyHistory",
+            action: days.count > Self.historyPreviewLimit ? "Show All ›" : nil,
+            onAction: { isDailyHistorySheetPresented = true }
+        ) {
+            if preview.isEmpty {
+                WeightEmptyLine(text: "No daily energy evidence available.")
+            } else {
+                EnergyRowList(data: preview) { EnergyDayHistoryRow(day: $0) }
             }
         }
         .sheet(isPresented: $isDailyHistorySheetPresented) {
-            EnergyDailyHistorySheet(days: days)
+            EnergyHistorySheet(title: "Daily Energy History", identifier: "energy.dailyHistory.sheet") {
+                EnergyRowList(data: days) { EnergyDayHistoryRow(day: $0) }
+            }
         }
     }
 }
 
-// MARK: - "Show All" sheets (mirrors the web's own `FloatingSheet` pattern)
+/// Founder-approved Energy wording (Build 90, delta 1): expenditure is always
+/// named as an estimate, and one footnote says what it is made of. Values
+/// keep the canonical `kcal` formatter (delta 2).
+enum EnergyEvidenceCopy {
+    static let summaryExpenditureLabel = "Avg Est. Expenditure"
+    static let rowExpenditureLabel = "Est. expenditure"
+    static let weekExpenditureLabel = "Avg est. expenditure"
+    static let estimateFootnote = "Expenditure is estimated from RMR plus wearable active calories, so small balances are approximate."
 
-private struct EnergyWeeklyHistorySheet: View {
-    let weeks: [EnergyWeekRecord]
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(weeks) { week in EnergyWeekHistoryRow(week: week) }
-                }
-                .padding(16)
-            }
-            .background(PhysiqueOSTheme.background)
-            .navigationTitle("Weekly History")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        }
-        .presentationDetents([.medium, .large])
-    }
-}
-
-private struct EnergyDailyHistorySheet: View {
-    let days: [EnergyDayRecord]
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 8) {
-                    ForEach(days) { day in EnergyDayHistoryRow(day: day) }
-                }
-                .padding(16)
-            }
-            .background(PhysiqueOSTheme.background)
-            .navigationTitle("Daily Energy History")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-            .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
-        }
-        .presentationDetents([.medium, .large])
-    }
-}
-
-// MARK: - Row views
-
-private struct EnergyWeekHistoryRow: View {
-    let week: EnergyWeekRecord
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                Text("\(TrainingDateFormatting.short(week.weekStart)) – \(TrainingDateFormatting.short(week.weekEnd))")
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Spacer(minLength: 8)
-                Text(week.partial ? "Partial" : "Complete")
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-            }
-            HStack(alignment: .top, spacing: 18) {
-                VStack(alignment: .leading, spacing: 10) {
-                    weekValue("Intake", EnergyEvidenceCalculator.formatCalories(week.averageIntake), color: PhysiqueOSTheme.energyIntake)
-                    weekValue("Balance", EnergyEvidenceCalculator.formatSignedCalories(week.averageBalance), color: PhysiqueOSTheme.chartSuccess)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                VStack(alignment: .leading, spacing: 10) {
-                    weekValue("Estimated expenditure", EnergyEvidenceCalculator.formatCalories(week.averageExpenditure), color: PhysiqueOSTheme.energyExpenditure)
-                    weekValue("Completed days", "\(week.completeDayCount)", color: PhysiqueOSTheme.textSecondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
+    /// A missing value in a compact row reads as an em dash (locked E1–E3);
+    /// the summary tiles keep the canonical "Not available".
+    static func compact(_ formatted: String) -> String {
+        formatted == "Not available" ? "—" : formatted
     }
 
-    private func weekValue(_ label: String, _ value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(color)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-}
-
-private struct EnergyDayHistoryRow: View {
-    let day: EnergyDayRecord
-
-    /// `completenessLabel` — verbatim.
-    private var completenessLabel: String {
-        switch day.completeness {
+    /// Server completeness → the verbatim day tag.
+    static func completenessLabel(_ completeness: String) -> String {
+        switch completeness {
         case "complete": "Complete · Estimated"
         case "nutrition-only": "Nutrition only"
         case "activity-only": "Activity only"
@@ -341,64 +204,254 @@ private struct EnergyDayHistoryRow: View {
         default: "No paired evidence"
         }
     }
+}
+
+/// The one estimate disclosure shared by the summary and both charts.
+struct EnergyEstimateFootnote: View {
+    private let m = EvidenceMetrics(family: .weight)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top) {
-                Text(TrainingDayView.formatCompactDate(day.date))
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                Spacer(minLength: 8)
-                Text(completenessLabel)
-                    .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+        Text(EnergyEvidenceCopy.estimateFootnote)
+            .evidenceText(EvidenceTextStyle(size: 10, weight: 400, lineHeight: 14))
+            .foregroundStyle(m.c.quiet)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("energy.estimateNote")
+    }
+}
+
+// MARK: - "Show All" sheets (locked correction E2 / E3)
+
+/// Medium/large modal history: flat bar with `Done` and a centered title,
+/// one contained list. Daily rows keep their own navigation stack so the
+/// conditional Nutrition/Activity links still push from inside the sheet.
+private struct EnergyHistorySheet<Rows: View>: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let identifier: String
+    let rows: Rows
+    /// The sheet's own back trail, so a page pushed inside it reads
+    /// `‹ Daily Energy History` instead of a generic `‹ Back`.
+    @State private var trail: EvidenceBackTrail
+    @State private var detent: PresentationDetent = .medium
+    private let m = EvidenceMetrics(family: .weight)
+
+    init(title: String, identifier: String, @ViewBuilder rows: () -> Rows) {
+        self.title = title
+        self.identifier = identifier
+        self.rows = rows()
+        _trail = State(initialValue: EvidenceBackTrail(seed: [title]))
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    rows
+                }
+                .padding(m.pt(13 + 1))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(m.c.surface, in: RoundedRectangle(cornerRadius: m.pt(15)))
+                .overlay(RoundedRectangle(cornerRadius: m.pt(15)).strokeBorder(m.c.line, lineWidth: m.pt(1)))
+                .padding(.horizontal, m.pt(16))
+                .padding(.top, m.pt(10))
+                .padding(.bottom, m.pt(30))
             }
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 4) {
-                dailyValue("Intake", EnergyEvidenceCalculator.formatCalories(day.calorieIntake), color: PhysiqueOSTheme.energyIntake)
-                dailyValue("Active calories", EnergyEvidenceCalculator.formatCalories(day.activeCalories), color: PhysiqueOSTheme.energyExpenditure)
-                dailyValue("Estimated expenditure", EnergyEvidenceCalculator.formatCalories(day.estimatedExpenditure), color: PhysiqueOSTheme.energyExpenditure)
-                dailyValue("Balance", EnergyEvidenceCalculator.formatSignedCalories(day.energyBalance), color: PhysiqueOSTheme.chartSuccess)
+            .background(m.c.page)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(m.c.page, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { dismiss() } label: {
+                        Text("Done")
+                            .evidenceText(.normal(12, 750, jakarta: false))
+                            .foregroundStyle(m.c.muted)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("evidence.sheet.done")
+                }
+                .evidenceFlatToolbarItem()
+                ToolbarItem(placement: .principal) {
+                    Text(title)
+                        .evidenceText(.normal(12, 800, jakarta: false))
+                        .foregroundStyle(m.c.ink)
+                        .accessibilityAddTraits(.isHeader)
+                }
             }
+            .safeAreaInset(edge: .top, spacing: 0) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
+            .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
+        }
+        .environment(\.evidenceBackTrail, trail)
+        .evidenceFamily(.weight)
+        .presentationDetents([.medium, .large], selection: $detent)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+// MARK: - Rows (locked correction `.energy-week` / `.energy-day`)
+
+/// Rows separated by a 1 px rule; the last row has none.
+private struct EnergyRowList<Data: RandomAccessCollection, Row: View>: View where Data.Element: Identifiable {
+    let data: Data
+    @ViewBuilder var row: (Data.Element) -> Row
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(data.enumerated()), id: \.element.id) { index, element in
+                row(element)
+                    .overlay(alignment: .bottom) {
+                        if index < data.count - 1 { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
+                    }
+            }
+        }
+    }
+}
+
+/// `.tag` (lime) / `.tag.warn` (amber) capsule.
+struct EnergyTag: View {
+    let text: String
+    var warn = false
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        let color = warn ? m.c.amber : m.c.accent
+        Text(text)
+            .evidenceText(.normal(8, 850, jakarta: false, tracking: 0.24))
+            .foregroundStyle(color)
+            .padding(.horizontal, m.pt(6))
+            .padding(.vertical, m.pt(3))
+            .background(color.opacity(0.15), in: Capsule())
+            .fixedSize()
+    }
+}
+
+/// `.energy-field`: 9 px muted label above a 10 px bold ink value.
+struct EnergyField: View {
+    let label: String
+    let value: String
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: m.pt(1)) {
+            Text(label)
+                .evidenceText(.normal(9, 400, jakarta: false))
+                .foregroundStyle(m.c.quiet)
+            Text(value)
+                .evidenceText(.normal(10, 760, jakarta: false, digits: true))
+                .foregroundStyle(m.c.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// `.energy-grid`: two columns, 4 px row gap, 12 px column gap.
+struct EnergyFieldGrid: View {
+    let fields: [(String, String)]
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(12), alignment: .top), GridItem(.flexible(), spacing: m.pt(12), alignment: .top)],
+                  alignment: .leading, spacing: m.pt(4)) {
+            ForEach(Array(fields.enumerated()), id: \.offset) { _, field in
+                EnergyField(label: field.0, value: field.1)
+            }
+        }
+    }
+}
+
+private func compact(_ formatted: String) -> String { EnergyEvidenceCopy.compact(formatted) }
+
+private struct EnergyWeekHistoryRow: View {
+    let week: EnergyWeekRecord
+    private let m = EvidenceMetrics(family: .weight)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: m.pt(8)) {
+                Text("\(TrainingDateFormatting.short(week.weekStart)) – \(TrainingDateFormatting.short(week.weekEnd))")
+                    .evidenceText(.normal(12, 790, jakarta: false))
+                    .foregroundStyle(m.c.ink)
+                Spacer(minLength: 0)
+                EnergyTag(text: week.partial ? "Partial" : "Complete", warn: week.partial)
+            }
+            EnergyFieldGrid(fields: [
+                ("Intake", compact(EnergyEvidenceCalculator.formatCalories(week.averageIntake))),
+                (EnergyEvidenceCopy.rowExpenditureLabel, compact(EnergyEvidenceCalculator.formatCalories(week.averageExpenditure))),
+                ("Balance", compact(EnergyEvidenceCalculator.formatSignedCalories(week.averageBalance))),
+                ("Completed days", "\(week.completeDayCount)"),
+            ])
+            .padding(.top, m.pt(7))
+        }
+        .padding(.vertical, m.pt(11))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("energy.week.\(week.weekStart)")
+    }
+}
+
+private struct EnergyDayHistoryRow: View {
+    let day: EnergyDayRecord
+    private let m = EvidenceMetrics(family: .weight)
+
+    private var completenessLabel: String { EnergyEvidenceCopy.completenessLabel(day.completeness) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: m.pt(8)) {
+                Text(TrainingDateFormatting.short(day.date))
+                    .evidenceText(.normal(12, 790, jakarta: false))
+                    .foregroundStyle(m.c.ink)
+                Spacer(minLength: 0)
+                EnergyTag(text: completenessLabel, warn: day.completeness != "complete")
+            }
+            .accessibilityElement(children: .combine)
+            EnergyFieldGrid(fields: [
+                ("Intake", compact(EnergyEvidenceCalculator.formatCalories(day.calorieIntake))),
+                ("Active calories", compact(EnergyEvidenceCalculator.formatCalories(day.activeCalories))),
+                (EnergyEvidenceCopy.rowExpenditureLabel, compact(EnergyEvidenceCalculator.formatCalories(day.estimatedExpenditure))),
+                ("Balance", compact(EnergyEvidenceCalculator.formatSignedCalories(day.energyBalance))),
+            ])
+            .padding(.top, m.pt(7))
             // "Nutrition Day"/"Activity" cross-links — visible iff the
-            // corresponding evidence exists for this day (verified against
-            // source: `nutritionHref` is set only when a nutrition payload
-            // matched, `activityHref` only when an activity day record
-            // exists), matching the general Evidence pages the web links to
+            // corresponding evidence exists for this day, matching the
+            // general Evidence pages the web links to
             // (`/progress/nutrition?context=all` /
             // `/progress/activity?context=all`) — not a day-specific route.
             if day.calorieIntake != nil || day.activeCalories != nil {
-                HStack(spacing: 16) {
+                HStack(spacing: m.pt(12)) {
                     if day.calorieIntake != nil {
                         NavigationLink(value: AppDestination.progressStream(streamId: "nutrition")) {
-                            Text("Nutrition Day")
+                            miniLink("Nutrition Day")
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("energy.day.\(day.date).nutrition")
                     }
                     if day.activeCalories != nil {
                         NavigationLink(value: AppDestination.progressStream(streamId: "activity")) {
-                            Text("Activity")
+                            miniLink("Activity")
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("energy.day.\(day.date).activity")
                     }
                 }
-                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                .foregroundStyle(PhysiqueOSTheme.accent)
+                .padding(.top, m.pt(7))
             }
         }
-        .padding(18)
+        .padding(.vertical, m.pt(10))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PhysiqueOSTheme.surfaceMuted)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("energy.day.\(day.date)")
     }
 
-    private func dailyValue(_ label: String, _ value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                .foregroundStyle(PhysiqueOSTheme.textMuted)
-            Text(value)
-                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                .foregroundStyle(color)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func miniLink(_ label: String) -> some View {
+        Text(label)
+            .evidenceText(.normal(9, 800, jakarta: false))
+            .foregroundStyle(m.c.accent)
+            .evidenceHitTarget(visualHeight: m.pt(11))
     }
 }

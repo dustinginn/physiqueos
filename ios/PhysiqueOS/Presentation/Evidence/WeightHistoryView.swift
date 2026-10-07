@@ -182,10 +182,13 @@ struct WeightHistoryView: View {
 }
 
 // MARK: - Weight family components (`energy-weight-recovery` harness)
+//
+// Shared with Energy and Recovery/Sleep, which were locked in the same
+// harness (`1f8ba1b9` + Founder correction `a21296ec`).
 
 /// `.section.contained`: 13 px inset, 15 px radius, 16 px title, accent
 /// action (`Show All` / `Close` expands the rows inline — no new route).
-private struct WeightSection<Content: View>: View {
+struct WeightSection<Content: View>: View {
     let title: String
     let identifier: String
     var action: String?
@@ -225,7 +228,7 @@ private struct WeightSection<Content: View>: View {
 }
 
 /// `.summary` / `.stat`: uppercase label, 14 px value, optional detail.
-private struct WeightStatTile: View {
+struct WeightStatTile: View {
     let label: String
     let value: String
     var detail: String?
@@ -255,7 +258,7 @@ private struct WeightStatTile: View {
 }
 
 /// `.pill` scope chips: 9 px radius; selected = surface-2 + lime ink + rule.
-private struct WeightScopePills: View {
+struct WeightScopePills: View {
     let scope: TrainingScopeContext
     let onSelect: (String) -> Void
     private let m = EvidenceMetrics(family: .weight)
@@ -300,7 +303,7 @@ private struct WeightScopePills: View {
     }
 }
 
-private struct WeightEmptyLine: View {
+struct WeightEmptyLine: View {
     let text: String
     private let m = EvidenceMetrics(family: .weight)
 
@@ -312,12 +315,15 @@ private struct WeightEmptyLine: View {
     }
 }
 
-/// `.state-panel` for Weight's async states.
-private struct WeightStatePanel: View {
+/// `.state-panel` for the harness's async states. Recovery's scope failure
+/// adds the locked accent `Try again` action (R6).
+struct WeightStatePanel: View {
     let title: String
     var detail: String?
     var loading = false
     let identifier: String
+    var actionLabel: String?
+    var onAction: () -> Void = {}
     private let m = EvidenceMetrics(family: .weight)
 
     var body: some View {
@@ -334,13 +340,24 @@ private struct WeightStatePanel: View {
                     .foregroundStyle(m.c.quiet)
                     .padding(.top, m.pt(4))
             }
+            if let actionLabel {
+                Button(action: onAction) {
+                    Text(actionLabel)
+                        .evidenceText(.normal(10, 760, jakarta: false))
+                        .foregroundStyle(m.c.accent)
+                        .evidenceHitTarget(visualHeight: m.pt(12))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, m.pt(6))
+                .accessibilityIdentifier("\(identifier).action")
+            }
         }
         .multilineTextAlignment(.center)
         .padding(m.pt(15 + 1))
         .frame(maxWidth: .infinity, minHeight: m.pt(110))
         .background(m.c.surface, in: RoundedRectangle(cornerRadius: m.pt(14)))
         .overlay(RoundedRectangle(cornerRadius: m.pt(14)).strokeBorder(m.c.line, lineWidth: m.pt(1)))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: actionLabel == nil ? .combine : .contain)
         .accessibilityIdentifier(identifier)
     }
 }
@@ -508,7 +525,7 @@ private struct WeightHistoryRow: View {
 }
 
 /// `.row`: 10 px vertical inset, 1 px rule below, read-only.
-private struct WeightRow: View {
+struct WeightRow: View {
     let label: String
     let copy: String
     let trailing: String

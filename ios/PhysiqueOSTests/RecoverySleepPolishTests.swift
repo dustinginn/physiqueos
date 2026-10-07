@@ -593,3 +593,54 @@ private final class PolishMemoryCredentialStore: FounderRefreshCredentialStore, 
     func saveRefreshCredential(_ credential: String) throws { lock.withLock { self.credential = credential } }
     func deleteRefreshCredential() throws { lock.withLock { credential = nil } }
 }
+
+/// Build 90 Founder-approved Recovery/Sleep presentation: the lighter
+/// Continuity point/line keeps non-available nights as explicit gaps, and the
+/// nightly Total Sleep line floats (delta 6) while bar summaries stay zero-based.
+final class RecoverySleepRedesignPresentationTests: XCTestCase {
+    private func row(_ day: String, _ status: RecoverySleepDetailStatus, awake: Int? = 1200) -> RecoverySleepTrends.ContinuityRow {
+        RecoverySleepTrends.ContinuityRow(sleepDay: day, status: status, awakeInWindowSeconds: awake, longestAsleepStretchSeconds: awake.map { $0 * 5 })
+    }
+
+    func testContinuitySplitsRunsAtNonAvailableNightsAndBridgesTheGap() {
+        // Newest first, as the Server sends them; Sep 21 has no stage detail.
+        let rows = [row("2026-09-23", .available), row("2026-09-22", .available), row("2026-09-21", .absent),
+                    row("2026-09-20", .available), row("2026-09-19", .available)]
+        let series = SleepContinuitySeries(rows: rows) { $0.awakeInWindowSeconds.map { Double($0) / 60 } }
+        XCTAssertEqual(series.points.map(\.day), ["2026-09-19", "2026-09-20", "2026-09-22", "2026-09-23"])
+        XCTAssertEqual(series.points.map(\.run), [0, 0, 1, 1])
+        XCTAssertEqual(series.bridges.count, 1)
+        XCTAssertEqual(series.bridges.first?.from.day, "2026-09-20")
+        XCTAssertEqual(series.bridges.first?.to.day, "2026-09-22")
+        XCTAssertFalse(series.points.contains { $0.day == "2026-09-21" }, "a gap night is never interpolated")
+    }
+
+    func testRecalculatingAndMissingValueNightsAreGapsAndEdgesAreNotBridged() {
+        let rows = [row("2026-09-24", .pendingCorrection), row("2026-09-23", .available), row("2026-09-22", .available, awake: nil),
+                    row("2026-09-21", .available), row("2026-09-20", .unknown)]
+        let series = SleepContinuitySeries(rows: rows) { $0.awakeInWindowSeconds.map(Double.init) }
+        XCTAssertEqual(series.points.map(\.day), ["2026-09-21", "2026-09-23"])
+        XCTAssertEqual(series.bridges.count, 1)
+        XCTAssertTrue(SleepContinuitySeries(rows: [row("2026-09-20", .absent)]) { $0.awakeInWindowSeconds.map(Double.init) }.points.isEmpty)
+    }
+
+    func testNightlyLineFloatsWhileBarSummariesStartAtZero() {
+        let date = Date(timeIntervalSince1970: 0)
+        let points = [SleepTotalChartPoint(id: "a", date: date, asleepSeconds: 6 * 3600 + 12 * 60, averageSeconds: nil),
+                      SleepTotalChartPoint(id: "b", date: date, asleepSeconds: 7 * 3600 + 40 * 60, averageSeconds: nil),
+                      SleepTotalChartPoint(id: "c", date: date, asleepSeconds: nil, averageSeconds: nil)]
+        XCTAssertEqual(SleepTotalChart.floorHours(points: points, style: .area), 5)
+        XCTAssertEqual(SleepTotalChart.floorHours(points: points, style: .bars), 0)
+        let short = [SleepTotalChartPoint(id: "s", date: date, asleepSeconds: 50 * 60, averageSeconds: nil)]
+        XCTAssertEqual(SleepTotalChart.floorHours(points: short, style: .area), 0, "the floor never goes below zero")
+    }
+
+    func testLockedStagePaletteCoversEveryStage() {
+        for stage in RecoverySleepStage.allCases + [.unknown] {
+            _ = SleepPalette.stage(stage)
+        }
+        XCTAssertNotEqual(UIColor(SleepPalette.awake).resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark)),
+                          UIColor(SleepPalette.awake).resolvedColor(with: UITraitCollection(userInterfaceStyle: .light)),
+                          "every stage color resolves for both Dark and Mineral Light")
+    }
+}

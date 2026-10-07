@@ -1075,3 +1075,287 @@ final class EvidenceIntakeReviewUITests: XCTestCase {
         XCTAssertFalse(element("evidenceReview.confirm").exists)
     }
 }
+
+/// Build 90 Founder-approved Energy + Recovery/Sleep redesign: journeys,
+/// sheet navigation, parent-aware back labels, chart arbitration (tap,
+/// horizontal scrub, vertical scroll), disclosures, paging and state panels.
+/// Sandbox fixtures only.
+@MainActor
+final class EnergyRecoveryRedesignUITests: XCTestCase {
+    private let app = XCUIApplication()
+
+    override func setUp() async throws {
+        continueAfterFailure = false
+    }
+
+    private func launch(_ extra: [String] = []) {
+        app.launchArguments = ["-physiqueos.native.authority-selection.v1", "sandbox"] + extra
+        app.launch()
+        app.buttons["Evidence"].tap()
+        XCTAssertTrue(element("evidence.hub.all").waitForExistence(timeout: 10))
+    }
+
+    private func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier].firstMatch
+    }
+
+    private func reveal(_ target: XCUIElement, maxSwipes: Int = 14) {
+        for _ in 0..<maxSwipes where !(target.exists && target.isHittable) {
+            app.swipeUp(velocity: .slow)
+        }
+        for _ in 0..<maxSwipes where !(target.exists && target.isHittable) {
+            app.swipeDown(velocity: .slow)
+        }
+        XCTAssertTrue(target.exists && target.isHittable, "Could not reveal \(target)")
+    }
+
+    private func open(stream id: String, expectsHeader: Bool = true) {
+        let row = element("evidence.stream.\(id)")
+        reveal(row)
+        row.tap()
+        if expectsHeader {
+            XCTAssertTrue(element("evidence.page.header").waitForExistence(timeout: 10), "\(id) header")
+        }
+    }
+
+    private func assertBack(_ label: String, file: StaticString = #filePath, line: UInt = #line) {
+        let back = element("evidence.back")
+        XCTAssertTrue(back.waitForExistence(timeout: 8), file: file, line: line)
+        XCTAssertEqual(back.label, label, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(back.frame.height, 44, file: file, line: line)
+    }
+
+    private func tap(_ target: XCUIElement, atX fraction: CGFloat) {
+        target.coordinate(withNormalizedOffset: CGVector(dx: fraction, dy: 0.5)).tap()
+    }
+
+    private func scrub(_ target: XCUIElement, from: CGFloat, to: CGFloat) {
+        let y = target.frame.midY / app.frame.height
+        app.coordinate(withNormalizedOffset: CGVector(dx: from, dy: y))
+            .press(forDuration: 0, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: to, dy: y)), withVelocity: .slow, thenHoldForDuration: 0.1)
+    }
+
+    private func swipeUpStarting(on target: XCUIElement) {
+        let y = target.frame.midY / app.frame.height
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: y))
+            .press(forDuration: 0, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: max(0.15, y - 0.35))), withVelocity: .fast, thenHoldForDuration: 0)
+    }
+
+    // MARK: Energy
+
+    func testEnergyEstimateWordingSheetsLinksAndBackTrail() {
+        launch()
+        open(stream: "energy")
+        assertBack("Evidence Hub")
+        XCTAssertTrue(app.staticTexts["Avg Est. Expenditure"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("energy.estimateNote").exists)
+        // Every completeness tag exists only across all Energy evidence; the
+        // default Build Lean Mass scope starts Jul 19.
+        let all = element("evidence.scope.all")
+        XCTAssertTrue(all.waitForExistence(timeout: 5))
+        all.tap()
+        XCTAssertTrue(all.isSelected)
+
+        let weekly = element("energy.weeklyHistory.toggle")
+        reveal(weekly)
+        weekly.tap()
+        XCTAssertTrue(app.navigationBars["Weekly History"].waitForExistence(timeout: 5))
+        element("evidence.sheet.done").tap()
+        XCTAssertTrue(app.navigationBars["Weekly History"].waitForNonExistence(timeout: 5))
+
+        let daily = element("energy.dailyHistory.toggle")
+        reveal(daily)
+        daily.tap()
+        XCTAssertTrue(app.navigationBars["Daily Energy History"].waitForExistence(timeout: 5))
+        for tag in ["Activity only", "Nutrition only", "Missing RMR", "No paired evidence"] {
+            reveal(app.staticTexts[tag].firstMatch)
+        }
+        let nutrition = element("energy.day.2026-08-30.nutrition")
+        reveal(nutrition)
+        nutrition.tap()
+        assertBack("Daily Energy History")
+        element("evidence.back").tap()
+        XCTAssertTrue(app.navigationBars["Daily Energy History"].waitForExistence(timeout: 5))
+        element("evidence.sheet.done").tap()
+
+        let activity = element("energy.day.2026-08-30.activity")
+        reveal(activity)
+        activity.tap()
+        assertBack("Energy")
+    }
+
+    func testEnergyChartsTapScrubAndScrollVertically() {
+        launch()
+        open(stream: "energy")
+        let chart = element("energy.overTime.chart")
+        let readout = element("energy.overTime.selectedWeek")
+        reveal(readout)
+        let latest = readout.label
+        XCTAssertTrue(latest.contains("Latest week"), latest)
+        tap(chart, atX: 0.12)
+        XCTAssertNotEqual(readout.label, latest, "A tap did not select a week")
+        XCTAssertFalse(readout.label.contains("Latest week"))
+        let tapped = readout.label
+        scrub(chart, from: 0.2, to: 0.75)
+        XCTAssertNotEqual(readout.label, tapped, "A horizontal scrub did not move the selection")
+
+        let bars = element("energy.weeklyBalance.chart")
+        let barReadout = element("energy.weeklyBalance.selectedWeek")
+        reveal(barReadout)
+        let barLatest = barReadout.label
+        tap(bars, atX: 0.15)
+        XCTAssertNotEqual(barReadout.label, barLatest, "A tap on the bars did not select a week")
+
+        reveal(chart)
+        let anchor = app.staticTexts["Weekly History"].firstMatch
+        let top = anchor.frame.minY
+        swipeUpStarting(on: chart)
+        XCTAssertLessThan(anchor.frame.minY, top - 100, "A vertical swipe starting on the chart did not scroll the page")
+    }
+
+    func testEnergyFailureOffersTryAgainAndEmptyStaysHonest() {
+        launch(["-physiqueos.energy-recovery-review.state", "failed"])
+        open(stream: "energy", expectsHeader: false)
+        XCTAssertTrue(element("energy.failure").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("energy.failure.action").isHittable)
+        app.terminate()
+        launch(["-physiqueos.energy-recovery-review.state", "empty"])
+        open(stream: "energy")
+        XCTAssertTrue(app.staticTexts["No weekly energy evidence available"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Not available"].firstMatch.exists)
+    }
+
+    // MARK: Recovery / Sleep
+
+    private func openRecoveryLanding() {
+        open(stream: "recovery")
+        XCTAssertTrue(element("sleep.recovery.landing").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("sleep.lastNight").waitForExistence(timeout: 10))
+    }
+
+    func testRecoveryBackLabelsFollowTheRealParentAndAllNightsPages() {
+        launch()
+        openRecoveryLanding()
+        assertBack("Evidence Hub")
+
+        let recent = element("sleep.night.2026-10-01")
+        reveal(recent)
+        recent.tap()
+        XCTAssertTrue(element("sleep.night.screen").waitForExistence(timeout: 8))
+        assertBack("Recovery")
+        element("evidence.back").tap()
+
+        let trends = element("sleep.trends")
+        reveal(trends)
+        trends.tap()
+        XCTAssertTrue(element("sleep.trends.screen").waitForExistence(timeout: 8))
+        assertBack("Recovery")
+
+        let showAll = element("sleep.trends.showAll")
+        reveal(showAll)
+        showAll.tap()
+        XCTAssertTrue(app.navigationBars["All Nights"].waitForExistence(timeout: 8))
+        // The first page holds 30 nights; the oldest fixture night needs two more pages.
+        let oldest = element("sleep.night.2026-07-06")
+        for _ in 0..<40 where !(oldest.exists && oldest.isHittable) { app.swipeUp(velocity: .fast) }
+        XCTAssertTrue(oldest.exists && oldest.isHittable, "All Nights did not page to the oldest night")
+        oldest.tap()
+        XCTAssertTrue(element("sleep.night.screen").waitForExistence(timeout: 8))
+        assertBack("All Nights")
+    }
+
+    func testRecoveryChartArbitrationAndDisclosures() {
+        launch()
+        openRecoveryLanding()
+
+        // Root: a tap toggles a night; tapping it again returns to the averages.
+        let rootChart = element("sleep.total.chart")
+        reveal(rootChart)
+        tap(rootChart, atX: 0.5)
+        XCTAssertTrue(element("sleep.chart.openNight").waitForExistence(timeout: 5))
+        tap(rootChart, atX: 0.5)
+        XCTAssertTrue(element("sleep.chart.openNight").waitForNonExistence(timeout: 5))
+
+        let trends = element("sleep.trends")
+        reveal(trends)
+        trends.tap()
+        XCTAssertTrue(element("sleep.trends.screen").waitForExistence(timeout: 8))
+        let total = element("sleep.total.chart")
+        XCTAssertTrue(total.waitForExistence(timeout: 8))
+        tap(total, atX: 0.4)
+        let selected = element("sleep.trends.selected")
+        XCTAssertTrue(selected.waitForExistence(timeout: 5))
+        let first = selected.label
+        scrub(total, from: 0.3, to: 0.85)
+        XCTAssertNotEqual(selected.label, first, "A horizontal scrub did not move the selected night")
+
+        let window = app.staticTexts["Sleep Window"].firstMatch
+        let top = window.frame.minY
+        swipeUpStarting(on: total)
+        XCTAssertLessThan(window.frame.minY, top - 100, "A vertical swipe starting on the chart did not scroll the page")
+
+        let continuity = element("sleep.continuity.selected")
+        reveal(continuity)
+        let continuityFirst = continuity.label
+        let awake = element("sleep.continuity.awake")
+        reveal(awake)
+        tap(awake, atX: 0.3)
+        XCTAssertNotEqual(continuity.label, continuityFirst, "A tap on Continuity did not select a night")
+
+        let stageMix = element("sleep.stageMix.toggle")
+        reveal(stageMix)
+        XCTAssertEqual(stageMix.value as? String, "Collapsed")
+        stageMix.tap()
+        XCTAssertEqual(stageMix.value as? String, "Expanded")
+
+        element("evidence.back").tap()
+        let night = element("sleep.night.2026-09-29")
+        reveal(night)
+        night.tap()
+        XCTAssertTrue(element("sleep.night.screen").waitForExistence(timeout: 8))
+        let readout = element("sleep.timeline.readout")
+        XCTAssertTrue(readout.waitForExistence(timeout: 5))
+        let instruction = readout.label
+        tap(element("sleep.timeline.chart"), atX: 0.45)
+        XCTAssertNotEqual(readout.label, instruction, "A tap on the Timeline did not inspect a stage")
+
+        let source = element("sleep.sourceData.toggle")
+        reveal(source)
+        XCTAssertEqual(source.value as? String, "Collapsed")
+        source.tap()
+        XCTAssertEqual(source.value as? String, "Expanded")
+        reveal(app.staticTexts["Calculation"].firstMatch)
+    }
+
+    func testRecoveryWeeklyViewWithholdsDetailCharts() {
+        launch(["-physiqueos.energy-recovery-review.state", "weekly"])
+        openRecoveryLanding()
+        let trends = element("sleep.trends")
+        reveal(trends)
+        trends.tap()
+        let sixMonths = element("sleep.range.6m")
+        XCTAssertTrue(sixMonths.waitForExistence(timeout: 8))
+        sixMonths.tap()
+        XCTAssertTrue(element("sleep.trends.weeklyNote").waitForExistence(timeout: 8))
+        XCTAssertFalse(element("sleep.trends.continuity").exists)
+        XCTAssertTrue(app.staticTexts["Weekly average"].firstMatch.exists)
+    }
+
+    func testRecoveryStatePanelsOfferTryAgainAndNightNotFound() {
+        launch(["-physiqueos.energy-recovery-review.state", "failed"])
+        open(stream: "recovery")
+        XCTAssertTrue(element("sleep.failed").waitForExistence(timeout: 8))
+        XCTAssertTrue(element("sleep.failed.action").isHittable)
+        app.terminate()
+
+        launch(["-physiqueos.energy-recovery-review.state", "scope-failed", "-physiqueos.energy-recovery-review.scope", "build-lean-mass"])
+        open(stream: "recovery")
+        XCTAssertTrue(element("sleep.scope.failed").waitForExistence(timeout: 8))
+        XCTAssertTrue(element("sleep.scope.failed.action").isHittable)
+        app.terminate()
+
+        launch(["-physiqueos.energy-recovery-review.state", "not-available"])
+        open(stream: "recovery")
+        XCTAssertTrue(element("sleep.notAvailable").waitForExistence(timeout: 8))
+    }
+}
