@@ -114,6 +114,8 @@ struct EvidencePalette {
 
     /// `.training` semantic colors (`training-evidence.css`) on the shared
     /// Evidence surfaces; the teal-tinted surface set is retired (Build 91).
+    /// Mineral semantic inks are the locked hues 2–5% deeper, so on the
+    /// shared (darker) card and inset no text loses contrast vs Build 90.
     static let training = EvidencePalette(
         page: EvidenceSurfaces.page,
         surface: EvidenceSurfaces.surface,
@@ -125,28 +127,29 @@ struct EvidencePalette {
         quiet: EvidenceSurfaces.quiet,
         accent: EvidenceAccent.neutral.color,
         accentSoft: EvidenceAccent.neutral.soft,
-        teal: d(0x55D4C5, 0x177A72),
-        tealSoft: d(0x55D4C5, 0x177A72, 0.12, 0.10),
-        purple: d(0xAE8CFA, 0x6F4FB3),
-        purpleSoft: d(0xAE8CFA, 0x6F4FB3, 0.12, 0.10),
-        green: d(0x69D6A1, 0x187A4E),
-        greenSoft: d(0x69D6A1, 0x187A4E, 0.12, 0.10),
-        amber: d(0xE7B96C, 0x956317),
-        amberSoft: d(0xE7B96C, 0x956317, 0.12, 0.10),
-        red: d(0xF07D7D, 0xA63E42),
-        redSoft: d(0xF07D7D, 0xA63E42, 0.12, 0.09),
-        blue: d(0x6FCDF4, 0x176D92),
-        protein: d(0xFB7185, 0xB83C57),
-        carbs: d(0xFBBF24, 0x9D6808),
-        fat: d(0x38BDF8, 0x14769F),
-        breakfast: d(0xF7CF7B, 0x9D6709),
-        lunch: d(0x7BD7C8, 0x19756B),
-        dinner: d(0xB69CF3, 0x684DA0),
-        snacks: d(0xFB9C8C, 0xA84B3E)
+        teal: d(0x55D4C5, 0x157069),
+        tealSoft: d(0x55D4C5, 0x157069, 0.12, 0.10),
+        purple: d(0xAE8CFA, 0x6547A5),
+        purpleSoft: d(0xAE8CFA, 0x6547A5, 0.12, 0.10),
+        green: d(0x69D6A1, 0x167048),
+        greenSoft: d(0x69D6A1, 0x167048, 0.12, 0.10),
+        amber: d(0xE7B96C, 0x895B15),
+        amberSoft: d(0xE7B96C, 0x895B15, 0.12, 0.10),
+        red: d(0xF07D7D, 0x97383C),
+        redSoft: d(0xF07D7D, 0x97383C, 0.12, 0.09),
+        blue: d(0x6FCDF4, 0x156385),
+        protein: d(0xFB7185, 0xA7364F),
+        carbs: d(0xFBBF24, 0x905F07),
+        fat: d(0x38BDF8, 0x126C91),
+        breakfast: d(0xF7CF7B, 0x905E08),
+        lunch: d(0x7BD7C8, 0x176A61),
+        dinner: d(0xB69CF3, 0x5D4590),
+        snacks: d(0xFB9C8C, 0x994439)
     )
 
     /// `.daily` — Nutrition + Activity semantic colors on the shared
     /// Evidence surfaces (the blue-teal tinted set is retired, Build 91).
+    /// Mineral semantic inks are deepened like `.training`'s (same hues).
     static let daily = EvidencePalette(
         page: EvidenceSurfaces.page,
         surface: EvidenceSurfaces.surface,
@@ -158,24 +161,24 @@ struct EvidencePalette {
         quiet: EvidenceSurfaces.quiet,
         accent: EvidenceAccent.neutral.color,
         accentSoft: EvidenceAccent.neutral.soft,
-        teal: d(0x69D8CD, 0x0B766F),
-        tealSoft: d(0x69D8CD, 0x0B766F, 0.13, 0.10),
-        purple: d(0xB99AF2, 0x6F55A7),
-        purpleSoft: d(0xB99AF2, 0x6F55A7, 0.13, 0.11),
-        green: d(0x7BDBA7, 0x277B51),
-        greenSoft: d(0x7BDBA7, 0x277B51, 0.13, 0.11),
-        amber: d(0xF5C467, 0x9A650D),
-        amberSoft: d(0xF5C467, 0x9A650D, 0.13, 0.11),
-        red: d(0xFB8E9C, 0xA83B50),
-        redSoft: d(0xFB8E9C, 0xA83B50, 0.13, 0.11),
-        blue: d(0x6FCDF4, 0x176D92),
-        protein: d(0xFB7185, 0xB83C57),
-        carbs: d(0xFBBF24, 0x9D6808),
-        fat: d(0x38BDF8, 0x14769F),
-        breakfast: d(0xF7CF7B, 0x9D6709),
-        lunch: d(0x7BD7C8, 0x19756B),
-        dinner: d(0xB69CF3, 0x684DA0),
-        snacks: d(0xFB9C8C, 0xA84B3E)
+        teal: d(0x69D8CD, 0x0A6A64),
+        tealSoft: d(0x69D8CD, 0x0A6A64, 0.13, 0.10),
+        purple: d(0xB99AF2, 0x654D98),
+        purpleSoft: d(0xB99AF2, 0x654D98, 0.13, 0.11),
+        green: d(0x7BDBA7, 0x24704A),
+        greenSoft: d(0x7BDBA7, 0x24704A, 0.13, 0.11),
+        amber: d(0xF5C467, 0x8C5C0C),
+        amberSoft: d(0xF5C467, 0x8C5C0C, 0.13, 0.11),
+        red: d(0xFB8E9C, 0x983548),
+        redSoft: d(0xFB8E9C, 0x983548, 0.13, 0.11),
+        blue: d(0x6FCDF4, 0x156385),
+        protein: d(0xFB7185, 0xA7364F),
+        carbs: d(0xFBBF24, 0x905F07),
+        fat: d(0x38BDF8, 0x126C91),
+        breakfast: d(0xF7CF7B, 0x905E08),
+        lunch: d(0x7BD7C8, 0x176A61),
+        dinner: d(0xB69CF3, 0x5D4590),
+        snacks: d(0xFB9C8C, 0x994439)
     )
 
     /// `.weight` — Energy/Weight/Recovery semantic colors. The harness's

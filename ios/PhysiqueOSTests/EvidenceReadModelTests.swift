@@ -523,8 +523,8 @@ final class EvidenceVisualSystemTests: XCTestCase {
 
     func testNutritionMacroAndMealColorsArePreserved() {
         let macros: [(NutritionEvidenceMacro, UInt32, UInt32)] = [
-            (.calories, 0x7BDBA7, 0x277B51), (.protein, 0xFB7185, 0xB83C57),
-            (.carbohydrates, 0xFBBF24, 0x9D6808), (.fat, 0x38BDF8, 0x14769F),
+            (.calories, 0x7BDBA7, 0x24704A), (.protein, 0xFB7185, 0xA7364F),
+            (.carbohydrates, 0xFBBF24, 0x905F07), (.fat, 0x38BDF8, 0x126C91),
         ]
         for (macro, dark, mineral) in macros {
             XCTAssertEqual(Self.hex(macro.color, dark: true), dark, macro.label)
@@ -535,6 +535,29 @@ final class EvidenceVisualSystemTests: XCTestCase {
         XCTAssertEqual(Self.hex(c.lunch, dark: true), 0x7BD7C8)
         XCTAssertEqual(Self.hex(c.dinner, dark: true), 0xB69CF3)
         XCTAssertEqual(Self.hex(c.snacks, dark: true), 0xFB9C8C)
+    }
+
+    /// The shared Mineral card/inset are darker than Training's and
+    /// Nutrition/Activity's old raised surfaces; their semantic inks were
+    /// deepened (same hue) so no semantic text loses contrast vs Build 90.
+    func testTrainingAndDailyMineralSemanticInksKeepTheirBuild90Contrast() {
+        // (family, slot, Build 90 ink, Build 90 card, Build 90 inset)
+        let build90: [(EvidenceFamily, KeyPath<EvidencePalette, Color>, UInt32, UInt32, UInt32)] = [
+            (.training, \.green, 0x187A4E, 0xFAF8F2, 0xE3ECE7), (.training, \.teal, 0x177A72, 0xFAF8F2, 0xE3ECE7),
+            (.training, \.amber, 0x956317, 0xFAF8F2, 0xE3ECE7), (.training, \.red, 0xA63E42, 0xFAF8F2, 0xE3ECE7),
+            (.training, \.purple, 0x6F4FB3, 0xFAF8F2, 0xE3ECE7), (.training, \.blue, 0x176D92, 0xFAF8F2, 0xE3ECE7),
+            (.daily, \.green, 0x277B51, 0xF8F5ED, 0xE6F0EC), (.daily, \.teal, 0x0B766F, 0xF8F5ED, 0xE6F0EC),
+            (.daily, \.amber, 0x9A650D, 0xF8F5ED, 0xE6F0EC), (.daily, \.red, 0xA83B50, 0xF8F5ED, 0xE6F0EC),
+            (.daily, \.protein, 0xB83C57, 0xF8F5ED, 0xE6F0EC), (.daily, \.carbs, 0x9D6808, 0xF8F5ED, 0xE6F0EC),
+            (.daily, \.fat, 0x14769F, 0xF8F5ED, 0xE6F0EC), (.daily, \.lunch, 0x19756B, 0xF8F5ED, 0xE6F0EC),
+        ]
+        let card = EvidenceSurfaces.hex["surface"]!.mineral
+        let inset = EvidenceSurfaces.hex["surface2"]!.mineral
+        for (family, slot, oldInk, oldCard, oldInset) in build90 {
+            let ink = Self.hex(family.palette[keyPath: slot], dark: false)
+            XCTAssertGreaterThanOrEqual(Self.contrast(ink, card), Self.contrast(oldInk, oldCard) - 0.01, "\(family) \(slot) on card")
+            XCTAssertGreaterThanOrEqual(Self.contrast(ink, inset), Self.contrast(oldInk, oldInset) - 0.01, "\(family) \(slot) on inset")
+        }
     }
 
     func testEnergyIntakeAndExpenditureSeriesArePreservedAndDistinctFromTheAccent() {
