@@ -25,13 +25,32 @@ struct AppDestinationRouterView: View {
     var onNavigate: (AppDestination) -> Void = { _ in }
 
     var body: some View {
-        Group { routedContent }
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled, let category = Self.reviewCategory(for: destination) {
+            EvidenceVisualSystemReview.activeCategory = category
+        }
+#endif
+        return Group { routedContent }
             .onAppear {
 #if DEBUG
                 NativePerformanceDiagnostics.recordShell(surface: destination.serverDestinationId)
 #endif
             }
     }
+
+#if DEBUG
+    /// Build 91 review: the Evidence category a routed page belongs to.
+    private static func reviewCategory(for destination: AppDestination) -> EvidenceDestinationCategory? {
+        switch destination {
+        case .progressStream(let streamId): EvidenceDestinationCategory(streamId: streamId)
+        case .trainingSession, .trainingDay, .trainingExercise, .trainingLibraryArea: .training
+        case .activityDay: .activity
+        case .nutritionDay: .nutrition
+        case .photoSetDetail: .photos
+        default: nil
+        }
+    }
+#endif
 
     @ViewBuilder
     private var routedContent: some View {

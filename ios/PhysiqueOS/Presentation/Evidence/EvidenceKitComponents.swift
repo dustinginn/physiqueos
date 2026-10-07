@@ -121,7 +121,7 @@ struct EvidenceScrollPage<Content: View>: View {
 
     private static var reviewScrollAnchor: UnitPoint? {
 #if DEBUG
-        EvidenceRedesignReview.scrollsToBottom ? .bottom : nil
+        EvidenceRedesignReview.scrollAnchor
 #else
         nil
 #endif
@@ -145,12 +145,14 @@ struct EvidencePageHeader: View {
         let t = family == .training
         HStack(alignment: .top, spacing: m.pt(12)) {
             if let symbol {
-                Text(symbol)
-                    .evidenceText(.normal(19, 800))
-                    .foregroundStyle(m.c.accent)
-                    .frame(width: m.pt(40), height: m.pt(40))
-                    .background(m.c.accentSoft, in: Circle())
-                    .accessibilityHidden(true)
+                EvidenceReviewHeroSlot(diameter: m.pt(40)) {
+                    Text(symbol)
+                        .evidenceText(.normal(19, 800))
+                        .foregroundStyle(m.c.accent)
+                        .frame(width: m.pt(40), height: m.pt(40))
+                        .background(m.c.accentSoft, in: Circle())
+                        .accessibilityHidden(true)
+                }
             }
             VStack(alignment: .leading, spacing: 0) {
                 // Literal uppercase (not `textCase`): the shipping accessibility
@@ -205,6 +207,25 @@ struct EvidencePageHeader: View {
             dateTitle ? EvidenceTextStyle(size: 24, weight: 820, lineHeight: 25.44, tracking: -0.72)
                       : EvidenceTextStyle(size: 26, weight: 820, lineHeight: 27.04, tracking: -0.91)
         }
+    }
+}
+
+/// A locked hero glyph that the Build 91 DEBUG review replaces with the
+/// routed page's category icon. Release renders the locked glyph only.
+struct EvidenceReviewHeroSlot<Locked: View>: View {
+    let diameter: CGFloat
+    @ViewBuilder var locked: Locked
+
+    var body: some View {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled {
+            EvidenceReviewHeroMark(category: EvidenceVisualSystemReview.activeCategory, diameter: diameter)
+        } else {
+            locked
+        }
+#else
+        locked
+#endif
     }
 }
 

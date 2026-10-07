@@ -46,13 +46,19 @@ enum EvidenceFamily {
     func pt(_ px: CGFloat) -> CGFloat { px * 402 / harnessWidth }
 
     var palette: EvidencePalette {
-        switch self {
+        let locked: EvidencePalette = switch self {
         case .training: .training
         case .daily: .daily
         case .weight: .weight
         case .record: .record
         case .workflow: .workflow
         }
+#if DEBUG
+        if self != .workflow, let option = EvidenceVisualSystemReview.option {
+            return locked.reviewed(option: option, category: EvidenceVisualSystemReview.activeCategory)
+        }
+#endif
+        return locked
     }
 }
 
@@ -276,6 +282,232 @@ struct EvidencePalette {
         })
     }
 }
+
+#if DEBUG
+// MARK: - Build 91 Evidence visual-system review (DEBUG design fixture)
+
+/// The nine Evidence destinations (eight Hub streams + Timeline) as one
+/// category map. DEBUG-only: Build 91 design mockups, not shipping
+/// behavior. Icons reuse established PhysiqueOS glyphs (the dormant
+/// `EvidenceStreamPresentation` map, Home focus icons, the web's
+/// `EVIDENCE_ICON_PRESENTATION` lucide set).
+enum EvidenceDestinationCategory: String, CaseIterable {
+    case training, activity, nutrition, weight, photos, dexa, energy, recovery, timeline
+
+    init?(streamId: String) {
+        let root = streamId.split(separator: "/").first.map(String.init) ?? streamId
+        if root.hasPrefix("recovery") || root.hasPrefix("sleep") {
+            self = .recovery
+        } else {
+            self.init(rawValue: root)
+        }
+    }
+
+    /// Production Timeline event types (`EvidenceTimelineService.js`).
+    /// Non-domain system events (Briefing, Analysis, Protocol, Check-In,
+    /// Evidence Upload) have no category and stay neutral.
+    init?(timelineType: String) {
+        switch timelineType {
+        case "Workout": self = .training
+        case "Daily Activity": self = .activity
+        case "Weight": self = .weight
+        case "Progress Photo": self = .photos
+        case "DEXA": self = .dexa
+        default: return nil
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .training: "dumbbell.fill"
+        case .activity: "waveform.path.ecg"
+        case .nutrition: "fork.knife"
+        case .weight: "scalemass.fill"
+        case .photos: "camera.fill"
+        case .dexa: "person.fill.viewfinder"
+        case .energy: "bolt.fill"
+        case .recovery: "moon.fill"
+        case .timeline: "clock.arrow.circlepath"
+        }
+    }
+}
+
+/// An existing PhysiqueOS accent family: the Dark value and the Mineral
+/// Light value (the family's deepest existing ink, so eyebrow text clears
+/// 4.5:1 on Evidence surfaces where an existing token allows it).
+struct EvidenceAccentFamily: Equatable {
+    let name: String
+    let dark: UInt32
+    let mineral: UInt32
+
+    static let purple = EvidenceAccentFamily(name: "Purple", dark: 0xAA98FF, mineral: 0x5C3FD2) // redesignPurple
+    static let teal = EvidenceAccentFamily(name: "Teal", dark: 0x3BD2CA, mineral: 0x0B766F) // redesignTeal / Evidence teal ink
+    static let green = EvidenceAccentFamily(name: "Green", dark: 0x55E39A, mineral: 0x28744A) // redesignGreen / Evidence green ink
+    static let amber = EvidenceAccentFamily(name: "Amber", dark: 0xEFB84F, mineral: 0x925500) // redesignAmber / redesignAmberInk
+    static let cyan = EvidenceAccentFamily(name: "Cyan", dark: 0x3BC6DD, mineral: 0x10708A) // redesignCyan / redesignCyanInk
+    static let blue = EvidenceAccentFamily(name: "Blue", dark: 0x60A5FA, mineral: 0x176D92) // chartEvidence / Evidence blue ink
+    static let rose = EvidenceAccentFamily(name: "Rose", dark: 0xF472B6, mineral: 0xA83B78) // mealSnacks
+    static let orange = EvidenceAccentFamily(name: "Orange", dark: 0xFB923C, mineral: 0xB65E16) // mealBreakfast
+    /// Aggregators (Hub, Timeline) carry no category color.
+    static let neutral = EvidenceAccentFamily(name: "Neutral", dark: 0xBCC5C8, mineral: 0x46535B) // Evidence `sub`
+
+    var color: Color { Self.dynamic(dark, mineral) }
+    var soft: Color { Self.dynamic(dark, mineral, 0.14, 0.12) }
+
+    static func dynamic(_ dark: UInt32, _ light: UInt32, _ darkOpacity: CGFloat = 1, _ lightOpacity: CGFloat = 1) -> Color {
+        Color(uiColor: UIColor { traits in
+            let dk = traits.userInterfaceStyle == .dark
+            let hex = dk ? dark : light
+            return UIColor(
+                red: CGFloat((hex >> 16) & 0xFF) / 255,
+                green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255,
+                alpha: dk ? darkOpacity : lightOpacity
+            )
+        })
+    }
+}
+
+/// `-physiqueos.b91.evidence-system a|b|c` renders the real Evidence
+/// pages with one candidate category map over the shared neutral Evidence
+/// surfaces. Absent from Release; without the flag every page is Build 90.
+enum EvidenceVisualSystemReview {
+    enum Option: String, CaseIterable {
+        /// One stable color per destination (the web Evidence icon palette).
+        case a
+        /// Four reusable families grouped by body system.
+        case b
+        /// Three families grouped by evidence role: inputs, signals, outcomes.
+        case c
+    }
+
+    static let option: Option? = {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "-physiqueos.b91.evidence-system"),
+              arguments.indices.contains(flag + 1)
+        else { return nil }
+        return Option(rawValue: arguments[flag + 1])
+    }()
+
+    static var isEnabled: Bool { option != nil }
+
+    /// The routed Evidence page's category. Set by the destination router
+    /// before the page body is built; a mockup-only global (a shipping
+    /// implementation would carry it in the environment).
+    nonisolated(unsafe) static var activeCategory: EvidenceDestinationCategory = .timeline
+
+    static func family(for category: EvidenceDestinationCategory, option: Option) -> EvidenceAccentFamily {
+        if category == .timeline { return .neutral }
+        switch option {
+        case .a:
+            switch category {
+            case .training: return .purple
+            case .activity: return .amber
+            case .nutrition: return .green
+            case .weight: return .blue
+            case .photos: return .rose
+            case .dexa: return .cyan
+            case .energy: return .orange
+            case .recovery: return .teal
+            case .timeline: return .neutral
+            }
+        case .b:
+            switch category {
+            case .training, .activity: return .purple
+            case .nutrition, .energy: return .amber
+            case .weight, .dexa, .photos: return .blue
+            case .recovery: return .teal
+            case .timeline: return .neutral
+            }
+        case .c:
+            switch category {
+            case .training, .nutrition: return .purple
+            case .activity, .energy, .recovery: return .teal
+            case .weight, .dexa, .photos: return .green
+            case .timeline: return .neutral
+            }
+        }
+    }
+
+    /// The category's accent under the active option (nil = seam off).
+    static func accent(for category: EvidenceDestinationCategory) -> EvidenceAccentFamily? {
+        option.map { family(for: category, option: $0) }
+    }
+}
+
+extension EvidencePalette {
+    /// Shared neutral Evidence surfaces (the record hierarchy already used by
+    /// the Hub, Timeline, Weight, Energy, Recovery, Photos and DEXA) plus
+    /// the category accent. Semantic data colors are untouched, except the
+    /// Weight harness's lime `green`, which becomes the Evidence semantic
+    /// green so no lime/olive survives.
+    func reviewed(option: EvidenceVisualSystemReview.Option, category: EvidenceDestinationCategory) -> EvidencePalette {
+        let shared = EvidencePalette.record
+        let accentFamily = EvidenceVisualSystemReview.family(for: category, option: option)
+        return EvidencePalette(
+            page: shared.page,
+            surface: shared.surface,
+            surface2: shared.surface2,
+            surface3: shared.surface3,
+            line: shared.line,
+            ink: shared.ink,
+            muted: shared.muted,
+            quiet: shared.quiet,
+            accent: accentFamily.color,
+            accentSoft: accentFamily.soft,
+            teal: teal,
+            tealSoft: tealSoft,
+            purple: purple,
+            purpleSoft: purpleSoft,
+            green: shared.green,
+            greenSoft: shared.greenSoft,
+            amber: amber,
+            amberSoft: amberSoft,
+            red: red,
+            redSoft: redSoft,
+            blue: blue,
+            protein: protein,
+            carbs: carbs,
+            fat: fat,
+            breakfast: breakfast,
+            lunch: lunch,
+            dinner: dinner,
+            snacks: snacks
+        )
+    }
+}
+
+/// The 38–40 pt hero mark: the category's SF Symbol in its accent on the
+/// accent-soft circle. Replaces the locked text glyphs (`⌁`, `↘`, `ϟ`,
+/// `P`, `D`, `◇`) only while the Build 91 review seam is on.
+struct EvidenceReviewHeroMark: View {
+    let systemImage: String
+    let family: EvidenceAccentFamily
+    let diameter: CGFloat
+
+    init(category: EvidenceDestinationCategory, diameter: CGFloat) {
+        systemImage = category.systemImage
+        family = EvidenceVisualSystemReview.accent(for: category) ?? .neutral
+        self.diameter = diameter
+    }
+
+    /// The Hub: the Evidence tab's own glyph, neutral.
+    init(hubDiameter diameter: CGFloat) {
+        systemImage = AppTab.evidence.systemImageName
+        family = .neutral
+        self.diameter = diameter
+    }
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: diameter * 0.42, weight: .semibold))
+            .foregroundStyle(family.color)
+            .frame(width: diameter, height: diameter)
+            .background(family.soft, in: Circle())
+            .accessibilityHidden(true)
+    }
+}
+#endif
 
 // MARK: - Nutrition macro colors
 

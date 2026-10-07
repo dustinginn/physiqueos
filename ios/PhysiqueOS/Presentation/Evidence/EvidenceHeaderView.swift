@@ -167,17 +167,12 @@ struct EvidenceHeaderView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: S.pt(11)) {
-            Text(symbol)
-                .evidenceLockedText(S.headerIcon)
-                .foregroundStyle(S.accent)
-                .frame(width: S.pt(38), height: S.pt(38))
-                .background(S.accent.opacity(0.15), in: Circle())
-                .accessibilityHidden(true)
+            mark
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(exposesTexts ? eyebrow.uppercased() : eyebrow)
                     .evidenceLockedText(S.eyebrow)
-                    .foregroundStyle(S.accent)
+                    .foregroundStyle(eyebrowColor)
                 Text(title)
                     .evidenceLockedText(S.title)
                     .foregroundStyle(S.ink)
@@ -198,6 +193,56 @@ struct EvidenceHeaderView: View {
         .accessibilityElement(children: exposesTexts ? .contain : .combine)
         .accessibilityIdentifier("evidence.header.\(title.lowercased())")
     }
+}
+
+private extension EvidenceHeaderView {
+    @ViewBuilder
+    var mark: some View {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled {
+            if let category = reviewCategory {
+                EvidenceReviewHeroMark(category: category, diameter: S.pt(38))
+            } else {
+                EvidenceReviewHeroMark(hubDiameter: S.pt(38))
+            }
+        } else {
+            lockedMark
+        }
+#else
+        lockedMark
+#endif
+    }
+
+    var lockedMark: some View {
+        Text(symbol)
+            .evidenceLockedText(S.headerIcon)
+            .foregroundStyle(S.accent)
+            .frame(width: S.pt(38), height: S.pt(38))
+            .background(S.accent.opacity(0.15), in: Circle())
+            .accessibilityHidden(true)
+    }
+
+    var eyebrowColor: Color {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled {
+            return (reviewCategory.flatMap(EvidenceVisualSystemReview.accent(for:)) ?? .neutral).color
+        }
+#endif
+        return S.accent
+    }
+
+#if DEBUG
+    /// The locked glyph identifies the page: `◇` Hub, `⌁` Timeline,
+    /// `P` Photos, `D` DEXA.
+    var reviewCategory: EvidenceDestinationCategory? {
+        switch symbol {
+        case "⌁": .timeline
+        case "P": .photos
+        case "D": .dexa
+        default: nil
+        }
+    }
+#endif
 }
 
 /// `.section-head` / `.section-title`.

@@ -108,7 +108,18 @@ private struct TimelineEventRow: View {
 
     private typealias S = EvidenceLockedStyle
 
-    private var tone: Color { S.tone(item.tone) }
+    private var tone: Color {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled {
+            if let category = EvidenceDestinationCategory(timelineType: item.type) {
+                return (EvidenceVisualSystemReview.accent(for: category) ?? .neutral).color
+            }
+            // System events stay neutral; a failure keeps its danger tone.
+            return item.tone == .danger ? S.red : S.muted
+        }
+#endif
+        return S.tone(item.tone)
+    }
     private var dateText: String { TimelineDateFormatting.long(item.date) }
 
     var body: some View {
@@ -151,14 +162,40 @@ private struct TimelineEventRow: View {
                     .frame(maxHeight: .infinity, alignment: .top)
                     .offset(x: S.pt(6))
             }
-            Circle()
-                .fill(tone)
-                .frame(width: S.pt(8), height: S.pt(8))
-                .padding(S.pt(4))
-                .background(tone.opacity(0.14), in: Circle())
+            node
                 .offset(x: S.pt(-1), y: S.pt(3))
         }
         .accessibilityHidden(true)
+    }
+}
+
+private extension TimelineEventRow {
+    @ViewBuilder
+    var node: some View {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled, let category = EvidenceDestinationCategory(timelineType: item.type) {
+            // Build 91 review: a domain event wears its category icon in the
+            // same 16-px node footprint, so the rail geometry is unchanged.
+            Image(systemName: category.systemImage)
+                .font(.system(size: S.pt(8), weight: .bold))
+                .foregroundStyle(tone)
+                .frame(width: S.pt(16), height: S.pt(16))
+                .background(tone.opacity(0.16), in: Circle())
+                .background(S.canvas, in: Circle())
+        } else {
+            lockedNode
+        }
+#else
+        lockedNode
+#endif
+    }
+
+    var lockedNode: some View {
+        Circle()
+            .fill(tone)
+            .frame(width: S.pt(8), height: S.pt(8))
+            .padding(S.pt(4))
+            .background(tone.opacity(0.14), in: Circle())
     }
 }
 
@@ -194,7 +231,7 @@ private extension ToolbarContent {
 private extension TimelineView {
     static var reviewScrollAnchor: UnitPoint? {
 #if DEBUG
-        EvidenceRedesignReview.scrollsToBottom ? .bottom : nil
+        EvidenceRedesignReview.scrollAnchor
 #else
         nil
 #endif

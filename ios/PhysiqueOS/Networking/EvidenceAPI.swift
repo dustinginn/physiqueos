@@ -1,4 +1,7 @@
 import Foundation
+#if DEBUG
+import SwiftUI
+#endif
 
 /// Mirrors `HomeAPI`/`LogAPI`'s pattern: the seam `EvidenceView` depends on
 /// instead of a concrete transport.
@@ -59,6 +62,18 @@ enum EvidenceRedesignReview {
         return arguments[flag + 1] == "bottom"
     }
 
+    /// The page's default scroll anchor for review captures:
+    /// `-physiqueos.evidence-review.scroll bottom|<fraction 0…1>`.
+    static var scrollAnchor: UnitPoint? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard isEnabled, let flag = arguments.firstIndex(of: "-physiqueos.evidence-review.scroll"),
+              arguments.indices.contains(flag + 1)
+        else { return nil }
+        let value = arguments[flag + 1]
+        if value == "bottom" { return .bottom }
+        return Double(value).map { UnitPoint(x: 0.5, y: $0) }
+    }
+
     static var evidenceAPI: EvidenceAPI? { isEnabled ? HubAPI(state: state) : nil }
     static var timelineAPI: TimelineAPI? { isEnabled ? TimelineFeedAPI(state: state) : nil }
 
@@ -72,6 +87,16 @@ enum EvidenceRedesignReview {
         usage = EvidenceHubUsageService.recordVisit(usage: usage, evidenceType: "training", now: now.addingTimeInterval(-3_600))
         usage = EvidenceHubUsageService.recordVisit(usage: usage, evidenceType: "training", now: now.addingTimeInterval(-60))
         return InMemoryUsageStore(usage: usage)
+    }
+
+    /// Build 91 review only: the remaining real production Timeline types
+    /// (`Daily Check-In`, `Analysis`), interleaved by the view's order.
+    static var b91TimelineExtras: [TimelineItem] {
+        guard EvidenceVisualSystemReview.isEnabled else { return [] }
+        return [
+            .init(id: "checkin-1", type: "Daily Check-In", date: "2026-07-31", title: "Morning check-in recorded", detail: "Readiness and soreness captured", tone: .primary),
+            .init(id: "analysis-1", type: "Analysis", date: "2026-07-30", title: "Progress analysis generated", detail: "Weekly evidence reviewed", tone: .primary),
+        ]
     }
 
     struct Unavailable: Error {}
@@ -138,7 +163,7 @@ enum EvidenceRedesignReview {
                     .init(id: "activity-1", type: "Daily Activity", date: "2026-08-29", title: "Daily activity captured", detail: "Apple Health activity evidence", tone: .evidence),
                     .init(id: "upload-1", type: "Evidence Upload", date: "2026-08-20", title: "Evidence upload failed", detail: "Unrecovered upload event", tone: .danger),
                     .init(id: "protocol-1", type: "Protocol", date: "2026-08-01", title: "Protocol updated", detail: "Current plan captured", tone: .surface),
-                ],
+                ] + EvidenceRedesignReview.b91TimelineExtras,
                 hasMore: true,
                 totalCount: 124,
                 limit: 8

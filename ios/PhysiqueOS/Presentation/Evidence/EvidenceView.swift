@@ -144,7 +144,7 @@ enum EvidenceHubPresentation {
 private extension EvidenceView {
     static var reviewScrollAnchor: UnitPoint? {
 #if DEBUG
-        EvidenceRedesignReview.scrollsToBottom ? .bottom : nil
+        EvidenceRedesignReview.scrollAnchor
 #else
         nil
 #endif

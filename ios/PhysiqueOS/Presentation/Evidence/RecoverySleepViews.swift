@@ -52,6 +52,23 @@ private struct SleepReportHeader: View {
     let subtitle: String
 
     var body: some View {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled {
+            // Build 91 review: Recovery gains the same hero mark as its
+            // Weight/Energy siblings.
+            HStack(alignment: .top, spacing: rm.pt(12)) {
+                EvidenceReviewHeroMark(category: .recovery, diameter: rm.pt(38))
+                lockedBody
+            }
+        } else {
+            lockedBody
+        }
+#else
+        lockedBody
+#endif
+    }
+
+    private var lockedBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(eyebrow)
                 .evidenceText(.normal(11, 800, jakarta: false, tracking: 1.43, uppercase: true))

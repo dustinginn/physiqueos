@@ -51,11 +51,7 @@ struct EvidenceStreamRowView: View {
             onTap(stream.destination)
         } label: {
             HStack(spacing: 0) {
-                Text(tileGlyph)
-                    .evidenceLockedText(S.rowIcon)
-                    .foregroundStyle(S.accent)
-                    .frame(width: S.pt(30), height: S.pt(30))
-                    .background(S.surface2, in: RoundedRectangle(cornerRadius: S.pt(9)))
+                tile
                     .frame(width: S.pt(32), alignment: .leading)
                     .padding(.trailing, S.pt(10))
 
@@ -73,7 +69,7 @@ struct EvidenceStreamRowView: View {
 
                 Text("›")
                     .evidenceLockedText(S.chevron)
-                    .foregroundStyle(S.accent)
+                    .foregroundStyle(chevronColor)
             }
             .padding(.horizontal, S.pt(1))
             .padding(.vertical, S.pt(10))
@@ -89,6 +85,41 @@ struct EvidenceStreamRowView: View {
         .accessibilityLabel("\(displayTitle). \(summary.label)\(summary.value.map { ": \($0)" } ?? "")")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("evidence.stream.\(stream.id)")
+    }
+
+    @ViewBuilder
+    private var tile: some View {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled, let category = EvidenceDestinationCategory(streamId: stream.id) {
+            // Build 91 review: the category's real icon in its accent on the
+            // accent-soft tile; the label beside it carries identity too.
+            let family = EvidenceVisualSystemReview.accent(for: category) ?? .neutral
+            Image(systemName: category.systemImage)
+                .font(.system(size: S.pt(13), weight: .semibold))
+                .foregroundStyle(family.color)
+                .frame(width: S.pt(30), height: S.pt(30))
+                .background(family.soft, in: RoundedRectangle(cornerRadius: S.pt(9)))
+        } else {
+            lockedTile
+        }
+#else
+        lockedTile
+#endif
+    }
+
+    private var lockedTile: some View {
+        Text(tileGlyph)
+            .evidenceLockedText(S.rowIcon)
+            .foregroundStyle(S.accent)
+            .frame(width: S.pt(30), height: S.pt(30))
+            .background(S.surface2, in: RoundedRectangle(cornerRadius: S.pt(9)))
+    }
+
+    private var chevronColor: Color {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled { return S.muted }
+#endif
+        return S.accent
     }
 
     private static func formatDate(_ value: String) -> String {

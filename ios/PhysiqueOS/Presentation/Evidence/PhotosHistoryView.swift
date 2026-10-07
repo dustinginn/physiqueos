@@ -246,14 +246,30 @@ struct PhotosHistoryView: View {
         NavigationLink(value: AppDestination.briefingDetail(briefingId: briefingID)) {
             Text("Read Photo Briefing")
                 .evidenceText(.normal(13, 850, jakarta: false, relativeTo: .headline))
-                .foregroundStyle(Color(red: 0x14 / 255, green: 0x20 / 255, blue: 0x0F / 255))
+                .foregroundStyle(primaryActionInk)
                 .frame(maxWidth: .infinity, minHeight: m.pt(52))
-                .background(m.c.accent, in: RoundedRectangle(cornerRadius: m.pt(14)))
+                .background(primaryActionFill, in: RoundedRectangle(cornerRadius: m.pt(14)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .padding(.bottom, m.pt(17))
         .accessibilityIdentifier("photos.briefing.read")
+    }
+
+    /// Build 91 review: the primary action is a shared neutral (ink on
+    /// page) treatment, never a full-width category-color fill.
+    private var primaryActionFill: Color {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled { return m.c.ink }
+#endif
+        return m.c.accent
+    }
+
+    private var primaryActionInk: Color {
+#if DEBUG
+        if EvidenceVisualSystemReview.isEnabled { return m.c.page }
+#endif
+        return Color(red: 0x14 / 255, green: 0x20 / 255, blue: 0x0F / 255)
     }
 
     private func sandboxPhotoBriefingID(for set: PhotoSetRecord) -> String? {
@@ -280,7 +296,7 @@ struct PhotosHistoryView: View {
 private extension PhotosHistoryView {
     static var reviewScrollAnchor: UnitPoint? {
         #if DEBUG
-        EvidenceRedesignReview.scrollsToBottom ? .bottom : nil
+        EvidenceRedesignReview.scrollAnchor
         #else
         nil
         #endif

@@ -95,12 +95,14 @@ struct EnergyHistoryView: View {
     /// Locked E1 header: 38 px lime `ϟ` mark, eyebrow, title, subtitle.
     private func header(for report: EnergyReportReadModel) -> some View {
         HStack(alignment: .top, spacing: m.pt(12)) {
-            Text("ϟ")
-                .evidenceText(.normal(16, 900, jakarta: false))
-                .foregroundStyle(m.c.accent)
-                .frame(width: m.pt(38), height: m.pt(38))
-                .background(m.c.accent.opacity(0.16), in: Circle())
-                .accessibilityHidden(true)
+            EvidenceReviewHeroSlot(diameter: m.pt(38)) {
+                Text("ϟ")
+                    .evidenceText(.normal(16, 900, jakarta: false))
+                    .foregroundStyle(m.c.accent)
+                    .frame(width: m.pt(38), height: m.pt(38))
+                    .background(m.c.accent.opacity(0.16), in: Circle())
+                    .accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: 0) {
                 Text("EVIDENCE REPORT")
                     .evidenceText(.normal(11, 800, jakarta: false, tracking: 1.43, uppercase: true))
