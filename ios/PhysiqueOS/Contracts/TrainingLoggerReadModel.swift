@@ -208,6 +208,10 @@ struct TrainingLoggerDraft: Codable, Equatable, Identifiable {
     /// `watchStartedAt` so the structured start, and therefore every trusted
     /// correlation envelope, is unchanged. Local-only.
     var watchHealthStartedAt: String? = nil
+    /// The Founder chose "Use without Watch" in the guided Watch handoff for
+    /// this workout. Local-only; the handoff is never offered again for this
+    /// session, including after relaunch or a later Watch reconnect.
+    var watchHandoffDeclinedAt: String? = nil
 
     /// The Watch owns a HealthKit workout for this session, so its Finish
     /// expects a Health leg.
@@ -296,9 +300,12 @@ extension TrainingLoggerDraft {
     /// the newest live (not past) draft that is not complete, not already
     /// submitted, and started within `activeLiveSessionWindow`.
     static func activeLiveSession(in drafts: [TrainingLoggerDraft], now: Date = Date()) -> TrainingLoggerDraft? {
-        let formatter = ISO8601DateFormatter()
+        // Accepts both plain and fractional-second timestamps (Build 90): the
+        // authority stamps Watch starts with fractional seconds, which a plain
+        // ISO8601DateFormatter cannot parse, so a Watch-started session was
+        // invisible to Log-tab routing and to the one-live-session guard.
         func started(_ draft: TrainingLoggerDraft) -> Date? {
-            draft.startedAt.flatMap { formatter.date(from: $0) }
+            draft.startedAt.flatMap(TrainingSessionClock.date(from:))
         }
         return drafts
             .filter { draft in

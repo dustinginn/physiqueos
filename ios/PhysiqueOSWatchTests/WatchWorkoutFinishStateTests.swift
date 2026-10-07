@@ -1239,4 +1239,33 @@ extension WatchWorkoutFinishStateTests {
         XCTAssertEqual(log.commands.map(\.kind), [.pause])
         XCTAssertNotEqual(busy.notice, .setPending)
     }
+
+    // MARK: Build 90
+
+    /// Build 89 dropped the appearance slot on a live application-context
+    /// delivery (only a relaunch picked it up). All three slots now reach the
+    /// store.
+    @MainActor
+    func testLiveApplicationContextDeliveryForwardsTheAppearanceSlot() throws {
+        let projection = try WatchWorkoutWireCodec.encode(try fixture("normal"))
+        let slots = WatchWorkoutStore.forwardedApplicationContextSlots([
+            WatchWorkoutContract.applicationContextProjectionKey: projection,
+            WatchWorkoutContract.applicationContextAppearanceKey: "mineralLight",
+        ])
+        XCTAssertEqual(slots.projection, projection)
+        XCTAssertNil(slots.dailyTotals)
+        XCTAssertEqual(slots.appearance, "mineralLight")
+        XCTAssertNil(WatchWorkoutStore.forwardedApplicationContextSlots([:]).appearance)
+    }
+
+    /// Founder Build 90 Option A: panel actions are centered in the free
+    /// space below the content; overflow keeps the original 18 pt gap.
+    func testPanelActionsAreTrueCenteredBelowTheContentAndOverflowKeepsTheGap() {
+        // Content 100, actions 38, page 300: free = 300 - 100 - 18 - 38 = 144.
+        let origin = WatchPanelActionLayout.actionsOriginY(contentHeight: 100, actionsHeight: 38, boundsHeight: 300)
+        XCTAssertEqual(origin, 100 + 18 + 72)
+        XCTAssertEqual(origin - (100 + 18), 300 - (origin + 38), "Equal space above and below the button.")
+        XCTAssertEqual(WatchPanelActionLayout.actionsOriginY(contentHeight: 280, actionsHeight: 38, boundsHeight: 300), 298,
+                       "Taller than the page: the 18 pt gap and scrolling, as before.")
+    }
 }

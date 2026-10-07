@@ -179,6 +179,16 @@ final class AppEnvironment {
     /// Workout Logger session; the Logger consumes it on load and resumes
     /// that exact draft. Never persisted.
     var pendingTrainingLoggerResumeDraftId: String?
+    /// The paired Watch as WatchConnectivity reports it (guided handoff).
+    let watchCompanion = WatchCompanionAvailability()
+    /// Requests that watchOS open PhysiqueOS on the Watch (guided handoff).
+    @MainActor
+    var watchAppLauncher: any WatchAppLaunching {
+#if DEBUG
+        if ReviewWatchAppLauncher.isEnabled { return ReviewWatchAppLauncher(environment: self) }
+#endif
+        return HealthKitWatchAppLauncher()
+    }
 
     /// Consumes the resume hint (so a later ordinary open is unaffected).
     func consumeTrainingLoggerResumeDraftId() -> String? {

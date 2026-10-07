@@ -316,8 +316,12 @@ final class TrainingSessionAuthority {
     @discardableResult
     func setReadyForWatch(sessionId: String, ready: Bool) -> TrainingSessionMutationOutcome {
         mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { draft in
+            // A session the Watch already started (or is recording Health
+            // for) is never re-prepared: preparing clears `startedAt`, which
+            // would detach the running Watch workout (Build 90 regression).
             guard draft.mode == .live, draft.completedSetCount == 0,
-                  !draft.exercises.isEmpty, draft.submissionState == nil
+                  !draft.exercises.isEmpty, draft.submissionState == nil,
+                  draft.watchStartedAt == nil, draft.watchHealthStartedAt == nil
             else { throw TrainingSessionMutationRejection.sessionNotMutable }
             draft.readyForWatchAt = ready ? TrainingSessionClock.string(from: self.now()) : nil
             if ready {
@@ -327,6 +331,26 @@ final class TrainingSessionAuthority {
                 draft.accumulatedPausedSeconds = nil
                 draft.leftAt = nil
                 draft.rest = nil
+            }
+        }
+    }
+
+    /// "Use without Watch" from the guided handoff: records the decision so
+    /// the handoff is not offered again for this workout and, if the plan
+    /// had already been prepared for the Watch (which cleared the phone
+    /// start), withdraws it and starts the session on this iPhone. A session
+    /// the Watch has already started is left exactly as it is.
+    @discardableResult
+    func declineWatchHandoff(sessionId: String) -> TrainingSessionMutationOutcome {
+        mutate(sessionId: sessionId, context: .ui, scope: .lifecycle) { draft in
+            guard draft.mode == .live, draft.submissionState == nil
+            else { throw TrainingSessionMutationRejection.sessionNotMutable }
+            let now = TrainingSessionClock.string(from: self.now())
+            if draft.watchHandoffDeclinedAt == nil { draft.watchHandoffDeclinedAt = now }
+            if draft.readyForWatchAt != nil, draft.watchStartedAt == nil {
+                draft.readyForWatchAt = nil
+                if draft.startedAt == nil { draft.startedAt = now }
+                draft.leftAt = nil
             }
         }
     }

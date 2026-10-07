@@ -1795,3 +1795,326 @@ extension TrainingSessionAuthorityTests {
         ))
     }
 }
+
+// MARK: - Build 90: docked Logger clock, End Rest, guided Watch handoff
+
+@MainActor
+private final class FakeWatchAppLauncher: WatchAppLaunching {
+    var delivered: Bool
+    private(set) var requests: [String] = []
+    init(delivered: Bool) { self.delivered = delivered }
+    func requestWatchAppLaunch(sessionId: String) async -> Bool {
+        requests.append(sessionId)
+        return delivered
+    }
+}
+
+extension TrainingSessionAuthorityTests {
+    private func watchProjectionRestId(_ authority: TrainingSessionAuthority, _ clock: Clock) -> String? {
+        authority.draft(id: "session-1").flatMap {
+            WatchWorkoutProjection.make(draft: $0, authority: authority, now: clock.now)?.rest?.id
+        }
+    }
+
+    private func liveActivityRestId(_ authority: TrainingSessionAuthority, _ clock: Clock) -> String? {
+        authority.draft(id: "session-1")
+            .flatMap { TrainingSessionLiveProjection.make(from: $0, now: clock.now) }
+            .flatMap { WorkoutActivityAttributes.ContentState(projection: $0).rest?.id }
+    }
+
+    func testB90ClockShowsWorkoutElapsedWithoutRestAndTheCanonicalRestAnchorOnEverySurface() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        let idle = try XCTUnwrap(TrainingLoggerClockPresentation.make(draft: authority.draft(id: "session-1")))
+        XCTAssertEqual(idle.kind, .workout, "No rest: the WORKOUT clock (Live Activity rule).")
+        XCTAssertEqual(idle.anchor, ISO8601DateFormatter().date(from: "2026-10-01T16:30:00Z"))
+        XCTAssertFalse(idle.canEndRest)
+
+        clock.advance(40)
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
+        let rest = try XCTUnwrap(authority.draft(id: "session-1")?.rest)
+        let resting = try XCTUnwrap(TrainingLoggerClockPresentation.make(draft: authority.draft(id: "session-1")))
+        XCTAssertEqual(resting.kind, .rest(id: rest.id, mode: .stopwatch))
+        XCTAssertEqual(resting.anchor, rest.startedAtDate, "The phone clock renders the one canonical anchor.")
+        XCTAssertTrue(resting.canEndRest)
+        XCTAssertEqual(watchProjectionRestId(authority, clock), rest.id, "Watch shows the same rest interval.")
+        XCTAssertEqual(liveActivityRestId(authority, clock), rest.id, "Live Activity shows the same rest interval.")
+    }
+
+    func testB90EndRestEndsTheCanonicalRestForPhoneWatchAndLiveActivity() async throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        let viewModel = TrainingLoggerViewModel(api: api, sessionAuthority: authority, now: { clock.now })
+        await viewModel.load()
+        viewModel.resume(draftId: "session-1")
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
+        let restId = try XCTUnwrap(authority.draft(id: "session-1")?.rest?.id)
+        var changes = 0
+        let observation = authority.observeChanges { _ in changes += 1 }
+        defer { observation.cancel() }
+
+        viewModel.endRest(restId: restId)
+
+        XCTAssertNil(authority.draft(id: "session-1")?.rest)
+        XCTAssertNil(store.stored("session-1")?.rest, "Ended rest is durable (relaunch restores no rest).")
+        XCTAssertEqual(changes, 1, "One authority change drives the Watch and Live Activity observers.")
+        XCTAssertNil(watchProjectionRestId(authority, clock))
+        XCTAssertNil(liveActivityRestId(authority, clock))
+        XCTAssertEqual(TrainingLoggerClockPresentation.make(draft: authority.draft(id: "session-1"))?.kind, .workout)
+
+        // Repeated and late taps are safe: no further change.
+        let revision = authority.draft(id: "session-1")?.currentRevision
+        viewModel.endRest(restId: restId)
+        XCTAssertEqual(authority.draft(id: "session-1")?.currentRevision, revision)
+        XCTAssertNil(viewModel.validationMessage)
+
+        // A stale tap naming a replaced rest never ends the newer one.
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b2")
+        let newer = try XCTUnwrap(authority.draft(id: "session-1")?.rest?.id)
+        viewModel.endRest(restId: restId)
+        XCTAssertEqual(authority.draft(id: "session-1")?.rest?.id, newer)
+    }
+
+    func testB90ClockHidesDuringFinishConfirmationAndNotYetRestoresTheSameRest() throws {
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]))
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
+        let restId = try XCTUnwrap(authority.draft(id: "session-1")?.rest?.id)
+        authority.requestFinishConfirmation(sessionId: "session-1")
+        XCTAssertNil(TrainingLoggerClockPresentation.make(draft: authority.draft(id: "session-1")),
+                     "Build 83: no rest treatment while Finish confirmation is open.")
+        authority.cancelFinishConfirmation(sessionId: "session-1")
+        XCTAssertEqual(TrainingLoggerClockPresentation.make(draft: authority.draft(id: "session-1"))?.restId, restId)
+
+        var reviewing = try XCTUnwrap(authority.draft(id: "session-1"))
+        reviewing.step = .summary
+        XCTAssertNil(TrainingLoggerClockPresentation.make(draft: reviewing), "Review steps show no docked clock.")
+        var past = liveSession(mode: .past)
+        past.step = .workout
+        XCTAssertNil(TrainingLoggerClockPresentation.make(draft: past), "Past entries have no live clock.")
+    }
+
+    func testB90ClockFreezesWhileTheWatchPausedAndOffersNoEndRest() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession()]))
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
+        clock.advance(30)
+        authority.pause(sessionId: "session-1")
+        let paused = try XCTUnwrap(TrainingLoggerClockPresentation.make(draft: authority.draft(id: "session-1")))
+        XCTAssertEqual(paused.frozenSeconds ?? -1, 30, accuracy: 0.5)
+        XCTAssertFalse(paused.canEndRest, "The authority refuses content changes while paused.")
+        let restId = try XCTUnwrap(paused.restId)
+        XCTAssertEqual(authority.endRest(sessionId: "session-1", restId: restId), .rejected(.sessionPaused))
+    }
+
+    func testB90CountdownClockUsesTheCanonicalEnd() throws {
+        let (authority, _) = makeAuthority(RecordingStore([liveSession()]), rest: .init(mode: .countdown, countdownDurationSeconds: 90))
+        authority.completeSet(sessionId: "session-1", exerciseId: "bench", setId: "b1")
+        let rest = try XCTUnwrap(authority.draft(id: "session-1")?.rest)
+        let clock = try XCTUnwrap(TrainingLoggerClockPresentation.make(draft: authority.draft(id: "session-1")))
+        XCTAssertTrue(clock.isCountdown)
+        XCTAssertEqual(clock.glyph, "timer")
+        XCTAssertEqual(clock.endsAt, rest.endsAtDate)
+    }
+
+    func testB90ClockTextFormatsMinutesAndHours() {
+        XCTAssertEqual(TrainingLoggerClockPresentation.clockText(84), "1:24")
+        XCTAssertEqual(TrainingLoggerClockPresentation.clockText(3_725), "1:02:05")
+        XCTAssertEqual(TrainingLoggerClockPresentation.clockText(-3), "0:00")
+    }
+
+    // MARK: Ready-for-Watch start-clearing defect (pre-existing, Build 89)
+
+    func testB90ReadyForWatchIsRefusedForAWatchStartedSessionAndNeverClearsItsStart() throws {
+        var watchStarted = liveSession()
+        watchStarted.watchStartedAt = watchStarted.startedAt
+        var healthRecording = liveSession(id: "session-2")
+        healthRecording.watchHealthStartedAt = "2026-10-01T16:31:00Z"
+        let (authority, _) = makeAuthority(RecordingStore([watchStarted, healthRecording]))
+        XCTAssertEqual(watchStarted.completedSetCount, 0, "The Build 89 card still showed for this session.")
+
+        XCTAssertEqual(authority.setReadyForWatch(sessionId: "session-1", ready: true), .rejected(.sessionNotMutable))
+        XCTAssertEqual(authority.draft(id: "session-1")?.startedAt, watchStarted.startedAt)
+        XCTAssertEqual(authority.setReadyForWatch(sessionId: "session-2", ready: true), .rejected(.sessionNotMutable))
+        XCTAssertNotNil(authority.draft(id: "session-2")?.startedAt)
+        XCTAssertNil(authority.preparedWorkout())
+    }
+
+    // MARK: Use without Watch
+
+    func testB90DeclineAfterReadyWithdrawsThePlanStartsOnPhoneAndPersists() throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        authority.setReadyForWatch(sessionId: "session-1", ready: true)
+        XCTAssertNil(authority.draft(id: "session-1")?.startedAt)
+        clock.advance(12)
+
+        XCTAssertTrue(authority.declineWatchHandoff(sessionId: "session-1").isAccepted)
+        let draft = try XCTUnwrap(authority.draft(id: "session-1"))
+        XCTAssertNil(draft.readyForWatchAt)
+        XCTAssertNil(authority.preparedWorkout(), "A late Watch Start can no longer pick this plan.")
+        XCTAssertEqual(draft.startedAt, TrainingSessionClock.string(from: clock.now))
+        XCTAssertEqual(draft.watchHandoffDeclinedAt, TrainingSessionClock.string(from: clock.now))
+        XCTAssertEqual(authority.activeLiveSession(at: clock.now)?.id, "session-1")
+
+        let (relaunched, _) = makeAuthority(store, clock: clock)
+        XCTAssertNotNil(relaunched.draft(id: "session-1")?.watchHandoffDeclinedAt, "Survives relaunch.")
+        let data = try JSONEncoder().encode(draft)
+        XCTAssertEqual(try JSONDecoder().decode(TrainingLoggerDraft.self, from: data).watchHandoffDeclinedAt, draft.watchHandoffDeclinedAt)
+    }
+
+    func testB90DeclineNeverDisturbsAWatchStartedSession() throws {
+        var watchStarted = liveSession()
+        watchStarted.watchStartedAt = watchStarted.startedAt
+        let (authority, _) = makeAuthority(RecordingStore([watchStarted]))
+        authority.declineWatchHandoff(sessionId: "session-1")
+        let draft = try XCTUnwrap(authority.draft(id: "session-1"))
+        XCTAssertEqual(draft.startedAt, watchStarted.startedAt)
+        XCTAssertEqual(draft.watchStartedAt, watchStarted.watchStartedAt)
+    }
+
+    // MARK: Handoff presentation model
+
+    private func handoffInputs(
+        _ draft: TrainingLoggerDraft?, paired: Bool = true, otherLive: Bool = false, canWrite: Bool = true
+    ) -> TrainingWatchHandoffModel.Inputs {
+        .init(draft: draft, canOfferHandoff: paired, otherLiveSessionExists: otherLive, canWrite: canWrite)
+    }
+
+    func testB90HandoffOffersOnlyForAPairedWatchBeforeTheFirstSet() throws {
+        let model = TrainingWatchHandoffModel()
+        let draft = liveSession()
+        model.sync(handoffInputs(draft))
+        XCTAssertEqual(model.phase, .offer)
+        model.sync(handoffInputs(draft, paired: false))
+        XCTAssertEqual(model.phase, .hidden, "No paired Watch with PhysiqueOS: never offered.")
+        model.sync(handoffInputs(draft, otherLive: true))
+        XCTAssertEqual(model.phase, .hidden, "Another live session would make the Watch Start fail.")
+        model.sync(handoffInputs(draft, canWrite: false))
+        XCTAssertEqual(model.phase, .hidden)
+        var started = draft
+        started.exercises[0].sets[0].isCompleted = true
+        model.sync(handoffInputs(started))
+        XCTAssertEqual(model.phase, .hidden, "Only before the first set.")
+        var onWatch = draft
+        onWatch.watchStartedAt = draft.startedAt
+        model.sync(handoffInputs(onWatch))
+        XCTAssertEqual(model.phase, .hidden, "Already Watch-started: no offer, no stale acknowledgment.")
+        var declined = draft
+        declined.watchHandoffDeclinedAt = "2026-10-01T16:31:00Z"
+        model.sync(handoffInputs(declined))
+        XCTAssertEqual(model.phase, .hidden, "Use without Watch is never re-prompted, even after reconnect.")
+        var leaving = draft
+        leaving.step = .summary
+        model.sync(handoffInputs(leaving))
+        XCTAssertEqual(model.phase, .hidden)
+    }
+
+    func testB90HandoffWaitsAfterADeliveredRequestAndDismissesOnlyOnWatchStartedAt() async throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        let model = TrainingWatchHandoffModel(acknowledgementDisplay: .milliseconds(30))
+        let launcher = FakeWatchAppLauncher(delivered: true)
+        model.sync(handoffInputs(authority.draft(id: "session-1")))
+
+        await model.ready(sessionId: "session-1", prepare: {
+            authority.setReadyForWatch(sessionId: "session-1", ready: true).isAccepted
+        }, launcher: launcher)
+        model.sync(handoffInputs(authority.draft(id: "session-1")))
+        XCTAssertEqual(launcher.requests, ["session-1"], "Ready asks watchOS to open PhysiqueOS (startWatchApp).")
+        XCTAssertEqual(model.phase, .waiting, "A delivered request is not an acknowledgment.")
+
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        let start = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "start", mutationId: "start",
+            kind: .startPreparedWorkout, sessionId: "session-1",
+            expectedRevision: try XCTUnwrap(authority.draft(id: "session-1")).currentRevision,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+        XCTAssertEqual(router.route(start).status, .applied)
+        model.sync(handoffInputs(authority.draft(id: "session-1")))
+        XCTAssertEqual(model.phase, .acknowledged)
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(model.phase, .hidden)
+        model.sync(handoffInputs(authority.draft(id: "session-1")))
+        XCTAssertEqual(model.phase, .hidden)
+    }
+
+    func testB90HandoffFallsBackWhenTheRequestIsNotDeliveredOrTimesOut() async throws {
+        let (authority, _) = makeAuthority(RecordingStore([liveSession(), liveSession(id: "session-2")]))
+        let undelivered = TrainingWatchHandoffModel()
+        await undelivered.ready(sessionId: "session-1", prepare: {
+            authority.setReadyForWatch(sessionId: "session-1", ready: true).isAccepted
+        }, launcher: FakeWatchAppLauncher(delivered: false))
+        XCTAssertEqual(undelivered.phase, .unreachable)
+        let retry = FakeWatchAppLauncher(delivered: true)
+        await undelivered.tryAgain(sessionId: "session-1", launcher: retry)
+        XCTAssertEqual(undelivered.phase, .waiting)
+        XCTAssertEqual(retry.requests, ["session-1"])
+
+        let timed = TrainingWatchHandoffModel(waitTimeout: .milliseconds(40))
+        await timed.ready(sessionId: "session-2", prepare: {
+            authority.setReadyForWatch(sessionId: "session-2", ready: true).isAccepted
+        }, launcher: FakeWatchAppLauncher(delivered: true))
+        XCTAssertEqual(timed.phase, .waiting)
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertEqual(timed.phase, .unreachable, "No Watch Start in time: truthful fallback, never dismissed.")
+    }
+
+    func testB90HandoffRefusedPreparationKeepsTheOffer() async {
+        let model = TrainingWatchHandoffModel()
+        model.sync(handoffInputs(liveSession()))
+        let launcher = FakeWatchAppLauncher(delivered: true)
+        await model.ready(sessionId: "session-1", prepare: { false }, launcher: launcher)
+        XCTAssertEqual(model.phase, .offer)
+        XCTAssertTrue(launcher.requests.isEmpty, "No launch request without an accepted preparation.")
+    }
+
+    func testB90HandoffRestoredPreparedLoggerShowsWaitingAndUseWithoutWatchStartsOnPhone() throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, _) = makeAuthority(store)
+        authority.setReadyForWatch(sessionId: "session-1", ready: true)
+        let restored = TrainingWatchHandoffModel()
+        restored.sync(handoffInputs(authority.draft(id: "session-1"), paired: false))
+        XCTAssertEqual(restored.phase, .waiting, "A relaunched prepared plan never silently loses its phone start.")
+
+        restored.useWithoutWatch { authority.declineWatchHandoff(sessionId: "session-1") }
+        XCTAssertEqual(restored.phase, .hidden)
+        restored.sync(handoffInputs(authority.draft(id: "session-1")))
+        XCTAssertEqual(restored.phase, .hidden, "No re-prompt for this workout.")
+        XCTAssertNotNil(authority.draft(id: "session-1")?.startedAt)
+    }
+
+    func testB90HandoffIgnoresAWatchStartItDidNotWaitFor() {
+        let model = TrainingWatchHandoffModel()
+        var onWatch = liveSession()
+        onWatch.watchStartedAt = onWatch.startedAt
+        model.sync(handoffInputs(onWatch))
+        XCTAssertEqual(model.phase, .hidden, "A stale or unrelated Watch start never flashes Started on Watch.")
+    }
+}
+
+extension TrainingSessionAuthorityTests {
+    /// Pre-existing (Build 89) defect found in Build 90: the authority writes
+    /// Watch starts with fractional seconds, which `activeLiveSession` could
+    /// not parse, so a Watch-started workout was not routable from the Log
+    /// tab and did not block a second prepared start.
+    func testB90WatchStartedSessionWithFractionalStartIsTheActiveLiveSession() throws {
+        let (authority, clock) = makeAuthority(RecordingStore([liveSession(), liveSession(id: "session-2")]))
+        authority.setReadyForWatch(sessionId: "session-1", ready: true)
+        clock.advance(5)
+        authority.setReadyForWatch(sessionId: "session-2", ready: true)
+        // Both prepared; session-2 is newer, so it is the Watch's plan.
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        let start = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "s", mutationId: "s",
+            kind: .startPreparedWorkout, sessionId: "session-2",
+            expectedRevision: try XCTUnwrap(authority.draft(id: "session-2")).currentRevision,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+        XCTAssertEqual(router.route(start).status, .applied)
+        let startedAt = try XCTUnwrap(authority.draft(id: "session-2")?.startedAt)
+        XCTAssertTrue(startedAt.contains("."), "Watch starts carry fractional seconds.")
+        XCTAssertEqual(authority.activeLiveSession(at: clock.now)?.id, "session-2")
+        XCTAssertEqual(authority.logTabRoutingTarget(at: clock.now)?.id, "session-2")
+        XCTAssertEqual(authority.startPreparedWorkout(sessionId: "session-1", context: .ui), .rejected(.sessionNotMutable),
+                       "A second prepared plan cannot start while the Watch workout is live.")
+    }
+}
