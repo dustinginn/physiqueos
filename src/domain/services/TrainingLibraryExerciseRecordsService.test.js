@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTrainingPerformanceEvent } from "../models/trainingPerformanceEvent";
+import { createTrainingExecutionVariantResolver } from "../models/trainingExecutionVariantDefinition.js";
 import {
   createSessionPerformanceRecordsReadModel,
   createTrainingLibraryExerciseRecordsReadModel,
@@ -247,6 +248,29 @@ describe("Session performance records read model", () => {
       { ...volume(), sessionVolume: null, id: "malformed" },
       { ...volume(), canonicalExerciseId: undefined, id: "no_exercise" },
     ] }).map((item) => item.sourceEventId)).toEqual([valid.id]);
+  });
+});
+
+describe("Performance Records stable variant identity (Build 92)", () => {
+  const seeded = {
+    id: "tev_pushdown_static_hold", canonicalExerciseId: "cable_pushdown", displayName: "Peak Squeeze", key: "peak_squeeze",
+    legacyKeys: ["static_hold"], status: "retired", provenance: "legacy_seed", createdAt: "2026-10-01T00:00:00.000Z",
+  };
+  const legacy = volume({ workoutDate: "2026-07-25", value: 6000, executionVariant: { key: "static_hold", label: "Static Hold", rawLabel: "static hold" } });
+  const renamed = volume({ workoutDate: "2026-08-01", value: 6100, executionVariant: { variantId: seeded.id, key: "peak_squeeze", label: "Peak Squeeze", rawLabel: "Peak Squeeze" } });
+  const ordinary = volume({ workoutDate: "2026-07-28", value: 9000 });
+
+  it("keeps one record family across a legacy key and a renamed/retired definition, separate from Ordinary", () => {
+    const resolved = createTrainingLibraryExerciseRecordsReadModel({
+      canonicalExerciseId: "cable_pushdown",
+      events: [legacy, renamed, ordinary],
+      variantResolver: createTrainingExecutionVariantResolver([seeded]),
+    });
+    expect(resolved.records).toHaveLength(2);
+    expect(resolved.records.map((record) => record.executionVariant?.variantId ?? record.executionVariant?.key ?? "ordinary").sort())
+      .toEqual(["ordinary", seeded.id].sort());
+    // Without definitions the legacy key grouping is unchanged (the two keys differ).
+    expect(compose("cable_pushdown", [legacy, renamed, ordinary]).records).toHaveLength(3);
   });
 });
 

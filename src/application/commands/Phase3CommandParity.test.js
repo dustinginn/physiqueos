@@ -54,6 +54,10 @@ const payloads = {
   },
   [Phase3Command.ADD_TO_MY_LIBRARY]: { canonicalExerciseId: "dumbbell_reverse_lunge" },
   [Phase3Command.CREATE_CANONICAL_EXERCISE]: { canonicalName: "Chest Supported Row", primaryMuscleGroupId: "back" },
+  [Phase3Command.CREATE_TRAINING_EXECUTION_VARIANT]: { canonicalExerciseId: "spider_curl", displayName: "Static Hold" },
+  [Phase3Command.RENAME_TRAINING_EXECUTION_VARIANT]: { variantId: "tev_fixture_static_hold", displayName: "Peak Squeeze" },
+  [Phase3Command.RETIRE_TRAINING_EXECUTION_VARIANT]: { variantId: "tev_fixture_static_hold" },
+  [Phase3Command.REACTIVATE_TRAINING_EXECUTION_VARIANT]: { variantId: "tev_fixture_static_hold" },
   [Phase3Command.SAVE_TRAINING_STRATEGY]: {
     protocolId: "training-protocol", expectedCurrentVersionId: "training-protocol_v1",
     draft: {
@@ -192,6 +196,10 @@ function commandPort(commandType) {
     [Phase3Command.SAVE_NUTRITION_STRATEGY]: "saveNutritionStrategy",
     [Phase3Command.ADD_TO_MY_LIBRARY]: "addToMyLibrary",
     [Phase3Command.CREATE_CANONICAL_EXERCISE]: "createCanonicalExercise",
+    [Phase3Command.CREATE_TRAINING_EXECUTION_VARIANT]: "createTrainingExecutionVariant",
+    [Phase3Command.RENAME_TRAINING_EXECUTION_VARIANT]: "renameTrainingExecutionVariant",
+    [Phase3Command.RETIRE_TRAINING_EXECUTION_VARIANT]: "retireTrainingExecutionVariant",
+    [Phase3Command.REACTIVATE_TRAINING_EXECUTION_VARIANT]: "reactivateTrainingExecutionVariant",
     [Phase3Command.SAVE_TRAINING_STRATEGY]: "saveTrainingStrategy",
     [Phase3Command.SAVE_PEPTIDE_SUPPORT]: "savePeptideSupport",
     [Phase3Command.SAVE_SUPPLEMENT_SUPPORT]: "saveSupplementSupport",

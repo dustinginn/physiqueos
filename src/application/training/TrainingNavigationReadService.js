@@ -1,4 +1,5 @@
 import { selectLiveTrainingPerformanceEvents } from "../../domain/services/TrainingPerformanceEventLiveness.js";
+import { createTrainingExecutionVariantResolver } from "../../domain/models/trainingExecutionVariantDefinition.js";
 import { createTrainingDayReadModel } from "./TrainingReadService.js";
 import {
   createTrainingLandingReports,
@@ -279,11 +280,12 @@ export function createTrainingNavigationReadService({
       return store.run("training.navigation.exercise", async () => {
         if (!registryHydrated) await ensureCanonicalExerciseRegistry();
         const exerciseIdentity = resolveTrainingExerciseIdentity(exerciseSlug);
-        const [user, goals, canonicalEvidenceObjects, events] = await Promise.all([
+        const [user, goals, canonicalEvidenceObjects, events, variantDefinitions] = await Promise.all([
           store.getUser(),
           store.listGoals(),
           store.listCanonicalTrainingEvidenceByExercise(exerciseIdentity.canonicalExerciseId),
           store.listTrainingPerformanceEventsByExercise(exerciseIdentity.canonicalExerciseId),
+          store.listTrainingExecutionVariantsByExercise?.(exerciseIdentity.canonicalExerciseId) ?? [],
         ]);
         const timeline = createTrainingEvidenceContext({ context, currentDate, goals, user });
         const report = createTrainingNavigationReport({
@@ -300,6 +302,7 @@ export function createTrainingNavigationReadService({
           exerciseRecords: createTrainingLibraryExerciseRecordsReadModel({
             canonicalExerciseId: exerciseIdentity.canonicalExerciseId,
             events: await selectLiveEvents(events, canonicalEvidenceObjects),
+            variantResolver: createTrainingExecutionVariantResolver(variantDefinitions),
           }),
         });
       });

@@ -27,6 +27,17 @@ import {
 } from "../../domain/services/TrainingLoggerAppleHealthService.js";
 import { listCanonicalTrainingExerciseIdentities } from "../../domain/models/trainingExerciseIdentity.js";
 import { normalizeTrainingExecutionVariant } from "../../domain/models/trainingExecutionVariant.js";
+import {
+  createTrainingExecutionVariantResolver,
+  createTrainingExecutionVariantSelection,
+  planTrainingExecutionVariantCreate,
+  planTrainingExecutionVariantReactivate,
+  planTrainingExecutionVariantRename,
+  planTrainingExecutionVariantRetire,
+  TRAINING_EXECUTION_VARIANT_COLLECTION,
+  TRAINING_EXECUTION_VARIANT_PROVENANCE,
+  TrainingExecutionVariantError,
+} from "../../domain/models/trainingExecutionVariantDefinition.js";
 import { createTrainingExerciseRelationshipGroup } from "../../domain/models/trainingExerciseRelationship.js";
 import {
   createCanonicalExerciseDefinition,
@@ -204,6 +215,8 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
   "editDexaReview", "requestEvidenceReviewConfirmation", "saveRecurringSupport", "saveNutritionStrategy",
   "resolveWorkoutReconciliation",
   "addToMyLibrary", "createCanonicalExercise", "saveTrainingStrategy", "savePeptideSupport",
+  "createTrainingExecutionVariant", "renameTrainingExecutionVariant",
+  "retireTrainingExecutionVariant", "reactivateTrainingExecutionVariant",
   "saveSupplementSupport",
   "saveSupplementStrategy", "changeSupplementLifecycle", "changePeptideLifecycle",
   "saveCoachingUpdates",
@@ -389,6 +402,10 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     saveNutritionStrategy,
     addToMyLibrary,
     createCanonicalExercise,
+    createTrainingExecutionVariant,
+    renameTrainingExecutionVariant,
+    retireTrainingExecutionVariant,
+    reactivateTrainingExecutionVariant,
     saveTrainingStrategy,
     savePeptideSupport,
     saveSupplementSupport,
@@ -2187,6 +2204,99 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     return { status: "committed", result: { status: "created", exercise: definition }, outbox: [] };
   }
 
+  /// Training Execution Variants (Build 92 V1). The Server owns identity,
+  /// normalization, duplicate detection and provenance: clients send only the
+  /// canonical exercise and a display name. Scope is one canonical exercise;
+  /// an active same-exercise name returns the existing identity and a
+  /// retired one is reactivated, never duplicated.
+  async function createTrainingExecutionVariant(context) {
+    const canonicalExerciseId = String(context.payload.canonicalExerciseId ?? "").trim();
+    await requireCanonicalTrainingExercise(context, canonicalExerciseId);
+    const definitions = await listTrainingExecutionVariants(context);
+    const plan = runVariantPlan(() => planTrainingExecutionVariantCreate({
+      definitions,
+      canonicalExerciseId,
+      displayName: context.payload.displayName,
+      id: createTrainingExecutionVariantId(context),
+      provenance: TRAINING_EXECUTION_VARIANT_PROVENANCE.USER_CREATED,
+      now: now(),
+    }));
+    if (plan.outcome !== "existing") await persistTrainingExecutionVariant(context, plan);
+    return variantOutcome(plan);
+  }
+
+  async function renameTrainingExecutionVariant(context) {
+    const definitions = await listTrainingExecutionVariants(context);
+    const plan = runVariantPlan(() => planTrainingExecutionVariantRename({
+      definitions,
+      variantId: context.payload.variantId,
+      displayName: context.payload.displayName,
+      now: now(),
+    }));
+    if (plan.outcome !== "unchanged") await persistTrainingExecutionVariant(context, plan);
+    return variantOutcome(plan);
+  }
+
+  async function retireTrainingExecutionVariant(context) {
+    const definitions = await listTrainingExecutionVariants(context);
+    const plan = runVariantPlan(() => planTrainingExecutionVariantRetire({
+      definitions, variantId: context.payload.variantId, now: now(),
+    }));
+    if (plan.outcome !== "unchanged") await persistTrainingExecutionVariant(context, plan);
+    return variantOutcome(plan);
+  }
+
+  async function reactivateTrainingExecutionVariant(context) {
+    const definitions = await listTrainingExecutionVariants(context);
+    const plan = runVariantPlan(() => planTrainingExecutionVariantReactivate({
+      definitions, variantId: context.payload.variantId, now: now(),
+    }));
+    if (plan.outcome !== "unchanged") await persistTrainingExecutionVariant(context, plan);
+    return variantOutcome(plan);
+  }
+
+  async function listTrainingExecutionVariants(context) {
+    return records.list({ ownerUserId: context.ownerUserId, collection: TRAINING_EXECUTION_VARIANT_COLLECTION });
+  }
+
+  async function requireCanonicalTrainingExercise(context, canonicalExerciseId) {
+    const runtimeDefinitions = await records.list({
+      ownerUserId: context.ownerUserId, collection: "canonicalExerciseLibrary",
+    });
+    const known = [...listCanonicalTrainingExerciseIdentities(), ...runtimeDefinitions]
+      .some((item) => item?.id === canonicalExerciseId);
+    if (!canonicalExerciseId || !known) {
+      throw problem(404, "CANONICAL_EXERCISE_UNAVAILABLE", "The canonical exercise is unavailable.", [
+        { field: "canonicalExerciseId", code: "unknown", detail: "Choose an existing canonical exercise." },
+      ]);
+    }
+  }
+
+  async function persistTrainingExecutionVariant(context, plan) {
+    const definition = plan.definition;
+    if (plan.previous) {
+      await records.put({
+        ownerUserId: context.ownerUserId,
+        collection: TRAINING_EXECUTION_VARIANT_COLLECTION,
+        recordId: definition.id,
+        expectedVersion: plan.previous.version,
+        payload: withoutVersion(definition),
+        sourceIdentity: definition.id,
+      });
+      return;
+    }
+    const created = await records.putIfAbsent({
+      ownerUserId: context.ownerUserId,
+      collection: TRAINING_EXECUTION_VARIANT_COLLECTION,
+      recordId: definition.id,
+      payload: definition,
+      sourceIdentity: definition.id,
+    });
+    if (created?.created === false) {
+      throw problem(409, "TRAINING_EXECUTION_VARIANT_IDENTITY_CONFLICT", "The execution variant identity already exists.");
+    }
+  }
+
   async function commitMorningCheckIn(context, { reconcilePreviousDayPriorities }) {
     const date = context.payload.localDate;
     const weightId = `weight_${date.replaceAll("-", "_")}`;
@@ -3238,6 +3348,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       ...listCanonicalTrainingExerciseIdentities(),
       ...runtimeDefinitions,
     ].map((item) => [item.id, item]));
+    // Build 92: definitions are read only when a variant is submitted, so an
+    // Ordinary-only (Build 90) commit performs exactly the same reads.
+    const variantResolver = context.payload.exercises.some((exercise) => exercise?.executionVariant)
+      ? createTrainingExecutionVariantResolver(await listTrainingExecutionVariants(context))
+      : null;
     const occurrences = context.payload.exercises.map((exercise, index) => {
       let definition = definitions.get(String(exercise.canonicalExerciseId));
       let createsCanonicalDefinition = false;
@@ -3293,7 +3408,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         bodyRegion: definition.body_region,
         equipment: definition.equipment,
         executionVariant: exercise.executionVariant
-          ? normalizeTrainingExecutionVariant(exercise.executionVariant)
+          ? resolveCommittedExecutionVariant(exercise.executionVariant, {
+            canonicalExerciseId: definition.id,
+            index,
+            resolver: variantResolver,
+          })
           : null,
         sets,
       };
@@ -3431,6 +3550,9 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           canonicalObjects: candidate.canonicalEvidenceObjects,
           packageId: evidencePackage.package_id,
           capturedAt: evidencePackage.captured_at,
+          variantResolver: createTrainingExecutionVariantResolver(
+            await listTrainingExecutionVariants(context)
+          ),
         }),
         sourceReviewId: supportingReviewId ?? `training_logger_session|${context.payload.sessionId}`,
         sourceEvidencePackageId: evidencePackage.package_id,
@@ -3927,6 +4049,92 @@ function finiteOrNull(value) {
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+/// Finalize-time variant authority. A submitted `variantId` must name a
+/// canonical definition of this same exercise; the Server then stamps the
+/// definition's current key and label. A retired definition is still
+/// accepted so a workout selected before retirement is never lost. The legacy
+/// key/label shape (Build 90 and earlier) remains valid; when its key maps to
+/// a same-exercise definition the stable identity is attached additively.
+function resolveCommittedExecutionVariant(input, { canonicalExerciseId, index, resolver }) {
+  const normalized = normalizeTrainingExecutionVariant(input);
+  if (!normalized) return null;
+  const requestedId = typeof input === "object" ? input?.variantId ?? null : null;
+  if (requestedId != null) {
+    const definition = resolver?.getDefinition(String(requestedId)) ?? null;
+    if (!definition) {
+      throw problem(400, "TRAINING_EXECUTION_VARIANT_UNKNOWN", `Exercise ${index + 1} names an unknown execution variant.`);
+    }
+    if (definition.canonicalExerciseId !== canonicalExerciseId) {
+      throw problem(400, "TRAINING_EXECUTION_VARIANT_EXERCISE_MISMATCH", `Exercise ${index + 1} names an execution variant of a different exercise.`);
+    }
+    return createTrainingExecutionVariantSelection(definition);
+  }
+  const resolved = resolver?.resolve(normalized, canonicalExerciseId);
+  if (resolved?.ordinary) return null;
+  return resolved?.variantId ? { variantId: resolved.variantId, ...normalized } : normalized;
+}
+
+function createTrainingExecutionVariantId(context) {
+  // Derived server-side from the authenticated owner and the validated
+  // UUIDv7 command identity: deterministic across an idempotent replay and
+  // never a client-chosen persistence key.
+  const digest = createHash("sha256")
+    .update(`${context.ownerUserId}|training-execution-variant|${context.metadata.commandId}`)
+    .digest("hex")
+    .slice(0, 32);
+  return `tev_${digest}`;
+}
+
+function runVariantPlan(plan) {
+  try {
+    return plan();
+  } catch (error) {
+    if (!(error instanceof TrainingExecutionVariantError)) throw error;
+    const status = error.code === "TRAINING_EXECUTION_VARIANT_NOT_FOUND"
+      ? 404
+      : error.code === "TRAINING_EXECUTION_VARIANT_DUPLICATE" ? 409 : 400;
+    throw new ApplicationProblem({
+      status,
+      code: error.code,
+      title: error.message,
+      ...(Object.keys(error.details ?? {}).length ? { recovery: error.details } : {}),
+    });
+  }
+}
+
+function variantOutcome(plan) {
+  const status = plan.outcome === "existing" ? "already_exists" : plan.outcome;
+  return {
+    status: "committed",
+    result: {
+      status,
+      variant: projectTrainingExecutionVariantDefinition(plan.definition),
+      selection: createTrainingExecutionVariantSelection(plan.definition),
+    },
+    outbox: [],
+  };
+}
+
+function projectTrainingExecutionVariantDefinition(definition) {
+  return {
+    variantId: definition.id,
+    canonicalExerciseId: definition.canonicalExerciseId,
+    key: definition.key,
+    label: definition.displayName,
+    legacyKeys: [...(definition.legacyKeys ?? [])],
+    status: definition.status,
+    provenance: definition.provenance,
+    createdAt: definition.createdAt,
+    updatedAt: definition.updatedAt,
+    retiredAt: definition.retiredAt ?? null,
+  };
+}
+
+function withoutVersion(definition) {
+  const { version: _version, ...payload } = definition;
+  return payload;
 }
 
 function problem(status, code, title, fieldErrors = []) {

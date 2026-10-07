@@ -36,6 +36,7 @@ import {
   toggleTrainingSetCompletion,
   updateTrainingSet,
   updateWorkoutContext,
+  TRAINING_LOGGER_PREVIEW_EXECUTION_VARIANTS_BY_EXERCISE,
 } from "./TrainingLoggerPreviewState";
 
 const componentSource = fs.readFileSync(
@@ -55,6 +56,10 @@ const reconciliationSource = fs.readFileSync(
   "utf8"
 );
 const routeSource = fs.readFileSync(new URL("./page.js", import.meta.url), "utf8");
+
+
+// The isolated preview offers only its synthetic, projection-shaped choices.
+const PREVIEW_STATIC_HOLD = TRAINING_LOGGER_PREVIEW_EXECUTION_VARIANTS_BY_EXERCISE.spider_curl[0].selection;
 
 describe("Training Logger preview state", () => {
   it("initializes live and retrospective modes into one shared draft architecture", () => {
@@ -250,7 +255,7 @@ describe("Training Logger preview state", () => {
       "spider_curl"
     );
     const occurrenceId = draft.exercises[0].id;
-    draft = assignTrainingVariant(draft, occurrenceId, "Static Hold");
+    draft = assignTrainingVariant(draft, occurrenceId, PREVIEW_STATIC_HOLD);
     expect(draft.exercises[0]).toMatchObject({
       id: occurrenceId,
       exerciseOccurrenceId: occurrenceId,
@@ -267,6 +272,10 @@ describe("Training Logger preview state", () => {
     draft = removeTrainingVariant(draft, occurrenceId);
     expect(draft.exercises[0].executionVariant).toBeNull();
     expect(draft.exercises[0].canonicalExerciseId).toBe("spider_curl");
+
+    // A free-typed label is not a canonical choice and is refused.
+    expect(assignTrainingVariant(draft, occurrenceId, "3-Second Pause")).toBe(draft);
+    expect(assignTrainingVariant(draft, occurrenceId, { key: "static_hold", label: "Static Hold" })).toBe(draft);
   });
 
   it("creates and removes canonical Superset relationship groups", () => {
@@ -289,7 +298,7 @@ describe("Training Logger preview state", () => {
   it("preserves Variant and Superset as independent, coexisting context", () => {
     let draft = createProvingDraft();
     const [spider, pushdown] = draft.exercises;
-    draft = assignTrainingVariant(draft, spider.id, "Static Hold");
+    draft = assignTrainingVariant(draft, spider.id, PREVIEW_STATIC_HOLD);
     draft = createTrainingSuperset(draft, spider.id, pushdown.id);
     expect(draft.exercises[0].canonicalExerciseId).toBe("spider_curl");
     expect(draft.exercises[0].executionVariant.key).toBe("static_hold");
@@ -301,7 +310,7 @@ describe("Training Logger preview state", () => {
 
   it("builds the workout completion summary", () => {
     let draft = createProvingDraft();
-    draft = assignTrainingVariant(draft, draft.exercises[0].id, "Static Hold");
+    draft = assignTrainingVariant(draft, draft.exercises[0].id, PREVIEW_STATIC_HOLD);
     draft = createTrainingSuperset(draft, draft.exercises[0].id, draft.exercises[1].id);
     draft = toggleTrainingSetCompletion(
       draft,
@@ -362,7 +371,7 @@ describe("Training Logger preview state", () => {
   it("builds a dated batch Evidence Review handoff without an Execution Context card", () => {
     let draft = createProvingDraft();
     const [spider, pushdown] = draft.exercises;
-    draft = assignTrainingVariant(draft, spider.id, "Static Hold");
+    draft = assignTrainingVariant(draft, spider.id, PREVIEW_STATIC_HOLD);
     draft = createTrainingSuperset(draft, spider.id, pushdown.id);
     draft = finalizeTrainingLoggerReconciliation(draft);
     const handoff = buildEvidenceReviewHandoff(draft);

@@ -4,6 +4,7 @@ import {
   TRAINING_PERFORMANCE_EVENT_TYPES,
 } from "../models/trainingPerformanceEvent";
 import { normalizeTrainingExecutionVariant } from "../models/trainingExecutionVariant";
+import { EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER } from "../models/trainingExecutionVariantDefinition.js";
 
 const TYPE_ORDER = {
   [TRAINING_PERFORMANCE_EVENT_TYPES.SESSION_VOLUME_PR]: 0,
@@ -13,6 +14,10 @@ const TYPE_ORDER = {
 export function createTrainingLibraryExerciseRecordsReadModel({
   canonicalExerciseId,
   events = [],
+  // Build 92: records group by stable variant identity, so a renamed or
+  // legacy-aliased variant keeps one record family and never merges into
+  // Ordinary. The default reproduces the legacy key grouping exactly.
+  variantResolver = EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER,
 } = {}) {
   const selectedId = cleanString(canonicalExerciseId);
   if (!selectedId) return null;
@@ -25,7 +30,7 @@ export function createTrainingLibraryExerciseRecordsReadModel({
   }
   const activeByFamily = new Map();
   for (const entry of byId.values()) {
-    const key = activeRecordFamilyKey(entry.event);
+    const key = activeRecordFamilyKey(entry.event, variantResolver);
     const current = activeByFamily.get(key);
     if (!current || isStrongerRecord(entry.item, current)) {
       activeByFamily.set(key, entry.item);
@@ -73,8 +78,8 @@ function compareSessionRecords(left, right) {
   );
 }
 
-function activeRecordFamilyKey(event) {
-  const variant = event.executionVariant?.key ?? "ordinary";
+function activeRecordFamilyKey(event, variantResolver) {
+  const variant = variantResolver.identity(event.executionVariant, event.canonicalExerciseId);
   const relationship = event.relationshipContext
     ? `${event.relationshipContext.relationshipType ?? "relationship"}:${(event.relationshipContext.orderedPartners ?? [])
       .map((partner) => partner.canonicalExerciseId ?? partner.name ?? "")

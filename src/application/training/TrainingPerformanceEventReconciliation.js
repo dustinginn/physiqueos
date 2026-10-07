@@ -37,6 +37,7 @@ export function createCommittedTrainingPerformanceAnalysis({
   canonicalObjects = [],
   packageId,
   capturedAt,
+  variantResolver = undefined,
 } = {}) {
   if (!packageId || !capturedAt) {
     throw new Error("A committed Training analysis needs its package id and capture time.");
@@ -45,6 +46,7 @@ export function createCommittedTrainingPerformanceAnalysis({
     canonicalObjects,
     generatedAt: capturedAt,
     now: capturedAt,
+    variantResolver,
   });
   return Object.freeze({
     id: `analysis_training_${packageId}`,

@@ -48,6 +48,7 @@ export const FOUNDATION_REQUIRED_SOURCE_COLLECTIONS = Object.freeze([
 export const FOUNDATION_OPTIONAL_SOURCE_COLLECTIONS = Object.freeze([
   "myLibraryMemberships",
   "confidenceActivationArtifacts",
+  "trainingExecutionVariants",
 ]);
 
 export const FOUNDATION_EXCLUDED_SOURCE_COLLECTIONS = Object.freeze([

@@ -109,6 +109,15 @@ export function createPostgresTrainingNavigationReadStore({
     getHealthKitCanonicalWorkout: (recordId) => records.get({ ownerUserId, collection: "healthKitCanonicalWorkouts", recordId }),
     listHealthKitWorkoutLinks: () => list("healthKitWorkoutLinks"),
     listHealthKitWorkoutLinkClaims: () => list("healthKitWorkoutLinkClaims"),
+    // Bounded, owner-scoped: one exercise's canonical execution variant
+    // definitions (active and retired), for stable record/history identity.
+    listTrainingExecutionVariantsByExercise: (canonicalExerciseId) => queryRecords(
+      `SELECT payload,version FROM physiqueos.canonical_training_records
+       WHERE owner_user_id=$1 AND collection_name='trainingExecutionVariants'
+         AND payload->>'canonicalExerciseId'=$2
+       ORDER BY record_id`,
+      [ownerUserId, canonicalExerciseId]
+    ),
     listTrainingPerformanceEventsByExercise: (canonicalExerciseId) => queryRecords(
       `SELECT payload,version FROM physiqueos.canonical_training_records
        WHERE owner_user_id=$1 AND collection_name='trainingPerformanceEvents'
@@ -152,6 +161,8 @@ export function createRepositoryTrainingNavigationReadStore({ repositories } = {
       .find((workout) => workout?.id === recordId) ?? null,
     listHealthKitWorkoutLinks: async () => repositories.healthKitWorkoutLinks?.list?.() ?? [],
     listHealthKitWorkoutLinkClaims: async () => repositories.healthKitWorkoutLinkClaims?.list?.() ?? [],
+    listTrainingExecutionVariantsByExercise: async (canonicalExerciseId) => ((await repositories.trainingExecutionVariants?.list?.()) ?? [])
+      .filter((definition) => definition?.canonicalExerciseId === canonicalExerciseId),
     listTrainingPerformanceEventsByExercise: async (canonicalExerciseId) => (await repositories.trainingPerformanceEvents.listTrainingPerformanceEvents())
       .filter((event) => event.canonicalExerciseId === canonicalExerciseId),
     listTrainingPerformanceEventsBySession: async ({ canonicalId = null, sessionId = null } = {}) => (await repositories.trainingPerformanceEvents.listTrainingPerformanceEvents())

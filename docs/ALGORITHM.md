@@ -469,6 +469,25 @@ reporting, Progress Intelligence, and briefing dependencies must preserve the
 same contract without duplicating sets or fabricating a second exercise
 identity.
 
+Build 92 adds canonical execution-variant definitions
+(`trainingExecutionVariants`, `src/domain/models/trainingExecutionVariantDefinition.js`).
+A definition belongs to exactly one canonical exercise and has an immutable
+`tev_` id, a display name, a Server-normalized `key`, `legacyKeys`, an
+`active`/`retired` status and `system`/`user_created`/`legacy_seed`
+provenance. V1 definitions inherit the exercise's normal sets/reps/load
+semantics; a duration in a label (for example "3-Second Pause") is execution
+intent, never measured telemetry. Ordinary remains the absent-variant sentinel.
+Only definitions are selectable Logger choices (`executionVariantsByExercise`);
+historical freeform variants, including the misfiled legacy "Super Set", never
+become choices. A selected occurrence stores `executionVariant {variantId, key,
+label, rawLabel}`; legacy `{key, label, rawLabel}` occurrences are never
+rewritten. One resolver maps an occurrence to its context identity: the
+same-exercise definition matched by `variantId`, current key or legacy key, else
+the legacy key, else Ordinary. Progression, Performance Records, PR baselines and
+previous-performance lookup partition by that identity, so a rename keeps
+history and a new variant starts with no borrowed evidence. With no definitions
+the resolver reproduces the pre-Build-92 key partition exactly.
+
 The canonical exercise hierarchy lives in `exercises` and `sets`, not in serialized `values[]` JSON. `values[]` may preserve raw supplemental evidence or non-hierarchical fields, but it must not duplicate the exercise tree as a string.
 
 ## Canonical Nutrition Day Evidence

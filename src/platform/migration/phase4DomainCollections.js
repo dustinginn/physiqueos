@@ -28,6 +28,7 @@ export const PHASE4_CANONICAL_DOMAIN_TABLES = Object.freeze({
   trainingPerformanceEventBatches: "canonical_training_records",
   canonicalExerciseLibrary: "canonical_training_records",
   myLibraryMemberships: "canonical_training_records",
+  trainingExecutionVariants: "canonical_training_records",
   dailyBriefings: "canonical_briefing_records",
   briefingReconciliationWorkItems: "canonical_briefing_records",
   confidenceInitializationArtifacts: "canonical_confidence_records",

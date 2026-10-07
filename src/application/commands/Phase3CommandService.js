@@ -38,6 +38,10 @@ export const Phase3Command = Object.freeze({
   SAVE_NUTRITION_STRATEGY: "operating-plan.nutrition-strategy.save.v1",
   ADD_TO_MY_LIBRARY: "training-catalog.my-library.add.v1",
   CREATE_CANONICAL_EXERCISE: "training-catalog.exercise.create.v1",
+  CREATE_TRAINING_EXECUTION_VARIANT: "training-catalog.execution-variant.create.v1",
+  RENAME_TRAINING_EXECUTION_VARIANT: "training-catalog.execution-variant.rename.v1",
+  RETIRE_TRAINING_EXECUTION_VARIANT: "training-catalog.execution-variant.retire.v1",
+  REACTIVATE_TRAINING_EXECUTION_VARIANT: "training-catalog.execution-variant.reactivate.v1",
   SAVE_TRAINING_STRATEGY: "operating-plan.training-strategy.save.v1",
   SAVE_PEPTIDE_SUPPORT: "operating-plan.peptide-support.save.v1",
   SAVE_SUPPLEMENT_SUPPORT: "operating-plan.supplement-support.save.v1",
@@ -91,6 +95,18 @@ const DEFINITIONS = Object.freeze({
   [Phase3Command.ADD_TO_MY_LIBRARY]: define("addToMyLibrary", ["canonicalExerciseId"], false),
   [Phase3Command.CREATE_CANONICAL_EXERCISE]: define(
     "createCanonicalExercise", ["canonicalName", "primaryMuscleGroupId"], false
+  ),
+  [Phase3Command.CREATE_TRAINING_EXECUTION_VARIANT]: define(
+    "createTrainingExecutionVariant", ["canonicalExerciseId", "displayName"], false
+  ),
+  [Phase3Command.RENAME_TRAINING_EXECUTION_VARIANT]: define(
+    "renameTrainingExecutionVariant", ["variantId", "displayName"], false
+  ),
+  [Phase3Command.RETIRE_TRAINING_EXECUTION_VARIANT]: define(
+    "retireTrainingExecutionVariant", ["variantId"], false
+  ),
+  [Phase3Command.REACTIVATE_TRAINING_EXECUTION_VARIANT]: define(
+    "reactivateTrainingExecutionVariant", ["variantId"], false
   ),
   [Phase3Command.SAVE_TRAINING_STRATEGY]: define(
     "saveTrainingStrategy", ["protocolId", "expectedCurrentVersionId", "draft"], false
@@ -200,6 +216,13 @@ function validatePayload(commandType, payload) {
       throw validation("loggerSessionCanonicalId", "No Logger session may be supplied for a no_match resolution.");
     }
   }
+  if ([Phase3Command.CREATE_TRAINING_EXECUTION_VARIANT, Phase3Command.RENAME_TRAINING_EXECUTION_VARIANT].includes(commandType) &&
+      typeof payload.displayName !== "string") {
+    throw validation("displayName", "displayName must be a string.");
+  }
+  if (payload.variantId != null && !/^tev_[a-z0-9_]{6,80}$/.test(String(payload.variantId))) {
+    throw validation("variantId", "variantId must identify a canonical execution variant.");
+  }
   if (payload.exercises != null && (!Array.isArray(payload.exercises) || payload.exercises.length === 0)) throw validation("exercises", "exercises must be a non-empty array.");
   if (payload.supportingEvidenceReviewVersion != null && (!Number.isInteger(Number(payload.supportingEvidenceReviewVersion)) || Number(payload.supportingEvidenceReviewVersion) < 1)) {
     throw validation("supportingEvidenceReviewVersion", "supportingEvidenceReviewVersion must be a positive integer.");
@@ -208,7 +231,7 @@ function validatePayload(commandType, payload) {
   if (payload.draft != null && (!payload.draft || typeof payload.draft !== "object" || Array.isArray(payload.draft))) {
     throw validation("draft", "draft must be an object.");
   }
-  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId", "expectedCurrentVersionId", "canonicalExerciseId", "canonicalName", "primaryMuscleGroupId", "batchId", "loggerSessionCanonicalId"]) {
+  for (const field of ["submissionId", "reviewId", "evidenceObjectId", "priorityId", "protocolId", "goalId", "transitionId", "sessionId", "draftId", "supportingEvidenceReviewId", "executionId", "reminderId", "expectedCurrentVersionId", "canonicalExerciseId", "canonicalName", "primaryMuscleGroupId", "batchId", "loggerSessionCanonicalId", "variantId", "displayName"]) {
     if (payload[field] != null && !String(payload[field]).trim()) throw validation(field, `${field} must be a non-empty identity.`);
   }
 }

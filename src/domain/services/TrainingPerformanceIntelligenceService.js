@@ -8,15 +8,13 @@ import {
   getCanonicalTrainingExerciseSlug,
   resolveTrainingExerciseOccurrenceIdentity,
 } from "../models/trainingExerciseIdentity";
-import {
-  getTrainingExecutionVariantKey,
-  normalizeTrainingExecutionVariant,
-} from "../models/trainingExecutionVariant";
+import { normalizeTrainingExecutionVariant } from "../models/trainingExecutionVariant";
 import {
   deriveTrainingExerciseRelationshipContext,
   getTrainingExerciseRelationshipComparisonKey,
 } from "../models/trainingExerciseRelationship";
 import { isActiveCanonicalEvidenceObject } from "./CanonicalReadModel";
+import { EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER } from "../models/trainingExecutionVariantDefinition.js";
 
 const OBSERVATION_TYPE = "training_performance";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -26,6 +24,10 @@ export function createTrainingPerformanceIntelligenceReport({
   generatedAt = null,
   now = new Date(),
   trainingSessions = [],
+  // Build 92: canonical variant definitions make the PR baseline partition by
+  // stable identity (so a renamed variant keeps its history). The default
+  // empty resolver reproduces the legacy key partition exactly.
+  variantResolver = EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER,
 } = {}) {
   const generatedAtValue = generatedAt ?? toIsoString(now);
   const nowDateKey = getDateKey(now) ?? getDateKey(generatedAtValue);
@@ -37,7 +39,7 @@ export function createTrainingPerformanceIntelligenceReport({
   const exerciseGroups = groupBy(exerciseEntries, (entry) => entry.exerciseKey);
   const exerciseObservations = [...exerciseGroups.entries()]
     .map(([exerciseKey, entries]) =>
-      createExercisePerformanceObservation({ entries, exerciseKey, nowDateKey })
+      createExercisePerformanceObservation({ entries, exerciseKey, nowDateKey, variantResolver })
     )
     .sort((left, right) => left.exercise.name.localeCompare(right.exercise.name));
   const categoryObservations = TRAINING_NAVIGATION_CATEGORIES.map((category) =>
@@ -243,15 +245,21 @@ function normalizeWeight(value) {
   return toFiniteNumber(value);
 }
 
-function createExercisePerformanceObservation({ entries = [], exerciseKey, nowDateKey }) {
+function createExercisePerformanceObservation({
+  entries = [],
+  exerciseKey,
+  nowDateKey,
+  variantResolver = EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER,
+}) {
   const sortedEntries = entries.sort(compareEntries);
   const lastSession = sortedEntries.at(-1);
-  const comparisonVariantKey = getTrainingExecutionVariantKey(
-    lastSession?.executionVariant
+  const comparisonVariantKey = variantResolver.identity(
+    lastSession?.executionVariant,
+    exerciseKey
   );
   const variantComparableEntries = sortedEntries.filter(
     (entry) =>
-      getTrainingExecutionVariantKey(entry.executionVariant) ===
+      variantResolver.identity(entry.executionVariant, exerciseKey) ===
       comparisonVariantKey
   );
   const relationshipComparisonKey = getTrainingExerciseRelationshipComparisonKey(
