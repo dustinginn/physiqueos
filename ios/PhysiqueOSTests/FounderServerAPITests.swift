@@ -1686,11 +1686,17 @@ final class FounderServerAPITests: XCTestCase {
             XCTAssertTrue(text.contains(".founderProduction"), file)
             XCTAssertFalse(text.contains("try?"), "Production errors must not be swallowed: " + file)
         }
-        for file in ["OperatingPlanTrainingProtocolBuilderView.swift", "OperatingPlanDexaAppointmentView.swift"] {
-            let text = try source(file)
-            XCTAssertTrue(text.contains("environment.nativeAuthority == .founderProduction"), file)
-            XCTAssertTrue(text.contains("OperatingPlanUnavailableView"), file)
-        }
+        let builder = try source("OperatingPlanTrainingProtocolBuilderView.swift")
+        XCTAssertTrue(builder.contains("environment.nativeAuthority == .founderProduction"))
+        XCTAssertTrue(builder.contains("productionUnavailableMessage"))
+        // Build 91 (Founder D2): Next DEXA Scan replaced the production dead
+        // end. It reads the Server-named Coaching Updates strategy, fails
+        // closed with Try Again, and never writes or swallows errors.
+        let dexa = try source("OperatingPlanDexaAppointmentView.swift")
+        XCTAssertTrue(dexa.contains("case .founderProduction:"))
+        XCTAssertTrue(dexa.contains("OperatingPlanFailureView("))
+        XCTAssertFalse(dexa.contains("OperatingPlanUnavailableView"))
+        XCTAssertFalse(dexa.contains("try?"), "Production errors must not be swallowed")
         let presentation = try source("OperatingPlanComponents.swift")
         XCTAssertFalse(presentation.contains("OperatingPlanSandboxStore"))
     }

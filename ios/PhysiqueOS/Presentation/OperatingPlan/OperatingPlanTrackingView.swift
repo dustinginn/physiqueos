@@ -23,48 +23,66 @@ struct OperatingPlanTrackingView: View {
         }
     }
 
+    var backTitle: String = "Operating Plan"
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                OperatingPlanScreenHeader(
-                    eyebrow: "TRACKING",
-                    title: "Tracking",
-                    subtitle: "Define the recurring measurements PhysiqueOS uses to understand how your plan is working."
-                )
-                OperatingPlanSection("Current Tracking Routines") {
-                    CardContainer(padding: .md) {
-                        if let tracking {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text(tracking.title)
-                                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                Text(tracking.purpose)
-                                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                OperatingPlanFieldRow(label: "Current Support", value: tracking.currentSupport)
-                                if let nextDue = tracking.nextDue { OperatingPlanFieldRow(label: "Next due", value: nextDue) }
-                                OperatingPlanFieldRow(label: "Completion", value: tracking.completion)
-                                PrimaryActionButton(title: "Edit Support") {
-                                    onNavigate(.operatingPlanTrackingSupport(executionId: tracking.executionId))
-                                }
-                            }
-                        } else if environment.nativeAuthority == .founderProduction, isLoadingProduction {
-                            ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 120)
-                        } else {
-                            Text(loadError ?? "Tracking is unavailable.")
-                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        OperatingPlanScrollPage {
+            OperatingPlanHeader(
+                eyebrow: "Tracking",
+                title: "Tracking",
+                subtitle: "Recurring measurements that keep the evidence current."
+            )
+            if let tracking {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .top, spacing: 12) {
+                        OperatingPlanIconTile(systemImage: OperatingPlanIcon.systemImage(for: "tracking"), tint: OperatingPlanColor.cyan)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Current tracking routine")
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanEyebrow)
+                                .foregroundStyle(OperatingPlanColor.muted)
+                            Text(tracking.title)
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanCardTitle)
+                                .foregroundStyle(OperatingPlanColor.ink)
+                            Text(tracking.currentSupport)
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanCardDetail)
+                                .foregroundStyle(OperatingPlanColor.muted)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
+                        Spacer(minLength: 6)
+                        OperatingPlanStatusPill(text: "Active", tone: .green)
                     }
+                    VStack(alignment: .leading, spacing: 0) {
+                        if let nextDue = tracking.nextDue { OperatingPlanLine("Next due", nextDue) }
+                        OperatingPlanLine("Completion", tracking.completion, detail: "Evidence-owned: no manual check-off", showsRule: false)
+                    }
+                    OperatingPlanButton(title: "Edit Support", style: .quiet) {
+                        OperatingPlanNavigationContext.navigate(.operatingPlanTrackingSupport(executionId: tracking.executionId), from: "Tracking", using: onNavigate)
+                    }
+                    .accessibilityIdentifier("operatingPlan.tracking.editSupport")
                 }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(OperatingPlanColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(OperatingPlanColor.rule, lineWidth: 1))
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("operatingPlan.tracking.routine")
+                Text(tracking.purpose)
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanCaption)
+                    .foregroundStyle(OperatingPlanColor.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
+            } else if environment.nativeAuthority == .founderProduction, isLoadingProduction {
+                OperatingPlanLoadingView()
+            } else {
+                OperatingPlanFailureView(
+                    title: "Tracking couldn't be loaded",
+                    message: loadError == nil ? "Tracking is unavailable." : "Nothing was changed. Check your connection and try again.",
+                    retry: loadError == nil ? nil : { Task { await loadProductionIfNeeded() } }
+                )
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationTitle("Tracking")
-        .navigationBarTitleDisplayMode(.inline)
+        .operatingPlanChrome(back: backTitle)
+        .accessibilityIdentifier("operatingPlan.tracking")
         .task(id: environment.nativeAuthority) { await loadProductionIfNeeded() }
     }
 
@@ -107,11 +125,13 @@ struct OperatingPlanTrackingSupportView: View {
     @State private var isLoadingProduction = false
     @State private var loadError: String?
 
+    var backTitle: String = "Tracking"
+
     var body: some View {
-        ScrollView {
+        OperatingPlanScrollPage {
             if let draft {
-                VStack(alignment: .leading, spacing: 18) {
-                    OperatingPlanScreenHeader(
+                VStack(alignment: .leading, spacing: 0) {
+                    OperatingPlanHeader(
                         eyebrow: draft.title,
                         title: "Edit Support",
                         subtitle: "Set when this measurement is expected and whether Home should remind you. Weight evidence completes it automatically."
@@ -120,7 +140,7 @@ struct OperatingPlanTrackingSupportView: View {
                         get: { draft.supportSchedule },
                         set: { self.draft?.supportSchedule = $0 }
                     ))
-                    OperatingPlanSection("Reminder") {
+                    OperatingPlanGroup("Reminder") {
                         HStack(spacing: 8) {
                             ForEach(OperatingPlanReminderPreference.allCases) { preference in
                                 OperatingPlanChoicePill(title: preference.label, isSelected: draft.reminderPreference == preference) {
@@ -129,30 +149,32 @@ struct OperatingPlanTrackingSupportView: View {
                             }
                         }
                     }
-                    OperatingPlanSection("Execution Notes") {
-                        CardContainer(padding: .sm) {
+                    OperatingPlanGroup("Execution Notes") {
+                        OperatingPlanSurface(verticalPadding: 10) {
                             TextField("Optional notes shown when this priority is opened", text: Binding(
                                 get: { draft.notes }, set: { self.draft?.notes = $0 }
                             ), axis: .vertical)
                             .lineLimit(3...6)
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
+                            .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
                         }
                     }
-                    if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
-                    PrimaryActionButton(title: "Save Support") { save(draft) }
+                    if let errorMessage { OperatingPlanErrorText(message: errorMessage).padding(.top, 16) }
+                    OperatingPlanButton(title: "Save Support", style: .primary) { save(draft) }
+                        .padding(.top, 22)
                         .accessibilityIdentifier("operatingPlan.tracking.save")
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
             } else if environment.nativeAuthority == .founderProduction, isLoadingProduction {
-                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240).padding(.top, 80)
+                OperatingPlanLoadingView()
             } else if environment.nativeAuthority == .founderProduction {
-                OperatingPlanUnavailableView(message: loadError ?? "This support method is unavailable.")
+                OperatingPlanFailureView(
+                    title: "This support method couldn't be loaded",
+                    message: loadError ?? "This support method is unavailable.",
+                    retry: { Task { await loadIfNeeded() } }
+                )
             }
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
+        .operatingPlanChrome(back: backTitle)
+        .accessibilityIdentifier("operatingPlan.trackingSupport")
         .task(id: environment.nativeAuthority) { await loadIfNeeded() }
     }
 

@@ -6,11 +6,25 @@ import SwiftUI
 /// `OperatingPlanStrategyDetailView` never offering an edit destination for
 /// it). Founder Production uses each domain's canonical API and concurrency
 /// model; OperatingPlanSandboxStore is used only under Sandbox authority.
+///
+/// Build 91: the locked editor grammar ("‹ Cancel" crumb, one title, line
+/// fields, one Save). Save semantics are unchanged: `expectedCurrentVersionId`
+/// on every production save, stale saves fail closed, no confirmation step.
+/// Next DEXA Scan opens Coaching Updates with `anchor: .dexa`, which scrolls
+/// to and marks the DEXA section; it is the same atomic editor and Save.
 struct OperatingPlanStrategyEditorView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     let strategyType: String
     let strategyId: String
+    /// Captured once: a later re-render of the router never re-anchors.
+    @State private var anchor: OperatingPlanNavigationContext.EditorAnchor?
+
+    init(strategyType: String, strategyId: String, anchor: OperatingPlanNavigationContext.EditorAnchor? = nil) {
+        self.strategyType = strategyType
+        self.strategyId = strategyId
+        _anchor = State(initialValue: anchor)
+    }
 
     var body: some View {
         Group {
@@ -20,18 +34,38 @@ struct OperatingPlanStrategyEditorView: View {
             case "training":
                 TrainingStrategyEditor(strategyId: strategyId, store: environment.operatingPlanStore, onSaved: { dismiss() })
             case "briefings":
-                CoachingUpdatesEditor(strategyId: strategyId, store: environment.operatingPlanStore, onSaved: { dismiss() })
+                CoachingUpdatesEditor(strategyId: strategyId, store: environment.operatingPlanStore, anchor: anchor, onSaved: { dismiss() })
             default:
-                OperatingPlanUnavailableView(message: "This strategy cannot be edited.")
+                OperatingPlanScrollPage {
+                    OperatingPlanFailureView(title: "Unavailable", message: "This strategy cannot be edited.")
+                }
             }
         }
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancel") { dismiss() }
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+        .operatingPlanChrome(back: "Cancel")
+        .accessibilityIdentifier("operatingPlan.editor.\(strategyType)")
+    }
+}
+
+/// A labelled editor control row (label column + control) in line grammar.
+private struct EditorControlLine<Control: View>: View {
+    let label: String
+    var showsRule = true
+    @ViewBuilder var control: Control
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                Text(label)
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldLabel)
+                    .foregroundStyle(OperatingPlanColor.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                control
+            }
+            .padding(.vertical, 6)
+            .frame(minHeight: 44)
+            if showsRule {
+                Rectangle().fill(OperatingPlanColor.rule).frame(height: 1).accessibilityHidden(true)
             }
         }
     }
@@ -53,71 +87,61 @@ private struct NutritionStrategyEditor: View {
     private var isProduction: Bool { environment.nativeAuthority == .founderProduction }
 
     var body: some View {
-        ScrollView {
+        OperatingPlanScrollPage {
             if isProduction, isLoadingProduction, model == nil {
-                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+                OperatingPlanLoadingView()
             } else if let model, !isProduction || expectedCurrentVersionId != nil {
-                VStack(alignment: .leading, spacing: 18) {
-                    OperatingPlanScreenHeader(eyebrow: "Nutrition", title: "Edit Strategy", subtitle: "Macro targets that translate the Energy strategy into daily nutrition.")
+                OperatingPlanHeader(eyebrow: "Nutrition", title: "Edit Strategy", subtitle: "Macro targets that translate the Energy strategy into daily nutrition.")
 
-                    OperatingPlanSection("Protein Basis") {
-                        HStack(spacing: 8) {
-                            ForEach(ProteinBasis.allCases) { basis in
-                                OperatingPlanChoicePill(title: basis.label, isSelected: model.proteinBasis == basis) {
-                                    self.model?.proteinBasis = basis
-                                }
-                            }
-                        }
-                        if model.proteinBasis == .bodyWeight {
-                            CardContainer(padding: .sm) {
-                                Stepper(value: Binding(get: { model.proteinRatio }, set: { self.model?.proteinRatio = $0 }), in: 0.5...2.0, step: 0.1) {
-                                    Text("\(model.proteinRatio, specifier: "%.1f") g per lb bodyweight")
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                }
-                            }
-                        } else {
-                            CardContainer(padding: .sm) {
-                                Stepper(value: Binding(get: { model.fixedProteinGrams }, set: { self.model?.fixedProteinGrams = $0 }), in: 50...400, step: 5) {
-                                    Text("\(Int(model.fixedProteinGrams)) g")
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                }
-                            }
+                OperatingPlanGroupTitle("Protein Basis")
+                HStack(spacing: 8) {
+                    ForEach(ProteinBasis.allCases) { basis in
+                        OperatingPlanChoicePill(title: basis.label, isSelected: model.proteinBasis == basis) {
+                            self.model?.proteinBasis = basis
                         }
                     }
-
-                    OperatingPlanSection("Carbohydrate Approach") {
-                        HStack(spacing: 8) {
-                            ForEach(CarbohydrateStrategy.allCases) { strategy in
-                                OperatingPlanChoicePill(title: strategy.label, isSelected: model.carbohydrateStrategy == strategy) {
-                                    self.model?.carbohydrateStrategy = strategy
-                                }
-                            }
-                        }
-                    }
-
-                    OperatingPlanSection("Fat Approach") {
-                        HStack(spacing: 8) {
-                            ForEach(FatStrategy.allCases) { strategy in
-                                OperatingPlanChoicePill(title: strategy.label, isSelected: model.fatStrategy == strategy) {
-                                    self.model?.fatStrategy = strategy
-                                }
-                            }
-                        }
-                    }
-
-                    if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
-                    PrimaryActionButton(title: "Save Strategy") { save(model) }
-                        .accessibilityIdentifier("operatingPlan.nutrition.save")
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+                OperatingPlanSurface(verticalPadding: 6) {
+                    if model.proteinBasis == .bodyWeight {
+                        Stepper(value: Binding(get: { model.proteinRatio }, set: { self.model?.proteinRatio = $0 }), in: 0.5...2.0, step: 0.1) {
+                            Text("\(model.proteinRatio, specifier: "%.1f") g per lb bodyweight")
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                .foregroundStyle(OperatingPlanColor.ink)
+                        }
+                        .frame(minHeight: 44)
+                    } else {
+                        Stepper(value: Binding(get: { model.fixedProteinGrams }, set: { self.model?.fixedProteinGrams = $0 }), in: 50...400, step: 5) {
+                            Text("\(Int(model.fixedProteinGrams)) g")
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                .foregroundStyle(OperatingPlanColor.ink)
+                        }
+                        .frame(minHeight: 44)
+                    }
+                }
+                .padding(.top, 10)
+
+                OperatingPlanGroupTitle("Carbohydrate Approach")
+                FlowPills(items: CarbohydrateStrategy.allCases, isSelected: { model.carbohydrateStrategy == $0 }, label: \.label) {
+                    self.model?.carbohydrateStrategy = $0
+                }
+
+                OperatingPlanGroupTitle("Fat Approach")
+                FlowPills(items: FatStrategy.allCases, isSelected: { model.fatStrategy == $0 }, label: \.label) {
+                    self.model?.fatStrategy = $0
+                }
+
+                if let errorMessage { OperatingPlanErrorText(message: errorMessage).padding(.top, 16) }
+                OperatingPlanButton(title: "Save Strategy", style: .primary) { save(model) }
+                    .padding(.top, 22)
+                    .accessibilityIdentifier("operatingPlan.nutrition.save")
             } else {
-                OperatingPlanUnavailableView(message: isProduction ? (loadError ?? "This strategy is unavailable.") : "This strategy is unavailable.")
+                OperatingPlanFailureView(
+                    title: "This strategy couldn't be loaded",
+                    message: isProduction ? (loadError ?? "This strategy is unavailable.") : "This strategy is unavailable.",
+                    retry: isProduction && loadError != nil ? { Task { await loadIfNeeded() } } : nil
+                )
             }
         }
-        .physiqueOSScrollBottomClearance()
         .task(id: "\(strategyId):\(environment.nativeAuthority)") { await loadIfNeeded() }
     }
 
@@ -151,7 +175,7 @@ private struct NutritionStrategyEditor: View {
             )
         } catch {
             model = nil
-            loadError = "This strategy couldn't be loaded. Pull to refresh or try again."
+            loadError = "Nothing was changed. Check your connection and try again."
         }
     }
 
@@ -203,67 +227,69 @@ private struct TrainingStrategyEditor: View {
     private var isProduction: Bool { environment.nativeAuthority == .founderProduction }
 
     var body: some View {
-        ScrollView {
+        OperatingPlanScrollPage {
             if isProduction, isLoadingProduction, model == nil {
-                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+                OperatingPlanLoadingView()
             } else if let model, !isProduction || expectedCurrentVersionId != nil {
-                VStack(alignment: .leading, spacing: 18) {
-                    OperatingPlanScreenHeader(eyebrow: "Training", title: "Edit Strategy", subtitle: "Weekly structure and progression intent for the current phase.")
+                OperatingPlanHeader(eyebrow: "Training", title: "Edit Strategy", subtitle: "Weekly structure and progression intent for the current phase.")
 
-                    OperatingPlanSection("Weekly Frequency") {
-                        VStack(spacing: 7) {
-                            ForEach(model.frequencies.indices, id: \.self) { index in
-                                CardContainer(padding: .sm) {
-                                    Stepper(value: Binding(
-                                        get: { self.model?.frequencies[index].count ?? 0 },
-                                        set: { self.model?.frequencies[index].count = $0 }
-                                    ), in: 0...7) {
-                                        HStack {
-                                            Text(model.frequencies[index].area.label)
-                                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                                            Spacer()
-                                            Text("\(model.frequencies[index].count)x / week")
-                                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                        }
-                                    }
+                OperatingPlanGroupTitle("Weekly Frequency")
+                OperatingPlanSurface {
+                    ForEach(model.frequencies.indices, id: \.self) { index in
+                        VStack(spacing: 0) {
+                            Stepper(value: Binding(
+                                get: { self.model?.frequencies[index].count ?? 0 },
+                                set: { self.model?.frequencies[index].count = $0 }
+                            ), in: 0...7) {
+                                HStack {
+                                    Text(model.frequencies[index].area.label)
+                                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                        .foregroundStyle(OperatingPlanColor.ink)
+                                    Spacer()
+                                    Text("\(model.frequencies[index].count)x / week")
+                                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                                        .foregroundStyle(OperatingPlanColor.muted)
                                 }
                             }
-                        }
-                    }
-
-                    OperatingPlanSection("Training Focus") {
-                        FlowPills(items: TrainingStrategyArea.allCases, isSelected: { model.priorities.contains($0) }, label: \.label) { area in
-                            if let index = self.model?.priorities.firstIndex(of: area) {
-                                self.model?.priorities.remove(at: index)
-                            } else {
-                                self.model?.priorities.append(area)
+                            .padding(.vertical, 6)
+                            .frame(minHeight: 44)
+                            if index < model.frequencies.count - 1 {
+                                Rectangle().fill(OperatingPlanColor.rule).frame(height: 1).accessibilityHidden(true)
                             }
                         }
                     }
-
-                    OperatingPlanSection("Progression") {
-                        HStack(spacing: 8) {
-                            ForEach(ProgressionPace.allCases) { pace in
-                                OperatingPlanChoicePill(title: pace.label, isSelected: model.progression == pace) {
-                                    self.model?.progression = pace
-                                }
-                            }
-                        }
-                    }
-
-                    if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
-                    PrimaryActionButton(title: "Save Strategy") { save(model) }
-                        .accessibilityIdentifier("operatingPlan.training.save")
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+
+                OperatingPlanGroupTitle("Training Focus")
+                FlowPills(items: TrainingStrategyArea.allCases, isSelected: { model.priorities.contains($0) }, label: \.label) { area in
+                    if let index = self.model?.priorities.firstIndex(of: area) {
+                        self.model?.priorities.remove(at: index)
+                    } else {
+                        self.model?.priorities.append(area)
+                    }
+                }
+
+                OperatingPlanGroupTitle("Progression")
+                HStack(spacing: 8) {
+                    ForEach(ProgressionPace.allCases) { pace in
+                        OperatingPlanChoicePill(title: pace.label, isSelected: model.progression == pace) {
+                            self.model?.progression = pace
+                        }
+                    }
+                }
+
+                if let errorMessage { OperatingPlanErrorText(message: errorMessage).padding(.top, 16) }
+                OperatingPlanButton(title: "Save Strategy", style: .primary) { save(model) }
+                    .padding(.top, 22)
+                    .accessibilityIdentifier("operatingPlan.training.save")
             } else {
-                OperatingPlanUnavailableView(message: isProduction ? (loadError ?? "This strategy is unavailable.") : "This strategy is unavailable.")
+                OperatingPlanFailureView(
+                    title: "This strategy couldn't be loaded",
+                    message: isProduction ? (loadError ?? "This strategy is unavailable.") : "This strategy is unavailable.",
+                    retry: isProduction && loadError != nil ? { Task { await loadIfNeeded() } } : nil
+                )
             }
         }
-        .physiqueOSScrollBottomClearance()
         .task(id: "\(strategyId):\(environment.nativeAuthority)") { await loadIfNeeded() }
     }
 
@@ -295,7 +321,7 @@ private struct TrainingStrategyEditor: View {
             )
         } catch {
             model = nil
-            loadError = "This strategy couldn't be loaded. Pull to refresh or try again."
+            loadError = "Nothing was changed. Check your connection and try again."
         }
     }
 
@@ -333,6 +359,7 @@ private struct CoachingUpdatesEditor: View {
     @Environment(AppEnvironment.self) private var environment
     let strategyId: String
     let store: OperatingPlanSandboxStore
+    let anchor: OperatingPlanNavigationContext.EditorAnchor?
     let onSaved: () -> Void
 
     @State private var model: CoachingUpdatesEditorReadModel?
@@ -343,114 +370,160 @@ private struct CoachingUpdatesEditor: View {
     @State private var isSaving = false
     @State private var loadError: String?
     @State private var errorMessage: String?
+    @State private var hasScrolledToAnchor = false
 
     private var isProduction: Bool { environment.nativeAuthority == .founderProduction }
 
+    static let dexaSectionId = "operatingPlan.coaching.section.dexa"
+
     var body: some View {
-        ScrollView {
-            if isProduction, isLoadingProduction, model == nil {
-                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
-            } else if let model, !isProduction || productionDetail != nil {
-                VStack(alignment: .leading, spacing: 18) {
-                    OperatingPlanScreenHeader(eyebrow: "Coaching Updates", title: "Edit Coaching Updates", subtitle: "How and when PhysiqueOS synthesizes progress into a readable update.")
+        ScrollViewReader { proxy in
+            OperatingPlanScrollPage {
+                if isProduction, isLoadingProduction, model == nil {
+                    OperatingPlanLoadingView()
+                } else if let model, !isProduction || productionDetail != nil {
+                    OperatingPlanHeader(
+                        eyebrow: "Coaching Updates",
+                        title: "Edit Coaching Updates",
+                        subtitle: anchor == .dexa
+                            ? "Opened at DEXA. Midweek, Weekly, Monthly and Progress Photos are above and save together."
+                            : "How and when PhysiqueOS synthesizes progress into a readable update."
+                    )
 
                     cadenceSection("Midweek Calibration", schedule: Binding(get: { model.midweek }, set: { self.model?.midweek = $0 }))
                     cadenceSection("Weekly Synthesis", schedule: Binding(get: { model.weekly }, set: { self.model?.weekly = $0 }))
 
-                    OperatingPlanSection("Monthly Review") {
-                        CardContainer(padding: .sm) {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Toggle("Enabled", isOn: Binding(get: { model.monthly.enabled }, set: { self.model?.monthly.enabled = $0 }))
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy).tint(PhysiqueOSTheme.accent)
-                                OperatingPlanFieldRow(label: "Monthly Delivery Rule", value: "Day \(model.monthly.dayOfMonth) of each month")
-                                exactTimePicker(label: "Preferred delivery time", value: Binding(get: { model.monthly.localTime }, set: { self.model?.monthly.localTime = $0 }))
-                            }
+                    OperatingPlanGroupTitle("Monthly Review")
+                    OperatingPlanSurface {
+                        OperatingPlanToggleLine(title: "Enabled", isOn: Binding(get: { model.monthly.enabled }, set: { self.model?.monthly.enabled = $0 }))
+                        OperatingPlanLine("Monthly delivery rule", "Day \(model.monthly.dayOfMonth) of each month")
+                        exactTimePicker(label: "Preferred delivery time", value: Binding(get: { model.monthly.localTime }, set: { self.model?.monthly.localTime = $0 }), showsRule: false)
+                    }
+
+                    OperatingPlanGroupTitle("Progress Photos")
+                    OperatingPlanSurface(verticalPadding: 10) {
+                        Text("Choose when you plan to take progress photos, whether Home should remind you, and whether completed photo sessions should generate a Photo Event review.")
+                            .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                            .foregroundStyle(OperatingPlanColor.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.bottom, 6)
+                        progressPhotoCadenceFields(model.photos)
+                        EditorControlLine(label: "Preferred time") {
+                            Picker("Preferred time", selection: Binding(get: { model.photos.timeOfDay }, set: { choice in
+                                self.model?.photos.timeOfDay = choice
+                                // The picker below shows 08:00 for an unset time; persist
+                                // what is shown rather than sending no time at all.
+                                if choice == .specific, self.model?.photos.specificTime == nil { self.model?.photos.specificTime = "08:00" }
+                            })) {
+                                ForEach(TimeOfDayChoice.allCases) { Text($0.label).tag($0) }
+                            }.pickerStyle(.menu).tint(OperatingPlanColor.teal)
                         }
-                    }
-
-                    OperatingPlanSection("Progress Photos") {
-                        CardContainer(padding: .sm) {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Choose when you plan to take progress photos, whether Home should remind you, and whether completed photo sessions should generate a Photo Event review.")
-                                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                progressPhotoCadenceFields(model.photos)
-                                Picker("Preferred time", selection: Binding(get: { model.photos.timeOfDay }, set: { choice in
-                                    self.model?.photos.timeOfDay = choice
-                                    // The picker below shows 08:00 for an unset time; persist
-                                    // what is shown rather than sending no time at all.
-                                    if choice == .specific, self.model?.photos.specificTime == nil { self.model?.photos.specificTime = "08:00" }
-                                })) {
-                                    ForEach(TimeOfDayChoice.allCases) { Text($0.label).tag($0) }
-                                }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
-                                if model.photos.timeOfDay == .specific {
-                                    exactTimePicker(label: "Specific time", value: Binding(
-                                        get: { model.photos.specificTime ?? "08:00" },
-                                        set: { self.model?.photos.specificTime = $0 }
-                                    ))
-                                }
-                                progressPhotoSummary(model.photos)
-                                Divider().overlay(PhysiqueOSTheme.divider)
-                                Toggle("Remind me about Progress Photos", isOn: Binding(get: { model.photos.reminderEnabled }, set: { self.model?.photos.reminderEnabled = $0 }))
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy).tint(PhysiqueOSTheme.accent)
-                                Toggle("Enable Photo Event briefing", isOn: Binding(get: { model.photoEventBriefingEnabled }, set: { self.model?.photoEventBriefingEnabled = $0 }))
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy).tint(PhysiqueOSTheme.accent)
-                            }
+                        if model.photos.timeOfDay == .specific {
+                            exactTimePicker(label: "Specific time", value: Binding(
+                                get: { model.photos.specificTime ?? "08:00" },
+                                set: { self.model?.photos.specificTime = $0 }
+                            ))
                         }
+                        progressPhotoSummary(model.photos)
+                        OperatingPlanToggleLine(title: "Remind me about Progress Photos", isOn: Binding(get: { model.photos.reminderEnabled }, set: { self.model?.photos.reminderEnabled = $0 }))
+                        OperatingPlanToggleLine(title: "Enable Photo Event briefing", isOn: Binding(get: { model.photoEventBriefingEnabled }, set: { self.model?.photoEventBriefingEnabled = $0 }), showsRule: false)
                     }
 
-                    OperatingPlanSection("DEXA") {
-                        CardContainer(padding: .sm) {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Schedule your next scan and choose the in-app reminders that support it.")
-                                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium).foregroundStyle(PhysiqueOSTheme.textSecondary)
-                                DateField(date: Binding(
-                                    get: { OperatingPlanDateValues.date(from: model.dexa.plannedDate) },
-                                    set: { self.model?.dexa.plannedDate = OperatingPlanDateValues.dateKey(from: $0) }
-                                ), maximumDate: .distantFuture, minimumDate: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())), label: "Next scan date")
-                                exactTimePicker(label: "Time", value: Binding(get: { model.dexa.localTime }, set: { self.model?.dexa.localTime = $0 }))
-                                TextField("Preparation note (optional)", text: Binding(get: { model.dexa.preparationNote }, set: { self.model?.dexa.preparationNote = $0 }), axis: .vertical)
-                                    .lineLimit(2...5).textFieldStyle(.roundedBorder)
-                                Divider().overlay(PhysiqueOSTheme.divider)
-                                ForEach(DexaReminderPreference.allCases) { preference in
-                                    Toggle(preference.label, isOn: Binding(
-                                        get: { model.dexa.reminderPreferences.contains(preference) },
-                                        set: { enabled in
-                                            if enabled, !(self.model?.dexa.reminderPreferences.contains(preference) ?? false) {
-                                                self.model?.dexa.reminderPreferences.append(preference)
-                                            } else if !enabled {
-                                                self.model?.dexa.reminderPreferences.removeAll { $0 == preference }
-                                            }
-                                        }
-                                    ))
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy).tint(PhysiqueOSTheme.accent)
-                                }
-                                Toggle("Remind me to upload results after the appointment", isOn: Binding(get: { model.dexa.uploadReminder }, set: { self.model?.dexa.uploadReminder = $0 }))
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy).tint(PhysiqueOSTheme.accent)
-                                Toggle("Enable DEXA Event briefing", isOn: Binding(get: { model.dexaEventBriefingEnabled }, set: { self.model?.dexaEventBriefingEnabled = $0 }))
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy).tint(PhysiqueOSTheme.accent)
-                            }
-                        }
-                    }
+                    dexaSection(model)
+                        .id(Self.dexaSectionId)
 
-                    OperatingPlanSection("Notifications") {
-                        Text("Enabled briefings notify you when the canonical update is published. iOS notification permission controls delivery.")
-                            .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
+                    OperatingPlanGroupTitle("Notifications")
+                    Text("Enabled briefings notify you when the canonical update is published. iOS notification permission controls delivery.")
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                        .foregroundStyle(OperatingPlanColor.muted)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
-                    PrimaryActionButton(title: isSaving ? "Saving Coaching Updates…" : "Save Coaching Updates") { save(model) }
-                        .disabled(isSaving)
+                    if let errorMessage { OperatingPlanErrorText(message: errorMessage).padding(.top, 16) }
+                    OperatingPlanButton(title: isSaving ? "Saving Coaching Updates…" : "Save Coaching Updates", style: .navy, isEnabled: !isSaving) { save(model) }
+                        .padding(.top, 22)
                         .accessibilityIdentifier("operatingPlan.coaching.save")
+                } else {
+                    OperatingPlanFailureView(
+                        title: "Coaching Updates couldn't be loaded",
+                        message: loadError ?? "Coaching Updates are unavailable.",
+                        retry: loadError == nil ? nil : { Task { await load() } }
+                    )
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-            } else {
-                OperatingPlanUnavailableView(message: loadError ?? "Coaching Updates are unavailable.")
+            }
+            .onChange(of: model != nil) { _, loaded in
+                guard loaded, anchor == .dexa, !hasScrolledToAnchor else { return }
+                hasScrolledToAnchor = true
+                // After this layout pass, so the section exists to scroll to.
+                Task { @MainActor in
+                    withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(Self.dexaSectionId, anchor: .top) }
+                }
             }
         }
-        .physiqueOSScrollBottomClearance()
         .task(id: "\(strategyId):\(environment.nativeAuthority)") { await load() }
+    }
+
+    @ViewBuilder
+    private func dexaSection(_ model: CoachingUpdatesEditorReadModel) -> some View {
+        let anchored = anchor == .dexa
+        VStack(alignment: .leading, spacing: 0) {
+            OperatingPlanGroupTitle("DEXA") {
+                if anchored {
+                    Text("From Next DEXA Scan")
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanPill)
+                        .foregroundStyle(OperatingPlanColor.amber)
+                        .accessibilityIdentifier("operatingPlan.coaching.dexa.anchored")
+                }
+            }
+            OperatingPlanSurface(tone: anchored ? .amber : .paper, verticalPadding: 10) {
+                Text("Schedule your next scan and choose the in-app reminders that support it.")
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                    .foregroundStyle(OperatingPlanColor.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 6)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Next scan date")
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldLabel)
+                        .foregroundStyle(OperatingPlanColor.muted)
+                    DateField(date: Binding(
+                        get: { OperatingPlanDateValues.date(from: model.dexa.plannedDate) },
+                        set: { self.model?.dexa.plannedDate = OperatingPlanDateValues.dateKey(from: $0) }
+                    ), maximumDate: .distantFuture, minimumDate: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())), label: "Next scan date")
+                }
+                .padding(.vertical, 8)
+                Rectangle().fill(OperatingPlanColor.rule).frame(height: 1).accessibilityHidden(true)
+                exactTimePicker(label: "Time", value: Binding(get: { model.dexa.localTime }, set: { self.model?.dexa.localTime = $0 }))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Preparation note (optional)")
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldLabel)
+                        .foregroundStyle(OperatingPlanColor.muted)
+                    TextField("Preparation note (optional)", text: Binding(get: { model.dexa.preparationNote }, set: { self.model?.dexa.preparationNote = $0 }), axis: .vertical)
+                        .lineLimit(2...5)
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                        .foregroundStyle(OperatingPlanColor.ink)
+                        .padding(10)
+                        .background(OperatingPlanColor.raised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .accessibilityIdentifier("operatingPlan.coaching.dexa.note")
+                }
+                .padding(.vertical, 10)
+                Rectangle().fill(OperatingPlanColor.rule).frame(height: 1).accessibilityHidden(true)
+                ForEach(DexaReminderPreference.allCases) { preference in
+                    OperatingPlanToggleLine(title: preference.label, isOn: Binding(
+                        get: { model.dexa.reminderPreferences.contains(preference) },
+                        set: { enabled in
+                            if enabled, !(self.model?.dexa.reminderPreferences.contains(preference) ?? false) {
+                                self.model?.dexa.reminderPreferences.append(preference)
+                            } else if !enabled {
+                                self.model?.dexa.reminderPreferences.removeAll { $0 == preference }
+                            }
+                        }
+                    ))
+                }
+                OperatingPlanToggleLine(title: "Remind me to upload results after the appointment", isOn: Binding(get: { model.dexa.uploadReminder }, set: { self.model?.dexa.uploadReminder = $0 }))
+                OperatingPlanToggleLine(title: "Enable DEXA Event briefing", isOn: Binding(get: { model.dexaEventBriefingEnabled }, set: { self.model?.dexaEventBriefingEnabled = $0 }), showsRule: false)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("operatingPlan.coaching.dexa")
     }
 
     @MainActor
@@ -473,7 +546,7 @@ private struct CoachingUpdatesEditor: View {
             } catch {
                 productionDetail = nil
                 model = nil
-                loadError = "Coaching Updates couldn't be loaded. Try again."
+                loadError = "Nothing was changed. Check your connection and try again."
             }
         }
     }
@@ -529,10 +602,11 @@ private struct CoachingUpdatesEditor: View {
             set: { self.model?.photos.cadenceInterval = min(max($0, CoachingProgressPhotosReadModel.intervalRange.lowerBound), CoachingProgressPhotosReadModel.intervalRange.upperBound) }
         ), in: CoachingProgressPhotosReadModel.intervalRange) {
             Text("Every \(photos.cadenceInterval) \(photos.cadenceUnit.label(for: photos.cadenceInterval))")
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                .foregroundStyle(OperatingPlanColor.ink)
                 .contentTransition(.numericText())
         }
+        .frame(minHeight: 44)
         .accessibilityIdentifier("operatingPlan.coaching.photos.interval")
         Picker("Unit", selection: Binding(
             get: { photos.cadenceUnit },
@@ -544,35 +618,36 @@ private struct CoachingUpdatesEditor: View {
             ForEach(ProgressPhotoCadenceUnit.allCases) { Text($0.pluralLabel).tag($0) }
         }
         .pickerStyle(.segmented)
+        .padding(.vertical, 6)
         .accessibilityIdentifier("operatingPlan.coaching.photos.unit")
-        HStack(spacing: 0) {
-            Text(photos.cadenceUnit == .month ? "On the" : "On")
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
-            if photos.cadenceUnit == .month {
-                Picker("Week of the month", selection: Binding(get: { photos.weekOfMonth ?? .first }, set: { self.model?.photos.weekOfMonth = $0 })) {
-                    ForEach(ProgressPhotoWeekOfMonth.allCases) { Text($0.label).tag($0) }
-                }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
-                .accessibilityIdentifier("operatingPlan.coaching.photos.weekOfMonth")
+        EditorControlLine(label: photos.cadenceUnit == .month ? "On the" : "On") {
+            HStack(spacing: 0) {
+                if photos.cadenceUnit == .month {
+                    Picker("Week of the month", selection: Binding(get: { photos.weekOfMonth ?? .first }, set: { self.model?.photos.weekOfMonth = $0 })) {
+                        ForEach(ProgressPhotoWeekOfMonth.allCases) { Text($0.label).tag($0) }
+                    }.pickerStyle(.menu).tint(OperatingPlanColor.teal)
+                    .accessibilityIdentifier("operatingPlan.coaching.photos.weekOfMonth")
+                }
+                Picker("Preferred day", selection: Binding(get: { photos.day }, set: { self.model?.photos.day = $0 })) {
+                    ForEach(OperatingPlanWeekday.allCases) { Text($0.label).tag($0) }
+                }.pickerStyle(.menu).tint(OperatingPlanColor.teal)
             }
-            Picker("Preferred day", selection: Binding(get: { photos.day }, set: { self.model?.photos.day = $0 })) {
-                ForEach(OperatingPlanWeekday.allCases) { Text($0.label).tag($0) }
-            }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
-            Spacer(minLength: 0)
         }
     }
 
     private func progressPhotoSummary(_ photos: CoachingProgressPhotosReadModel) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(photos.cadenceSummary)
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                .foregroundStyle(OperatingPlanColor.ink)
             if let next = progressPhotoNextDate(photos) {
                 Text(next)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                    .foregroundStyle(OperatingPlanColor.muted)
             }
         }
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("operatingPlan.coaching.photos.summary")
     }
@@ -586,27 +661,29 @@ private struct CoachingUpdatesEditor: View {
     }
 
     private func cadenceSection(_ title: String, schedule: Binding<CoachingUpdateScheduleReadModel>) -> some View {
-        OperatingPlanSection(title) {
-            CardContainer(padding: .sm) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Toggle("Enabled", isOn: Binding(get: { schedule.wrappedValue.enabled }, set: { schedule.wrappedValue.enabled = $0 }))
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy).tint(PhysiqueOSTheme.accent)
+        VStack(alignment: .leading, spacing: 0) {
+            OperatingPlanGroupTitle(title)
+            OperatingPlanSurface {
+                OperatingPlanToggleLine(title: "Enabled", isOn: Binding(get: { schedule.wrappedValue.enabled }, set: { schedule.wrappedValue.enabled = $0 }))
+                EditorControlLine(label: "Day of week") {
                     Picker("Day of week", selection: Binding(get: { schedule.wrappedValue.day }, set: { schedule.wrappedValue.day = $0 })) {
                         ForEach(OperatingPlanWeekday.allCases) { Text($0.label).tag($0) }
-                    }.pickerStyle(.menu).tint(PhysiqueOSTheme.accent)
-                    exactTimePicker(label: "Preferred delivery time", value: Binding(get: { schedule.wrappedValue.localTime }, set: { schedule.wrappedValue.localTime = $0 }))
+                    }.pickerStyle(.menu).tint(OperatingPlanColor.teal)
                 }
+                exactTimePicker(label: "Preferred delivery time", value: Binding(get: { schedule.wrappedValue.localTime }, set: { schedule.wrappedValue.localTime = $0 }), showsRule: false)
             }
         }
     }
 
-    private func exactTimePicker(label: String, value: Binding<String>) -> some View {
-        DatePicker(label, selection: Binding(
-            get: { OperatingPlanDateValues.time(from: value.wrappedValue) },
-            set: { value.wrappedValue = OperatingPlanDateValues.timeKey(from: $0) }
-        ), displayedComponents: .hourAndMinute)
-        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-        .tint(PhysiqueOSTheme.accent)
+    private func exactTimePicker(label: String, value: Binding<String>, showsRule: Bool = true) -> some View {
+        EditorControlLine(label: label, showsRule: showsRule) {
+            DatePicker(label, selection: Binding(
+                get: { OperatingPlanDateValues.time(from: value.wrappedValue) },
+                set: { value.wrappedValue = OperatingPlanDateValues.timeKey(from: $0) }
+            ), displayedComponents: .hourAndMinute)
+            .labelsHidden()
+            .tint(OperatingPlanColor.teal)
+        }
     }
 }
 
@@ -618,10 +695,10 @@ struct FlowPills<Item: Hashable>: View {
     let label: KeyPath<Item, String>
     let toggle: (Item) -> Void
 
-    private let columns = [GridItem(.adaptive(minimum: 84), spacing: 8)]
+    @ScaledMetric(relativeTo: .body) private var minimum: CGFloat = 96
 
     var body: some View {
-        LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: minimum), spacing: 8)], alignment: .leading, spacing: 8) {
             ForEach(items, id: \.self) { item in
                 OperatingPlanChoicePill(title: item[keyPath: label], isSelected: isSelected(item)) { toggle(item) }
             }

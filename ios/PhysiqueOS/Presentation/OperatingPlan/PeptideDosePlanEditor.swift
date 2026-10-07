@@ -22,16 +22,16 @@ struct PeptideDosePlanEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            OperatingPlanSection("How the dose changes") {
+            OperatingPlanGroup("How the dose changes") {
                 if dosing.pattern == .custom {
-                    CardContainer(padding: .sm) {
+                    OperatingPlanSurface(verticalPadding: 10) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Manual plan")
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                .foregroundStyle(OperatingPlanColor.ink)
                             Text("This plan was written by hand and can't be edited here. Start a new plan from today to replace it.")
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                                .foregroundStyle(OperatingPlanColor.muted)
                         }
                     }
                 } else {
@@ -46,8 +46,8 @@ struct PeptideDosePlanEditor: View {
             }
 
             if dosing.pattern != .custom {
-                OperatingPlanSection("Starting dose") {
-                    CardContainer(padding: .sm) {
+                OperatingPlanGroup("Starting dose") {
+                    OperatingPlanSurface(verticalPadding: 10) {
                         VStack(alignment: .leading, spacing: 10) {
                             doseStepper(label: "Starting dose", value: $dosing.startingDoseAmount, unit: dosing.startingDoseUnit)
                             TextField("Unit", text: $dosing.startingDoseUnit)
@@ -59,7 +59,7 @@ struct PeptideDosePlanEditor: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Starts")
                             .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.textMuted)
+                            .foregroundStyle(OperatingPlanColor.muted)
                         DateField(date: Binding(
                             get: { OperatingPlanDateValues.date(from: dosing.startDate) },
                             set: { dosing.startDate = OperatingPlanDateValues.dateKey(from: $0) }
@@ -67,35 +67,35 @@ struct PeptideDosePlanEditor: View {
                         if rewritesHistory, original.map({ $0 != dosing }) ?? true {
                             Text("Rewrites your dose history before today")
                                 .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.chartEffort)
+                                .foregroundStyle(OperatingPlanColor.amber)
                         }
                     }
                 }
             }
 
             if dosing.pattern.usesTarget {
-                OperatingPlanSection("Peak dose") {
-                    CardContainer(padding: .sm) {
+                OperatingPlanGroup("Peak dose") {
+                    OperatingPlanSurface(verticalPadding: 10) {
                         doseStepper(label: "Peak dose", value: $dosing.targetDoseAmount, unit: dosing.startingDoseUnit)
                     }
                 }
             }
 
             if dosing.pattern.usesStep {
-                OperatingPlanSection("Change by") {
-                    CardContainer(padding: .sm) {
+                OperatingPlanGroup("Change by") {
+                    OperatingPlanSurface(verticalPadding: 10) {
                         VStack(alignment: .leading, spacing: 10) {
                             Stepper(value: $dosing.stepAmount, in: 0...5, step: 0.25) {
                                 Text("\(dosing.pattern == .titrateDown ? "−" : "+")\(PeptideSupportPresentation.formatDoseAmount(dosing.stepAmount)) \(dosing.startingDoseUnit) each step")
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                    .foregroundStyle(OperatingPlanColor.ink)
                             }
                             .accessibilityLabel("Change by")
                             .accessibilityValue("\(PeptideSupportPresentation.formatDoseAmount(dosing.stepAmount)) \(dosing.startingDoseUnit)")
                             Stepper(value: $dosing.stepInterval, in: 1...12) {
                                 Text("Every \(dosing.stepInterval) \(dosing.stepUnit.label.lowercased())")
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                    .foregroundStyle(OperatingPlanColor.ink)
                             }
                             .accessibilityLabel("Step interval")
                             intervalUnitPicker(value: $dosing.stepUnit)
@@ -105,26 +105,26 @@ struct PeptideDosePlanEditor: View {
             }
 
             if dosing.pattern.usesHold {
-                OperatingPlanSection("Hold, then decrease") {
-                    CardContainer(padding: .sm) {
+                OperatingPlanGroup("Hold, then decrease") {
+                    OperatingPlanSurface(verticalPadding: 10) {
                         VStack(alignment: .leading, spacing: 10) {
                             Stepper(value: $dosing.holdDuration, in: 1...52) {
                                 Text("Hold for \(dosing.holdDuration) \(dosing.holdUnit.label.lowercased())")
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                    .foregroundStyle(OperatingPlanColor.ink)
                             }
                             .accessibilityLabel("Hold for")
                             intervalUnitPicker(value: $dosing.holdUnit)
                             Stepper(value: $dosing.decreaseAmount, in: 0...5, step: 0.25) {
                                 Text("Decrease by \(PeptideSupportPresentation.formatDoseAmount(dosing.decreaseAmount)) \(dosing.startingDoseUnit)")
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                    .foregroundStyle(OperatingPlanColor.ink)
                             }
                             .accessibilityLabel("Decrease by")
                             Stepper(value: $dosing.decreaseInterval, in: 1...12) {
                                 Text("Decrease every \(dosing.decreaseInterval) \(dosing.decreaseUnit.label.lowercased())")
-                                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                    .foregroundStyle(OperatingPlanColor.ink)
                             }
                             .accessibilityLabel("Decrease interval")
                             intervalUnitPicker(value: $dosing.decreaseUnit)
@@ -135,7 +135,7 @@ struct PeptideDosePlanEditor: View {
             }
 
             if dosing.pattern != .custom {
-                OperatingPlanSection("Ends") {
+                OperatingPlanGroup("Ends") {
                     HStack(spacing: 8) {
                         OperatingPlanChoicePill(title: "Ongoing", isSelected: dosing.endDate == nil, minHeight: 44) { dosing.endDate = nil }
                         OperatingPlanChoicePill(title: "Choose end date", isSelected: dosing.endDate != nil, minHeight: 44) {
@@ -163,8 +163,8 @@ struct PeptideDosePlanEditor: View {
     private func doseStepper(label: String, value: Binding<Double>, unit: String, prefix: String = "") -> some View {
         Stepper(value: value, in: 0...1000, step: 0.25) {
             Text("\(prefix)\(PeptideSupportPresentation.formatDoseAmount(value.wrappedValue)) \(unit)")
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                .foregroundStyle(OperatingPlanColor.ink)
         }
         .accessibilityLabel(label)
         .accessibilityValue("\(PeptideSupportPresentation.formatDoseAmount(value.wrappedValue)) \(unit)")

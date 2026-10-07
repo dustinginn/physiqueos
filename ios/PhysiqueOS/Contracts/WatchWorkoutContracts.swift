@@ -237,6 +237,12 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
     /// read-only there, so the Watch shows why Complete Set is unavailable.
     /// Optional and additive (older phones omit it, older Watches ignore it).
     var isPhoneReviewing: Bool? = nil
+    /// When the phone prepared this plan for the Watch (`readyForWatchAt`),
+    /// sent only with `.prepared`. With `sessionId` it names one preparation
+    /// lifecycle, so the Watch's single "ready" cue fires once per genuine
+    /// Ready. Optional and additive (older phones omit it, older Watches
+    /// ignore it); it is never a start authority (`watchStartedAt` is).
+    var preparedAt: Date? = nil
 
     var isTerminalAuthorityState: Bool {
         phase == .cancelled || phase == .unavailable

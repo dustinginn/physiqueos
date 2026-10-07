@@ -26,15 +26,15 @@ struct PeptideEditorSheet<Content: View>: View {
                 VStack(alignment: .leading, spacing: 14) {
                     content
                     if let errorMessage {
-                        OperatingPlanEditorErrorBanner(message: errorMessage)
+                        OperatingPlanErrorText(message: errorMessage)
                     }
                 }
                 .padding(16)
             }
-            .background(PhysiqueOSTheme.background)
+            .background(OperatingPlanColor.canvas)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
+            .toolbarBackground(OperatingPlanColor.canvas, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
@@ -60,8 +60,8 @@ struct PeptideSheetCaption: View {
 
     var body: some View {
         Text(text)
-            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+            .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+            .foregroundStyle(OperatingPlanColor.muted)
             .fixedSize(horizontal: false, vertical: true)
     }
 }
@@ -74,8 +74,8 @@ private struct PeptideSheetRow<Trailing: View>: View {
     var body: some View {
         HStack(spacing: 10) {
             Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                .foregroundStyle(OperatingPlanColor.ink)
             Spacer(minLength: 8)
             trailing
         }
@@ -181,24 +181,24 @@ struct PeptideChangeDoseSheet: View {
             }
 
             if scope == .onlyNextDose {
-                CardContainer(padding: .sm) {
+                OperatingPlanSurface(verticalPadding: 10) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Record what you actually take")
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                            .foregroundStyle(OperatingPlanColor.ink)
                         PeptideSheetCaption(text: "Your plan stays as it is. Open next dose\(viewModel.nextDoseLabel.map { " (\($0))" } ?? "") and enter the amount you took when you mark it complete.")
                     }
                 }
             } else {
-                CardContainer(padding: .sm) {
+                OperatingPlanSurface(verticalPadding: 10) {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 10) {
                             NumericEditField(text: $amountText, accessibilityLabel: "Dose amount", placeholder: "0")
                                 .frame(width: 96, height: 44)
                                 .accessibilityIdentifier("operatingPlan.peptide.sheet.dose.amount")
                             Text(unit)
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                .foregroundStyle(OperatingPlanColor.ink)
                             Spacer(minLength: 8)
                             Stepper(
                                 value: Binding(
@@ -222,11 +222,11 @@ struct PeptideChangeDoseSheet: View {
                             } label: {
                                 HStack(spacing: 6) {
                                     Text(startLabel)
-                                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                        .foregroundStyle(PhysiqueOSTheme.accent)
+                                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                        .foregroundStyle(OperatingPlanColor.teal)
                                     Image(systemName: "chevron.up.chevron.down")
                                         .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                        .foregroundStyle(OperatingPlanColor.muted)
                                 }
                             }
                             .accessibilityLabel("Starts")
@@ -319,13 +319,13 @@ struct PeptideDaysSheet: View {
             onCancel: { viewModel.errorMessage = nil; onDismiss() },
             onSave: save
         ) {
-            CardContainer(padding: .sm) {
+            OperatingPlanSurface(verticalPadding: 10) {
                 VStack(alignment: .leading, spacing: 12) {
                     if usesInterval {
                         Stepper(value: $interval, in: 1...365) {
                             Text(PeptideSupportPresentation.formatInterval(interval))
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                .foregroundStyle(OperatingPlanColor.ink)
                         }
                         .accessibilityIdentifier("operatingPlan.peptide.sheet.days.interval")
                         PeptideSheetCaption(text: "Counting from your next dose.")
@@ -341,14 +341,14 @@ struct PeptideDaysSheet: View {
                         .accessibilityIdentifier("operatingPlan.peptide.sheet.days.chips")
                     }
                     Text(preview)
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                        .foregroundStyle(OperatingPlanColor.ink)
                         .accessibilityIdentifier("operatingPlan.peptide.sheet.days.preview")
                     Button(usesInterval ? "Choose days of the week instead" : "Repeat every N days instead") {
                         usesInterval.toggle()
                     }
                     .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                    .foregroundStyle(PhysiqueOSTheme.accent)
+                    .foregroundStyle(OperatingPlanColor.teal)
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("operatingPlan.peptide.sheet.days.mode")
                 }
@@ -405,17 +405,17 @@ struct PeptideTimeSheet: View {
             onCancel: { viewModel.errorMessage = nil; onDismiss() },
             onSave: save
         ) {
-            CardContainer(padding: .sm) {
+            OperatingPlanSurface(verticalPadding: 10) {
                 VStack(alignment: .leading, spacing: 8) {
                     DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
                         .datePickerStyle(.wheel)
                         .labelsHidden()
-                        .tint(PhysiqueOSTheme.accent)
+                        .tint(OperatingPlanColor.teal)
                         .frame(maxWidth: .infinity)
                         .accessibilityIdentifier("operatingPlan.peptide.sheet.time.wheel")
                     Text(preview)
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                        .foregroundStyle(OperatingPlanColor.ink)
                         .accessibilityIdentifier("operatingPlan.peptide.sheet.time.preview")
                     if let schedule = viewModel.detail?.supportSchedule, let caption = PeptideSupportPresentation.bucketCaption(for: schedule) {
                         PeptideSheetCaption(text: caption)
@@ -458,11 +458,11 @@ struct PeptideNotesSheet: View {
             onCancel: { viewModel.errorMessage = nil; onDismiss() },
             onSave: save
         ) {
-            CardContainer(padding: .sm) {
+            OperatingPlanSurface(verticalPadding: 10) {
                 TextField("Notes shown when this dose is opened", text: $notes, axis: .vertical)
                     .lineLimit(4...8)
-                    .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                    .foregroundStyle(OperatingPlanColor.ink)
                     .accessibilityIdentifier("operatingPlan.peptide.sheet.notes.field")
             }
         }

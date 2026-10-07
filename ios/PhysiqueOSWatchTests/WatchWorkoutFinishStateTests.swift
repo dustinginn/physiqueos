@@ -1269,3 +1269,223 @@ extension WatchWorkoutFinishStateTests {
                        "Taller than the page: the 18 pt gap and scrolling, as before.")
     }
 }
+
+/// Build 91 (Founder D6): the single truthful "your Watch is ready for you"
+/// cue. Driven through the real store with a fake transport; the haptic is
+/// counted through `readyCueSinkForTesting`.
+final class WatchReadyCueTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_790_000_000)
+
+    final class Clock: @unchecked Sendable {
+        var now: Date
+        init(_ now: Date) { self.now = now }
+    }
+
+    final class Counter {
+        var count = 0
+        var commands: [WatchWorkoutCommand] = []
+    }
+
+    @MainActor
+    private func makeStore(_ suite: String, clock: Clock, wipe: Bool = true) -> (WatchWorkoutStore, Counter) {
+        let defaults = UserDefaults(suiteName: suite)!
+        if wipe { defaults.removePersistentDomain(forName: suite) }
+        let store = WatchWorkoutStore(session: nil, defaults: defaults, now: { clock.now })
+        let counter = Counter()
+        store.readyCueSinkForTesting = { counter.count += 1 }
+        store.commandSinkForTesting = { counter.commands.append($0) }
+        return (store, counter)
+    }
+
+    private func prepared(at preparedAt: Date?, session: String = "session-ready") throws -> WatchWorkoutProjection {
+        var projection = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("start")?.projection)
+        projection.sessionId = session
+        projection.preparedAt = preparedAt
+        return projection
+    }
+
+    /// Prepared + confirmed reachable + active: Start is actionable.
+    @MainActor
+    private func present(_ store: WatchWorkoutStore, _ projection: WatchWorkoutProjection, _ counter: Counter? = nil) {
+        store.apply(projection)
+        store.refresh()
+        if let counter { answerRefresh(store, counter) }
+    }
+
+    /// The phone answers the read-only refresh (no projection change), which
+    /// clears the in-flight refresh so a later one can be sent.
+    @MainActor
+    private func answerRefresh(_ store: WatchWorkoutStore, _ counter: Counter) {
+        guard let refresh = counter.commands.last(where: { $0.kind == .refreshProjection }) else { return }
+        let ack = WatchWorkoutAcknowledgement(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: refresh.commandId,
+            mutationId: refresh.mutationId, status: .unchanged, reason: nil, acknowledgedRevision: nil, projection: nil
+        )
+        store.receiveAcknowledgement(try! WatchWorkoutWireCodec.encode(ack))
+    }
+
+    @MainActor
+    func testCuesExactlyOnceForANewPreparationDespiteReplayRefreshAndRedisplay() throws {
+        let clock = Clock(now)
+        let (store, counter) = makeStore("ready.once", clock: clock)
+        let projection = try prepared(at: now.addingTimeInterval(-5))
+        present(store, projection)
+        XCTAssertEqual(store.presentedPhase, .prepared)
+        XCTAssertTrue(store.isStartWorkoutEnabled)
+        XCTAssertEqual(counter.count, 1, "Ready on screen with Start enabled: one cue.")
+
+        store.apply(projection)
+        store.receiveApplicationContext([
+            WatchWorkoutContract.applicationContextProjectionKey: try WatchWorkoutWireCodec.encode(projection),
+        ])
+        store.setDisplayActive(false)
+        store.setDisplayActive(true)
+        XCTAssertEqual(counter.count, 1, "Replay, refresh and redisplay never repeat the cue.")
+    }
+
+    @MainActor
+    func testColdLaunchOfTheSamePreparationDoesNotReplayTheCue() throws {
+        let clock = Clock(now)
+        let projection = try prepared(at: now.addingTimeInterval(-5))
+        let (first, firstCounter) = makeStore("ready.cold", clock: clock)
+        present(first, projection)
+        XCTAssertEqual(firstCounter.count, 1)
+
+        clock.now = now.addingTimeInterval(30)
+        let (relaunched, counter) = makeStore("ready.cold", clock: clock, wipe: false)
+        present(relaunched, projection)
+        XCTAssertEqual(counter.count, 0, "The cued lifecycle is persisted across a relaunch.")
+    }
+
+    @MainActor
+    func testANewPreparationOfTheSameSessionCuesAgain() throws {
+        let clock = Clock(now)
+        let (store, counter) = makeStore("ready.new", clock: clock)
+        present(store, try prepared(at: now.addingTimeInterval(-5)), counter)
+        XCTAssertEqual(counter.count, 1)
+
+        clock.now = now.addingTimeInterval(90)
+        var again = try prepared(at: now.addingTimeInterval(80))
+        again.revision += 2
+        store.apply(again)
+        XCTAssertEqual(counter.count, 1, "A new context alone is passive (reachability not confirmed).")
+        store.refresh()
+        XCTAssertEqual(counter.count, 2, "A genuinely new preparation gets its own single cue.")
+    }
+
+    @MainActor
+    func testStalePreparationNeverCues() throws {
+        let clock = Clock(now)
+        let (store, counter) = makeStore("ready.stale", clock: clock)
+        present(store, try prepared(at: now.addingTimeInterval(-(WatchReadyCue.freshness + 1))))
+        XCTAssertEqual(store.presentedPhase, .prepared)
+        XCTAssertEqual(counter.count, 0)
+    }
+
+    @MainActor
+    func testAPreparationWithoutPreparedAtNeverCues() throws {
+        let clock = Clock(now)
+        let (store, counter) = makeStore("ready.legacy", clock: clock)
+        present(store, try prepared(at: nil))
+        XCTAssertEqual(counter.count, 0, "An older phone cannot prove freshness: no cue.")
+    }
+
+    @MainActor
+    func testInactiveAppCuesOnActivationOnlyWhileFresh() throws {
+        let clock = Clock(now)
+        let (store, counter) = makeStore("ready.inactive", clock: clock)
+        store.setDisplayActive(false)
+        present(store, try prepared(at: now))
+        XCTAssertEqual(counter.count, 0, "Never while the app is not presenting it.")
+        clock.now = now.addingTimeInterval(20)
+        store.setDisplayActive(true)
+        XCTAssertEqual(counter.count, 1, "Cues when the Watch actually presents it.")
+
+        clock.now = now
+        let (late, lateCounter) = makeStore("ready.inactive.late", clock: clock)
+        late.setDisplayActive(false)
+        present(late, try prepared(at: now, session: "session-late"))
+        clock.now = now.addingTimeInterval(WatchReadyCue.freshness + 5)
+        late.setDisplayActive(true)
+        XCTAssertEqual(lateCounter.count, 0, "Opening the app after the window: no cue.")
+    }
+
+    @MainActor
+    func testReachabilityAloneOrAnActiveWorkoutNeverCues() throws {
+        let clock = Clock(now)
+        let (store, counter) = makeStore("ready.reachability", clock: clock)
+        store.refresh()
+        XCTAssertEqual(counter.count, 0)
+        var active = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("normal")?.projection)
+        active.preparedAt = now
+        present(store, active)
+        XCTAssertEqual(counter.count, 0)
+    }
+
+    @MainActor
+    func testUseWithoutWatchNeverCues() throws {
+        let clock = Clock(now)
+        let (store, counter) = makeStore("ready.decline", clock: clock)
+        store.setDisplayActive(false)
+        store.apply(try prepared(at: now))
+        // "Use without Watch": the phone withdraws the preparation and
+        // starts on iPhone before the Watch ever presents it.
+        var started = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("normal")?.projection)
+        started.sessionId = "session-ready"
+        started.revision += 5
+        store.apply(started)
+        store.setDisplayActive(true)
+        store.refresh()
+        XCTAssertEqual(counter.count, 0)
+    }
+
+    @MainActor
+    func testCueIsNotStartAndStartStaysAnExplicitTap() throws {
+        let clock = Clock(now)
+        let (store, counter) = makeStore("ready.start", clock: clock)
+        present(store, try prepared(at: now))
+        XCTAssertEqual(counter.count, 1)
+        XCTAssertTrue(counter.commands.allSatisfy { $0.kind == .refreshProjection },
+                      "The cue sends nothing: no start, no mutation.")
+        XCTAssertEqual(store.presentedPhase, .prepared, "Cueing never starts the workout.")
+        store.startPreparedWorkout()
+        XCTAssertEqual(counter.commands.last?.kind, .startPreparedWorkout, "Start is still the explicit tap.")
+        XCTAssertFalse(store.isStartWorkoutEnabled, "A pending start disables Start until the phone answers.")
+        XCTAssertEqual(counter.count, 1)
+    }
+
+    func testDecisionRules() {
+        let key = WatchReadyCue.lifecycleKey(sessionId: "s", preparedAt: now)
+        func decide(_ phase: WatchWorkoutStore.PresentedPhase = .prepared, start: Bool = true, active: Bool = true,
+                    at: Date? = nil, last: String? = nil) -> String? {
+            WatchReadyCue.decide(phase: phase, isStartEnabled: start, isDisplayActive: active, sessionId: "s",
+                                 preparedAt: now, now: at ?? now, lastCuedKey: last)
+        }
+        XCTAssertEqual(decide(), key)
+        XCTAssertNil(decide(last: key), "Same lifecycle: no repeat.")
+        XCTAssertNil(decide(.active))
+        XCTAssertNil(decide(.none))
+        XCTAssertNil(decide(start: false), "Start not actionable (pending or unreachable).")
+        XCTAssertNil(decide(active: false))
+        XCTAssertNotNil(decide(at: now.addingTimeInterval(WatchReadyCue.freshness)))
+        XCTAssertNil(decide(at: now.addingTimeInterval(WatchReadyCue.freshness + 1)))
+        XCTAssertNotNil(decide(at: now.addingTimeInterval(-30)), "Small phone-ahead skew is tolerated.")
+        XCTAssertNil(decide(at: now.addingTimeInterval(-(WatchReadyCue.futureSkew + 1))))
+        XCTAssertNil(WatchReadyCue.decide(phase: .prepared, isStartEnabled: true, isDisplayActive: true, sessionId: "s",
+                                          preparedAt: nil, now: now, lastCuedKey: nil))
+    }
+
+    func testPreparedAtIsAdditiveAndBackwardDecodable() throws {
+        var projection = try XCTUnwrap(WatchWorkoutPreviewFixtures.make("start")?.projection)
+        projection.preparedAt = now
+        let data = try WatchWorkoutWireCodec.encode(projection)
+        XCTAssertEqual(try WatchWorkoutWireCodec.decode(WatchWorkoutProjection.self, from: data).preparedAt, now)
+
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: "preparedAt")
+        let legacy = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try WatchWorkoutWireCodec.decode(WatchWorkoutProjection.self, from: legacy)
+        XCTAssertNil(decoded.preparedAt, "An older phone omits it.")
+        XCTAssertEqual(decoded.phase, .prepared)
+    }
+}

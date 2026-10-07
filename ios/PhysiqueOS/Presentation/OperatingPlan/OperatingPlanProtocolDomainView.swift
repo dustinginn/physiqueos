@@ -16,7 +16,7 @@ import SwiftUI
 /// one-tap "Resume" here so it is never unreachable.
 struct OperatingPlanProtocolDomainView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let protocolId: String
     let onNavigate: (AppDestination) -> Void
     @State private var productionDomain: OperatingPlanProtocolDomainReadModel?
@@ -32,48 +32,53 @@ struct OperatingPlanProtocolDomainView: View {
         }
     }
 
+    var backTitle: String = "Operating Plan"
+
     var body: some View {
-        ScrollView {
+        OperatingPlanScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button { dismiss() } label: {
-                    Label("Operating Plan", systemImage: "arrow.left")
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .operatingPlanChrome(back: backTitle)
+        .accessibilityIdentifier("operatingPlan.domain")
         .task(id: "\(protocolId):\(environment.nativeAuthority)") { await loadProductionIfNeeded() }
+        .refreshable {
+            if environment.nativeAuthority == .founderProduction {
+                await environment.productionNativeAPI.invalidateReadResources(["operating-plan-protocol-domain"])
+            }
+            await loadProductionIfNeeded()
+        }
     }
 
     @ViewBuilder
     private var content: some View {
         if environment.nativeAuthority == .founderProduction, isLoadingProduction, productionDomain == nil {
-            ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+            OperatingPlanLoadingView()
         } else if let domain {
-            VStack(alignment: .leading, spacing: 16) {
-                OperatingPlanScreenHeader(eyebrow: domain.category.rawValue.capitalized, title: domain.title, subtitle: domain.purpose)
-                VStack(spacing: 8) {
-                    ForEach(domain.methods) { method in
-                        methodCard(method, category: domain.category)
-                    }
-                }
-                if let lifecycleError {
-                    OperatingPlanEditorErrorBanner(message: lifecycleError)
+            OperatingPlanHeader(eyebrow: domain.category.rawValue.capitalized, title: domain.title, subtitle: domain.purpose)
+            VStack(spacing: 12) {
+                ForEach(domain.methods) { method in
+                    methodCard(method, category: domain.category, domainTitle: Self.pageTitle(for: domain.category))
                 }
             }
+            if let lifecycleError {
+                OperatingPlanErrorText(message: lifecycleError).padding(.top, 14)
+            }
         } else {
-            OperatingPlanUnavailableView(message: loadError ?? "This support strategy is unavailable.")
+            OperatingPlanFailureView(
+                title: "This support strategy couldn't be loaded",
+                message: loadError == nil ? "This support strategy is unavailable." : "Nothing was changed. Check your connection and try again.",
+                retry: loadError == nil ? nil : { Task { await loadProductionIfNeeded() } }
+            )
+        }
+    }
+
+    /// The crumb title this domain gives the pages it opens.
+    static func pageTitle(for category: ProtocolCategory) -> String {
+        switch category {
+        case .peptide: "Peptides"
+        case .supplement: "Supplements"
+        case .recovery: "Recovery"
+        default: category.rawValue.capitalized
         }
     }
 
@@ -91,7 +96,7 @@ struct OperatingPlanProtocolDomainView: View {
         }
     }
 
-    private func methodCard(_ method: OperatingPlanSupportMethodReadModel, category: ProtocolCategory) -> some View {
+    private func methodCard(_ method: OperatingPlanSupportMethodReadModel, category: ProtocolCategory, domainTitle: String) -> some View {
         let status = Self.lifecycleStatus(
             method: method,
             category: category,
@@ -102,67 +107,124 @@ struct OperatingPlanProtocolDomainView: View {
             label: isPaused ? "Restore" : "Pause",
             isPause: !isPaused
         )
-        return CardContainer(padding: .sm) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 10) {
-                    IconBadge(systemImage: OperatingPlanIcon.systemImage(for: category.rawValue), color: colorToken(for: category), size: .sm, isCircular: true)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(method.name)
-                            .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                        Text(method.purpose)
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    }
-                    Spacer(minLength: 6)
-                    if isPaused { StatusChip(text: "Paused", color: .muted) }
-                    else if Self.showsReminderIndicator(method: method, lifecycleState: status) {
-                        Image(systemName: "bell.fill")
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                            .accessibilityLabel("Reminder on")
-                    }
+        let isChanging = changingLifecycleProtocolId == method.protocolId
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                OperatingPlanIconTile(systemImage: OperatingPlanIcon.systemImage(for: category.rawValue), tint: OperatingPlanColor.tint(for: category.rawValue))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(method.name)
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanCardTitle)
+                        .foregroundStyle(OperatingPlanColor.ink)
+                    Text(method.purpose)
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanCardDetail)
+                        .foregroundStyle(OperatingPlanColor.muted)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                OperatingPlanFieldRow(label: "Support", value: method.supportSummary)
-                if let dose = method.currentDose {
-                    OperatingPlanFieldRow(label: "Current Dose", value: dose)
-                }
-                if let schedule = method.currentSchedule {
-                    OperatingPlanFieldRow(label: "Schedule", value: schedule)
-                }
-                HStack(spacing: 12) {
-                    if category == .peptide {
-                        if let editDestination = method.editDestination {
-                            Button("Manage") { onNavigate(editDestination) }
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.accent)
-                                .accessibilityIdentifier("operatingPlan.domain.peptide.manage")
+                Spacer(minLength: 6)
+                if isPaused {
+                    OperatingPlanStatusPill(text: "Paused", tone: .muted)
+                } else {
+                    HStack(spacing: 6) {
+                        if Self.showsReminderIndicator(method: method, lifecycleState: status) {
+                            Image(systemName: "bell.fill")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(OperatingPlanColor.teal)
+                                .accessibilityLabel("Reminder on")
                         }
-                        if isPaused {
-                            Button("Resume") { resumePeptide(method) }
-                                .disabled(changingLifecycleProtocolId == method.protocolId)
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.chartSuccess)
-                                .accessibilityIdentifier("operatingPlan.domain.peptide.resume")
-                        }
-                    } else if let editDestination = method.editDestination, !isPaused {
-                        Button("Edit Support") { onNavigate(editDestination) }
-                            .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                            .foregroundStyle(PhysiqueOSTheme.accent)
-                    }
-                    if category == .supplement {
-                        if !isPaused {
-                            Button("Edit Strategy") { onNavigate(.operatingPlanSupplementEdit(protocolId: method.protocolId)) }
-                                .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                                .foregroundStyle(PhysiqueOSTheme.accent)
-                        }
-                        Button(lifecycleAction.label) {
-                            changeLifecycle(method, action: lifecycleAction)
-                        }
-                        .disabled(changingLifecycleProtocolId == method.protocolId)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
-                        .foregroundStyle(lifecycleAction.isPause ? PhysiqueOSTheme.destructive : PhysiqueOSTheme.chartSuccess)
+                        OperatingPlanStatusPill(text: "Active", tone: .green)
                     }
                 }
+            }
+            if method.currentDose != nil || method.currentSchedule != nil {
+                HStack(alignment: .top, spacing: 12) {
+                    if let dose = method.currentDose { fact("Current dose", dose) }
+                    if let schedule = method.currentSchedule { fact("Schedule", schedule) }
+                }
+            } else {
+                fact("Support", method.supportSummary)
+            }
+            actions(method, category: category, domainTitle: domainTitle, isPaused: isPaused, isChanging: isChanging, lifecycleAction: lifecycleAction)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(OperatingPlanColor.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(OperatingPlanColor.rule, lineWidth: 1))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("operatingPlan.domain.method.\(method.protocolId)")
+    }
+
+    private func fact(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldLabel)
+                .foregroundStyle(OperatingPlanColor.muted)
+            Text(value)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                .foregroundStyle(OperatingPlanColor.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Full-size (>= 44 pt) actions replacing the old 12 pt text buttons:
+    /// navigation actions side by side (stacked at accessibility sizes),
+    /// a Supplement's lifecycle action on its own row.
+    @ViewBuilder
+    private func actions(
+        _ method: OperatingPlanSupportMethodReadModel,
+        category: ProtocolCategory,
+        domainTitle: String,
+        isPaused: Bool,
+        isChanging: Bool,
+        lifecycleAction: OperatingPlanLifecycleActionReadModel
+    ) -> some View {
+        VStack(spacing: 10) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 10) { primaryButtons(method, category: category, domainTitle: domainTitle, isPaused: isPaused, isChanging: isChanging) }
+            } else {
+                HStack(spacing: 10) { primaryButtons(method, category: category, domainTitle: domainTitle, isPaused: isPaused, isChanging: isChanging) }
+            }
+            if category == .supplement {
+                OperatingPlanButton(title: lifecycleAction.label, style: lifecycleAction.isPause ? .destructive : .navy, isEnabled: !isChanging) {
+                    changeLifecycle(method, action: lifecycleAction)
+                }
+                .accessibilityIdentifier("operatingPlan.domain.supplement.lifecycle")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func primaryButtons(
+        _ method: OperatingPlanSupportMethodReadModel,
+        category: ProtocolCategory,
+        domainTitle: String,
+        isPaused: Bool,
+        isChanging: Bool
+    ) -> some View {
+        if category == .peptide {
+            if let editDestination = method.editDestination {
+                OperatingPlanButton(title: "Manage", style: .quiet) {
+                    OperatingPlanNavigationContext.navigate(editDestination, from: domainTitle, using: onNavigate)
+                }
+                .accessibilityIdentifier("operatingPlan.domain.peptide.manage")
+            }
+            if isPaused {
+                OperatingPlanButton(title: "Resume", systemImage: "play.fill", style: .navy, isEnabled: !isChanging) { resumePeptide(method) }
+                    .accessibilityIdentifier("operatingPlan.domain.peptide.resume")
+            }
+        } else {
+            if let editDestination = method.editDestination, !isPaused {
+                OperatingPlanButton(title: "Edit Support", style: .quiet) {
+                    OperatingPlanNavigationContext.navigate(editDestination, from: domainTitle, using: onNavigate)
+                }
+                .accessibilityIdentifier("operatingPlan.domain.editSupport")
+            }
+            if category == .supplement, !isPaused {
+                OperatingPlanButton(title: "Edit Strategy", style: .quiet) {
+                    onNavigate(.operatingPlanSupplementEdit(protocolId: method.protocolId))
+                }
+                .accessibilityIdentifier("operatingPlan.domain.supplement.editStrategy")
             }
         }
     }
@@ -268,12 +330,4 @@ struct OperatingPlanProtocolDomainView: View {
         }
     }
 
-    private func colorToken(for category: ProtocolCategory) -> HomeColorToken {
-        switch category {
-        case .recovery: .success
-        case .peptide: .effort
-        case .supplement: .success
-        default: .primary
-        }
-    }
 }

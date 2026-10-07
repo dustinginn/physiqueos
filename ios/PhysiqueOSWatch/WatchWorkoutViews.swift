@@ -222,6 +222,14 @@ struct WatchEyebrow: View {
 /// A panel page laid out like the locked board: content from just below the
 /// clock, actions centered in the space below it, scrolling only when Dynamic
 /// Type or a small case makes the page taller than the screen.
+///
+/// Build 91 (Mineral Light bottom bar, Founder D5): a page that fits is laid
+/// out with NO ScrollView, so no system scroll chrome (the watchOS 26+ bottom
+/// scroll edge effect, drawn light under Mineral) can sit under the action.
+/// The page paints its own background full-bleed. Only an overflowing page
+/// (accessibility text sizes) scrolls, with the bottom edge effect hidden.
+/// Geometry is unchanged: the same `WatchPanelActionLayout`, insets and
+/// 18 pt minimum gap.
 struct WatchPanelPage<Content: View, Actions: View>: View {
     @ViewBuilder let content: () -> Content
     @ViewBuilder let actions: () -> Actions
@@ -230,19 +238,50 @@ struct WatchPanelPage<Content: View, Actions: View>: View {
         GeometryReader { geometry in
             let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
             let topInset = WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top)
-            ScrollView {
-                WatchPanelActionLayout {
-                    VStack(spacing: 6) { content() }
-                    VStack(spacing: 6) { actions() }
+            // `minHeight` keeps the ideal height at the natural height when
+            // that is taller, so ViewThatFits picks the ScrollView exactly
+            // when the page overflows.
+            ViewThatFits(in: .vertical) {
+                panel(topInset: topInset)
+                    .frame(minHeight: fullHeight, alignment: .top)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("watch.panel.fixed")
+                ScrollView {
+                    panel(topInset: topInset)
+                        .frame(minHeight: fullHeight, alignment: .top)
                 }
-                .padding(.horizontal, 9)
-                .padding(.top, topInset)
-                .padding(.bottom, 8)
-                .frame(minHeight: fullHeight, alignment: .top)
+                .scrollBounceBehavior(.basedOnSize)
+                .contentMargins(.horizontal, 0, for: .scrollContent)
+                .watchPanelBottomScrollEdgeEffectHidden()
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("watch.panel.scroll")
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .contentMargins(.horizontal, 0, for: .scrollContent)
+            .frame(height: fullHeight, alignment: .top)
+            .background(WatchPhysiqueOSTheme.background)
             .ignoresSafeArea(edges: [.top, .bottom])
+        }
+    }
+
+    private func panel(topInset: CGFloat) -> some View {
+        WatchPanelActionLayout {
+            VStack(spacing: 6) { content() }
+            VStack(spacing: 6) { actions() }
+        }
+        .padding(.horizontal, 9)
+        .padding(.top, topInset)
+        .padding(.bottom, 8)
+    }
+}
+
+private extension View {
+    /// Hides only this ScrollView's bottom scroll edge effect (watchOS 26+);
+    /// no other watchOS affordance is touched.
+    @ViewBuilder
+    func watchPanelBottomScrollEdgeEffectHidden() -> some View {
+        if #available(watchOS 26.0, *) {
+            scrollEdgeEffectHidden(true, for: .bottom)
+        } else {
+            self
         }
     }
 }
@@ -626,7 +665,7 @@ struct WatchWorkoutStartView: View {
             }
         } actions: {
             WatchActionButton(title: "Start Workout", systemImage: "play.fill",
-                              enabled: !store.isMutationPending && store.connectionState == .reachable) {
+                              enabled: store.isStartWorkoutEnabled) {
                 store.startPreparedWorkout()
             }
             .accessibilityIdentifier("watch.start")

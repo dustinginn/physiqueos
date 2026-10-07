@@ -9,12 +9,30 @@ import SwiftUI
 struct OperatingPlanTrainingProtocolBuilderView: View {
     @Environment(AppEnvironment.self) private var environment
     let onNavigate: (AppDestination) -> Void
+    var backTitle: String = "Operating Plan"
 
     private var store: OperatingPlanSandboxStore { environment.operatingPlanStore }
 
+    /// Founder Production copy (Build 91, audit #85): plain product language
+    /// instead of the engineering "legacy builder" sentence. Nothing new is
+    /// offered: Training is created and changed from the Operating Plan.
+    static let productionUnavailableTitle = "Training is set up from your plan"
+    static let productionUnavailableMessage = "Review or change your Training strategy from Training on your Operating Plan."
+
     var body: some View {
         if environment.nativeAuthority == .founderProduction {
-            OperatingPlanUnavailableView(message: "Training creation is not available through this legacy builder. Return to your current production Training strategy.")
+            OperatingPlanScrollPage {
+                OperatingPlanHeader(eyebrow: "Training", title: "Training Strategy")
+                OperatingPlanNote(
+                    icon: "dumbbell.fill", tint: OperatingPlanColor.purple,
+                    title: Self.productionUnavailableTitle,
+                    message: Self.productionUnavailableMessage
+                )
+                .accessibilityIdentifier("operatingPlan.trainingBuilder.unavailable")
+                OperatingPlanButton(title: "Open Operating Plan", style: .quiet) { onNavigate(.operatingPlan) }
+                    .padding(.top, 22)
+            }
+            .operatingPlanChrome(back: backTitle)
         } else {
             sandboxContent
         }

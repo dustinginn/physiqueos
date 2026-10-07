@@ -2118,3 +2118,49 @@ extension TrainingSessionAuthorityTests {
                        "A second prepared plan cannot start while the Watch workout is live.")
     }
 }
+
+// MARK: - Build 91: preparedAt (Watch "ready" cue lifecycle)
+
+extension TrainingSessionAuthorityTests {
+    /// The prepared projection names its preparation (`readyForWatchAt`);
+    /// an active projection never does, and preparing is never a start.
+    func testPreparedProjectionCarriesPreparedAtAndActiveDoesNot() throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        XCTAssertEqual(authority.setReadyForWatch(sessionId: "session-1", ready: true), .applied(revision: 1))
+        let draft = try XCTUnwrap(authority.preparedWorkout())
+        let prepared = try XCTUnwrap(WatchWorkoutProjection.make(draft: draft, authority: authority, now: clock.now, prepared: true))
+        XCTAssertEqual(prepared.phase, .prepared)
+        let readyAt = try XCTUnwrap(draft.readyForWatchAt.flatMap(TrainingSessionClock.date(from:)))
+        XCTAssertEqual(prepared.preparedAt, readyAt)
+        XCTAssertNil(prepared.startedAt, "Preparing is not starting.")
+        XCTAssertNil(prepared.watchHealthStartedAt)
+
+        let router = WatchWorkoutCommandRouter(authority: authority, isPhoneReachable: { true }, now: { clock.now })
+        let start = WatchWorkoutCommand(
+            schemaVersion: WatchWorkoutContract.schemaVersion, commandId: "start", mutationId: "start",
+            kind: .startPreparedWorkout, sessionId: "session-1", expectedRevision: 1,
+            exerciseId: nil, setId: nil, issuedAt: clock.now
+        )
+        XCTAssertEqual(router.route(start).status, .applied)
+        let started = try XCTUnwrap(authority.draft(id: "session-1"))
+        XCTAssertNotNil(started.watchStartedAt, "watchStartedAt stays the start authority.")
+        let active = try XCTUnwrap(WatchWorkoutProjection.make(draft: started, authority: authority, now: clock.now))
+        XCTAssertNil(active.preparedAt)
+    }
+
+    /// Ready -> Use without Watch -> Ready again yields a new preparation
+    /// instant, so the Watch can tell a genuinely new Ready from a replay.
+    func testEachReadyIsADistinctPreparation() throws {
+        let store = RecordingStore([liveSession()])
+        let (authority, clock) = makeAuthority(store)
+        authority.setReadyForWatch(sessionId: "session-1", ready: true)
+        let first = try XCTUnwrap(authority.draft(id: "session-1")?.readyForWatchAt)
+        authority.setReadyForWatch(sessionId: "session-1", ready: false)
+        XCTAssertNil(authority.draft(id: "session-1")?.readyForWatchAt)
+        clock.advance(30)
+        authority.setReadyForWatch(sessionId: "session-1", ready: true)
+        let second = try XCTUnwrap(authority.draft(id: "session-1")?.readyForWatchAt)
+        XCTAssertNotEqual(first, second)
+    }
+}

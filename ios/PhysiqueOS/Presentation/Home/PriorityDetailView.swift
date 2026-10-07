@@ -69,6 +69,12 @@ struct PriorityDetailView: View {
         .refreshable { await reload() }
     }
 
+    /// Operating Plan pages show the page that opened them in their crumb
+    /// (Build 91): "‹ DEXA tomorrow" rather than a generic parent.
+    private func navigate(_ destination: AppDestination, from priority: PriorityOccurrence) {
+        OperatingPlanNavigationContext.navigate(destination, from: priority.title, using: onNavigate)
+    }
+
     private func reload() async {
         if environment.nativeAuthority == .founderProduction {
             await environment.productionNativeAPI.invalidateReadResources(["priority"])
@@ -228,13 +234,13 @@ struct PriorityDetailView: View {
                     PriorityDetailButton(
                         title: priority.actionLabel ?? (template == .photoEvidence ? "Upload Photos" : "View DEXA Appointment"),
                         style: template == .photoEvidence ? .evidence : .navy
-                    ) { onNavigate(destination) }
+                    ) { navigate(destination, from: priority) }
                     .accessibilityIdentifier("priorityDetail.evidenceAction")
                 }
             case .continueAction:
                 if let destination = priority.continueActionDestination {
                     PriorityDetailButton(title: priority.actionLabel ?? "Continue", style: .navy) {
-                        onNavigate(destination)
+                        navigate(destination, from: priority)
                     }
                     .accessibilityIdentifier(PriorityDetailPresentation.isFoamRolling(priority)
                                              ? "priorityDetail.reviewSupport" : "priorityDetail.continue")
@@ -375,7 +381,7 @@ struct PriorityDetailView: View {
         .accessibilityIdentifier("priorityDetail.paused")
         if let destination = priority.continueActionDestination {
             PriorityDetailButton(title: "Go to \(priority.title)", style: .amber) {
-                onNavigate(destination)
+                navigate(destination, from: priority)
             }
             .padding(.top, 11)
             .accessibilityIdentifier("priorityDetail.goToPeptide")

@@ -79,7 +79,8 @@ extension WatchWorkoutProjection {
             recentlyEnded: Self.recentlyEnded(authority: authority, excluding: draft.id),
             watchHealthStartedAt: (draft.watchStartedAt ?? draft.watchHealthStartedAt)
                 .flatMap(TrainingSessionClock.date(from:)),
-            isPhoneReviewing: phase == .active && live.phase == .reviewing ? true : nil
+            isPhoneReviewing: phase == .active && live.phase == .reviewing ? true : nil,
+            preparedAt: prepared ? draft.readyForWatchAt.flatMap(TrainingSessionClock.date(from:)) : nil
         )
     }
 

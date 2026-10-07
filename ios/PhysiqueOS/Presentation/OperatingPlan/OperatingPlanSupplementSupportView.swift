@@ -19,35 +19,28 @@ struct OperatingPlanSupplementSupportView: View {
         }
     }
 
+    var backTitle: String = "Supplements"
+
     var body: some View {
-        ScrollView {
-            content.padding(.horizontal, 16).padding(.top, 12)
+        OperatingPlanScrollPage {
+            content
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button { isEditing ? (isEditing = false) : dismiss() } label: {
-                    Label(isEditing ? "Cancel" : "Supplement Strategy", systemImage: isEditing ? "xmark" : "arrow.left")
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .operatingPlanChrome(back: isEditing ? "Cancel" : backTitle, onBack: isEditing ? { isEditing = false } : nil)
+        .accessibilityIdentifier("operatingPlan.supplementSupport")
         .task(id: "\(protocolId):\(environment.nativeAuthority)") { await loadProductionIfNeeded() }
     }
 
     @ViewBuilder private var content: some View {
         if environment.nativeAuthority == .founderProduction, isLoadingProduction, productionDetail == nil {
-            ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+            OperatingPlanLoadingView()
         } else if let support {
             if isEditing, let draft { editor(draft) } else { detail(support) }
         } else {
-            OperatingPlanUnavailableView(message: loadError ?? "This supplement support is unavailable.")
+            OperatingPlanFailureView(
+                title: "This supplement support couldn't be loaded",
+                message: loadError == nil ? "This supplement support is unavailable." : "Nothing was changed. Check your connection and try again.",
+                retry: loadError == nil ? nil : { Task { await loadProductionIfNeeded() } }
+            )
         }
     }
 
@@ -66,31 +59,32 @@ struct OperatingPlanSupplementSupportView: View {
     }
 
     private func detail(_ support: OperatingPlanSupplementSupportReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            OperatingPlanScreenHeader(eyebrow: "SUPPLEMENT SUPPORT", title: support.name, subtitle: support.supportSummary)
-            OperatingPlanSection("Current Support") {
-                CardContainer(padding: .sm) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        OperatingPlanFieldRow(label: "Dose / Quantity", value: [support.doseAmount, support.doseUnit].filter { !$0.isEmpty }.joined(separator: " "))
-                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSchedulePresentation.formatSupportSchedule(support.supportSchedule))
-                        OperatingPlanFieldRow(label: "Reminder", value: support.reminderPreference.label)
-                        if let nextDue = support.nextDue { OperatingPlanFieldRow(label: "Next due", value: nextDue) }
-                        if !support.notes.isEmpty { OperatingPlanFieldRow(label: "Execution Notes", value: support.notes) }
+        VStack(alignment: .leading, spacing: 0) {
+            OperatingPlanHeader(eyebrow: "Supplement Support", title: support.name, subtitle: support.supportSummary)
+            OperatingPlanGroup("Current Support") {
+                OperatingPlanSurface {
+                    VStack(alignment: .leading, spacing: 0) {
+                        OperatingPlanLine("Dose / Quantity", [support.doseAmount, support.doseUnit].filter { !$0.isEmpty }.joined(separator: " "))
+                        OperatingPlanLine("Schedule", OperatingPlanSchedulePresentation.formatSupportSchedule(support.supportSchedule))
+                        OperatingPlanLine("Reminder", support.reminderPreference.label)
+                        if let nextDue = support.nextDue { OperatingPlanLine("Next due", nextDue) }
+                        if !support.notes.isEmpty { OperatingPlanLine("Execution Notes", support.notes) }
                     }
                 }
             }
-            PrimaryActionButton(title: "Edit Support") {
+            OperatingPlanButton(title: "Edit Support", style: .quiet) {
                 draft = support
                 isEditing = true
             }
+            .padding(.top, 20)
         }
     }
 
     private func editor(_ draft: OperatingPlanSupplementSupportReadModel) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            OperatingPlanScreenHeader(eyebrow: "EDIT SUPPORT", title: draft.name, subtitle: "Keep the quantity, schedule, reminder, and optional context aligned with your current strategy.")
-            OperatingPlanSection("Dose / Quantity") {
-                CardContainer(padding: .sm) {
+            OperatingPlanHeader(eyebrow: "Edit Support", title: draft.name, subtitle: "Keep the quantity, schedule, reminder, and optional context aligned with your current strategy.")
+            OperatingPlanGroup("Dose / Quantity") {
+                OperatingPlanSurface(verticalPadding: 10) {
                     HStack(spacing: 10) {
                         TextField("Amount", text: Binding(get: { draft.doseAmount }, set: { self.draft?.doseAmount = $0 }))
                             .keyboardType(.decimalPad)
@@ -102,7 +96,7 @@ struct OperatingPlanSupplementSupportView: View {
             OperatingPlanSupportScheduleEditor(schedule: Binding(
                 get: { draft.supportSchedule }, set: { self.draft?.supportSchedule = $0 }
             ), sectionNumber: "2")
-            OperatingPlanSection("Reminder") {
+            OperatingPlanGroup("Reminder") {
                 HStack(spacing: 8) {
                     ForEach(OperatingPlanReminderPreference.allCases) { preference in
                         OperatingPlanChoicePill(title: preference.label, isSelected: draft.reminderPreference == preference) {
@@ -111,14 +105,14 @@ struct OperatingPlanSupplementSupportView: View {
                     }
                 }
             }
-            OperatingPlanSection("Execution Notes") {
-                CardContainer(padding: .sm) {
+            OperatingPlanGroup("Execution Notes") {
+                OperatingPlanSurface(verticalPadding: 10) {
                     TextField("Optional context, such as take with food", text: Binding(get: { draft.notes }, set: { self.draft?.notes = $0 }), axis: .vertical)
                         .lineLimit(3...6)
                 }
             }
-            if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
-            PrimaryActionButton(title: "Save Support") { save(draft) }
+            if let errorMessage { OperatingPlanErrorText(message: errorMessage) }
+            OperatingPlanButton(title: "Save Support", style: .primary) { save(draft) }
         }
     }
 

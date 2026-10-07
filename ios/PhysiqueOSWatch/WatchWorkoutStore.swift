@@ -172,6 +172,8 @@ struct WatchWorkoutLatencyTrace: Equatable {
         case commandNotSent
         case completeSetEnabled, completeSetDisabled
         case healthStartRequested, healthStarted, healthStartFailed
+        /// The single "ready for you" cue played for a new preparation.
+        case readyCue
     }
 
     struct Entry: Equatable {
@@ -365,6 +367,12 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         presentedPhase == .active && projection?.isPhoneReviewing == true
     }
 
+    /// Start Workout is tappable on the prepared screen: the exact predicate
+    /// the button uses, and the one the "ready" cue waits for.
+    var isStartWorkoutEnabled: Bool {
+        !isMutationPending && connectionState == .reachable
+    }
+
     /// Complete Set is tappable. A read-only refresh never blocks it.
     var isCompleteSetAvailable: Bool {
         projection?.canCompleteSet == true && !isMutationPending && connectionState == .reachable
@@ -487,6 +495,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 
     func setDisplayActive(_ active: Bool) {
         displayIsActive = active
+        defer { evaluateReadyCue() }
         trace(active ? .displayActive : .displayInactive)
         if active { evaluateAutomaticHealthStart() }
         guard active, session?.activationState == .activated, session?.isReachable == true else { return }
@@ -606,6 +615,9 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     /// mutation gate, so it never disables Complete Set or delays a tap.
     func refresh() {
         guard refreshInFlight == nil else { return }
+        // Confirmed reachability (never assumed) can complete Start's
+        // predicate for a prepared plan that is already on screen.
+        defer { evaluateReadyCue() }
         if commandSinkForTesting == nil {
             guard let session, session.activationState == .activated, session.isReachable else {
                 connectionState = .phoneUnavailable
@@ -901,6 +913,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     }
 
     private func receive(_ acknowledgement: WatchWorkoutAcknowledgement, viaContext: Bool = false) {
+        // A settled command can be what makes Start Workout actionable.
+        defer { evaluateReadyCue() }
         if let refresh = refreshInFlight, refresh.commandId == acknowledgement.commandId {
             refreshInFlight = nil
             refreshWatchdogTask?.cancel()
@@ -1252,6 +1266,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 
     func apply(_ incoming: WatchWorkoutProjection, recordsAuthoritativeContact: Bool = true) {
         guard incoming.schemaVersion == WatchWorkoutContract.schemaVersion else { return }
+        defer { evaluateReadyCue() }
         if recordsAuthoritativeContact { lastAuthoritativeContactAt = now() }
         if incoming.requiresHealthSave, let operationId = incoming.finish?.operationId {
             rememberFinish(sessionId: incoming.sessionId, operationId: operationId, finishedAt: incoming.finishedAt)
@@ -1447,6 +1462,38 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         finishKnowledge = knowledge
     }
 
+    // MARK: - Ready cue
+
+    /// Test seam: when set, the ready cue is reported here instead of
+    /// playing the haptic.
+    @ObservationIgnored var readyCueSinkForTesting: (() -> Void)?
+
+    /// The one "your Watch is ready for you" cue: once per genuinely new
+    /// preparation, the first time Start Workout is actually actionable on
+    /// screen. Event-driven (state changes only, never a view body); the
+    /// cued lifecycle is persisted so replays, reconnects, relaunches and
+    /// redraws never repeat it.
+    func evaluateReadyCue() {
+        guard debugSurface == nil, let projection else { return }
+        let decision = WatchReadyCue.decide(
+            phase: presentedPhase,
+            isStartEnabled: isStartWorkoutEnabled,
+            isDisplayActive: displayIsActive,
+            sessionId: projection.sessionId,
+            preparedAt: projection.preparedAt,
+            now: now(),
+            lastCuedKey: defaults.string(forKey: WatchReadyCue.lastCuedKey)
+        )
+        guard let key = decision else { return }
+        defaults.set(key, forKey: WatchReadyCue.lastCuedKey)
+        trace(.readyCue)
+        if let sink = readyCueSinkForTesting {
+            sink()
+        } else {
+            WKInterfaceDevice.current().play(.notification)
+        }
+    }
+
     // MARK: - Rest haptics
 
     private func stopCountdownHaptics() {
@@ -1532,6 +1579,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
         Task { @MainActor [weak self] in
             self?.connectionState = reachable ? .reachable : activated ? .passive : .phoneUnavailable
             if reachable { self?.refresh() }
+            self?.evaluateReadyCue()
         }
     }
 
@@ -1541,6 +1589,7 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             self?.trace(reachable ? .reachable : .unreachable)
             self?.connectionState = reachable ? .reachable : .passive
             if reachable { self?.retryPending() }
+            self?.evaluateReadyCue()
         }
     }
 
@@ -1580,6 +1629,46 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             receiveApplicationContext(session.receivedApplicationContext)
         }
         refresh()
+    }
+}
+
+/// The truthful "your Watch is ready for you" rule (Build 91, Founder D6).
+/// It cues when a NEW preparation lifecycle first reaches the state where
+/// Start Workout is actionable on screen: phase prepared, the exact
+/// Start-enabled predicate, and the app active. It never means the phone
+/// merely sent Ready, that WCSession is reachable, that a launch request
+/// arrived, or that a workout started (`watchStartedAt` stays the start
+/// authority).
+enum WatchReadyCue {
+    /// A preparation older than this is stale: no cue.
+    static let freshness: TimeInterval = 10 * 60
+    /// Tolerated phone-ahead clock skew for a just-made preparation.
+    static let futureSkew: TimeInterval = 60
+    static let lastCuedKey = "physiqueos.watchWorkout.readyCue.lastLifecycle.v1"
+
+    /// One preparation lifecycle: the session and the instant it was
+    /// prepared (whole seconds, as the wire carries them).
+    static func lifecycleKey(sessionId: String, preparedAt: Date) -> String {
+        "\(sessionId)@\(Int(preparedAt.timeIntervalSince1970.rounded(.down)))"
+    }
+
+    /// The lifecycle key to cue for now, or nil for no cue. Without
+    /// `preparedAt` (an older phone) freshness cannot be proven, so there is
+    /// no cue: the conservative choice.
+    static func decide(
+        phase: WatchWorkoutStore.PresentedPhase,
+        isStartEnabled: Bool,
+        isDisplayActive: Bool,
+        sessionId: String,
+        preparedAt: Date?,
+        now: Date,
+        lastCuedKey: String?
+    ) -> String? {
+        guard phase == .prepared, isStartEnabled, isDisplayActive, let preparedAt else { return nil }
+        let age = now.timeIntervalSince(preparedAt)
+        guard age <= freshness, age >= -futureSkew else { return nil }
+        let key = lifecycleKey(sessionId: sessionId, preparedAt: preparedAt)
+        return key == lastCuedKey ? nil : key
     }
 }
 
