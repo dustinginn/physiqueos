@@ -35,7 +35,7 @@ struct NutritionHistoryView: View {
     @State private var isHistorySheetPresented = false
 
     static let historyPreviewLimit = 3
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         EvidenceScrollPage {
@@ -43,6 +43,7 @@ struct NutritionHistoryView: View {
         }
         .evidencePageChrome("Nutrition")
         .evidenceFamily(.daily)
+        .evidenceDomain(.nutrition)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = NutritionHistoryViewModel(api: environment.nutritionAPI)
@@ -67,7 +68,7 @@ struct NutritionHistoryView: View {
         case .failed(let message):
             EvidenceStatePanel(kind: .failure(message, nil), identifier: "nutrition.failure")
         case .loaded(let landing):
-            EvidencePageHeader(symbol: "⌁", eyebrow: "Evidence Report", title: landing.title, subtitle: landing.subtitle ?? "What PhysiqueOS currently understands.")
+            EvidencePageHeader(showsMark: true, eyebrow: "Evidence Report", title: landing.title, subtitle: landing.subtitle ?? "What PhysiqueOS currently understands.")
             EvidenceScopePicker(scope: landing.scope) { scopeID in
                 Task { await viewModel?.selectScope(pillID: scopeID) }
             }
@@ -104,7 +105,7 @@ struct NutritionHistoryView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 Text("›")
                                     .evidenceText(EvidenceTextStyle(size: 20, weight: 400, lineHeight: 20))
-                                    .foregroundStyle(m.c.teal)
+                                    .foregroundStyle(m.c.accent)
                             }
                             NutritionMacroGridView(totals: day.totals)
                                 .padding(.top, m.pt(10))
@@ -194,7 +195,7 @@ struct NutritionHistoryView: View {
 private struct NutritionHistorySheet: View {
     @Environment(\.dismiss) private var dismiss
     let days: [NutritionDayRecord]
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         NavigationStack {
@@ -239,6 +240,7 @@ private struct NutritionHistorySheet: View {
         }
         .environment(\.evidenceBackTrail, nil)
         .evidenceFamily(.daily)
+        .evidenceDomain(.nutrition)
         .presentationDetents([.medium, .large])
     }
 }

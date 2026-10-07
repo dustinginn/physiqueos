@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// One locked Evidence Hub row (H1 `.hub-row`): a 30-px lettered record
-/// tile, the stream title over its compact summary, and an accent chevron,
-/// separated from the next row by a full-width 1-px rule. The whole row is
-/// one button; the summary families mirror `getCompactSummary`
+/// One locked Evidence Hub row (H1 `.hub-row`): a 30-px icon tile in the
+/// stream's domain accent (the Hub is the key to the category colors), the
+/// stream title over its compact summary, and a neutral chevron, separated
+/// from the next row by a full-width 1-px rule. The whole row is one
+/// button; the summary families mirror `getCompactSummary`
 /// (`EvidenceHubIndex.jsx:129-150`) unchanged.
 struct EvidenceStreamRowView: View {
     let stream: EvidenceStreamSummary
@@ -17,11 +18,7 @@ struct EvidenceStreamRowView: View {
         stream.id == "photos" ? "Photos" : stream.title
     }
 
-    /// The locked record tile: the stream's initial; Timeline uses the
-    /// harness's `⌁` chronology mark.
-    private var tileGlyph: String {
-        stream.id == "timeline" ? "⌁" : String(displayTitle.prefix(1)).uppercased()
-    }
+    private var domain: EvidenceDomain? { EvidenceDomain(streamId: stream.id) }
 
     /// Mirrors `getCompactSummary` (`EvidenceHubIndex.jsx:129-150`).
     private var summary: (label: String, value: String?) {
@@ -51,11 +48,7 @@ struct EvidenceStreamRowView: View {
             onTap(stream.destination)
         } label: {
             HStack(spacing: 0) {
-                Text(tileGlyph)
-                    .evidenceLockedText(S.rowIcon)
-                    .foregroundStyle(S.accent)
-                    .frame(width: S.pt(30), height: S.pt(30))
-                    .background(S.surface2, in: RoundedRectangle(cornerRadius: S.pt(9)))
+                EvidenceHubTile(domain: domain)
                     .frame(width: S.pt(32), alignment: .leading)
                     .padding(.trailing, S.pt(10))
 
@@ -73,7 +66,7 @@ struct EvidenceStreamRowView: View {
 
                 Text("›")
                     .evidenceLockedText(S.chevron)
-                    .foregroundStyle(S.accent)
+                    .foregroundStyle(S.muted)
             }
             .padding(.horizontal, S.pt(1))
             .padding(.vertical, S.pt(10))
@@ -101,5 +94,23 @@ struct EvidenceStreamRowView: View {
         display.dateFormat = "MMM d"
         display.timeZone = TimeZone(identifier: "UTC")
         return display.string(from: date)
+    }
+}
+
+/// The Hub's 30-px rounded tile: the domain icon in its accent on the
+/// accent-soft fill. A stream without a domain gets the neutral clipboard.
+struct EvidenceHubTile: View {
+    let domain: EvidenceDomain?
+
+    private typealias S = EvidenceLockedStyle
+
+    var body: some View {
+        let accent = domain?.accent ?? .neutral
+        Image(systemName: domain?.systemImage ?? "list.clipboard.fill")
+            .font(.system(size: S.pt(13), weight: .semibold))
+            .foregroundStyle(accent.color)
+            .frame(width: S.pt(30), height: S.pt(30))
+            .background(accent.soft, in: RoundedRectangle(cornerRadius: S.pt(9)))
+            .accessibilityHidden(true)
     }
 }

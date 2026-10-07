@@ -13,7 +13,7 @@ struct DEXATrendChartView: View {
     let color: Color
     var note = "Structured values extracted from BodySpec reports."
     @Binding var selectedPointID: String?
-    private let m = EvidenceMetrics(family: .record)
+    private let m = EvidenceMetrics(family: .record, domain: .dexa)
 
     private var validPoints: [DEXATrendPoint] { series.points.filter { $0.value != nil } }
     private var selectedPoint: DEXATrendPoint? {

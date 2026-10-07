@@ -35,7 +35,7 @@ struct EnergyHistoryView: View {
     @State private var isDailyHistorySheetPresented = false
 
     static let historyPreviewLimit = 3
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         EvidenceScrollPage(spacing: 0, top: 10) {
@@ -43,6 +43,7 @@ struct EnergyHistoryView: View {
         }
         .evidencePageChrome("Energy")
         .evidenceFamily(.weight)
+        .evidenceDomain(.energy)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = EnergyHistoryViewModel(api: environment.energyAPI)
@@ -92,15 +93,10 @@ struct EnergyHistoryView: View {
         }
     }
 
-    /// Locked E1 header: 38 px lime `ϟ` mark, eyebrow, title, subtitle.
+    /// Locked E1 header: 38 px Energy domain mark, eyebrow, title, subtitle.
     private func header(for report: EnergyReportReadModel) -> some View {
         HStack(alignment: .top, spacing: m.pt(12)) {
-            Text("ϟ")
-                .evidenceText(.normal(16, 900, jakarta: false))
-                .foregroundStyle(m.c.accent)
-                .frame(width: m.pt(38), height: m.pt(38))
-                .background(m.c.accent.opacity(0.16), in: Circle())
-                .accessibilityHidden(true)
+            EvidenceDomainMark(domain: .energy, diameter: m.pt(38))
             VStack(alignment: .leading, spacing: 0) {
                 Text("EVIDENCE REPORT")
                     .evidenceText(.normal(11, 800, jakarta: false, tracking: 1.43, uppercase: true))
@@ -208,7 +204,7 @@ enum EnergyEvidenceCopy {
 
 /// The one estimate disclosure shared by the summary and both charts.
 struct EnergyEstimateFootnote: View {
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         Text(EnergyEvidenceCopy.estimateFootnote)
@@ -233,7 +229,7 @@ private struct EnergyHistorySheet<Rows: View>: View {
     /// `‹ Daily Energy History` instead of a generic `‹ Back`.
     @State private var trail: EvidenceBackTrail
     @State private var detent: PresentationDetent = .medium
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     init(title: String, identifier: String, @ViewBuilder rows: () -> Rows) {
         self.title = title
@@ -286,6 +282,7 @@ private struct EnergyHistorySheet<Rows: View>: View {
         }
         .environment(\.evidenceBackTrail, trail)
         .evidenceFamily(.weight)
+        .evidenceDomain(.energy)
         .presentationDetents([.medium, .large], selection: $detent)
         .accessibilityIdentifier(identifier)
     }
@@ -297,7 +294,7 @@ private struct EnergyHistorySheet<Rows: View>: View {
 private struct EnergyRowList<Data: RandomAccessCollection, Row: View>: View where Data.Element: Identifiable {
     let data: Data
     @ViewBuilder var row: (Data.Element) -> Row
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -315,7 +312,7 @@ private struct EnergyRowList<Data: RandomAccessCollection, Row: View>: View wher
 struct EnergyTag: View {
     let text: String
     var warn = false
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         let color = warn ? m.c.amber : m.c.accent
@@ -333,7 +330,7 @@ struct EnergyTag: View {
 struct EnergyField: View {
     let label: String
     let value: String
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         VStack(alignment: .leading, spacing: m.pt(1)) {
@@ -352,7 +349,7 @@ struct EnergyField: View {
 /// `.energy-grid`: two columns, 4 px row gap, 12 px column gap.
 struct EnergyFieldGrid: View {
     let fields: [(String, String)]
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(12), alignment: .top), GridItem(.flexible(), spacing: m.pt(12), alignment: .top)],
@@ -368,7 +365,7 @@ private func compact(_ formatted: String) -> String { EnergyEvidenceCopy.compact
 
 private struct EnergyWeekHistoryRow: View {
     let week: EnergyWeekRecord
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -396,7 +393,7 @@ private struct EnergyWeekHistoryRow: View {
 
 private struct EnergyDayHistoryRow: View {
     let day: EnergyDayRecord
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     private var completenessLabel: String { EnergyEvidenceCopy.completenessLabel(day.completeness) }
 

@@ -26,7 +26,7 @@ struct PhotoSetDetailView: View {
         self.initialPoseId = initialPoseId
     }
 
-    private let m = EvidenceMetrics(family: .record)
+    private let m = EvidenceMetrics(family: .record, domain: .photos)
 
     var body: some View {
         ScrollView {
@@ -41,6 +41,7 @@ struct PhotoSetDetailView: View {
         .photoInspection($inspection, chrome: .record)
         .navigationBarTitleDisplayMode(.inline)
         .evidenceFamily(.record)
+        .evidenceDomain(.photos)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = PhotoSetDetailViewModel(api: environment.photosAPI, setId: setId)

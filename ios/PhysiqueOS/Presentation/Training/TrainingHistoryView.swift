@@ -55,7 +55,7 @@ struct TrainingHistoryView: View {
             EvidenceStatePanel(kind: .failure(message, nil), identifier: "training.failure")
         case .loaded(let landing):
             EvidencePageHeader(
-                symbol: "⌁",
+                showsMark: true,
                 eyebrow: "Evidence Report",
                 title: landing.title,
                 subtitle: landing.subtitle ?? "What PhysiqueOS currently understands."
@@ -380,13 +380,14 @@ private struct TrainingAreaTile: View {
 /// when expanded.
 struct EvidenceKitDisclosureRow: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let label: String
     var detail: String?
     let isExpanded: Bool
     var trailingText: String?
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         HStack(spacing: m.pt(10)) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(label)

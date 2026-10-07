@@ -32,7 +32,7 @@ struct NutritionTrendChartView: View {
     let emptyMessage: String
     @Binding var selectedWeekID: String?
 
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
     private var validPoints: [NutritionTrendPoint] { points.filter { $0.value != nil } }
 
     private var selectedPoint: NutritionTrendPoint? {
@@ -155,7 +155,7 @@ struct NutritionBarChartView: View {
 
     let bars: [Bar]
     let emptyMessage: String
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         let maxValue = bars.map(\.value).max() ?? 0
@@ -212,7 +212,7 @@ struct NutritionDonutChartView: View {
     let slices: [Slice]
     let centerLabel: String
     let emptyMessage: String
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         if slices.isEmpty || slices.allSatisfy({ $0.percentage == 0 }) {

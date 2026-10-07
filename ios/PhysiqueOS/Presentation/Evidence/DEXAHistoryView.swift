@@ -41,7 +41,7 @@ struct DEXAHistoryView: View {
     static let supplementalPreviewLimit = 3
     static let regionalPreviewLimit = 3
     static let historyPreviewLimit = 3
-    private let m = EvidenceMetrics(family: .record)
+    private let m = EvidenceMetrics(family: .record, domain: .dexa)
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -59,6 +59,7 @@ struct DEXAHistoryView: View {
         .defaultScrollAnchor(Self.reviewScrollAnchor)
         .evidencePageChrome("DEXA")
         .evidenceFamily(.record)
+        .evidenceDomain(.dexa)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = DEXAHistoryViewModel(api: environment.dexaAPI)
@@ -82,7 +83,7 @@ struct DEXAHistoryView: View {
         case .failed(let message):
             EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "dexa.failure")
         case .loaded(let report):
-            EvidenceHeaderView(symbol: "D", eyebrow: "Evidence Report", title: report.title, subtitle: report.subtitle, exposesTexts: true)
+            EvidenceHeaderView(domain: .dexa, eyebrow: "Evidence Report", title: report.title, subtitle: report.subtitle, exposesTexts: true)
             EvidenceScopePicker(scope: report.scope) { pillID in
                 Task { await viewModel?.selectScope(pillID: pillID) }
             }
@@ -565,7 +566,7 @@ private extension DEXAHistoryView {
 private struct DEXAScanHistoryRowView: View {
     let row: DEXAScanHistoryRow
     var onOpenSource: () -> Void = {}
-    private let m = EvidenceMetrics(family: .record)
+    private let m = EvidenceMetrics(family: .record, domain: .dexa)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

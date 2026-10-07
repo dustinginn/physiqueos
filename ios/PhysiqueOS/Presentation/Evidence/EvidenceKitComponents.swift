@@ -12,6 +12,7 @@ import SwiftUI
 /// Nutrition/Activity and Weight bars draw a 1 px rule.
 struct EvidencePageChrome: ViewModifier {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     @Environment(\.dismiss) private var dismiss
     @Environment(\.evidenceBackTrail) private var trail
     @State private var token = EvidenceTrailToken()
@@ -29,7 +30,7 @@ struct EvidencePageChrome: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         content
             .background(m.c.page)
             .navigationBarTitleDisplayMode(.inline)
@@ -99,13 +100,14 @@ extension ToolbarContent {
 /// The scrolling page body with the harness's `.scroll` padding.
 struct EvidenceScrollPage<Content: View>: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     var spacing: CGFloat = 16
     /// `.scroll` top inset in px (Training 10; daily 16, `.tight` 10).
     var top: CGFloat?
     @ViewBuilder var content: Content
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         ScrollView {
             VStack(alignment: .leading, spacing: m.pt(spacing)) {
                 content
@@ -130,10 +132,12 @@ struct EvidenceScrollPage<Content: View>: View {
 
 // MARK: - Header
 
-/// `.header`: optional 40 px mark, eyebrow, title, subtitle, breadcrumbs.
+/// `.header`: optional 40 px domain mark, eyebrow, title, subtitle,
+/// breadcrumbs. Report landings show the mark; child pages do not.
 struct EvidencePageHeader: View {
     @Environment(\.evidenceFamily) private var family
-    var symbol: String?
+    @Environment(\.evidenceDomain) private var domain
+    var showsMark = false
     let eyebrow: String
     let title: String
     var subtitle: String?
@@ -141,16 +145,11 @@ struct EvidencePageHeader: View {
     var dateTitle = false
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         let t = family == .training
         HStack(alignment: .top, spacing: m.pt(12)) {
-            if let symbol {
-                Text(symbol)
-                    .evidenceText(.normal(19, 800))
-                    .foregroundStyle(m.c.accent)
-                    .frame(width: m.pt(40), height: m.pt(40))
-                    .background(m.c.accentSoft, in: Circle())
-                    .accessibilityHidden(true)
+            if showsMark, let markDomain = m.domain {
+                EvidenceDomainMark(domain: markDomain, diameter: m.pt(40))
             }
             VStack(alignment: .leading, spacing: 0) {
                 // Literal uppercase (not `textCase`): the shipping accessibility
@@ -214,11 +213,12 @@ struct EvidencePageHeader: View {
 /// wraps it in a VIEWING card; Nutrition/Activity show bordered pills.
 struct EvidenceScopePicker: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let scope: TrainingScopeContext
     var onSelect: ((String) -> Void)?
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         if family == .record {
             // `.scope`: "Viewing Goal" and flat 9-px-radius pills; the
             // selected pill is `surface2` with an inset 34% accent ring.
@@ -332,7 +332,8 @@ enum EvidenceSectionStyle {
     case contained
     /// `.section.open` — no container.
     case open
-    /// `.section.analytical` — teal-tinted field.
+    /// `.section.analytical` — the emphasized inset card (L2 + rule); the
+    /// Training teal field it used to be is retired (Build 91).
     case analytical
     /// Nutrition/Activity `.section.contained` (`--surface-3`).
     case containedDeep
@@ -340,6 +341,7 @@ enum EvidenceSectionStyle {
 
 struct EvidenceSection<Trailing: View, Content: View>: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     var title: String?
     var style: EvidenceSectionStyle = .contained
     var identifier: String?
@@ -347,7 +349,7 @@ struct EvidenceSection<Trailing: View, Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         VStack(alignment: .leading, spacing: 0) {
             if let title {
                 HStack(alignment: family == .training ? .center : .firstTextBaseline, spacing: m.pt(10)) {
@@ -377,10 +379,11 @@ extension EvidenceSection where Trailing == EmptyView {
 
 private struct EvidenceSectionContainer: ViewModifier {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let style: EvidenceSectionStyle
 
     func body(content: Content) -> some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         switch style {
         case .open:
             content
@@ -392,8 +395,8 @@ private struct EvidenceSectionContainer: ViewModifier {
         case .analytical:
             content
                 .padding(m.pt(13 + 1))
-                .background(m.c.tealSoft, in: RoundedRectangle(cornerRadius: m.pt(16)))
-                .overlay(RoundedRectangle(cornerRadius: m.pt(16)).strokeBorder(m.c.teal.opacity(0.32), lineWidth: m.pt(1)))
+                .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(16)))
+                .overlay(RoundedRectangle(cornerRadius: m.pt(16)).strokeBorder(m.c.line, lineWidth: m.pt(1)))
         }
     }
 }
@@ -401,10 +404,11 @@ private struct EvidenceSectionContainer: ViewModifier {
 /// `.section-action` (`Show All >`, `Browse >`, `View all →`).
 struct EvidenceSectionAction: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let label: String
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         Text(label)
             .evidenceText(family == .training ? .normal(10, 800) : .normal(9, 800))
             .foregroundStyle(m.c.accent)
@@ -415,10 +419,11 @@ struct EvidenceSectionAction: View {
 /// `.small-note` beside a section title (`2 sessions`, `read-only history`).
 struct EvidenceSmallNote: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let text: String
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         Text(text)
             .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 13.05))
             .foregroundStyle(m.c.quiet)
@@ -443,6 +448,7 @@ enum EvidenceRailTone {
 /// optional value and the accent chevron. Divider drawn by the list.
 struct EvidenceRailRow: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     var type: String?
     let label: String
     var detail: String?
@@ -451,7 +457,7 @@ struct EvidenceRailRow: View {
     var showsChevron = true
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         let toneColor = tone.color(m.c, family: family)
         HStack(spacing: m.pt(10)) {
             VStack(alignment: .leading, spacing: 0) {
@@ -503,12 +509,13 @@ struct EvidenceRailRow: View {
 /// Training `.row` without a rail: label + detail + chevron link row.
 struct EvidenceLinkRow: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let label: String
     var detail: String?
     var showsChevron = true
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         HStack(spacing: m.pt(10)) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(label)
@@ -539,11 +546,12 @@ struct EvidenceLinkRow: View {
 /// Stacks rows with the harness's `.row + .row` 1 px top rule.
 struct EvidenceDividedList<Data: RandomAccessCollection, Row: View>: View where Data.Element: Identifiable {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let data: Data
     @ViewBuilder var row: (Data.Element) -> Row
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         VStack(spacing: 0) {
             ForEach(Array(data.enumerated()), id: \.element.id) { index, element in
                 row(element)
@@ -560,10 +568,11 @@ struct EvidenceDividedList<Data: RandomAccessCollection, Row: View>: View where 
 /// `.disclosure`: surface-2 field, 11 px radius, 10 px inset.
 struct EvidenceField<Content: View>: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     @ViewBuilder var content: Content
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         content
             .padding(m.pt(10))
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -574,6 +583,7 @@ struct EvidenceField<Content: View>: View {
 /// `.metric-grid` / `.metric`.
 struct EvidenceMetricGrid: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     struct Item: Identifiable {
         var id: String { label }
         let label: String
@@ -585,7 +595,7 @@ struct EvidenceMetricGrid: View {
     var columns = 3
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         let grid = Array(repeating: GridItem(.flexible(), spacing: m.pt(7), alignment: .top), count: columns)
         LazyVGrid(columns: grid, alignment: .leading, spacing: m.pt(7)) {
             ForEach(items) { item in
@@ -612,10 +622,11 @@ struct EvidenceMetricGrid: View {
 /// `.definition`: key/value rows with 1 px rules (none under the last).
 struct EvidenceDefinitionList: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let rows: [(key: String, value: String)]
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         VStack(spacing: 0) {
             ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                 HStack(alignment: .top, spacing: m.pt(10)) {
@@ -639,16 +650,18 @@ struct EvidenceDefinitionList: View {
     }
 }
 
-/// `.provenance`: teal-tinted source field with a 3 px left rule.
+/// `.provenance`: a source note on the L2 inset with a 3 px left rule in
+/// the page accent (or a semantic `tint`); no tinted wash.
 struct EvidenceProvenance: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let title: String
     var detail: String?
     var tint: Color?
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
-        let color = tint ?? m.c.teal
+        let m = EvidenceMetrics(family: family, domain: domain)
+        let color = tint ?? m.c.accent
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
                 .evidenceText(.normal(11, 800))
@@ -665,7 +678,7 @@ struct EvidenceProvenance: View {
         .padding(.leading, m.pt(11) + m.pt(3))
         .padding(.trailing, m.pt(11))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: m.pt(11)))
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(11)))
         .overlay(alignment: .leading) {
             UnevenRoundedRectangle(topLeadingRadius: m.pt(11), bottomLeadingRadius: m.pt(11))
                 .fill(color)
@@ -678,12 +691,13 @@ struct EvidenceProvenance: View {
 /// `.comparison` (green) and its amber/neutral counterparts.
 struct EvidenceCallout: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     enum Tone { case success, stable, warning, neutral }
     let text: String
     var tone: Tone = .success
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         let color: Color = switch tone {
         case .success: m.c.green
         case .stable: m.c.teal
@@ -706,13 +720,14 @@ struct EvidenceCallout: View {
 /// `.set-row` grid: 34 px label column, then two right-aligned columns.
 struct EvidenceSetRow: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let first: String
     let second: String
     let third: String
     var isHeader = false
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         let style: EvidenceTextStyle = isHeader
             ? .normal(8, 400, tracking: 0.72, uppercase: true)
             : .normal(10, 400)
@@ -738,14 +753,16 @@ struct EvidenceSetRow: View {
     }
 }
 
-/// `.superset`: purple relationship field with a 3 px rail.
+/// `.superset`: a relationship group on the L2 inset; the purple label and
+/// 3 px rail carry the (semantic) superset relationship.
 struct EvidenceRelationshipGroup<Content: View>: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let label: String
     @ViewBuilder var content: Content
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         VStack(alignment: .leading, spacing: 0) {
             Text(label)
                 .evidenceText(.normal(8, 850, tracking: 0.96, uppercase: true))
@@ -757,7 +774,7 @@ struct EvidenceRelationshipGroup<Content: View>: View {
         .padding(.leading, m.pt(10) + m.pt(3))
         .padding(.trailing, m.pt(10))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(m.c.purpleSoft, in: RoundedRectangle(cornerRadius: m.pt(12)))
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(12)))
         .overlay(alignment: .leading) {
             UnevenRoundedRectangle(topLeadingRadius: m.pt(12), bottomLeadingRadius: m.pt(12))
                 .fill(m.c.purple)
@@ -772,6 +789,7 @@ struct EvidenceRelationshipGroup<Content: View>: View {
 /// `.state` / `.state-panel`: centered loading, empty and failure fields.
 struct EvidenceStatePanel: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     enum Kind {
         case loading(String)
         case empty(String, String?)
@@ -782,7 +800,7 @@ struct EvidenceStatePanel: View {
     let identifier: String
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         let t = family == .training
         VStack(spacing: 0) {
             switch kind {
@@ -796,7 +814,7 @@ struct EvidenceStatePanel: View {
                 if !t {
                     Text("◯")
                         .evidenceText(.normal(20, 400))
-                        .foregroundStyle(m.c.teal)
+                        .foregroundStyle(m.c.accent)
                         .padding(.bottom, m.pt(7))
                         .accessibilityHidden(true)
                 }
@@ -808,7 +826,7 @@ struct EvidenceStatePanel: View {
                 if !t {
                     Text("!")
                         .evidenceText(.normal(20, 400))
-                        .foregroundStyle(m.c.teal)
+                        .foregroundStyle(m.c.accent)
                         .padding(.bottom, m.pt(7))
                         .accessibilityHidden(true)
                 }
@@ -840,11 +858,12 @@ struct EvidenceStatePanel: View {
 
 private struct EvidenceKitSpinner: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var spinning = false
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         let t = family == .training
         let width = m.pt(t ? 2 : 3)
         ZStack {
@@ -863,11 +882,12 @@ private struct EvidenceKitSpinner: View {
 /// `.placeholder` — a stable informational destination (Foundation).
 struct EvidencePlaceholder: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let title: String
     let detail: String
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
                 .evidenceText(.normal(14, 700))
@@ -890,9 +910,11 @@ struct EvidencePlaceholder: View {
 // MARK: - Nutrition / Activity ("daily") components
 
 /// Daily `.metric-grid` / `.metric`: two columns, 8 px uppercase label over
-/// a 12 px tabular value; optional teal accent fill and semantic value ink.
+/// a 12 px tabular value; an `accent` tile adds a 1 px accent ring (no
+/// tinted fill) and values may carry semantic ink.
 struct EvidenceDailyMetricGrid: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     struct Item: Identifiable {
         var id: String { label }
         let label: String
@@ -904,7 +926,7 @@ struct EvidenceDailyMetricGrid: View {
     let items: [Item]
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(7), alignment: .top), GridItem(.flexible(), spacing: m.pt(7), alignment: .top)], alignment: .leading, spacing: m.pt(7)) {
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: 0) {
@@ -919,7 +941,12 @@ struct EvidenceDailyMetricGrid: View {
                 }
                 .padding(m.pt(9))
                 .frame(maxWidth: .infinity, minHeight: m.pt(52), alignment: .topLeading)
-                .background(item.accent ? m.c.tealSoft : m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(10)))
+                .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(10)))
+                .overlay {
+                    if item.accent {
+                        RoundedRectangle(cornerRadius: m.pt(10)).strokeBorder(m.c.accent.opacity(0.34), lineWidth: m.pt(1))
+                    }
+                }
                 .accessibilityElement(children: .combine)
             }
         }
@@ -929,10 +956,11 @@ struct EvidenceDailyMetricGrid: View {
 /// Daily `.area-grid` / `.area`: informational label/value tiles.
 struct EvidenceDailyAreaGrid: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let items: [(label: String, value: String)]
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(7), alignment: .top), GridItem(.flexible(), spacing: m.pt(7), alignment: .top)], alignment: .leading, spacing: m.pt(7)) {
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                 VStack(alignment: .leading, spacing: 0) {
@@ -958,10 +986,11 @@ struct EvidenceDailyAreaGrid: View {
 /// Daily `.hero-day`: the latest-day field (gradient, 1 px rule, 15 px radius).
 struct EvidenceDailyHero<Content: View>: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     @ViewBuilder var content: Content
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         content
             .padding(m.pt(13 + 1))
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -977,18 +1006,19 @@ struct EvidenceDailyHero<Content: View>: View {
 /// accent chevron on the last trailing line. 1 px rule below every row.
 struct EvidenceDailyRow: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let label: String
     var copy: String?
     var trailing: [String] = []
     var showsChevron = true
     var railColor: Color?
     /// `.inline`: muted `›` on the last trailing line (Activity);
-    /// `.stacked`: 20 px teal `›` below the value (Nutrition history);
-    /// `.center`: 20 px teal `›` centered right (link rows).
+    /// `.stacked`: 20 px accent `›` below the value (Nutrition history);
+    /// `.center`: 20 px accent `›` centered right (link rows).
     var chevron: EvidenceDailyChevron = .inline
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         HStack(alignment: .center, spacing: m.pt(10)) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(label)
@@ -1013,7 +1043,7 @@ struct EvidenceDailyRow: View {
                     if showsChevron && chevron == .stacked {
                         Text("›")
                             .evidenceText(EvidenceTextStyle(size: 20, weight: 750, lineHeight: 20))
-                            .foregroundStyle(m.c.teal)
+                            .foregroundStyle(m.c.accent)
                     }
                 }
                 .multilineTextAlignment(.trailing)
@@ -1021,7 +1051,7 @@ struct EvidenceDailyRow: View {
             if showsChevron && chevron == .center {
                 Text("›")
                     .evidenceText(EvidenceTextStyle(size: 20, weight: 400, lineHeight: 20))
-                    .foregroundStyle(m.c.teal)
+                    .foregroundStyle(m.c.accent)
             }
         }
         .padding(.vertical, m.pt(9))
@@ -1041,11 +1071,12 @@ enum EvidenceDailyChevron { case inline, stacked, center }
 /// Daily `.open-list`: 1 px rule above the list and below every row.
 struct EvidenceDailyOpenList<Data: RandomAccessCollection, Row: View>: View where Data.Element: Identifiable {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let data: Data
     @ViewBuilder var row: (Data.Element) -> Row
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         VStack(spacing: 0) {
             ForEach(data) { element in
                 row(element)
@@ -1058,16 +1089,17 @@ struct EvidenceDailyOpenList<Data: RandomAccessCollection, Row: View>: View wher
     }
 }
 
-/// Daily `.provenance`: teal dot + bold source + copy on a teal tint.
+/// Daily `.provenance`: accent dot + bold source + copy on the L2 inset.
 struct EvidenceDailyProvenance: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let title: String
     var detail: String?
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         HStack(alignment: .top, spacing: m.pt(8)) {
-            Circle().fill(m.c.teal).frame(width: m.pt(7), height: m.pt(7)).padding(.top, m.pt(3)).accessibilityHidden(true)
+            Circle().fill(m.c.accent).frame(width: m.pt(7), height: m.pt(7)).padding(.top, m.pt(3)).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 0) {
                 Text(title)
                     .evidenceText(EvidenceTextStyle(size: 9, weight: 700, lineHeight: 12.42))
@@ -1084,7 +1116,7 @@ struct EvidenceDailyProvenance: View {
         .padding(.vertical, m.pt(9))
         .padding(.horizontal, m.pt(10))
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(m.c.tealSoft, in: RoundedRectangle(cornerRadius: m.pt(10)))
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(10)))
         .accessibilityElement(children: .combine)
     }
 }
@@ -1092,11 +1124,12 @@ struct EvidenceDailyProvenance: View {
 /// Daily `.warning`: amber note (non-color cue: the leading glyph).
 struct EvidenceDailyWarning: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let text: String
     var provisional = false
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         HStack(alignment: .top, spacing: m.pt(8)) {
             Text(provisional ? "◷" : "!")
                 .evidenceText(EvidenceTextStyle(size: 9, weight: 700, lineHeight: 12.78))
@@ -1117,11 +1150,12 @@ struct EvidenceDailyWarning: View {
 /// Daily section title + optional action (`Show All >`), 9 px gap.
 struct EvidenceDailySectionHead<Trailing: View>: View {
     @Environment(\.evidenceFamily) private var family
+    @Environment(\.evidenceDomain) private var domain
     let title: String
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
-        let m = EvidenceMetrics(family: family)
+        let m = EvidenceMetrics(family: family, domain: domain)
         HStack(alignment: .firstTextBaseline, spacing: m.pt(10)) {
             Text(title)
                 .evidenceText(.normal(12, 850, tracking: -0.12))

@@ -47,7 +47,7 @@ struct ActivityHistoryView: View {
     @State private var isHistorySheetPresented = false
 
     static let historyPreviewLimit = 3
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .activity)
 
     var body: some View {
         EvidenceScrollPage(top: 10) {
@@ -55,6 +55,7 @@ struct ActivityHistoryView: View {
         }
         .evidencePageChrome("Activity")
         .evidenceFamily(.daily)
+        .evidenceDomain(.activity)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = ActivityHistoryViewModel(api: environment.activityAPI)
@@ -79,7 +80,7 @@ struct ActivityHistoryView: View {
         case .failed(let message):
             EvidenceStatePanel(kind: .failure(message, nil), identifier: "activity.failure")
         case .loaded(let landing):
-            EvidencePageHeader(symbol: "⌁", eyebrow: "Evidence Report", title: landing.title, subtitle: landing.subtitle)
+            EvidencePageHeader(showsMark: true, eyebrow: "Evidence Report", title: landing.title, subtitle: landing.subtitle)
             EvidenceScopePicker(scope: landing.scope) { scopeID in
                 Task { await viewModel?.selectScope(pillID: scopeID) }
             }
@@ -116,14 +117,14 @@ struct ActivityHistoryView: View {
                                     if day.isInProgress {
                                         Text("Still updating from Apple Health")
                                             .evidenceText(EvidenceTextStyle(size: 9, weight: 600, lineHeight: 12.42))
-                                            .foregroundStyle(m.c.teal)
+                                            .foregroundStyle(m.c.accent)
                                             .padding(.top, m.pt(3))
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 Text("›")
                                     .evidenceText(EvidenceTextStyle(size: 20, weight: 400, lineHeight: 20))
-                                    .foregroundStyle(m.c.teal)
+                                    .foregroundStyle(m.c.accent)
                             }
                             ActivityMetricGridView(day: day)
                                 .padding(.top, m.pt(10))
@@ -198,7 +199,7 @@ struct ActivityHistoryView: View {
 /// Current Linked Training Context — real evidence, not navigation.
 struct ActivityLinkedTrainingSection: View {
     let entries: [ActivityTrainingContextEntry]
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .activity)
 
     var body: some View {
         EvidenceSection(title: "Linked Training Context", style: .containedDeep, identifier: "activity.linkedTraining") {
@@ -228,7 +229,7 @@ struct ActivityLinkedTrainingSection: View {
 private struct ActivityHistorySheet: View {
     @Environment(\.dismiss) private var dismiss
     let days: [ActivityDayRecord]
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .activity)
 
     var body: some View {
         NavigationStack {
@@ -275,6 +276,7 @@ private struct ActivityHistorySheet: View {
         }
         .environment(\.evidenceBackTrail, nil)
         .evidenceFamily(.daily)
+        .evidenceDomain(.activity)
         .presentationDetents([.medium, .large])
     }
 }
