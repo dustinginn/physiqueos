@@ -82,7 +82,7 @@ struct EvidenceView: View {
                         .accessibilityIdentifier("evidence.hub.refreshFailed")
                 }
                 EvidenceHeaderView(
-                    symbol: "◇",
+                    domain: nil,
                     eyebrow: "Your record",
                     title: "Evidence",
                     subtitle: "What PhysiqueOS has captured."

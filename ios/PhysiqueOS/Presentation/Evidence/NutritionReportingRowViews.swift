@@ -30,7 +30,7 @@ struct NutritionDailyCalorieRowView: View {
 private struct NutritionMacroValues: View {
     let values: [NutritionMacroKey: Double]
     let selectedMacro: NutritionMacroKey
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         HStack(spacing: m.pt(8)) {
@@ -47,7 +47,7 @@ private struct NutritionMacroValues: View {
 struct NutritionWeeklyMacroRowView: View {
     let row: NutritionWeeklyMacroRow
     let selectedMacro: NutritionMacroKey
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         HStack(spacing: m.pt(10)) {
@@ -67,7 +67,7 @@ struct NutritionWeeklyMacroRowView: View {
 struct NutritionDailyMacroRowView: View {
     let row: NutritionDailyMacroRow
     let selectedMacro: NutritionMacroKey
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         HStack(spacing: m.pt(10)) {
@@ -91,7 +91,7 @@ struct NutritionDailyMacroRowView: View {
 
 struct NutritionRecurringMealRow: View {
     let meal: NutritionRecurringMeal
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         HStack(alignment: .top, spacing: m.pt(10)) {
@@ -140,7 +140,7 @@ struct NutritionRecurringMealRow: View {
 
 struct NutritionWeeklyMealRowView: View {
     let row: NutritionWeeklyMealRow
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         VStack(alignment: .leading, spacing: m.pt(8)) {
@@ -180,7 +180,7 @@ struct NutritionWeeklyMealRowView: View {
 
 struct NutritionMealHistoryGroupRow: View {
     let group: NutritionMealHistoryGroup
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         HStack(spacing: m.pt(10)) {
@@ -234,7 +234,7 @@ struct NutritionReportListSheet<Content: View>: View {
     @Environment(\.dismiss) private var dismiss
     let title: String
     @ViewBuilder var content: Content
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         NavigationStack {
@@ -272,6 +272,7 @@ struct NutritionReportListSheet<Content: View>: View {
         }
         .environment(\.evidenceBackTrail, nil)
         .evidenceFamily(.daily)
+        .evidenceDomain(.nutrition)
         .presentationDetents([.medium, .large])
     }
 }

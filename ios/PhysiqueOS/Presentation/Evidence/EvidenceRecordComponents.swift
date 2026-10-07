@@ -37,7 +37,8 @@ struct RecordCard<Content: View>: View {
     var padding: CGFloat = 12
     var radius: CGFloat = 14
     @ViewBuilder var content: Content
-    private let m = EvidenceMetrics(family: .record)
+    @Environment(\.evidenceDomain) private var domain
+    private var m: EvidenceMetrics { EvidenceMetrics(family: .record, domain: domain) }
 
     var body: some View {
         content
@@ -124,7 +125,8 @@ private struct GreedyWordsLayout: Layout {
 /// `.tag`: accent text on a 14% accent capsule.
 struct RecordTag: View {
     let text: String
-    private let m = EvidenceMetrics(family: .record)
+    @Environment(\.evidenceDomain) private var domain
+    private var m: EvidenceMetrics { EvidenceMetrics(family: .record, domain: domain) }
 
     var body: some View {
         Text(text)
@@ -202,7 +204,8 @@ struct RecordDisclosureHead: View {
     let isExpanded: Bool
     let identifier: String
     let toggle: () -> Void
-    private let m = EvidenceMetrics(family: .record)
+    @Environment(\.evidenceDomain) private var domain
+    private var m: EvidenceMetrics { EvidenceMetrics(family: .record, domain: domain) }
 
     var body: some View {
         Button(action: toggle) {
@@ -267,7 +270,8 @@ enum RecordDate {
 /// Drawn only where no photo pixels exist; it never stands in for a pose
 /// whose real media failed (that shows the failure state instead).
 struct RecordSilhouetteArt: View {
-    private let m = EvidenceMetrics(family: .record)
+    @Environment(\.evidenceDomain) private var domain
+    private var m: EvidenceMetrics { EvidenceMetrics(family: .record, domain: domain) }
 
     var body: some View {
         GeometryReader { proxy in
@@ -337,7 +341,8 @@ struct EllipticalCornerRectangle: Shape {
 /// `.spinner`: a 22-px ring in `--line` with an accent leading arc.
 struct RecordSpinner: View {
     @State private var spinning = false
-    private let m = EvidenceMetrics(family: .record)
+    @Environment(\.evidenceDomain) private var domain
+    private var m: EvidenceMetrics { EvidenceMetrics(family: .record, domain: domain) }
 
     var body: some View {
         ZStack {
@@ -362,7 +367,8 @@ struct RecordSpinner: View {
 /// `.retry`: accent label on a `surface2` 8-px pill.
 struct RecordRetryLabel: View {
     var title = "Try again"
-    private let m = EvidenceMetrics(family: .record)
+    @Environment(\.evidenceDomain) private var domain
+    private var m: EvidenceMetrics { EvidenceMetrics(family: .record, domain: domain) }
 
     var body: some View {
         Text(title)

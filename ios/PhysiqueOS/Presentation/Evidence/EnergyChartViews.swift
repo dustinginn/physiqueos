@@ -23,7 +23,7 @@ struct EnergyOverTimeChartView: View {
     let weeksAscending: [EnergyWeekRecord]
     @Binding var selectedWeekID: String?
     @State private var range: EvidenceChartRange = .all
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     private var filteredWeeks: [EnergyWeekRecord] {
         EnergyEvidenceCalculator.rangeFiltered(weeksAscending: weeksAscending, range: range)
@@ -154,7 +154,7 @@ struct EnergyWeeklyBarChartView: View {
     /// (`EnergyEvidenceCalculator.recentFourWeeks`).
     let weeksAscending: [EnergyWeekRecord]
     @Binding var selectedWeekID: String?
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     private var selectedWeek: EnergyWeekRecord? {
         (selectedWeekID.flatMap { id in weeksAscending.first { $0.id == id } }) ?? weeksAscending.last
@@ -242,7 +242,7 @@ struct EnergyWeeklyBarChartView: View {
 /// `.section-note`: 10 px quiet copy under a section title.
 struct EnergySectionNote: View {
     let text: String
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         Text(text)
@@ -257,7 +257,7 @@ struct EnergySectionNote: View {
 /// is dashed, so the estimate reads the same in the legend and the plot.
 struct EnergySeriesLegend: View {
     var dashedExpenditure = true
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         HStack(spacing: m.pt(11)) {
@@ -290,7 +290,7 @@ struct EnergySeriesLegend: View {
 
 /// `.chart` field: surface-2 with 25 / 50 / 75 % rules.
 private struct EnergyChartField: View {
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -307,7 +307,7 @@ private struct EnergyChartField: View {
 /// `.dot`: page-filled point with a 2 px series ring.
 private struct EnergyChartDot: View {
     let color: Color
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         Circle()
@@ -320,7 +320,7 @@ private struct EnergyChartDot: View {
 private struct EnergyAxisLabels: View {
     let first: String?
     let last: String?
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         HStack {
@@ -336,7 +336,7 @@ private struct EnergyAxisLabels: View {
 }
 
 private struct EnergyChartEmpty: View {
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         Text("No weekly energy evidence available")
@@ -355,7 +355,7 @@ struct EnergyWeekDetailView: View {
     /// The latest week is shown until a week is tapped or scrubbed.
     var isExplicit = false
     var identifier = "energy.selectedWeek"
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .energy)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

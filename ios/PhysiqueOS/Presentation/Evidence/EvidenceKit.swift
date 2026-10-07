@@ -4,8 +4,10 @@ import UIKit
 /// Founder-locked Evidence family design systems (Redesign Batch 3, B/C).
 ///
 /// Each locked family was designed in its own HTML harness, so each keeps
-/// its own palette, typeface and harness width. Lengths are written in the
-/// harness's CSS px and scaled to the 402 pt iPhone 17 Pro:
+/// its own typeface, harness width and semantic data colors. Since Build 91
+/// every family shares one neutral surface hierarchy (`EvidenceSurfaces`)
+/// and takes its accent from the page's `EvidenceDomain`. Lengths are
+/// written in the harness's CSS px and scaled to the 402 pt iPhone 17 Pro:
 ///
 /// - Training (`training-evidence-style-translation-20261004`, `33ea6491`):
 ///   Plus Jakarta Sans, 390 px phone.
@@ -45,6 +47,8 @@ enum EvidenceFamily {
     /// CSS px → pt for this family's harness.
     func pt(_ px: CGFloat) -> CGFloat { px * 402 / harnessWidth }
 
+    /// The family's semantic palette on the shared Evidence surfaces, with
+    /// a neutral accent; `EvidenceMetrics` applies the page's domain accent.
     var palette: EvidencePalette {
         switch self {
         case .training: .training
@@ -53,6 +57,13 @@ enum EvidenceFamily {
         case .record: .record
         case .workflow: .workflow
         }
+    }
+
+    /// The domain a family implies on its own. Only Training is a single
+    /// domain; Daily (Nutrition/Activity), Weight (Weight/Energy/Recovery)
+    /// and Record (Photos/DEXA) pages declare theirs via `evidenceDomain`.
+    var impliedDomain: EvidenceDomain? {
+        self == .training ? .training : nil
     }
 }
 
@@ -78,10 +89,10 @@ struct EvidencePalette {
     let ink: Color
     let muted: Color
     let quiet: Color
-    /// The family's identity accent (Training purple, Nutrition/Activity
-    /// teal, Weight lime).
-    let accent: Color
-    let accentSoft: Color
+    /// The page's domain accent (`EvidenceDomain.accent`); neutral until a
+    /// domain is applied. Never a surface wash.
+    var accent: Color
+    var accentSoft: Color
     let teal: Color
     let tealSoft: Color
     let purple: Color
@@ -101,18 +112,19 @@ struct EvidencePalette {
     let dinner: Color
     let snacks: Color
 
-    /// `.training` (`training-evidence.css` `:root` / `[data-theme=light]`).
+    /// `.training` semantic colors (`training-evidence.css`) on the shared
+    /// Evidence surfaces; the teal-tinted surface set is retired (Build 91).
     static let training = EvidencePalette(
-        page: d(0x071416, 0xF1EEE6),
-        surface: d(0x0D2325, 0xFAF8F2),
-        surface2: d(0x102B2C, 0xE3ECE7),
-        surface3: d(0x153737, 0xD4E5DE),
-        line: d(0x294344, 0xC7D1CB),
-        ink: d(0xF3F7F4, 0x14282A),
-        muted: d(0xA9BAB6, 0x536765),
-        quiet: d(0x748B87, 0x71807D),
-        accent: d(0xAE8CFA, 0x6F4FB3),
-        accentSoft: d(0xAE8CFA, 0x6F4FB3, 0.12, 0.10),
+        page: EvidenceSurfaces.page,
+        surface: EvidenceSurfaces.surface,
+        surface2: EvidenceSurfaces.surface2,
+        surface3: EvidenceSurfaces.surface3,
+        line: EvidenceSurfaces.line,
+        ink: EvidenceSurfaces.ink,
+        muted: EvidenceSurfaces.muted,
+        quiet: EvidenceSurfaces.quiet,
+        accent: EvidenceAccent.neutral.color,
+        accentSoft: EvidenceAccent.neutral.soft,
         teal: d(0x55D4C5, 0x177A72),
         tealSoft: d(0x55D4C5, 0x177A72, 0.12, 0.10),
         purple: d(0xAE8CFA, 0x6F4FB3),
@@ -133,18 +145,19 @@ struct EvidencePalette {
         snacks: d(0xFB9C8C, 0xA84B3E)
     )
 
-    /// `.daily` — Nutrition + Activity (`evidence.css` of the N/A harness).
+    /// `.daily` — Nutrition + Activity semantic colors on the shared
+    /// Evidence surfaces (the blue-teal tinted set is retired, Build 91).
     static let daily = EvidencePalette(
-        page: d(0x061219, 0xF3EFE6),
-        surface: d(0x102A34, 0xF8F5ED),
-        surface2: d(0x153641, 0xE6F0EC),
-        surface3: d(0x0B222B, 0xE9E5DC),
-        line: d(0x25444E, 0xC8D4CF),
-        ink: d(0xF5F8F7, 0x13272F),
-        muted: d(0x9FB2B7, 0x566C72),
-        quiet: d(0x72878D, 0x74858A),
-        accent: d(0x69D8CD, 0x0B766F),
-        accentSoft: d(0x69D8CD, 0x0B766F, 0.13, 0.10),
+        page: EvidenceSurfaces.page,
+        surface: EvidenceSurfaces.surface,
+        surface2: EvidenceSurfaces.surface2,
+        surface3: EvidenceSurfaces.surface3,
+        line: EvidenceSurfaces.line,
+        ink: EvidenceSurfaces.ink,
+        muted: EvidenceSurfaces.muted,
+        quiet: EvidenceSurfaces.quiet,
+        accent: EvidenceAccent.neutral.color,
+        accentSoft: EvidenceAccent.neutral.soft,
         teal: d(0x69D8CD, 0x0B766F),
         tealSoft: d(0x69D8CD, 0x0B766F, 0.13, 0.10),
         purple: d(0xB99AF2, 0x6F55A7),
@@ -165,24 +178,26 @@ struct EvidencePalette {
         snacks: d(0xFB9C8C, 0xA84B3E)
     )
 
-    /// `.weight` — the record palette of the Energy/Weight/Recovery harness.
+    /// `.weight` — Energy/Weight/Recovery semantic colors. The harness's
+    /// lime accent/green is retired (Build 91): `green` is the Evidence
+    /// semantic green.
     static let weight = EvidencePalette(
-        page: d(0x0A141E, 0xF7F3E9),
-        surface: d(0x101E2A, 0xEEE9DE),
-        surface2: d(0x152633, 0xE5DFD2),
-        surface3: d(0x101E2A, 0xEEE9DE),
-        line: d(0x243746, 0xC9C2B5),
-        ink: d(0xF4F1E9, 0x162028),
-        muted: d(0xB6C0C5, 0x46535B),
-        quiet: d(0x82929B, 0x6C777D),
-        accent: d(0xB9E467, 0x467221),
-        accentSoft: d(0xB9E467, 0x467221, 0.15, 0.15),
+        page: EvidenceSurfaces.page,
+        surface: EvidenceSurfaces.surface,
+        surface2: EvidenceSurfaces.surface2,
+        surface3: EvidenceSurfaces.surface3,
+        line: EvidenceSurfaces.line,
+        ink: EvidenceSurfaces.ink,
+        muted: EvidenceSurfaces.muted,
+        quiet: EvidenceSurfaces.quiet,
+        accent: EvidenceAccent.neutral.color,
+        accentSoft: EvidenceAccent.neutral.soft,
         teal: d(0x5DD5CF, 0x167D78),
         tealSoft: d(0x5DD5CF, 0x167D78, 0.13, 0.10),
         purple: d(0xB68CFF, 0x7350AF),
         purpleSoft: d(0xB68CFF, 0x7350AF, 0.14, 0.12),
-        green: d(0xB9E467, 0x467221),
-        greenSoft: d(0xB9E467, 0x467221, 0.14, 0.12),
+        green: d(0x68D391, 0x28744A),
+        greenSoft: d(0x68D391, 0x28744A, 0.14, 0.14),
         amber: d(0xF4B860, 0xAD641C),
         amberSoft: d(0xF4B860, 0xAD641C, 0.14, 0.12),
         red: d(0xFF8177, 0xB94A42),
@@ -200,16 +215,16 @@ struct EvidencePalette {
     /// `.record` — Photos + DEXA (`source/evidence.css`). `muted` is the
     /// harness `--sub`, `quiet` its `--muted`; `purple` is `--violet`.
     static let record = EvidencePalette(
-        page: d(0x0A141E, 0xF7F3E9),
-        surface: d(0x101E2A, 0xEEE9DE),
-        surface2: d(0x172733, 0xE4DED2),
-        surface3: d(0x1D303E, 0xDAD3C6),
-        line: d(0x263947, 0xC7C0B3),
-        ink: d(0xF4F1E9, 0x162028),
-        muted: d(0xBDC6C9, 0x46535B),
-        quiet: d(0x87969D, 0x69767C),
-        accent: d(0xB9E467, 0x467221),
-        accentSoft: d(0xB9E467, 0x467221, 0.14, 0.14),
+        page: EvidenceSurfaces.page,
+        surface: EvidenceSurfaces.surface,
+        surface2: EvidenceSurfaces.surface2,
+        surface3: EvidenceSurfaces.surface3,
+        line: EvidenceSurfaces.line,
+        ink: EvidenceSurfaces.ink,
+        muted: EvidenceSurfaces.muted,
+        quiet: EvidenceSurfaces.quiet,
+        accent: EvidenceAccent.neutral.color,
+        accentSoft: EvidenceAccent.neutral.soft,
         teal: d(0x68D391, 0x28744A),
         tealSoft: d(0x68D391, 0x28744A, 0.14, 0.14),
         purple: d(0xB68CFF, 0x7350AF),
@@ -405,10 +420,70 @@ extension View {
 }
 
 /// Reads the current family's px → pt scale and palette inside a view.
+/// The palette carries the domain's accent (`EvidenceDomain.accent`): the
+/// page's declared domain, else the one its family implies, else neutral.
 struct EvidenceMetrics {
     let family: EvidenceFamily
+    let domain: EvidenceDomain?
+    let c: EvidencePalette
+
+    init(family: EvidenceFamily, domain: EvidenceDomain? = nil) {
+        self.family = family
+        self.domain = domain ?? family.impliedDomain
+        c = family.palette.applying(self.domain?.accent ?? .neutral)
+    }
+
     func pt(_ px: CGFloat) -> CGFloat { family.pt(px) }
-    var c: EvidencePalette { family.palette }
+}
+
+extension EvidencePalette {
+    func applying(_ accent: EvidenceAccent) -> EvidencePalette {
+        var palette = self
+        palette.accent = accent.color
+        palette.accentSoft = accent.soft
+        return palette
+    }
+}
+
+/// The ONE shared Evidence surface hierarchy (Build 91, Founder-approved):
+/// the neutral slate / warm-paper set the Hub, Timeline, Weight, Energy,
+/// Recovery, Photos and DEXA already used. Category identity never tints a
+/// page or card; it lives in accents only.
+///
+/// - `page` (L0): canvas and flat navigation bar.
+/// - `surface` (L1): hero, report, chart and scope cards, with a 1 px `line`.
+/// - `surface2` (L2): metric tiles, inset rows/fields, unselected pills.
+/// - `surface3` (L3): deep sections, pressed / selected tracks.
+/// - lists: no fill, 1 px `line` rules.
+enum EvidenceSurfaces {
+    static let page = dynamic(0x0A141E, 0xF7F3E9)
+    static let surface = dynamic(0x101E2A, 0xEEE9DE)
+    static let surface2 = dynamic(0x172733, 0xE4DED2)
+    static let surface3 = dynamic(0x1D303E, 0xDAD3C6)
+    static let line = dynamic(0x263947, 0xC7C0B3)
+    static let ink = dynamic(0xF4F1E9, 0x162028)
+    static let muted = dynamic(0xBDC6C9, 0x46535B)
+    static let quiet = dynamic(0x87969D, 0x69767C)
+
+    /// Dark / Mineral hex pairs, for tests and documentation.
+    static let hex: [String: (dark: UInt32, mineral: UInt32)] = [
+        "page": (0x0A141E, 0xF7F3E9), "surface": (0x101E2A, 0xEEE9DE),
+        "surface2": (0x172733, 0xE4DED2), "surface3": (0x1D303E, 0xDAD3C6),
+        "line": (0x263947, 0xC7C0B3), "ink": (0xF4F1E9, 0x162028),
+        "muted": (0xBDC6C9, 0x46535B), "quiet": (0x87969D, 0x69767C),
+    ]
+
+    private static func dynamic(_ dark: UInt32, _ light: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let hex = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(
+                red: CGFloat((hex >> 16) & 0xFF) / 255,
+                green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255,
+                alpha: 1
+            )
+        })
+    }
 }
 
 // MARK: - Back navigation label

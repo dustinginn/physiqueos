@@ -30,7 +30,7 @@ enum RecoverySleepDestination {
 
 // MARK: - Shared chrome and components
 
-private let rm = EvidenceMetrics(family: .weight)
+private let rm = EvidenceMetrics(family: .weight, domain: .recovery)
 
 private extension View {
     /// The locked flat navigation bar and page canvas. The back label comes
@@ -41,17 +41,34 @@ private extension View {
         self
             .evidencePageChrome(trailTitle)
             .evidenceFamily(.weight)
+            .evidenceDomain(.recovery)
             .suppressesContentAreaPopGesture()
     }
 }
 
-/// `.report-head`: eyebrow, 30 px title, subtitle (locked R1/R2 have no mark).
+/// `.report-head`: optional 38 px domain mark, eyebrow, 30 px title, subtitle.
 private struct SleepReportHeader: View {
     let eyebrow: String
     let title: String
     let subtitle: String
+    /// The Recovery report landing shows the domain mark, like its Weight
+    /// and Energy siblings; child pages (Trends) do not.
+    var showsMark = false
 
     var body: some View {
+        HStack(alignment: .top, spacing: rm.pt(12)) {
+            if showsMark {
+                EvidenceDomainMark(domain: .recovery, diameter: rm.pt(38))
+            }
+            text
+        }
+        .padding(.top, rm.pt(3))
+        .padding(.bottom, rm.pt(17))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("evidence.page.header")
+    }
+
+    private var text: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(eyebrow)
                 .evidenceText(.normal(11, 800, jakarta: false, tracking: 1.43, uppercase: true))
@@ -66,10 +83,6 @@ private struct SleepReportHeader: View {
                 .padding(.top, rm.pt(4))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, rm.pt(3))
-        .padding(.bottom, rm.pt(17))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("evidence.page.header")
     }
 }
 
@@ -377,6 +390,7 @@ struct RecoverySleepNightsSheet: View {
         }
         .environment(\.evidenceBackTrail, trail)
         .evidenceFamily(.weight)
+        .evidenceDomain(.recovery)
         .accessibilityIdentifier("sleep.nights.sheet")
         .task {
             if viewModel == nil { viewModel = RecoverySleepNightsViewModel(api: environment.recoverySleepAPI, range: range) }
@@ -436,7 +450,7 @@ struct RecoveryEvidenceView: View {
 
     @ViewBuilder
     private var content: some View {
-        SleepReportHeader(eyebrow: "Evidence Report", title: "Recovery", subtitle: "Sleep from Apple Health")
+        SleepReportHeader(eyebrow: "Evidence Report", title: "Recovery", subtitle: "Sleep from Apple Health", showsMark: true)
         SleepScopeSelector()
         if scopeRange == nil || scopeRange?.isEmpty == true {
             SleepScopeStateCard(store: store, range: scopeRange) { retryNonce += 1 }

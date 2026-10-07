@@ -184,6 +184,11 @@ enum PhysiqueOSTheme {
     static let redesignMuted = dynamic(dark: 0x92A5AF, light: 0x5D7279)
     static let redesignAmberInk = dynamic(dark: 0xEFB84F, light: 0x925500)
     static let redesignCyanInk = dynamic(dark: 0x3BC6DD, light: 0x10708A)
+    /// Build 91 Evidence (Energy) orange text ink. Dark keeps the existing
+    /// `mealBreakfast` orange; Mineral deepens the same 27° hue so normal
+    /// text clears AA on Evidence surfaces (5.55 page / 5.08 card / 4.59
+    /// inset), where `#B65E16` measured 4.12 / 3.77 / 3.41.
+    static let redesignOrangeInk = dynamic(dark: 0xFB923C, light: 0x9A4C10)
     static let redesignOnAmber = dynamic(dark: 0x10202A, light: 0xFFFAF1)
     static let redesignHairline = dynamic(dark: 0x9DB3BD, light: 0x193842, darkOpacity: 0.184, lightOpacity: 0.169)
     // Batch 2 Training Logger utility roles (locked utility package).

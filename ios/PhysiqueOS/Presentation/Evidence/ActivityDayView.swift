@@ -21,7 +21,7 @@ struct ActivityDayView: View {
     @State private var viewModelAuthority: NativeAPIEnvironment?
     let date: String
 
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .activity)
 
     var body: some View {
         EvidenceScrollPage {
@@ -29,6 +29,7 @@ struct ActivityDayView: View {
         }
         .evidencePageChrome(TrainingDateFormatting.short(date))
         .evidenceFamily(.daily)
+        .evidenceDomain(.activity)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = ActivityDayViewModel(api: environment.activityAPI, date: date)

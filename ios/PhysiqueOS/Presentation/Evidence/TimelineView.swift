@@ -66,7 +66,7 @@ struct TimelineView: View {
         case .loaded(let timeline):
             VStack(alignment: .leading, spacing: 0) {
                 EvidenceHeaderView(
-                    symbol: "⌁",
+                    domain: .timeline,
                     eyebrow: "Evidence",
                     title: "Timeline",
                     subtitle: "A chronological record of what PhysiqueOS has captured."
@@ -99,16 +99,22 @@ struct TimelineView: View {
     }
 }
 
-/// One T1 `.event`: a toned 8-px node with a 4-px 14% halo on the rail,
-/// the uppercase type · date eyebrow, the title and the optional detail.
-/// Rows are read-only; the rail and node are decorative.
+/// One T1 `.event` on the rail: the uppercase type · date eyebrow, the
+/// title and the optional detail. A domain event (Workout, Daily Activity,
+/// Weight, Progress Photo, DEXA) wears its domain icon and accent in the
+/// 16-px node; a system event keeps the neutral 8-px dot with its 14% halo,
+/// and a failure keeps its danger red. Rows are read-only; the rail and
+/// node are decorative (the type label carries identity in text).
 private struct TimelineEventRow: View {
     let item: TimelineItem
     let isLast: Bool
 
     private typealias S = EvidenceLockedStyle
 
-    private var tone: Color { S.tone(item.tone) }
+    private var domain: EvidenceDomain? { EvidenceDomain(timelineType: item.type) }
+
+    /// Timeline identity color (`TimelineIdentity`).
+    private var tone: Color { TimelineIdentity.color(type: item.type, tone: item.tone) }
     private var dateText: String { TimelineDateFormatting.long(item.date) }
 
     var body: some View {
@@ -151,14 +157,54 @@ private struct TimelineEventRow: View {
                     .frame(maxHeight: .infinity, alignment: .top)
                     .offset(x: S.pt(6))
             }
+            node
+                .offset(x: S.pt(-1), y: S.pt(3))
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private extension TimelineEventRow {
+    @ViewBuilder
+    var node: some View {
+        if let domain {
+            Image(systemName: domain.systemImage)
+                .font(.system(size: S.pt(8), weight: .bold))
+                .foregroundStyle(domain.accent.color)
+                .frame(width: S.pt(16), height: S.pt(16))
+                .background(domain.accent.soft, in: Circle())
+                .background(S.canvas, in: Circle())
+        } else {
             Circle()
                 .fill(tone)
                 .frame(width: S.pt(8), height: S.pt(8))
                 .padding(S.pt(4))
                 .background(tone.opacity(0.14), in: Circle())
-                .offset(x: S.pt(-1), y: S.pt(3))
         }
-        .accessibilityHidden(true)
+    }
+}
+
+/// Timeline event identity: a domain event takes its domain accent; a
+/// system event (Briefing, Check-In, Analysis, Protocol, Upload) is
+/// neutral, except a failure, which keeps the danger red.
+enum TimelineIdentity {
+    enum Kind: Equatable {
+        case domain(EvidenceDomain)
+        case danger
+        case neutral
+    }
+
+    static func kind(type: String, tone: HomeColorToken) -> Kind {
+        if let domain = EvidenceDomain(timelineType: type) { return .domain(domain) }
+        return tone == .danger ? .danger : .neutral
+    }
+
+    static func color(type: String, tone: HomeColorToken) -> Color {
+        switch kind(type: type, tone: tone) {
+        case .domain(let domain): domain.accent.color
+        case .danger: EvidenceLockedStyle.red
+        case .neutral: EvidenceLockedStyle.muted
+        }
     }
 }
 

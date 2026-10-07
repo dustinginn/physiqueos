@@ -42,7 +42,7 @@ enum SleepPalette {
     }
 }
 
-private let chartMetrics = EvidenceMetrics(family: .weight)
+private let chartMetrics = EvidenceMetrics(family: .weight, domain: .recovery)
 
 private func axisLabel(_ text: String) -> some View {
     Text(text)

@@ -23,7 +23,7 @@ struct PhotosHistoryView: View {
     @ScaledMetric(relativeTo: .caption) private var tagScale: CGFloat = 1
 
     static let historyPreviewLimit = 3
-    private let m = EvidenceMetrics(family: .record)
+    private let m = EvidenceMetrics(family: .record, domain: .photos)
 
     var body: some View {
         ScrollView {
@@ -38,6 +38,7 @@ struct PhotosHistoryView: View {
         .defaultScrollAnchor(Self.reviewScrollAnchor)
         .evidencePageChrome("Progress Photos")
         .evidenceFamily(.record)
+        .evidenceDomain(.photos)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = PhotosHistoryViewModel(
@@ -79,7 +80,7 @@ struct PhotosHistoryView: View {
                 ) ?? landing)
                 : landing
             EvidenceHeaderView(
-                symbol: "P",
+                domain: .photos,
                 eyebrow: "Evidence Report",
                 title: displayed.title,
                 subtitle: displayed.subtitle ?? "What PhysiqueOS currently understands.",
@@ -241,14 +242,15 @@ struct PhotosHistoryView: View {
         }
     }
 
-    /// `.primary-action`: full-width 52-px accent action.
+    /// `.primary-action`: full-width 52-px shared neutral action (ink fill,
+    /// page-color label) — never a full-width category slab.
     private func readPhotoBriefingLink(briefingID: String) -> some View {
         NavigationLink(value: AppDestination.briefingDetail(briefingId: briefingID)) {
             Text("Read Photo Briefing")
                 .evidenceText(.normal(13, 850, jakarta: false, relativeTo: .headline))
-                .foregroundStyle(Color(red: 0x14 / 255, green: 0x20 / 255, blue: 0x0F / 255))
+                .foregroundStyle(m.c.page)
                 .frame(maxWidth: .infinity, minHeight: m.pt(52))
-                .background(m.c.accent, in: RoundedRectangle(cornerRadius: m.pt(14)))
+                .background(m.c.ink, in: RoundedRectangle(cornerRadius: m.pt(14)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -310,7 +312,7 @@ private extension PhotosHistoryView {
 private struct PhotoSetHistoryRow: View {
     @Environment(AppEnvironment.self) private var environment
     let set: PhotoSetRecord
-    private let m = EvidenceMetrics(family: .record)
+    private let m = EvidenceMetrics(family: .record, domain: .photos)
 
     var body: some View {
         HStack(spacing: m.pt(10)) {
@@ -360,7 +362,7 @@ private struct PhotoSetHistoryRow: View {
 private struct PhotoEvidenceDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     let set: PhotoSetRecord
-    private let m = EvidenceMetrics(family: .record)
+    private let m = EvidenceMetrics(family: .record, domain: .photos)
 
     var body: some View {
         NavigationStack {
@@ -394,6 +396,7 @@ private struct PhotoEvidenceDetailSheet: View {
         }
         .environment(\.evidenceBackTrail, nil)
         .evidenceFamily(.record)
+        .evidenceDomain(.photos)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }

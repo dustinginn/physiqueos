@@ -8,24 +8,23 @@ import UIKit
 /// The locked harness renders a 360-px-wide phone in SF Pro
 /// (`-apple-system`). Every length here is that CSS pixel value scaled by
 /// 402/360, so the iPhone 17 Pro (402 pt) reproduces the reference at
-/// matched scale. Evidence keeps its own locked palette (deep slate with a
-/// lime record accent in Dark; warm paper with olive ink in Mineral Light);
-/// it is resolved through the global appearance trait, so System / Dark /
-/// Mineral Light still come only from `AppAppearanceStore`.
+/// matched scale. Surfaces and text are the shared Evidence hierarchy
+/// (`EvidenceSurfaces`); category identity comes from `EvidenceDomain`
+/// accents (Build 91), resolved through the global appearance trait, so
+/// System / Dark / Mineral Light still come only from `AppAppearanceStore`.
 enum EvidenceLockedStyle {
     /// CSS px → pt at the locked 360 → 402 scale.
     static func pt(_ px: CGFloat) -> CGFloat { px * 402 / 360 }
 
     // MARK: Palette (`:root` / `html[data-theme=light]`)
 
-    static let canvas = dynamic(dark: 0x0A141E, light: 0xF7F3E9)
-    static let surface = dynamic(dark: 0x101E2A, light: 0xEEE9DE)
-    static let surface2 = dynamic(dark: 0x152633, light: 0xE4DED2)
-    static let line = dynamic(dark: 0x263947, light: 0xC7C0B3)
-    static let ink = dynamic(dark: 0xF4F1E9, light: 0x162028)
-    static let sub = dynamic(dark: 0xBCC5C8, light: 0x46535B)
-    static let muted = dynamic(dark: 0x87969D, light: 0x69767C)
-    static let accent = dynamic(dark: 0xB9E467, light: 0x467221)
+    static let canvas = EvidenceSurfaces.page
+    static let surface = EvidenceSurfaces.surface
+    static let surface2 = EvidenceSurfaces.surface2
+    static let line = EvidenceSurfaces.line
+    static let ink = EvidenceSurfaces.ink
+    static let sub = EvidenceSurfaces.muted
+    static let muted = EvidenceSurfaces.quiet
     static let green = dynamic(dark: 0x68D391, light: 0x28744A)
     static let blue = dynamic(dark: 0x6BB7FF, light: 0x246FAD)
     static let violet = dynamic(dark: 0xB68CFF, light: 0x7350AF)
@@ -33,19 +32,6 @@ enum EvidenceLockedStyle {
     static let red = dynamic(dark: 0xFF8177, light: 0xB94A42)
     /// `.nav` border: `color-mix(var(--line) 74%, transparent)`.
     static let navRule = dynamic(dark: 0x263947, light: 0xC7C0B3, opacity: 0.74)
-
-    /// A server-authored tone rendered in the locked Evidence palette.
-    static func tone(_ token: HomeColorToken) -> Color {
-        switch token {
-        case .primary: violet
-        case .success: green
-        case .evidence: blue
-        case .effort, .warning: amber
-        case .danger: red
-        case .surface: accent
-        case .muted, .plain: muted
-        }
-    }
 
     private static func dynamic(dark: UInt32, light: UInt32, opacity: CGFloat = 1) -> Color {
         Color(uiColor: UIColor { traits in
@@ -79,8 +65,6 @@ enum EvidenceLockedStyle {
     static let sectionTitle = TextStyle(size: 15, weight: 800, lineHeight: 18, tracking: -0.225, relativeTo: .headline)
     static let rowLabel = TextStyle(size: 12, weight: 790, lineHeight: 15, relativeTo: .subheadline)
     static let rowCopy = TextStyle(size: 9, weight: 400, lineHeight: 12.15, relativeTo: .caption2)
-    static let rowIcon = TextStyle(size: 12, weight: 900, lineHeight: 15, relativeTo: .subheadline)
-    static let headerIcon = TextStyle(size: 16, weight: 900, lineHeight: 19, relativeTo: .headline)
     static let chevron = TextStyle(size: 16, weight: 400, lineHeight: 18, relativeTo: .subheadline)
     static let eventType = TextStyle(size: 8, weight: 850, lineHeight: 10, tracking: 0.64, uppercase: true, relativeTo: .caption2)
     static let eventTitle = TextStyle(size: 12, weight: 800, lineHeight: 15, relativeTo: .subheadline)
@@ -152,9 +136,10 @@ extension View {
     }
 }
 
-/// `.header`: 38-px record mark, eyebrow, title and subtitle.
+/// `.header`: 38-px domain mark, eyebrow, title and subtitle. A `nil`
+/// domain is the Evidence Hub itself (the neutral Evidence tab glyph).
 struct EvidenceHeaderView: View {
-    let symbol: String
+    let domain: EvidenceDomain?
     let eyebrow: String
     let title: String
     let subtitle: String
@@ -167,17 +152,18 @@ struct EvidenceHeaderView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: S.pt(11)) {
-            Text(symbol)
-                .evidenceLockedText(S.headerIcon)
-                .foregroundStyle(S.accent)
-                .frame(width: S.pt(38), height: S.pt(38))
-                .background(S.accent.opacity(0.15), in: Circle())
-                .accessibilityHidden(true)
+            Group {
+                if let domain {
+                    EvidenceDomainMark(domain: domain, diameter: S.pt(38))
+                } else {
+                    EvidenceDomainMark(hubDiameter: S.pt(38))
+                }
+            }
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(exposesTexts ? eyebrow.uppercased() : eyebrow)
                     .evidenceLockedText(S.eyebrow)
-                    .foregroundStyle(S.accent)
+                    .foregroundStyle((domain?.accent ?? .neutral).color)
                 Text(title)
                     .evidenceLockedText(S.title)
                     .foregroundStyle(S.ink)
@@ -260,7 +246,7 @@ struct EvidenceStateCard: View {
     }
 }
 
-/// `.spinner`: a 22-px ring in the rule color with an accent top arc.
+/// `.spinner`: a 22-px ring in the rule color with a neutral ink top arc.
 private struct EvidenceLockedSpinner: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var spinning = false
@@ -271,7 +257,7 @@ private struct EvidenceLockedSpinner: View {
             Circle().stroke(EvidenceLockedStyle.line, lineWidth: width)
             Circle()
                 .trim(from: 0, to: 0.25)
-                .stroke(EvidenceLockedStyle.accent, lineWidth: width)
+                .stroke(EvidenceLockedStyle.sub, lineWidth: width)
                 .rotationEffect(.degrees(-135))
         }
         .padding(width / 2)

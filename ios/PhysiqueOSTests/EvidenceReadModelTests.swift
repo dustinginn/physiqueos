@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 import UIKit
 @testable import PhysiqueOS
@@ -389,5 +390,263 @@ private actor GatedEvidenceAPI: EvidenceAPI {
     func complete(_ index: Int, with result: Result<EvidenceHubReadModel, Error>) {
         pending.removeValue(forKey: index)?.resume(with: result)
         completed += 1
+    }
+}
+
+/// Build 91 Evidence visual system (Founder-approved Option A): one domain
+/// registry, one shared neutral surface hierarchy, domain accents, and
+/// semantic data colors kept independent of the category accent.
+final class EvidenceVisualSystemTests: XCTestCase {
+
+    // MARK: Registry
+
+    func testHubStreamsMapToTheNineDestinations() {
+        let expected: [String: EvidenceDomain] = [
+            "training": .training, "nutrition": .nutrition, "weight": .weight, "photos": .photos,
+            "dexa": .dexa, "activity": .activity, "energy": .energy, "recovery": .recovery, "timeline": .timeline,
+        ]
+        for (streamId, domain) in expected {
+            XCTAssertEqual(EvidenceDomain(streamId: streamId), domain, streamId)
+        }
+        XCTAssertEqual(EvidenceDomain.allCases.count, 9)
+        XCTAssertNil(EvidenceDomain(streamId: "health-metrics"), "the hidden placeholder has no domain")
+        XCTAssertNil(EvidenceDomain(streamId: "protocols"))
+    }
+
+    func testEveryDestinationHasItsApprovedRealIcon() {
+        let icons: [EvidenceDomain: String] = [
+            .training: "dumbbell.fill", .activity: "waveform.path.ecg", .nutrition: "fork.knife",
+            .weight: "scalemass.fill", .photos: "camera.fill", .dexa: "person.fill.viewfinder",
+            .energy: "bolt.fill", .recovery: "moon.fill", .timeline: "clock.arrow.circlepath",
+        ]
+        for domain in EvidenceDomain.allCases {
+            XCTAssertEqual(domain.systemImage, icons[domain], "\(domain)")
+            XCTAssertNotNil(UIImage(systemName: domain.systemImage), "\(domain.systemImage) must be a real SF Symbol")
+        }
+        XCTAssertNotNil(UIImage(systemName: AppTab.evidence.systemImageName), "Hub mark")
+        XCTAssertNotNil(UIImage(systemName: "list.clipboard.fill"), "neutral fallback tile")
+    }
+
+    func testOptionAAccentsAreOneStableFamilyPerDomain() {
+        let expected: [EvidenceDomain: (String, UInt32, UInt32)] = [
+            .training: ("Purple", 0xAA98FF, 0x5C3FD2), .activity: ("Amber", 0xEFB84F, 0x925500),
+            .nutrition: ("Green", 0x55E39A, 0x28744A), .energy: ("Orange", 0xFB923C, 0x9A4C10),
+            .weight: ("Blue", 0x60A5FA, 0x176D92), .dexa: ("Cyan", 0x3BC6DD, 0x10708A),
+            .photos: ("Rose", 0xF472B6, 0xA83B78), .recovery: ("Teal", 0x3BD2CA, 0x0B766F),
+            .timeline: ("Neutral", 0xBCC5C8, 0x46535B),
+        ]
+        for domain in EvidenceDomain.allCases {
+            let accent = domain.accent
+            let (name, dark, mineral) = expected[domain]!
+            XCTAssertEqual(accent.name, name, "\(domain)")
+            XCTAssertEqual(accent.dark, dark, "\(domain)")
+            XCTAssertEqual(accent.mineral, mineral, "\(domain)")
+            XCTAssertEqual(Self.hex(accent.color, dark: true), dark)
+            XCTAssertEqual(Self.hex(accent.color, dark: false), mineral)
+        }
+        let domainFamilies = EvidenceDomain.allCases.filter { $0 != .timeline }.map(\.accent.name)
+        XCTAssertEqual(Set(domainFamilies).count, 8, "Option A: eight distinct domain colors")
+    }
+
+    func testEnergyOrangeUsesTheSharedOrangeInk() {
+        XCTAssertEqual(Self.hex(PhysiqueOSTheme.redesignOrangeInk, dark: true), EvidenceAccent.orange.dark)
+        XCTAssertEqual(Self.hex(PhysiqueOSTheme.redesignOrangeInk, dark: false), EvidenceAccent.orange.mineral)
+        XCTAssertEqual(Self.hex(PhysiqueOSTheme.mealBreakfast, dark: true), EvidenceAccent.orange.dark, "Dark keeps the approved Option A orange")
+    }
+
+    // MARK: Shared surfaces
+
+    func testEveryEvidenceFamilySharesOneNeutralSurfaceHierarchy() {
+        for family in [EvidenceFamily.training, .daily, .weight, .record] {
+            let c = family.palette
+            let slots: [(String, Color)] = [
+                ("page", c.page), ("surface", c.surface), ("surface2", c.surface2), ("surface3", c.surface3),
+                ("line", c.line), ("ink", c.ink), ("muted", c.muted), ("quiet", c.quiet),
+            ]
+            for (slot, color) in slots {
+                let pair = EvidenceSurfaces.hex[slot]!
+                XCTAssertEqual(Self.hex(color, dark: true), pair.dark, "\(family) \(slot) dark")
+                XCTAssertEqual(Self.hex(color, dark: false), pair.mineral, "\(family) \(slot) mineral")
+            }
+        }
+        typealias S = EvidenceLockedStyle
+        let locked: [(String, Color)] = [
+            ("page", S.canvas), ("surface", S.surface), ("surface2", S.surface2), ("line", S.line),
+            ("ink", S.ink), ("muted", S.sub), ("quiet", S.muted),
+        ]
+        for (slot, color) in locked {
+            let pair = EvidenceSurfaces.hex[slot]!
+            XCTAssertEqual(Self.hex(color, dark: true), pair.dark, "Hub/Timeline \(slot)")
+            XCTAssertEqual(Self.hex(color, dark: false), pair.mineral, "Hub/Timeline \(slot)")
+        }
+    }
+
+    func testTrainingTealSurfaceWashIsGone() {
+        let retired: Set<UInt32> = [0x071416, 0x0D2325, 0x102B2C, 0x153737, 0x294344, 0xE3ECE7, 0xD4E5DE,
+                                    0x061219, 0x102A34, 0x153641, 0x0B222B, 0xE6F0EC]
+        for family in [EvidenceFamily.training, .daily] {
+            let c = family.palette
+            for color in [c.page, c.surface, c.surface2, c.surface3, c.line] {
+                XCTAssertFalse(retired.contains(Self.hex(color, dark: true)), "\(family) dark tinted surface")
+                XCTAssertFalse(retired.contains(Self.hex(color, dark: false)), "\(family) mineral tinted surface")
+            }
+        }
+    }
+
+    func testNoLegacyLimeOrOliveEvidenceAccentSurvives() {
+        let legacy: Set<UInt32> = [0xB9E467, 0x467221]
+        let domains: [EvidenceDomain?] = [nil] + EvidenceDomain.allCases.map { Optional($0) }
+        for family in [EvidenceFamily.training, .daily, .weight, .record] {
+            for domain in domains {
+                let c = EvidenceMetrics(family: family, domain: domain).c
+                for color in [c.accent, c.green] {
+                    XCTAssertFalse(legacy.contains(Self.hex(color, dark: true)), "\(family) \(String(describing: domain))")
+                    XCTAssertFalse(legacy.contains(Self.hex(color, dark: false)), "\(family) \(String(describing: domain))")
+                }
+            }
+        }
+        XCTAssertEqual(Self.hex(EvidencePalette.weight.green, dark: true), 0x68D391, "Weight harness lime green → Evidence semantic green")
+    }
+
+    func testMetricsApplyThePageDomainAccent() {
+        XCTAssertEqual(Self.hex(EvidenceMetrics(family: .weight, domain: .energy).c.accent, dark: false), 0x9A4C10)
+        XCTAssertEqual(Self.hex(EvidenceMetrics(family: .weight, domain: .recovery).c.accent, dark: true), 0x3BD2CA)
+        XCTAssertEqual(Self.hex(EvidenceMetrics(family: .record, domain: .photos).c.accent, dark: true), 0xF472B6)
+        XCTAssertEqual(Self.hex(EvidenceMetrics(family: .daily, domain: .activity).c.accent, dark: false), 0x925500)
+        XCTAssertEqual(EvidenceMetrics(family: .training).domain, .training, "Training implies its domain")
+        XCTAssertEqual(Self.hex(EvidenceMetrics(family: .training).c.accent, dark: true), 0xAA98FF)
+        XCTAssertNil(EvidenceMetrics(family: .record).domain)
+        XCTAssertEqual(Self.hex(EvidenceMetrics(family: .record).c.accent, dark: true), EvidenceAccent.neutral.dark, "no domain renders neutral, never lime")
+    }
+
+    // MARK: Semantic data colors
+
+    func testNutritionMacroAndMealColorsArePreserved() {
+        let macros: [(NutritionEvidenceMacro, UInt32, UInt32)] = [
+            (.calories, 0x7BDBA7, 0x277B51), (.protein, 0xFB7185, 0xB83C57),
+            (.carbohydrates, 0xFBBF24, 0x9D6808), (.fat, 0x38BDF8, 0x14769F),
+        ]
+        for (macro, dark, mineral) in macros {
+            XCTAssertEqual(Self.hex(macro.color, dark: true), dark, macro.label)
+            XCTAssertEqual(Self.hex(macro.color, dark: false), mineral, macro.label)
+        }
+        let c = EvidenceMetrics(family: .daily, domain: .nutrition).c
+        XCTAssertEqual(Self.hex(c.breakfast, dark: true), 0xF7CF7B)
+        XCTAssertEqual(Self.hex(c.lunch, dark: true), 0x7BD7C8)
+        XCTAssertEqual(Self.hex(c.dinner, dark: true), 0xB69CF3)
+        XCTAssertEqual(Self.hex(c.snacks, dark: true), 0xFB9C8C)
+    }
+
+    func testEnergyIntakeAndExpenditureSeriesArePreservedAndDistinctFromTheAccent() {
+        let c = EvidenceMetrics(family: .weight, domain: .energy).c
+        XCTAssertEqual(Self.hex(c.amber, dark: true), 0xF4B860, "Intake")
+        XCTAssertEqual(Self.hex(c.amber, dark: false), 0xAD641C, "Intake")
+        XCTAssertEqual(Self.hex(c.blue, dark: true), 0x6BB7FF, "Estimated expenditure")
+        XCTAssertEqual(Self.hex(c.blue, dark: false), 0x246FAD, "Estimated expenditure")
+        for dark in [true, false] {
+            XCTAssertNotEqual(Self.hex(c.accent, dark: dark), Self.hex(c.amber, dark: dark))
+            XCTAssertNotEqual(Self.hex(c.accent, dark: dark), Self.hex(c.blue, dark: dark))
+        }
+    }
+
+    func testWeightTrendAndDEXAMarkerStayDistinct() {
+        let c = EvidenceMetrics(family: .weight, domain: .weight).c
+        XCTAssertEqual(Self.hex(c.blue, dark: true), 0x6BB7FF, "Weight line")
+        XCTAssertEqual(Self.hex(c.purple, dark: true), 0xB68CFF, "DEXA marker")
+        XCTAssertEqual(Self.hex(c.purple, dark: false), 0x7350AF, "DEXA marker")
+        let dexa = EvidenceMetrics(family: .record, domain: .dexa).c
+        XCTAssertEqual(Self.hex(dexa.green, dark: true), 0x68D391, "DEXA core trend")
+        XCTAssertEqual(Self.hex(dexa.amber, dark: true), 0xF4B860, "DEXA fat mass")
+    }
+
+    func testSleepSeriesAndStagesArePreserved() {
+        let stages: [(Color, UInt32, UInt32)] = [
+            (SleepPalette.total, 0x5DD5CF, 0x167D78), (SleepPalette.deep, 0x6F86FF, 0x4357C5),
+            (SleepPalette.core, 0x55AEF5, 0x2D78AD), (SleepPalette.rem, 0xB184F5, 0x7954B1),
+            (SleepPalette.awake, 0xF0A45F, 0xB66B2D),
+        ]
+        for (color, dark, mineral) in stages {
+            XCTAssertEqual(Self.hex(color, dark: true), dark)
+            XCTAssertEqual(Self.hex(color, dark: false), mineral)
+        }
+    }
+
+    // MARK: Timeline
+
+    func testTimelineUsesDomainIdentityOnlyForDomainEvents() {
+        let domainEvents: [String: EvidenceDomain] = [
+            "Workout": .training, "Daily Activity": .activity, "Weight": .weight, "Progress Photo": .photos, "DEXA": .dexa,
+        ]
+        for (type, domain) in domainEvents {
+            XCTAssertEqual(TimelineIdentity.kind(type: type, tone: .primary), .domain(domain), type)
+        }
+        for type in ["Daily Briefing", "Daily Check-In", "Analysis", "Protocol", "Evidence Upload"] {
+            XCTAssertEqual(TimelineIdentity.kind(type: type, tone: .primary), .neutral, type)
+        }
+        XCTAssertEqual(TimelineIdentity.kind(type: "Evidence Upload", tone: .danger), .danger, "upload failure stays danger red")
+    }
+
+    // MARK: Hub
+
+    func testHubCompositionIsUnchanged() {
+        let ids = ["training", "nutrition", "weight", "photos", "dexa", "activity", "energy", "timeline", "recovery", "health-metrics"]
+        let streams = ids.map {
+            EvidenceStreamSummary(id: $0, title: $0, metric: "", trend: "", lastUpdated: nil, status: .available, tone: .primary, destination: .progressStream(streamId: $0))
+        }
+        let presented = EvidenceHubPresentation.lockedStreams(streams)
+        XCTAssertEqual(presented.map(\.id), ["training", "nutrition", "weight", "photos", "dexa", "activity", "energy", "recovery", "timeline"])
+        for stream in presented {
+            XCTAssertEqual(stream.destination, .progressStream(streamId: stream.id))
+            XCTAssertNotNil(EvidenceDomain(streamId: stream.id), "every presented Hub row has a real icon")
+        }
+    }
+
+    // MARK: Contrast
+
+    func testAccentTextAndIconContrastOnSharedSurfaces() {
+        let pairs = EvidenceSurfaces.hex
+        for domain in EvidenceDomain.allCases {
+            let accent = domain.accent
+            for (fg, dark) in [(accent.dark, true), (accent.mineral, false)] {
+                let mode = dark ? "Dark" : "Mineral"
+                let page = dark ? pairs["page"]!.dark : pairs["page"]!.mineral
+                let card = dark ? pairs["surface"]!.dark : pairs["surface"]!.mineral
+                XCTAssertGreaterThanOrEqual(Self.contrast(fg, page), 4.5, "\(domain) text on page (\(mode))")
+                XCTAssertGreaterThanOrEqual(Self.contrast(fg, card), 4.5, "\(domain) text on card (\(mode))")
+                let tile = Self.over(fg, page, alpha: dark ? 0.14 : 0.12)
+                XCTAssertGreaterThanOrEqual(Self.contrast(fg, tile), 3.0, "\(domain) icon on its tile (\(mode))")
+            }
+        }
+        XCTAssertGreaterThanOrEqual(Self.contrast(EvidenceAccent.orange.mineral, pairs["surface2"]!.mineral), 4.5, "Energy orange ink on the inset")
+    }
+
+    // MARK: Helpers
+
+    static func hex(_ color: Color, dark: Bool) -> UInt32 {
+        let resolved = UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: dark ? .dark : .light))
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        resolved.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (UInt32((r * 255).rounded()) << 16) | (UInt32((g * 255).rounded()) << 8) | UInt32((b * 255).rounded())
+    }
+
+    static func luminance(_ hex: UInt32) -> Double {
+        func channel(_ v: UInt32) -> Double {
+            let c = Double(v) / 255
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel((hex >> 16) & 0xFF) + 0.7152 * channel((hex >> 8) & 0xFF) + 0.0722 * channel(hex & 0xFF)
+    }
+
+    static func contrast(_ a: UInt32, _ b: UInt32) -> Double {
+        let (la, lb) = (luminance(a), luminance(b))
+        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+    }
+
+    static func over(_ fg: UInt32, _ bg: UInt32, alpha: Double) -> UInt32 {
+        func mix(_ shift: UInt32) -> UInt32 {
+            let f = Double((fg >> shift) & 0xFF), b = Double((bg >> shift) & 0xFF)
+            return UInt32((f * alpha + b * (1 - alpha)).rounded()) << shift
+        }
+        return mix(16) | mix(8) | mix(0)
     }
 }

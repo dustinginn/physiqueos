@@ -25,7 +25,7 @@ struct WeightHistoryView: View {
     @State private var isHistoryExpanded = false
 
     static let previewLimit = 3
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .weight)
 
     var body: some View {
         EvidenceScrollPage(spacing: 0, top: 10) {
@@ -33,6 +33,7 @@ struct WeightHistoryView: View {
         }
         .evidencePageChrome("Weight")
         .evidenceFamily(.weight)
+        .evidenceDomain(.weight)
         .task(id: environment.nativeAuthority) {
             // Recreate the provider when authority changes so a fixture
             // result can never remain visible in Founder Production mode.
@@ -79,12 +80,7 @@ struct WeightHistoryView: View {
 
     private func header(for report: WeightReportReadModel) -> some View {
         HStack(alignment: .top, spacing: m.pt(12)) {
-            Text("↘")
-                .evidenceText(.normal(16, 900, jakarta: false))
-                .foregroundStyle(m.c.accent)
-                .frame(width: m.pt(38), height: m.pt(38))
-                .background(m.c.accent.opacity(0.16), in: Circle())
-                .accessibilityHidden(true)
+            EvidenceDomainMark(domain: .weight, diameter: m.pt(38))
             VStack(alignment: .leading, spacing: 0) {
                 Text("EVIDENCE REPORT")
                     .evidenceText(.normal(11, 800, jakarta: false, tracking: 1.43, uppercase: true))
@@ -194,7 +190,7 @@ struct WeightSection<Content: View>: View {
     var action: String?
     var onAction: () -> Void = {}
     @ViewBuilder var content: Content
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .weight)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -232,7 +228,7 @@ struct WeightStatTile: View {
     let label: String
     let value: String
     var detail: String?
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .weight)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -261,7 +257,7 @@ struct WeightStatTile: View {
 struct WeightScopePills: View {
     let scope: TrainingScopeContext
     let onSelect: (String) -> Void
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .weight)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -305,7 +301,7 @@ struct WeightScopePills: View {
 
 struct WeightEmptyLine: View {
     let text: String
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .weight)
 
     var body: some View {
         Text(text)
@@ -324,7 +320,7 @@ struct WeightStatePanel: View {
     let identifier: String
     var actionLabel: String?
     var onAction: () -> Void = {}
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .weight)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -370,7 +366,7 @@ private struct WeightTrendChartView: View {
     let chart: WeightChartData
     let selectedPointID: String?
     let onSelect: (String) -> Void
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .weight)
 
     private var validPoints: [WeightChartPoint] { chart.points.filter { $0.value != nil } }
 
@@ -498,7 +494,7 @@ private struct WeightTrendChartView: View {
 /// `.row`: week label + entry count, average and week-over-week delta.
 private struct WeeklyAverageRow: View {
     let week: WeightWeeklyAverage
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .weight)
 
     private var deltaText: String {
         guard let delta = week.weekOverWeek else { return "Base" }
@@ -530,7 +526,7 @@ struct WeightRow: View {
     let copy: String
     let trailing: String
     var trailingDetail: String?
-    private let m = EvidenceMetrics(family: .weight)
+    private let m = EvidenceMetrics(family: .weight, domain: .weight)
 
     var body: some View {
         HStack(alignment: .center, spacing: m.pt(10)) {

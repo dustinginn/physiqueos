@@ -14,7 +14,7 @@ struct NutritionDayView: View {
     @State private var viewModelAuthority: NativeAPIEnvironment?
     let dayId: String
 
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         EvidenceScrollPage(top: 10) {
@@ -22,6 +22,7 @@ struct NutritionDayView: View {
         }
         .evidencePageChrome(TrainingDateFormatting.short(viewModel?.loadedDay?.date ?? ""))
         .evidenceFamily(.daily)
+        .evidenceDomain(.nutrition)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = NutritionDayViewModel(api: environment.nutritionAPI, dayId: dayId)
@@ -82,14 +83,14 @@ extension NutritionDayViewModel {
 /// Locked N4: an Apple Health totals-only day stays valid without meals.
 private struct NutritionDayTotalsOnlyPanel: View {
     let text: String
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         let parts = text.components(separatedBy: ". ")
         VStack(spacing: m.pt(4)) {
             Text("≈")
                 .evidenceText(.normal(12, 900))
-                .foregroundStyle(m.c.teal)
+                .foregroundStyle(m.c.accent)
                 .accessibilityHidden(true)
             Text(parts.first.map { $0.hasSuffix(".") ? $0 : $0 + "." } ?? text)
                 .evidenceText(.normal(11, 840))
@@ -131,7 +132,7 @@ extension NutritionDayView {
 /// line, then foods with serving sizes. Ruled above each meal.
 private struct NutritionMealRowView: View {
     let meal: NutritionMealRecord
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     private var slotColor: Color {
         switch meal.slot {

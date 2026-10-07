@@ -50,7 +50,7 @@ struct NutritionReportingView: View {
 
     let reportId: String
 
-    private let m = EvidenceMetrics(family: .daily)
+    private let m = EvidenceMetrics(family: .daily, domain: .nutrition)
 
     var body: some View {
         EvidenceScrollPage(top: 10) {
@@ -58,6 +58,7 @@ struct NutritionReportingView: View {
         }
         .evidencePageChrome(viewModel?.loadedReport?.title ?? "Reporting")
         .evidenceFamily(.daily)
+        .evidenceDomain(.nutrition)
         .task(id: environment.nativeAuthority) {
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = NutritionReportingViewModel(api: environment.nutritionAPI, reportId: reportId)
@@ -92,7 +93,7 @@ struct NutritionReportingView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(report.eyebrow.uppercased())
                 .evidenceText(.normal(9, 900, tracking: 1.44, uppercase: true))
-                .foregroundStyle(m.c.teal)
+                .foregroundStyle(m.c.accent)
             Text(report.title)
                 .evidenceText(EvidenceTextStyle(size: 25, weight: 820, lineHeight: 26, tracking: -0.875))
                 .foregroundStyle(m.c.ink)
@@ -169,7 +170,7 @@ struct NutritionReportingView: View {
             if let targetLabel {
                 Text(targetLabel)
                     .evidenceText(.normal(9, 800))
-                    .foregroundStyle(m.c.teal)
+                    .foregroundStyle(m.c.accent)
             }
         } content: {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: m.pt(7), alignment: .top), GridItem(.flexible(), spacing: m.pt(7), alignment: .top)], spacing: m.pt(7)) {
@@ -203,7 +204,7 @@ struct NutritionReportingView: View {
             VStack(alignment: .leading, spacing: 0) {
                 rangeSelector()
                 NutritionTrendChartView(
-                    points: report.weeklyTrend, color: m.c.teal,
+                    points: report.weeklyTrend, color: m.c.accent,
                     valueLabel: { "\(Int($0.rounded())) cal" },
                     emptyMessage: "No calorie evidence available in this period",
                     selectedWeekID: $selectedCaloriesWeek
@@ -328,7 +329,7 @@ struct NutritionReportingView: View {
                 .padding(.bottom, m.pt(9))
                 rangeSelector()
                 NutritionTrendChartView(
-                    points: report.weeklyTrend, color: m.c.teal,
+                    points: report.weeklyTrend, color: m.c.accent,
                     valueLabel: { "\(Int($0.rounded()))\(report.selectedTrendMetric.unit)" },
                     emptyMessage: "No contributing meal evidence.",
                     selectedWeekID: $selectedMealsWeek
