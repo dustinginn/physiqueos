@@ -1,53 +1,67 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-07T02:59:54Z",
+  "generated_at_utc": "2026-10-07T15:15:37Z",
   "task": {
-    "id": "build90-testflight-release-20261007",
-    "title": "Build 90 VALID in TestFlight from Founder-authorized integration candidate 8fab4fcb",
+    "id": "training-variant-audit-build92-design-20261007",
+    "title": "Training execution variant authority audit + Build 92 Create Variant architecture",
     "agent": "claude",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "8fab4fcb6be2c2c9d9f0f87b1123a6e49337fdbd",
-    "final_sha": "32baf1d5f43120cd07088df1210e1dc84ed26a78",
+    "base_sha": "32baf1d5f43120cd07088df1210e1dc84ed26a78",
+    "final_sha": null,
     "native_sha": "32baf1d5f43120cd07088df1210e1dc84ed26a78",
-    "production_server_sha": "1b6687ffbf016575e674d12406200c3792eb90a7",
-    "production_deployment": "cbe6be96",
+    "production_server_sha": "e7ffc6716706ae4d2140008a1655bfed95a93889",
+    "production_deployment": "b98c26e4",
     "native_build": 90
   },
   "result": {
-    "summary": "Build 90 (com.physiqueos.native.dev 1.0 (90)) from 32baf1d5 (= validated integration 8fab4fcb [Build 89 + Claude A a14eb4c4 Founder-selected Logger clock/Watch handoff/Photo viewer/Watch centering + Claude B 8c3172e1 Energy + Recovery/Sleep] + build-number bump only) uploaded via the guarded API-key tool; delivery 68dc945f-cfaa-43bb-a1ff-d0020fed54ff VALID. Archive PhysiqueOS-Build90-32baf1d5.xcarchive (2026-10-06); next build 91. Server 1b6687ff/cbe6be96 unchanged by this task.",
+    "summary": "Training execution variant audit complete — Build 92 Create Variant architecture ready for Founder review. Static Hold still exists only as occurrence-level data in historical canonical Training evidence (spider_curl x4 active + 1 retracted, pendulum_squat_machine x1; all reps+load, last 2026-08-29); no variant registry/definition ever existed. Build 90 shows only Ordinary because ProductionTrainingLoggerAPI hard-codes variants: [] (since Founder Production wiring 81467f25, 2026-09-10) and the Server training-logger read has no choice projection; fixture-era Native (<=Build 18) and the web Logger offered hard-coded Static Hold / 3-Second Pause / Slow Eccentric. Classification: DATA/PROJECTION GAP on a LEGACY MODEL LIMITATION (not a Server regression). Build 91 restoration not recommended; Build 92 design: per-exercise trainingExecutionVariants definitions (immutable id, legacyKeys alias, loggingMode inherit|timed), create/rename/retire commands, additive per-exercise Logger projection, variant-identity partition for progression/records. Also found legacy 'Super Set' recorded as an execution variant on 3 sessions.",
     "success": true,
     "production_mutated": false,
     "deployed": false,
-    "testflight_uploaded": true
+    "testflight_uploaded": false
   },
   "validation": {
     "tests": {
-      "status": "passed",
-      "summary": "Post-bump 32baf1d5: release-contract 142/0, full unit 2159/0, Watch unit 59/0, verify_release_configuration 1.0 (90) OK, clean generic Release OK (app/Watch/extension 1.0 (90)), seams 0, generator deterministic, diff-check clean, archive verified, guarded dry-run all PASS. Pre-bump 8fab4fcb: focused 502/0, full iPhone UI all classes passed, Watch UI 6/7 identical to Build 89 baseline."
+      "status": "not_run",
+      "summary": "Audit/design only; no code changed. Source traced at Server e7ffc671 and Native 32baf1d5."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder physical acceptance of Build 90 pending (checklist in report)."
+      "summary": "Founder review of Build 92 Create Variant design and decisions D1-D10 pending."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Native release only; no Server deploy or production data mutation; Server checked read-only."
+      "summary": "One Founder-authorized bounded production read: REPEATABLE READ READ ONLY, transaction_read_only=on, owner-scoped SELECTs, explicit ROLLBACK, remote exit 0, marker once. Local wrapper flagged RUNNER_STDERR_UNEXPECTED solely from a local Node NO_COLOR/FORCE_COLOR warning; not re-run."
     }
   },
   "decisions_required": [
-    "Founder: install Build 90 from TestFlight and run the physical acceptance checklist"
+    "D1 variant scope (recommend per canonical exercise)",
+    "D2 include Timed hold logging mode in V1 (recommend yes)",
+    "D3 seed legacy Static Hold definitions for Spider Curls + Pendulum Squat as inherit (recommend yes, separate authorized op)",
+    "D4 legacy 'Super Set' variant occurrences (recommend exclude from choices; correction separate)",
+    "D5 rename/retire UI timing (recommend Server commands V1, Native create only)",
+    "D6 retired-name collision (recommend reactivate)",
+    "D7 Build 91 stopgap (recommend no; defer to Build 92)",
+    "D8 variant progression recommendations in Build 92 (optional)",
+    "D9 timed-hold records (defer)",
+    "D10 web Logger switches to canonical projection (recommend yes)"
   ],
   "blockers": [],
-  "unexpected_findings": [],
-  "backlog": [
-    "DEXA appointment dead end (OP-A first fix)",
-    "Watch UI no-WCSession harness limitation (testFinalSetFinish)"
+  "unexpected_findings": [
+    "Legacy 'Super Set' recorded as execution variant (super_set) on 3 canonical sessions (Leg Extensions/Sissy Squats, Seated Hip Adductions/Abductions) — relationship context misfiled as variant",
+    "Founder's real Static Hold sets are reps+load, not timed — Static Hold must not be hard-wired to duration",
+    "Server listPreviouslyUsedExecutionVariants has no production caller"
   ],
-  "recommended_next_step": "Founder installs Build 90 via TestFlight and completes physical acceptance.",
-  "full_report_path": "agent-handoffs/reports/20261007T025954Z-build90-testflight-valid.md",
+  "backlog": [
+    "Build 92 Server S1: trainingExecutionVariants model/commands/projection/partition resolver",
+    "Build 92 Server S2: authorized legacy Static Hold seed",
+    "Build 92 Native N1: per-exercise menu + Create Variant sheet + Watch Row.variantLabel"
+  ],
+  "recommended_next_step": "Founder reviews the report and answers D1-D10; then authorize Build 92 Server S1 implementation.",
+  "full_report_path": "agent-handoffs/reports/20261007T151537Z-training-variant-audit-build92-design.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
