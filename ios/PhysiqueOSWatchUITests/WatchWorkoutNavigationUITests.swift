@@ -149,12 +149,24 @@ final class WatchPanelFooterUITests: XCTestCase {
         }
     }
 
-    func testOrphanPromptFitsAndKeepsBothActions() {
+    /// The orphan prompt fits a 49 mm screen (no ScrollView). On the 42 mm
+    /// case its two actions are taller than the screen, as in Build 90, so
+    /// the page uses the overflow fallback (bottom edge effect hidden); both
+    /// actions must still be reachable.
+    func testOrphanPromptKeepsBothActionsReachable() {
         let app = launch("orphan")
         XCTAssertTrue(element(app, "watch.orphan").waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["End & Save"].isHittable)
-        XCTAssertTrue(app.buttons["Discard"].isHittable)
-        XCTAssertEqual(app.scrollViews.count, 0)
+        if app.windows.firstMatch.frame.height >= 240 {
+            XCTAssertEqual(app.scrollViews.count, 0, "49 mm: fits, so no ScrollView")
+        }
+        let discard = app.buttons["Discard"]
+        var swipes = 0
+        while !discard.isHittable && swipes < 4 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(discard.isHittable)
     }
 
     func testAccessibilityTextOverflowStillScrollsToTheAction() {
