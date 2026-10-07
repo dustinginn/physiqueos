@@ -307,7 +307,7 @@ private enum AppearanceReviewLaunchConfiguration {
             destinations: [.briefingDetail(briefingId: "weekly_briefing_2026-08-23_2026-08-29")]
         )
         case "briefing-history": Route(tab: .home, destinations: [.briefingList])
-        default: briefingReviewPath(value) ?? evidenceReviewPath(value)
+        default: briefingReviewPath(value) ?? evidenceReviewPath(value) ?? operatingPlanReviewPath(value)
         }
     }
 
@@ -319,6 +319,47 @@ private enum AppearanceReviewLaunchConfiguration {
 
     /// `evidence:<step>;<step>` — e.g. `evidence:stream=training;trainingDay=2026-08-26`.
     /// Opens any Evidence vertical deterministically for parity captures.
+    /// `op:<step>;<step>` (Build 91 Operating Plan parity captures), e.g.
+    /// `op:landing;strategy=briefings/strategy_fixture_coaching;edit=briefings/strategy_fixture_coaching@dexa`.
+    /// Steps: landing, strategy=type/id, edit=type/id[@dexa], dexa,
+    /// domain=id, peptide=id, recovery=id, tracking, trackingSupport=id,
+    /// supplementSupport=id, supplementEdit=id. `tab=home` pushes onto Home.
+    private static func operatingPlanReviewPath(_ value: String) -> Route? {
+        guard value.hasPrefix("op:") else { return nil }
+        var tab: AppTab = .you
+        var destinations: [AppDestination] = []
+        for step in value.dropFirst("op:".count).split(separator: ";").map(String.init) {
+            let parts = step.split(separator: "=", maxSplits: 1).map(String.init)
+            let argument = parts.count == 2 ? parts[1] : ""
+            let pair = argument.split(separator: "/", maxSplits: 1).map(String.init)
+            switch parts[0] {
+            case "tab": tab = argument == "home" ? .home : .you
+            case "landing": destinations.append(.operatingPlan)
+            case "strategy" where pair.count == 2:
+                destinations.append(.operatingPlanStrategy(strategyType: pair[0], strategyId: pair[1]))
+            case "edit" where pair.count == 2:
+                let anchored = pair[1].hasSuffix("@dexa")
+                let destination = AppDestination.operatingPlanStrategyEdit(
+                    strategyType: pair[0], strategyId: anchored ? String(pair[1].dropLast("@dexa".count)) : pair[1]
+                )
+                if anchored {
+                    MainActor.assumeIsolated { OperatingPlanNavigationContext.requestAnchor(.dexa, for: destination) }
+                }
+                destinations.append(destination)
+            case "dexa": destinations.append(.operatingPlanDexaAppointment)
+            case "domain": destinations.append(.operatingPlanProtocolDomain(protocolId: argument))
+            case "peptide": destinations.append(.operatingPlanPeptideExecution(protocolId: argument))
+            case "recovery": destinations.append(.operatingPlanRecoverySupport(executionId: argument))
+            case "tracking": destinations.append(.operatingPlanTracking)
+            case "trackingSupport": destinations.append(.operatingPlanTrackingSupport(executionId: argument))
+            case "supplementSupport": destinations.append(.operatingPlanSupplementSupport(protocolId: argument))
+            case "supplementEdit": destinations.append(.operatingPlanSupplementEdit(protocolId: argument))
+            default: break
+            }
+        }
+        return destinations.isEmpty ? nil : Route(tab: tab, destinations: destinations)
+    }
+
     private static func evidenceReviewPath(_ value: String) -> Route? {
         guard value.hasPrefix("evidence:") else { return nil }
         let steps = value.dropFirst("evidence:".count).split(separator: ";").compactMap { step -> AppDestination? in

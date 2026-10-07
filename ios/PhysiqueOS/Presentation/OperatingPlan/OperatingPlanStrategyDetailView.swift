@@ -48,27 +48,16 @@ struct OperatingPlanStrategyDetailView: View {
         return nil
     }
 
+    var backTitle: String = "Operating Plan"
+
+    private var pageTitle: String { OperatingPlanStrategyType(rawValue: strategyType)?.title ?? "Strategy" }
+
     var body: some View {
-        ScrollView {
+        OperatingPlanScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button { dismiss() } label: {
-                    Label("Operating Plan", systemImage: "arrow.left")
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .operatingPlanChrome(back: backTitle)
+        .accessibilityIdentifier("operatingPlan.strategy.\(strategyType)")
         .task(id: "\(strategyId):\(environment.nativeAuthority)") { await loadProductionIfNeeded() }
         .refreshable {
             if isProductionManaged {
@@ -139,68 +128,149 @@ struct OperatingPlanStrategyDetailView: View {
     @ViewBuilder
     private var content: some View {
         if isProductionManaged, isLoadingProduction, detail == nil {
-            ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+            OperatingPlanLoadingView()
         } else if let detail {
-            VStack(alignment: .leading, spacing: 16) {
-                OperatingPlanScreenHeader(eyebrow: detail.strategyType.title, title: detail.title, subtitle: detail.purpose)
-
-                CardContainer(padding: .sm) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        OperatingPlanFieldRow(label: "Goal", value: detail.goal)
-                        OperatingPlanFieldRow(label: "Started", value: detail.startedDate)
-                        OperatingPlanFieldRow(label: "Status", value: detail.status)
-                    }
-                }
-
-                OperatingPlanSection("Strategy Detail") {
-                    CardContainer(padding: .sm) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(detail.fields) { field in
-                                OperatingPlanFieldRow(label: field.label, value: field.value)
-                            }
-                        }
-                    }
-                }
-
-                if !detail.energyPhaseHistory.isEmpty {
-                    OperatingPlanSection("Phase History") {
-                        VStack(spacing: 8) {
-                            ForEach(detail.energyPhaseHistory) { snapshot in
-                                energyPhaseCard(snapshot)
-                            }
-                        }
-                    }
-                }
-
-                if let editLabel = detail.editLabel, let editDestination = detail.editDestination {
-                    PrimaryActionButton(title: editLabel) { onNavigate(editDestination) }
-                }
-            }
+            loaded(detail)
+        } else if isProductionManaged {
+            OperatingPlanFailureView(
+                title: "This strategy couldn't be loaded",
+                message: loadError.map { _ in "Nothing was changed. Check your connection and try again." } ?? "This strategy is unavailable.",
+                retry: loadError == nil ? nil : { Task { await loadProductionIfNeeded() } }
+            )
         } else {
-            OperatingPlanUnavailableView(message: isProductionManaged ? (loadError ?? "This strategy is unavailable.") : "This strategy is unavailable.")
+            OperatingPlanFailureView(title: "Unavailable", message: "This strategy is unavailable.")
         }
     }
 
-    private func energyPhaseCard(_ snapshot: OperatingPlanEnergyPhaseSnapshotReadModel) -> some View {
-        CardContainer(padding: .sm, background: snapshot.isActive ? PhysiqueOSTheme.surfaceAccent : PhysiqueOSTheme.surfaceElevated) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Phase \(snapshot.phaseOrder)")
-                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(snapshot.isActive ? PhysiqueOSTheme.accent : PhysiqueOSTheme.textMuted)
-                    Spacer()
-                    StatusChip(text: snapshot.isActive ? "Active" : "Completed", color: snapshot.isActive ? .success : .muted)
+    /// Locked strategy detail: the identity field, then the strategy
+    /// itself. Energy / Nutrition / Training lead with two metric tiles;
+    /// Coaching Updates is a line list plus its Scheduled Evidence card.
+    private func loaded(_ detail: OperatingPlanStrategyDetailReadModel) -> some View {
+        let isCoaching = detail.strategyType == .briefings
+        let tiles = isCoaching ? [] : Array(detail.fields.prefix(2))
+        let lines = isCoaching ? detail.fields : Array(detail.fields.dropFirst(tiles.count))
+        return VStack(alignment: .leading, spacing: 0) {
+            OperatingPlanHeroField(
+                eyebrow: isCoaching ? "Coaching Updates" : "\(detail.strategyType.title) Strategy",
+                title: detail.title,
+                copy: detail.purpose,
+                facts: [(label: "Goal", value: detail.goal), (label: "Started", value: Self.startedValue(detail.startedDate))].filter { !$0.value.isEmpty },
+                status: detail.status.isEmpty ? nil : detail.status
+            )
+            .accessibilityIdentifier("operatingPlan.strategy.hero")
+
+            OperatingPlanGroupTitle(isCoaching ? "Strategy Detail" : "Current Strategy", icon: isCoaching ? "text.alignleft" : OperatingPlanIcon.systemImage(for: detail.strategyType.rawValue))
+            if !tiles.isEmpty {
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(tiles) { field in
+                        OperatingPlanMetricTile(label: field.label, value: field.value)
+                    }
                 }
-                Text(snapshot.phaseName)
-                    .physiqueOSFont(PhysiqueOSTypography.cardHeading16)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
-                OperatingPlanFieldRow(label: "Caloric Intake", value: snapshot.caloricIntake)
-                OperatingPlanFieldRow(label: "Activity Target", value: snapshot.activityTarget)
-                OperatingPlanFieldRow(label: "Review Cadence", value: snapshot.reviewCadence)
-                Text(snapshot.note)
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .padding(.bottom, 4)
             }
+            ForEach(lines) { field in
+                OperatingPlanLine(field.label, field.value)
+            }
+
+            if !detail.energyPhaseHistory.isEmpty {
+                OperatingPlanGroupTitle("Phase History", icon: "clock.arrow.circlepath")
+                VStack(spacing: 8) {
+                    ForEach(detail.energyPhaseHistory) { snapshot in
+                        energyPhaseCard(snapshot)
+                    }
+                }
+            }
+
+            if isCoaching, let scheduled = scheduledEvidence {
+                scheduledEvidenceCard(scheduled)
+            }
+
+            if detail.strategyType == .energy {
+                Text("Read-only by design: Energy follows the active phase.")
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanCaption)
+                    .foregroundStyle(OperatingPlanColor.muted)
+                    .padding(.top, 14)
+            }
+
+            if let editLabel = detail.editLabel, let editDestination = detail.editDestination {
+                OperatingPlanButton(title: editLabel, style: isCoaching ? .navy : .primary) {
+                    OperatingPlanNavigationContext.navigate(editDestination, from: pageTitle, using: onNavigate)
+                }
+                .padding(.top, 20)
+                .accessibilityIdentifier("operatingPlan.strategy.edit")
+            }
+        }
+    }
+
+    // MARK: Scheduled Evidence (Coaching Updates, Founder D3)
+
+    /// The DEXA appointment and Progress Photos cadence, read from the same
+    /// Coaching Updates record (presentation only; it edits nothing).
+    private var scheduledEvidence: (dexa: NextDexaScanPresentation, photos: CoachingProgressPhotosReadModel)? {
+        let editor: CoachingUpdatesEditorReadModel? = isProductionManaged
+            ? productionCoachingDetail?.editor
+            : environment.operatingPlanStore.coachingEditor(strategyId: strategyId)
+        guard let editor else { return nil }
+        let today = OperatingPlanDateValues.dateKey(from: Date())
+        return (NextDexaScanPresentation(dexa: editor.dexa, eventBriefingEnabled: editor.dexaEventBriefingEnabled, today: today), editor.photos)
+    }
+
+    private func scheduledEvidenceCard(_ scheduled: (dexa: NextDexaScanPresentation, photos: CoachingProgressPhotosReadModel)) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            OperatingPlanGroupTitle("Scheduled Evidence", icon: "calendar")
+            OperatingPlanSurface {
+                Button {
+                    OperatingPlanNavigationContext.navigate(.operatingPlanDexaAppointment, from: pageTitle, using: onNavigate)
+                } label: {
+                    OperatingPlanLine("Next DEXA scan", scheduled.dexa.summaryText,
+                                      detail: scheduled.dexa.isScheduled ? scheduled.dexa.remindersSummary : "Schedule it in Coaching Updates") {
+                        OperatingPlanChevron()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens Next DEXA Scan")
+                .accessibilityIdentifier("operatingPlan.coaching.nextDexa")
+                OperatingPlanLine("Progress Photos", scheduled.photos.cadenceSummary,
+                                  detail: Self.nextPhotoLabel(scheduled.photos), showsRule: false)
+                    .accessibilityIdentifier("operatingPlan.coaching.photos")
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("operatingPlan.coaching.scheduledEvidence")
+        }
+    }
+
+    /// The Server phrases it "Started Aug 16, 2026"; under the hero's
+    /// "Started" label only the date is shown.
+    static func startedValue(_ startedDate: String) -> String {
+        startedDate.hasPrefix("Started ") ? String(startedDate.dropFirst("Started ".count)) : startedDate
+    }
+
+    static func nextPhotoLabel(_ photos: CoachingProgressPhotosReadModel) -> String? {
+        let today = OperatingPlanDateValues.dateKey(from: Date())
+        guard let date = ProgressPhotoCadencePreview.firstOccurrence(edited: photos, saved: photos, today: today) else { return nil }
+        return "Next: \(OperatingPlanDateValues.readableDate(date))"
+    }
+
+    private func energyPhaseCard(_ snapshot: OperatingPlanEnergyPhaseSnapshotReadModel) -> some View {
+        OperatingPlanSurface(tone: snapshot.isActive ? .field : .paper, verticalPadding: 12) {
+            HStack {
+                Text("Phase \(snapshot.phaseOrder)")
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanEyebrow)
+                    .foregroundStyle(snapshot.isActive ? OperatingPlanColor.fieldInk : OperatingPlanColor.muted)
+                Spacer()
+                OperatingPlanStatusPill(text: snapshot.isActive ? "Active" : "Completed", tone: snapshot.isActive ? .green : .muted)
+            }
+            Text(snapshot.phaseName)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanCardTitle)
+                .foregroundStyle(snapshot.isActive ? OperatingPlanColor.fieldInk : OperatingPlanColor.ink)
+                .padding(.top, 4)
+            OperatingPlanLine("Caloric Intake", snapshot.caloricIntake)
+            OperatingPlanLine("Activity Target", snapshot.activityTarget)
+            OperatingPlanLine("Review Cadence", snapshot.reviewCadence, showsRule: false)
+            Text(snapshot.note)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                .foregroundStyle(OperatingPlanColor.muted)
         }
     }
 }

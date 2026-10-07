@@ -7,17 +7,17 @@ struct OperatingPlanSupportScheduleEditor: View {
     var sectionNumber: String = "1"
 
     var body: some View {
-        CardContainer(padding: .md) {
+        OperatingPlanSurface(verticalPadding: 14) {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 10) {
                     Text(sectionNumber)
                         .physiqueOSFont(PhysiqueOSTypography.caption12Semibold)
                         .foregroundStyle(.white)
                         .frame(width: 28, height: 28)
-                        .background(PhysiqueOSTheme.accent, in: Circle())
+                        .background(OperatingPlanColor.teal, in: Circle())
                     Text("Schedule")
-                        .physiqueOSFont(PhysiqueOSTypography.cardHeading20)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanSectionTitle)
+                        .foregroundStyle(OperatingPlanColor.ink)
                 }
 
                 labeled("How often?") {
@@ -25,7 +25,7 @@ struct OperatingPlanSupportScheduleEditor: View {
                         ForEach(SupportScheduleFrequency.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.menu)
-                    .tint(PhysiqueOSTheme.accent)
+                    .tint(OperatingPlanColor.teal)
                 }
 
                 if schedule.frequency == .weekly {
@@ -34,7 +34,7 @@ struct OperatingPlanSupportScheduleEditor: View {
                             ForEach(OperatingPlanWeekday.allCases) { Text($0.label).tag($0) }
                         }
                         .pickerStyle(.menu)
-                        .tint(PhysiqueOSTheme.accent)
+                        .tint(OperatingPlanColor.teal)
                     }
                 } else if schedule.frequency == .specificDays {
                     labeled("Which days?") {
@@ -53,7 +53,7 @@ struct OperatingPlanSupportScheduleEditor: View {
                 } else if schedule.frequency == .everyXDays {
                     labeled("Repeat interval") {
                         Stepper("Every \(schedule.intervalDays) days", value: $schedule.intervalDays, in: 1...365)
-                            .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
+                            .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
                     }
                 }
 
@@ -62,14 +62,14 @@ struct OperatingPlanSupportScheduleEditor: View {
                         ForEach(SupportScheduleTiming.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.menu)
-                    .tint(PhysiqueOSTheme.accent)
+                    .tint(OperatingPlanColor.teal)
                 }
 
                 if schedule.timing == .specific {
                     labeled("Local time") {
                         DatePicker("Local time", selection: specificTime, displayedComponents: .hourAndMinute)
                             .labelsHidden()
-                            .tint(PhysiqueOSTheme.accent)
+                            .tint(OperatingPlanColor.teal)
                     }
                 }
 
@@ -93,18 +93,18 @@ struct OperatingPlanSupportScheduleEditor: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("SCHEDULE PREVIEW")
-                        .physiqueOSFont(PhysiqueOSTypography.deepPageEyebrow10)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldLabel)
+                        .foregroundStyle(OperatingPlanColor.muted)
                     Text(OperatingPlanSchedulePresentation.formatSupportSchedule(schedule))
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                        .foregroundStyle(OperatingPlanColor.ink)
                     Text(dateWindow)
-                        .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                        .foregroundStyle(OperatingPlanColor.muted)
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(PhysiqueOSTheme.surfaceMuted, in: RoundedRectangle(cornerRadius: 14))
+                .background(OperatingPlanColor.raised, in: RoundedRectangle(cornerRadius: 14))
             }
         }
     }
@@ -112,8 +112,8 @@ struct OperatingPlanSupportScheduleEditor: View {
     private func labeled<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(label)
-                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                .foregroundStyle(OperatingPlanColor.ink)
             content()
         }
     }

@@ -33,6 +33,12 @@ struct AppDestinationRouterView: View {
             }
     }
 
+    /// The crumb an Operating Plan page shows: the title of the page that
+    /// pushed it (recorded by that page), else its family parent.
+    private func operatingPlanBack(_ fallback: String) -> String {
+        OperatingPlanNavigationContext.backTitle(for: destination, default: fallback)
+    }
+
     @ViewBuilder
     private var routedContent: some View {
         switch destination {
@@ -175,23 +181,24 @@ struct AppDestinationRouterView: View {
         case .trainingExercise(let exerciseId):
             TrainingExerciseDetailView(exerciseId: exerciseId)
         case .operatingPlan:
-            OperatingPlanLandingView(onNavigate: onNavigate)
+            OperatingPlanLandingView(onNavigate: onNavigate, backTitle: operatingPlanBack("You"))
         case .operatingPlanStrategy(let strategyType, let strategyId):
-            OperatingPlanStrategyDetailView(strategyType: strategyType, strategyId: strategyId, onNavigate: onNavigate)
+            OperatingPlanStrategyDetailView(strategyType: strategyType, strategyId: strategyId, onNavigate: onNavigate, backTitle: operatingPlanBack("Operating Plan"))
         case .operatingPlanStrategyEdit(let strategyType, let strategyId):
-            OperatingPlanStrategyEditorView(strategyType: strategyType, strategyId: strategyId)
+            OperatingPlanStrategyEditorView(strategyType: strategyType, strategyId: strategyId,
+                                            anchor: OperatingPlanNavigationContext.consumeAnchor(for: destination))
         case .operatingPlanProtocolDomain(let protocolId):
-            OperatingPlanProtocolDomainView(protocolId: protocolId, onNavigate: onNavigate)
+            OperatingPlanProtocolDomainView(protocolId: protocolId, onNavigate: onNavigate, backTitle: operatingPlanBack("Operating Plan"))
         case .operatingPlanPeptideExecution(let protocolId):
-            OperatingPlanPeptideExecutionView(protocolId: protocolId, onNavigate: onNavigate)
+            OperatingPlanPeptideExecutionView(protocolId: protocolId, onNavigate: onNavigate, backTitle: operatingPlanBack("Peptides"))
         case .operatingPlanRecoverySupport(let executionId):
-            OperatingPlanRecoverySupportView(executionId: executionId)
+            OperatingPlanRecoverySupportView(executionId: executionId, backTitle: operatingPlanBack("Recovery"))
         case .operatingPlanTracking:
-            OperatingPlanTrackingView(onNavigate: onNavigate)
+            OperatingPlanTrackingView(onNavigate: onNavigate, backTitle: operatingPlanBack("Operating Plan"))
         case .operatingPlanTrackingSupport(let executionId):
-            OperatingPlanTrackingSupportView(executionId: executionId)
+            OperatingPlanTrackingSupportView(executionId: executionId, backTitle: operatingPlanBack("Tracking"))
         case .operatingPlanSupplementSupport(let protocolId):
-            OperatingPlanSupplementSupportView(protocolId: protocolId)
+            OperatingPlanSupplementSupportView(protocolId: protocolId, backTitle: operatingPlanBack("Supplements"))
         case .operatingPlanSupplementNew:
             OperatingPlanSupplementEditorView(protocolId: nil)
         case .operatingPlanSupplementEdit(let protocolId):
@@ -209,9 +216,9 @@ struct AppDestinationRouterView: View {
             .background(PhysiqueOSTheme.background)
             .navigationTitle(title)
         case .operatingPlanDexaAppointment:
-            OperatingPlanDexaAppointmentView()
+            OperatingPlanDexaAppointmentView(onNavigate: onNavigate, backTitle: operatingPlanBack("Back"))
         case .operatingPlanTrainingStrategyBuilder:
-            OperatingPlanTrainingProtocolBuilderView(onNavigate: onNavigate)
+            OperatingPlanTrainingProtocolBuilderView(onNavigate: onNavigate, backTitle: operatingPlanBack("Operating Plan"))
         case .founderServerConnection:
             FounderServerConnectionView()
         case .settings:

@@ -36,27 +36,14 @@ struct OperatingPlanRecoverySupportView: View {
         }
     }
 
+    var backTitle: String = "Recovery"
+
     var body: some View {
-        ScrollView {
+        OperatingPlanScrollPage {
             content
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button { isEditing ? (isEditing = false) : dismiss() } label: {
-                    Label(isEditing ? "Cancel" : "Support", systemImage: isEditing ? "xmark" : "arrow.left")
-                        .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                }
-            }
-        }
+        .operatingPlanChrome(back: isEditing ? "Cancel" : backTitle, onBack: isEditing ? { isEditing = false } : nil)
+        .accessibilityIdentifier("operatingPlan.recovery")
         .task(id: environment.nativeAuthority) { await loadProductionIfNeeded() }
     }
 
@@ -76,7 +63,7 @@ struct OperatingPlanRecoverySupportView: View {
     @ViewBuilder
     private var content: some View {
         if environment.nativeAuthority == .founderProduction, isLoadingProduction, productionDetail == nil {
-            ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+            OperatingPlanLoadingView()
         } else if let support {
             if isEditing, let draft {
                 editor(draft: draft)
@@ -84,45 +71,50 @@ struct OperatingPlanRecoverySupportView: View {
                 detail(support)
             }
         } else {
-            OperatingPlanUnavailableView(message: loadError ?? "This support method is unavailable.")
+            OperatingPlanFailureView(
+                title: "This support method couldn't be loaded",
+                message: loadError == nil ? "This support method is unavailable." : "Nothing was changed. Check your connection and try again.",
+                retry: loadError == nil ? nil : { Task { await loadProductionIfNeeded() } }
+            )
         }
     }
 
     private func detail(_ support: OperatingPlanRecoverySupportReadModel) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            OperatingPlanScreenHeader(eyebrow: "Recovery", title: support.name, subtitle: support.purpose)
+        VStack(alignment: .leading, spacing: 0) {
+            OperatingPlanHeader(eyebrow: "Recovery", title: support.name, subtitle: support.purpose)
 
-            OperatingPlanSection("Current Support") {
-                CardContainer(padding: .sm) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        OperatingPlanFieldRow(label: "Summary", value: support.supportSummary)
-                        OperatingPlanFieldRow(label: "Schedule", value: OperatingPlanSchedulePresentation.formatSupportSchedule(support.supportSchedule))
-                        OperatingPlanFieldRow(label: "Starts", value: OperatingPlanDateValues.readableDate(support.supportSchedule.startDate))
-                        OperatingPlanFieldRow(label: "Ends", value: support.supportSchedule.endDate.map(OperatingPlanDateValues.readableDate) ?? "Until changed")
-                        OperatingPlanFieldRow(label: "Reminder", value: support.reminderPreference.label)
-                        if let nextDue = support.nextDue { OperatingPlanFieldRow(label: "Next due", value: nextDue) }
-                        if !support.notes.isEmpty { OperatingPlanFieldRow(label: "Execution Notes", value: support.notes) }
+            OperatingPlanGroup("Current Support") {
+                OperatingPlanSurface {
+                    VStack(alignment: .leading, spacing: 0) {
+                        OperatingPlanLine("Summary", support.supportSummary)
+                        OperatingPlanLine("Schedule", OperatingPlanSchedulePresentation.formatSupportSchedule(support.supportSchedule))
+                        OperatingPlanLine("Starts", OperatingPlanDateValues.readableDate(support.supportSchedule.startDate))
+                        OperatingPlanLine("Ends", support.supportSchedule.endDate.map(OperatingPlanDateValues.readableDate) ?? "Until changed")
+                        OperatingPlanLine("Reminder", support.reminderPreference.label)
+                        if let nextDue = support.nextDue { OperatingPlanLine("Next due", nextDue) }
+                        if !support.notes.isEmpty { OperatingPlanLine("Execution Notes", support.notes) }
                     }
                 }
             }
 
-            PrimaryActionButton(title: "Edit Support") {
+            OperatingPlanButton(title: "Edit Support", style: .quiet) {
                 draft = support
                 isEditing = true
             }
+            .padding(.top, 20)
             .accessibilityIdentifier("operatingPlan.recovery.editSupport")
         }
     }
 
     private func editor(draft: OperatingPlanRecoverySupportReadModel) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            OperatingPlanScreenHeader(eyebrow: "Recovery", title: "Edit \(draft.name) Support", subtitle: "Adjust when and how this support method is scheduled.")
+            OperatingPlanHeader(eyebrow: "Recovery", title: "Edit \(draft.name) Support", subtitle: "Adjust when and how this support method is scheduled.")
 
             OperatingPlanSupportScheduleEditor(schedule: Binding(
                 get: { draft.supportSchedule }, set: { self.draft?.supportSchedule = $0 }
             ))
 
-            OperatingPlanSection("Reminder") {
+            OperatingPlanGroup("Reminder") {
                 HStack(spacing: 8) {
                     ForEach(OperatingPlanReminderPreference.allCases) { option in
                         OperatingPlanChoicePill(title: option.label, isSelected: draft.reminderPreference == option) {
@@ -132,8 +124,8 @@ struct OperatingPlanRecoverySupportView: View {
                 }
             }
 
-            OperatingPlanSection("Execution Notes") {
-                CardContainer(padding: .sm) {
+            OperatingPlanGroup("Execution Notes") {
+                OperatingPlanSurface(verticalPadding: 10) {
                     TextField("Optional notes shown when this priority is opened", text: Binding(
                         get: { draft.notes }, set: { self.draft?.notes = $0 }
                     ), axis: .vertical)
@@ -141,8 +133,8 @@ struct OperatingPlanRecoverySupportView: View {
                 }
             }
 
-            if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
-            PrimaryActionButton(title: "Save Support") { save(draft) }
+            if let errorMessage { OperatingPlanErrorText(message: errorMessage) }
+            OperatingPlanButton(title: "Save Support", style: .primary) { save(draft) }
                 .accessibilityIdentifier("operatingPlan.recovery.save")
         }
     }

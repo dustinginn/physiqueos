@@ -751,7 +751,8 @@ final class OperatingPlanReadModelTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(AppDestination.self, from: data), .operatingPlanDexaAppointment)
     }
 
-    /// `plannedDate` is a canonical date-only value; `summary(_:)` parses and
+    /// `plannedDate` is a canonical date-only value; Next DEXA Scan
+    /// (`NextDexaScanPresentation`, Build 91) parses and
     /// displays it with the SAME (UTC) reference frame on both ends. Both
     /// formatters are hardcoded to UTC internally, independent of the
     /// device's own time zone, so this doesn't need to fake the device
@@ -760,7 +761,9 @@ final class OperatingPlanReadModelTests: XCTestCase {
     /// calendar day early for every negative-UTC-offset zone.
     func testDexaAppointmentSummaryPreservesTheCanonicalCalendarDay() throws {
         let item = CoachingDexaReadModel(plannedDate: "2026-11-15", localTime: "", reminderPreferences: [], uploadReminder: false, preparationNote: "")
-        XCTAssertEqual(OperatingPlanDexaAppointmentView.summary(item), "November 15")
+        let presentation = NextDexaScanPresentation(dexa: item, eventBriefingEnabled: false, today: "2026-11-01")
+        XCTAssertEqual(presentation.dateText, "Sun, Nov 15")
+        XCTAssertEqual(presentation.summaryText, "Sun, Nov 15")
     }
 
     /// Month-boundary case: a naive local-timezone parse/display mismatch
@@ -768,7 +771,7 @@ final class OperatingPlanReadModelTests: XCTestCase {
     /// prior day of the same month.
     func testDexaAppointmentSummaryPreservesTheCanonicalCalendarDayAcrossAMonthBoundary() throws {
         let item = CoachingDexaReadModel(plannedDate: "2026-03-01", localTime: "", reminderPreferences: [], uploadReminder: false, preparationNote: "")
-        XCTAssertEqual(OperatingPlanDexaAppointmentView.summary(item), "March 1")
+        XCTAssertEqual(NextDexaScanPresentation(dexa: item, eventBriefingEnabled: false, today: "2026-02-01").dateText, "Sun, Mar 1")
     }
 
     // MARK: - Training Protocol Builder (`/profile/operating-plan/training/new`)
@@ -1019,5 +1022,193 @@ extension OperatingPlanReadModelTests {
         XCTAssertFalse(ProgressPhotoCadencePreview.matchesDayRule(photos(1, .month, .last, day: .saturday), date: "2026-10-24"))
         XCTAssertFalse(ProgressPhotoCadencePreview.matchesDayRule(photos(1, .month, .first, day: .saturday), date: "2026-10-10"))
         XCTAssertTrue(ProgressPhotoCadencePreview.matchesDayRule(photos(3, .week, day: .saturday), date: "2026-10-10"))
+    }
+}
+
+// MARK: - Build 91 Operating Plan redesign (Founder D1–D4)
+
+@MainActor
+final class Build91OperatingPlanTests: XCTestCase {
+    private var root: URL {
+        URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+    }
+
+    private func source(_ path: String) throws -> String {
+        try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    private func landing(_ coachingIds: [String]) -> OperatingPlanReadModel {
+        let items = coachingIds.enumerated().map { index, id in
+            OperatingPlanSectionItemReadModel(
+                id: "coaching-\(index)", title: "Coaching Updates", detail: "Midweek calibration and weekly synthesis",
+                destination: .operatingPlanStrategy(strategyType: "briefings", strategyId: id), status: "Active"
+            )
+        }
+        let energy = OperatingPlanSectionItemReadModel(
+            id: "energy", title: "Energy", detail: "x",
+            destination: .operatingPlanStrategy(strategyType: "energy", strategyId: "energy-1"), status: "Active"
+        )
+        return OperatingPlanReadModel(sections: [
+            OperatingPlanSectionReadModel(id: "energy", iconKey: "energy", tone: .primary, title: "Energy Strategy", subtitle: "", items: [energy]),
+            OperatingPlanSectionReadModel(id: "coaching", iconKey: "coaching", tone: .primary, title: "Coaching Updates", subtitle: "", items: items),
+        ])
+    }
+
+    // MARK: Next DEXA Scan (D2)
+
+    func testDexaResolverFindsTheOneServerNamedCoachingStrategy() {
+        XCTAssertEqual(NextDexaScanResolver.coachingStrategy(in: landing(["coaching-77"])), .found("coaching-77"))
+        XCTAssertEqual(NextDexaScanResolver.coachingStrategy(in: landing([])), .none, "No active Coaching Updates")
+        XCTAssertEqual(NextDexaScanResolver.coachingStrategy(in: landing(["a", "b"])), .ambiguous, "Two ids are refused, never guessed")
+        XCTAssertEqual(NextDexaScanResolver.coachingStrategy(in: landing(["a", "a"])), .found("a"))
+    }
+
+    func testDexaResolverWorksOnTheSandboxLandingToo() {
+        XCTAssertEqual(NextDexaScanResolver.coachingStrategy(in: OperatingPlanSandboxStore().landing), .found("strategy_fixture_coaching"))
+    }
+
+    private func dexa(_ date: String, time: String = "07:30", reminders: [DexaReminderPreference] = DexaReminderPreference.allCases,
+                      upload: Bool = true, note: String = " Use consistent morning preparation conditions. ") -> CoachingDexaReadModel {
+        CoachingDexaReadModel(plannedDate: date, localTime: time, reminderPreferences: reminders, uploadReminder: upload, preparationNote: note)
+    }
+
+    func testScheduledPresentation() {
+        let presentation = NextDexaScanPresentation(dexa: dexa("2026-10-09"), eventBriefingEnabled: true, today: "2026-10-06")
+        XCTAssertTrue(presentation.isScheduled)
+        XCTAssertEqual(presentation.dateText, "Fri, Oct 9")
+        XCTAssertEqual(presentation.timingText, "7:30 AM · Pacific Time · in 3 days")
+        XCTAssertEqual(presentation.summaryText, "Fri, Oct 9 · 7:30 AM")
+        XCTAssertEqual(presentation.remindersSummary, "3 reminders · Upload reminder on")
+        XCTAssertEqual(presentation.reminders.map(\.isOn), [true, true, true])
+        XCTAssertEqual(presentation.preparationNote, "Use consistent morning preparation conditions.")
+        XCTAssertTrue(presentation.eventBriefingEnabled)
+    }
+
+    func testScheduledPresentationRelativeDaysAndPartialReminders() {
+        let tomorrow = NextDexaScanPresentation(dexa: dexa("2026-10-07", reminders: [.dayBefore], upload: false, note: "  "), eventBriefingEnabled: false, today: "2026-10-06")
+        XCTAssertEqual(tomorrow.timingText, "7:30 AM · Pacific Time · Tomorrow")
+        XCTAssertEqual(tomorrow.remindersSummary, "1 reminder")
+        XCTAssertEqual(tomorrow.reminders.map(\.isOn), [false, true, false])
+        XCTAssertNil(tomorrow.preparationNote, "A blank note is not shown")
+        XCTAssertFalse(tomorrow.eventBriefingEnabled)
+        let today = NextDexaScanPresentation(dexa: dexa("2026-10-06", time: ""), eventBriefingEnabled: true, today: "2026-10-06")
+        XCTAssertEqual(today.timingText, "Pacific Time · Today")
+        XCTAssertEqual(today.summaryText, "Tue, Oct 6")
+    }
+
+    func testNotScheduledPresentation() {
+        let presentation = NextDexaScanPresentation(dexa: dexa("", reminders: [], upload: false), eventBriefingEnabled: true, today: "2026-10-06")
+        XCTAssertFalse(presentation.isScheduled)
+        XCTAssertEqual(presentation.summaryText, "Not scheduled")
+        XCTAssertEqual(presentation.remindersSummary, "No reminders")
+    }
+
+    func testNextDexaScanReadsAndNeverWrites() throws {
+        let view = try source("PhysiqueOS/Presentation/OperatingPlan/OperatingPlanDexaAppointmentView.swift")
+        XCTAssertFalse(view.contains(".save("), "No second write boundary: editing goes through Coaching Updates")
+        XCTAssertFalse(view.contains("saveDexaAppointment"))
+        XCTAssertFalse(view.contains("OperatingPlanUnavailableView"), "The production dead end is gone")
+        XCTAssertTrue(view.contains("coachingUpdatesAPI.fetchDetail(strategyId:"))
+        XCTAssertTrue(view.contains("api.fetchOperatingPlan()"))
+        XCTAssertTrue(view.contains("anchor: .dexa"))
+        XCTAssertTrue(view.contains(".operatingPlanStrategyEdit(strategyType: \"briefings\", strategyId: strategyId)"))
+        for identifier in ["operatingPlan.dexa.edit", "operatingPlan.dexa.openCoaching", "operatingPlan.dexa.notScheduled",
+                           "operatingPlan.dexa.noCoaching", "operatingPlan.dexa.appointment"] {
+            XCTAssertTrue(view.contains("\"\(identifier)\""), identifier)
+        }
+    }
+
+    // MARK: Coaching Updates editor anchor + save parity
+
+    func testCoachingEditorKeepsItsAtomicSaveAndScrollsToTheDexaAnchor() throws {
+        let editor = try source("PhysiqueOS/Presentation/OperatingPlan/OperatingPlanStrategyEditorView.swift")
+        XCTAssertTrue(editor.contains("environment.coachingUpdatesAPI.save(detail, model: model)"), "The same atomic Coaching Updates save")
+        XCTAssertTrue(editor.contains("proxy.scrollTo(Self.dexaSectionId, anchor: .top)"))
+        XCTAssertTrue(editor.contains("\"From Next DEXA Scan\""))
+        XCTAssertTrue(editor.contains("expectedCurrentVersionId: expectedCurrentVersionId"), "Nutrition/Training still send the version they read")
+        XCTAssertTrue(editor.contains("\"This strategy was not saved. Refresh before retrying.\""), "Stale saves fail closed with the production copy")
+        XCTAssertEqual(editor.components(separatedBy: "\"Enable DEXA Event briefing\"").count - 1, 1, "One DEXA Event briefing control")
+    }
+
+    func testEditorAnchorIsReadOnceAndBackTitlesFallBack() {
+        OperatingPlanNavigationContext.resetForTesting()
+        let edit = AppDestination.operatingPlanStrategyEdit(strategyType: "briefings", strategyId: "c")
+        XCTAssertNil(OperatingPlanNavigationContext.consumeAnchor(for: edit))
+        var pushed: [AppDestination] = []
+        OperatingPlanNavigationContext.navigate(edit, from: "Next DEXA Scan", anchor: .dexa) { pushed.append($0) }
+        XCTAssertEqual(pushed, [edit])
+        XCTAssertEqual(OperatingPlanNavigationContext.backTitle(for: edit, default: "Coaching Updates"), "Next DEXA Scan")
+        XCTAssertEqual(OperatingPlanNavigationContext.consumeAnchor(for: edit), .dexa)
+        XCTAssertNil(OperatingPlanNavigationContext.consumeAnchor(for: edit), "A later plain visit opens at the top")
+        XCTAssertEqual(OperatingPlanNavigationContext.backTitle(for: .operatingPlanTracking, default: "Operating Plan"), "Operating Plan")
+        OperatingPlanNavigationContext.resetForTesting()
+    }
+
+    func testPriorityDetailNamesItselfInTheOperatingPlanCrumb() throws {
+        let priority = try source("PhysiqueOS/Presentation/Home/PriorityDetailView.swift")
+        XCTAssertTrue(priority.contains("OperatingPlanNavigationContext.navigate(destination, from: priority.title, using: onNavigate)"))
+        let router = try source("PhysiqueOS/Presentation/Root/AppDestinationRouterView.swift")
+        XCTAssertTrue(router.contains("OperatingPlanDexaAppointmentView(onNavigate: onNavigate, backTitle: operatingPlanBack(\"Back\"))"))
+        XCTAssertTrue(router.contains("anchor: OperatingPlanNavigationContext.consumeAnchor(for: destination)"))
+    }
+
+    // MARK: Chrome, one title, 44 pt targets (D1)
+
+    private static let pages = [
+        "OperatingPlanLandingView", "OperatingPlanStrategyDetailView", "OperatingPlanStrategyEditorView",
+        "OperatingPlanProtocolDomainView", "OperatingPlanPeptideExecutionView", "OperatingPlanRecoverySupportView",
+        "OperatingPlanTrackingView", "OperatingPlanSupplementSupportView", "OperatingPlanSupplementEditorView",
+        "OperatingPlanDexaAppointmentView",
+    ]
+
+    func testEveryOperatingPlanPageUsesTheLockedChromeWithOneTitle() throws {
+        for page in Self.pages {
+            let text = try source("PhysiqueOS/Presentation/OperatingPlan/\(page).swift")
+            XCTAssertTrue(text.contains(".operatingPlanChrome(back:"), "\(page): locked crumb chrome")
+            XCTAssertFalse(text.contains(".navigationTitle("), "\(page): one title (the in-page header)")
+            XCTAssertFalse(text.contains("PrimaryActionButton"), "\(page): family buttons")
+            XCTAssertFalse(text.contains("CardContainer"), "\(page): family surfaces")
+            XCTAssertFalse(text.contains("PhysiqueOSTheme.background"), "\(page): Priority-family canvas (D4)")
+        }
+    }
+
+    func testFailedLoadsOfferTryAgain() throws {
+        for page in ["OperatingPlanLandingView", "OperatingPlanStrategyDetailView", "OperatingPlanProtocolDomainView",
+                     "OperatingPlanTrackingView", "OperatingPlanDexaAppointmentView", "OperatingPlanRecoverySupportView"] {
+            let text = try source("PhysiqueOS/Presentation/OperatingPlan/\(page).swift")
+            XCTAssertTrue(text.contains("OperatingPlanFailureView("), page)
+            XCTAssertTrue(text.contains("retry:"), page)
+        }
+    }
+
+    func testFamilyTokensAreThePriorityCanvasAndPillsAreAtLeast44pt() throws {
+        let components = try source("PhysiqueOS/Presentation/OperatingPlan/OperatingPlanComponents.swift")
+        XCTAssertTrue(components.contains("static var canvas: Color { PhysiqueOSTheme.priorityCanvas }"))
+        XCTAssertTrue(components.contains("static var ink: Color { PhysiqueOSTheme.priorityInk }"))
+        XCTAssertTrue(components.contains(".frame(minHeight: max(44, minHeight ?? 44))"))
+        XCTAssertTrue(components.contains("frame(minWidth: 44, minHeight: 44, alignment: .leading)"), "Crumb target")
+        XCTAssertTrue(components.contains("minHeight: style == .text ? 44 : 50"), "Buttons are 44/50 pt")
+    }
+
+    // MARK: Copy
+
+    func testTrainingBuilderProductionCopyIsProductLanguage() {
+        let copy = OperatingPlanTrainingProtocolBuilderView.productionUnavailableTitle + " " + OperatingPlanTrainingProtocolBuilderView.productionUnavailableMessage
+        XCTAssertFalse(copy.lowercased().contains("legacy"))
+        XCTAssertFalse(copy.lowercased().contains("production"))
+    }
+
+    func testHeroShowsTheStartedDateUnderItsLabel() {
+        XCTAssertEqual(OperatingPlanStrategyDetailView.startedValue("Started Aug 16, 2026"), "Aug 16, 2026")
+        XCTAssertEqual(OperatingPlanStrategyDetailView.startedValue("July 19, 2026"), "July 19, 2026")
+    }
+
+    func testEnergyStaysReadOnlyAndPhaseHistoryIsNotFabricated() throws {
+        let detail = try source("PhysiqueOS/Presentation/OperatingPlan/OperatingPlanStrategyDetailView.swift")
+        XCTAssertTrue(detail.contains("energyPhaseHistory: []"), "D7: no Energy phase-history projection in Build 91")
+        XCTAssertTrue(detail.contains("if let editLabel = detail.editLabel, let editDestination = detail.editDestination"))
+        let store = OperatingPlanSandboxStore()
+        let energy = try XCTUnwrap(store.strategyDetail(strategyType: "energy", strategyId: "strategy_fixture_energy"))
+        XCTAssertNil(energy.editDestination, "Energy has no editor")
     }
 }

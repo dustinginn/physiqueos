@@ -1532,3 +1532,100 @@ final class Build90FounderSelectedUITests: XCTestCase {
         try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
     }
 }
+
+/// Build 91 Operating Plan redesign journeys (Sandbox fixtures through the
+/// DEBUG `op:` review route): one title + crumb chrome, 44 pt actions,
+/// back labels, and the Next DEXA Scan -> Coaching Updates editor anchor.
+@MainActor
+final class OperatingPlanRedesignUITests: XCTestCase {
+    override func setUp() { continueAfterFailure = false }
+
+    private func launch(_ route: String, appearance: String = "dark") -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-physiqueos.native.authority-selection.v1", "sandbox",
+                               "-physiqueos.appearance-review.route", route,
+                               "-physiqueos.appearance-review.value", appearance]
+        app.launch()
+        return app
+    }
+
+    private func element(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    private func crumb(_ app: XCUIApplication) -> XCUIElement { app.buttons["operatingPlan.back"].firstMatch }
+
+    private func scrollTo(_ target: XCUIElement, in app: XCUIApplication, attempts: Int = 8) {
+        var count = 0
+        while !target.isHittable && count < attempts {
+            app.swipeUp()
+            count += 1
+        }
+    }
+
+    func testRootShowsOneTitleAndTheYouCrumb() {
+        let app = launch("op:landing")
+        XCTAssertTrue(app.staticTexts["Your Operating Plan"].waitForExistence(timeout: 20))
+        XCTAssertEqual(crumb(app).label, "You")
+        XCTAssertFalse(app.navigationBars.staticTexts["Operating Plan"].exists, "No duplicate system title")
+        XCTAssertTrue(element(app, "operatingPlan.landing.energy").exists)
+    }
+
+    func testLandingToPeptidesToExecutionCarriesCrumbsAndFullSizeActions() {
+        let app = launch("op:landing", appearance: "light")
+        let peptides = element(app, "operatingPlan.landing.peptide")
+        XCTAssertTrue(peptides.waitForExistence(timeout: 20))
+        scrollTo(peptides, in: app)
+        peptides.tap()
+        let manage = app.buttons["operatingPlan.domain.peptide.manage"].firstMatch
+        XCTAssertTrue(manage.waitForExistence(timeout: 10))
+        XCTAssertEqual(crumb(app).label, "Operating Plan")
+        XCTAssertGreaterThanOrEqual(manage.frame.height, 44, "Manage is a full-size target")
+        let resume = app.buttons["operatingPlan.domain.peptide.resume"].firstMatch
+        if resume.exists { XCTAssertGreaterThanOrEqual(resume.frame.height, 44) }
+        manage.tap()
+        XCTAssertTrue(app.buttons["operatingPlan.peptide.row.dose"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(crumb(app).label, "Peptides")
+        crumb(app).tap()
+        XCTAssertTrue(manage.waitForExistence(timeout: 10), "The crumb returns to the domain")
+    }
+
+    func testNextDexaScanEditOpensTheCoachingEditorAtDexa() {
+        let app = launch("op:tab=home;dexa")
+        let edit = app.buttons["operatingPlan.dexa.edit"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 20))
+        XCTAssertTrue(element(app, "operatingPlan.dexa.appointment").exists, "Sandbox schedule shows as scheduled")
+        XCTAssertTrue(app.buttons["operatingPlan.dexa.openCoaching"].exists)
+        scrollTo(edit, in: app)
+        edit.tap()
+        let anchored = element(app, "operatingPlan.coaching.dexa.anchored")
+        XCTAssertTrue(anchored.waitForExistence(timeout: 10))
+        XCTAssertTrue(anchored.isHittable, "Opened scrolled to DEXA")
+        XCTAssertEqual(crumb(app).label, "Cancel")
+        XCTAssertTrue(element(app, "operatingPlan.coaching.save").exists, "The same atomic Save")
+        crumb(app).tap()
+        XCTAssertTrue(app.buttons["operatingPlan.dexa.edit"].firstMatch.waitForExistence(timeout: 10), "Cancel returns to Next DEXA Scan")
+    }
+
+    func testCoachingUpdatesScheduledEvidenceOpensNextDexaScan() {
+        let app = launch("op:landing;strategy=briefings/strategy_fixture_coaching", appearance: "light")
+        let nextDexa = app.buttons["operatingPlan.coaching.nextDexa"].firstMatch
+        XCTAssertTrue(nextDexa.waitForExistence(timeout: 20))
+        scrollTo(nextDexa, in: app)
+        nextDexa.tap()
+        XCTAssertTrue(app.buttons["operatingPlan.dexa.edit"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(crumb(app).label, "Coaching Updates")
+    }
+
+    func testTrackingKeepsEvidenceOwnedCompletion() {
+        let app = launch("op:landing;tracking")
+        XCTAssertTrue(element(app, "operatingPlan.tracking.routine").waitForExistence(timeout: 20))
+        XCTAssertEqual(crumb(app).label, "Operating Plan")
+        XCTAssertFalse(app.buttons["Mark Complete"].exists, "No manual completion")
+        let edit = app.buttons["operatingPlan.tracking.editSupport"].firstMatch
+        XCTAssertGreaterThanOrEqual(edit.frame.height, 44)
+        edit.tap()
+        XCTAssertTrue(app.buttons["operatingPlan.tracking.save"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(crumb(app).label, "Tracking")
+    }
+}

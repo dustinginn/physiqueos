@@ -22,41 +22,41 @@ struct OperatingPlanSupplementEditorView: View {
     private var store: OperatingPlanSandboxStore { environment.operatingPlanStore }
 
     var body: some View {
-        ScrollView {
+        OperatingPlanScrollPage {
             if let model, environment.nativeAuthority == .sandbox || productionDetail != nil {
-                VStack(alignment: .leading, spacing: 18) {
-                    OperatingPlanScreenHeader(
+                VStack(alignment: .leading, spacing: 0) {
+                    OperatingPlanHeader(
                         eyebrow: "Supplement",
                         title: model.mode == .create ? "Add Supplement" : "Edit Strategy",
                         subtitle: "Dose, timing, and reminders stay in Execution."
                     )
 
-                    OperatingPlanSection("Name") {
-                        CardContainer(padding: .sm) {
+                    OperatingPlanGroup("Name") {
+                        OperatingPlanSurface(verticalPadding: 10) {
                             TextField("Supplement name", text: Binding(get: { model.name }, set: { self.model?.name = $0 }))
-                                .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                .foregroundStyle(OperatingPlanColor.ink)
                         }
                     }
 
-                    OperatingPlanSection("Purpose") {
-                        CardContainer(padding: .sm) {
+                    OperatingPlanGroup("Purpose") {
+                        OperatingPlanSurface(verticalPadding: 10) {
                             TextField("Purpose", text: Binding(get: { model.purpose }, set: { self.model?.purpose = $0 }))
-                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                .foregroundStyle(OperatingPlanColor.ink)
                         }
                     }
 
-                    OperatingPlanSection("Current Strategy or Role") {
-                        CardContainer(padding: .sm) {
+                    OperatingPlanGroup("Current Strategy or Role") {
+                        OperatingPlanSurface(verticalPadding: 10) {
                             TextField("Current strategy or role", text: Binding(get: { model.role }, set: { self.model?.role = $0 }), axis: .vertical)
                                 .lineLimit(3...6)
-                                .physiqueOSFont(PhysiqueOSTypography.cardBody14Medium)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldValue)
+                                .foregroundStyle(OperatingPlanColor.ink)
                         }
                     }
 
-                    OperatingPlanSection("Goal") {
+                    OperatingPlanGroup("Goal") {
                         HStack(spacing: 8) {
                             ForEach(model.goalOptions) { goal in
                                 OperatingPlanChoicePill(title: goal.title, isSelected: model.goalId == goal.id) {
@@ -67,7 +67,7 @@ struct OperatingPlanSupplementEditorView: View {
                     }
 
                     if model.mode == .create {
-                        OperatingPlanSection("Start Date") {
+                        OperatingPlanGroup("Start Date") {
                             DateField(date: Binding(
                                 get: { Self.dateFormatter.date(from: model.startDate) ?? Date() },
                                 set: { self.model?.startDate = Self.dateFormatter.string(from: $0) }
@@ -75,31 +75,23 @@ struct OperatingPlanSupplementEditorView: View {
                         }
                     }
 
-                    if let errorMessage { OperatingPlanEditorErrorBanner(message: errorMessage) }
-                    PrimaryActionButton(title: model.mode == .create ? "Add Supplement" : "Save Strategy") { save(model) }
+                    if let errorMessage { OperatingPlanErrorText(message: errorMessage).padding(.top, 16) }
+                    OperatingPlanButton(title: model.mode == .create ? "Add Supplement" : "Save Strategy", style: .primary) { save(model) }
+                        .padding(.top, 22)
                         .accessibilityIdentifier("operatingPlan.supplement.save")
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
             } else if environment.nativeAuthority == .founderProduction, isLoadingProduction {
-                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 240)
+                OperatingPlanLoadingView()
             } else {
-                OperatingPlanUnavailableView(message: loadError ?? "This supplement is unavailable.")
+                OperatingPlanFailureView(
+                    title: "This supplement couldn't be loaded",
+                    message: loadError == nil ? "This supplement is unavailable." : "Nothing was changed. Check your connection and try again.",
+                    retry: loadError == nil ? nil : { Task { await load() } }
+                )
             }
         }
-        .physiqueOSScrollBottomClearance()
-        .background(PhysiqueOSTheme.background)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .restoresInteractivePopGesture()
-        .toolbarBackground(PhysiqueOSTheme.background, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancel") { dismiss() }
-                    .physiqueOSFont(PhysiqueOSTypography.label14Heavy)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-            }
-        }
+        .operatingPlanChrome(back: "Cancel")
+        .accessibilityIdentifier("operatingPlan.supplementEditor")
         .task(id: "\(protocolId ?? "new"):\(environment.nativeAuthority)") { await load() }
     }
 
