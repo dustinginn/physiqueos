@@ -1,4 +1,7 @@
-import { createDefaultTrainingProgressionRule } from "./TrainingProgressionPolicy.js";
+import {
+  createDefaultTrainingProgressionRule,
+  TRAINING_PROGRESSION_PRESCRIPTION_SCHEMA_VERSION,
+} from "./TrainingProgressionPolicy.js";
 
 export const TRAINING_PROTOCOL_TYPE = "training";
 export const TRAINING_PROTOCOL_ID = "protocol_training_founder_maintenance";
@@ -139,6 +142,7 @@ export function createFounderTrainingProtocolActivation({
         preferredRhythm: structuredClone(rhythm),
         progression: {
           pace: progressionPace,
+          prescriptionSchemaVersion: TRAINING_PROGRESSION_PRESCRIPTION_SCHEMA_VERSION,
           defaultRule: createDefaultTrainingProgressionRule(),
           exerciseOverrides: [],
         },
@@ -162,7 +166,7 @@ export function createFounderTrainingProtocolActivation({
       evidenceBasis: {
         evidenceTypes: ["training_session"],
         directEvidenceConfidence: "moderate",
-        limitations: ["Exercise-specific rep-range maxima and equipment increments are not configured yet."],
+        limitations: ["Exercise-specific rep ranges, working-set counts, rep increments, reset targets, and equipment increments are not configured yet."],
       },
       confirmation: {
         confirmedByUser: true,

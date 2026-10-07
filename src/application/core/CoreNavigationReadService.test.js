@@ -331,7 +331,7 @@ describe("provider-native core navigation reads", () => {
         suggestedReps: null,
         status: "progression_opportunity",
         recommendedAction: "consider_progression",
-        reasonCode: "strategy_eligibility_gates_satisfied",
+        reasonCode: "progression_step_authority_unavailable",
         historyReferences: expect.arrayContaining([
           expect.objectContaining({ sessionId: "session-pull-up-0" }),
         ]),
@@ -347,6 +347,10 @@ describe("provider-native core navigation reads", () => {
           source: "active_training_strategy_default_rule",
           qualificationMode: "stable_completed_set_profile_transitional",
         }),
+        progressionStep: expect.objectContaining({
+          kind: "none",
+          reasonCode: "rep_range_authority_unavailable",
+        }),
         targetSelection: expect.objectContaining({ status: "unavailable" }),
       }),
     ]));
@@ -355,6 +359,56 @@ describe("provider-native core navigation reads", () => {
     expect(set).toMatchObject({ weight: 25, weight_unit: "lb", load_type: "external_load" });
     // Additive Server-owned set-level load semantics for Native's completion copy.
     expect(set.load_semantics).toBe("weighted_bodyweight");
+  });
+
+  it("projects additive Server-owned rep-step metadata without changing legacy Native target fields", async () => {
+    const { narrow, runtime } = services();
+    installTrainingProgressionStrategy(runtime, {
+      repRange: { minimum: 6, maximum: 8 },
+      workingSetsRequired: 4,
+      repIncrement: 1,
+    });
+    for (const [index, date] of ["2026-08-01", "2026-08-15"].entries()) {
+      runtime.canonicalEvidenceObjects.push({
+        canonicalId: `training-pull-up-step-${index}`,
+        quality: { status: "complete" },
+        payload: {
+          id: `session-pull-up-step-${index}`,
+          evidence_type: "training",
+          observed_at: date,
+          exercises: [{
+            id: `pull-up-step-${index}`,
+            canonicalExerciseId: "pull_up",
+            name: "Pull-Ups",
+            sets: Array.from({ length: 4 }, () => ({
+              reps: 7,
+              weight: 25,
+              weight_unit: "lb",
+              load_type: "external_load",
+            })),
+          }],
+        },
+      });
+    }
+
+    const recommendation = (await narrow.getTrainingLogger()).initialProgressionRecommendations
+      .find((item) => item.canonicalExerciseId === "pull_up");
+    expect(recommendation).toMatchObject({
+      state: "opportunity",
+      suggestedLoad: 25,
+      suggestedLoadType: "external_load",
+      suggestedReps: 8,
+      prescription: "25 lb x 8",
+      progressionStep: {
+        kind: "reps",
+        currentLoad: 25,
+        nextLoad: 25,
+        currentRepTarget: 7,
+        nextRepTarget: 8,
+        repRangeMin: 6,
+        repRangeMax: 8,
+      },
+    });
   });
 
   it("re-reads a durable same-day Finish and reflects the new qualifying session", async () => {

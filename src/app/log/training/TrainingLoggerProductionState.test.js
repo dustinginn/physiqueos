@@ -6,6 +6,7 @@ import {
   canCreateNewTrainingLoggerExercise,
   addTrainingExercise,
   addTrainingSet,
+  applyProgressionSuggestion,
   assignTrainingVariant,
   createTrainingLoggerProductionDraft,
   createTrainingSuperset,
@@ -58,6 +59,60 @@ describe("production Training Logger state", () => {
       canonicalExerciseId: "runtime_curl",
       name: "Runtime Curl",
     });
+  });
+
+  it("consumes the Server-owned step projection instead of recalculating progression in the client", () => {
+    const exerciseLibrary = [canonicalExercise(
+      "pull_up", "Pull-Ups", "Back", ["Lats", "Biceps"]
+    )];
+    const serverRecommendation = {
+      canonicalExerciseId: "pull_up",
+      status: "progression_opportunity",
+      eyebrow: "Progression opportunity",
+      message: "Server-owned double progression step.",
+      prescription: "25 lb x 8",
+      suggestedLoad: 25,
+      suggestedReps: 8,
+      comparisonContext: {
+        canonicalExerciseId: "pull_up",
+        relationshipKey: "standalone",
+        variantKey: "ordinary",
+      },
+      progressionStep: {
+        kind: "reps",
+        currentLoad: 25,
+        nextLoad: 25,
+        currentRepTarget: 7,
+        nextRepTarget: 8,
+      },
+    };
+    let draft = createTrainingLoggerProductionDraft({
+      exerciseLibrary,
+      historySessions: [{
+        id: "pull-up-history",
+        evidence_type: "training",
+        observed_at: "2026-10-04",
+        exercises: [{
+          id: "pull-up-occurrence",
+          canonicalExerciseId: "pull_up",
+          name: "Pull-Ups",
+          sets: Array.from({ length: 4 }, () => ({ reps: 7, weight: 25, weight_unit: "lb" })),
+        }],
+      }],
+      initialProgressionRecommendations: [serverRecommendation],
+      workoutDate: "2026-10-06",
+    });
+    draft = addTrainingExercise(draft, "pull_up");
+    expect(draft.exercises[0].progressionRecommendation).toMatchObject({
+      prescription: "25 lb x 8",
+      suggestedLoad: 25,
+      suggestedReps: 8,
+      progressionStep: { kind: "reps", nextRepTarget: 8 },
+    });
+    draft = applyProgressionSuggestion(draft, draft.exercises[0].id);
+    expect(draft.exercises[0].sets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ load: 25, reps: 8, confirmed: false }),
+    ]));
   });
 
   it("uses confirmed performed history for the normal picker and keeps the global registry explicit", () => {

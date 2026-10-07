@@ -15,8 +15,10 @@ describe("TrainingProtocolBuilderService progression authority", () => {
       successfulSessionsRequired: 2,
       minimumExposureDays: 14,
     });
+    expect(version.trainingStrategy.progression.prescriptionSchemaVersion)
+      .toBe("training_double_progression_prescription_v1");
     expect(version.evidenceBasis.limitations).toEqual([
-      "Exercise-specific rep-range maxima and equipment increments are not configured yet.",
+      "Exercise-specific rep ranges, working-set counts, rep increments, reset targets, and equipment increments are not configured yet.",
     ]);
   });
 });

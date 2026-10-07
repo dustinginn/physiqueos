@@ -1008,6 +1008,7 @@ function projectTrainingLoggerRecommendationResult(result, canonicalExerciseId) 
     exposureDays: result.exposureDays,
     progressionGates: result.progressionGates,
     progressionPolicy: result.progressionPolicy,
+    progressionStep: result.progressionStep,
     targetSelection: result.targetSelection,
   });
 }
@@ -1026,7 +1027,14 @@ function resolveActiveTrainingProgressionStrategy(runtime = {}) {
     version?.status !== "superseded" &&
     !version?.endedAt
   );
-  return versions.length === 1 ? versions[0].trainingStrategy ?? null : null;
+  if (versions.length !== 1 || !versions[0].trainingStrategy) return null;
+  return Object.freeze({
+    ...versions[0].trainingStrategy,
+    progressionAuthority: Object.freeze({
+      protocolVersionId: versions[0].id,
+      effectiveAt: versions[0].effectiveAt ?? null,
+    }),
+  });
 }
 
 function projectGoalContext(goal, date) {

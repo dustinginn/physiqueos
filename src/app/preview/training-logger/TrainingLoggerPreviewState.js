@@ -9,11 +9,13 @@ import {
   resolveCanonicalTrainingMuscleGroup,
 } from "../../../domain/models/trainingMuscleGroupIdentity";
 import {
+  getTrainingExecutionVariantKey,
   normalizeTrainingExecutionVariant,
 } from "../../../domain/models/trainingExecutionVariant";
 import {
   createTrainingExerciseOccurrenceId,
   createTrainingExerciseRelationshipGroup,
+  getTrainingExerciseRelationshipComparisonKey,
   removeExerciseFromTrainingRelationshipGroups,
   TRAINING_EXERCISE_RELATIONSHIP_TYPES,
 } from "../../../domain/models/trainingExerciseRelationship";
@@ -23,10 +25,6 @@ import {
 import {
   resolvePreviousExerciseOccurrence,
 } from "../../../domain/services/TrainingExerciseOccurrenceHistoryService";
-import {
-  createTrainingLoggerProgressionRecommendation,
-  TRAINING_LOGGER_PROGRESSION_STATUS,
-} from "../../../domain/services/TrainingLoggerProgressionService";
 import {
   createTrainingLoggerSuggestion,
 } from "../../../domain/services/TrainingLoggerSuggestionService";
@@ -311,9 +309,11 @@ export function listPerformedTrainingLoggerExerciseIds(sessions = []) {
 }
 
 export function createTrainingLoggerProductionDraft({
+  contextualProgressionRecommendations = [],
   exerciseLibrary = [],
   goalContext = null,
   historySessions = [],
+  initialProgressionRecommendations = [],
   mode = null,
   performedExerciseIds = null,
   workoutDate,
@@ -331,6 +331,8 @@ export function createTrainingLoggerProductionDraft({
       exerciseLibrary,
       goalContext,
       historySessions,
+      initialProgressionRecommendations,
+      contextualProgressionRecommendations,
       performedExerciseIds: Array.isArray(performedExerciseIds)
         ? performedExerciseIds
         : listPerformedTrainingLoggerExerciseIds(historySessions),
@@ -361,9 +363,11 @@ export function createTrainingLoggerProductionDraft({
 export function hydrateTrainingLoggerProductionDraft(
   recoveredDraft,
   {
+    contextualProgressionRecommendations = [],
     exerciseLibrary = [],
     goalContext = null,
     historySessions = [],
+    initialProgressionRecommendations = [],
     performedExerciseIds = null,
     workoutDate,
   } = {}
@@ -377,6 +381,8 @@ export function hydrateTrainingLoggerProductionDraft(
       exerciseLibrary,
       goalContext,
       historySessions,
+      initialProgressionRecommendations,
+      contextualProgressionRecommendations,
       performedExerciseIds,
       workoutDate,
     });
@@ -392,6 +398,8 @@ export function hydrateTrainingLoggerProductionDraft(
       exerciseLibrary,
       goalContext,
       historySessions,
+      initialProgressionRecommendations,
+      contextualProgressionRecommendations,
       performedExerciseIds: Array.isArray(performedExerciseIds)
         ? performedExerciseIds
         : listPerformedTrainingLoggerExerciseIds(historySessions),
@@ -1053,40 +1061,34 @@ function selectDraftProgressionRecommendation(draft, context) {
     return RECOMMENDATION_FIXTURES[context.canonicalExerciseId]
       ?? createMaintainRecommendation(context.previousPerformance);
   }
-  const result = createTrainingLoggerProgressionRecommendation({
-    canonicalExerciseId: context.canonicalExerciseId,
-    goalContext: draft.productionContext?.goalContext,
-    nowDate: draft.workoutDate,
-    relationshipContext: context.relationshipContext,
-    sessions: draft.productionContext?.historySessions ?? [],
-    variant: context.executionVariant,
-  });
-  if (result.status === TRAINING_LOGGER_PROGRESSION_STATUS.INSUFFICIENT) return null;
-  const state = result.status === TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY
+  const relationshipKey = getTrainingExerciseRelationshipComparisonKey(context.relationshipContext);
+  const variantKey = getTrainingExecutionVariantKey(context.executionVariant);
+  const recommendations = context.relationshipContext
+    ? draft.productionContext?.contextualProgressionRecommendations ?? []
+    : draft.productionContext?.initialProgressionRecommendations ?? [];
+  const result = recommendations.find((candidate) =>
+    candidate.canonicalExerciseId === context.canonicalExerciseId &&
+    candidate.comparisonContext?.variantKey === variantKey &&
+    candidate.comparisonContext?.relationshipKey === relationshipKey
+  );
+  if (!result) return null;
+  const state = result.status === "progression_opportunity"
     ? PROGRESSION_STATES.OPPORTUNITY
-    : result.status === TRAINING_LOGGER_PROGRESSION_STATUS.RECOVER
+    : result.status === "recover_prior_performance"
       ? PROGRESSION_STATES.RECOVER
       : PROGRESSION_STATES.MAINTAIN;
-  const prescription = result.recommendedLoad != null && result.recommendedReps != null
-    ? `${result.recommendedLoad} lb × ${result.recommendedReps}`
-    : result.recommendedAction === "consider_progression"
-      ? "Progress manually if today’s performance supports it"
-      : "Repeat the latest comparable performance";
   return {
     state,
-    eyebrow: state === PROGRESSION_STATES.OPPORTUNITY
-      ? "Progression opportunity"
-      : state === PROGRESSION_STATES.RECOVER
-        ? "Recovery opportunity"
-        : "Maintain current performance",
-    message: result.reason,
-    prescription,
-    suggestedLoad: result.recommendedLoad,
-    suggestedReps: result.recommendedReps,
+    eyebrow: result.eyebrow,
+    message: result.message,
+    prescription: result.prescription,
+    suggestedLoad: result.suggestedLoad,
+    suggestedReps: result.suggestedReps,
     confidence: result.confidence,
     historyReferences: result.historyReferences,
     comparisonContext: result.comparisonContext,
     calibration: result.calibration,
+    progressionStep: result.progressionStep,
   };
 }
 

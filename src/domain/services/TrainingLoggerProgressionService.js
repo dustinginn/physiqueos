@@ -51,7 +51,10 @@ export function createTrainingLoggerProgressionRecommendation({
     relationshipContext,
     sessions,
     variant,
-  }).filter((entry) => !nowDateKey || entry.date <= nowDateKey);
+  })
+    .filter((entry) => !nowDateKey || entry.date <= nowDateKey)
+    .filter((entry) => !policy.executable || !policy.prescriptionContext?.effectiveDate ||
+      entry.date >= policy.prescriptionContext.effectiveDate);
   const phase = resolveTrainingProgressionPhase(goalContext);
   const phaseExpectation = PHASE_EXPECTATIONS[phase];
 
@@ -81,8 +84,12 @@ export function createTrainingLoggerProgressionRecommendation({
   const previous = comparable[1] ?? null;
   const calibration = diagnosticCalibration({ comparable, phase, phaseExpectation, sessions });
   const currentLoadRun = listCurrentLoadRun(comparable, latest);
-  const qualifyingRun = listCurrentQualifyingRun(currentLoadRun, policy);
-  const exposureStartDate = qualifyingRun.at(-1)?.date ?? null;
+  const currentStep = resolveCurrentPrescriptionStep(latest, policy);
+  const qualifyingRun = listCurrentQualifyingRun(currentLoadRun, policy, currentStep);
+  const exposureRun = policy.stepSelectionExecutable
+    ? currentLoadRun.filter((entry) => qualifiesForLoadExposure(entry, policy))
+    : qualifyingRun;
+  const exposureStartDate = exposureRun.at(-1)?.date ?? null;
   const exposureDays = exposureStartDate ? daysBetween(nowDateKey, exposureStartDate) : 0;
   const qualifyingSuccessfulSessions = qualifyingRun.length;
   const sessionCountGateSatisfied = qualifyingSuccessfulSessions >= policy.successfulSessionsRequired;
@@ -91,6 +98,7 @@ export function createTrainingLoggerProgressionRecommendation({
     eligible: sessionCountGateSatisfied && exposureGateSatisfied,
     exposureGateSatisfied,
     sessionCountGateSatisfied,
+    stepSelectionAuthoritySatisfied: policy.stepSelectionExecutable,
   });
   const confidence = comparable.length >= 5 ? "high" : comparable.length >= 3 ? "moderate" : "low";
   const common = {
@@ -118,25 +126,34 @@ export function createTrainingLoggerProgressionRecommendation({
       recommendedLoadType: previous.loadType,
       recommendedReps: previous.reps,
       recommendedUnit: previous.unit,
+      progressionStep: createProgressionStep({
+        currentRepTarget: currentStep.currentRepTarget,
+        kind: "none",
+        latest,
+        policy,
+        reasonCode: "recovery_precedence",
+      }),
       targetSelection: Object.freeze({ status: "recovery_target", policy: "prior_comparable_performance" }),
     };
   }
 
   if (gates.eligible) {
-    const target = deriveEvidenceSupportedTarget(comparable, policy);
+    const selection = selectProgressionStep({ comparable, currentStep, latest, policy });
     return {
       ...common,
       status: TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY,
       reason: `The current prescription has ${qualifyingSuccessfulSessions} qualifying successful sessions and ${exposureDays} days of exposure.`,
-      reasonCode: "strategy_eligibility_gates_satisfied",
-      recommendedAction: target ? "use_suggestion" : "consider_progression",
-      recommendedLoad: target?.load ?? null,
-      recommendedLoadType: target ? latest.loadType : null,
-      recommendedReps: target?.reps ?? null,
-      recommendedUnit: target ? latest.unit : null,
-      targetSelection: target
-        ? Object.freeze({ status: "available", policy: target.policy })
-        : Object.freeze({ status: "unavailable", policy: "no_evidence_supported_load_increment" }),
+      reasonCode: selection.reasonCode,
+      recommendedAction: selection.target ? "use_suggestion" : "consider_progression",
+      recommendedLoad: selection.target?.load ?? null,
+      recommendedLoadType: selection.target ? latest.loadType : null,
+      recommendedReps: selection.target?.reps ?? null,
+      recommendedUnit: selection.target ? latest.unit : null,
+      progressionStep: selection.progressionStep,
+      targetSelection: Object.freeze({
+        status: selection.target ? "available" : "unavailable",
+        policy: selection.targetPolicy,
+      }),
     };
   }
 
@@ -158,6 +175,13 @@ export function createTrainingLoggerProgressionRecommendation({
     recommendedLoadType: latest.loadType,
     recommendedReps: latest.reps,
     recommendedUnit: latest.unit,
+    progressionStep: createProgressionStep({
+      currentRepTarget: currentStep.currentRepTarget,
+      kind: "none",
+      latest,
+      policy,
+      reasonCode,
+    }),
     targetSelection: Object.freeze({ status: "not_eligible", policy: null }),
   };
 }
@@ -269,13 +293,13 @@ function listCurrentLoadRun(entries, latest) {
   return run;
 }
 
-function listCurrentQualifyingRun(entries, policy) {
+function listCurrentQualifyingRun(entries, policy, currentStep) {
   if (!entries.length) return [];
   const latestProfile = entries[0].setProfileKey;
   const run = [];
   for (const entry of entries) {
-    const qualifies = policy.qualificationMode === "prescribed_top_of_rep_range"
-      ? qualifiesAtConfiguredTopOfRange(entry, policy)
+    const qualifies = policy.stepSelectionExecutable
+      ? qualifiesAtCurrentPrescriptionStep(entry, policy, currentStep.currentRepTarget)
       : entry.setProfileKey === latestProfile;
     if (!qualifies) break;
     run.push(entry);
@@ -283,12 +307,35 @@ function listCurrentQualifyingRun(entries, policy) {
   return run;
 }
 
-function qualifiesAtConfiguredTopOfRange(entry, policy) {
+function qualifiesAtCurrentPrescriptionStep(entry, policy, currentRepTarget) {
+  if (currentRepTarget === null) return false;
   if (!entry.sets.length) return false;
   if (policy.workingSetsRequired !== null && entry.sets.length !== policy.workingSetsRequired) return false;
   return entry.sets.every((set) =>
-    sameLoadContext(set, entry) && set.reps >= policy.repRange.maximum
+    sameLoadContext(set, entry) && set.reps >= currentRepTarget
   );
+}
+
+function qualifiesForLoadExposure(entry, policy) {
+  if (!entry.sets.length || entry.sets.length !== policy.workingSetsRequired) return false;
+  return entry.sets.every((set) => sameLoadContext(set, entry) &&
+    set.reps >= policy.repRange.minimum);
+}
+
+function resolveCurrentPrescriptionStep(latest, policy) {
+  if (!policy.stepSelectionExecutable || latest.sets.length !== policy.workingSetsRequired) {
+    return { currentRepTarget: null, reasonCode: policy.stepSelectionReasonCode };
+  }
+  const reps = latest.sets.map((set) => set.reps);
+  const uniform = reps.every((value) => value === reps[0]);
+  if (!uniform) return { currentRepTarget: null, reasonCode: "non_uniform_working_set_reps" };
+  if (reps[0] < policy.repRange.minimum) {
+    return { currentRepTarget: null, reasonCode: "current_reps_below_prescribed_range" };
+  }
+  return {
+    currentRepTarget: Math.min(reps[0], policy.repRange.maximum),
+    reasonCode: null,
+  };
 }
 
 function diagnosticCalibration({ comparable, phase, phaseExpectation, sessions }) {
@@ -336,7 +383,96 @@ function listProgressionIntervals(entries = []) {
   return intervals;
 }
 
-function deriveEvidenceSupportedTarget(entries = [], policy) {
+function selectProgressionStep({ comparable, currentStep, latest, policy }) {
+  if (!policy.stepSelectionExecutable || currentStep.currentRepTarget === null) {
+    return {
+      progressionStep: createProgressionStep({
+        currentRepTarget: currentStep.currentRepTarget,
+        kind: "none",
+        latest,
+        policy,
+        reasonCode: currentStep.reasonCode ?? policy.stepSelectionReasonCode,
+      }),
+      reasonCode: "progression_step_authority_unavailable",
+      target: null,
+      targetPolicy: currentStep.reasonCode ?? policy.stepSelectionReasonCode,
+    };
+  }
+
+  if (currentStep.currentRepTarget < policy.repRange.maximum) {
+    const nextRepTarget = Math.min(
+      policy.repRange.maximum,
+      currentStep.currentRepTarget + policy.repIncrement
+    );
+    return {
+      progressionStep: createProgressionStep({
+        currentRepTarget: currentStep.currentRepTarget,
+        kind: "reps",
+        latest,
+        nextLoad: latest.load,
+        nextRepTarget,
+        policy,
+        reasonCode: "within_prescribed_rep_range",
+      }),
+      reasonCode: "eligible_for_prescribed_rep_progression",
+      target: { load: latest.load, reps: nextRepTarget },
+      targetPolicy: "active_training_strategy_rep_increment",
+    };
+  }
+
+  const nextLoad = deriveEvidenceSupportedLoad(comparable);
+  const progressionStep = createProgressionStep({
+    currentRepTarget: currentStep.currentRepTarget,
+    kind: "load",
+    latest,
+    nextLoad,
+    nextRepTarget: policy.loadResetRepTarget,
+    policy,
+    reasonCode: nextLoad === null
+      ? "prescribed_top_reached_without_safe_load_increment"
+      : "prescribed_top_reached",
+  });
+  return {
+    progressionStep,
+    reasonCode: nextLoad === null
+      ? "eligible_for_load_progression_target_unavailable"
+      : "eligible_for_prescribed_load_progression",
+    target: nextLoad === null
+      ? null
+      : { load: nextLoad, reps: policy.loadResetRepTarget },
+    targetPolicy: nextLoad === null
+      ? "no_evidence_supported_load_increment"
+      : "historical_minimum_load_increment",
+  };
+}
+
+function createProgressionStep({
+  currentRepTarget = null,
+  kind,
+  latest = null,
+  nextLoad = null,
+  nextRepTarget = null,
+  policy,
+  reasonCode,
+}) {
+  return Object.freeze({
+    kind,
+    currentRepTarget,
+    nextRepTarget,
+    repRangeMin: policy.repRange?.minimum ?? null,
+    repRangeMax: policy.repRange?.maximum ?? null,
+    workingSetsRequired: policy.workingSetsRequired ?? null,
+    currentLoad: latest?.load ?? null,
+    nextLoad,
+    loadType: latest?.loadType ?? null,
+    unit: latest?.unit ?? null,
+    resetRepTarget: kind === "load" ? policy.loadResetRepTarget ?? null : null,
+    reasonCode,
+    authority: policy.prescriptionAuthority ?? null,
+  });
+}
+
+function deriveEvidenceSupportedLoad(entries = []) {
   const ordered = [...entries].sort((left, right) => compareOccurrenceOrder(right, left));
   const increments = [];
   for (let index = 1; index < ordered.length; index += 1) {
@@ -348,11 +484,7 @@ function deriveEvidenceSupportedTarget(entries = [], policy) {
   }
   const latest = entries[0];
   if (increments.length < 2 || latest.load <= 0) return null;
-  return {
-    load: latest.load + Math.min(...increments),
-    reps: policy.repRange?.minimum ?? Math.max(1, latest.reps - 2),
-    policy: "historical_minimum_load_increment",
-  };
+  return latest.load + Math.min(...increments);
 }
 
 function insufficient({ calibration, comparisonContext, comparable, policy, reason, reasonCode }) {
@@ -379,6 +511,22 @@ function insufficient({ calibration, comparisonContext, comparable, policy, reas
       eligible: false,
       exposureGateSatisfied: false,
       sessionCountGateSatisfied: false,
+      stepSelectionAuthoritySatisfied: false,
+    }),
+    progressionStep: Object.freeze({
+      kind: "none",
+      currentRepTarget: null,
+      nextRepTarget: null,
+      repRangeMin: null,
+      repRangeMax: null,
+      workingSetsRequired: null,
+      currentLoad: null,
+      nextLoad: null,
+      loadType: null,
+      unit: null,
+      resetRepTarget: null,
+      reasonCode,
+      authority: null,
     }),
     targetSelection: Object.freeze({ status: "not_eligible", policy: null }),
   };
@@ -401,6 +549,14 @@ function projectPolicy(policy) {
     action: policy.action,
     qualificationMode: policy.qualificationMode,
     minimumExposureSource: policy.minimumExposureSource,
+    repRange: policy.repRange,
+    workingSetsRequired: policy.workingSetsRequired,
+    repIncrement: policy.repIncrement,
+    loadResetRepTarget: policy.loadResetRepTarget,
+    stepSelectionExecutable: policy.stepSelectionExecutable,
+    stepSelectionReasonCode: policy.stepSelectionReasonCode,
+    prescriptionAuthority: policy.prescriptionAuthority,
+    prescriptionContext: policy.prescriptionContext,
     limitation: policy.limitation,
   });
 }
