@@ -222,6 +222,23 @@ extension PriorityCompletionWriteAPI {
     func skip(priorityId: String, occurrenceDate: String, expectedVersion: Int) async throws {
         throw NotAvailablePriorityCompletionWriteAPI.NotAvailable()
     }
+
+    /// Every in-app Skip surface submits the exact command projected by the
+    /// Server. Callers never reconstruct identity, date, or version and
+    /// never choose a backing domain/collection.
+    func skip(command: PriorityNotificationSkipCommand) async throws {
+        guard command.isValid(
+            forPriorityId: command.payload.priorityId,
+            occurrenceDate: command.payload.occurrenceDate
+        ) else {
+            throw ProductionNativeError.invalidResponse
+        }
+        try await skip(
+            priorityId: command.payload.priorityId,
+            occurrenceDate: command.payload.occurrenceDate,
+            expectedVersion: command.expectedVersion
+        )
+    }
 }
 
 struct ProductionPriorityCompletionWriteAPI: PriorityCompletionWriteAPI {

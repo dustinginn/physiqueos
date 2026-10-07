@@ -293,9 +293,15 @@ struct MorningCheckInView: View {
         if let review { return review.unfinished }
 #endif
         if isProduction {
-            return (productionCheckIn?.unfinishedPriorities ?? []).map { ($0.id, $0.title, $0.context) }
+            return (productionCheckIn?.ordinaryUnfinishedPriorities ?? []).map { ($0.id, $0.title, $0.context) }
         }
         return store.previousDayUnfinishedPriorities().map { ($0.id, $0.title, $0.metadata) }
+    }
+    private var scheduledEvidencePriorities: [MorningCheckInReconciliationItem] {
+        isProduction ? productionCheckIn?.scheduledEvidencePriorities ?? [] : []
+    }
+    private var productionRecoveryOnlyItems: [MorningCheckInReconciliationItem] {
+        isProduction ? productionCheckIn?.recoveryOnlyItems ?? [] : []
     }
     private var evidenceRecoveryItems: [MorningEvidenceRecoveryItem] { showsSandboxCards ? store.evidenceRecoveryItems() : [] }
     private var briefingReconciliation: BriefingReconciliationPresentation? { showsSandboxCards ? store.briefingReconciliationPresentation() : nil }
@@ -326,6 +332,22 @@ struct MorningCheckInView: View {
                                 }
                             }
                             .captureSurface(padding: 15)
+                        }
+                        if !scheduledEvidencePriorities.isEmpty {
+                            CaptureSectionTitle(title: "Yesterday’s scheduled evidence", hint: "Add evidence or mark skipped")
+                            VStack(spacing: 8) {
+                                ForEach(scheduledEvidencePriorities) { item in
+                                    productionEvidenceRecoveryCard(item, allowsSkip: true)
+                                }
+                            }
+                        }
+                        if !productionRecoveryOnlyItems.isEmpty {
+                            CaptureSectionTitle(title: "Recover missing evidence")
+                            VStack(spacing: 8) {
+                                ForEach(productionRecoveryOnlyItems) { item in
+                                    productionEvidenceRecoveryCard(item, allowsSkip: false)
+                                }
+                            }
                         }
                         if !evidenceRecoveryItems.isEmpty {
                             CaptureSectionTitle(title: "Recover missing evidence")
@@ -506,6 +528,42 @@ struct MorningCheckInView: View {
         .accessibilityIdentifier("morningCheckIn.evidenceRecovery.\(item.type.rawValue)")
     }
 
+    /// Prior-day scheduled evidence has exactly two truthful paths: resume
+    /// the evidence workflow or select Mark Skipped for the batch save.
+    /// A recovery-only prompt renders the first path only because it is not
+    /// a canonical priority occurrence.
+    private func productionEvidenceRecoveryCard(
+        _ item: MorningCheckInReconciliationItem,
+        allowsSkip: Bool
+    ) -> some View {
+        let skipSelected = choices[item.id]?.disposition == .skipped
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(item.title).captureFont(CaptureType.rowTitle).foregroundStyle(PhysiqueOSTheme.captureInk)
+            if let status = item.statusLabel ?? item.context {
+                Text(status).captureFont(CaptureType.meta).foregroundStyle(PhysiqueOSTheme.captureMuted)
+            }
+            HStack(spacing: 8) {
+                if let destination = item.evidenceDestination, let action = item.primaryAction {
+                    Button(action.label) { onNavigate(destination) }
+                        .buttonStyle(.borderedProminent)
+                        .tint(PhysiqueOSTheme.captureTeal)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("morningCheckIn.\(item.id).evidenceAction")
+                }
+                if allowsSkip {
+                    Button("Mark Skipped") { setDisposition(.skipped, for: item.id) }
+                        .buttonStyle(.bordered)
+                        .tint(skipSelected ? PhysiqueOSTheme.captureTeal : PhysiqueOSTheme.captureSecondary)
+                        .frame(minHeight: 44)
+                        .accessibilityAddTraits(skipSelected ? .isSelected : [])
+                        .accessibilityIdentifier("morningCheckIn.\(item.id).skipped")
+                }
+            }
+        }
+        .captureSurface(padding: 15)
+        .accessibilityElement(children: .contain)
+    }
+
     /// `BriefingReconciliationCard` (Sandbox) — its own single action,
     /// independent of the weight form. `finalizeBriefingReconciliation` never
     /// fabricates a real regeneration.
@@ -593,6 +651,14 @@ struct MorningCheckInView: View {
             }
             resolved[occurrence.id] = (disposition, choices[occurrence.id]?.note ?? "")
         }
+        for occurrence in scheduledEvidencePriorities {
+            guard choices[occurrence.id]?.disposition == .skipped else {
+                messageIsError = true
+                message = "Add or resume the missing evidence, or mark the scheduled priority skipped."
+                return
+            }
+            resolved[occurrence.id] = (.skipped, choices[occurrence.id]?.note ?? "")
+        }
         guard isProduction else {
             switch store.saveMorningCheckIn(weightText: weightText, dispositions: resolved) {
             case .success: messageIsError = false; message = nil; complete = true
@@ -612,19 +678,19 @@ struct MorningCheckInView: View {
             return
         }
         var submissions: [MorningCheckInReconciliationSubmission] = []
-        for occurrence in unfinished {
-            guard let disposition = resolved[occurrence.id]?.disposition else { continue }
-            guard let canonicalOccurrence = productionCheckIn?.reconciliationItems.first(where: { $0.id == occurrence.id }) else {
+        for canonicalOccurrence in productionCheckIn?.unfinishedPriorities ?? [] {
+            guard let disposition = resolved[canonicalOccurrence.id]?.disposition else { continue }
+            guard productionCheckIn?.reconciliationItems.contains(where: { $0.occurrenceKey == canonicalOccurrence.occurrenceKey }) == true else {
                 messageIsError = true
                 message = "This priority's canonical occurrence could not be loaded. Refresh Morning Weigh-In before saving."
                 return
             }
             submissions.append(MorningCheckInReconciliationSubmission(
-                priorityId: occurrence.id,
+                priorityId: canonicalOccurrence.id,
                 occurrenceDate: canonicalOccurrence.date,
                 occurrenceKey: canonicalOccurrence.occurrenceKey,
                 disposition: disposition.rawValue,
-                note: resolved[occurrence.id]?.note
+                note: resolved[canonicalOccurrence.id]?.note
             ))
         }
         Task {

@@ -31,9 +31,18 @@ struct ProductionMorningCheckInAPI: MorningCheckInAPI {
         var title: String
         var context: String?
         var kind: String?
+        var evidenceRequired: Bool?
+        var evidenceType: String?
+        var statusLabel: String?
+        var primaryAction: MorningCheckInReconciliationAction?
 
         var readModel: MorningCheckInReconciliationItem {
-            MorningCheckInReconciliationItem(id: id, occurrenceKey: occurrenceKey, date: date, title: title, context: context, kind: kind ?? "execution_reconciliation")
+            MorningCheckInReconciliationItem(
+                id: id, occurrenceKey: occurrenceKey, date: date, title: title,
+                context: context, kind: kind ?? "execution_reconciliation",
+                evidenceRequired: evidenceRequired, evidenceType: evidenceType,
+                statusLabel: statusLabel, primaryAction: primaryAction
+            )
         }
     }
 }

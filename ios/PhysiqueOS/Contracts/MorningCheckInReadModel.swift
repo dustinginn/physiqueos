@@ -21,6 +21,18 @@ struct MorningCheckInReadModel: Codable, Equatable {
     var unfinishedPriorities: [MorningCheckInReconciliationItem] {
         reconciliationItems.filter { $0.kind != "evidence_recovery" }
     }
+
+    var scheduledEvidencePriorities: [MorningCheckInReconciliationItem] {
+        unfinishedPriorities.filter { $0.evidenceRequired == true }
+    }
+
+    var ordinaryUnfinishedPriorities: [MorningCheckInReconciliationItem] {
+        unfinishedPriorities.filter { $0.evidenceRequired != true }
+    }
+
+    var recoveryOnlyItems: [MorningCheckInReconciliationItem] {
+        reconciliationItems.filter { $0.kind == "evidence_recovery" }
+    }
 }
 
 /// One `reconciliationItems[]` entry (`DailyFocusService.js`'s previous-day
@@ -41,4 +53,30 @@ struct MorningCheckInReconciliationItem: Codable, Equatable, Identifiable {
     var title: String
     var context: String?
     var kind: String
+    /// True only when this is a real scheduled priority occurrence whose
+    /// missing evidence can alternatively be marked Skipped. Recovery-only
+    /// prompts omit it and never gain a disposition action.
+    var evidenceRequired: Bool? = nil
+    var evidenceType: String? = nil
+    var statusLabel: String? = nil
+    var primaryAction: MorningCheckInReconciliationAction? = nil
+
+    var evidenceDestination: AppDestination? {
+        guard let href = primaryAction?.href,
+              let path = href.split(separator: "?", maxSplits: 1).first.map(String.init)
+        else { return nil }
+        if path.hasPrefix("/evidence/review/"),
+           let reviewId = path.split(separator: "/").last.map(String.init) {
+            return .evidenceReview(reviewId: reviewId)
+        }
+        if path == "/evidence/photos" { return .photoUpload }
+        if path == "/log", evidenceType == "training" { return .trainingLogger }
+        if path == "/log" { return .evidenceIntake }
+        return nil
+    }
+}
+
+struct MorningCheckInReconciliationAction: Codable, Equatable {
+    var label: String
+    var href: String
 }

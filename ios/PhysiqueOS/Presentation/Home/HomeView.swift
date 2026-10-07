@@ -24,7 +24,9 @@ struct HomeView: View {
     @State private var viewModelAuthority: NativeAPIEnvironment?
     @State private var confidenceDetailPresentation: (confidence: Int, detail: ConfidenceDetail)?
     @State private var completingPriorityIDs: Set<String> = []
-    @State private var completionError: String?
+    @State private var skippingPriorityIDs: Set<String> = []
+    @State private var skipCandidate: HomePrioritySkipCandidate?
+    @State private var priorityActionError: String?
     var onNavigate: (AppDestination) -> Void
 
     var body: some View {
@@ -86,13 +88,28 @@ struct HomeView: View {
             await viewModel?.load()
             await syncPriorityNotifications()
         }
-        .alert("Priority could not be completed", isPresented: Binding(
-            get: { completionError != nil },
-            set: { if !$0 { completionError = nil } }
+        .alert("Priority action could not be saved", isPresented: Binding(
+            get: { priorityActionError != nil },
+            set: { if !$0 { priorityActionError = nil } }
         )) {
-            Button("OK", role: .cancel) { completionError = nil }
+            Button("OK", role: .cancel) { priorityActionError = nil }
         } message: {
-            Text(completionError ?? "Please try again.")
+            Text(priorityActionError ?? "Please try again.")
+        }
+        .confirmationDialog(
+            "Skip \(skipCandidate?.title ?? "this priority")?",
+            isPresented: Binding(
+                get: { skipCandidate != nil },
+                set: { if !$0 { skipCandidate = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Mark Skipped", role: .destructive) {
+                if let candidate = skipCandidate { performSkip(candidate) }
+            }
+            Button("Cancel", role: .cancel) { skipCandidate = nil }
+        } message: {
+            Text("Only this occurrence will be skipped. Its schedule and future occurrences stay unchanged.")
         }
         .sheet(item: Binding(
             get: { confidenceDetailPresentation.map(ConfidenceDetailPresentation.init) },
@@ -266,7 +283,12 @@ struct HomeView: View {
                        ) {
                         NotificationsDisabledNotice()
                     }
-                    TodaysFocusCardView(items: home.todaysFocus, completingIDs: completingPriorityIDs, onTap: onNavigate) { occurrence in
+                    TodaysFocusCardView(
+                        items: home.todaysFocus,
+                        completingIDs: completingPriorityIDs,
+                        skippingIDs: skippingPriorityIDs,
+                        onTap: onNavigate,
+                        onComplete: { occurrence in
                         guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: environment.nativeAuthority)) != nil else { return }
                         completingPriorityIDs.insert(occurrence.id)
                         Task { @MainActor in
@@ -277,7 +299,7 @@ struct HomeView: View {
                                 return
                             }
                             guard let version = occurrence.expectedVersion else {
-                                completionError = "Refresh Home to obtain the current priority version."
+                                priorityActionError = "Refresh Home to obtain the current priority version."
                                 completingPriorityIDs.remove(occurrence.id)
                                 return
                             }
@@ -299,11 +321,28 @@ struct HomeView: View {
                                 }
                                 await syncPriorityNotifications()
                             } catch {
-                                completionError = "The priority was not marked complete. Refresh before retrying."
+                                priorityActionError = "The priority was not marked complete. Refresh before retrying."
                                 completingPriorityIDs.remove(occurrence.id)
                             }
                         }
-                    }
+                        },
+                        onSkip: { occurrence in
+                            guard let command = occurrence.canonicalSkipCommand else { return }
+                            skipCandidate = .init(
+                                occurrenceID: occurrence.id,
+                                title: occurrence.title,
+                                command: command
+                            )
+                        },
+                        onSkipSessionItem: { _, child in
+                            guard let command = child.canonicalSkipCommand else { return }
+                            skipCandidate = .init(
+                                occurrenceID: child.id,
+                                title: child.label,
+                                command: command
+                            )
+                        }
+                    )
                     .transition(.opacity)
                 }
             }
@@ -329,6 +368,45 @@ struct HomeView: View {
         await mutate()
         completingPriorityIDs.remove(occurrenceID)
     }
+
+    /// Home consumes the same projected command as Detail and notifications.
+    /// The acknowledged occurrence is removed only after the canonical write;
+    /// uncertain/stale failures remain visible and invite a truthful refresh.
+    private func performSkip(_ candidate: HomePrioritySkipCandidate) {
+        skipCandidate = nil
+        guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: environment.nativeAuthority)) != nil,
+              environment.nativeAuthority == .founderProduction
+        else { return }
+        skippingPriorityIDs.insert(candidate.occurrenceID)
+        Task { @MainActor in
+            do {
+                try await environment.priorityCompletionWriteAPI.skip(command: candidate.command)
+                environment.feedback.play(.prioritySkipped)
+                await PriorityNotificationScheduler.cleanupCompletedOccurrence(
+                    priorityId: candidate.command.payload.priorityId,
+                    occurrenceDate: candidate.command.payload.occurrenceDate
+                )
+                await viewModel?.reconcileAfterConfirmedPriorityDisposition(
+                    occurrenceID: candidate.occurrenceID
+                )
+                skippingPriorityIDs.remove(candidate.occurrenceID)
+                await syncPriorityNotifications()
+            } catch PrioritySkipError.alreadyCompleted {
+                skippingPriorityIDs.remove(candidate.occurrenceID)
+                await viewModel?.load()
+            } catch {
+                skippingPriorityIDs.remove(candidate.occurrenceID)
+                priorityActionError = "The priority was not marked skipped. Refresh before retrying."
+            }
+        }
+    }
+}
+
+private struct HomePrioritySkipCandidate: Identifiable {
+    let occurrenceID: String
+    let title: String
+    let command: PriorityNotificationSkipCommand
+    var id: String { "\(command.payload.priorityId)|\(command.payload.occurrenceDate)" }
 }
 
 private struct ConfidenceDetailPresentation: Identifiable {

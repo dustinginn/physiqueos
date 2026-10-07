@@ -1609,7 +1609,7 @@ extension PriorityNotificationSchedulerTests {
         XCTAssertEqual(try actions(PriorityNotificationCategory.directCompletion).map(\.identifier), [
             PriorityNotificationActionIdentifier.complete, PriorityNotificationActionIdentifier.snooze,
         ])
-        // Dose-aware: planned-context Complete + Snooze, never Skip.
+        // Kept for already-delivered older payloads that lacked capability.
         XCTAssertEqual(try actions(PriorityNotificationCategory.specializedActionable).map(\.identifier), [
             PriorityNotificationActionIdentifier.complete, PriorityNotificationActionIdentifier.snooze,
         ])
@@ -1843,7 +1843,8 @@ extension PriorityNotificationSchedulerTests {
 extension PriorityNotificationSchedulerTests {
     private static let peptideWithSkipJSON = #"{"classification":"specialized_workflow_required","workflow":"peptide_protocol","scheduledTime":"17:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":7,"payload":{"priorityId":"reminder_tesamorelin","occurrenceDate":"2026-09-16","dose":"0.5 mg","protocolId":"protocol_tesamorelin"}},"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":7,"payload":{"priorityId":"reminder_tesamorelin","occurrenceDate":"2026-09-16"}}}"#
     private static let foamWithSkipJSON = #"{"classification":"specialized_workflow_required","workflow":"priority_detail","scheduledTime":"20:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":4,"payload":{"priorityId":"reminder_foam","occurrenceDate":"2026-09-16","dose":null,"protocolId":"protocol_foam"}},"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":4,"payload":{"priorityId":"reminder_foam","occurrenceDate":"2026-09-16"}}}"#
-    private static let supplementJSON = #"{"classification":"specialized_workflow_required","workflow":"priority_detail","scheduledTime":"08:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":2,"payload":{"priorityId":"reminder_creatine","occurrenceDate":"2026-09-16","dose":"5 g","protocolId":"protocol_creatine"}},"skipCommand":null}"#
+    private static let supplementJSON = #"{"classification":"specialized_workflow_required","workflow":"priority_detail","scheduledTime":"08:00","completionCommand":{"commandType":"priority.complete.v1","expectedVersion":2,"payload":{"priorityId":"reminder_creatine","occurrenceDate":"2026-09-16","dose":"5 g","protocolId":"protocol_creatine"}},"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":2,"payload":{"priorityId":"reminder_creatine","occurrenceDate":"2026-09-16"}}}"#
+    private static let evidenceSkipJSON = #"{"classification":"specialized_workflow_required","workflow":"progress_photos","scheduledTime":"08:00","completionCommand":null,"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":6,"payload":{"priorityId":"reminder_progress_photos","occurrenceDate":"2026-09-16"}}}"#
     private static let pausedPeptideJSON = #"{"classification":"open_only","workflow":"peptide_protocol","scheduledTime":"17:00","completionCommand":null,"skipCommand":null}"#
     private static let skipOnlyJSON = #"{"classification":"specialized_workflow_required","workflow":"priority_detail","scheduledTime":"09:00","completionCommand":null,"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":5,"payload":{"priorityId":"reminder_x","occurrenceDate":"2026-09-16"}}}"#
 
@@ -1870,14 +1871,17 @@ extension PriorityNotificationSchedulerTests {
         let foam = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.foamWithSkipJSON.utf8))
         XCTAssertEqual(PriorityNotificationCategory.category(for: foam), PriorityNotificationCategory.specializedSkippable)
         let supplement = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.supplementJSON.utf8))
-        XCTAssertFalse(PriorityOccurrenceCapabilities.resolve(supplement).skipAllowed, "Unsupported Support gets no Skip.")
-        XCTAssertEqual(PriorityNotificationCategory.category(for: supplement), PriorityNotificationCategory.specializedActionable)
+        XCTAssertTrue(PriorityOccurrenceCapabilities.resolve(supplement).skipAllowed, "Actionable Support defaults to Skip.")
+        XCTAssertEqual(PriorityNotificationCategory.category(for: supplement), PriorityNotificationCategory.specializedSkippable)
         let paused = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.pausedPeptideJSON.utf8))
         XCTAssertEqual(PriorityOccurrenceCapabilities.resolve(paused), .openOnly)
         XCTAssertEqual(PriorityNotificationCategory.category(for: paused), PriorityNotificationCategory.openOnly)
         let skipOnly = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.skipOnlyJSON.utf8))
         XCTAssertEqual(PriorityNotificationCategory.category(for: skipOnly), PriorityNotificationCategory.skipOnly,
                        "Skip is never a reason to broaden Complete.")
+        let evidence = try JSONDecoder().decode(PriorityNotificationAction.self, from: Data(Self.evidenceSkipJSON.utf8))
+        XCTAssertEqual(PriorityNotificationCategory.category(for: evidence), PriorityNotificationCategory.skipOnly,
+                       "Evidence keeps its workflow as the primary open action and gains only Skip/Snooze.")
 
         var wrongType = peptide
         wrongType.skipCommand?.commandType = "priority.complete.v1"
@@ -1957,20 +1961,28 @@ extension PriorityNotificationSchedulerTests {
     }
 
     @MainActor
-    func testSupplementAndPausedNotificationsNeverSkip() async throws {
-        var skips = 0
+    func testActionableSupplementSkipsButPausedNotificationDoesNot() async throws {
+        var skips: [PriorityNotificationDelegate.SkipActionPayload] = []
+        var feedback: [PhysiqueOSFeedbackEvent] = []
+        var cleaned: [String] = []
         let delegate = PriorityNotificationDelegate(
             environment: nil,
-            skipActionHandler: { _ in skips += 1 },
-            feedbackHandler: { _ in XCTFail("No feedback without a skip.") },
+            skipActionHandler: { skips.append($0) },
+            feedbackHandler: { feedback.append($0) },
             postActionReconciliation: {},
-            completionCleanup: { _, _ in XCTFail("Nothing is withdrawn.") }
+            completionCleanup: { cleaned.append("\($0)|\($1)") }
         )
-        for (id, json) in [("reminder_creatine", Self.supplementJSON), ("reminder_tesamorelin", Self.pausedPeptideJSON)] {
-            let request = try Self.request(id: id, json: json, time: "17:00")
-            await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, request))
-        }
-        XCTAssertEqual(skips, 0)
+        let supplement = try Self.request(id: "reminder_creatine", json: Self.supplementJSON, time: "08:00")
+        await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, supplement))
+        XCTAssertEqual(skips, [.init(priorityId: "reminder_creatine", occurrenceDate: "2026-09-16", expectedVersion: 2)])
+        XCTAssertEqual(feedback, [.prioritySkipped])
+        XCTAssertEqual(cleaned, ["reminder_creatine|2026-09-16"])
+
+        let paused = try Self.request(id: "reminder_tesamorelin", json: Self.pausedPeptideJSON, time: "17:00")
+        await delegate.handle(snapshot: Self.snapshot(PriorityNotificationActionIdentifier.skip, paused))
+        XCTAssertEqual(skips.count, 1, "Paused/non-occurrence notifications remain non-skippable.")
+        XCTAssertEqual(feedback.count, 1)
+        XCTAssertEqual(cleaned.count, 1)
     }
 
     @MainActor

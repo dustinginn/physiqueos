@@ -6,6 +6,48 @@ import XCTest
 /// native must decode and display server-owned values, never derive them.
 final class HomeReadModelTests: XCTestCase {
 
+    func testHomeSkipComesOnlyFromExactProjectedCommand() {
+        var actionable = Self.executionContextItem(title: "Fadogia", time: "08:00", dose: nil)
+        actionable.routePriorityId = "reminder_fadogia"
+        actionable.notificationAction?.skipCommand = .init(
+            commandType: ProductionCommandType.skipPriority,
+            expectedVersion: 8,
+            payload: .init(priorityId: "reminder_fadogia", occurrenceDate: actionable.date)
+        )
+        XCTAssertEqual(actionable.canonicalSkipCommand?.payload.priorityId, "reminder_fadogia")
+        XCTAssertEqual(actionable.canonicalSkipCommand?.expectedVersion, 8)
+
+        var informational = actionable
+        informational.id = "protein-fallback"
+        informational.routePriorityId = "protein-fallback"
+        informational.notificationAction = nil
+        informational.projectedSkipCommand = nil
+        XCTAssertNil(informational.canonicalSkipCommand, "Informational Home fallbacks never infer Skip.")
+
+        var mismatched = actionable
+        mismatched.notificationAction?.skipCommand?.payload.occurrenceDate = "2026-09-17"
+        XCTAssertNil(mismatched.canonicalSkipCommand, "A command for another occurrence is refused.")
+    }
+
+    func testGroupedHomeSessionKeepsChildSkipAndHasNoAggregateSkip() {
+        let child = PrioritySessionItem(
+            id: "reminder_progress_photos", label: "Progress Photos", completed: false,
+            satisfiedByEvidence: false,
+            skipCommand: .init(
+                commandType: ProductionCommandType.skipPriority, expectedVersion: 4,
+                payload: .init(priorityId: "reminder_progress_photos", occurrenceDate: "2026-09-16")
+            )
+        )
+        XCTAssertEqual(child.canonicalSkipCommand?.payload.priorityId, "reminder_progress_photos")
+        var malformedChild = child
+        malformedChild.skipCommand?.commandType = ProductionCommandType.completePriority
+        XCTAssertNil(malformedChild.canonicalSkipCommand, "A grouped child also fails closed on a non-Skip command.")
+        var group = Self.executionContextItem(title: "Morning Check-in", time: "08:00", dose: nil)
+        group.sessionItems = [child]
+        group.notificationAction?.skipCommand = nil
+        XCTAssertNil(group.canonicalSkipCommand, "Presentation groups never invent aggregate Skip.")
+    }
+
     private static func context(title: String, time: String, dose: String? = nil) -> String {
         PriorityExecutionContextPresentation.context(
             for: executionContextItem(title: title, time: time, dose: dose)
