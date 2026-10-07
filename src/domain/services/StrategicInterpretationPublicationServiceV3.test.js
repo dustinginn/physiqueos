@@ -66,6 +66,26 @@ describe("shared canonical V3 strategic publication", () => {
       phase: { id: fixtures.dexa.goalContract.phase.phaseId,
         label: "Lean Mass Build" },
     });
+    const directionNeutral = structuredClone(afterEvent);
+    const current = directionNeutral.goalConfidenceHistory.at(-1).assessment;
+    current.narrativeExplanation.text =
+      "The plan remains feasible, with the next checkpoint still needed to confirm persistence.";
+    const directionNeutralPresentation = resolveActiveGoalConfidencePresentation({
+      activeGoal: { id: fixtures.dexa.goalContract.goalId,
+        title: "Build 10 lb of lean mass",
+        phases: [{ id: fixtures.dexa.goalContract.phase.phaseId,
+          status: "active" }] },
+      activePhase: { id: fixtures.dexa.goalContract.phase.phaseId,
+        name: "Lean Mass Build" },
+      store: directionNeutral,
+    });
+    expect(directionNeutralPresentation).toMatchObject({
+      movementDirection: "increased",
+      primaryReason: "Confidence increased from 62% to 79%.",
+      presentationExplanation: "Confidence increased from 62% to 79%.",
+      canonicalNarrativeExplanation:
+        "The plan remains feasible, with the next checkpoint still needed to confirm persistence.",
+    });
     const weekly = await publishFixture({ setup, fixture: fixtures.weekly,
       publisherType: "weekly_briefing", cadenceOrEventType: "weekly",
       previous: afterEvent.goalConfidenceHistory.at(-1).assessment });

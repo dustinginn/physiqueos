@@ -48,7 +48,15 @@ export function resolveActiveGoalConfidencePresentation({
     assessment,
     surface: "goal",
   });
-  const primaryReason = explanationModel?.summary ??
+  // V3's published narrative explains the outlook, but it is not required to
+  // repeat the assessment's movement verb. Project the display sentence from
+  // the canonical numeric movement instead of treating narrative wording as
+  // the movement authority. The full published narrative remains available in
+  // canonicalNarrativeExplanation and the V3 explanation detail below.
+  const v3MovementExplanation = isV3
+    ? buildV3MovementExplanation(assessment)
+    : null;
+  const primaryReason = v3MovementExplanation ?? explanationModel?.summary ??
     assessment.narrativeExplanation?.text ?? null;
   const richV3Detail = isV3 && assessment.narrativePresentationV3
     ? createRichV3ExplanationDetail({ assessment, activeGoal, activePhase,
@@ -108,7 +116,8 @@ export function resolveActiveGoalConfidencePresentation({
       assessment.currentPercentage - assessment.priorPercentage,
     priorScore: assessment.priorPercentage,
     primaryReason,
-    presentationExplanation: explanationModel?.summary ?? null,
+    presentationExplanation: v3MovementExplanation ??
+      explanationModel?.summary ?? null,
     canonicalNarrativeExplanation: assessment.narrativeExplanation?.text ?? null,
     narrativeSummary: assessment.narrativeSummary ??
       assessment.narrativeExplanation?.text ?? null,
@@ -145,6 +154,28 @@ export function resolveActiveGoalConfidencePresentation({
   };
   assertCanonicalConfidencePresentation(presentation);
   return Object.freeze(presentation);
+}
+
+function buildV3MovementExplanation(assessment) {
+  const current = assessment.currentPercentage;
+  const prior = assessment.priorPercentage;
+  if (!Number.isFinite(current)) return null;
+  if (assessment.movement === "increase") {
+    return Number.isFinite(prior)
+      ? `Confidence increased from ${prior}% to ${current}%.`
+      : `Confidence increased to ${current}%.`;
+  }
+  if (assessment.movement === "decrease") {
+    return Number.isFinite(prior)
+      ? `Confidence decreased from ${prior}% to ${current}%.`
+      : `Confidence decreased to ${current}%.`;
+  }
+  if (assessment.movement === "no_meaningful_change") {
+    return prior == null
+      ? `Confidence starts at ${current}%.`
+      : `Confidence held at ${current}%.`;
+  }
+  return null;
 }
 
 function createRichV3ExplanationDetail({ assessment, activeGoal, activePhase,
