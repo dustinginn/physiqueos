@@ -1,0 +1,48 @@
+{
+ "out": "boards/B90-4a-watch-start-button-mineral.png",
+ "scale": 0.85,
+ "title": "B90-4a \u00b7 Watch primary button placement \u00b7 Mineral Light",
+ "subtitle": "Start Workout (READY FOR WATCH) screen, real watchOS 27 SwiftUI from the -watchFixture start state. The button size, style, 38 pt height, tap target and action are unchanged; only its vertical position changes. Top: 49 mm Ultra 3 (Founder Watch). Bottom: 42 mm fit check.",
+ "rows": [
+  {
+   "label": "49 mm \u00b7 Ultra 3",
+   "cells": [
+    {
+     "file": "captures/b90-4/u3-mineralLight-start-bottom.png",
+     "caption": "Current (Build 89)",
+     "note": "Pinned to bottom edge"
+    },
+    {
+     "file": "captures/b90-4/u3-mineralLight-start-centered.png",
+     "caption": "Option A \u00b7 centered",
+     "note": "Centered in the space below the title"
+    },
+    {
+     "file": "captures/b90-4/u3-mineralLight-start-optical.png",
+     "caption": "Option B \u00b7 optical",
+     "note": "42% of the free space: slightly above center"
+    }
+   ]
+  },
+  {
+   "label": "42 mm \u00b7 Series 12",
+   "cells": [
+    {
+     "file": "captures/b90-4/s42-mineralLight-start-bottom.png",
+     "caption": "Current (Build 89)",
+     "note": "Pinned to bottom edge"
+    },
+    {
+     "file": "captures/b90-4/s42-mineralLight-start-centered.png",
+     "caption": "Option A \u00b7 centered",
+     "note": "Centered in the space below the title"
+    },
+    {
+     "file": "captures/b90-4/s42-mineralLight-start-optical.png",
+     "caption": "Option B \u00b7 optical",
+     "note": "42% of the free space: slightly above center"
+    }
+   ]
+  }
+ ]
+}

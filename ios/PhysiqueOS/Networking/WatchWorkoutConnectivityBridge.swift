@@ -167,7 +167,31 @@ final class PhoneWatchWorkoutConnectivityBridge: NSObject, WCSessionDelegate, HK
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: (any Error)?
     ) {
-        Task { @MainActor [weak self] in self?.publishCurrentProjection() }
+        let status = Self.companionStatus(session)
+        Task { @MainActor [weak self] in
+            self?.environment.watchCompanion.update(isPaired: status.0, isWatchAppInstalled: status.1, isReachable: status.2)
+            self?.publishCurrentProjection()
+        }
+    }
+
+    /// Paired / installed / reachable, read on the delegate's queue.
+    nonisolated private static func companionStatus(_ session: WCSession) -> (Bool, Bool, Bool) {
+        guard session.activationState == .activated else { return (false, false, false) }
+        return (session.isPaired, session.isWatchAppInstalled, session.isReachable)
+    }
+
+    nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
+        let status = Self.companionStatus(session)
+        Task { @MainActor [weak self] in
+            self?.environment.watchCompanion.update(isPaired: status.0, isWatchAppInstalled: status.1, isReachable: status.2)
+        }
+    }
+
+    nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
+        let status = Self.companionStatus(session)
+        Task { @MainActor [weak self] in
+            self?.environment.watchCompanion.update(isPaired: status.0, isWatchAppInstalled: status.1, isReachable: status.2)
+        }
     }
 
     nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
@@ -222,3 +246,112 @@ extension WatchDailyTotals {
         )
     }
 }
+
+// MARK: - Guided Watch handoff support (Build 90)
+
+/// What this iPhone truthfully knows about its paired Watch, read from
+/// WatchConnectivity. `isReachable` is normally false until the PhysiqueOS
+/// Watch app is running, so the guided handoff is offered on paired +
+/// installed, never on reachability.
+@Observable
+final class WatchCompanionAvailability {
+    private(set) var isPaired = false
+    private(set) var isWatchAppInstalled = false
+    private(set) var isReachable = false
+
+    /// A paired Watch with the PhysiqueOS app installed.
+    var canOfferHandoff: Bool { isPaired && isWatchAppInstalled }
+
+    init(isPaired: Bool = false, isWatchAppInstalled: Bool = false, isReachable: Bool = false) {
+        self.isPaired = isPaired
+        self.isWatchAppInstalled = isWatchAppInstalled
+        self.isReachable = isReachable
+#if DEBUG
+        // UI-test fixture only: the simulator has no paired Watch.
+        if ProcessInfo.processInfo.arguments.contains("-physiqueos.watch-review.paired") {
+            self.isPaired = true
+            self.isWatchAppInstalled = true
+        }
+#endif
+    }
+
+    func update(isPaired: Bool, isWatchAppInstalled: Bool, isReachable: Bool) {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-physiqueos.watch-review.paired") { return }
+#endif
+        if self.isPaired != isPaired { self.isPaired = isPaired }
+        if self.isWatchAppInstalled != isWatchAppInstalled { self.isWatchAppInstalled = isWatchAppInstalled }
+        if self.isReachable != isReachable { self.isReachable = isReachable }
+    }
+}
+
+/// Asks watchOS to open PhysiqueOS on the paired Watch. `true` means only
+/// that the request was delivered: watchOS cannot bring the app to the front
+/// of a locked, asleep, off-wrist or out-of-range Watch, so callers never
+/// treat it as acknowledgment (that is the authority's `watchStartedAt`).
+@MainActor
+protocol WatchAppLaunching {
+    func requestWatchAppLaunch(sessionId: String) async -> Bool
+}
+
+/// The sanctioned path: `HKHealthStore.startWatchApp(with:)`, which delivers
+/// the workout configuration to the Watch app's
+/// `WKApplicationDelegate.handle(_:)`.
+struct HealthKitWatchAppLauncher: WatchAppLaunching {
+    func requestWatchAppLaunch(sessionId: String) async -> Bool {
+        guard HKHealthStore.isHealthDataAvailable() else { return false }
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = .traditionalStrengthTraining
+        configuration.locationType = .indoor
+        return await withCheckedContinuation { continuation in
+            HKHealthStore().startWatchApp(with: configuration) { success, _ in
+                continuation.resume(returning: success)
+            }
+        }
+    }
+}
+
+#if DEBUG
+/// UI-test fixture only (absent from Release). The simulator has no paired
+/// Watch, so `-physiqueos.watch-review.launch delivered|failed` decides the
+/// request result, and `-physiqueos.watch-review.watch-start <seconds>`
+/// stands in for the Watch tapping Start Workout: it sends the exact
+/// `.startPreparedWorkout` command a Watch sends through the real router,
+/// so acknowledgment still comes only from the authority's `watchStartedAt`.
+struct ReviewWatchAppLauncher: WatchAppLaunching {
+    weak var environment: AppEnvironment?
+
+    static var isEnabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("-physiqueos.watch-review.launch")
+    }
+
+    private static func value(_ flag: String) -> String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1]
+    }
+
+    func requestWatchAppLaunch(sessionId: String) async -> Bool {
+        let delivered = Self.value("-physiqueos.watch-review.launch") == "delivered"
+        if let seconds = Self.value("-physiqueos.watch-review.watch-start").flatMap(Double.init), let environment {
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(seconds))
+                let authority = environment.trainingSessionAuthority(for: environment.nativeAuthority)
+                guard let draft = authority.draft(id: sessionId) else { return }
+                let router = WatchWorkoutCommandRouter(
+                    authority: authority, isPhoneReachable: { true },
+                    serverWaitingForNetwork: { false }, canCommitFinish: { _ in true }
+                )
+                _ = router.route(WatchWorkoutCommand(
+                    schemaVersion: WatchWorkoutContract.schemaVersion,
+                    commandId: UUID().uuidString, mutationId: UUID().uuidString,
+                    kind: .startPreparedWorkout, sessionId: sessionId,
+                    expectedRevision: draft.currentRevision,
+                    exerciseId: nil, setId: nil, issuedAt: Date()
+                ))
+            }
+        }
+        return delivered
+    }
+}
+#endif

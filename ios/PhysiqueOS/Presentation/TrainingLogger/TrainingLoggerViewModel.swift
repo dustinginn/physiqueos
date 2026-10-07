@@ -333,14 +333,38 @@ final class TrainingLoggerViewModel {
         ))
     }
 
-    func setReadyForWatch(_ ready: Bool) {
-        guard canWrite, completedDraft == nil, let selectedDraftId else { return }
+    /// Prepares (or withdraws) this plan for the paired Watch through the
+    /// one session authority. Returns whether the authority accepted it.
+    @discardableResult
+    func setReadyForWatch(_ ready: Bool) -> Bool {
+        guard canWrite, completedDraft == nil, let selectedDraftId else { return false }
         validationMessage = nil
         let outcome = sessionAuthority.setReadyForWatch(sessionId: selectedDraftId, ready: ready)
         noteRejection(outcome)
         if case .rejected = outcome {
             validationMessage = "Finish preparing the workout before making it available on Watch."
+            return false
         }
+        return true
+    }
+
+    /// "Use without Watch": recorded on the session so the guided handoff
+    /// is not offered again for this workout (see
+    /// `TrainingSessionAuthority.declineWatchHandoff`).
+    func declineWatchHandoff() {
+        guard canWrite, completedDraft == nil, let selectedDraftId else { return }
+        noteRejection(sessionAuthority.declineWatchHandoff(sessionId: selectedDraftId))
+    }
+
+    /// End Rest from the docked Logger clock: the canonical `endRest`, named
+    /// by the rest the screen showed, so a late tap after a newer set
+    /// completion (a replaced rest) is refused instead of ending the new one.
+    /// Ending an already-ended rest is a no-op. Watch and Live Activity
+    /// follow through the authority's change observers.
+    func endRest(restId: String) {
+        guard canWrite, completedDraft == nil, !isFinishConfirmed, let selectedDraftId else { return }
+        validationMessage = nil
+        noteRejection(sessionAuthority.endRest(sessionId: selectedDraftId, restId: restId))
     }
 
     /// Only a failed device write is worth telling the Founder about; the
@@ -1039,5 +1063,160 @@ struct TrainingLoggerWorkoutPresentation: Equatable {
         totalSetCount = draft.totalSetCount
         progress = "\(completedSetCount)/\(totalSetCount) sets"
         canFinish = completedSetCount > 0 && draft.validationMessages().isEmpty
+    }
+}
+
+// MARK: - Guided iPhone → Watch handoff (Founder Build 90, Option B)
+
+/// Presentation state for the guided Watch handoff. It owns no session
+/// state: Ready is `TrainingSessionAuthority.setReadyForWatch`, Use without
+/// Watch is `declineWatchHandoff`, and the only acknowledgment is the
+/// authority's `watchStartedAt` (stamped when the phone applies the Watch's
+/// Start Workout). A launch request that was merely sent never dismisses.
+@MainActor
+@Observable
+final class TrainingWatchHandoffModel {
+    enum Phase: Equatable { case hidden, offer, waiting, unreachable, acknowledged }
+
+    struct Inputs: Equatable {
+        var draft: TrainingLoggerDraft?
+        var canOfferHandoff: Bool
+        var otherLiveSessionExists: Bool
+        var canWrite: Bool
+    }
+
+    private(set) var phase: Phase = .hidden
+    /// The session whose Ready flow is in progress (tapped, or restored).
+    private(set) var flowSessionId: String?
+    private var requestUndelivered = false
+    private var timeoutTask: Task<Void, Never>?
+    private var dismissTask: Task<Void, Never>?
+    private let waitTimeout: Duration
+    private let acknowledgementDisplay: Duration
+
+    init(waitTimeout: Duration = .seconds(25), acknowledgementDisplay: Duration = .seconds(1.4)) {
+        self.waitTimeout = waitTimeout
+        self.acknowledgementDisplay = acknowledgementDisplay
+    }
+
+    /// Entering the active Logger before the first set, on a phone-started
+    /// live session, with a paired Watch that has PhysiqueOS installed, no
+    /// other live session, and no earlier "Use without Watch" for it.
+    static func isOfferEligible(
+        _ draft: TrainingLoggerDraft, canOfferHandoff: Bool, otherLiveSessionExists: Bool, canWrite: Bool
+    ) -> Bool {
+        canWrite && canOfferHandoff && !otherLiveSessionExists
+            && draft.mode == .live && draft.step == .workout
+            && draft.completedSetCount == 0 && !draft.exercises.isEmpty
+            && draft.startedAt != nil && draft.readyForWatchAt == nil
+            && draft.watchStartedAt == nil && draft.watchHealthStartedAt == nil
+            && draft.watchHandoffDeclinedAt == nil
+            && draft.submissionState == nil && draft.finishConfirmationRequestedAt == nil
+            && draft.leftAt == nil
+    }
+
+    /// Re-derives the phase from authoritative state. Called on appear and on
+    /// every change, so relaunch, background/foreground and a Watch start
+    /// that lands while the phone was elsewhere all resolve the same way.
+    func sync(_ inputs: Inputs) {
+        guard let draft = inputs.draft, draft.step == .workout else {
+            if phase != .acknowledged { clearFlow(); phase = .hidden }
+            return
+        }
+        if phase == .acknowledged { return }
+        if draft.watchStartedAt != nil {
+            if flowSessionId == draft.id, phase == .waiting || phase == .unreachable {
+                acknowledge()
+            } else {
+                clearFlow()
+                phase = .hidden
+            }
+            return
+        }
+        if draft.readyForWatchAt != nil, draft.completedSetCount == 0, draft.submissionState == nil {
+            // Prepared for the Watch and waiting for its Start (a fresh Ready,
+            // or a restored Logger): never fall back to the normal Logger
+            // silently, because the phone start was withdrawn.
+            if flowSessionId != draft.id {
+                flowSessionId = draft.id
+                requestUndelivered = false
+                startTimeout()
+            }
+            phase = requestUndelivered ? .unreachable : .waiting
+            return
+        }
+        clearFlow()
+        phase = Self.isOfferEligible(
+            draft, canOfferHandoff: inputs.canOfferHandoff,
+            otherLiveSessionExists: inputs.otherLiveSessionExists, canWrite: inputs.canWrite
+        ) ? .offer : .hidden
+    }
+
+    /// Ready on Watch: prepare through the authority, then ask watchOS to
+    /// open PhysiqueOS. A request that was not delivered shows the fallback
+    /// instruction; delivery alone never dismisses.
+    func ready(sessionId: String, prepare: () -> Bool, launcher: any WatchAppLaunching) async {
+        guard prepare() else { return }
+        flowSessionId = sessionId
+        requestUndelivered = false
+        phase = .waiting
+        startTimeout()
+        await requestLaunch(sessionId: sessionId, launcher: launcher)
+    }
+
+    /// Try Again from the fallback: a fresh launch request and wait.
+    func tryAgain(sessionId: String, launcher: any WatchAppLaunching) async {
+        guard flowSessionId == sessionId else { return }
+        requestUndelivered = false
+        phase = .waiting
+        startTimeout()
+        await requestLaunch(sessionId: sessionId, launcher: launcher)
+    }
+
+    /// Use without Watch: recorded on the session (no re-prompt for this
+    /// workout) and dismissed immediately.
+    func useWithoutWatch(decline: () -> Void) {
+        decline()
+        clearFlow()
+        phase = .hidden
+    }
+
+    private func requestLaunch(sessionId: String, launcher: any WatchAppLaunching) async {
+        let delivered = await launcher.requestWatchAppLaunch(sessionId: sessionId)
+        if !delivered, flowSessionId == sessionId, phase == .waiting {
+            requestUndelivered = true
+            phase = .unreachable
+        }
+    }
+
+    private func acknowledge() {
+        timeoutTask?.cancel()
+        phase = .acknowledged
+        dismissTask?.cancel()
+        let display = acknowledgementDisplay
+        dismissTask = Task { [weak self] in
+            try? await Task.sleep(for: display)
+            guard !Task.isCancelled, let self else { return }
+            self.clearFlow()
+            self.phase = .hidden
+        }
+    }
+
+    private func startTimeout() {
+        timeoutTask?.cancel()
+        let timeout = waitTimeout
+        timeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            guard !Task.isCancelled, let self, self.phase == .waiting else { return }
+            self.requestUndelivered = true
+            self.phase = .unreachable
+        }
+    }
+
+    private func clearFlow() {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        flowSessionId = nil
+        requestUndelivered = false
     }
 }

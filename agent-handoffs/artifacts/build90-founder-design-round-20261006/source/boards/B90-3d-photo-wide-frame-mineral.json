@@ -1,0 +1,32 @@
+{
+ "out": "boards/B90-3d-photo-wide-frame-mineral.png",
+ "title": "B90-3d \u00b7 Photo viewer \u00b7 wider frame (1:1 flexed crop) \u00b7 Mineral Light",
+ "subtitle": "The flexed pair center-cropped to 1:1 to test a wider frame. The fitted stage shrinks to the photos instead of growing blank bands; the space left over reads as page background.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-3/b90-3-current-light-flexed-wide.png",
+     "caption": "Current (Build 89)",
+     "note": "Full-height panes"
+    },
+    {
+     "file": "captures/b90-3/b90-3-a-light-flexed-wide.png",
+     "caption": "Option A \u00b7 captioned stage",
+     "note": "Top stage, dated captions, text below"
+    },
+    {
+     "file": "captures/b90-3/b90-3-b-light-flexed-wide.png",
+     "caption": "Option B \u00b7 centered group",
+     "note": "Labels on photos, text card, zoom pill"
+    },
+    {
+     "file": "captures/b90-3/b90-3-c-light-flexed-wide.png",
+     "caption": "Option C \u00b7 framed panel",
+     "note": "Column headers, zoom row, text below"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

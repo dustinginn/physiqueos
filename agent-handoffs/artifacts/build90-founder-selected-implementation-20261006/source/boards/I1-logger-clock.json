@@ -1,0 +1,48 @@
+{
+ "out": "boards/I1-logger-clock.png",
+ "title": "I1 \u00b7 Logger docked clock + End Rest (B90-1 Option A)",
+ "subtitle": "Implementation in the real Sandbox Logger (no paired Watch). The clock reads the canonical session the Watch and Live Activity use; End Rest calls the canonical endRest.",
+ "scale": 0.33,
+ "rows": [
+  {
+   "label": "Mineral Light",
+   "cells": [
+    {
+     "file": "captures/iphone/b90-1-light-workout.png",
+     "caption": "No rest",
+     "note": "WORKOUT elapsed"
+    },
+    {
+     "file": "captures/iphone/b90-1-light-rest.png",
+     "caption": "Active rest",
+     "note": "REST stopwatch + End"
+    },
+    {
+     "file": "captures/iphone/b90-1-light-scrolled.png",
+     "caption": "Long workout",
+     "note": "scrolled to the end"
+    }
+   ]
+  },
+  {
+   "label": "Dark",
+   "cells": [
+    {
+     "file": "captures/iphone/b90-1-dark-workout.png",
+     "caption": "No rest",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-1-dark-rest.png",
+     "caption": "Active rest",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-1-dark-scrolled.png",
+     "caption": "Long workout",
+     "note": ""
+    }
+   ]
+  }
+ ]
+}

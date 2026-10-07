@@ -1,0 +1,32 @@
+{
+ "out": "boards/B90-1c-stopwatch-long-scrolled.png",
+ "title": "B90-1c \u00b7 Logger stopwatch \u00b7 long workout scrolled to the end",
+ "subtitle": "Real shipping Logger (Sandbox, iPhone 17 Pro) with the same Chest + Core workout in every column. The clock reads the canonical draft.rest anchor (the Watch and Live Activity source); values are frozen at 1:24 rest / 12:34 workout for comparison. Scrolled to the final exercise (Planks): every option sits inside the existing sticky bar safe-area, so the last set row and Add set stay above it and the tab bar is never covered.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-1/b90-1-current-light-scrolled.png",
+     "caption": "Current (Build 89)",
+     "note": "No phone stopwatch; Live Activity only"
+    },
+    {
+     "file": "captures/b90-1/b90-1-a-light-scrolled.png",
+     "caption": "Option A \u00b7 docked tile",
+     "note": "Stopwatch tile beside Finish Workout"
+    },
+    {
+     "file": "captures/b90-1/b90-1-b-light-scrolled.png",
+     "caption": "Option B \u00b7 floating pill",
+     "note": "Pill above the bar, only while resting"
+    },
+    {
+     "file": "captures/b90-1/b90-1-c-light-scrolled.png",
+     "caption": "Option C \u00b7 footer status line",
+     "note": "Quiet line inside the bar above Finish"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

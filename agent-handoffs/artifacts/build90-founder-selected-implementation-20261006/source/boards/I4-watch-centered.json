@@ -1,0 +1,68 @@
+{
+ "out": "boards/I4-watch-centered.png",
+ "title": "I4 \u00b7 Watch primary action true-centered (B90-4 Option A)",
+ "subtitle": "Shared WatchPanelPage: Start Workout, Idle and the Apple Health orphan prompt. Execution keeps its own layout (unchanged).",
+ "scale": 0.8,
+ "rows": [
+  {
+   "label": "49 mm Ultra 3",
+   "cells": [
+    {
+     "file": "captures/watch/u3-mineralLight-start.png",
+     "caption": "Start \u00b7 Mineral",
+     "note": ""
+    },
+    {
+     "file": "captures/watch/u3-dark-start.png",
+     "caption": "Start \u00b7 Dark",
+     "note": ""
+    },
+    {
+     "file": "captures/watch/u3-mineralLight-idle.png",
+     "caption": "Idle \u00b7 Mineral",
+     "note": ""
+    },
+    {
+     "file": "captures/watch/u3-dark-orphan.png",
+     "caption": "Orphan \u00b7 Dark",
+     "note": ""
+    },
+    {
+     "file": "captures/watch/u3-dark-normal.png",
+     "caption": "Execution",
+     "note": "unchanged"
+    }
+   ]
+  },
+  {
+   "label": "42 mm Series 12",
+   "cells": [
+    {
+     "file": "captures/watch/s42-mineralLight-start.png",
+     "caption": "Start \u00b7 Mineral",
+     "note": ""
+    },
+    {
+     "file": "captures/watch/s42-dark-start.png",
+     "caption": "Start \u00b7 Dark",
+     "note": ""
+    },
+    {
+     "file": "captures/watch/s42-dark-idle.png",
+     "caption": "Idle \u00b7 Dark",
+     "note": ""
+    },
+    {
+     "file": "captures/watch/s42-mineralLight-orphan.png",
+     "caption": "Orphan \u00b7 Mineral",
+     "note": ""
+    },
+    {
+     "file": "captures/watch/s42-mineralLight-normal.png",
+     "caption": "Execution",
+     "note": "unchanged"
+    }
+   ]
+  }
+ ]
+}

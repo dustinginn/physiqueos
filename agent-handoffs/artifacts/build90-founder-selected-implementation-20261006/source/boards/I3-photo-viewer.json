@@ -1,0 +1,58 @@
+{
+ "out": "boards/I3-photo-viewer.png",
+ "title": "I3 \u00b7 Photo comparison group (B90-3 Option B)",
+ "subtitle": "Safe synthetic review photos only. Interpretation = canonical persisted per-pose narrative. The wide row is the flexed pair center-cropped to 1:1.",
+ "scale": 0.33,
+ "rows": [
+  {
+   "label": "Mineral Light",
+   "cells": [
+    {
+     "file": "captures/iphone/b90-3-light-front.png",
+     "caption": "Front Relaxed",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-3-light-back.png",
+     "caption": "Back Relaxed",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-3-light-flexed.png",
+     "caption": "Back Flexed",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-3-light-flexed-wide.png",
+     "caption": "Wider frame",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "label": "Dark",
+   "cells": [
+    {
+     "file": "captures/iphone/b90-3-dark-front.png",
+     "caption": "Front Relaxed",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-3-dark-back.png",
+     "caption": "Back Relaxed",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-3-dark-flexed.png",
+     "caption": "Back Flexed",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-3-dark-flexed-wide.png",
+     "caption": "Wider frame",
+     "note": ""
+    }
+   ]
+  }
+ ]
+}

@@ -210,7 +210,8 @@ struct PhotoBriefingSections: View {
             previous: items[0].isInspectable ? items[0] : nil,
             current: items[1].isInspectable ? items[1] : nil,
             previousLabel: "Previous\(entry.priorDate.map { " · \(BriefingDateFormatting.monthDay($0))" } ?? "")",
-            currentLabel: "Current · \(BriefingDateFormatting.monthDay(entry.currentDate))"
+            currentLabel: "Current · \(BriefingDateFormatting.monthDay(entry.currentDate))",
+            narrative: entry.narrative
         )
     }
 
@@ -811,12 +812,18 @@ struct PhotoComparisonInspection: Identifiable, Equatable {
     var current: PhotoInspectionItem?
     var previousLabel: String
     var currentLabel: String
+    /// The canonical persisted per-pose interpretation (`entry.narrative`).
+    var narrative: String = ""
 }
 
-/// The locked paired comparison viewer: Previous and Current stay visible
-/// side by side in one shared zoomable plane, so pinch and pan move both
-/// together (equivalent scale and position). Read-only; swipe down or
-/// Close dismisses; zoom resets on reopen.
+/// The paired comparison viewer (Founder Build 90, Option B: centered
+/// comparison group). Previous and Current stay side by side in one shared
+/// zoomable plane, so pinch and pan move both together. The stage is sized
+/// to the photos themselves (no full-height letterbox panes), the dated
+/// labels ride on each photo, and the canonical persisted per-pose
+/// interpretation sits in a card directly below the pair; the group is
+/// centered vertically and the rest of the screen is page background.
+/// Read-only; swipe down or Close dismisses; zoom resets on reopen.
 struct PhotoComparisonViewer: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -826,54 +833,23 @@ struct PhotoComparisonViewer: View {
     @State private var resetToken = 0
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 8) {
-                Button { dismiss() } label: {
-                    Text("✕")
-                        .briefingText(.j(17, 600))
-                        .frame(width: 44, height: 44)
-                        .background(colorScheme == .dark ? Color.white.opacity(0.12) : BriefingPalette.fixed(0x102638, 0.1), in: Circle())
-                        .contentShape(Circle())
+        GeometryReader { geometry in
+            let width = geometry.size.width - PhotoComparisonStageLayout.horizontalPadding * 2
+            let stage = PhotoComparisonStageLayout(width: width, photoRatio: photoRatio, availableHeight: geometry.size.height)
+            VStack(spacing: 0) {
+                header
+                Spacer(minLength: 8)
+                comparisonStage(stage)
+                if !request.narrative.isEmpty {
+                    interpretationCard
+                        .padding(.top, 12)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close comparison")
-                .accessibilityIdentifier("briefing.photo.comparison.close")
-                VStack(spacing: 2) {
-                    Text(request.title).briefingText(.j(14, 700))
-                    Text(request.range).briefingText(.j(10, 400)).foregroundStyle(BriefingPalette.fixed(0x99A8AE))
-                }
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .combine)
-                Color.clear.frame(width: 44, height: 44)
+                Spacer(minLength: 8)
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 4)
-            BriefingPairedZoomView(
-                previous: image(for: request.previous),
-                current: image(for: request.current),
-                resetToken: resetToken,
-                paneColor: colorScheme == .dark ? UIColor(red: 0.04, green: 0.08, blue: 0.106, alpha: 1) : UIColor(red: 0.824, green: 0.867, blue: 0.847, alpha: 1),
-                onZoom: { zoom = $0 }
-            )
-            .overlay(alignment: .topLeading) { paneLabels }
-            .accessibilityElement()
-            .accessibilityLabel("\(request.title) comparison, \(request.previousLabel), \(request.currentLabel)")
-            .accessibilityValue("Zoom \(Self.zoomLabel(zoom))")
-            .accessibilityHint("Pinch to zoom both photos together. Double tap to zoom in or out.")
-            .accessibilityAction(named: "Reset zoom") { resetToken += 1 }
-            HStack {
-                Text("Pinch to zoom · synchronized pan")
-                Spacer(minLength: 0)
-                Text(Self.zoomLabel(zoom)).foregroundStyle(BriefingEventPalette.teal).briefingText(.j(10, 800))
-            }
-            .briefingText(.j(10, 400))
-            .foregroundStyle(BriefingPalette.fixed(0x9AA9B0))
-            .padding(.top, 11)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, PhotoComparisonStageLayout.horizontalPadding)
+            .padding(.bottom, 14)
         }
         .foregroundStyle(colorScheme == .dark ? Color.white : BriefingPalette.fixed(0x102638))
-        .padding(.horizontal, 10)
-        .padding(.bottom, 18)
         .background(BriefingEventPalette.viewer.ignoresSafeArea())
         .gesture(DragGesture(minimumDistance: 30).onEnded { value in
             if zoom <= 1.01, value.translation.height > 120, abs(value.translation.width) < 80 { dismiss() }
@@ -887,28 +863,107 @@ struct PhotoComparisonViewer: View {
         zoom < 1.05 ? "1×" : String(format: "%.1f×", zoom)
     }
 
-    private var paneLabels: some View {
-        GeometryReader { geometry in
-            let paneWidth = (geometry.size.width - 6) / 2
-            HStack(spacing: 6) {
-                label(request.previousLabel).frame(width: paneWidth, alignment: .topLeading)
-                label(request.currentLabel).frame(width: paneWidth, alignment: .topLeading)
+    private var header: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Button { dismiss() } label: {
+                Text("✕")
+                    .briefingText(.j(17, 600))
+                    .frame(width: 44, height: 44)
+                    .background(colorScheme == .dark ? Color.white.opacity(0.12) : BriefingPalette.fixed(0x102638, 0.1), in: Circle())
+                    .contentShape(Circle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close comparison")
+            .accessibilityIdentifier("briefing.photo.comparison.close")
+            VStack(spacing: 2) {
+                Text(request.title).briefingText(.j(14, 700))
+                Text(request.range).briefingText(.j(10, 400)).foregroundStyle(BriefingEventPalette.muted)
+            }
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+            Color.clear.frame(width: 44, height: 44)
         }
-        .allowsHitTesting(false)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
     }
 
-    private func label(_ text: String) -> some View {
+    /// Height ÷ width of the taller loaded photo (portrait 3:4 until loaded).
+    private var photoRatio: CGFloat {
+        let ratios = [image(for: request.previous), image(for: request.current)].compactMap { $0 }
+            .filter { $0.size.width > 0 }
+            .map { $0.size.height / $0.size.width }
+        return ratios.max() ?? PhotoComparisonStageLayout.defaultPhotoRatio
+    }
+
+    private func comparisonStage(_ stage: PhotoComparisonStageLayout) -> some View {
+        BriefingPairedZoomView(
+            previous: image(for: request.previous),
+            current: image(for: request.current),
+            resetToken: resetToken,
+            // Any residual letterbox (photos of different aspect) reads as
+            // the page itself, never as an empty image container.
+            paneColor: colorScheme == .dark ? UIColor(red: 0.008, green: 0.027, blue: 0.047, alpha: 1) : UIColor(red: 0.89, green: 0.914, blue: 0.898, alpha: 1),
+            onZoom: { zoom = $0 }
+        )
+        .frame(height: stage.stageHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(alignment: .topLeading) {
+            HStack(spacing: PhotoComparisonStageLayout.paneGap) {
+                photoLabel(request.previousLabel).frame(width: stage.paneWidth, alignment: .topLeading)
+                photoLabel(request.currentLabel).frame(width: stage.paneWidth, alignment: .topLeading)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+        .overlay(alignment: .bottom) {
+            Text("\(Self.zoomLabel(zoom)) · Pinch to zoom")
+                .briefingText(.j(10, 700))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(BriefingPalette.fixed(0x030B10, 0.55), in: Capsule())
+                .padding(.bottom, 10)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+        .accessibilityElement()
+        .accessibilityLabel("\(request.title) comparison, \(request.previousLabel), \(request.currentLabel)")
+        .accessibilityValue("Zoom \(Self.zoomLabel(zoom))")
+        .accessibilityHint("Pinch to zoom both photos together. Double tap to zoom in or out.")
+        .accessibilityAction(named: "Reset zoom") { resetToken += 1 }
+        .accessibilityIdentifier("briefing.photo.comparison.stage")
+    }
+
+    private func photoLabel(_ text: String) -> some View {
         Text(text)
-            .briefingText(.j(9, 600))
+            .briefingText(.j(10, 700))
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
-            .padding(.vertical, 7)
-            .background(BriefingPalette.fixed(0x030B10, 0.7), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .padding(.vertical, 5)
+            .background(BriefingPalette.fixed(0x030B10, 0.62), in: Capsule())
             .padding(8)
     }
 
+    /// The canonical persisted per-pose interpretation, never hard-coded.
+    private var interpretationCard: some View {
+        BriefingParagraph(request.narrative, .j(15, 500, 1.42), color: BriefingEventPalette.ink)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(BriefingEventPalette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(BriefingEventPalette.rule, lineWidth: 1))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("briefing.photo.comparison.interpretation")
+    }
+
     private func image(for item: PhotoInspectionItem?) -> UIImage? {
+#if DEBUG
+        PhotoComparisonReviewFixture.cropped(sourceImage(for: item))
+#else
+        sourceImage(for: item)
+#endif
+    }
+
+    private func sourceImage(for item: PhotoInspectionItem?) -> UIImage? {
         guard let item else { return nil }
         switch item.source {
         case .authenticatedProduction(let mediaId):
@@ -1032,3 +1087,46 @@ struct BriefingPairedZoomView: UIViewRepresentable {
         }
     }
 }
+
+/// Geometry of the bounded comparison stage: two panes sized to the photos
+/// (height = pane width × the taller photo's height/width), capped so the
+/// interpretation always fits below. Pure, so it is unit-tested.
+struct PhotoComparisonStageLayout: Equatable {
+    static let horizontalPadding: CGFloat = 12
+    static let paneGap: CGFloat = 6
+    static let defaultPhotoRatio: CGFloat = 4.0 / 3.0
+    static let maximumStageFraction: CGFloat = 0.6
+
+    let paneWidth: CGFloat
+    let stageHeight: CGFloat
+
+    init(width: CGFloat, photoRatio: CGFloat, availableHeight: CGFloat) {
+        paneWidth = max(0, (width - Self.paneGap) / 2)
+        let ratio = photoRatio > 0 ? photoRatio : Self.defaultPhotoRatio
+        stageHeight = max(0, min(paneWidth * ratio, availableHeight * Self.maximumStageFraction))
+    }
+}
+
+#if DEBUG
+/// Review fixture only (absent from Release):
+/// `-physiqueos.briefing-review.photo-aspect <w/h>` center-crops the synthetic
+/// review photos so stage behavior can be checked against wider poses.
+enum PhotoComparisonReviewFixture {
+    static var aspect: CGFloat? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-physiqueos.briefing-review.photo-aspect"),
+              arguments.indices.contains(index + 1), let value = Double(arguments[index + 1]) else { return nil }
+        return CGFloat(value)
+    }
+
+    static func cropped(_ image: UIImage?) -> UIImage? {
+        guard let image, let aspect, aspect > 0, let cg = image.cgImage else { return image }
+        let width = CGFloat(cg.width), height = CGFloat(cg.height)
+        let rect: CGRect = width / height > aspect
+            ? CGRect(x: (width - height * aspect) / 2, y: 0, width: height * aspect, height: height)
+            : CGRect(x: 0, y: (height - width / aspect) / 2, width: width, height: width / aspect)
+        guard let crop = cg.cropping(to: rect.integral) else { return image }
+        return UIImage(cgImage: crop, scale: image.scale, orientation: image.imageOrientation)
+    }
+}
+#endif

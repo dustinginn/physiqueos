@@ -1,0 +1,58 @@
+{
+ "out": "boards/I2-watch-handoff.png",
+ "title": "I2 \u00b7 Guided Watch handoff (B90-2 Option B)",
+ "subtitle": "Paired-Watch states use DEBUG Watch fixtures (the simulator has no Watch); the acknowledgment is a real .startPreparedWorkout routed through the authority, so dismissal comes only from watchStartedAt.",
+ "scale": 0.33,
+ "rows": [
+  {
+   "label": "Flow (Mineral Light)",
+   "cells": [
+    {
+     "file": "captures/iphone/b90-2-offer-light.png",
+     "caption": "Offer",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-2-waiting-light.png",
+     "caption": "Waiting",
+     "note": "request delivered, not acknowledged"
+    },
+    {
+     "file": "captures/iphone/b90-2-acknowledged-light.png",
+     "caption": "After Watch Start",
+     "note": "\"Started on Watch\" shows ~1.4 s (UI-asserted), then auto-dismisses"
+    },
+    {
+     "file": "captures/iphone/b90-2-on-watch-light.png",
+     "caption": "Normal Logger",
+     "note": "On Watch chip; no Ready card"
+    }
+   ]
+  },
+  {
+   "label": "Fallback and phone-only",
+   "cells": [
+    {
+     "file": "captures/iphone/b90-2-unreachable-light.png",
+     "caption": "Not reachable",
+     "note": "request not delivered / timeout"
+    },
+    {
+     "file": "captures/iphone/b90-2-without-light.png",
+     "caption": "Use without Watch",
+     "note": "no re-prompt"
+    },
+    {
+     "file": "captures/iphone/b90-2-offer-dark.png",
+     "caption": "Offer \u00b7 Dark",
+     "note": ""
+    },
+    {
+     "file": "captures/iphone/b90-2-unreachable-dark.png",
+     "caption": "Not reachable \u00b7 Dark",
+     "note": ""
+    }
+   ]
+  }
+ ]
+}

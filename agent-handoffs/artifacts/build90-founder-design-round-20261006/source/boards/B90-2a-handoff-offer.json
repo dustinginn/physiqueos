@@ -1,0 +1,32 @@
+{
+ "out": "boards/B90-2a-handoff-offer.png",
+ "title": "B90-2a \u00b7 Watch handoff \u00b7 paired initial state",
+ "subtitle": "Entering the active Logger before the first set with a paired Watch that has PhysiqueOS installed. Same workout in every column; only the container differs (the content is one shared view).",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-1/b90-1-current-light-norest.png",
+     "caption": "Current (Build 89)",
+     "note": "Large Ready for Watch card; protocol assumed"
+    },
+    {
+     "file": "captures/b90-2/b90-2-a-light-offer.png",
+     "caption": "Option A \u00b7 bottom sheet",
+     "note": "System sheet, compact detent"
+    },
+    {
+     "file": "captures/b90-2/b90-2-b-light-offer.png",
+     "caption": "Option B \u00b7 centered card",
+     "note": "Card over a dimmed Logger"
+    },
+    {
+     "file": "captures/b90-2/b90-2-c-light-offer.png",
+     "caption": "Option C \u00b7 docked panel",
+     "note": "Replaces the sticky bar; Logger stays live"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

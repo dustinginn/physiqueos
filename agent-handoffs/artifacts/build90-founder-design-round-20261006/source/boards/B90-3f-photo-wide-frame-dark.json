@@ -1,0 +1,32 @@
+{
+ "out": "boards/B90-3f-photo-wide-frame-dark.png",
+ "title": "B90-3f \u00b7 Photo viewer \u00b7 wider frame \u00b7 Dark",
+ "subtitle": "Wider-frame check in Dark.",
+ "rows": [
+  {
+   "cells": [
+    {
+     "file": "captures/b90-3/b90-3-current-dark-flexed-wide.png",
+     "caption": "Current (Build 89)",
+     "note": "Full-height panes"
+    },
+    {
+     "file": "captures/b90-3/b90-3-a-dark-flexed-wide.png",
+     "caption": "Option A \u00b7 captioned stage",
+     "note": "Top stage, dated captions, text below"
+    },
+    {
+     "file": "captures/b90-3/b90-3-b-dark-flexed-wide.png",
+     "caption": "Option B \u00b7 centered group",
+     "note": "Labels on photos, text card, zoom pill"
+    },
+    {
+     "file": "captures/b90-3/b90-3-c-dark-flexed-wide.png",
+     "caption": "Option C \u00b7 framed panel",
+     "note": "Column headers, zoom row, text below"
+    }
+   ]
+  }
+ ],
+ "scale": 0.33
+}

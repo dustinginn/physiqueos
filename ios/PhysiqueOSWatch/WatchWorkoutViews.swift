@@ -220,8 +220,8 @@ struct WatchEyebrow: View {
 }
 
 /// A panel page laid out like the locked board: content from just below the
-/// clock, actions pinned to the bottom edge, scrolling only when Dynamic Type
-/// or a small case makes the page taller than the screen.
+/// clock, actions centered in the space below it, scrolling only when Dynamic
+/// Type or a small case makes the page taller than the screen.
 struct WatchPanelPage<Content: View, Actions: View>: View {
     @ViewBuilder let content: () -> Content
     @ViewBuilder let actions: () -> Actions
@@ -231,9 +231,8 @@ struct WatchPanelPage<Content: View, Actions: View>: View {
             let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
             let topInset = WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top)
             ScrollView {
-                VStack(spacing: 6) {
-                    content()
-                    Spacer(minLength: 6)
+                WatchPanelActionLayout {
+                    VStack(spacing: 6) { content() }
                     VStack(spacing: 6) { actions() }
                 }
                 .padding(.horizontal, 9)
@@ -245,6 +244,41 @@ struct WatchPanelPage<Content: View, Actions: View>: View {
             .contentMargins(.horizontal, 0, for: .scrollContent)
             .ignoresSafeArea(edges: [.top, .bottom])
         }
+    }
+}
+
+/// Content at the top; the actions are centered vertically in the free space
+/// left below it (Founder Build 90, Option A). The 18 pt minimum gap equals
+/// the original VStack (6 pt spacing either side of a `Spacer(minLength: 6)`),
+/// so when the page is taller than the screen the gap collapses to 18 pt and
+/// the enclosing ScrollView scrolls exactly as before. Button size, style and
+/// tap target are untouched; only the vertical position moved.
+struct WatchPanelActionLayout: Layout {
+    static let minimumGap: CGFloat = 18
+
+    /// The actions' top edge: centered in the space below the content.
+    static func actionsOriginY(contentHeight: CGFloat, actionsHeight: CGFloat, boundsHeight: CGFloat) -> CGFloat {
+        let free = max(0, boundsHeight - contentHeight - minimumGap - actionsHeight)
+        return contentHeight + minimumGap + free / 2
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let width = proposal.width
+        let content = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil))
+        let actions = subviews[1].sizeThatFits(ProposedViewSize(width: width, height: nil))
+        let natural = content.height + Self.minimumGap + actions.height
+        return CGSize(width: width ?? max(content.width, actions.width), height: max(natural, proposal.height ?? natural))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let width = ProposedViewSize(width: bounds.width, height: nil)
+        let content = subviews[0].sizeThatFits(width)
+        let actions = subviews[1].sizeThatFits(width)
+        subviews[0].place(at: CGPoint(x: bounds.midX, y: bounds.minY), anchor: .top, proposal: ProposedViewSize(width: bounds.width, height: content.height))
+        let actionsY = bounds.minY + Self.actionsOriginY(contentHeight: content.height, actionsHeight: actions.height, boundsHeight: bounds.height)
+        subviews[1].place(at: CGPoint(x: bounds.midX, y: actionsY), anchor: .top, proposal: ProposedViewSize(width: bounds.width, height: actions.height))
     }
 }
 
@@ -471,7 +505,7 @@ struct WatchWorkoutRootView: View {
                  ? (store.health.recordingCorrelationId != nil
                     ? "Apple Health keeps recording. Set logging waits for iPhone."
                     : "Set logging waits for iPhone.")
-                 : "Build the exercises and sets, then choose Ready for Watch.")
+                 : "Start a workout on iPhone, then choose Ready on Watch.")
         } actions: {
             WatchActionButton(title: "Refresh") { store.refresh() }
                 .accessibilityIdentifier("watch.idle.refresh")

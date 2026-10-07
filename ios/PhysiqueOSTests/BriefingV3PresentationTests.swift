@@ -1060,6 +1060,23 @@ extension BriefingLockedPresentationTests {
         XCTAssertEqual(entry.displayLabel, "Front relaxed")
         XCTAssertEqual(PhotoComparisonViewer.zoomLabel(1), "1×")
         XCTAssertEqual(PhotoComparisonViewer.zoomLabel(2.4), "2.4×")
+        XCTAssertEqual(request?.narrative, "N", "The canonical persisted per-pose interpretation reaches the viewer.")
+    }
+
+    /// Build 90 Option B: the stage is sized to the photos (no full-height
+    /// letterbox panes) and capped so the interpretation card fits below.
+    func testPhotoComparisonStageFitsThePhotosAndNeverFillsTheScreen() {
+        // iPhone 17 Pro content width 402 - 2 × 12 padding.
+        let portrait = PhotoComparisonStageLayout(width: 378, photoRatio: 4.0 / 3.0, availableHeight: 780)
+        XCTAssertEqual(portrait.paneWidth, 186)
+        XCTAssertEqual(portrait.stageHeight, 248, "3:4 portrait: exactly the photo height, no blank bands.")
+        let wide = PhotoComparisonStageLayout(width: 378, photoRatio: 1, availableHeight: 780)
+        XCTAssertEqual(wide.stageHeight, 186, "A wider frame shrinks the stage instead of adding bands.")
+        let tall = PhotoComparisonStageLayout(width: 378, photoRatio: 4, availableHeight: 780)
+        XCTAssertEqual(tall.stageHeight, 780 * PhotoComparisonStageLayout.maximumStageFraction, accuracy: 0.001)
+        XCTAssertLessThan(tall.stageHeight, 780, "Never a full-height image column.")
+        let unknown = PhotoComparisonStageLayout(width: 378, photoRatio: 0, availableHeight: 780)
+        XCTAssertEqual(unknown.stageHeight, portrait.stageHeight, "Unloaded photos fall back to portrait 3:4.")
     }
 
     func testDEXAKeepsEveryUnitAndTheConfidenceHeadlineIsCanonical() throws {

@@ -1,0 +1,88 @@
+{
+ "out": "boards/B90-4b-watch-shared-impact.png",
+ "scale": 0.85,
+ "title": "B90-4b \u00b7 Shared component impact + Dark",
+ "subtitle": "The placement lives in the shared WatchPanelPage, so the same change reaches the Idle screen (Prepare a workout on iPhone / Refresh) and the Apple Health orphan prompt. Execution, Finish/Cancel confirmation, Finishing and Workout Saved use their own layouts and are unaffected.",
+ "rows": [
+  {
+   "label": "Start Workout \u00b7 Dark \u00b7 49 mm",
+   "cells": [
+    {
+     "file": "captures/b90-4/u3-dark-start-bottom.png",
+     "caption": "Current (Build 89)",
+     "note": "Pinned to bottom edge"
+    },
+    {
+     "file": "captures/b90-4/u3-dark-start-centered.png",
+     "caption": "Option A \u00b7 centered",
+     "note": "Centered in the space below the title"
+    },
+    {
+     "file": "captures/b90-4/u3-dark-start-optical.png",
+     "caption": "Option B \u00b7 optical",
+     "note": "42% of the free space: slightly above center"
+    }
+   ]
+  },
+  {
+   "label": "Idle \u00b7 Mineral \u00b7 49 mm",
+   "cells": [
+    {
+     "file": "captures/b90-4/u3-mineralLight-idle-bottom.png",
+     "caption": "Current (Build 89)",
+     "note": "Pinned to bottom edge"
+    },
+    {
+     "file": "captures/b90-4/u3-mineralLight-idle-centered.png",
+     "caption": "Option A \u00b7 centered",
+     "note": "Centered in the space below the title"
+    },
+    {
+     "file": "captures/b90-4/u3-mineralLight-idle-optical.png",
+     "caption": "Option B \u00b7 optical",
+     "note": "42% of the free space: slightly above center"
+    }
+   ]
+  },
+  {
+   "label": "Idle \u00b7 Dark \u00b7 42 mm",
+   "cells": [
+    {
+     "file": "captures/b90-4/s42-dark-idle-bottom.png",
+     "caption": "Current (Build 89)",
+     "note": "Pinned to bottom edge"
+    },
+    {
+     "file": "captures/b90-4/s42-dark-idle-centered.png",
+     "caption": "Option A \u00b7 centered",
+     "note": "Centered in the space below the title"
+    },
+    {
+     "file": "captures/b90-4/s42-dark-idle-optical.png",
+     "caption": "Option B \u00b7 optical",
+     "note": "42% of the free space: slightly above center"
+    }
+   ]
+  },
+  {
+   "label": "Apple Health orphan prompt \u00b7 Mineral \u00b7 49 mm (two actions)",
+   "cells": [
+    {
+     "file": "captures/b90-4/u3-mineralLight-orphan-bottom.png",
+     "caption": "Current (Build 89)",
+     "note": "Pinned to bottom edge"
+    },
+    {
+     "file": "captures/b90-4/u3-mineralLight-orphan-centered.png",
+     "caption": "Option A \u00b7 centered",
+     "note": "Centered in the space below the title"
+    },
+    {
+     "file": "captures/b90-4/u3-mineralLight-orphan-optical.png",
+     "caption": "Option B \u00b7 optical",
+     "note": "42% of the free space: slightly above center"
+    }
+   ]
+  }
+ ]
+}

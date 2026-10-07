@@ -144,6 +144,8 @@ struct TrainingLoggerView: View {
     /// SwiftUI may keep a tab's hierarchy alive while another tab is visible.
     /// A late PR read must not consume the one-shot celebration off-screen.
     @State private var isSurfaceVisible = false
+    /// Guided Watch handoff presentation (state lives in the authority).
+    @State private var watchHandoff = TrainingWatchHandoffModel()
 
     var body: some View {
         Group {
@@ -165,6 +167,10 @@ struct TrainingLoggerView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
         .toolbar {
+            if let viewModel, let draft = viewModel.draft, draft.step == .workout, draft.expectsWatchHealthWorkout,
+               !viewModel.isFinishConfirmed {
+                ToolbarItem(placement: .navigationBarTrailing) { TrainingLoggerWatchStatusChip() }
+            }
             if let viewModel, let draft = viewModel.draft, draft.step != .complete, draft.step != .workout,
                !viewModel.isFinishConfirmed {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -330,6 +336,56 @@ struct TrainingLoggerView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             persistentAction(viewModel)
         }
+        .overlay { watchHandoffOverlay(viewModel) }
+        .onAppear { watchHandoff.sync(watchHandoffInputs(viewModel)) }
+        .onChange(of: watchHandoffInputs(viewModel)) { _, inputs in watchHandoff.sync(inputs) }
+    }
+
+    private func watchHandoffInputs(_ viewModel: TrainingLoggerViewModel) -> TrainingWatchHandoffModel.Inputs {
+        let draft = viewModel.isFinishConfirmed ? nil : viewModel.draft
+        let otherLive = draft.flatMap { current in
+            viewModel.sessionAuthority.activeLiveSession().map { $0.id != current.id }
+        } ?? false
+        return .init(
+            draft: draft,
+            canOfferHandoff: environment.watchCompanion.canOfferHandoff,
+            otherLiveSessionExists: otherLive,
+            canWrite: viewModel.canWrite
+        )
+    }
+
+    /// Founder Build 90 Option B: a centered card over the dimmed Logger.
+    @ViewBuilder
+    private func watchHandoffOverlay(_ viewModel: TrainingLoggerViewModel) -> some View {
+        let phase = watchHandoff.phase
+        if phase != .hidden, let sessionId = viewModel.draft?.id {
+            ZStack {
+                Color.black.opacity(0.38).ignoresSafeArea()
+                    .accessibilityHidden(true)
+                TrainingWatchHandoffCard(
+                    phase: phase,
+                    primary: {
+                        let launcher = environment.watchAppLauncher
+                        Task {
+                            if phase == .unreachable {
+                                await watchHandoff.tryAgain(sessionId: sessionId, launcher: launcher)
+                            } else {
+                                await watchHandoff.ready(
+                                    sessionId: sessionId,
+                                    prepare: { viewModel.setReadyForWatch(true) },
+                                    launcher: launcher
+                                )
+                            }
+                        }
+                    },
+                    secondary: {
+                        watchHandoff.useWithoutWatch { viewModel.declineWatchHandoff() }
+                    }
+                )
+                .padding(.horizontal, 22)
+            }
+            .transition(.opacity)
+        }
     }
 
     @ViewBuilder
@@ -351,10 +407,19 @@ struct TrainingLoggerView: View {
             if NumericEditingContract.finishActionVisible(step: viewModel.draft?.step, keyboardVisible: isNumericKeyboardVisible) {
                 let presentation = viewModel.workoutPresentation
                 persistentActionBar {
-                    LoggerExecutionButton(title: "Finish Workout", isEnabled: presentation?.canFinish == true) {
-                        viewModel.reviewWorkout()
+                    // Founder Build 90 Option A: the canonical clock docked
+                    // beside Finish Workout (phone-only rest timing).
+                    HStack(spacing: 8) {
+                        if let clock = TrainingLoggerClockPresentation.make(draft: viewModel.draft) {
+                            TrainingLoggerClockTile(presentation: clock) { restId in
+                                viewModel.endRest(restId: restId)
+                            }
+                        }
+                        LoggerExecutionButton(title: "Finish Workout", isEnabled: presentation?.canFinish == true) {
+                            viewModel.reviewWorkout()
+                        }
+                        .accessibilityIdentifier("trainingLogger.finishWorkout")
                     }
-                    .accessibilityIdentifier("trainingLogger.finishWorkout")
                 }
             }
         default:
@@ -795,10 +860,6 @@ struct TrainingLoggerView: View {
             if let draft = viewModel.draft, let presentation = viewModel.workoutPresentation {
                 workoutIdentity(draft: draft, presentation: presentation)
 
-                if draft.completedSetCount == 0, !draft.exercises.isEmpty {
-                    readyForWatchField(draft: draft, viewModel: viewModel)
-                }
-
                 HStack(spacing: 8) {
                     Button {
                         viewModel.saveAndLeave()
@@ -881,41 +942,6 @@ struct TrainingLoggerView: View {
             shape.strokeBorder(isDestructive ? PhysiqueOSTheme.redesignRed.opacity(0.55) : PhysiqueOSTheme.redesignHairline, lineWidth: 1)
         }
         .contentShape(shape)
-    }
-
-    /// L5B: the Watch preparation field shows only before the first
-    /// completed set (unchanged predicate) and toggles the same authority
-    /// call; ready and not-ready keep their canonical labels.
-    private func readyForWatchField(draft: TrainingLoggerDraft, viewModel: TrainingLoggerViewModel) -> some View {
-        let ready = draft.readyForWatchAt != nil
-        return Button {
-            viewModel.setReadyForWatch(!ready)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: ready ? "checkmark.circle.fill" : "applewatch")
-                    .font(.system(size: 12, weight: .bold))
-                    .accessibilityHidden(true)
-                Text(ready ? "Ready on Watch" : "Ready for Watch")
-                    .logText(LoggerType.fieldTitle12)
-                Spacer(minLength: 6)
-                Text("before first set only")
-                    .logText(LoggerType.fieldCaption9)
-            }
-            .foregroundStyle(PhysiqueOSTheme.redesignInk)
-            .padding(.vertical, 9)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(
-                LinearGradient(colors: [PhysiqueOSTheme.redesignUtilityField, PhysiqueOSTheme.redesignUtilityNavy],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(ready ? "Ready on Watch" : "Ready for Watch")
-        .accessibilityHint("Available before the first completed set")
-        .accessibilityIdentifier("trainingLogger.readyForWatch")
     }
 
     private func workoutIdentity(
@@ -2123,4 +2149,292 @@ enum LoggerReviewSeam {
         }
     }
 #endif
+}
+
+// MARK: - Docked Logger clock (Founder Build 90, Option A)
+
+/// What the docked clock beside Finish Workout shows, derived only from the
+/// canonical session (`draft.rest` and the start/pause anchors) that also
+/// feeds the Watch and the Live Activity; nothing here ticks or owns state.
+/// Hidden exactly where every other surface hides rest (Build 83): Finish
+/// confirmation, after finish, and during submission.
+struct TrainingLoggerClockPresentation: Equatable {
+    enum Kind: Equatable {
+        /// The canonical rest interval (stopwatch counts up, countdown down).
+        case rest(id: String, mode: TrainingRestMode)
+        /// No rest running: elapsed workout time (the Live Activity rule).
+        case workout
+    }
+
+    var kind: Kind
+    /// Count-up origin (rest start, or workout start shifted by pauses).
+    var anchor: Date
+    /// Countdown end.
+    var endsAt: Date?
+    /// Paused (from the Watch): the clock holds this value.
+    var frozenSeconds: Double?
+
+    var isRest: Bool { if case .rest = kind { true } else { false } }
+    var restId: String? { if case .rest(let id, _) = kind { id } else { nil } }
+    var isCountdown: Bool { if case .rest(_, .countdown) = kind { true } else { false } }
+    var glyph: String { isCountdown ? "timer" : "stopwatch" }
+    var label: String { isRest ? "Rest" : "Workout" }
+    var accessibilityLabel: String { isRest ? (isCountdown ? "Rest countdown" : "Rest stopwatch") : "Workout time" }
+    /// End Rest is offered while a rest is running (not while paused: the
+    /// authority refuses content changes on a paused session).
+    var canEndRest: Bool { isRest && frozenSeconds == nil }
+
+    static func make(draft: TrainingLoggerDraft?) -> Self? {
+        guard let draft, draft.mode == .live, draft.step == .workout,
+              draft.finishConfirmationRequestedAt == nil, draft.finishedAt == nil,
+              draft.submissionState == nil,
+              let started = draft.startedAt.flatMap(TrainingSessionClock.date(from:))
+        else { return nil }
+        if let rest = draft.rest, let restStart = rest.startedAtDate {
+            let frozen = rest.mode == .countdown ? rest.frozenRemainingSeconds : rest.frozenElapsedSeconds
+            return .init(kind: .rest(id: rest.id, mode: rest.mode), anchor: restStart, endsAt: rest.endsAtDate, frozenSeconds: frozen)
+        }
+        let paused = draft.accumulatedPausedSeconds ?? 0
+        let anchor = started.addingTimeInterval(paused)
+        let frozen = draft.pausedAt.flatMap(TrainingSessionClock.date(from:)).map { max(0, $0.timeIntervalSince(anchor)) }
+        return .init(kind: .workout, anchor: anchor, endsAt: nil, frozenSeconds: frozen)
+    }
+
+    static func clockText(_ seconds: Double) -> String {
+        let total = max(0, Int(seconds))
+        return total >= 3600
+            ? String(format: "%d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
+            : String(format: "%d:%02d", total / 60, total % 60)
+    }
+}
+
+/// The docked clock tile beside Finish Workout: green glyph, label and a
+/// declarative clock (`Text(timerInterval:)`, the Live Activity's renderer),
+/// with a restrained End action while rest is running.
+struct TrainingLoggerClockTile: View {
+    let presentation: TrainingLoggerClockPresentation
+    let onEndRest: (String) -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        HStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: presentation.glyph)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(PhysiqueOSTheme.redesignGreen)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(presentation.label)
+                        .logText(LoggerType.eyebrow8)
+                        .foregroundStyle(presentation.isRest ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignUtilityMuted)
+                    clock
+                        .font(Font(PlusJakartaSans.uiFont(size: 19, weight: 700)))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(presentation.accessibilityLabel)
+            .accessibilityIdentifier("trainingLogger.workoutClock")
+            if presentation.canEndRest, let restId = presentation.restId {
+                Spacer(minLength: 0)
+                Button { onEndRest(restId) } label: {
+                    Text("End")
+                        .logText(LoggerType.control11)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                        .padding(.horizontal, 10)
+                        .frame(height: 28)
+                        .background(PhysiqueOSTheme.redesignSoft, in: Capsule())
+                        .overlay(Capsule().strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("End rest")
+                .accessibilityIdentifier("trainingLogger.endRest")
+            }
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, presentation.canEndRest ? 4 : 12)
+        .frame(width: presentation.canEndRest ? 168 : 120, height: 52, alignment: .leading)
+        .background(presentation.isRest ? PhysiqueOSTheme.redesignGreen.opacity(0.1) : PhysiqueOSTheme.redesignSoft, in: shape)
+        .overlay(shape.strokeBorder(presentation.isRest ? PhysiqueOSTheme.redesignGreen.opacity(0.55) : PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+    }
+
+    @ViewBuilder private var clock: some View {
+        if let frozen = presentation.frozenSeconds {
+            Text(TrainingLoggerClockPresentation.clockText(frozen))
+        } else if presentation.isCountdown {
+            let end = max(presentation.endsAt ?? presentation.anchor, presentation.anchor.addingTimeInterval(1))
+            Text(timerInterval: presentation.anchor...end, countsDown: true, showsHours: false)
+        } else {
+            Text(timerInterval: presentation.anchor...presentation.anchor.addingTimeInterval(24 * 3600), countsDown: false, showsHours: false)
+        }
+    }
+}
+
+// MARK: - Guided Watch handoff card (Founder Build 90, Option B)
+
+/// The centered handoff card shown over the dimmed Logger.
+struct TrainingWatchHandoffCard: View {
+    let phase: TrainingWatchHandoffModel.Phase
+    let primary: () -> Void
+    let secondary: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                glyph
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .logText(LoggerType.surfaceTitle16)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(message)
+                        .logText(LoggerType.body11)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            if let primaryTitle {
+                Button(action: primary) {
+                    Text(primaryTitle)
+                        .logText(LoggerType.execution14)
+                        // Paper reads near-white on Mineral's deep purple and
+                        // deep ink on Dark's light purple.
+                        .foregroundStyle(PhysiqueOSTheme.redesignPaper)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(PhysiqueOSTheme.redesignPurple, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("trainingLogger.watchHandoff.primary")
+            }
+            if let secondaryTitle {
+                Button(action: secondary) {
+                    Text(secondaryTitle)
+                        .logText(LoggerType.control14)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(PhysiqueOSTheme.redesignSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("trainingLogger.watchHandoff.useWithoutWatch")
+            }
+            if let footnote {
+                Text(footnote)
+                    .logText(LoggerType.fieldCaption9)
+                    .foregroundStyle(PhysiqueOSTheme.redesignUtilityMuted)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(18)
+        .background(PhysiqueOSTheme.redesignPaper, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+        .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityIdentifier("trainingLogger.watchHandoff")
+    }
+
+    @ViewBuilder private var glyph: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 12, style: .continuous).fill(tint.opacity(0.14))
+            if phase == .waiting {
+                ProgressView().tint(tint)
+            } else {
+                Image(systemName: symbol).font(.system(size: 19, weight: .semibold)).foregroundStyle(tint)
+            }
+        }
+        .frame(width: 42, height: 42)
+        .accessibilityHidden(true)
+    }
+
+    private var symbol: String {
+        switch phase {
+        case .acknowledged: "checkmark.circle.fill"
+        case .unreachable: "applewatch.slash"
+        default: "applewatch"
+        }
+    }
+
+    private var tint: Color {
+        switch phase {
+        case .acknowledged: PhysiqueOSTheme.redesignGreen
+        case .unreachable: PhysiqueOSTheme.redesignAmber
+        default: PhysiqueOSTheme.redesignPurple
+        }
+    }
+
+    var title: String {
+        switch phase {
+        case .offer: "Log this workout on Apple Watch?"
+        case .waiting: "Waiting for your Watch"
+        case .acknowledged: "Started on Watch"
+        case .unreachable: "Watch not reachable"
+        case .hidden: ""
+        }
+    }
+
+    /// Truthful: watchOS may not bring PhysiqueOS to the front (locked,
+    /// asleep, off-wrist, out of range), so waiting always says how to start
+    /// it by hand.
+    var message: String {
+        switch phase {
+        case .offer: "Your Watch records heart rate and Apple Health. Sets stay in sync with this iPhone."
+        case .waiting: "Asking your Watch to open PhysiqueOS. If it doesn’t appear, raise your wrist, open PhysiqueOS and tap Start Workout."
+        case .acknowledged: "Your Watch confirmed the start. Log sets on either device."
+        case .unreachable: "Open PhysiqueOS on your Apple Watch, keep it unlocked and nearby, then tap Start Workout there."
+        case .hidden: ""
+        }
+    }
+
+    private var primaryTitle: String? {
+        switch phase {
+        case .offer: "Ready on Watch"
+        case .unreachable: "Try Again"
+        default: nil
+        }
+    }
+
+    private var secondaryTitle: String? {
+        switch phase {
+        case .offer, .waiting, .unreachable: "Use without Watch"
+        default: nil
+        }
+    }
+
+    private var footnote: String? {
+        switch phase {
+        case .waiting: "This iPhone keeps the workout until the Watch confirms."
+        case .acknowledged: "Opening your workout…"
+        default: nil
+        }
+    }
+}
+
+/// Quiet status after the Watch started (or is recording Apple Health for)
+/// this workout; replaces the former Ready for Watch card.
+struct TrainingLoggerWatchStatusChip: View {
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(PhysiqueOSTheme.redesignGreen).frame(width: 6, height: 6)
+            Image(systemName: "applewatch").font(.system(size: 11, weight: .semibold))
+            Text("On Watch").logText(LoggerType.pill10Strong)
+        }
+        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(PhysiqueOSTheme.redesignSoft, in: Capsule())
+        .overlay(Capsule().strokeBorder(PhysiqueOSTheme.redesignHairline, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Recording on Apple Watch")
+        .accessibilityIdentifier("trainingLogger.watchStatus")
+    }
 }

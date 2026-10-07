@@ -1545,14 +1545,41 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
     }
 
     nonisolated func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
-        let projectionData = applicationContext[WatchWorkoutContract.applicationContextProjectionKey] as? Data
-        let totalsData = applicationContext[WatchWorkoutContract.applicationContextDailyTotalsKey] as? Data
+        let slots = Self.forwardedApplicationContextSlots(applicationContext)
         Task { @MainActor [weak self] in
             var context: [String: Any] = [:]
-            if let projectionData { context[WatchWorkoutContract.applicationContextProjectionKey] = projectionData }
-            if let totalsData { context[WatchWorkoutContract.applicationContextDailyTotalsKey] = totalsData }
+            if let projection = slots.projection { context[WatchWorkoutContract.applicationContextProjectionKey] = projection }
+            if let totals = slots.dailyTotals { context[WatchWorkoutContract.applicationContextDailyTotalsKey] = totals }
+            if let appearance = slots.appearance { context[WatchWorkoutContract.applicationContextAppearanceKey] = appearance }
             self?.receiveApplicationContext(context)
         }
+    }
+
+    /// The Sendable slots a live application-context delivery carries to the
+    /// main actor. All three are forwarded: dropping the appearance slot
+    /// (Build 89) meant a phone-side Watch appearance change only arrived on
+    /// the Watch's next launch.
+    nonisolated static func forwardedApplicationContextSlots(
+        _ applicationContext: [String: Any]
+    ) -> (projection: Data?, dailyTotals: Data?, appearance: String?) {
+        (
+            applicationContext[WatchWorkoutContract.applicationContextProjectionKey] as? Data,
+            applicationContext[WatchWorkoutContract.applicationContextDailyTotalsKey] as? Data,
+            applicationContext[WatchWorkoutContract.applicationContextAppearanceKey] as? String
+        )
+    }
+
+    /// The iPhone asked watchOS to open PhysiqueOS for a workout
+    /// (`HKHealthStore.startWatchApp`, guided handoff). The prepared plan
+    /// already rides the application context; take the newest delivered
+    /// context and ask the phone for a fresh projection so Start Workout is
+    /// on screen. Starting stays the Founder's tap on the Watch.
+    func handlePhoneWorkoutLaunchRequest() {
+        install()
+        if let session, session.activationState == .activated, !session.receivedApplicationContext.isEmpty {
+            receiveApplicationContext(session.receivedApplicationContext)
+        }
+        refresh()
     }
 }
 
