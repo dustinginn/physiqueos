@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-10-06T00:35:00Z",
+  "task": {
+    "id": "evidence-app-open-load-failure-audit-20261006",
+    "title": "Evidence intermittent app-open failure audit (\"Evidence could not be loaded.\") + bounded Native resilience fix",
+    "agent": "claude",
+    "status": "completed"
+  },
+  "repository": "dustinginn/physiqueos",
+  "authority": {
+    "base_sha": "f66c7fc690b1b61094e620791ee2d4a40caf3799",
+    "final_sha": "c3d9d2571b7e881577c393d37d11475fccd891a8",
+    "native_sha": "c3d9d2571b7e881577c393d37d11475fccd891a8",
+    "production_server_sha": "b7eb1e397f0238df9ae904fd182ddbb51602e8d8",
+    "production_deployment": "6fa4e887",
+    "native_build": 87
+  },
+  "result": {
+    "summary": "Root cause PROVEN outside the app: authoritative DNS ns66.domaincontrol.com serves a stale dustinginn.com zone (SOA 2026082000 vs ns65 2026090800) with no physiqueos CNAME, so resolvers that ask ns66 cache NXDOMAIN for up to 3600 s; every Native/web request then fails before reaching the Server (zero Server traffic 23:50-00:10Z; Server healthy, live/ready 200 via ondigitalocean host and pinned custom domain; home router 10.0.0.1 still NXDOMAIN at 00:33Z). Native defect PROVEN: Evidence root was the only tab root with a catch-all terminal failure, no Retry/pull/foreground retry, and blanked a loaded hub on refresh failure (Home hides the same outage with its last-known snapshot). Bounded fix c3d9d257: newest-load-wins guard, cancellation is non-terminal, failed refresh keeps the in-memory hub, classified copy, Try Again + pull to refresh + foreground retry when failed, bounded EvidenceHubLoad diagnostics. Batch 3 preview 9fa2428c keeps the locked design. Founder must fix GoDaddy DNS.",
+    "success": true,
+    "production_mutated": false,
+    "deployed": false,
+    "testflight_uploaded": false
+  },
+  "validation": {
+    "tests": {
+      "status": "passed",
+      "summary": "Build 87 lane: focused Evidence 26/0 (9 new VM reliability + production DNS-outage test), FounderServerAPITests 247/0, generic Release compile OK. Batch 3 preview: focused unit 28/0, EvidenceHubTimelineUITests 3/3 (new accessible Try Again assertion), generic Release compile OK. Full unit/UI suites not run. Merge-tree clean vs 793462b1, 70ebf753, e9f8a957."
+    },
+    "review": {
+      "status": "not_run",
+      "summary": "Founder review of the audit and the Native candidate requested."
+    },
+    "zero_write_audit": {
+      "status": "passed",
+      "summary": "Read-only doctl logs/spec/deployment (physiqueos-final-cutover-config), public DNS queries and health GETs only; no production mutation, no DNS change, no deploy."
+    }
+  },
+  "decisions_required": [
+    "Founder: fix GoDaddy DNS now - re-save the physiqueos CNAME (e.g. lower TTL to 600) so ns66 re-syncs; verify dig @ns66.domaincontrol.com physiqueos.dustinginn.com +norecurse returns the CNAME; open a GoDaddy case if ns66 stays on serial 2026082000",
+    "Optional durable: move dustinginn.com (or the physiqueos host) DNS to a consistent provider (Cloudflare/DigitalOcean DNS)",
+    "Authorize including Native c3d9d257 in the next build, and the Batch 3 resolution per preview 9fa2428c at final merge"
+  ],
+  "blockers": [
+    "Production DNS outage persists until the GoDaddy zone is re-synced (Founder action; not authorized/possible from this lane)"
+  ],
+  "unexpected_findings": [
+    "ns66.domaincontrol.com serves stale zone serial 2026082000 without the physiqueos CNAME; ns65 serves 2026090800 - production host intermittently NXDOMAIN with a 1 h negative cache (also takes down the web app)",
+    "Cold-launch Evidence Hub pulls ~20 MB of scope-all reads alongside Home 6.2 MB and Log 9.5 MB (Log read 3x in 10 s) on one 1 vCPU / 1 GB web instance - headroom risk vs the 15 s idle timeout, not the cause of this incident",
+    "doctl context physiqueos-audit now returns 401; physiqueos-final-cutover-config works for reads"
+  ],
+  "backlog": [
+    "Consider per-stream fail-soft Evidence Hub (one failed domain read currently fails the hub)",
+    "Consider a persisted last-known Evidence Hub snapshot (new persistence - needs a decision)",
+    "Reduce scope-all Evidence Hub payloads (summary projections) and duplicate Log reads on launch",
+    "Ask Founder for one You > Network diagnostics export after the next occurrence to confirm NSURLError -1003"
+  ],
+  "recommended_next_step": "Founder fixes GoDaddy DNS (re-save physiqueos CNAME, verify ns66); then review Native c3d9d257 for the next build and preview 9fa2428c for the Batch 3 merge.",
+  "full_report_path": "agent-handoffs/reports/20261006T003500Z-evidence-app-open-load-failure-audit.md",
+  "safety": {
+    "contains_secrets": false,
+    "contains_credentials": false,
+    "contains_production_exports": false,
+    "contains_founder_evidence": false,
+    "safe_for_chatgpt_retrieval": true
+  }
+}

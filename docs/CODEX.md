@@ -2,7 +2,7 @@
 
 ## Agent tasks and handoffs (GitHub control plane)
 
-PhysiqueOS agent tasks and completion handoffs may be transported through `agent-handoffs/`. Read `agent-handoffs/README.md` (on `origin/main`) for the protocol. When explicitly told to read the latest GitHub task, consume `agent-handoffs/inbox/latest.json` and its prompt before acting. At completion, publish the sanitized handoff according to the protocol.
+PhysiqueOS agent tasks and completion handoffs may be transported through `agent-handoffs/`. Read `agent-handoffs/README.md` (on `origin/main`) for the protocol. When explicitly told to read the latest GitHub task, consume `agent-handoffs/inbox/latest.json` and its prompt before acting. At completion, publish the sanitized handoff according to the protocol. `agent-handoffs/latest.json` / `latest.md` are the accepted Native release authority: non-release tasks publish only a timestamped report and leave them unchanged (`agent-handoffs/RELEASE_AUTHORITY.md`).
 
 ## Purpose
 
