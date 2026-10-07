@@ -26,6 +26,7 @@ export default defineConfig({
       "src/domain/services/TrainingLoggerCanonicalPipeline.test.js",
       "src/domain/services/TrainingLoggerDraftRecoveryService.test.js",
       "src/domain/services/TrainingLoggerProgressionService.test.js",
+      "src/domain/services/AdaptiveTrainingProgressionStepSelector.test.js",
       "src/domain/services/TrainingLoggerSuggestionService.test.js",
       "src/domain/services/TrainingSupersetPerformanceContext.test.js",
       "src/navigation/trainingTimelineNavigation.test.js",

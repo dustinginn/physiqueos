@@ -975,6 +975,7 @@ function projectTrainingLoggerRecommendationResult(result, canonicalExerciseId) 
       ? "Recovery opportunity"
       : "Maintain current performance";
   const hasTarget = result.recommendedReps != null;
+  const hasLoadStep = result.progressionStep?.kind === "load" && result.recommendedLoad != null;
   const bodyweight = result.recommendedLoadType === "bodyweight";
   const loadLabel = bodyweight
     ? "BW"
@@ -988,6 +989,8 @@ function projectTrainingLoggerRecommendationResult(result, canonicalExerciseId) 
     message: result.reason,
     prescription: hasTarget
       ? `${loadLabel ?? "No added load"} x ${result.recommendedReps}`
+      : hasLoadStep
+        ? `Increase to ${loadLabel}; choose repetitions manually`
       : result.recommendedAction === "consider_progression"
         ? "Progress manually if today’s performance supports it"
         : "Repeat the latest comparable performance",
@@ -1008,6 +1011,7 @@ function projectTrainingLoggerRecommendationResult(result, canonicalExerciseId) 
     exposureDays: result.exposureDays,
     progressionGates: result.progressionGates,
     progressionPolicy: result.progressionPolicy,
+    progressionStep: result.progressionStep ?? null,
     targetSelection: result.targetSelection,
   });
 }

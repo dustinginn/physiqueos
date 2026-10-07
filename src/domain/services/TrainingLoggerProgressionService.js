@@ -9,6 +9,14 @@ import {
   getTrainingExerciseRelationshipComparisonKey,
 } from "../models/trainingExerciseRelationship";
 import {
+  classifyTrainingSetLoad,
+  resolveExerciseDefaultLoadType,
+  TRAINING_SET_LOAD_SEMANTICS,
+} from "../models/trainingSetLoadSemantics";
+import {
+  selectAdaptiveTrainingProgressionStep,
+} from "./AdaptiveTrainingProgressionStepSelector.js";
+import {
   resolveExecutableTrainingProgressionPolicy,
 } from "./TrainingProgressionPolicy.js";
 
@@ -123,20 +131,26 @@ export function createTrainingLoggerProgressionRecommendation({
   }
 
   if (gates.eligible) {
-    const target = deriveEvidenceSupportedTarget(comparable, policy);
+    const selection = selectAdaptiveTrainingProgressionStep(comparable);
+    const step = selection.progressionStep;
+    const hasRepTarget = step.kind === "reps";
+    const hasLoadTarget = step.kind === "load";
     return {
       ...common,
       status: TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY,
       reason: `The current prescription has ${qualifyingSuccessfulSessions} qualifying successful sessions and ${exposureDays} days of exposure.`,
       reasonCode: "strategy_eligibility_gates_satisfied",
-      recommendedAction: target ? "use_suggestion" : "consider_progression",
-      recommendedLoad: target?.load ?? null,
-      recommendedLoadType: target ? latest.loadType : null,
-      recommendedReps: target?.reps ?? null,
-      recommendedUnit: target ? latest.unit : null,
-      targetSelection: target
-        ? Object.freeze({ status: "available", policy: target.policy })
-        : Object.freeze({ status: "unavailable", policy: "no_evidence_supported_load_increment" }),
+      recommendedAction: hasRepTarget ? "use_suggestion" : "consider_progression",
+      recommendedLoad: hasRepTarget
+        ? latest.load
+        : hasLoadTarget ? step.nextLoad : null,
+      recommendedLoadType: hasRepTarget || hasLoadTarget ? latest.loadType : null,
+      recommendedReps: hasRepTarget ? step.nextRepTarget : null,
+      recommendedUnit: hasRepTarget || hasLoadTarget ? latest.unit : null,
+      progressionStep: step,
+      targetSelection: hasRepTarget || hasLoadTarget
+        ? Object.freeze({ status: "available", policy: step.reasonCode })
+        : Object.freeze({ status: "unavailable", policy: step.reasonCode }),
     };
   }
 
@@ -212,7 +226,7 @@ function listAllPerformances(sessions = []) {
     const sessionId = session.id ?? candidate?.canonicalId ?? null;
     const sessionKey = String(sessionId ?? `legacy_session_${sessionIndex}_${observedAt}`);
     return (session.exercises ?? []).map((exercise, exerciseIndex) => {
-      const sets = normalizeComparableSets(exercise.sets);
+      const sets = normalizeComparableSets(exercise.sets, exercise);
       const best = getBestComparableSet(sets);
       if (!best) return null;
       return {
@@ -220,6 +234,7 @@ function listAllPerformances(sessions = []) {
           getCanonicalTrainingExerciseSlug(exercise.name),
         date: observedAt.slice(0, 10),
         load: best.load,
+        loadSemantics: best.loadSemantics,
         loadType: best.loadType,
         occurrenceId: exercise.id ?? `occurrence_${exerciseIndex}`,
         observedAt,
@@ -231,6 +246,8 @@ function listAllPerformances(sessions = []) {
         sessionKey,
         setProfileKey: sets.map(setProfilePart).join(";"),
         sets,
+        semanticLoad: best.semanticLoad,
+        semanticUnit: best.semanticUnit,
         unit: best.unit,
         variantKey: getTrainingExecutionVariantKey(exercise),
       };
@@ -238,18 +255,27 @@ function listAllPerformances(sessions = []) {
   });
 }
 
-function normalizeComparableSets(sets = []) {
+function normalizeComparableSets(sets = [], exercise = {}) {
+  const defaultLoadType = resolveExerciseDefaultLoadType(exercise);
   return (sets ?? [])
     .filter((set) => set?.completed !== false && set?.isCompleted !== false)
     .map((set) => {
+      const classification = classifyTrainingSetLoad(set, { defaultLoadType });
       const loadType = set.load_type ?? set.loadType ??
         (set.weight_unit === "bodyweight" || set.unit === "bodyweight"
           ? "bodyweight"
           : "external_load");
       return {
         load: loadType === "bodyweight" ? 0 : finite(set.weight ?? set.load),
+        loadSemantics: classification.semantics,
         loadType,
         reps: finite(set.reps),
+        semanticLoad: classification.semantics === TRAINING_SET_LOAD_SEMANTICS.BODYWEIGHT
+          ? 0
+          : classification.load,
+        semanticUnit: classification.semantics === TRAINING_SET_LOAD_SEMANTICS.BODYWEIGHT
+          ? "bodyweight"
+          : set.weight_unit ?? set.unit ?? "lb",
         unit: loadType === "bodyweight" ? "bodyweight" : set.weight_unit ?? set.unit ?? "lb",
       };
     })
@@ -334,25 +360,6 @@ function listProgressionIntervals(entries = []) {
     }
   }
   return intervals;
-}
-
-function deriveEvidenceSupportedTarget(entries = [], policy) {
-  const ordered = [...entries].sort((left, right) => compareOccurrenceOrder(right, left));
-  const increments = [];
-  for (let index = 1; index < ordered.length; index += 1) {
-    const current = ordered[index];
-    const prior = ordered[index - 1];
-    if (current.loadType !== prior.loadType || current.unit !== prior.unit) continue;
-    const increment = current.load - prior.load;
-    if (increment > 0 && increment <= 50) increments.push(increment);
-  }
-  const latest = entries[0];
-  if (increments.length < 2 || latest.load <= 0) return null;
-  return {
-    load: latest.load + Math.min(...increments),
-    reps: policy.repRange?.minimum ?? Math.max(1, latest.reps - 2),
-    policy: "historical_minimum_load_increment",
-  };
 }
 
 function insufficient({ calibration, comparisonContext, comparable, policy, reason, reasonCode }) {

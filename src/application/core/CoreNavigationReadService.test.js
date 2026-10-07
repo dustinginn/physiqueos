@@ -357,6 +357,62 @@ describe("provider-native core navigation reads", () => {
     expect(set.load_semantics).toBe("weighted_bodyweight");
   });
 
+  it("projects the additive evidence-adaptive rep step while legacy fields remain usable", async () => {
+    const { narrow, runtime } = services();
+    installTrainingProgressionStrategy(runtime);
+    const profiles = [
+      ["2026-06-01", null, [13, 13, 13, 13], "bodyweight"],
+      ["2026-06-15", 25, [6, 6, 6, 6], "lb"],
+      ["2026-06-22", 25, [6, 6, 6, 6], "lb"],
+      ["2026-06-29", 25, [6, 6, 7, 7], "lb"],
+      ["2026-08-01", 25, [7, 7, 7, 7], "lb"],
+      ["2026-08-15", 25, [7, 7, 7, 7], "lb"],
+    ];
+    profiles.forEach(([date, weight, reps, unit], index) => {
+      runtime.canonicalEvidenceObjects.push({
+        canonicalId: `training-pull-up-adaptive-${index}`,
+        quality: { status: "complete" },
+        payload: {
+          id: `session-pull-up-adaptive-${index}`,
+          evidence_type: "training",
+          observed_at: date,
+          exercises: [{
+            id: `pull-up-adaptive-${index}`,
+            canonicalExerciseId: "pull_up",
+            name: "Pull-Ups",
+            sets: reps.map((rep) => ({
+              reps: rep,
+              weight,
+              weight_unit: unit,
+              load_type: unit === "bodyweight" ? "bodyweight" : "external_load",
+            })),
+          }],
+        },
+      });
+    });
+
+    const recommendation = (await narrow.getTrainingLogger()).initialProgressionRecommendations
+      .find((item) => item.canonicalExerciseId === "pull_up");
+    expect(recommendation).toMatchObject({
+      state: "opportunity",
+      prescription: "25 lb x 8",
+      suggestedLoad: 25,
+      suggestedLoadType: "external_load",
+      suggestedReps: 8,
+      progressionStep: {
+        kind: "reps",
+        currentLoad: 25,
+        nextLoad: 25,
+        currentRepTarget: 7,
+        nextRepTarget: 8,
+        loadType: "weighted_bodyweight",
+        unit: "lb",
+        reasonCode: "same_load_rep_rebuild_supported",
+        confidence: "supported",
+      },
+    });
+  });
+
   it("re-reads a durable same-day Finish and reflects the new qualifying session", async () => {
     const { narrow, runtime } = services();
     installTrainingProgressionStrategy(runtime);

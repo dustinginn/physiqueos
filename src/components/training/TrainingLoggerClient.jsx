@@ -87,6 +87,8 @@ export default function TrainingLoggerClient({
   initialDate,
   initialHistorySessions = [],
   initialPerformedExerciseIds = null,
+  initialProgressionRecommendations = [],
+  contextualProgressionRecommendations = [],
   production = false,
 }) {
   const createInitialDraft = () => production
@@ -94,6 +96,8 @@ export default function TrainingLoggerClient({
         exerciseLibrary: initialCanonicalExercises,
         goalContext,
         historySessions: initialHistorySessions,
+        initialProgressionRecommendations,
+        contextualProgressionRecommendations,
         performedExerciseIds: initialPerformedExerciseIds,
         workoutDate: initialDate,
       })
@@ -123,6 +127,8 @@ export default function TrainingLoggerClient({
         exerciseLibrary: initialCanonicalExercises,
         goalContext,
         historySessions: initialHistorySessions,
+        initialProgressionRecommendations,
+        contextualProgressionRecommendations,
         performedExerciseIds: initialPerformedExerciseIds,
         workoutDate: initialDate,
       });
@@ -143,6 +149,8 @@ export default function TrainingLoggerClient({
     initialDate,
     initialHistorySessions,
     initialPerformedExerciseIds,
+    initialProgressionRecommendations,
+    contextualProgressionRecommendations,
     production,
   ]);
 

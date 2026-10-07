@@ -46,6 +46,9 @@ describe("production Training Logger integration", () => {
     expect(coreNavigationSource).toContain("initialPerformedExerciseIds: performedExerciseIds");
     expect(coreNavigationSource).toContain("goal.status === \"active\"");
     expect(coreNavigationSource).toContain("initialHistorySessions: historySessions");
+    expect(clientSource).toContain("initialProgressionRecommendations");
+    expect(clientSource).toContain("contextualProgressionRecommendations");
+    expect(stateSource).not.toContain("createTrainingLoggerProgressionRecommendation");
   });
 
   it("uses the shared canonical timezone resolver when profile timezone fields are null", () => {

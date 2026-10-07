@@ -486,6 +486,56 @@ describe("production Training Logger state", () => {
     expect(draft.exercises[0].sets.some((set) => set.load === 225)).toBe(false);
   });
 
+  it("consumes the Server progression projection without recreating selector logic", () => {
+    const serverRecommendation = {
+      canonicalExerciseId: "pull_up",
+      state: "opportunity",
+      eyebrow: "Progression opportunity",
+      message: "Eligible with an evidence-supported rep step.",
+      prescription: "25 lb x 8",
+      suggestedLoad: 25,
+      suggestedReps: 8,
+      confidence: "high",
+      historyReferences: [{ date: "2026-09-20", sessionId: "pull_1" }],
+      comparisonContext: {
+        canonicalExerciseId: "pull_up",
+        relationshipKey: "standalone",
+        variantKey: "ordinary",
+      },
+      calibration: { eligibilityRole: "diagnostic_only" },
+      status: "progression_opportunity",
+      progressionStep: {
+        kind: "reps",
+        currentLoad: 25,
+        nextLoad: 25,
+        currentRepTarget: 7,
+        nextRepTarget: 8,
+        loadType: "weighted_bodyweight",
+        unit: "lb",
+        reasonCode: "same_load_rep_rebuild_supported",
+        confidence: "supported",
+      },
+    };
+    let draft = createTrainingLoggerProductionDraft({
+      exerciseLibrary: [{
+        id: "pull_up",
+        name: "Pull-Ups",
+        body_region: "Back",
+        primary_muscle_groups: ["Lats"],
+      }],
+      initialProgressionRecommendations: [serverRecommendation],
+      workoutDate: "2026-10-06",
+    });
+    draft = addTrainingExercise(draft, "pull_up");
+
+    expect(draft.exercises[0].progressionRecommendation).toMatchObject({
+      prescription: "25 lb x 8",
+      suggestedLoad: 25,
+      suggestedReps: 8,
+      progressionStep: serverRecommendation.progressionStep,
+    });
+  });
+
   it("preserves a valid superset slot when swapping to a provisional exercise", () => {
     let draft = createTrainingLoggerProductionDraft({ workoutDate: "2026-08-10" });
     draft = addTrainingExercise(draft, "spider_curl");

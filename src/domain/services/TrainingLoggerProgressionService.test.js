@@ -305,10 +305,15 @@ describe("TrainingLoggerProgressionService", () => {
     });
     expect(withIncrement).toMatchObject({
       status: TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY,
-      recommendedAction: "use_suggestion",
+      recommendedAction: "consider_progression",
       recommendedLoad: 160,
-      recommendedReps: 8,
-      targetSelection: { status: "available", policy: "historical_minimum_load_increment" },
+      recommendedReps: null,
+      progressionStep: {
+        kind: "load",
+        nextLoad: 160,
+        nextRepTarget: null,
+      },
+      targetSelection: { status: "available", policy: "repeated_compatible_load_increment_supported" },
     });
 
     const configuredRepRange = recommendation({
@@ -325,7 +330,7 @@ describe("TrainingLoggerProgressionService", () => {
     expect(configuredRepRange).toMatchObject({
       status: TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY,
       recommendedLoad: 160,
-      recommendedReps: 8,
+      recommendedReps: null,
       progressionPolicy: { qualificationMode: "prescribed_top_of_rep_range" },
     });
   });
