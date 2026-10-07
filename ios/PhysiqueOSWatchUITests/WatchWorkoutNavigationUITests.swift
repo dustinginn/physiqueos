@@ -112,3 +112,55 @@ final class WatchWorkoutNavigationUITests: XCTestCase {
         XCTAssertTrue(element(app, "watch.idle").waitForExistence(timeout: 5), "Done returns to idle.")
     }
 }
+
+/// Build 91 audit probe (design branch only): captures the panel pages after
+/// a Digital Crown scroll and a swipe so the Mineral Light bottom edge can be
+/// inspected. Captures land in `TEST_RUNNER_B91_WATCH_CAPTURE_DIR` when set.
+final class WatchFooterProbeUITests: XCTestCase {
+    override func setUp() { continueAfterFailure = true }
+
+    private func capture(_ name: String) {
+        guard let dir = ProcessInfo.processInfo.environment["B91_WATCH_CAPTURE_DIR"] else { return }
+        let data = XCUIScreen.main.screenshot().pngRepresentation
+        try? data.write(to: URL(fileURLWithPath: dir).appendingPathComponent(name + ".png"))
+    }
+
+    private func run(_ fixture: String, probe: String?, appearance: String = "mineralLight") {
+        let app = XCUIApplication()
+        app.launchArguments = ["-watchFixture", fixture, "-watchAppearance", appearance]
+        if let probe { app.launchArguments += ["-watchFooterProbe", probe] }
+        app.launch()
+        sleep(6)
+        let tag = "\(fixture)-\(probe ?? "none")-\(appearance)"
+        capture("\(tag)-0-rest")
+        XCUIDevice.shared.rotateDigitalCrown(delta: 0.15)
+        capture("\(tag)-1-crown-down")
+        sleep(1)
+        capture("\(tag)-2-crown-settled")
+        XCUIDevice.shared.rotateDigitalCrown(delta: -0.3)
+        sleep(1)
+        capture("\(tag)-3-crown-back")
+        app.swipeUp()
+        capture("\(tag)-4-swipe-up")
+        sleep(1)
+        capture("\(tag)-5-swipe-settled")
+        app.terminate()
+    }
+
+    func testPanelBottomEdge() {
+        let only = ProcessInfo.processInfo.environment["B91_WATCH_PROBES"]
+        if let only {
+            for spec in only.split(separator: ",") {
+                let parts = spec.split(separator: ":").map(String.init)
+                run(parts[0], probe: parts[1] == "none" ? nil : parts[1], appearance: parts.count > 2 ? parts[2] : "mineralLight")
+            }
+            return
+        }
+        run("start", probe: nil)
+        run("start", probe: "overflow")
+        run("start", probe: "overflow-hidden")
+        run("idle", probe: nil)
+        run("orphan", probe: nil)
+        run("start", probe: nil, appearance: "dark")
+    }
+}

@@ -227,6 +227,50 @@ struct WatchPanelPage<Content: View, Actions: View>: View {
     @ViewBuilder let actions: () -> Actions
 
     var body: some View {
+#if DEBUG
+        if WatchFooterProbe.mode == "fixed" {
+            candidateBody
+        } else {
+            shippingBody
+        }
+#else
+        shippingBody
+#endif
+    }
+
+#if DEBUG
+    /// Build 91 candidate (DEBUG probe `fixed`, not shipping): the same panel
+    /// geometry, but with no ScrollView when the page fits, the panel painting
+    /// its own full-bleed background, and no bottom scroll edge effect on the
+    /// overflow fallback. Nothing system-owned can draw below the action.
+    private var candidateBody: some View {
+        GeometryReader { geometry in
+            let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
+            let topInset = WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top)
+            let panel = WatchPanelActionLayout {
+                VStack(spacing: 6) { content() }
+                VStack(spacing: 6) { actions() }
+            }
+            .padding(.horizontal, 9)
+            .padding(.top, topInset)
+            .padding(.bottom, 8)
+            ViewThatFits(in: .vertical) {
+                panel.frame(height: fullHeight, alignment: .top)
+                ScrollView {
+                    panel.frame(minHeight: fullHeight, alignment: .top)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .contentMargins(.horizontal, 0, for: .scrollContent)
+                .modifier(WatchFooterProbe.HiddenBottomEdge())
+            }
+            .frame(height: fullHeight, alignment: .top)
+            .background(WatchPhysiqueOSTheme.background)
+            .ignoresSafeArea(edges: [.top, .bottom])
+        }
+    }
+#endif
+
+    private var shippingBody: some View {
         GeometryReader { geometry in
             let fullHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
             let topInset = WatchExecutionLayout.topInset(safeAreaTop: geometry.safeAreaInsets.top)
@@ -239,13 +283,61 @@ struct WatchPanelPage<Content: View, Actions: View>: View {
                 .padding(.top, topInset)
                 .padding(.bottom, 8)
                 .frame(minHeight: fullHeight, alignment: .top)
+#if DEBUG
+                .padding(.bottom, WatchFooterProbe.extraBottom)
+                .padding(.top, WatchFooterProbe.extraTop)
+#endif
             }
             .scrollBounceBehavior(.basedOnSize)
             .contentMargins(.horizontal, 0, for: .scrollContent)
+#if DEBUG
+            .modifier(WatchFooterProbe())
+#endif
             .ignoresSafeArea(edges: [.top, .bottom])
         }
     }
 }
+
+#if DEBUG
+/// Build 91 audit probe (design branch only, never shipped): reproduces the
+/// Mineral Light bottom bar by letting the panel overflow by a few points,
+/// and toggles the watchOS scroll edge effect to prove the source.
+/// `-watchFooterProbe overflow|overflow-hidden|overflow-hard|hidden`.
+struct WatchFooterProbe: ViewModifier {
+    static var mode: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-watchFooterProbe"), arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1]
+    }
+    static var extraBottom: CGFloat { mode?.hasPrefix("overflow") == true ? 6 : 0 }
+    /// Pushes the panel down so the action straddles the bottom edge.
+    static var extraTop: CGFloat { mode?.hasPrefix("tall") == true ? 70 : 0 }
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(watchOS 26.0, *) {
+            switch Self.mode {
+            case "overflow-hidden", "hidden", "tall-hidden": content.scrollEdgeEffectHidden(true, for: .bottom)
+            case "overflow-hard": content.scrollEdgeEffectStyle(.hard, for: .bottom)
+            default: content
+            }
+        } else {
+            content
+        }
+    }
+
+    struct HiddenBottomEdge: ViewModifier {
+        @ViewBuilder
+        func body(content: Content) -> some View {
+            if #available(watchOS 26.0, *) {
+                content.scrollEdgeEffectHidden(true, for: .bottom)
+            } else {
+                content
+            }
+        }
+    }
+}
+#endif
 
 /// Content at the top; the actions are centered vertically in the free space
 /// left below it (Founder Build 90, Option A). The 18 pt minimum gap equals
