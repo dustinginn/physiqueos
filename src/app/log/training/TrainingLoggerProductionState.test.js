@@ -297,12 +297,18 @@ describe("production Training Logger state", () => {
       history("2026-08-02", { load: 40, reps: 8, variant: "Static Hold" }),
     ];
     let draft = createTrainingLoggerProductionDraft({
+      executionVariantsByExercise: { spider_curl: [STATIC_HOLD_CHOICE] },
       historySessions,
       workoutDate: "2026-08-10",
     });
     draft = addTrainingExercise(draft, "spider_curl");
     expect(draft.exercises[0].previousPerformance).toMatchObject({ load: 35, reps: 12 });
-    draft = assignTrainingVariant(draft, draft.exercises[0].id, "Static Hold");
+    // Legacy key-only history resolves to the canonical definition.
+    draft = assignTrainingVariant(draft, draft.exercises[0].id, STATIC_HOLD_CHOICE.selection);
+    expect(draft.exercises[0].executionVariant).toMatchObject({
+      variantId: STATIC_HOLD_CHOICE.variantId,
+      key: "static_hold",
+    });
     expect(draft.exercises[0].previousPerformance).toMatchObject({ load: 40, reps: 8 });
 
     draft = addTrainingExercise(draft, "cable_pushdown");
@@ -387,13 +393,15 @@ describe("production Training Logger state", () => {
       load: 22.5,
       reps: 14,
     });
-    draft = assignTrainingVariant(draft, occurrence.id, "Static Hold");
+    // Variants are per canonical exercise; a provisional exercise has no
+    // canonical choices, so it stays Ordinary.
+    expect(assignTrainingVariant(draft, occurrence.id, STATIC_HOLD_CHOICE.selection)).toBe(draft);
 
     expect(draft.exercises[0]).toMatchObject({
       canonicalExerciseId: null,
       name: "Cross-body Cable Arc",
       resolutionStatus: "unresolved_provisional",
-      executionVariant: { label: "Static Hold" },
+      executionVariant: null,
       provisionalExercise: {
         suggestedPrimaryMuscleGroup: "Biceps",
         suggestedPrimaryMuscleGroupConfidence: "user_supplied",
@@ -459,13 +467,15 @@ describe("production Training Logger state", () => {
       }],
     };
     let draft = createTrainingLoggerProductionDraft({
+      executionVariantsByExercise: { spider_curl: [STATIC_HOLD_CHOICE] },
       exerciseLibrary,
       historySessions: [forearmHistory],
       workoutDate: "2026-08-10",
     });
     draft = addTrainingExercise(draft, "spider_curl");
     const occurrenceId = draft.exercises[0].id;
-    draft = assignTrainingVariant(draft, occurrenceId, "Static Hold");
+    draft = assignTrainingVariant(draft, occurrenceId, STATIC_HOLD_CHOICE.selection);
+    expect(draft.exercises[0].executionVariant?.variantId).toBe(STATIC_HOLD_CHOICE.variantId);
     draft = updateTrainingSet(draft, occurrenceId, draft.exercises[0].sets[0].id, {
       load: 225,
       reps: 3,
@@ -582,6 +592,21 @@ function canonicalExercise(id, name, bodyRegion, primaryMuscleGroups) {
     primary_muscle_groups: primaryMuscleGroups,
   };
 }
+
+const STATIC_HOLD_CHOICE = Object.freeze({
+  variantId: "tev_test_spider_curl_static_hold",
+  key: "static_hold",
+  label: "Static Hold",
+  legacyKeys: [],
+  status: "active",
+  provenance: "legacy_seed",
+  selection: Object.freeze({
+    variantId: "tev_test_spider_curl_static_hold",
+    key: "static_hold",
+    label: "Static Hold",
+    rawLabel: "Static Hold",
+  }),
+});
 
 function history(date, { load, reps, variant = null }) {
   return {

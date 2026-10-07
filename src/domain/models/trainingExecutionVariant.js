@@ -4,6 +4,9 @@ const EXECUTION_VARIANT_ALIASES = Object.freeze({
 
 export const ORDINARY_EXECUTION_VARIANT_KEY = "ordinary";
 
+// Immutable canonical variant-definition identity (Build 92).
+export const TRAINING_EXECUTION_VARIANT_ID_PATTERN = /^tev_[a-z0-9_]{6,80}$/;
+
 export function normalizeTrainingExecutionVariant(value) {
   const source = typeof value === "string"
     ? value
@@ -16,7 +19,15 @@ export function normalizeTrainingExecutionVariant(value) {
   const normalizedText = alias ?? normalizedSource;
   if (!normalizedText) return null;
 
+  // Build 92: a selection from a canonical definition carries its immutable
+  // `variantId` alongside the legacy key/label/rawLabel shape. It is
+  // preserved verbatim when well formed and omitted otherwise, so every
+  // pre-Build-92 occurrence normalizes exactly as before.
+  const variantId = typeof value === "object" && TRAINING_EXECUTION_VARIANT_ID_PATTERN.test(String(value?.variantId ?? ""))
+    ? value.variantId
+    : null;
   return {
+    ...(variantId ? { variantId } : {}),
     key: normalizedText.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""),
     label: resolveVariantLabel(value, rawLabel, alias),
     rawLabel,

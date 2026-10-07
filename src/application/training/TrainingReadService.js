@@ -1,5 +1,6 @@
 import { listCanonicalTrainingExerciseIdentities } from "../../domain/models/trainingExerciseIdentity.js";
 import { resolvePreviousExerciseOccurrence } from "../../domain/services/TrainingExerciseOccurrenceHistoryService.js";
+import { createTrainingExecutionVariantResolver } from "../../domain/models/trainingExecutionVariantDefinition.js";
 import { createTrainingLoggerSuggestion } from "../../domain/services/TrainingLoggerSuggestionService.js";
 import { requireAuthenticationPrincipal } from "../auth/principal.js";
 import { isActiveCanonicalTrainingSession } from "../../domain/services/CanonicalReadModel.js";
@@ -69,7 +70,12 @@ export function createTrainingReadService({ repositories } = {}) {
       const actor = requireAuthenticationPrincipal(principal);
       const sessions = await listSessions(repositories, actor.userId);
       return Object.freeze({
-        comparable: resolvePreviousExerciseOccurrence({ before, canonicalExerciseId, relationshipContext, sessions, variantKey }),
+        comparable: resolvePreviousExerciseOccurrence({
+          before, canonicalExerciseId, relationshipContext, sessions, variantKey,
+          variantResolver: createTrainingExecutionVariantResolver(
+            (await repositories.trainingExecutionVariants?.list?.()) ?? []
+          ),
+        }),
         suggestion: createTrainingLoggerSuggestion({ date: localDate, sessions }),
       });
     },

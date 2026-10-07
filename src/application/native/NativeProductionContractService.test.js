@@ -715,6 +715,8 @@ describe("Native production contract boundary", () => {
       "workout-reconciliation.resolve.v1",
       "operating-plan.recurring-support.save.v1", "operating-plan.nutrition-strategy.save.v1",
       "training-catalog.my-library.add.v1", "training-catalog.exercise.create.v1",
+      "training-catalog.execution-variant.create.v1", "training-catalog.execution-variant.rename.v1",
+      "training-catalog.execution-variant.retire.v1", "training-catalog.execution-variant.reactivate.v1",
       "operating-plan.training-strategy.save.v1",
       "operating-plan.peptide-support.save.v1",
       "operating-plan.supplement-support.save.v1",

@@ -299,6 +299,59 @@ describe("provider-native core navigation reads", () => {
     });
   });
 
+  it("projects Server-owned execution variant choices per exercise without inferring them from history", async () => {
+    const { narrow, runtime } = services();
+    runtime.canonicalEvidenceObjects.push({
+      canonicalId: "training-legacy-variants",
+      quality: { status: "complete" },
+      payload: {
+        id: "session-legacy-variants",
+        evidence_type: "training",
+        observed_at: "2026-08-20",
+        exercises: [
+          { id: "spider-legacy", canonicalExerciseId: "spider_curl", name: "Spider Curls",
+            executionVariant: { key: "static_hold", label: "Static Hold", rawLabel: "Static Hold" },
+            sets: [{ reps: 12, weight: 35, weight_unit: "lb" }] },
+          { id: "leg-ext-legacy", canonicalExerciseId: "leg_extension", name: "Leg Extensions",
+            executionVariant: { key: "super_set", label: "Super Set", rawLabel: "super set" },
+            sets: [{ reps: 12, weight: 100, weight_unit: "lb" }] },
+        ],
+      },
+    });
+    // Historical freeform variants (including the misfiled "Super Set") are
+    // never choices: with no definitions every exercise is Ordinary only.
+    const before = await narrow.getTrainingLogger();
+    expect(before.executionVariantsByExercise).toEqual({});
+    expect(before.initialHistorySessions[0].exercises[0].executionVariant).toMatchObject({ key: "static_hold" });
+
+    runtime.trainingExecutionVariants.push(
+      { id: "tev_spider_static_hold_seed", schemaVersion: "training_execution_variant_v1", canonicalExerciseId: "spider_curl",
+        displayName: "Static Hold", key: "static_hold", legacyKeys: ["static_hold"], status: "active", provenance: "legacy_seed",
+        createdAt: "2026-10-07T00:00:00.000Z", updatedAt: "2026-10-07T00:00:00.000Z", retiredAt: null, version: 1 },
+      { id: "tev_spider_retired_pause", schemaVersion: "training_execution_variant_v1", canonicalExerciseId: "spider_curl",
+        displayName: "3-Second Pause", key: "3_second_pause", legacyKeys: [], status: "retired", provenance: "user_created",
+        createdAt: "2026-10-07T00:00:00.000Z", updatedAt: "2026-10-07T00:00:00.000Z", retiredAt: "2026-10-07T00:00:00.000Z", version: 2 },
+      { id: "tev_unknown_exercise_variant", schemaVersion: "training_execution_variant_v1", canonicalExerciseId: "not_a_catalog_exercise",
+        displayName: "Slow Eccentric", key: "slow_eccentric", legacyKeys: [], status: "active", provenance: "user_created",
+        createdAt: "2026-10-07T00:00:00.000Z", updatedAt: "2026-10-07T00:00:00.000Z", retiredAt: null, version: 1 },
+    );
+    const after = await narrow.getTrainingLogger();
+    expect(after.executionVariantsByExercise).toEqual({
+      spider_curl: [{
+        variantId: "tev_spider_static_hold_seed",
+        key: "static_hold",
+        label: "Static Hold",
+        legacyKeys: ["static_hold"],
+        status: "active",
+        provenance: "legacy_seed",
+        selection: { variantId: "tev_spider_static_hold_seed", key: "static_hold", label: "Static Hold", rawLabel: "Static Hold" },
+      }],
+    });
+    // Additive only: every pre-Build-92 field keeps its shape.
+    expect(Object.keys(after).filter((key) => key !== "executionVariantsByExercise").sort())
+      .toEqual(Object.keys(before).filter((key) => key !== "executionVariantsByExercise").sort());
+  });
+
   it("projects canonical progression recommendations and bodyweight loading semantics for Native", async () => {
     const { narrow, runtime } = services();
     installTrainingProgressionStrategy(runtime);
@@ -671,6 +724,7 @@ describe("provider-native core navigation reads", () => {
     expect(CORE_NAVIGATION_COLLECTIONS.operatingPlan).not.toContain("analyses");
     expect(CORE_NAVIGATION_COLLECTIONS.trainingLogger).toEqual([
       "user", "goals", "canonicalEvidenceObjects", "myLibraryMemberships", "protocols", "protocolVersions",
+      "trainingExecutionVariants",
     ]);
     expect(CORE_NAVIGATION_COLLECTIONS.profile).not.toContain("canonicalEvidenceObjects");
     expect(CORE_NAVIGATION_COLLECTIONS.tracking).toEqual(["user", "executionItems", "protocols", "reminders"]);

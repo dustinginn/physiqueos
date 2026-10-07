@@ -92,6 +92,7 @@ export function createPhase5SyntheticRuntime({ recordsPerCollection = 3 } = {}) 
     ],
     trainingPerformanceEvents: many("trainingPerformanceEvents", { exerciseId: "phase5_exercise_curl", sessionId: "phase5-training-session-001", eventType: "volume", value: 300 }),
     myLibraryMemberships: [],
+    trainingExecutionVariants: [],
     trainingPerformanceEventBatches: many("trainingPerformanceEventBatches", { sessionId: "phase5-training-session-001", eventIds: ["phase5-trainingPerformanceEvents-001"], state: "processed" }),
     canonicalExerciseLibrary: many("canonicalExerciseLibrary", { canonicalExerciseId: "phase5_exercise_curl", name: "Synthetic Curl", bodyRegion: "Arms", movementPattern: "Elbow Flexion", category: "Arms", aliases: ["Fixture Curl"] }),
     piEnergyConfidenceWorkItems: many("piEnergyConfidenceWorkItems", { goalId: "phase5-goals-001", state: "completed" }),

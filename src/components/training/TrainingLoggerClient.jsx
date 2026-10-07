@@ -69,7 +69,7 @@ import {
   TRAINING_LOGGER_EXERCISE_SELECTION_CONTEXTS,
   TRAINING_LOGGER_MODES,
   TRAINING_LOGGER_STEPS,
-  TRAINING_LOGGER_VARIANT_OPTIONS,
+  listTrainingLoggerVariantChoices,
   toggleTrainingSetCompletion,
   updateTrainingSet,
   updateWorkoutContext,
@@ -89,6 +89,7 @@ export default function TrainingLoggerClient({
   initialPerformedExerciseIds = null,
   initialProgressionRecommendations = [],
   contextualProgressionRecommendations = [],
+  executionVariantsByExercise = {},
   production = false,
 }) {
   const createInitialDraft = () => production
@@ -98,6 +99,7 @@ export default function TrainingLoggerClient({
         historySessions: initialHistorySessions,
         initialProgressionRecommendations,
         contextualProgressionRecommendations,
+        executionVariantsByExercise,
         performedExerciseIds: initialPerformedExerciseIds,
         workoutDate: initialDate,
       })
@@ -129,6 +131,7 @@ export default function TrainingLoggerClient({
         historySessions: initialHistorySessions,
         initialProgressionRecommendations,
         contextualProgressionRecommendations,
+        executionVariantsByExercise,
         performedExerciseIds: initialPerformedExerciseIds,
         workoutDate: initialDate,
       });
@@ -151,6 +154,7 @@ export default function TrainingLoggerClient({
     initialPerformedExerciseIds,
     initialProgressionRecommendations,
     contextualProgressionRecommendations,
+    executionVariantsByExercise,
     production,
   ]);
 
@@ -1131,6 +1135,7 @@ function ExerciseCard({
   onUpdateSet,
 }) {
   const superset = getSupersetContext(draft, exercise.id);
+  const variantChoices = listTrainingLoggerVariantChoices(draft, exercise.canonicalExerciseId);
   const previousContext = exercise.executionVariant || superset
     ? `Comparable ${formatDate(exercise.previousPerformance.date)}`
     : exercise.previousPerformance.context;
@@ -1180,7 +1185,7 @@ function ExerciseCard({
             <ActionMenuButton icon={Sparkles} label={exercise.executionVariant ? "Edit Variant" : "Add Variant"} onClick={onToggleVariantPicker} />
             <ActionMenuButton icon={RefreshCw} label="Swap exercise" onClick={onRequestSwap} />
             {exercise.executionVariant && (
-              <ActionMenuButton icon={Minus} label="Remove Variant" onClick={onRemoveVariant} />
+              <ActionMenuButton icon={Minus} label="Use Ordinary" onClick={onRemoveVariant} />
             )}
             <ActionMenuButton icon={Link2} label="Link as Superset" onClick={onToggleSupersetPicker} />
             {superset && (
@@ -1196,17 +1201,31 @@ function ExerciseCard({
               Execution Variant
             </p>
             <div className="flex flex-wrap gap-2">
-              {TRAINING_LOGGER_VARIANT_OPTIONS.map((variant) => (
+              <button
+                aria-pressed={!exercise.executionVariant}
+                className="min-h-11 rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-xs font-extrabold"
+                onClick={onRemoveVariant}
+                type="button"
+              >
+                Ordinary
+              </button>
+              {variantChoices.map((choice) => (
                 <button
+                  aria-pressed={exercise.executionVariant?.variantId === choice.variantId}
                   className="min-h-11 rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-xs font-extrabold"
-                  key={variant}
-                  onClick={() => onAssignVariant(variant)}
+                  key={choice.variantId}
+                  onClick={() => onAssignVariant(choice.selection)}
                   type="button"
                 >
-                  {variant}
+                  {choice.label}
                 </button>
               ))}
             </div>
+            {variantChoices.length === 0 && (
+              <p className="mt-2 text-xs font-semibold text-[var(--text-muted)]">
+                No saved variants for this exercise yet.
+              </p>
+            )}
           </div>
         )}
 

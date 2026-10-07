@@ -35,6 +35,10 @@ import {
 } from "../../domain/services/TrainingLoggerProgressionService.js";
 import { deriveTrainingExerciseRelationshipContext } from "../../domain/models/trainingExerciseRelationship.js";
 import { getTrainingExecutionVariantKey } from "../../domain/models/trainingExecutionVariant.js";
+import {
+  createTrainingExecutionVariantResolver,
+  projectTrainingExecutionVariantChoices,
+} from "../../domain/models/trainingExecutionVariantDefinition.js";
 import { createTrainingLoggerSuggestion } from "../../domain/services/TrainingLoggerSuggestionService.js";
 import {
   buildStrategyDomainModel,
@@ -81,7 +85,7 @@ export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   ]),
   trainingLogger: Object.freeze([
     "user", "goals", "canonicalEvidenceObjects", "myLibraryMemberships",
-    "protocols", "protocolVersions",
+    "protocols", "protocolVersions", "trainingExecutionVariants",
   ]),
   morningCheckIn: Object.freeze([
     "user", "weightEntries", "reminders", "dailyCheckIns", "dexaScans",
@@ -224,6 +228,8 @@ export function createCoreNavigationReadService({
           ownerUserId: runtime.user?.id,
         }), initialDate);
         const trainingStrategy = resolveActiveTrainingProgressionStrategy(runtime);
+        const variantDefinitions = runtime.trainingExecutionVariants ?? [];
+        const variantResolver = createTrainingExecutionVariantResolver(variantDefinitions);
         const initialProgressionRecommendations = canonicalExercises
           .map((exercise) => projectTrainingLoggerRecommendation({
             exercise,
@@ -231,6 +237,7 @@ export function createCoreNavigationReadService({
             initialDate,
             sessions: confirmedTrainingRecords,
             trainingStrategy,
+            variantResolver,
           }))
           .filter(Boolean);
         // Additive: Suggested/Maintain for each superset relationship context
@@ -243,6 +250,7 @@ export function createCoreNavigationReadService({
           initialDate,
           sessions: confirmedTrainingRecords,
           trainingStrategy,
+          variantResolver,
         });
         return Object.freeze({
           goalContext,
@@ -265,6 +273,14 @@ export function createCoreNavigationReadService({
           initialMyLibraryExerciseIds: myLibraryExerciseIds,
           initialProgressionRecommendations,
           contextualProgressionRecommendations,
+          // Additive Build 92 contract: Server-owned, per-exercise execution
+          // variant choices (active definitions only). Exercises with none are
+          // absent, meaning Ordinary only. Never inferred from history, so the
+          // misfiled legacy "Super Set" variant can never become a choice.
+          // Older clients ignore the field.
+          executionVariantsByExercise: projectTrainingExecutionVariantChoices(variantDefinitions, {
+            canonicalExerciseIds: canonicalExercises.map((exercise) => exercise.id),
+          }),
         });
       });
     },
@@ -891,13 +907,14 @@ function projectTrainingHistorySession(record) {
   };
 }
 
-function projectTrainingLoggerRecommendation({ exercise, goalContext, initialDate, sessions, trainingStrategy }) {
+function projectTrainingLoggerRecommendation({ exercise, goalContext, initialDate, sessions, trainingStrategy, variantResolver }) {
   const result = createTrainingLoggerProgressionRecommendation({
     canonicalExerciseId: exercise.id,
     goalContext,
     nowDate: initialDate,
     sessions,
     trainingStrategy,
+    variantResolver,
   });
   return projectTrainingLoggerRecommendationResult(result, exercise.id);
 }
@@ -915,6 +932,7 @@ export function projectTrainingLoggerContextualRecommendations({
   initialDate,
   sessions,
   trainingStrategy,
+  variantResolver,
 }) {
   const ordinaryVariantKey = getTrainingExecutionVariantKey(null);
   const contexts = new Map();
@@ -940,6 +958,7 @@ export function projectTrainingLoggerContextualRecommendations({
           relationshipContext,
           sessions,
           trainingStrategy,
+          variantResolver,
         }),
         canonicalExerciseId,
       );

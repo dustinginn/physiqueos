@@ -13,6 +13,10 @@ import {
   normalizeTrainingExecutionVariant,
 } from "../../../domain/models/trainingExecutionVariant";
 import {
+  createTrainingExecutionVariantResolver,
+  EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER,
+} from "../../../domain/models/trainingExecutionVariantDefinition.js";
+import {
   createTrainingExerciseOccurrenceId,
   createTrainingExerciseRelationshipGroup,
   getTrainingExerciseRelationshipComparisonKey,
@@ -97,11 +101,51 @@ export const TRAINING_LOGGER_CATEGORY_SUGGESTION = Object.freeze({
   futureLearningSource: "confirmed_training_evidence_history",
 });
 
-export const TRAINING_LOGGER_VARIANT_OPTIONS = Object.freeze([
-  "Static Hold",
-  "3-Second Pause",
-  "Slow Eccentric",
-]);
+// Synthetic, preview-only execution-variant choices shaped exactly like the
+// Server's `executionVariantsByExercise` projection. They are never a
+// production authority: a production draft only ever offers the Server's
+// canonical per-exercise definitions (Ordinary only when there are none).
+export const TRAINING_LOGGER_PREVIEW_EXECUTION_VARIANTS_BY_EXERCISE = Object.freeze({
+  spider_curl: Object.freeze([
+    previewVariantChoice("tev_preview_spider_curl_static_hold", "static_hold", "Static Hold"),
+  ]),
+});
+
+function previewVariantChoice(variantId, key, label) {
+  return Object.freeze({
+    variantId,
+    key,
+    label,
+    legacyKeys: Object.freeze([]),
+    status: "active",
+    provenance: "system",
+    selection: Object.freeze({ variantId, key, label, rawLabel: label }),
+  });
+}
+
+/// The execution-variant choices one exercise may select: the Server
+/// projection for a production draft, the synthetic fixture for the isolated
+/// preview. Ordinary is always available separately and is never listed.
+export function listTrainingLoggerVariantChoices(draft, canonicalExerciseId) {
+  const projection = isProductionDraft(draft)
+    ? draft.productionContext?.executionVariantsByExercise ?? {}
+    : TRAINING_LOGGER_PREVIEW_EXECUTION_VARIANTS_BY_EXERCISE;
+  return projection?.[canonicalExerciseId] ?? [];
+}
+
+function createDraftVariantResolver(draft) {
+  if (!isProductionDraft(draft)) return EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER;
+  const definitions = Object.entries(draft.productionContext?.executionVariantsByExercise ?? {})
+    .flatMap(([canonicalExerciseId, choices]) => (choices ?? []).map((choice) => ({
+      id: choice.variantId,
+      canonicalExerciseId,
+      key: choice.key,
+      displayName: choice.label,
+      legacyKeys: choice.legacyKeys ?? [],
+      status: choice.status ?? "active",
+    })));
+  return createTrainingExecutionVariantResolver(definitions);
+}
 
 export const TRAINING_LOGGER_DENSITY_CONTRACT = Object.freeze({
   canonicalShellWidthPx: 393,
@@ -310,6 +354,7 @@ export function listPerformedTrainingLoggerExerciseIds(sessions = []) {
 
 export function createTrainingLoggerProductionDraft({
   contextualProgressionRecommendations = [],
+  executionVariantsByExercise = {},
   exerciseLibrary = [],
   goalContext = null,
   historySessions = [],
@@ -333,6 +378,7 @@ export function createTrainingLoggerProductionDraft({
       historySessions,
       initialProgressionRecommendations,
       contextualProgressionRecommendations,
+      executionVariantsByExercise: executionVariantsByExercise ?? {},
       performedExerciseIds: Array.isArray(performedExerciseIds)
         ? performedExerciseIds
         : listPerformedTrainingLoggerExerciseIds(historySessions),
@@ -364,6 +410,7 @@ export function hydrateTrainingLoggerProductionDraft(
   recoveredDraft,
   {
     contextualProgressionRecommendations = [],
+    executionVariantsByExercise = {},
     exerciseLibrary = [],
     goalContext = null,
     historySessions = [],
@@ -383,6 +430,7 @@ export function hydrateTrainingLoggerProductionDraft(
       historySessions,
       initialProgressionRecommendations,
       contextualProgressionRecommendations,
+      executionVariantsByExercise,
       performedExerciseIds,
       workoutDate,
     });
@@ -400,6 +448,7 @@ export function hydrateTrainingLoggerProductionDraft(
       historySessions,
       initialProgressionRecommendations,
       contextualProgressionRecommendations,
+      executionVariantsByExercise: executionVariantsByExercise ?? {},
       performedExerciseIds: Array.isArray(performedExerciseIds)
         ? performedExerciseIds
         : listPerformedTrainingLoggerExerciseIds(historySessions),
@@ -745,7 +794,16 @@ export function removeTrainingSet(draft, exerciseOccurrenceId, setId) {
 }
 
 export function assignTrainingVariant(draft, exerciseOccurrenceId, value) {
-  const executionVariant = normalizeTrainingExecutionVariant(value);
+  const exercise = draft.exercises.find((item) => item.id === exerciseOccurrenceId);
+  // Only a canonical choice of this exact exercise may be selected; anything
+  // else (a free-typed label, another exercise's variant) leaves the draft
+  // unchanged instead of inventing a variant identity.
+  const choice = exercise
+    ? listTrainingLoggerVariantChoices(draft, exercise.canonicalExerciseId)
+      .find((item) => item.variantId === value?.variantId)
+    : null;
+  if (!choice) return draft;
+  const executionVariant = normalizeTrainingExecutionVariant(choice.selection);
   return refreshComparableContexts(updateExercise(
     draft,
     exerciseOccurrenceId,
@@ -1028,6 +1086,7 @@ function selectDraftPreviousPerformance(draft, context) {
     relationshipContext: context.relationshipContext,
     sessions: draft.productionContext?.historySessions ?? [],
     variantKey: context.executionVariant,
+    variantResolver: createDraftVariantResolver(draft),
   });
   const occurrence = result.exactVariantOccurrence;
   if (!occurrence) {

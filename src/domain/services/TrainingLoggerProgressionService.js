@@ -2,8 +2,8 @@ import {
   getCanonicalTrainingExerciseSlug,
 } from "../models/trainingExerciseIdentity";
 import {
-  getTrainingExecutionVariantKey,
-} from "../models/trainingExecutionVariant";
+  EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER,
+} from "../models/trainingExecutionVariantDefinition.js";
 import {
   deriveTrainingExerciseRelationshipContext,
   getTrainingExerciseRelationshipComparisonKey,
@@ -43,11 +43,13 @@ export function createTrainingLoggerProgressionRecommendation({
   sessions = [],
   trainingStrategy = null,
   variant = null,
+  variantResolver = EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER,
 } = {}) {
   const comparisonContext = createComparisonContext({
     canonicalExerciseId,
     relationshipContext,
     variant,
+    variantResolver,
   });
   const policy = resolveExecutableTrainingProgressionPolicy({
     canonicalExerciseId,
@@ -59,6 +61,7 @@ export function createTrainingLoggerProgressionRecommendation({
     relationshipContext,
     sessions,
     variant,
+    variantResolver,
   }).filter((entry) => !nowDateKey || entry.date <= nowDateKey);
   const phase = resolveTrainingProgressionPhase(goalContext);
   const phaseExpectation = PHASE_EXPECTATIONS[phase];
@@ -195,12 +198,16 @@ export function listComparablePerformances({
   relationshipContext = null,
   sessions = [],
   variant = null,
+  variantResolver = EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER,
 } = {}) {
-  const requestedVariantKey = getTrainingExecutionVariantKey(variant);
+  // Exact variant context: the stable definition identity when one exists
+  // (current key, legacy alias or variantId), else the legacy key, else
+  // Ordinary. A new definition therefore never borrows Ordinary evidence.
+  const requestedVariantKey = variantResolver.identity(variant, canonicalExerciseId);
   const requestedRelationshipKey = getTrainingExerciseRelationshipComparisonKey(
     relationshipContext
   );
-  const matches = listAllPerformances(sessions)
+  const matches = listAllPerformances(sessions, variantResolver)
     .filter((entry) => entry.canonicalExerciseId === canonicalExerciseId)
     .filter((entry) => entry.variantKey === requestedVariantKey)
     .filter((entry) => entry.relationshipKey === requestedRelationshipKey)
@@ -216,7 +223,7 @@ export function listComparablePerformances({
   return [...bySession.values()].sort(compareOccurrenceOrder);
 }
 
-function listAllPerformances(sessions = []) {
+function listAllPerformances(sessions = [], variantResolver = EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER) {
   return sessions.flatMap((candidate, sessionIndex) => {
     const session = candidate?.payload ?? candidate;
     const qualityStatus = String(candidate?.quality?.status ?? session?.quality?.status ?? "").toLowerCase();
@@ -229,9 +236,10 @@ function listAllPerformances(sessions = []) {
       const sets = normalizeComparableSets(exercise.sets, exercise);
       const best = getBestComparableSet(sets);
       if (!best) return null;
+      const canonicalExerciseId = exercise.canonicalExerciseId ??
+        getCanonicalTrainingExerciseSlug(exercise.name);
       return {
-        canonicalExerciseId: exercise.canonicalExerciseId ??
-          getCanonicalTrainingExerciseSlug(exercise.name),
+        canonicalExerciseId,
         date: observedAt.slice(0, 10),
         load: best.load,
         loadSemantics: best.loadSemantics,
@@ -249,7 +257,7 @@ function listAllPerformances(sessions = []) {
         semanticLoad: best.semanticLoad,
         semanticUnit: best.semanticUnit,
         unit: best.unit,
-        variantKey: getTrainingExecutionVariantKey(exercise),
+        variantKey: variantResolver.identity(exercise.executionVariant, canonicalExerciseId),
       };
     }).filter((entry) => entry?.date);
   });
@@ -434,11 +442,11 @@ function daysBetween(later, earlier) {
   return Math.max(0, Math.floor((laterTime - earlierTime) / 86400000));
 }
 
-function createComparisonContext({ canonicalExerciseId, relationshipContext, variant }) {
+function createComparisonContext({ canonicalExerciseId, relationshipContext, variant, variantResolver }) {
   return {
     canonicalExerciseId,
     relationshipKey: getTrainingExerciseRelationshipComparisonKey(relationshipContext),
-    variantKey: getTrainingExecutionVariantKey(variant),
+    variantKey: variantResolver.identity(variant, canonicalExerciseId),
   };
 }
 

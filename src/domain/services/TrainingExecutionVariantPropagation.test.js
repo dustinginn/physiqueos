@@ -7,6 +7,10 @@ import {
   listPreviouslyUsedExecutionVariants,
   resolvePreviousExerciseOccurrence,
 } from "./TrainingExerciseOccurrenceHistoryService";
+import {
+  createTrainingExecutionVariantResolver,
+  projectTrainingExecutionVariantChoices,
+} from "../models/trainingExecutionVariantDefinition.js";
 
 const ordinary = session("ordinary", "2026-08-01", null, 12, 35);
 const staticHold = session("static", "2026-08-08", {
@@ -90,6 +94,52 @@ describe("Training execution variant propagation", () => {
     expect(events.length).toBeGreaterThan(0);
     expect(events.every((event) => event.executionVariant?.key === "static_hold"))
       .toBe(true);
+  });
+
+  describe("stable variant identity (Build 92)", () => {
+    const seeded = {
+      id: "tev_spider_static_hold_seed", canonicalExerciseId: "spider_curl", displayName: "Peak Squeeze", key: "peak_squeeze",
+      legacyKeys: ["static_hold"], status: "active", provenance: "legacy_seed", createdAt: "2026-10-01T00:00:00.000Z",
+    };
+    const renamedSelection = { variantId: seeded.id, key: "peak_squeeze", label: "Peak Squeeze", rawLabel: "Peak Squeeze" };
+
+    it("resolves previous performance for a renamed definition from legacy-key history", () => {
+      const resolver = createTrainingExecutionVariantResolver([seeded]);
+      const exact = resolvePreviousExerciseOccurrence({
+        sessions: [ordinary, staticHold], canonicalExerciseId: "spider_curl",
+        variantKey: renamedSelection, before: "2026-08-09", variantResolver: resolver,
+      });
+      expect(exact.matchKind).toBe("exact_variant");
+      expect(exact.exactVariantOccurrence.session.id).toBe("static");
+      expect(exact.comparisonContext.variantKey).toBe(seeded.id);
+      // Without the definition, the renamed key has no history (legacy behavior).
+      expect(resolvePreviousExerciseOccurrence({
+        sessions: [ordinary, staticHold], canonicalExerciseId: "spider_curl",
+        variantKey: renamedSelection, before: "2026-08-09",
+      }).matchKind).toBe("canonical_only");
+    });
+
+    it("keeps the PR baseline continuous across a rename only when definitions are supplied", () => {
+      const renamedLater = session("renamed", "2026-08-15", renamedSelection, 14, 35);
+      const withDefinitions = createTrainingPerformanceIntelligenceReport({
+        trainingSessions: [ordinary, staticHold, renamedLater],
+        now: new Date("2026-08-16T12:00:00Z"),
+        variantResolver: createTrainingExecutionVariantResolver([seeded]),
+      }).exerciseObservations.find((item) => item.exercise.key === "spider_curl");
+      expect(withDefinitions.explanation_data.previous_comparable_session.session_id).toBe("static");
+      const legacy = createTrainingPerformanceIntelligenceReport({
+        trainingSessions: [ordinary, staticHold, renamedLater],
+        now: new Date("2026-08-16T12:00:00Z"),
+      }).exerciseObservations.find((item) => item.exercise.key === "spider_curl");
+      expect(legacy.explanation_data.previous_comparable_session).toBeNull();
+    });
+
+    it("never offers historical freeform variants as choices", () => {
+      expect(projectTrainingExecutionVariantChoices([])).toEqual({});
+      expect(listPreviouslyUsedExecutionVariants({
+        sessions: [ordinary, staticHold], canonicalExerciseId: "spider_curl",
+      })).toHaveLength(1);
+    });
   });
 });
 

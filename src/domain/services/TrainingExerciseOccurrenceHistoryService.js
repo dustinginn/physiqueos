@@ -2,11 +2,8 @@ import {
   getCanonicalTrainingExerciseSlug,
   resolveTrainingExerciseOccurrenceIdentity,
 } from "../models/trainingExerciseIdentity";
-import {
-  getTrainingExecutionVariantKey,
-  normalizeTrainingExecutionVariant,
-  ORDINARY_EXECUTION_VARIANT_KEY,
-} from "../models/trainingExecutionVariant";
+import { normalizeTrainingExecutionVariant } from "../models/trainingExecutionVariant";
+import { EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER } from "../models/trainingExecutionVariantDefinition.js";
 import {
   deriveTrainingExerciseRelationshipContext,
   getTrainingExerciseRelationshipComparisonKey,
@@ -18,9 +15,11 @@ export function resolvePreviousExerciseOccurrence({
   relationshipContext = null,
   sessions = [],
   variantKey = null,
+  // Build 92: `variantKey` may also be a canonical selection carrying
+  // `variantId`; matching uses the stable definition identity when one exists.
+  variantResolver = EMPTY_TRAINING_EXECUTION_VARIANT_RESOLVER,
 } = {}) {
-  const requestedVariantKey = normalizeTrainingExecutionVariant(variantKey)?.key ??
-    ORDINARY_EXECUTION_VARIANT_KEY;
+  const requestedVariantKey = variantResolver.identity(variantKey, canonicalExerciseId);
   const occurrences = listExerciseOccurrences({
     before,
     canonicalExerciseId,
@@ -29,15 +28,17 @@ export function resolvePreviousExerciseOccurrence({
   const requestedRelationshipKey = getTrainingExerciseRelationshipComparisonKey(
     relationshipContext
   );
+  const occurrenceVariantKey = (occurrence) =>
+    variantResolver.identity(occurrence.exercise?.executionVariant, canonicalExerciseId);
   const exactVariantOccurrence = occurrences.find(
     (occurrence) =>
-      getTrainingExecutionVariantKey(occurrence.exercise) === requestedVariantKey &&
+      occurrenceVariantKey(occurrence) === requestedVariantKey &&
       getTrainingExerciseRelationshipComparisonKey(occurrence.relationshipContext) ===
         requestedRelationshipKey
   ) ?? null;
   const canonicalFallbackOccurrence = occurrences.find(
     (occurrence) =>
-      getTrainingExecutionVariantKey(occurrence.exercise) !== requestedVariantKey ||
+      occurrenceVariantKey(occurrence) !== requestedVariantKey ||
       getTrainingExerciseRelationshipComparisonKey(occurrence.relationshipContext) !==
         requestedRelationshipKey
   ) ?? null;
@@ -57,6 +58,11 @@ export function resolvePreviousExerciseOccurrence({
   };
 }
 
+/// Historical, read-only: the distinct freeform variants recorded on one
+/// exercise. This is NOT a choice authority: Logger choices come only from
+/// canonical `trainingExecutionVariants` definitions
+/// (`projectTrainingExecutionVariantChoices`), so misfiled history such as the
+/// legacy "Super Set" variant can never become selectable.
 export function listPreviouslyUsedExecutionVariants({
   canonicalExerciseId,
   sessions = [],

@@ -5,6 +5,7 @@ import {
   resolveTrainingProgressionPhase,
   TRAINING_LOGGER_PROGRESSION_STATUS,
 } from "./TrainingLoggerProgressionService";
+import { createTrainingExecutionVariantResolver } from "../models/trainingExecutionVariantDefinition.js";
 
 const CABLE = "cable_machine_front_raise";
 
@@ -210,6 +211,63 @@ describe("TrainingLoggerProgressionService", () => {
       status: TRAINING_LOGGER_PROGRESSION_STATUS.INSUFFICIENT,
       qualifyingSuccessfulSessions: 0,
     });
+  });
+
+  it("partitions by stable variant identity: legacy aliases resolve, renames keep history, new variants start empty", () => {
+    const seeded = {
+      id: "tev_cable_static_hold", canonicalExerciseId: CABLE, displayName: "Static Hold", key: "static_hold",
+      legacyKeys: ["static_hold"], status: "active", provenance: "legacy_seed", createdAt: "2026-10-01T00:00:00.000Z",
+    };
+    const fresh = {
+      id: "tev_cable_slow_eccentric", canonicalExerciseId: CABLE, displayName: "Slow Eccentric", key: "slow_eccentric",
+      legacyKeys: [], status: "active", provenance: "user_created", createdAt: "2026-10-02T00:00:00.000Z",
+    };
+    const legacyHistory = [
+      session("2026-09-01", { variant: { key: "static_hold", label: "Static Hold", rawLabel: "static hold" } }),
+      session("2026-09-15", { variant: { variantId: seeded.id, key: "static_hold", label: "Static Hold", rawLabel: "Static Hold" } }),
+    ];
+    const ordinary = [session("2026-09-01", { load: 200 }), session("2026-09-15", { load: 200 })];
+    const resolver = createTrainingExecutionVariantResolver([seeded, fresh]);
+
+    // Legacy key-only and stable-id occurrences form ONE context.
+    const selected = recommendation({
+      nowDate: "2026-09-15", sessions: [...legacyHistory, ...ordinary],
+      variant: { variantId: seeded.id, key: "static_hold", label: "Static Hold" }, variantResolver: resolver,
+    });
+    expect(selected).toMatchObject({
+      status: TRAINING_LOGGER_PROGRESSION_STATUS.OPPORTUNITY,
+      qualifyingSuccessfulSessions: 2,
+      comparisonContext: { variantKey: seeded.id },
+    });
+    expect(selected.recommendedLoad).not.toBe(200);
+
+    // A renamed definition keeps the same identity and therefore its history.
+    const renamedResolver = createTrainingExecutionVariantResolver([
+      { ...seeded, displayName: "Peak Squeeze", key: "peak_squeeze", legacyKeys: ["static_hold"] }, fresh,
+    ]);
+    expect(recommendation({
+      nowDate: "2026-09-15", sessions: legacyHistory,
+      variant: { variantId: seeded.id, key: "peak_squeeze", label: "Peak Squeeze" }, variantResolver: renamedResolver,
+    }).qualifyingSuccessfulSessions).toBe(2);
+
+    // A new user-created variant borrows nothing from Ordinary or Static Hold.
+    expect(recommendation({
+      nowDate: "2026-09-15", sessions: [...legacyHistory, ...ordinary],
+      variant: { variantId: fresh.id, key: "slow_eccentric", label: "Slow Eccentric" }, variantResolver: resolver,
+    })).toMatchObject({
+      status: TRAINING_LOGGER_PROGRESSION_STATUS.INSUFFICIENT,
+      reasonCode: "insufficient_comparable_finalized_sessions",
+    });
+    // Ordinary never absorbs variant evidence.
+    expect(recommendation({ nowDate: "2026-09-15", sessions: [...legacyHistory, ...ordinary], variantResolver: resolver }))
+      .toMatchObject({ qualifyingSuccessfulSessions: 2, comparisonContext: { variantKey: "ordinary" } });
+    expect(listComparablePerformances({
+      canonicalExerciseId: CABLE, sessions: [...legacyHistory, ...ordinary], variantResolver: resolver,
+    }).map((entry) => entry.load)).toEqual([200, 200]);
+    expect(listComparablePerformances({
+      canonicalExerciseId: CABLE, sessions: [...legacyHistory, ...ordinary], variantResolver: resolver,
+      variant: { variantId: seeded.id, key: "static_hold", label: "Static Hold" },
+    }).map((entry) => entry.load)).toEqual([150, 150]);
   });
 
   it("preserves stored identity, alias fallback, Variant, and exact Superset partitions", () => {
