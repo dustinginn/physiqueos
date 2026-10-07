@@ -201,7 +201,7 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
 
             launchReview(route: "you", appearance: appearance)
             tapRow("you.operatingPlan", at: offset)
-            XCTAssertTrue(app.staticTexts["OPERATING PLAN"].waitForExistence(timeout: 5), "You → Operating Plan missed at x=\(offset) (\(appearance))")
+            XCTAssertTrue(app.staticTexts["Your Operating Plan"].waitForExistence(timeout: 5), "You → Operating Plan missed at x=\(offset) (\(appearance))")
 
             launchReview(route: "you", appearance: appearance)
             tapRow("you.goals", at: offset)
