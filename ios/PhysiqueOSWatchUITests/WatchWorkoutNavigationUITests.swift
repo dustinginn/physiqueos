@@ -112,3 +112,61 @@ final class WatchWorkoutNavigationUITests: XCTestCase {
         XCTAssertTrue(element(app, "watch.idle").waitForExistence(timeout: 5), "Done returns to idle.")
     }
 }
+
+/// Build 91 (Founder D5): the shared panel page lays out without a
+/// ScrollView when it fits (no system scroll chrome under the action in
+/// Mineral Light) and still scrolls when accessibility text overflows.
+final class WatchPanelFooterUITests: XCTestCase {
+    override func setUp() { continueAfterFailure = false }
+
+    private func launch(_ fixture: String, appearance: String = "mineralLight", extra: [String] = []) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-watchFixture", fixture, "-watchAppearance", appearance] + extra
+        app.launch()
+        return app
+    }
+
+    private func element(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    func testDefaultSizePanelsFitWithoutAScrollViewInBothAppearances() {
+        let cases: [(String, String, String)] = [
+            ("start", "mineralLight", "watch.start"),
+            ("idle", "mineralLight", "watch.idle.refresh"),
+            ("idle-unavailable", "mineralLight", "watch.idle.refresh"),
+            ("start", "dark", "watch.start"),
+        ]
+        for (fixture, appearance, action) in cases {
+            let app = launch(fixture, appearance: appearance)
+            let button = element(app, action)
+            XCTAssertTrue(button.waitForExistence(timeout: 15), "\(fixture) \(appearance)")
+            XCTAssertTrue(button.isHittable, "\(fixture): the action is on screen without scrolling.")
+            // Page identifiers (watch.idle, watch.orphan) replace the inner
+            // panel identifier, so the structural check is the ScrollView.
+            XCTAssertEqual(app.scrollViews.count, 0, "\(fixture) \(appearance): fits, so no ScrollView")
+            app.terminate()
+        }
+    }
+
+    func testOrphanPromptFitsAndKeepsBothActions() {
+        let app = launch("orphan")
+        XCTAssertTrue(element(app, "watch.orphan").waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["End & Save"].isHittable)
+        XCTAssertTrue(app.buttons["Discard"].isHittable)
+        XCTAssertEqual(app.scrollViews.count, 0)
+    }
+
+    func testAccessibilityTextOverflowStillScrollsToTheAction() {
+        let app = launch("orphan", extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        XCTAssertTrue(element(app, "watch.orphan").waitForExistence(timeout: 15))
+        XCTAssertGreaterThan(app.scrollViews.count, 0, "An overflowing page falls back to scrolling.")
+        let discard = app.buttons["Discard"]
+        var swipes = 0
+        while !discard.isHittable && swipes < 6 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(discard.isHittable, "The last action stays reachable by scrolling.")
+    }
+}
