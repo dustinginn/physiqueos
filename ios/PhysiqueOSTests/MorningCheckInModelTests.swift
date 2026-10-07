@@ -4,6 +4,43 @@ import XCTest
 @MainActor
 final class MorningCheckInModelTests: XCTestCase {
 
+    func testScheduledEvidenceGetsEvidenceActionAndSkipWhileRecoveryOnlyDoesNot() {
+        let scheduled = MorningCheckInReconciliationItem(
+            id: "reminder_progress_photos", occurrenceKey: "reminder_progress_photos:2026-10-06",
+            date: "2026-10-06", title: "Progress Photos", context: nil,
+            kind: "execution_reconciliation", evidenceRequired: true,
+            evidenceType: "photo_session", statusLabel: "Yesterday’s Progress Photos are still missing",
+            primaryAction: .init(label: "Upload Photos", href: "/evidence/photos?recovery=1")
+        )
+        let recoveryOnly = MorningCheckInReconciliationItem(
+            id: "evidence_recovery_nutrition_2026-10-06", occurrenceKey: "recovery:nutrition",
+            date: "2026-10-06", title: "Nutrition", context: nil,
+            kind: "evidence_recovery", evidenceRequired: false,
+            evidenceType: "nutrition", statusLabel: "Yesterday’s nutrition hasn’t been logged",
+            primaryAction: .init(label: "Add Nutrition", href: "/log?recovery=1")
+        )
+        let model = MorningCheckInReadModel(
+            today: "2026-10-07", existingWeight: nil, previousWeight: nil,
+            reconciliationItems: [scheduled, recoveryOnly]
+        )
+        XCTAssertEqual(model.scheduledEvidencePriorities.map(\.id), [scheduled.id])
+        XCTAssertEqual(model.recoveryOnlyItems.map(\.id), [recoveryOnly.id])
+        XCTAssertEqual(scheduled.evidenceDestination, .photoUpload)
+        XCTAssertEqual(recoveryOnly.evidenceDestination, .evidenceIntake)
+        XCTAssertTrue(model.ordinaryUnfinishedPriorities.isEmpty)
+    }
+
+    func testScheduledEvidenceResumeReviewUsesCanonicalReviewDestination() {
+        let item = MorningCheckInReconciliationItem(
+            id: "reminder_weight", occurrenceKey: "reminder_weight:2026-10-06",
+            date: "2026-10-06", title: "Morning Weight", context: nil,
+            kind: "execution_reconciliation", evidenceRequired: true,
+            evidenceType: "weight", statusLabel: "Awaiting confirmation",
+            primaryAction: .init(label: "Resume review", href: "/evidence/review/review-123?returnTo=morning")
+        )
+        XCTAssertEqual(item.evidenceDestination, .evidenceReview(reviewId: "review-123"))
+    }
+
     // MARK: - Core Evidence Recovery: missing detection (default state = no reviews)
 
     func testAllFourRecoveryTypesAreMissingByDefault() {

@@ -6,12 +6,13 @@ import UserNotifications
 /// - `simpleCompletion`: a simple binary Priority — Complete (check-circle),
 ///   Skip, Snooze.
 /// - `specializedSkippable`: completion with the Server-planned context
-///   (peptide dose, recovery Support such as Foam Rolling) plus the Server's
+///   (peptide/supplement dose, recovery Support) plus the Server's
 ///   Skip — Complete, Skip, Snooze. Never plain completion.
 /// - `specializedActionable`: planned-context completion without Skip
-///   (e.g. a supplement) — Complete, Snooze.
+///   (backward compatibility with an older Server) — Complete, Snooze.
 /// - `skipOnly`: no direct completion, but the Server offers Skip — Skip,
-///   Snooze.
+///   Snooze. This preserves the evidence workflow as the notification-body
+///   primary route while still offering the occurrence disposition.
 /// - `specializedWorkflow` / `openOnly`: no custom actions; tapping the
 ///   notification opens the proper flow (Morning Check-In, Photos, ...).
 /// - `directCompletion`: the pre-Build 78 simple category (Complete,

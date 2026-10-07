@@ -344,6 +344,7 @@ struct ProductionHomeAPI: HomeAPI {
         var sessionItems: [PrioritySessionItem]?
         var executionContract: ExecutionContract?
         var notificationAction: PriorityNotificationAction?
+        var skipCommand: PriorityNotificationSkipCommand?
 
         struct ExecutionContract: Decodable {
             var priorityId: String?
@@ -381,7 +382,8 @@ struct ProductionHomeAPI: HomeAPI {
                 sessionItems: sessionItems,
                 continueActionDestination: destination,
                 attributedScope: nil,
-                notificationAction: notificationAction
+                notificationAction: notificationAction,
+                projectedSkipCommand: skipCommand
             )
         }
     }
@@ -1160,7 +1162,8 @@ struct ProductionPriorityAPI: PriorityAPI {
             continueActionDestination: Self.destination(forActionHref: value.action?.href) ?? pausedDestination, attributedScope: nil,
             detailSections: value.sections.map { PrioritySectionReadModel(title: $0.title, items: $0.items.map { PriorityDetailFieldReadModel(label: $0.label, detail: $0.detail) }) },
             relatedWeight: value.relatedWeight,
-            notificationAction: value.notificationAction
+            notificationAction: value.notificationAction,
+            projectedSkipCommand: value.skipCommand
         )
     }
 
@@ -1174,7 +1177,7 @@ struct ProductionPriorityAPI: PriorityAPI {
         var sections: [Section]
         var relatedWeight: PriorityRelatedWeight?
         var skippable: Bool?
-        var skipCommand: SkipCommand?
+        var skipCommand: PriorityNotificationSkipCommand?
         /// Design S3 (`priority.paused` / `priority.pauseContext`); absent
         /// on an older Server, which never pauses a peptide.
         var paused: Bool?
@@ -1182,7 +1185,6 @@ struct ProductionPriorityAPI: PriorityAPI {
         /// Peptide occurrences only (`priority.doseAdjustable`).
         var doseAdjustable: Bool?
     }
-    private struct SkipCommand: Decodable { var commandType: String?; var expectedVersion: Int? }
     private struct ExecutionContract: Decodable { var priorityId: String?; var occurrenceDate: String?; var expectedVersion: Int? }
     private struct ExecutionProjection: Decodable { var executionId: String?; var protocolRootId: String? }
     private struct ActionPayload: Decodable {

@@ -302,6 +302,20 @@ struct PrioritySessionItem: Codable, Equatable, Identifiable {
     var label: String
     var completed: Bool
     var satisfiedByEvidence: Bool?
+    /// Group wrappers are presentation only. Each child keeps its own
+    /// occurrence-scoped Server capability; there is no aggregate Skip.
+    var skipCommand: PriorityNotificationSkipCommand? = nil
+    var notificationAction: PriorityNotificationAction? = nil
+
+    var canonicalSkipCommand: PriorityNotificationSkipCommand? {
+        guard let command = skipCommand ?? notificationAction?.skipCommand,
+              command.commandType == ProductionCommandType.skipPriority,
+              command.expectedVersion >= 0,
+              !command.payload.priorityId.isEmpty,
+              !command.payload.occurrenceDate.isEmpty
+        else { return nil }
+        return command
+    }
 }
 
 /// The one shared occurrence view Home, the Priority detail screen, and
@@ -363,10 +377,10 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
         set { pausedState = newValue }
     }
 
-    /// The Server offers Mark Skipped for this occurrence (today, open,
-    /// ordinary reminder). Native never decides eligibility itself.
+    /// The Server offers Mark Skipped for this exact open actionable
+    /// occurrence. Native never decides eligibility itself.
     var skippable: Bool {
-        get { skippableState ?? false }
+        get { canonicalSkipCommand != nil }
         set { skippableState = newValue }
     }
     var actionLabel: String?
@@ -405,6 +419,28 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     /// notification schedule — both come from here. `nil` under Sandbox,
     /// which has no wire equivalent.
     var notificationAction: PriorityNotificationAction? = nil
+    /// The exact Server-owned `priority.skip.v1` command projected on Home
+    /// or Priority Detail. `notificationAction.skipCommand` is the same
+    /// capability on notification-capable occurrences; this separate field
+    /// covers detail and execution-backed priorities without forcing them
+    /// into notification semantics.
+    var projectedSkipCommand: PriorityNotificationSkipCommand? = nil
+
+    /// One capability authority for every Native surface. New payloads use
+    /// command presence; the synthesized fallback only keeps cached Build 78
+    /// detail payloads/tests source-compatible while they age out.
+    var canonicalSkipCommand: PriorityNotificationSkipCommand? {
+        if let command = projectedSkipCommand ?? notificationAction?.skipCommand,
+           command.isValid(forPriorityId: routePriorityId ?? id, occurrenceDate: date) {
+            return command
+        }
+        guard skippableState == true, let skipExpectedVersion, skipExpectedVersion >= 0 else { return nil }
+        return PriorityNotificationSkipCommand(
+            commandType: ProductionCommandType.skipPriority,
+            expectedVersion: skipExpectedVersion,
+            payload: .init(priorityId: routePriorityId ?? id, occurrenceDate: date)
+        )
+    }
 
     var destination: AppDestination {
         if sessionItems != nil, id == "morning-check-in" {
@@ -488,6 +524,15 @@ struct PriorityNotificationSkipCommand: Codable, Equatable {
     var commandType: String
     var expectedVersion: Int
     var payload: Payload
+
+    func isValid(forPriorityId priorityId: String, occurrenceDate: String) -> Bool {
+        commandType == ProductionCommandType.skipPriority
+            && expectedVersion >= 0
+            && !payload.priorityId.isEmpty
+            && !payload.occurrenceDate.isEmpty
+            && payload.priorityId == priorityId
+            && payload.occurrenceDate == occurrenceDate
+    }
 }
 
 struct PriorityNotificationCompletionCommand: Codable, Equatable {

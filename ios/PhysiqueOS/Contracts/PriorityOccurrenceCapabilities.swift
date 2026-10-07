@@ -17,10 +17,9 @@ import Foundation
 ///     has no direct completion and opens its proper flow.
 /// - Skip comes only from the Server's explicit `skipCommand`
 ///   (`priority.skip.v1`, identity + version, never a dose). The Server
-///   offers it for ordinary reminders, peptides and recovery Support (e.g.
-///   Foam Rolling) and withholds it from supplements, Morning Check-In,
-///   Photos, DEXA and paused occurrences. Native never infers Skip from a
-///   Priority type; a payload without `skipCommand` offers no Skip.
+///   offers it for every current open actionable occurrence, including
+///   supplements and evidence-backed priorities. Native never infers Skip
+///   from a Priority type; a payload without `skipCommand` offers no Skip.
 struct PriorityOccurrenceCapabilities: Equatable, Sendable {
     enum Completion: Equatable, Sendable {
         /// No completion outside the app's own flow.

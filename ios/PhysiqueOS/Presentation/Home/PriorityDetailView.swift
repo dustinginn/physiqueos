@@ -138,6 +138,7 @@ struct PriorityDetailView: View {
             switch template {
             case .morningEvidence:
                 morningEvidenceCard(priority)
+                actionZone(priority, template: template)
             case .photoEvidence, .dexaEvidence:
                 evidenceBanner(template)
                 actionZone(priority, template: template)
@@ -248,6 +249,10 @@ struct PriorityDetailView: View {
             case .morningEvidence, .noAction:
                 EmptyView()
             }
+            if priority.canonicalSkipCommand != nil {
+                skipControl(priority)
+                    .padding(.top, template == .manual || template == .doseAware ? 10 : 12)
+            }
         }
     }
 
@@ -279,27 +284,31 @@ struct PriorityDetailView: View {
             }
         }
         .accessibilityIdentifier("priorityDetail.markComplete")
-        if priority.skippable {
-            Button("Mark Skipped") { isConfirmingSkip = true }
-                .buttonStyle(.plain)
-                .physiqueOSFont(PhysiqueOSTypography.priorityDetailAction)
-                .foregroundStyle(PhysiqueOSTheme.priorityMuted)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .contentShape(Rectangle())
-                .accessibilityIdentifier("priorityDetail.markSkipped")
-                .confirmationDialog(
-                    "Skip \(priority.title) today?",
-                    isPresented: $isConfirmingSkip,
-                    titleVisibility: .visible
-                ) {
-                    Button("Mark Skipped", role: .destructive) {
-                        Task { await viewModel?.skip() }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text(Self.skipConfirmationMessage(isDose: priority.doseAdjustable))
+    }
+
+    /// One secondary disposition control for every Server-skippable detail
+    /// template, including evidence workflows. The primary Log/Upload/View
+    /// action remains visually dominant and Skip never fabricates evidence.
+    private func skipControl(_ priority: PriorityOccurrence) -> some View {
+        Button("Mark Skipped") { isConfirmingSkip = true }
+            .buttonStyle(.plain)
+            .physiqueOSFont(PhysiqueOSTypography.priorityDetailAction)
+            .foregroundStyle(PhysiqueOSTheme.priorityMuted)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
+            .accessibilityIdentifier("priorityDetail.markSkipped")
+            .confirmationDialog(
+                "Skip \(priority.title) today?",
+                isPresented: $isConfirmingSkip,
+                titleVisibility: .visible
+            ) {
+                Button("Mark Skipped", role: .destructive) {
+                    Task { await viewModel?.skip() }
                 }
-        }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(Self.skipConfirmationMessage(isDose: priority.doseAdjustable))
+            }
     }
 
     /// "Took a different amount?" — the planned dose is pre-filled; editing

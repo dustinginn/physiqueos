@@ -69,22 +69,44 @@ struct FocusTileView: View {
     var density: Density = .balanced
     var onTap: (AppDestination) -> Void
     var onComplete: (PriorityOccurrence) -> Void
+    var onSkip: (PriorityOccurrence) -> Void = { _ in }
     var isCompleting: Bool = false
+    var isSkipping: Bool = false
 
     var body: some View {
         HStack(spacing: 8) {
             Button { onTap(item.destination) } label: { rowBody }
                 .buttonStyle(.plain)
-            if item.completable, !item.completed, !isCompleting {
+            if item.completable, !item.completed, !isCompleting, !isSkipping {
                 Button { onComplete(item) } label: { completeButton }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Mark \(item.title) complete")
+            }
+            if item.canonicalSkipCommand != nil, !item.completed, !isSkipping, !isCompleting {
+                Menu {
+                    Button("Skip", systemImage: "forward.end") { onSkip(item) }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("More actions for \(item.title)")
+                .accessibilityIdentifier("home.priority.\(item.id).actions")
             }
             if isCompleting {
                 Circle().fill(PhysiqueOSTheme.chartSuccess)
                     .overlay(Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.white))
                     .frame(width: 24, height: 24)
                     .accessibilityLabel("Completed")
+            }
+            if isSkipping {
+                Image(systemName: "forward.end")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .frame(width: 24, height: 24)
+                    .accessibilityLabel("Skipped")
             }
         }
         .padding(.horizontal, 10)

@@ -132,6 +132,13 @@ final class HomeViewModel {
         }
     }
 
+    /// Completion and Skip are both terminal occurrence dispositions. This
+    /// alias keeps the optimistic removal/re-read policy shared without
+    /// implying that Skip is a completion or adherence success.
+    func reconcileAfterConfirmedPriorityDisposition(occurrenceID: String) async {
+        await reconcileAfterConfirmedPriorityCompletion(occurrenceID: occurrenceID)
+    }
+
     /// Replaces the identity (`id`/`title`/`destination`) of whichever
     /// Home goal row is presented as `.primary` with the Goals engine's
     /// current active goal — everything else about that row (icon, color,

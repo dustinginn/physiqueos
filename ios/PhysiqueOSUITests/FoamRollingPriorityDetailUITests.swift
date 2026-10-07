@@ -32,12 +32,12 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
     func testPriorityFamilyVariantsRenderTheirLockedActionsOnly() {
         let expectations: [(variant: String, present: [String], absent: [String])] = [
             ("peptide", ["priorityDetail.amountTaken", "priorityDetail.markComplete", "priorityDetail.markSkipped"], []),
-            ("supplement", ["priorityDetail.markComplete"], ["priorityDetail.amountTaken", "priorityDetail.markSkipped"]),
+            ("supplement", ["priorityDetail.markComplete", "priorityDetail.markSkipped"], ["priorityDetail.amountTaken"]),
             ("paused", ["priorityDetail.goToPeptide", "priorityDetail.paused"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
-            ("morning", ["priorityDetail.logWeight"], ["priorityDetail.markComplete"]),
-            ("morning-completed", ["priorityDetail.viewWeight"], ["priorityDetail.markComplete", "priorityDetail.logWeight"]),
-            ("photos", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner"], ["priorityDetail.markComplete"]),
-            ("dexa", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner"], ["priorityDetail.markComplete"]),
+            ("morning", ["priorityDetail.logWeight", "priorityDetail.markSkipped"], ["priorityDetail.markComplete"]),
+            ("morning-completed", ["priorityDetail.viewWeight"], ["priorityDetail.markComplete", "priorityDetail.markSkipped", "priorityDetail.logWeight"]),
+            ("photos", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner", "priorityDetail.markSkipped"], ["priorityDetail.markComplete"]),
+            ("dexa", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner", "priorityDetail.markSkipped"], ["priorityDetail.markComplete"]),
             ("completed", ["priorityDetail.completed"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
             ("skipped", ["priorityDetail.skipped"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
             ("setup", ["priorityDetail.reviewSupport"], ["priorityDetail.markComplete"]),
@@ -63,6 +63,9 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
             }
             for identifier in expectation.present where identifier.hasSuffix("markComplete") || identifier.hasSuffix("evidenceAction") {
                 XCTAssertGreaterThanOrEqual(app.buttons[identifier].frame.height, 51.5, "\(expectation.variant) primary action height")
+            }
+            for identifier in expectation.present where identifier.hasSuffix("markSkipped") {
+                XCTAssertGreaterThanOrEqual(app.buttons[identifier].frame.height, 43.5, "\(expectation.variant) Skip touch target")
             }
             XCTAssertFalse(app.tabBars.firstMatch.exists, "\(expectation.variant): no persistent tab bar")
         }

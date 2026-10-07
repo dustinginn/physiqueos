@@ -12,6 +12,18 @@ final class CompletionFeedbackAndNotificationCapabilityTests: XCTestCase {
         func fetchPriority(priorityId: String, occurrenceDate: String?) async throws -> PriorityOccurrence? { occurrence }
     }
 
+    private actor OneShotPriorityReads: PriorityAPI {
+        let occurrence: PriorityOccurrence
+        private var reads = 0
+        init(_ occurrence: PriorityOccurrence) { self.occurrence = occurrence }
+        func fetchExecutionItems() async throws -> [ExecutionItemFixture] { [] }
+        func fetchPriority(priorityId: String, occurrenceDate: String?) async throws -> PriorityOccurrence? {
+            reads += 1
+            if reads == 1 { return occurrence }
+            throw URLError(.notConnectedToInternet)
+        }
+    }
+
     private actor Writes: PriorityCompletionWriteAPI {
         enum Mode { case succeed, fail, alreadyCompleted }
         let mode: Mode
@@ -93,6 +105,28 @@ final class CompletionFeedbackAndNotificationCapabilityTests: XCTestCase {
         let calls = await notSkippable.calls
         XCTAssertEqual(calls, 0, "Skip is never sent where the Server did not offer it.")
         XCTAssertTrue(feedback.events.isEmpty)
+    }
+
+    @MainActor
+    func testAcknowledgedSkipStaysTerminalAndRemovesCapabilityWhenRefreshIsUncertain() async {
+        var occurrence = foamRolling(skippable: false)
+        occurrence.projectedSkipCommand = .init(
+            commandType: ProductionCommandType.skipPriority, expectedVersion: 5,
+            payload: .init(priorityId: "reminder-foam", occurrenceDate: occurrence.date)
+        )
+        let viewModel = PriorityDetailViewModel(
+            api: OneShotPriorityReads(occurrence), writeAPI: Writes(.succeed),
+            morningCheckInAPI: NotAvailableMorningCheckInAPI(), store: LoggingSandboxStore(),
+            authority: .founderProduction, priorityId: "reminder-foam", occurrenceDate: occurrence.date
+        )
+        await viewModel.load()
+        await viewModel.skip()
+        guard case .loaded(.some(let acknowledged)) = viewModel.state else {
+            return XCTFail("A durable Skip must survive an uncertain refresh.")
+        }
+        XCTAssertTrue(acknowledged.skipped)
+        XCTAssertFalse(acknowledged.completable)
+        XCTAssertNil(acknowledged.canonicalSkipCommand, "A terminal acknowledgement must not re-offer Skip.")
     }
 
     func testHapticsStayBehindTheFeedbackClientAndAwayFromPassiveSurfaces() throws {
@@ -180,5 +214,45 @@ extension CompletionFeedbackAndNotificationCapabilityTests {
     func testPeptideSkipConfirmationSaysNoAmountIsRecorded() {
         XCTAssertTrue(PriorityDetailView.skipConfirmationMessage(isDose: true).contains("No amount is recorded"))
         XCTAssertFalse(PriorityDetailView.skipConfirmationMessage(isDose: false).contains("dose"))
+    }
+
+    @MainActor
+    func testEvidenceAndSupplementDetailsUseTheSameProjectedSkipWithoutCompletionOrEvidence() async {
+        let writes = SplitWrites()
+        let feedback = RecordingFeedbackClient()
+        let variants: [(String, AppDestination?)] = [
+            ("Fadogia", nil),
+            ("Morning Weight", .checkIn(checkInType: "morning")),
+            ("Progress Photos", .photoUpload),
+            ("DEXA", .operatingPlanDexaAppointment),
+        ]
+        for (index, variant) in variants.enumerated() {
+            let priorityId = "priority-\(index)"
+            var occurrence = PriorityOccurrence(
+                id: priorityId, routePriorityId: priorityId, executionItemId: "execution-\(index)",
+                date: "2026-10-07", title: variant.0, subtitle: nil, metadata: nil,
+                changeLabel: nil, icon: .target, color: .primary, urgency: .available,
+                completed: false, completable: variant.1 == nil, expectedVersion: 20 + index,
+                actionLabel: variant.1 == nil ? nil : "Open", completionContext: nil,
+                continueActionDestination: variant.1
+            )
+            occurrence.projectedSkipCommand = .init(
+                commandType: ProductionCommandType.skipPriority, expectedVersion: 20 + index,
+                payload: .init(priorityId: priorityId, occurrenceDate: occurrence.date)
+            )
+            let viewModel = PriorityDetailViewModel(
+                api: PriorityReads(occurrence), writeAPI: writes,
+                morningCheckInAPI: NotAvailableMorningCheckInAPI(), store: LoggingSandboxStore(),
+                authority: .founderProduction, priorityId: priorityId,
+                occurrenceDate: occurrence.date, feedback: feedback
+            )
+            await viewModel.load()
+            await viewModel.skip()
+        }
+        let skips = await writes.skips
+        let completions = await writes.completions
+        XCTAssertEqual(skips.count, variants.count)
+        XCTAssertTrue(completions.isEmpty, "Universal Skip never routes through completion or fabricates evidence.")
+        XCTAssertEqual(feedback.events, Array(repeating: .prioritySkipped, count: variants.count))
     }
 }

@@ -107,14 +107,25 @@ enum PriorityFamilyReviewFixtures {
                 detailSections: sections.map { .init(title: $0.0, items: [.init(label: $0.1, detail: $0.2)]) }
             )
         }
+        func withSkip(_ source: PriorityOccurrence) -> PriorityOccurrence {
+            var occurrence = source
+            occurrence.projectedSkipCommand = .init(
+                commandType: ProductionCommandType.skipPriority,
+                expectedVersion: occurrence.expectedVersion ?? 12,
+                payload: .init(
+                    priorityId: occurrence.routePriorityId ?? occurrence.id,
+                    occurrenceDate: occurrence.date
+                )
+            )
+            return occurrence
+        }
         switch variant {
         case "generic":
-            var o = base("reminder_server_priority", "Server Priority", "Server-owned occurrence", sections: [
+            let o = base("reminder_server_priority", "Server Priority", "Server-owned occurrence", sections: [
                 ("What", "Server Priority", "Production"),
                 ("When", "Sep 10", "Scheduled by the operating plan."),
             ])
-            o.skippable = true
-            return o
+            return withSkip(o)
         case "peptide":
             var o = base("execution_tesamorelin", "Tesamorelin", "Tonight · 10:29 PM", sections: [
                 ("What", "Tesamorelin", "Complete the scheduled Execution action."),
@@ -127,8 +138,7 @@ enum PriorityFamilyReviewFixtures {
             ])
             o.completionContext = .init(occurrenceDate: date, dose: "0.5 mg", protocolId: "tesamorelin")
             o.doseAdjustableState = true
-            o.skippable = true
-            return o
+            return withSkip(o)
         case "paused":
             var o = base("execution_retatrutide", "Retatrutide", "Thursday · 9:45 PM", sections: [
                 ("What", "Retatrutide is paused", "Resume it from the Operating Plan to record doses again."),
@@ -143,13 +153,13 @@ enum PriorityFamilyReviewFixtures {
             o.continueActionDestination = .operatingPlanPeptideExecution(protocolId: "retatrutide")
             return o
         case "supplement":
-            return base("execution_fadogia", "Fadogia Agrestis", "Every other day", sections: [
+            return withSkip(base("execution_fadogia", "Fadogia Agrestis", "Every other day", sections: [
                 ("What", "Fadogia Agrestis", "Complete the scheduled supplement support."),
                 ("When", "Every other day", "Timing comes from the saved Support schedule."),
                 ("Dose / Quantity", "Not specified", "No quantity is currently configured."),
                 ("Execution Notes", "Saved Support note", "Every-other-day supplement. Available for reminders if desired, but not currently surfaced by default."),
                 ("Why it matters", "Supports the current supplement strategy", "This supplement supports the current strategy."),
-            ])
+            ]))
         case "morning", "morning-completed":
             var o = base("morning-check-in", "Morning Weigh-In", "Daily · Morning", sections: [
                 ("What", "Record your weight", "A valid Weight recorded for Oct 4 satisfies this routine automatically."),
@@ -165,7 +175,7 @@ enum PriorityFamilyReviewFixtures {
                 o.completed = true
                 o.relatedWeight = .init(canonicalId: "weight-oct-4", date: date, value: 182.4, unit: "lb", version: 1)
             }
-            return o
+            return variant == "morning-completed" ? o : withSkip(o)
         case "photos":
             var o = base("progress-photos", "Progress Photos", "Scheduled for this afternoon.", sections: [
                 ("What", "Progress Photos", "Upload Front Relaxed, Back Relaxed, and Back Flexed to complete today's check-in."),
@@ -177,7 +187,7 @@ enum PriorityFamilyReviewFixtures {
             o.completionContext = nil
             o.actionLabel = "Upload Photos"
             o.continueActionDestination = .photoUpload
-            return o
+            return withSkip(o)
         case "dexa":
             var o = base("dexa-appointment", "DEXA tomorrow", "Tomorrow at 7:30 AM", sections: [
                 ("What", "DEXA tomorrow", "Your DEXA appointment remains scheduled. This priority does not complete the scan itself."),
@@ -190,7 +200,7 @@ enum PriorityFamilyReviewFixtures {
             o.urgency = .upcoming
             o.actionLabel = "View DEXA Appointment"
             o.continueActionDestination = .operatingPlanDexaAppointment
-            return o
+            return withSkip(o)
         case "completed":
             var o = foam
             o.completed = true
@@ -316,6 +326,10 @@ final class PriorityDetailViewModel {
             var acknowledged = occurrence
             acknowledged.completed = true
             acknowledged.completable = false
+            acknowledged.skippable = false
+            acknowledged.skipExpectedVersion = nil
+            acknowledged.projectedSkipCommand = nil
+            acknowledged.notificationAction?.skipCommand = nil
             state = .loaded(acknowledged)
             feedback?.play(.priorityCompleted)
             await notificationCleanup(
@@ -350,24 +364,23 @@ final class PriorityDetailViewModel {
         guard authority == .founderProduction,
               (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: authority)) != nil,
               case .loaded(.some(let occurrence)) = state,
-              occurrence.skippable, !occurrence.completed, !occurrence.skipped, !occurrence.paused,
-              let version = occurrence.skipExpectedVersion
+              !occurrence.completed, !occurrence.skipped, !occurrence.paused,
+              let command = occurrence.canonicalSkipCommand
         else { return }
         do {
-            try await writeAPI.skip(
-                priorityId: occurrence.routePriorityId ?? occurrence.id,
-                occurrenceDate: occurrence.date,
-                expectedVersion: version
-            )
+            try await writeAPI.skip(command: command)
             var acknowledged = occurrence
             acknowledged.skipped = true
             acknowledged.skippable = false
+            acknowledged.skipExpectedVersion = nil
+            acknowledged.projectedSkipCommand = nil
+            acknowledged.notificationAction?.skipCommand = nil
             acknowledged.completable = false
             state = .loaded(acknowledged)
             feedback?.play(.prioritySkipped)
             // Same cleanup as completion: withdraw this occurrence's local
             // reminder and re-sync Home and the notification horizon.
-            await notificationCleanup(occurrence.routePriorityId ?? occurrence.id, occurrence.date)
+            await notificationCleanup(command.payload.priorityId, command.payload.occurrenceDate)
             do {
                 state = .loaded(try await api.fetchPriority(priorityId: priorityId, occurrenceDate: occurrenceDate))
             } catch {
