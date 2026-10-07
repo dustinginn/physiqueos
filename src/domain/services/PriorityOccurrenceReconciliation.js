@@ -43,6 +43,9 @@ export function createPriorityReconciliationEntry({
 }) {
   return {
     key: createPriorityOccurrenceKey(priorityId, occurrenceDate),
+    priorityId,
+    // Compatibility alias for records and clients created before execution-
+    // backed Priority Skip. New readers use `priorityId ?? reminderId`.
     reminderId: priorityId,
     occurrenceDate,
     status: disposition,
@@ -56,7 +59,10 @@ export function createPriorityReconciliationEntry({
 export function upsertPriorityReconciliationEntries(checkIn, entries, recordedAt) {
   const byKey = new Map(
     (checkIn.reconciliation ?? []).map((item) => [
-      createPriorityOccurrenceKey(item.reminderId, item.occurrenceDate ?? checkIn.date),
+      createPriorityOccurrenceKey(
+        getPriorityReconciliationId(item),
+        item.occurrenceDate ?? checkIn.date
+      ),
       item,
     ])
   );
@@ -71,9 +77,13 @@ export function upsertPriorityReconciliationEntries(checkIn, entries, recordedAt
 export function findPriorityOccurrenceReconciliation(checkIn, priorityId, occurrenceDate) {
   if (!checkIn || !Array.isArray(checkIn.reconciliation)) return null;
   return checkIn.reconciliation.find((item) =>
-    item?.reminderId === priorityId &&
+    getPriorityReconciliationId(item) === priorityId &&
     (item.occurrenceDate ?? checkIn.date) === occurrenceDate
   ) ?? null;
+}
+
+export function getPriorityReconciliationId(item) {
+  return item?.priorityId ?? item?.reminderId ?? null;
 }
 
 export function isPriorityOccurrenceSkipped(checkIn, priorityId, occurrenceDate) {

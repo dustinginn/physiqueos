@@ -39,10 +39,18 @@ import { createReminderRepository } from "../../data/repositories/ReminderReposi
 import { findExecutionForProtocol, findSuspensionWindow } from "../../domain/services/ExecutionPriorityProjectionService.js";
 import {
   createPriorityOccurrenceKey,
-  isPrioritySkipSupportedReminder,
   isReminderOccurrenceCompleted,
   resolvePriorityExecutionContract,
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
+import {
+  PriorityDispositionTargetKind,
+  isPriorityDispositionSourceCompleted,
+  isPriorityDispositionSourceSatisfiedByEvidence,
+  resolveActionablePriorityDisposition,
+  resolvePriorityDispositionExecutionContract,
+  resolvePriorityDispositionSource,
+} from "../../domain/services/PriorityOccurrenceDispositionService.js";
+import { hasEvidenceForReminderOccurrence } from "../../domain/services/DailyFocusService.js";
 import {
   createPriorityReconciliationCheckIn,
   createPriorityReconciliationCheckInId,
@@ -203,7 +211,6 @@ export const CANONICAL_PERSISTENCE_PORT_NAMES = Object.freeze([
 
 const RECURRING_SUPPORT_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "executionItems", "reminders"]);
 // Reminder types whose skip eligibility depends on the linked protocol.
-const SKIP_SUPPORT_REMINDER_TYPES = new Set(["protocol_reminder", "recovery_reminder", "supplement_reminder"]);
 const RECURRING_SUPPORT_READ_COLLECTIONS = Object.freeze(["user", ...RECURRING_SUPPORT_BOUNDED_COLLECTIONS]);
 
 const NUTRITION_STRATEGY_BOUNDED_COLLECTIONS = Object.freeze(["protocols", "protocolVersions"]);
@@ -2372,22 +2379,37 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     }
   }
 
-  // `priority.skip.v1`: marks TODAY's occurrence of an ordinary priority as
-  // skipped by writing the SAME dated reconciliation entry Morning Check-In
-  // writes for a prior-day skip (one semantic, one writer helper). The
-  // reminder's `completionHistory` is never touched; the reminder version is
-  // advanced so `If-Match` serializes skip against a concurrent completion.
+  // `priority.skip.v1`: one current-day occurrence disposition for both
+  // Reminder-backed priorities and Server-recognized execution-backed
+  // priorities (currently DEXA). The client names only the projected priority
+  // identity/date/version; the Server resolves and locks the canonical source.
   async function skipCanonicalPriority(context) {
     const id = String(context.payload.priorityId);
     const occurrenceDate = String(context.payload.occurrenceDate);
     const occurrenceKey = createPriorityOccurrenceKey(id, occurrenceDate);
-    const [users, current] = await Promise.all([
+    const currentInstant = now();
+    const [
+      users,
+      reminders,
+      executionItems,
+      protocols,
+      checkIns,
+      weightEntries,
+      progressPhotos,
+      dexaScans,
+    ] = await Promise.all([
       records.list({ ownerUserId: context.ownerUserId, collection: "user" }),
-      ownedRecord(context, "reminders", id),
+      records.list({ ownerUserId: context.ownerUserId, collection: "reminders" }),
+      records.list({ ownerUserId: context.ownerUserId, collection: "executionItems" }),
+      records.list({ ownerUserId: context.ownerUserId, collection: "protocols" }),
+      records.list({ ownerUserId: context.ownerUserId, collection: "dailyCheckIns" }),
+      records.list({ ownerUserId: context.ownerUserId, collection: "weightEntries" }),
+      records.list({ ownerUserId: context.ownerUserId, collection: "progressPhotos" }),
+      records.list({ ownerUserId: context.ownerUserId, collection: "dexaScans" }),
     ]);
     const user = users.find((item) => String(item?.id) === String(context.ownerUserId)) ?? users[0] ?? null;
     const timeZone = resolveLocalTimeZone(user?.timeZone ?? user?.timezone);
-    const today = getLocalDateKey(now(), timeZone);
+    const today = getLocalDateKey(currentInstant, timeZone);
     if (occurrenceDate < today) {
       throw new ApplicationProblem({
         status: 422,
@@ -2405,28 +2427,70 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         recovery: { today },
       });
     }
-    // A Support reminder's linked protocol decides (peptide and recovery
-    // yes, supplement no), exactly as the read contract does.
-    const protocol = SKIP_SUPPORT_REMINDER_TYPES.has(current?.type)
-      ? (await records.list({ ownerUserId: context.ownerUserId, collection: "protocols" }))
-        .find((item) => String(item?.id) === String(current.linkedEntityId)) ?? null
-      : undefined;
-    if (!isPrioritySkipSupportedReminder(current, { protocol })) {
+    const source = resolvePriorityDispositionSource({
+      executionItems,
+      priorityId: id,
+      reminders,
+    });
+    if (!source) {
       throw new ApplicationProblem({
-        status: 422,
-        code: "PRIORITY_SKIP_UNSUPPORTED",
-        title: "This priority cannot be skipped from Priority Detail.",
-        recovery: { workflow: resolvePriorityExecutionContract({ reminder: current, occurrenceDate }).workflow },
+        status: 404,
+        code: "RESOURCE_NOT_FOUND",
+        title: "This priority occurrence is unavailable.",
       });
     }
+    const current = source.record;
+    const fallbackExecution = resolvePriorityDispositionExecutionContract(source, {
+      occurrenceDate,
+      priorityId: id,
+    });
     const identity = { priorityId: id, occurrenceDate, occurrenceKey };
-    if (isReminderOccurrenceCompleted(current, { occurrenceDate, timeZone })) {
+    if (isPriorityDispositionSourceCompleted(source, {
+      isReminderCompleted: isReminderOccurrenceCompleted,
+      occurrenceDate,
+      timeZone,
+    })) {
       return {
         status: "committed",
         result: {
           status: "already_completed",
           ...identity,
-          execution: resolvePriorityExecutionContract({ reminder: current, occurrenceDate }),
+          execution: fallbackExecution,
+          revision: current.version,
+        },
+        outbox: [],
+      };
+    }
+    if (isPriorityDispositionSourceSatisfiedByEvidence(source, { dexaScans, timeZone })) {
+      return {
+        status: "committed",
+        result: {
+          status: "already_completed",
+          ...identity,
+          execution: fallbackExecution,
+          revision: current.version,
+        },
+        outbox: [],
+      };
+    }
+    if (
+      source.kind === PriorityDispositionTargetKind.REMINDER &&
+      hasEvidenceForReminderOccurrence({
+        checkIns,
+        date: occurrenceDate,
+        dexaScans,
+        progressPhotos,
+        reminder: current,
+        timeZone,
+        weightEntries,
+      })
+    ) {
+      return {
+        status: "committed",
+        result: {
+          status: "already_completed",
+          ...identity,
+          execution: fallbackExecution,
           revision: current.version,
         },
         outbox: [],
@@ -2447,7 +2511,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         result: {
           status: "already_skipped",
           ...identity,
-          execution: resolvePriorityExecutionContract({ reminder: current, occurrenceDate }),
+          execution: fallbackExecution,
           note,
           skippedAt: existingEntry.recordedAt ?? null,
           revision: current.version,
@@ -2455,14 +2519,40 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         outbox: [],
       };
     }
-    // A paused peptide date is refused exactly as completion is.
-    await assertPriorityOccurrenceNotPaused(context, current, occurrenceDate);
+    if (source.kind === PriorityDispositionTargetKind.REMINDER) {
+      // Preserve the explicit paused error while the generic resolver also
+      // treats paused/setup/not-scheduled states as no actionable occurrence.
+      await assertPriorityOccurrenceNotPaused(
+        context,
+        current,
+        occurrenceDate,
+        executionItems,
+      );
+    }
+    const actionable = resolveActionablePriorityDisposition({
+      executionItems,
+      now: currentInstant,
+      occurrenceDate,
+      priorityId: id,
+      protocols,
+      reminders,
+      source,
+      timeZone,
+    });
+    if (!actionable?.executionContract) {
+      throw new ApplicationProblem({
+        status: 422,
+        code: "PRIORITY_SKIP_UNSUPPORTED",
+        title: "No open actionable priority occurrence can be skipped for this date.",
+        recovery: { workflow: fallbackExecution?.workflow ?? null },
+      });
+    }
     requireExpectedVersion(context, current, `priority:${id}`);
-    const recordedAt = now().toISOString();
+    const recordedAt = currentInstant.toISOString();
     const updated = await records.put({
       ownerUserId: context.ownerUserId,
-      collection: "reminders",
-      recordId: id,
+      collection: source.collection,
+      recordId: current.id,
       expectedVersion: current.version,
       payload: { ...current, provenance: commandProvenance(context) },
     });
@@ -2502,7 +2592,12 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       result: {
         status: "skipped",
         ...identity,
-        execution: resolvePriorityExecutionContract({ reminder: updated, occurrenceDate }),
+        execution: source.kind === PriorityDispositionTargetKind.REMINDER
+          ? resolvePriorityExecutionContract({ reminder: updated, occurrenceDate })
+          : resolvePriorityDispositionExecutionContract(
+              { ...source, record: updated },
+              { occurrenceDate, priorityId: id, destination: actionable.executionContract.destination }
+            ),
         note,
         skippedAt: recordedAt,
         revision: updated.version,

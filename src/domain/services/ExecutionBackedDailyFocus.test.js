@@ -43,8 +43,8 @@ describe("Execution-backed Daily Focus composition", () => {
     expect(item).toMatchObject({
       id: reminder.id,
       label: "Retatrutide",
-      subtitle: "Tonight",
-      metadata: "1 mg tonight",
+      subtitle: "9:45 PM",
+      metadata: "1 mg",
       exactLocalTime: "21:45",
       completable: true,
       completionId: reminder.id,
@@ -100,7 +100,7 @@ describe("Execution-backed Daily Focus composition", () => {
     }));
 
     expect(due).toMatchObject({
-      metadata: "0.5 mg tonight",
+      metadata: "0.5 mg",
       executionId: "execution_retatrutide",
       completionId: reminder.id,
       completable: true,
@@ -168,11 +168,11 @@ describe("Execution-backed Daily Focus composition", () => {
   it("reflects phase edits and removals on fresh composition", () => {
     const configured = execution({ timeline: [phase("1")] });
     expect(priority(focus({ executionItems: [configured] })).metadata).toBe(
-      "1 mg tonight"
+      "1 mg"
     );
     configured.timeline[0].dose.amount = "0.5";
     expect(priority(focus({ executionItems: [configured] })).metadata).toBe(
-      "0.5 mg tonight"
+      "0.5 mg"
     );
     configured.timeline = [];
     expect(priority(focus({ executionItems: [configured] }))).toMatchObject({
@@ -190,8 +190,8 @@ describe("Execution-backed Daily Focus composition", () => {
     const item = priority(focus({ executionItems: [configured], now: friday }));
     expect(item).toMatchObject({
       exactLocalTime: "20:30",
-      subtitle: "Tonight",
-      metadata: "1 mg tonight",
+      subtitle: "8:30 PM",
+      metadata: "1 mg",
     });
   });
 
@@ -246,7 +246,7 @@ describe("Execution-backed Daily Focus composition", () => {
 
     expect(item).toMatchObject({
       id: tesaReminder.id,
-      metadata: "0.75 mg tonight",
+      metadata: "0.75 mg",
       completionId: tesaReminder.id,
     });
     expect(priority(createDailyFocusService().getDailyFocus({
@@ -444,7 +444,7 @@ describe("Execution-backed Daily Focus skip capability", () => {
     expect(priority(focus({ checkIns: skipped }))).toBeUndefined();
   });
 
-  it("never offers skip for supplement Support", () => {
+  it("offers the same generic Skip command for supplement Support", () => {
     const supplementProtocol = { id: "protocol_creatine", userId: "user", name: "Creatine", category: "supplement", status: "active" };
     const supplementReminder = {
       id: "reminder_creatine", title: "Creatine", type: "supplement_reminder", linkedEntityId: supplementProtocol.id,
@@ -460,7 +460,10 @@ describe("Execution-backed Daily Focus skip capability", () => {
     });
     const creatine = priority(items, "Creatine");
     expect(creatine).toBeDefined();
-    expect(creatine.notificationAction.skipCommand).toBeNull();
+    expect(creatine.notificationAction.skipCommand).toMatchObject({
+      commandType: "priority.skip.v1",
+      payload: { priorityId: "reminder_creatine", occurrenceDate: "2026-07-30" },
+    });
     expect(priority(items).notificationAction.skipCommand).not.toBeNull();
   });
 });

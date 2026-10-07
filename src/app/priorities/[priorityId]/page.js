@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import PriorityDetailScreen from "../../../screens/PriorityDetailScreen";
 import { getProductionPriorityNavigationReadService } from "../../../application/composition/productionApplicationComposition";
-import { completePriority } from "./actions";
+import { completePriority, skipPriority } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,7 @@ export default async function PriorityDetailPage({ params }) {
   return (
     <PriorityDetailScreen
       completeAction={completePriority}
+      skipAction={skipPriority}
       priority={priority}
     />
   );

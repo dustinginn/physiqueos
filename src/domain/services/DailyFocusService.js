@@ -31,6 +31,7 @@ import {
   isReminderOccurrenceCompleted,
   openOnlyNotificationAction,
   resolveNotificationAction,
+  resolveExecutionPriorityContract,
   resolvePriorityExecutionContract,
   specializedNotificationAction,
   protocolSupportNotificationAction,
@@ -139,6 +140,7 @@ export function createDailyFocusService() {
           timeZone,
           weightEntries,
           includeFallback: false,
+          groupSessions: false,
         });
         for (const candidate of candidates) {
           const canonicalDate = candidate.occurrenceDate
@@ -241,6 +243,7 @@ function buildDailyFocusCandidates({
   checkIns = [],
   executionItems = [],
   includeFallback = true,
+  groupSessions = true,
   latestWeight = null,
   now = new Date(),
   occurrenceDate = null,
@@ -279,7 +282,7 @@ function buildDailyFocusCandidates({
   });
   const highPriorityItems = [
     morningWeightItem,
-    ...getDexaAppointmentItems({ executionItems, now, timeZone }),
+    ...getDexaAppointmentItems({ executionItems, now, timeZone, today }),
     ...getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now }),
     doseChangeItem,
     ...executionProtocolItems,
@@ -294,7 +297,7 @@ function buildDailyFocusCandidates({
       ]),
     }),
   ].filter((item) => item && !isOccurrenceTerminallyReconciled(checkIns, today, item));
-  const sessions = getDailySessionsFromItems(highPriorityItems);
+  const sessions = groupSessions ? getDailySessionsFromItems(highPriorityItems) : [];
   const sessionItemIds = new Set(
     sessions.flatMap((session) => session.items.map((item) => item.id))
   );
@@ -314,7 +317,12 @@ function buildDailyFocusCandidates({
       ]
     : [];
 
-  return [...sessionPriorities, ...primaryItems, ...fallbackItems].filter(Boolean);
+  return [...sessionPriorities, ...primaryItems, ...fallbackItems]
+    .filter(Boolean)
+    .map((item) => ({
+      ...item,
+      skipCommand: item.notificationAction?.skipCommand ?? null,
+    }));
 }
 
 export const DailyFocusService = createDailyFocusService();
@@ -508,7 +516,7 @@ function isOccurrenceTerminallyReconciled(checkIns, date, item) {
 function hasTerminalReconciliation(checkIns, date, reminderId) {
   return getReconciliationsForDate(checkIns, date).some(
     (item) =>
-      item.reminderId === reminderId &&
+      (item.priorityId ?? item.reminderId) === reminderId &&
       TERMINAL_RECONCILIATION_STATUSES.has(String(item.status ?? "").toLowerCase())
   );
 }
@@ -614,7 +622,12 @@ function getMorningWeightItem({ checkIns, executionItems, latestWeight, now, pro
     state: state.name,
     priority: state.priorityOffset + 10,
     executionContract,
-    notificationAction: resolveNotificationAction({ executionContract, completable: false, timeOfDay: timing }),
+    notificationAction: resolveNotificationAction({
+      executionContract,
+      completable: false,
+      timeOfDay: timing,
+      skippable: !completed && isPrioritySkipSupportedReminder(support.reminder),
+    }),
   };
 }
 
@@ -629,7 +642,7 @@ function getLegacyMorningWeightItem({ latestWeight, todaysCheckIn, today, now, t
   };
 }
 
-function getDexaAppointmentItems({ executionItems, now, timeZone }) {
+function getDexaAppointmentItems({ executionItems, now, timeZone, today }) {
   const appointment = executionItems.find((item) => item.id === "execution_next_dexa");
   const projection = projectDexaAppointmentPriority({
     appointment,
@@ -638,6 +651,13 @@ function getDexaAppointmentItems({ executionItems, now, timeZone }) {
   });
   if (!projection) return [];
   const upload = projection.stage === DexaPriorityStage.UPLOAD_RESULTS;
+  const executionContract = resolveExecutionPriorityContract({
+    executionItem: appointment,
+    occurrenceDate: today,
+    priorityId: projection.priorityId,
+    workflow: upload ? "dexa_evidence" : "dexa_appointment",
+    destination: projection.href,
+  });
 
   return [{
     id: projection.priorityId,
@@ -650,7 +670,8 @@ function getDexaAppointmentItems({ executionItems, now, timeZone }) {
     completed: false,
     completable: false,
     executionId: appointment.id,
-    occurrenceDate: projection.scheduledDate,
+    occurrenceDate: today,
+    executionContract,
     state: upload ? "overdue" : "upcoming",
     priority: projection.priority,
     changeLabel: upload ? "Results needed" : null,
@@ -659,8 +680,10 @@ function getDexaAppointmentItems({ executionItems, now, timeZone }) {
     notificationAction: specializedNotificationAction({
       workflow: upload ? "dexa_evidence" : "dexa_appointment",
       priorityId: projection.priorityId,
-      occurrenceDate: projection.scheduledDate,
+      occurrenceDate: today,
       timeOfDay: appointment.preferredSchedule?.timeOfDay,
+      executionContract,
+      skippable: true,
     }),
   }];
 }
@@ -724,7 +747,12 @@ function getProgressPhotoItems({ progressPhotos, reminders, today, dayName, now 
       state: state.name,
       priority: state.priorityOffset + 12,
       executionContract,
-      notificationAction: resolveNotificationAction({ executionContract, completable: false, timeOfDay: reminder.schedule?.timeOfDay }),
+      notificationAction: resolveNotificationAction({
+        executionContract,
+        completable: false,
+        timeOfDay: reminder.schedule?.timeOfDay,
+        skippable: !completed && isPrioritySkipSupportedReminder(reminder),
+      }),
     };
   });
 }
@@ -753,14 +781,16 @@ function getDailySessionsFromItems(items) {
     const completedCount = sessionItems.filter((item) => item.completed).length;
     const pendingCount = sessionItems.length - completedCount;
     const pendingItems = sessionItems.filter((item) => !item.completed);
-    const dedicatedWeight = pendingItems.length === 1 && ["verified-weight", MORNING_WEIGH_IN_REMINDER_ID].includes(pendingItems[0].id) ? pendingItems[0] : null;
+    const singleOccurrence = pendingItems.length === 1 && isEvidencePriority(pendingItems[0])
+      ? pendingItems[0]
+      : null;
 
     return {
       id: `${timeBlock}-check-in`,
       label: `${formatSessionLabel(timeBlock)} Check-in`,
       subtitle: `Complete today's scheduled ${formatSessionLabel(timeBlock).toLowerCase()} evidence.`,
       metadata: `${completedCount}/${sessionItems.length} complete`,
-      href: dedicatedWeight?.href ??
+      href: singleOccurrence?.href ??
         (timeBlock === "morning" ? "/check-in/morning" : `/log?session=${timeBlock}`),
       icon: "target",
       color: "primary",
@@ -776,22 +806,18 @@ function getDailySessionsFromItems(items) {
 }
 
 function mapSessionToPriority(session, occurrenceDate) {
-  // A one-item Morning Weigh-In session is not a separate canonical
-  // "Morning Check-In" obligation. Preserve the Tracking reminder's exact
-  // identity, schedule, destination, and notification action end to end.
-  // Only genuinely composite sessions receive the synthetic grouped-session
-  // identity/daypart action below.
-  const morningWeighIn =
-    session.items.length === 1 &&
-    session.items[0].id === MORNING_WEIGH_IN_REMINDER_ID
-      ? session.items[0]
-      : null;
+  // A one-item evidence session is not a separate obligation. Preserve the
+  // canonical child's identity and action contract so Morning Weight and a
+  // lone Progress Photos occurrence expose the same Skip everywhere.
+  const singleOccurrence = session.items.length === 1 && isEvidencePriority(session.items[0])
+    ? session.items[0]
+    : null;
 
-  if (morningWeighIn) {
+  if (singleOccurrence) {
     return {
-      ...morningWeighIn,
+      ...singleOccurrence,
       occurrenceDate:
-        morningWeighIn.executionContract?.occurrenceDate ?? occurrenceDate,
+        singleOccurrence.executionContract?.occurrenceDate ?? occurrenceDate,
     };
   }
 
@@ -807,13 +833,23 @@ function mapSessionToPriority(session, occurrenceDate) {
     occurrenceDate,
     sessionItems: session.items.map((item) => ({
       completed: item.completed,
+      executionContract: item.executionContract ?? null,
+      href: item.href ?? null,
       id: item.id,
       label: item.label,
+      notificationAction: item.notificationAction ?? null,
       satisfiedByEvidence: item.satisfiedByEvidence,
+      skipCommand: item.notificationAction?.skipCommand ?? null,
     })),
     priority: session.priority,
     notificationAction: specializedNotificationAction({ workflow: "grouped_session", priorityId: session.id, occurrenceDate, timeOfDay: session.timeBlock }),
   };
+}
+
+function isEvidencePriority(item) {
+  return ["morning_check_in", "progress_photos", "dexa_evidence"].includes(
+    item?.executionContract?.workflow
+  );
 }
 
 function getExecutionBackedProtocolItems({
@@ -979,9 +1015,9 @@ function getExecutionBackedProtocolItems({
           completionContext: projection.completable
             ? { occurrenceDate: today, dose: doseText, protocolId }
             : null,
-          // Peptide and recovery Support (not supplements) may be skipped;
-          // the skip carries no dose.
-          skippable: Boolean(reminder) && isPrioritySkipSupportedReminder(reminder, { protocol }),
+          // Skip is a generic occurrence disposition; it never carries dose.
+          skippable: projection.completable && Boolean(reminder) &&
+            isPrioritySkipSupportedReminder(reminder),
         }),
         state: state.name,
         priority: state.priorityOffset + (recoverySupport ? 18 : 22) + index,
@@ -1166,7 +1202,7 @@ function shouldSurfaceFallbackHabits({ checkIns, latestWeight, weightEntries, to
   return recentEvidenceDays < 4 || knownMissedHabit;
 }
 
-function reminderAppliesToday(reminder, dayName, localDate = null) {
+export function reminderAppliesToday(reminder, dayName, localDate = null) {
   if (reminder.schedule?.type === "daily" || reminder.schedule?.cadence === "daily") {
     return true;
   }
@@ -1404,7 +1440,7 @@ function classifyReminderOccurrence({
 function getReconciliationState({ checkIns, date, reminderId }) {
   const checkIn = checkIns.find((item) => item.date === date);
   const reconciliation = checkIn?.reconciliation?.find(
-    (item) => item.reminderId === reminderId
+    (item) => (item.priorityId ?? item.reminderId) === reminderId
   );
 
   if (!reconciliation) return null;
@@ -1413,7 +1449,7 @@ function getReconciliationState({ checkIns, date, reminderId }) {
   return "skipped";
 }
 
-function hasEvidenceForReminderOccurrence({
+export function hasEvidenceForReminderOccurrence({
   checkIns,
   date,
   dexaScans,

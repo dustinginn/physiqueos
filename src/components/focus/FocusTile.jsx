@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import IconBadge from "../ui/IconBadge";
 import PriorityCompletionForm from "./PriorityCompletionForm";
+import PrioritySkipForm from "./PrioritySkipForm";
 
 const iconMap = {
   activity: Activity,
@@ -28,6 +29,8 @@ export default function FocusTile({
   metadata,
   completable = false,
   completeAction,
+  skipAction,
+  skipCommand = null,
   completionId,
   completionContext,
   density = "balanced",
@@ -109,7 +112,9 @@ export default function FocusTile({
     </>
   );
 
-  if (href && completable && completeAction && completionId && !completed) {
+  if (href && !completed && (
+    completable && completeAction && completionId || skipCommand && skipAction
+  )) {
     return (
       <div className={classes}>
         <Link className="contents" href={href}>
@@ -137,12 +142,17 @@ export default function FocusTile({
           </span>
         </Link>
 
-        <PriorityCompletionForm
-          action={completeAction}
-          completionContext={completionContext}
-          label={label}
-          priorityId={completionId}
-        />
+        {completable && completeAction && completionId && (
+          <PriorityCompletionForm
+            action={completeAction}
+            completionContext={completionContext}
+            label={label}
+            priorityId={completionId}
+          />
+        )}
+        {skipCommand && skipAction && (
+          <PrioritySkipForm action={skipAction} command={skipCommand} compact label={label} />
+        )}
       </div>
     );
   }

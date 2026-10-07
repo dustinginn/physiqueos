@@ -58,13 +58,13 @@ export function createMorningEvidenceRecoverySelection({
     protocolVersions,
     protocols,
   });
-  const evidencePriorityKeys = new Set(
+  const evidencePriorityByType = new Map(
     priorityItems
-      .filter((item) => normalizeEvidenceRecoveryType(item.linkedEvidenceType))
-      .map((item) => item.occurrenceKey)
+      .map((item) => [normalizeEvidenceRecoveryType(item.linkedEvidenceType), item])
+      .filter(([type]) => Boolean(type))
   );
   const executionReconciliationItems = priorityItems
-    .filter((item) => !evidencePriorityKeys.has(item.occurrenceKey))
+    .filter((item) => !normalizeEvidenceRecoveryType(item.linkedEvidenceType))
     .map((item) => Object.freeze({
       ...item,
       kind: MORNING_RECONCILIATION_ITEM_KINDS.EXECUTION,
@@ -84,14 +84,18 @@ export function createMorningEvidenceRecoverySelection({
     );
 
     if (!shouldSurface || !actionable) continue;
-    evidenceRecoveryItems.push(Object.freeze({
-      id: `evidence_recovery_${evidenceType}_${previousDate}`,
-      kind: MORNING_RECONCILIATION_ITEM_KINDS.EVIDENCE,
+    const scheduledPriority = evidencePriorityByType.get(evidenceType) ?? null;
+    const item = Object.freeze({
+      id: scheduledPriority?.id ?? `evidence_recovery_${evidenceType}_${previousDate}`,
+      kind: scheduledPriority
+        ? MORNING_RECONCILIATION_ITEM_KINDS.EXECUTION
+        : MORNING_RECONCILIATION_ITEM_KINDS.EVIDENCE,
       evidenceType,
+      evidenceRequired: Boolean(scheduledPriority),
       occurrenceDate: previousDate,
       date: previousDate,
       dateLabel: "Yesterday",
-      occurrenceKey: actionable.context.recoveryKey,
+      occurrenceKey: scheduledPriority?.occurrenceKey ?? actionable.context.recoveryKey,
       expectationKey: actionable.context.recoveryKey,
       status,
       title: copyFor(evidenceType, status).title,
@@ -102,7 +106,9 @@ export function createMorningEvidenceRecoverySelection({
       }),
       pendingReviewId: pendingReview?.id ?? null,
       recoveryContext: actionable.context,
-    }));
+    });
+    if (scheduledPriority) executionReconciliationItems.push(item);
+    else evidenceRecoveryItems.push(item);
   }
 
   return Object.freeze({

@@ -4,7 +4,7 @@ import { createPriorityDetailService } from "./PriorityDetailService";
 
 describe("DEXA Priority Detail", () => {
   it("shows a saved preparation note and routes pre-appointment priorities to appointment detail", async () => {
-    const detail = await service(appointment({ preparationNote: "Use the saved clinic instructions." }))
+    const detail = await service(appointment({ preparationNote: "Use the saved clinic instructions." }), "2026-08-14T15:00:00.000Z")
       .getPriorityDetail(createDexaPriorityId("2026-08-15", DexaPriorityStage.DAY_BEFORE));
     expect(detail).toMatchObject({
       id: "dexa-appointment:2026-08-15:day-before",
@@ -25,13 +25,13 @@ describe("DEXA Priority Detail", () => {
   });
 
   it("fabricates no preparation note when none was saved", async () => {
-    const detail = await service(appointment())
+    const detail = await service(appointment({ reminderPreferences: ["morning_of"] }), "2026-08-15T14:00:00.000Z")
       .getPriorityDetail(createDexaPriorityId("2026-08-15", DexaPriorityStage.MORNING_OF));
     expect(section(detail, "Preparation")).toBeUndefined();
   });
 
   it("uses upload copy and the existing evidence route after the appointment without stale prep guidance", async () => {
-    const detail = await service(appointment({ preparationNote: "Do not surface this after the scan." }))
+    const detail = await service(appointment({ preparationNote: "Do not surface this after the scan." }), "2026-08-15T15:00:00.000Z")
       .getPriorityDetail(createDexaPriorityId("2026-08-15", DexaPriorityStage.UPLOAD_RESULTS));
     expect(detail).toMatchObject({
       title: "Upload DEXA results",
@@ -48,14 +48,14 @@ describe("DEXA Priority Detail", () => {
   });
 
   it("does not resolve a stale derived priority after the appointment is completed", async () => {
-    const detail = await service(appointment({ active: false, status: "completed" }))
+    const detail = await service(appointment({ active: false, status: "completed" }), "2026-08-15T15:00:00.000Z")
       .getPriorityDetail(createDexaPriorityId("2026-08-15", DexaPriorityStage.UPLOAD_RESULTS));
     expect(detail).toBeNull();
   });
 });
 
-function service(dexa) {
-  return createPriorityDetailService({ repositories: {
+function service(dexa, instant) {
+  return createPriorityDetailService({ now: () => new Date(instant), repositories: {
     users: { getCurrentUser: async () => ({ id: "user", timeZone: "America/Los_Angeles" }) },
     goals: { listGoals: async () => [{ id: "goal", title: "Build Lean Mass", status: "active" }] },
     reminders: { getReminderById: async () => null },

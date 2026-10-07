@@ -17,6 +17,7 @@ import {
   DexaPriorityStage,
   isCurrentScheduledDexaAppointment,
   parseDexaPriorityId,
+  projectDexaAppointmentPriority,
 } from "./DexaAppointmentLifecycleService";
 import { formatSupportSchedulePreview } from "../models/SupportScheduleModel";
 import {
@@ -29,15 +30,20 @@ import {
   isPriorityOccurrenceSkipped,
 } from "./PriorityOccurrenceReconciliation.js";
 import {
-  isPrioritySkipSupportedReminder,
   isReminderOccurrenceCompleted,
   openOnlyNotificationAction,
   prioritySkipCommand,
   resolveNotificationAction,
+  resolveExecutionPriorityContract,
   resolvePriorityExecutionContract,
   specializedNotificationAction,
   protocolSupportNotificationAction,
 } from "./ReminderOccurrenceCompletion.js";
+import {
+  resolveActionablePriorityDisposition,
+  resolvePriorityDispositionSource,
+} from "./PriorityOccurrenceDispositionService.js";
+import { hasEvidenceForReminderOccurrence } from "./DailyFocusService.js";
 import {
   resolveCanonicalGoalRelationships,
   selectCanonicalActiveGoal,
@@ -60,7 +66,8 @@ export function createPriorityDetailService({ repositories, now = () => new Date
       if (!resolvedUserId) return null;
 
       const timeZone = resolveLocalTimeZone(user?.timeZone ?? user?.timezone);
-      const today = getLocalDateKey(now(), timeZone);
+      const currentInstant = now();
+      const today = getLocalDateKey(currentInstant, timeZone);
       const occurrenceDate = requestedOccurrenceDate ?? today;
 
       const [
@@ -71,6 +78,8 @@ export function createPriorityDetailService({ repositories, now = () => new Date
         operatingRhythm,
         executionItems,
         weightEntries,
+        progressPhotos,
+        dexaScans,
         occurrenceCheckIn,
       ] =
         await Promise.all([
@@ -81,20 +90,62 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           repositories.operatingRhythm?.getOperatingRhythm(resolvedUserId) ?? null,
           repositories.executionItems?.listExecutionItems?.(resolvedUserId) ?? [],
           repositories.weightEntries?.listWeightEntries?.(resolvedUserId) ?? [],
+          repositories.progressPhotos?.listPhotos?.(resolvedUserId) ?? [],
+          repositories.dexaScans?.listDEXAScans?.(resolvedUserId) ?? [],
           repositories.dailyCheckIns?.getCheckInForDate?.(resolvedUserId, occurrenceDate) ?? null,
         ]);
 
+      const dispositionSource = resolvePriorityDispositionSource({
+        executionItems,
+        priorityId,
+        reminders: reminder ? [reminder] : [],
+      });
+      const disposition = dispositionSource
+        ? resolveActionablePriorityDisposition({
+            executionItems,
+            now: currentInstant,
+            occurrenceDate,
+            priorityId,
+            protocols,
+            reminders: reminder ? [reminder] : [],
+            source: dispositionSource,
+            timeZone,
+          })
+        : null;
+
       const dexaPriority = parseDexaPriorityId(priorityId);
       if (dexaPriority) {
-        if (requestedOccurrenceDate && requestedOccurrenceDate !== dexaPriority.scheduledDate) return null;
         const appointment = executionItems.find((item) => item.id === "execution_next_dexa");
+        const projection = projectDexaAppointmentPriority({ appointment, now: currentInstant, timeZone });
         if (isCurrentScheduledDexaAppointment(appointment) &&
-            appointment.preferredSchedule?.date === dexaPriority.scheduledDate) {
-          return createDexaAppointmentPriorityDetail({
+            appointment.preferredSchedule?.date === dexaPriority.scheduledDate &&
+            projection?.priorityId === priorityId) {
+          const skipEntry = isPriorityOccurrenceSkipped(occurrenceCheckIn, priorityId, occurrenceDate)
+            ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, priorityId, occurrenceDate)
+            : null;
+          const detail = createDexaAppointmentPriorityDetail({
             appointment,
             goals,
             operatingPlan,
             stage: dexaPriority.stage,
+            occurrenceDate,
+            executionContract: disposition?.executionContract ?? resolveExecutionPriorityContract({
+              executionItem: appointment,
+              occurrenceDate,
+              priorityId,
+              workflow: dexaPriority.stage === DexaPriorityStage.UPLOAD_RESULTS
+                ? "dexa_evidence"
+                : "dexa_appointment",
+              destination: dexaPriority.stage === DexaPriorityStage.UPLOAD_RESULTS
+                ? "/evidence/dexa"
+                : "/profile/operating-plan/execution/dexa",
+            }),
+            skipEntry,
+          });
+          return withSkipContract(detail, {
+            occurrenceDate,
+            today,
+            open: !skipEntry && Boolean(disposition),
           });
         }
         return null;
@@ -107,16 +158,27 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           reminders: [reminder],
           userId: resolvedUserId,
         });
+        const weightEntry = canonicalWeightEntries(weightEntries)
+          .find((entry) => String(entry.measuredAt).slice(0, 10) === occurrenceDate) ?? null;
+        const completed = Boolean(weightEntry) || isReminderOccurrenceCompleted(reminder, { occurrenceDate, timeZone });
+        const skipEntry = !completed && isPriorityOccurrenceSkipped(occurrenceCheckIn, reminder.id, occurrenceDate)
+          ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, reminder.id, occurrenceDate)
+          : null;
+        const open = !completed && !skipEntry && Boolean(disposition);
         return support
-          ? withExecutionContractAndNotificationAction(createMorningWeighInPriorityDetail({
+          ? withSkipContract(withExecutionContractAndNotificationAction(createMorningWeighInPriorityDetail({
               goals,
               operatingPlan,
               support,
               occurrenceDate,
               timeZone,
-              weightEntry: canonicalWeightEntries(weightEntries)
-                .find((entry) => String(entry.measuredAt).slice(0, 10) === occurrenceDate) ?? null,
-            }), reminder, occurrenceDate, false, support.executionItem?.preferredSchedule?.timeOfDay)
+              weightEntry,
+              skipEntry,
+            }), reminder, occurrenceDate, false, support.executionItem?.preferredSchedule?.timeOfDay, open), {
+              occurrenceDate,
+              today,
+              open,
+            })
           : null;
       }
 
@@ -132,7 +194,6 @@ export function createPriorityDetailService({ repositories, now = () => new Date
             executionItems,
             protocol.id
           );
-          const currentInstant = now();
           const projection = projectExecutionPriority({
             executionItem: match.executionItem,
             localDate: occurrenceDate,
@@ -142,17 +203,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
             timeZone,
           });
 
-          // Recovery Support (e.g. Foam Rolling) is an ordinary manual
-          // completion with no dose, so today's canonical skip applies to it
-          // exactly as it does to a plain reminder: read the dated
-          // reconciliation entry (completed wins over a skip) so a skipped
-          // occurrence never re-reads as Open/completable, and offer the
-          // Server-owned skip contract for today's open occurrence. A peptide
-          // is skippable too (the skip records no dose; completion stays
-          // dose-aware); supplement Support stays unchanged (deferred).
-          const skipSupported = isPrioritySkipSupportedReminder(reminder, { protocol });
-          const supportSkipEntry = skipSupported &&
-            projection.occurrenceCompleted !== true &&
+          const supportSkipEntry = projection.occurrenceCompleted !== true &&
             isPriorityOccurrenceSkipped(occurrenceCheckIn, reminder.id, projection.localDate)
               ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, reminder.id, projection.localDate)
               : null;
@@ -172,6 +223,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
                   operatingPlan,
                   projection,
                   protocol,
+                  skipEntry: supportSkipEntry,
                 })
               : createExecutionPriorityDetail({
                   executionItem: match.executionItem,
@@ -190,19 +242,13 @@ export function createPriorityDetailService({ repositories, now = () => new Date
               timeOfDay: match.executionItem?.preferredSchedule?.timeOfDay ?? reminder.schedule?.timeOfDay,
               // A notification skip is only meaningful on or before its
               // own day; a past occurrence belongs to Morning Check-In.
-              skippable: skipSupported && projection.localDate >= today,
+              skippable: detail?.completable === true && projection.localDate === today,
             }
           ), projection), protocol.category);
-          if (!skipSupported) return supportDetail;
-          // `completable` is already false for a completed, skipped, setup
-          // required (missing Execution) or inactive occurrence, so none of
-          // those can be offered a skip.
           return withSkipContract(supportDetail, {
-            reminder,
-            protocol,
             occurrenceDate: projection.localDate,
             today,
-            open: supportDetail?.completable === true,
+            open: supportDetail?.completable === true && Boolean(disposition),
           });
         }
 
@@ -224,12 +270,27 @@ export function createPriorityDetailService({ repositories, now = () => new Date
       }
 
       if (reminder?.linkedEvidenceType === "progress_photo") {
-        return withExecutionContractAndNotificationAction(createProgressPhotoPriorityDetail({
+        const completed = hasEvidenceForReminderOccurrence({
+          checkIns: occurrenceCheckIn ? [occurrenceCheckIn] : [],
+          date: occurrenceDate,
+          dexaScans,
+          progressPhotos,
+          reminder,
+          timeZone,
+          weightEntries,
+        });
+        const skipEntry = !completed && isPriorityOccurrenceSkipped(occurrenceCheckIn, reminder.id, occurrenceDate)
+          ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, reminder.id, occurrenceDate)
+          : null;
+        const open = !completed && !skipEntry && Boolean(disposition);
+        return withSkipContract(withExecutionContractAndNotificationAction(createProgressPhotoPriorityDetail({
           executionItem: executionItems.find((item) => item.id === "execution_progress_photos"),
           reminder,
           goals,
           operatingPlan,
-        }), reminder, occurrenceDate, false);
+          completed,
+          skipEntry,
+        }), reminder, occurrenceDate, false, null, open), { occurrenceDate, today, open });
       }
 
       if (reminder) {
@@ -240,7 +301,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           : isPriorityOccurrenceSkipped(occurrenceCheckIn, reminder.id, occurrenceDate)
             ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, reminder.id, occurrenceDate)
             : null;
-        const open = !completed && !skipEntry;
+        const open = !completed && !skipEntry && Boolean(disposition);
         return withSkipContract(withExecutionContractAndNotificationAction(createReminderPriorityDetail({
           reminder,
           goals,
@@ -248,7 +309,7 @@ export function createPriorityDetailService({ repositories, now = () => new Date
           occurrenceDate,
           completed,
           skipEntry,
-        }), reminder, occurrenceDate, open, null, occurrenceDate >= today && isPrioritySkipSupportedReminder(reminder)), { reminder, occurrenceDate, today, open });
+        }), reminder, occurrenceDate, open, null, open), { occurrenceDate, today, open });
       }
 
       return createFallbackPriorityDetail(priorityId, goals, occurrenceDate);
@@ -259,23 +320,20 @@ export function createPriorityDetailService({ repositories, now = () => new Date
 // that already carries its `executionContract`. `open` is the caller's
 // verdict that the occurrence is neither completed nor skipped nor otherwise
 // non-actionable; on top of that a skip is offered only for today's
-// occurrence of a `priority_detail` reminder the shared eligibility rule
-// (`isPrioritySkipSupportedReminder`) accepts — the same rule
-// `priority.skip.v1` enforces on the write side.
-function withSkipContract(detail, { reminder, protocol, occurrenceDate, today, open }) {
+// occurrence whose Server-resolved execution contract has a current source
+// version. The command re-resolves actionability before it writes.
+function withSkipContract(detail, { occurrenceDate, today, open }) {
   if (!detail) return null;
   const skippable = open === true &&
     occurrenceDate === today &&
-    detail.executionContract?.workflow === "priority_detail" &&
-    isPrioritySkipSupportedReminder(reminder, { protocol });
+    Boolean(prioritySkipCommand(detail.executionContract));
   const skipCommand = skippable ? prioritySkipCommand(detail.executionContract) : null;
   return { ...detail, skippable: Boolean(skipCommand), skipCommand };
 }
 
-// Every Priority Detail carries the Server-owned skip contract. Only the
-// paths that run `withSkipContract` above — an ordinary reminder and an
-// execution-backed recovery or peptide Support reminder — can ever set
-// `skippable: true`.
+// Every Priority Detail carries the Server-owned skip contract. Any template
+// may set it by passing an open occurrence resolved by the shared Server
+// disposition resolver; no domain-specific client matrix participates.
 function withSkipDefaults(detail) {
   if (!detail) return detail;
   return {
@@ -653,10 +711,12 @@ function createSupplementSupportPriorityDetail({
   operatingPlan,
   projection,
   protocol,
+  skipEntry = null,
 }) {
   if (!protocol || !projection) return null;
   const completed = projection.occurrenceCompleted === true;
-  const actionable = !completed &&
+  const skipped = !completed && Boolean(skipEntry);
+  const actionable = !completed && !skipped &&
     projection.operationalState === ExecutionPriorityOperationalState.ACTIONABLE;
   const setupRequired = [
     ExecutionPriorityOperationalState.MISSING_EXECUTION,
@@ -672,7 +732,7 @@ function createSupplementSupportPriorityDetail({
     title: projection.title,
     eyebrow: "Priority Detail",
     subtitle: projection.timeOfDayLabel,
-    status: completed ? "Completed" : actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
+    status: completed ? "Completed" : skipped ? "Skipped" : actionable ? "Open" : setupRequired ? "Setup required" : "Inactive",
     completable: actionable && projection.completable,
     completionContext:
       actionable && projection.completable
@@ -682,6 +742,13 @@ function createSupplementSupportPriorityDetail({
             protocolId: projection.protocolRootId,
           }
         : null,
+    skipContext: skipped
+      ? {
+          occurrenceDate: projection.localDate,
+          note: skipEntry.note ?? null,
+          skippedAt: skipEntry.recordedAt ?? null,
+        }
+      : null,
     action: {
       label: setupRequired ? "Review Support" : "View Support",
       href: projection.executionHref,
@@ -692,9 +759,11 @@ function createSupplementSupportPriorityDetail({
       {
         title: "What",
         items: [{
-          label: actionable ? projection.title : "Support setup required",
+          label: actionable || skipped ? projection.title : "Support setup required",
           detail: actionable
             ? "Complete the scheduled supplement support."
+            : skipped
+              ? "Skipped for this occurrence. No dose was recorded."
             : "Review the saved Support schedule before recording completion.",
         }],
       },
@@ -757,7 +826,7 @@ function getExecutionNotesSections(executionItem) {
     : [];
 }
 
-function createMorningWeighInPriorityDetail({ goals, operatingPlan, support, occurrenceDate, timeZone, weightEntry }) {
+function createMorningWeighInPriorityDetail({ goals, operatingPlan, support, occurrenceDate, timeZone, weightEntry, skipEntry = null }) {
   const relatedWeight = weightEntry ? {
     canonicalId: weightEntry.id,
     date: occurrenceDate,
@@ -767,13 +836,21 @@ function createMorningWeighInPriorityDetail({ goals, operatingPlan, support, occ
     version: weightEntry.version ?? null,
   } : null;
   const completed = Boolean(relatedWeight) || isReminderOccurrenceCompleted(support.reminder, { occurrenceDate, timeZone });
+  const skipped = !completed && Boolean(skipEntry);
   return {
     id: support.reminder.id,
     title: "Morning Weigh-In",
     eyebrow: "Priority Detail",
     subtitle: support.supportSummary,
-    status: completed ? "Completed" : support.reminder.active ? "Open" : "Reminder off",
+    status: completed ? "Completed" : skipped ? "Skipped" : support.reminder.active ? "Open" : "Reminder off",
     completable: false,
+    skipContext: skipped
+      ? {
+          occurrenceDate,
+          note: skipEntry.note ?? null,
+          skippedAt: skipEntry.recordedAt ?? null,
+        }
+      : null,
     action: { label: "Log Weight", href: "/check-in/morning" },
     relatedWeight,
     sections: [
@@ -933,14 +1010,29 @@ function createLegacyReminderOnlyProtocolPriorityDetail({
   };
 }
 
-function createProgressPhotoPriorityDetail({ executionItem, reminder, goals, operatingPlan }) {
+function createProgressPhotoPriorityDetail({
+  executionItem,
+  reminder,
+  goals,
+  operatingPlan,
+  completed = false,
+  skipEntry = null,
+}) {
+  const skipped = !completed && Boolean(skipEntry);
   return {
     id: reminder.id,
     title: reminder.title,
     eyebrow: "Priority Detail",
     subtitle: formatProgressPhotoScheduleSubtitle(reminder.schedule),
-    status: "Open",
+    status: completed ? "Completed" : skipped ? "Skipped" : "Open",
     completable: false,
+    skipContext: skipped
+      ? {
+          occurrenceDate: skipEntry.occurrenceDate ?? null,
+          note: skipEntry.note ?? null,
+          skippedAt: skipEntry.recordedAt ?? null,
+        }
+      : null,
     action: {
       label: "Upload Photos",
       href: "/evidence/photos",
@@ -993,8 +1085,17 @@ function createProgressPhotoPriorityDetail({ executionItem, reminder, goals, ope
   };
 }
 
-function createDexaAppointmentPriorityDetail({ appointment, goals, operatingPlan, stage }) {
+function createDexaAppointmentPriorityDetail({
+  appointment,
+  executionContract,
+  goals,
+  occurrenceDate,
+  operatingPlan,
+  skipEntry = null,
+  stage,
+}) {
   const upload = stage === DexaPriorityStage.UPLOAD_RESULTS;
+  const skipped = Boolean(skipEntry);
   const preparationNote = String(appointment.preparationNote ?? "").trim();
   const date = formatDexaDate(appointment.preferredSchedule.date);
   const time = formatTimeOfDay(appointment.preferredSchedule.timeOfDay);
@@ -1005,13 +1106,23 @@ function createDexaAppointmentPriorityDetail({ appointment, goals, operatingPlan
     title,
     eyebrow: "Priority Detail",
     subtitle: getDexaPrioritySubtitle(stage, time),
-    status: upload ? "Action needed" : "Upcoming",
+    status: skipped ? "Skipped" : upload ? "Action needed" : "Upcoming",
     completable: false,
+    executionContract,
+    skipContext: skipped
+      ? {
+          occurrenceDate,
+          note: skipEntry.note ?? null,
+          skippedAt: skipEntry.recordedAt ?? null,
+        }
+      : null,
     notificationAction: specializedNotificationAction({
       workflow: upload ? "dexa_evidence" : "dexa_appointment",
       priorityId: createDexaPriorityId(appointment.preferredSchedule.date, stage),
-      occurrenceDate: appointment.preferredSchedule.date,
+      occurrenceDate,
       timeOfDay: appointment.preferredSchedule.timeOfDay,
+      executionContract,
+      skippable: !skipped,
     }),
     action: {
       label: upload ? "Upload DEXA Results" : "View DEXA Appointment",

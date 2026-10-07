@@ -199,7 +199,7 @@ describe("Supplement Support migration", () => {
     expect(due).toMatchObject({
       completionId: "reminder_supplement",
       metadata: "2 capsules this morning",
-      icon: "utensils",
+      icon: "pills",
     });
 
     const everyOther = execution({

@@ -98,6 +98,7 @@ describe("priority.skip.v1 canonical port", () => {
     expect(checkIn).toMatchObject({ userId: ownerUserId, date: TODAY });
     expect(checkIn.reconciliation).toEqual([{
       key: "priority-one:2026-08-11",
+      priorityId: "priority-one",
       reminderId: "priority-one",
       occurrenceDate: TODAY,
       status: "skipped",
@@ -228,6 +229,7 @@ describe("priority.skip.v1 for an execution-backed recovery Support reminder (Fo
     const checkIn = snapshot.dailyCheckIns.find((item) => item.id === "daily_check_in_2026_08_11");
     expect(checkIn.reconciliation).toEqual([{
       key: `${FOAM}:2026-08-11`,
+      priorityId: FOAM,
       reminderId: FOAM,
       occurrenceDate: TODAY,
       status: "skipped",
@@ -329,6 +331,7 @@ describe("priority.skip.v1 for a peptide occurrence", () => {
       id: "execution_peptide", userId: ownerUserId, type: "peptide", title: "Peptide", active: true,
       protocolRootId: "protocol-peptide", cadence: { type: "daily" },
       preferredSchedule: { daysOfWeek: [], timeOfDay: "21:00", startDate: "2026-07-23" },
+      timeline: [{ startDate: "2026-07-23", endDate: null, dose: { amount: "0.5", unit: "mg" } }],
       executionRevision: 1, version: 1, ...overrides,
     };
   }
@@ -337,7 +340,12 @@ describe("priority.skip.v1 for a peptide occurrence", () => {
       user: [{ id: ownerUserId, timeZone: "America/Los_Angeles", version: 1 }],
       goals: [],
       protocols: [PEPTIDE_PROTOCOL, SUPPLEMENT_PROTOCOL],
-      executionItems: [execution],
+      executionItems: [execution, {
+        id: "execution_creatine", userId: ownerUserId, type: "supplement", title: "Creatine", active: true,
+        protocolRootId: "protocol-supplement", cadence: { type: "daily" },
+        preferredSchedule: { daysOfWeek: [], timeOfDay: "08:00", startDate: "2026-07-23" },
+        executionRevision: 1, version: 1,
+      }],
       reminders: [
         {
           id: PEPTIDE, userId: ownerUserId, title: "Peptide", type: "protocol_reminder",
@@ -396,7 +404,7 @@ describe("priority.skip.v1 for a peptide occurrence", () => {
     expect(records.snapshot()).toEqual(before);
   });
 
-  it("refuses a stale version, a paused date, and a supplement-linked protocol reminder", async () => {
+  it("refuses a stale version and a paused date, while accepting supplement Support", async () => {
     await expect(ports(peptideRecords()).skipPriority(context({ priorityId: PEPTIDE, occurrenceDate: TODAY }, "2", "stale")))
       .rejects.toMatchObject({ status: 412, code: "STALE_VERSION" });
     const paused = peptideRecords({ execution: peptideExecution({ scheduleSuspensions: [{ pausedFrom: "2026-08-10", resumedOn: null }] }) });
@@ -404,9 +412,11 @@ describe("priority.skip.v1 for a peptide occurrence", () => {
       .rejects.toMatchObject({ status: 422, code: "PRIORITY_OCCURRENCE_PAUSED" });
     expect(paused.snapshot().dailyCheckIns).toEqual([]);
     const supplement = peptideRecords();
-    await expect(ports(supplement).skipPriority(context({ priorityId: "reminder_creatine_daily", occurrenceDate: TODAY }, "1", "supp")))
-      .rejects.toMatchObject({ status: 422, code: "PRIORITY_SKIP_UNSUPPORTED" });
-    expect(supplement.snapshot().dailyCheckIns).toEqual([]);
+    const result = await ports(supplement).skipPriority(context({ priorityId: "reminder_creatine_daily", occurrenceDate: TODAY }, "1", "supp"));
+    expect(result.result).toMatchObject({ status: "skipped", priorityId: "reminder_creatine_daily" });
+    expect(supplement.snapshot().dailyCheckIns[0].reconciliation[0]).toMatchObject({
+      priorityId: "reminder_creatine_daily", reminderId: "reminder_creatine_daily", status: "skipped",
+    });
   });
 
   it("still refuses past and future peptide occurrences", async () => {

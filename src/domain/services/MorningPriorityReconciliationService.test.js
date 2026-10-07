@@ -302,7 +302,7 @@ describe("Morning priority reconciliation server boundary", () => {
     ).toBeNull();
   });
 
-  it("does not require an outcome disposition for a scheduled evidence-recovery item", async () => {
+  it("requires the scheduled evidence occurrence to be added or intentionally skipped", async () => {
     const { checkInWrites, service } = fixture({
       reminders: [reminder("photos", {
         linkedEvidenceType: "progress_photo",
@@ -314,19 +314,34 @@ describe("Morning priority reconciliation server boundary", () => {
       userId: "user",
       timeZone: TIME_ZONE,
     });
+    await expect(service.save({ userId: "user", timeZone: TIME_ZONE, submissions: [] }))
+      .rejects.toMatchObject({ code: "missing_disposition" });
     const result = await service.save({
-      userId: "user",
-      timeZone: TIME_ZONE,
-      submissions: [],
+      userId: "user", timeZone: TIME_ZONE, submissions: [submission("photos")],
     });
 
     expect(selected.items[0]).toMatchObject({
-      kind: "evidence_recovery",
+      kind: "execution_reconciliation",
+      evidenceRequired: true,
       status: "missing",
       primaryAction: { label: "Upload Photos" },
     });
-    expect(result.persisted).toEqual([]);
-    expect(checkInWrites).not.toHaveBeenCalled();
+    expect(result.persisted).toEqual(["photos:2026-07-28"]);
+    expect(checkInWrites).toHaveBeenCalledOnce();
+  });
+
+  it("cannot fabricate completion for scheduled evidence without evidence", async () => {
+    const { service } = fixture({
+      reminders: [reminder("photos", {
+        linkedEvidenceType: "progress_photo",
+        type: "progress_photo",
+      })],
+    });
+    await expect(service.save({
+      userId: "user",
+      timeZone: TIME_ZONE,
+      submissions: [submission("photos", { disposition: "completed" })],
+    })).rejects.toMatchObject({ code: "unsupported_disposition" });
   });
 
   it("loads the accepted source version for a sparse active Activity successor", async () => {

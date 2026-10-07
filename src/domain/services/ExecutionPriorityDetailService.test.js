@@ -17,7 +17,7 @@ describe("Execution-backed priority detail", () => {
       notificationAction: { classification: "specialized_workflow_required", workflow: "peptide_protocol", completionCommand: null, scheduledTime: "21:45" },
       id: reminder.id,
       title: "Shared Peptide",
-      subtitle: "Tonight",
+      subtitle: "9:45 PM",
       status: "Open",
       completable: true,
       completionContext: {
@@ -180,7 +180,7 @@ describe("Execution-backed priority detail", () => {
       "2026-07-30"
     );
 
-    expect(homePriority.metadata).toBe("0.75 mg tonight");
+    expect(homePriority.metadata).toBe("0.75 mg");
     expect(detail.completionContext.dose).toBe("0.75 mg");
     expect(executionPhase.current.dose).toEqual({
       amount: "0.75",

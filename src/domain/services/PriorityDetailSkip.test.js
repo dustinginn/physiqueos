@@ -3,6 +3,7 @@ import { createPriorityDetailService } from "./PriorityDetailService";
 import { createPriorityReconciliationEntry } from "./PriorityOccurrenceReconciliation.js";
 import { createPriorityNavigationReadService } from "../../application/priorities/PriorityNavigationReadService.js";
 import { createPostgresPriorityNavigationReadStore } from "../../platform/database/PostgresPriorityNavigationReadStore.js";
+import { createDexaPriorityId, DexaPriorityStage } from "./DexaAppointmentLifecycleService.js";
 
 // 12:00 on 2026-09-16 in America/Los_Angeles.
 const NOW = () => new Date("2026-09-16T19:00:00.000Z");
@@ -120,6 +121,30 @@ describe("Priority Detail skip contract", () => {
     });
   });
 
+  it("projects the universal command for the current execution-backed DEXA stage", async () => {
+    const appointment = {
+      id: "execution_next_dexa", userId: "user", type: "dexa_appointment", active: true,
+      status: "scheduled", preferredSchedule: { date: "2026-09-17", timeOfDay: "07:30", daysOfWeek: [] },
+      timezone: "America/Los_Angeles", reminderPreferences: ["day_before"], uploadReminder: true,
+      linkedGoalIds: [], version: 9,
+    };
+    const id = createDexaPriorityId("2026-09-17", DexaPriorityStage.DAY_BEFORE);
+    const { service } = detailService({ reminder: null, executionItems: [appointment] });
+    const detail = await service.getPriorityDetail(id, "user");
+    expect(detail).toMatchObject({
+      id,
+      status: "Upcoming",
+      action: { label: "View DEXA Appointment" },
+      skippable: true,
+      skipCommand: {
+        commandType: "priority.skip.v1",
+        expectedVersion: 9,
+        payload: { priorityId: id, occurrenceDate: TODAY },
+      },
+      notificationAction: { skipCommand: { commandType: "priority.skip.v1" } },
+    });
+  });
+
   it("keeps Completed when an occurrence is both completed and skipped", async () => {
     const reminder = plainReminder({ completionHistory: [{ occurrenceDate: TODAY, completedAt: `${TODAY}T17:00:00.000Z` }] });
     const { service } = detailService({ reminder, checkIn: skippedCheckIn() });
@@ -133,7 +158,7 @@ describe("Priority Detail skip contract", () => {
     expect(detail).toMatchObject({ status: "Open", completable: true, skippable: false, skipCommand: null });
   });
 
-  it("is not skippable for specialized or dose-aware workflows", async () => {
+  it("projects Skip for scheduled evidence workflows without treating setup-only Support as actionable", async () => {
     const cases = [
       plainReminder({ id: "reminder_weight_alt", linkedEvidenceType: "weight" }),
       plainReminder({ id: "reminder_dexa_upload", linkedEvidenceType: "dexa" }),
@@ -148,7 +173,12 @@ describe("Priority Detail skip contract", () => {
     for (const reminder of cases) {
       const { service } = detailService({ reminder, protocols });
       const detail = await service.getPriorityDetail(reminder.id, "user");
-      expect(detail, reminder.id).toMatchObject({ skippable: false, skipCommand: null, skipContext: null });
+      const expected = ["reminder_dexa_upload", "reminder_progress_photos"].includes(reminder.id);
+      expect(detail, reminder.id).toMatchObject({
+        skippable: expected,
+        skipCommand: expected ? { commandType: "priority.skip.v1" } : null,
+        skipContext: null,
+      });
     }
   });
 
@@ -334,10 +364,9 @@ describe("execution-backed peptide Support skip contract", () => {
     const past = peptideService();
     expect(await past.service.getPriorityDetail("reminder_peptide_weekly", "user", { occurrenceDate: "2026-09-09" }))
       .toMatchObject({ skippable: false, skipCommand: null, notificationAction: { skipCommand: null } });
-    // A future occurrence: the notification may skip on its own day; the
-    // detail button (today-only) may not.
+    // A future detail cannot submit today's command early.
     expect(await past.service.getPriorityDetail("reminder_peptide_weekly", "user", { occurrenceDate: "2026-09-23" }))
-      .toMatchObject({ skippable: false, skipCommand: null, notificationAction: { skipCommand: { commandType: "priority.skip.v1" } } });
+      .toMatchObject({ skippable: false, skipCommand: null, notificationAction: { skipCommand: null } });
     const completed = peptideService({ reminder: peptideReminder({
       completionHistory: [{ occurrenceDate: TODAY, completedAt: `${TODAY}T17:30:00.000Z`, effectiveDose: "0.5 mg" }],
     }) });

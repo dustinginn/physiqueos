@@ -78,6 +78,34 @@ export function resolvePriorityExecutionContract({ reminder, occurrenceDate } = 
   });
 }
 
+// Execution-backed priorities without a Reminder (currently the scheduled
+// DEXA appointment) use the same public occurrence/command shape. The
+// Server resolves this public priority identity back to its canonical source;
+// clients never select a collection or target kind.
+export function resolveExecutionPriorityContract({
+  executionItem,
+  occurrenceDate,
+  priorityId,
+  workflow,
+  destination,
+} = {}) {
+  if (!executionItem?.id || !priorityId) {
+    throw new TypeError("Priority execution requires a canonical execution item and projected priority ID.");
+  }
+  return Object.freeze({
+    priorityId,
+    occurrenceDate,
+    occurrenceKey: createPriorityOccurrenceKey(priorityId, occurrenceDate),
+    expectedVersion: executionItem.version !== null &&
+      executionItem.version !== undefined &&
+      Number.isSafeInteger(Number(executionItem.version))
+      ? Number(executionItem.version)
+      : null,
+    workflow,
+    destination,
+  });
+}
+
 // Named time-of-day buckets, resolved to the SAME hours `getPriorityState`'s
 // `getPreferredHour` already uses for priority ordering in
 // DailyFocusService.js — one canonical mapping, not two. This is the only
@@ -134,18 +162,28 @@ export function resolveNotificationAction({ executionContract, completable = fal
     priorityId: executionContract.priorityId,
     occurrenceDate: executionContract.occurrenceDate,
   });
+  const skipCommand = skippable === true
+    ? prioritySkipCommand(executionContract)
+    : null;
   if (forceSpecialized || executionContract.workflow !== "priority_detail") {
     return Object.freeze({
       classification: "specialized_workflow_required",
       workflow: executionContract.workflow,
       destination,
       completionCommand: null,
-      skipCommand: null,
+      skipCommand,
       scheduledTime,
     });
   }
   if (completable !== true || executionContract.expectedVersion === null) {
-    return Object.freeze({ classification: "open_only", workflow: executionContract.workflow, destination, completionCommand: null, skipCommand: null, scheduledTime });
+    return Object.freeze({
+      classification: skipCommand ? "specialized_workflow_required" : "open_only",
+      workflow: executionContract.workflow,
+      destination,
+      completionCommand: null,
+      skipCommand,
+      scheduledTime,
+    });
   }
   return Object.freeze({
     classification: "direct_completion_allowed",
@@ -159,7 +197,7 @@ export function resolveNotificationAction({ executionContract, completable = fal
         occurrenceDate: executionContract.occurrenceDate,
       }),
     }),
-    skipCommand: skippable === true ? prioritySkipCommand(executionContract) : null,
+    skipCommand,
     scheduledTime,
   });
 }
@@ -168,13 +206,21 @@ export function resolveNotificationAction({ executionContract, completable = fal
 // appointments, grouped Home sessions) — always specialized, since there's
 // no canonical reminder identity a notification could safely complete
 // directly against.
-export function specializedNotificationAction({ workflow, priorityId, occurrenceDate, timeOfDay = null }) {
+export function specializedNotificationAction({
+  executionContract = null,
+  workflow,
+  priorityId,
+  occurrenceDate,
+  timeOfDay = null,
+  skippable = false,
+}) {
+  const contract = executionContract ?? null;
   return Object.freeze({
     classification: "specialized_workflow_required",
     workflow,
     destination: Object.freeze({ priorityId, occurrenceDate }),
     completionCommand: null,
-    skipCommand: null,
+    skipCommand: skippable === true ? prioritySkipCommand(contract) : null,
     scheduledTime: resolveScheduledTime(timeOfDay),
   });
 }
@@ -182,9 +228,9 @@ export function specializedNotificationAction({ workflow, priorityId, occurrence
 // Protocol Support retains its domain workflow regardless of the reminder
 // used to schedule it. Editing a Support schedule does not authorize blind
 // notification completion; peptide completion remains dose-aware. Skip is a
-// separate capability: `skippable` (the shared skip rule — peptide and
-// recovery Support, never supplements) adds `skipCommand` beside the
-// dose-aware completion command, for an open occurrence only.
+// separate capability: `skippable` adds `skipCommand` beside the dose-aware
+// completion command for any open Support occurrence, independent of its
+// peptide/recovery/supplement category.
 export function protocolSupportNotificationAction({
   category,
   executionContract = null,
@@ -194,7 +240,12 @@ export function protocolSupportNotificationAction({
   ...occurrence
 }) {
   const workflow = category === "peptide" ? "peptide_protocol" : "priority_detail";
-  const base = specializedNotificationAction({ ...occurrence, workflow });
+  const base = specializedNotificationAction({
+    ...occurrence,
+    executionContract,
+    workflow,
+    skippable: skippable && completable,
+  });
   if (completable !== true || executionContract?.expectedVersion === null ||
       executionContract?.expectedVersion === undefined) return base;
   return Object.freeze({
@@ -228,49 +279,15 @@ export function openOnlyNotificationAction({ priorityId, occurrenceDate }) {
   });
 }
 
-// Today-only skip (`priority.skip.v1`). The Server is the single owner of
-// skip eligibility; Native renders `skippable`/`skipCommand` (Priority
-// Detail) and `notificationAction.skipCommand` and never re-derives it.
-// Skipping means the occurrence was intentionally not done: it writes the
-// dated reconciliation entry only, never `completionHistory`, a dose or
-// evidence. Eligible:
-// - an ordinary `priority_detail` reminder;
-// - Protocol Support whose linked protocol is `recovery` (Foam Rolling;
-//   manual completion, no dose) or `peptide` (completion stays dose-aware;
-//   a skip records no dose). A paused peptide date is refused at write time.
-// Excluded:
-// - Morning Weigh-in (`morning_check_in` workflow)
-// - Progress Photos (`progress_photos` workflow)
-// - DEXA reminders / appointments (`dexa_evidence` workflow; DEXA
-//   appointment priorities have no reminder at all)
-//   (all three by `executionContract.workflow`, not by reminder type)
-// - supplement Support (`supplement_reminder`, or any Support reminder whose
-//   protocol is a supplement): whether a supplement occurrence may be
-//   skipped remains a deferred product decision.
-// For a Support reminder the linked protocol's category decides, so callers
-// pass the resolved `protocol` (`null` when it does not resolve). Without a
-// `protocol` argument the reminder type alone decides (the pre-capability
-// rule: recovery reminders yes, peptide and supplement reminders no).
+// Today-only skip (`priority.skip.v1`). A real open actionable occurrence is
+// skippable by default. Domain-specific completion remains independent: an
+// evidence workflow can carry Skip without gaining a manual Complete action,
+// and a Support skip never carries a dose. The write-side occurrence resolver
+// revalidates schedule, lifecycle and source authority before committing.
 export const PRIORITY_SKIP_COMMAND_TYPE = "priority.skip.v1";
-const PRIORITY_SKIP_SUPPORT_REMINDER_TYPES = new Set([
-  "protocol_reminder",
-  "recovery_reminder",
-  "supplement_reminder",
-]);
-const PRIORITY_SKIP_SUPPORT_CATEGORIES = new Set(["peptide", "recovery"]);
 
-export function isPrioritySkipSupportedReminder(reminder, { protocol } = {}) {
-  if (!reminder?.id || reminder.active === false) return false;
-  const workflow = resolvePriorityExecutionContract({
-    reminder,
-    occurrenceDate: "2000-01-01",
-  }).workflow;
-  if (workflow !== "priority_detail") return false;
-  if (!PRIORITY_SKIP_SUPPORT_REMINDER_TYPES.has(reminder.type)) return true;
-  if (protocol === undefined) return reminder.type === "recovery_reminder";
-  return Boolean(protocol) &&
-    String(protocol.id) === String(reminder.linkedEntityId) &&
-    PRIORITY_SKIP_SUPPORT_CATEGORIES.has(protocol.category);
+export function isPrioritySkipSupportedReminder(reminder) {
+  return Boolean(reminder?.id) && reminder.active !== false;
 }
 
 export function prioritySkipCommand(executionContract) {

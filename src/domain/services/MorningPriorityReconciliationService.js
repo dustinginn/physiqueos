@@ -188,6 +188,12 @@ function validateSubmissions({ checkIns, selection, submissions }) {
 
     const eligible = eligibleByKey.get(submission.occurrenceKey);
     if (eligible?.id === submission.priorityId) {
+      if (eligible.evidenceRequired === true && submission.disposition !== "skipped") {
+        throw new MorningPriorityReconciliationValidationError(
+          "Scheduled evidence must be added through its evidence workflow or marked skipped.",
+          "unsupported_disposition"
+        );
+      }
       writes.push(submission);
       continue;
     }
@@ -370,7 +376,7 @@ function findExistingReconciliation(checkIns, date, priorityId) {
 
   return (checkIn?.reconciliation ?? []).find(
     (item) =>
-      item.reminderId === priorityId &&
+      (item.priorityId ?? item.reminderId) === priorityId &&
       (item.occurrenceDate ?? date) === date
   );
 }

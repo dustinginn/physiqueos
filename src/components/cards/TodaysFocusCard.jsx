@@ -4,9 +4,11 @@ import Card from "../ui/Card";
 import SectionTitle from "../ui/SectionTitle";
 import FocusTile from "../focus/FocusTile";
 import IconBadge from "../ui/IconBadge";
+import PrioritySkipForm from "../focus/PrioritySkipForm";
 
 export default function TodaysFocusCard({
   completeAction,
+  skipAction,
   items = [],
   onItemClick,
 }) {
@@ -32,12 +34,13 @@ export default function TodaysFocusCard({
       <div className={`mt-2.5 grid ${gridClass} gap-2`}>
         {items.map((item) =>
           isSessionPriority(item) ? (
-            <SessionPriorityCard item={item} key={item.id} />
+            <SessionPriorityCard item={item} key={item.id} skipAction={skipAction} />
           ) : (
             <FocusTile
               key={item.id}
               {...item}
               completeAction={completeAction}
+              skipAction={skipAction}
               density={density}
               onClick={onItemClick ? () => onItemClick(item) : undefined}
             />
@@ -48,7 +51,7 @@ export default function TodaysFocusCard({
   );
 }
 
-function SessionPriorityCard({ item }) {
+function SessionPriorityCard({ item, skipAction }) {
   const visibleItems = item.sessionItems.slice(0, 5);
   const hiddenCount = Math.max(item.sessionItems.length - visibleItems.length, 0);
   const completedCount = item.sessionItems.filter((sessionItem) => sessionItem.completed).length;
@@ -56,7 +59,7 @@ function SessionPriorityCard({ item }) {
   const Icon = iconMap[item.icon] ?? Target;
 
   return (
-    <Link
+    <div
       className="
         block
         rounded-[16px]
@@ -76,7 +79,6 @@ function SessionPriorityCard({ item }) {
         active:scale-[0.99]
       "
       data-testid="session-priority-card"
-      href={item.href}
     >
       <div className="flex items-start gap-3">
         <IconBadge icon={Icon} color={item.color} size="sm" className="rounded-full" />
@@ -84,9 +86,9 @@ function SessionPriorityCard({ item }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="text-sm font-extrabold leading-[1.15] text-[var(--text-primary)]">
+              <Link className="text-sm font-extrabold leading-[1.15] text-[var(--text-primary)]" href={item.href}>
                 {item.label}
-              </h3>
+              </Link>
               {item.subtitle && (
                 <p className="mt-1 text-[11px] font-medium leading-4 text-[var(--text-muted)]">
                   {item.subtitle}
@@ -100,7 +102,7 @@ function SessionPriorityCard({ item }) {
 
           <div className="mt-3 space-y-1.5">
             {visibleItems.map((sessionItem) => (
-              <SessionItemRow item={sessionItem} key={sessionItem.id} />
+              <SessionItemRow item={sessionItem} key={sessionItem.id} skipAction={skipAction} />
             ))}
             {hiddenCount > 0 && (
               <p className="pl-6 text-[11px] font-semibold text-[var(--text-muted)]">
@@ -122,13 +124,13 @@ function SessionPriorityCard({ item }) {
           </div>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
-function SessionItemRow({ item }) {
-  return (
-    <div className="flex items-center gap-2 text-[12px] font-semibold leading-4 text-[var(--text-primary)]">
+function SessionItemRow({ item, skipAction }) {
+  const row = (
+    <>
       <span
         aria-label={item.completed ? "Completed" : "Pending"}
         className={`
@@ -149,7 +151,20 @@ function SessionItemRow({ item }) {
       >
         <Check size={10} strokeWidth={3} aria-hidden="true" />
       </span>
-      <span className="min-w-0 truncate">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+    </>
+  );
+  return (
+    <div className="flex min-h-11 items-center gap-2 text-[12px] font-semibold leading-4 text-[var(--text-primary)]">
+      {item.href ? <Link className="flex min-w-0 flex-1 items-center gap-2" href={item.href}>{row}</Link> : row}
+      {!item.completed && item.skipCommand && skipAction && (
+        <PrioritySkipForm
+          action={skipAction}
+          command={item.skipCommand}
+          compact
+          label={item.label}
+        />
+      )}
     </div>
   );
 }

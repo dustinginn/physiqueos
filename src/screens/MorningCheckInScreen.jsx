@@ -69,12 +69,19 @@ export default function MorningCheckInScreen({
                         {item.dateLabel ?? "Yesterday"}{item.context ? ` · ${item.context}` : ""}
                       </span>
                     </legend>
+                    {item.primaryAction && (
+                      <Link className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--primary)] px-4 text-sm font-extrabold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-100" href={item.primaryAction.href}>
+                        {item.primaryAction.label}
+                      </Link>
+                    )}
                     <div className="grid min-w-0 gap-2">
-                      {[
-                        ["completed", "Completed"],
-                        ["skipped", "Skipped"],
-                        ["note", "Add note"],
-                      ].map(([value, label]) => (
+                      {(item.evidenceRequired
+                        ? [["skipped", "Mark Skipped"]]
+                        : [
+                            ["completed", "Completed"],
+                            ["skipped", "Skipped"],
+                            ["note", "Add note"],
+                          ]).map(([value, label]) => (
                         <label
                           className="flex min-h-12 min-w-0 cursor-pointer items-center gap-3 rounded-xl border border-[var(--divider)] bg-[var(--surface-elevated)] px-3 text-sm font-bold text-[var(--text-primary)] has-[:checked]:border-[var(--primary)] has-[:checked]:ring-2 has-[:checked]:ring-indigo-100"
                           key={value}

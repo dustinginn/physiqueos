@@ -4,8 +4,9 @@ import Card from "../components/ui/Card";
 import ActionButton from "../components/ui/ActionButton";
 import IconBadge from "../components/ui/IconBadge";
 import PriorityCompletionButton from "./PriorityCompletionButton";
+import PrioritySkipForm from "../components/focus/PrioritySkipForm";
 
-export default function PriorityDetailScreen({ completeAction, priority }) {
+export default function PriorityDetailScreen({ completeAction, priority, skipAction }) {
   return (
     <main className="min-h-screen bg-[#F7F8FA]">
       <div className="mx-auto max-w-[393px] px-4 pt-10 pb-10">
@@ -49,6 +50,13 @@ export default function PriorityDetailScreen({ completeAction, priority }) {
             <ActionButton href={priority.action?.href ?? "/"}>
               {priority.action?.label ?? "Continue"}
             </ActionButton>
+          )}
+          {priority.skipCommand && skipAction && (
+            <PrioritySkipForm
+              action={skipAction}
+              command={priority.skipCommand}
+              label={priority.title}
+            />
           )}
         </div>
       </div>

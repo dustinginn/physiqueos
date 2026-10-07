@@ -6,7 +6,7 @@ import GoalsCard from "../components/cards/GoalsCard";
 import TodaysFocusCard from "../components/cards/TodaysFocusCard";
 import { getProductionCoreNavigationReadService } from "../application/composition/productionApplicationComposition";
 import { adaptApplicationReadModelToLegacyWeb } from "../application/read-models/legacyWebPresentation";
-import { completeHomePriority } from "../app/actions";
+import { completeHomePriority, skipHomePriority } from "../app/actions";
 
 export default async function HomeScreen() {
   const briefing = adaptApplicationReadModelToLegacyWeb(
@@ -35,6 +35,7 @@ export default async function HomeScreen() {
 
           <TodaysFocusCard
             completeAction={completeHomePriority}
+            skipAction={skipHomePriority}
             items={briefing.todaysFocus}
           />
         </div>

@@ -103,16 +103,18 @@ function pending(type, id = `review_${type}`) {
 }
 
 describe("Morning evidence recovery projection", () => {
-  it("turns a scheduled missing photo priority into Upload Photos, not outcome reconciliation", () => {
+  it("offers Upload Photos and Mark Skipped for a scheduled missing photo occurrence", () => {
     const result = selection({ priorityItems: [photoPriority()] });
-    expect(result.executionReconciliationItems).toEqual([]);
-    expect(result.evidenceRecoveryItems[0]).toMatchObject({
-      kind: MORNING_RECONCILIATION_ITEM_KINDS.EVIDENCE,
+    expect(result.evidenceRecoveryItems).toEqual([]);
+    expect(result.executionReconciliationItems[0]).toMatchObject({
+      id: "reminder_weekly_progress_photo_set",
+      kind: MORNING_RECONCILIATION_ITEM_KINDS.EXECUTION,
+      evidenceRequired: true,
       evidenceType: "photo_session",
       status: MORNING_EVIDENCE_RECOVERY_STATUSES.MISSING,
       primaryAction: { label: "Upload Photos" },
     });
-    expect(result.evidenceRecoveryItems[0].primaryAction.href).toContain(
+    expect(result.executionReconciliationItems[0].primaryAction.href).toContain(
       "date=2026-08-08"
     );
   });
@@ -122,12 +124,12 @@ describe("Morning evidence recovery projection", () => {
       priorityItems: [photoPriority()],
       reviews: [pending("photo_session", "review_photo")],
     });
-    expect(result.evidenceRecoveryItems[0]).toMatchObject({
+    expect(result.executionReconciliationItems[0]).toMatchObject({
       pendingReviewId: "review_photo",
       status: MORNING_EVIDENCE_RECOVERY_STATUSES.PENDING_CONFIRMATION,
       primaryAction: { label: "Resume review" },
     });
-    expect(result.evidenceRecoveryItems[0].primaryAction.href)
+    expect(result.executionReconciliationItems[0].primaryAction.href)
       .toContain("/evidence/review/review_photo?");
   });
 
