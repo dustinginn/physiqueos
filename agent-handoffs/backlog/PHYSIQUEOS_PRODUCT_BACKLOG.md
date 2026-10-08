@@ -16,6 +16,15 @@ Before proposing or reconstructing the PhysiqueOS backlog:
 Agent handoff reports describe implementation state. This backlog describes what still needs product attention.
 
 
+NEXT BUILD 93 — FOUNDER-REQUESTED CANDIDATES (COLLECTING, NOT YET FINALIZED)
+
+Photo Briefing comparison viewer — ADD TO NEXT-BUILD LIST (Founder request, 2026-10-07).
+- Improve the existing Photo Briefing paired comparison to display the two corresponding progress photos simultaneously side by side, rather than paging between one photo at a time.
+- Support synchronized zoom and pan on the paired photos to make matching body-area comparisons easier.
+- Preserve actual canonical source photos, their pose/date mappings and the established Photo Briefing sections, captions, comparison meaning and existing single-photo functionality. Do not generate synthetic replacement photos or substitute placeholder imagery for acceptance.
+- Scope is implementation and real-image visual/functional acceptance of this specific paired comparison experience. It is not authorization to redesign the entire Photo Briefing, alter Photo Intelligence interpretation, or release a new build yet.
+- Status: FOUNDER REQUESTED / NEXT-BUILD CANDIDATE, NOT IMPLEMENTED. This is one of several items being collected. Do not begin work or finalize Build 93 until Founder finishes adding items and explicitly authorizes the work.
+
 CURRENT DELIVERY / OPEN ACCEPTANCE AUTHORITY — 2026-10-07 local (LATEST; supersedes historical Build 91 and pre-release Build 92 roadmap snapshots below)
 
 Build 92 is RELEASED TO TESTFLIGHT (Apple build-status VALID; import-status VALID), NOT YET PHYSICALLY ACCEPTED BY FOUNDER.
