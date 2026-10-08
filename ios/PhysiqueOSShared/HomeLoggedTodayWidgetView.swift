@@ -47,6 +47,9 @@ enum HomeWidgetInteractionMetrics {
     static let refreshHitTarget: CGFloat = 44
     static let smallRefreshGlyphFrame: CGFloat = 24
     static let largeRefreshGlyphFrame: CGFloat = 28
+    /// Negative inset that keeps the 44 pt square refresh target from
+    /// consuming header height ((44 − 24) / 2).
+    static let smallRefreshInset: CGFloat = 10
 }
 
 struct HomeLoggedTodayWidgetView: View {
@@ -94,6 +97,9 @@ struct HomeLoggedTodayWidgetView: View {
         .widgetAccentable()
     }
 
+    /// Founder-approved Option B (2026-10-08): Nutrition and Active side by
+    /// side at equal prominence, legible P/C/F gram chips, and the iPhone
+    /// Finish Workout amber Start Logger.
     private var smallBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
@@ -102,7 +108,7 @@ struct HomeLoggedTodayWidgetView: View {
                     .foregroundStyle(palette.text)
                 Spacer(minLength: 2)
                 Text(compactFreshnessText)
-                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundStyle(freshnessIsWarning ? palette.warning : palette.secondary)
                     .lineLimit(1)
                 Button(intent: RefreshHomeWidgetTotalsIntent(
@@ -123,13 +129,25 @@ struct HomeLoggedTodayWidgetView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Refresh totals in PhysiqueOS")
+                // The 44 pt target stays; it no longer sets the header height.
+                .padding(.vertical, -HomeWidgetInteractionMetrics.smallRefreshInset)
+                .padding(.trailing, -HomeWidgetInteractionMetrics.smallRefreshInset)
             }
+            .frame(height: HomeWidgetInteractionMetrics.smallRefreshGlyphFrame)
 
             if rendersToday, let snapshot {
-                VStack(alignment: .leading, spacing: 5) {
-                    smallNutrition(snapshot.nutrition)
-                    Divider().overlay(palette.divider)
-                    smallActivityAndWeight(activity: snapshot.activity, weight: snapshot.weight)
+                VStack(alignment: .leading, spacing: 0) {
+                    smallMetricColumns(nutrition: snapshot.nutrition, activity: snapshot.activity)
+                        .padding(.top, 8)
+                    // With today's weight the rhythm tightens by 3 pt so the
+                    // square still fits its 138 pt content area.
+                    smallMacroChips(snapshot.nutrition)
+                        .padding(.top, snapshot.weight == nil ? 8 : 7)
+                    if let weight = HomeWidgetValueFormatter.weight(snapshot.weight) {
+                        smallLabel("WEIGHT  \(weight)")
+                            .padding(.top, 3)
+                            .accessibilityLabel("Weight \(weight)")
+                    }
                 }
                 .privacySensitive()
                 .redacted(reason: privacyRedactedForPreview ? .privacy : [])
@@ -194,63 +212,99 @@ struct HomeLoggedTodayWidgetView: View {
         }
     }
 
-    private func smallNutrition(_ nutrition: HomeWidgetNutritionSummary?) -> some View {
+    private func smallLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 8, weight: .bold, design: .rounded))
+            .tracking(0.6)
+            .foregroundStyle(palette.secondary)
+            .lineLimit(1)
+    }
+
+    /// Equal 17 pt figures for calories eaten and active calories.
+    private func smallMetricColumns(
+        nutrition: HomeWidgetNutritionSummary?,
+        activity: HomeWidgetActivitySummary?
+    ) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            smallFigureColumn(
+                label: "NUTRITION",
+                value: nutrition.map { HomeWidgetValueFormatter.calories($0.calories) },
+                spoken: "Nutrition"
+            )
+            Rectangle()
+                .fill(palette.divider)
+                .frame(width: 1, height: 32)
+                .padding(.horizontal, 6)
+                .accessibilityHidden(true)
+            smallFigureColumn(
+                label: "ACTIVE",
+                value: activity?.activeCalories.map { HomeWidgetValueFormatter.activeCalories($0) },
+                spoken: "Active"
+            )
+        }
+    }
+
+    private func smallFigureColumn(label: String, value: String?, spoken: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text("NUTRITION")
-                .font(.system(size: 7, weight: .bold, design: .rounded))
-                .tracking(0.5)
-                .foregroundStyle(palette.secondary)
-            if let nutrition {
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(HomeWidgetValueFormatter.calories(nutrition.calories))
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+            smallLabel(label)
+            if let value {
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(value)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(palette.text)
                     Text("cal")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(.system(size: 8, weight: .bold, design: .rounded))
                         .foregroundStyle(palette.secondary)
                 }
-                .foregroundStyle(palette.text)
-                Text("P \(HomeWidgetValueFormatter.grams(nutrition.proteinG))  C \(HomeWidgetValueFormatter.grams(nutrition.carbsG))  F \(HomeWidgetValueFormatter.grams(nutrition.fatG))")
-                    .font(.system(size: 8, weight: .semibold, design: .rounded))
-                    .foregroundStyle(palette.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            } else {
-                Text("—  Not logged")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(palette.secondary)
-            }
-        }
-    }
-
-    private func smallActivityAndWeight(
-        activity: HomeWidgetActivitySummary?,
-        weight: HomeWidgetWeightSummary?
-    ) -> some View {
-        HStack(alignment: .top, spacing: 7) {
-            smallMetric(
-                label: "ACTIVE",
-                value: activity?.activeCalories.map { "\(HomeWidgetValueFormatter.activeCalories($0)) cal" } ?? HomeWidgetValueFormatter.missing
-            )
-            if let weight = HomeWidgetValueFormatter.weight(weight) {
-                Divider().overlay(palette.divider).frame(height: 25)
-                smallMetric(label: "WEIGHT", value: weight)
-            }
-        }
-    }
-
-    private func smallMetric(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label)
-                .font(.system(size: 7, weight: .bold, design: .rounded))
-                .tracking(0.4)
-                .foregroundStyle(palette.secondary)
-            Text(value)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(palette.text)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.75)
+            } else {
+                Text(HomeWidgetValueFormatter.missing)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(palette.tertiary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(value.map { "\(spoken) \($0) calories" } ?? "\(spoken) not logged")
+    }
+
+    @ViewBuilder
+    private func smallMacroChips(_ nutrition: HomeWidgetNutritionSummary?) -> some View {
+        if let nutrition {
+            HStack(spacing: 4) {
+                macroChip("P", nutrition.proteinG, spoken: "Protein")
+                macroChip("C", nutrition.carbsG, spoken: "Carbs")
+                macroChip("F", nutrition.fatG, spoken: "Fat")
+            }
+        } else {
+            smallLabel("NOT LOGGED YET")
+        }
+    }
+
+    private func macroChip(_ letter: String, _ grams: Double?, spoken: String) -> some View {
+        let value = HomeWidgetValueFormatter.grams(grams)
+        return HStack(alignment: .firstTextBaseline, spacing: 2) {
+            Text(letter)
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(palette.secondary)
+            Text(value)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(palette.text)
+            if grams != nil {
+                Text("g")
+                    .font(.system(size: 8, weight: .semibold, design: .rounded))
+                    .foregroundStyle(palette.secondary)
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .frame(maxWidth: .infinity, minHeight: 20)
+        .background(palette.chip, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(grams == nil ? "\(spoken) not logged" : "\(spoken) \(value) grams")
     }
 
     @ViewBuilder
@@ -389,10 +443,10 @@ struct HomeLoggedTodayWidgetView: View {
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 11, weight: .bold))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(palette.onWorkoutAction)
             .padding(.horizontal, 13)
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(palette.actionGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(palette.workoutAction, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .accessibilityLabel(active ? "Resume Workout" : "Start Workout Logger")
     }
@@ -403,17 +457,17 @@ struct HomeLoggedTodayWidgetView: View {
             Image(systemName: active ? "arrow.clockwise.circle.fill" : "plus.circle.fill")
                 .font(.system(size: 11, weight: .semibold))
             Text(active ? "Resume Workout" : "Start Logger")
-                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
             Spacer(minLength: 0)
             Image(systemName: "arrow.up.right")
                 .font(.system(size: 8, weight: .bold))
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 8)
+        .foregroundStyle(palette.onWorkoutAction)
+        .padding(.horizontal, 9)
         .frame(maxWidth: .infinity, minHeight: 30)
-        .background(palette.actionGradient, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .background(palette.workoutAction, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(active ? "Resume Workout" : "Start Workout Logger")
     }
@@ -495,10 +549,15 @@ struct HomeWidgetPalette {
     let nutrition: Color
     let activity: Color
     let weight: Color
-    let actionGradient: LinearGradient
+    let chip: Color
+    /// Start Logger / Resume Workout: the iPhone Finish Workout amber
+    /// (`WorkoutActivityPrimaryAction`, the same token the Watch and Live
+    /// Activity use) with the iPhone execution ink.
+    let workoutAction: Color
+    let onWorkoutAction: Color
 
-    /// Refresh and Start Logger intentionally share one widget-owned action
-    /// semantic instead of maintaining independent presentation colors.
+    /// Refresh keeps the widget's teal action accent (Founder: no recolor of
+    /// refresh/status yet); only the workout CTA moved to amber.
     var refreshAccent: Color { actionAccent }
 
     init(colorScheme: ColorScheme) {
@@ -514,7 +573,8 @@ struct HomeWidgetPalette {
             nutrition = Color(hex: 0x4EE09A)
             activity = Color(hex: 0xF3BA49)
             weight = Color(hex: 0x40C7D7)
-            actionGradient = LinearGradient(colors: [actionAccent, Color(hex: 0x123D61)], startPoint: .leading, endPoint: .trailing)
+            chip = Color(hex: 0x203441, alpha: 0.55)
+            workoutAction = Color(hex: WorkoutActivityPrimaryAction.darkHex)
         } else {
             background = Color(hex: 0xEEF1EB)
             text = Color(hex: 0x0A1C29)
@@ -527,17 +587,24 @@ struct HomeWidgetPalette {
             nutrition = Color(hex: 0x0C9363)
             activity = Color(hex: 0xB47510)
             weight = Color(hex: 0x0E8CA7)
-            actionGradient = LinearGradient(colors: [actionAccent, Color(hex: 0x163F62)], startPoint: .leading, endPoint: .trailing)
+            chip = Color(hex: 0xCAD4CF, alpha: 0.55)
+            workoutAction = Color(hex: WorkoutActivityPrimaryAction.mineralLightHex)
         }
+        onWorkoutAction = Color(hex: WorkoutActivityPrimaryAction.foregroundHex)
     }
 }
 
 private extension Color {
     init(hex: UInt32) {
+        self.init(hex: hex, alpha: 1)
+    }
+
+    init(hex: UInt32, alpha: Double) {
         self.init(
             red: Double((hex >> 16) & 0xFF) / 255,
             green: Double((hex >> 8) & 0xFF) / 255,
-            blue: Double(hex & 0xFF) / 255
+            blue: Double(hex & 0xFF) / 255,
+            opacity: alpha
         )
     }
 }

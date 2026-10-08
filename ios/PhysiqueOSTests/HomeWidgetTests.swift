@@ -10,11 +10,90 @@ final class HomeWidgetTests: XCTestCase {
         XCTAssertLessThan(HomeWidgetInteractionMetrics.largeRefreshGlyphFrame, HomeWidgetInteractionMetrics.refreshHitTarget)
     }
 
-    func testRefreshAccentUsesTheStartLoggerActionSemanticInBothAppearances() {
+    func testRefreshKeepsTheTealActionAccentWhileStartLoggerUsesTheWorkoutAmber() {
         for colorScheme in [ColorScheme.dark, .light] {
             let palette = HomeWidgetPalette(colorScheme: colorScheme)
             XCTAssertEqual(palette.refreshAccent, palette.actionAccent)
+            XCTAssertEqual(Self.hex(palette.refreshAccent), colorScheme == .dark ? 0x20BDB2 : 0x0B817F, "refresh/status stay teal")
+            XCTAssertNotEqual(Self.hex(palette.refreshAccent), Self.hex(palette.workoutAction))
         }
+    }
+
+    /// Option B (Founder 2026-10-08): the Start Logger fill is the iPhone
+    /// Finish Workout amber shared with the Watch and Live Activity.
+    func testStartLoggerIsTheSharedWorkoutAmberWithContrastSafeInk() {
+        let dark = HomeWidgetPalette(colorScheme: .dark)
+        let light = HomeWidgetPalette(colorScheme: .light)
+        XCTAssertEqual(Self.hex(dark.workoutAction), WorkoutActivityPrimaryAction.darkHex)
+        XCTAssertEqual(Self.hex(light.workoutAction), WorkoutActivityPrimaryAction.mineralLightHex)
+        XCTAssertEqual(Self.hex(dark.onWorkoutAction), WorkoutActivityPrimaryAction.foregroundHex)
+        XCTAssertEqual(Self.hex(light.onWorkoutAction), WorkoutActivityPrimaryAction.foregroundHex)
+        XCTAssertEqual(WorkoutActivityPrimaryAction.darkHex, 0xEFB84F)
+        XCTAssertEqual(WorkoutActivityPrimaryAction.mineralLightHex, 0xC88228)
+        for palette in [dark, light] {
+            XCTAssertGreaterThanOrEqual(Self.contrast(palette.workoutAction, palette.onWorkoutAction), 4.5)
+        }
+    }
+
+    func testSquareRefreshTargetStaysAccessibleWithoutConsumingHeaderHeight() {
+        XCTAssertEqual(
+            HomeWidgetInteractionMetrics.smallRefreshGlyphFrame + 2 * HomeWidgetInteractionMetrics.smallRefreshInset,
+            HomeWidgetInteractionMetrics.refreshHitTarget
+        )
+    }
+
+    /// Every square state fits the 170 pt systemSmall content area (16 pt
+    /// WidgetKit margins) in both appearances, with and without weight.
+    @MainActor
+    func testOptionBSquareFitsTheSystemSmallContentAreaInEveryState() {
+#if canImport(UIKit)
+        var large = HomeWidgetSamples.snapshot()
+        large.nutrition = .init(calories: 9_999.4, proteinG: 388, carbsG: 512, fatG: 199)
+        large.activity = .init(activeCalories: 2_345, isPartialDay: false)
+        var missing = HomeWidgetSamples.snapshot()
+        missing.nutrition = nil
+        missing.activity = nil
+        let states: [(String, HomeWidgetSnapshot?)] = [
+            ("full", HomeWidgetSamples.snapshot()),
+            ("no weight", HomeWidgetSamples.snapshot(weight: false)),
+            ("active workout", HomeWidgetSamples.snapshot(activeWorkout: true)),
+            ("stale", HomeWidgetSamples.snapshot(stale: true)),
+            ("waiting", HomeWidgetSamples.snapshot(waiting: true)),
+            ("largest values", large),
+            ("not logged", missing),
+            ("no snapshot", nil),
+        ]
+        for scheme in [ColorScheme.dark, .light] {
+            for (name, snapshot) in states {
+                let host = UIHostingController(rootView: HomeLoggedTodayWidgetView(
+                    snapshot: snapshot, date: HomeWidgetSamples.referenceDate, familyOverrideForPreview: .systemSmall
+                ).environment(\.colorScheme, scheme))
+                let size = host.sizeThatFits(in: CGSize(width: 138, height: CGFloat.greatestFiniteMagnitude))
+                XCTAssertLessThanOrEqual(size.height, 138, "\(name) \(scheme) overflows the square")
+            }
+        }
+#endif
+    }
+
+    private static func components(_ color: Color) -> (Double, Double, Double) {
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        return (Double(red), Double(green), Double(blue))
+    }
+
+    private static func hex(_ color: Color) -> UInt32 {
+        let (red, green, blue) = components(color)
+        return UInt32((red * 255).rounded()) << 16 | UInt32((green * 255).rounded()) << 8 | UInt32((blue * 255).rounded())
+    }
+
+    private static func contrast(_ lhs: Color, _ rhs: Color) -> Double {
+        func luminance(_ color: Color) -> Double {
+            let (red, green, blue) = components(color)
+            let linear = [red, green, blue].map { $0 <= 0.03928 ? $0 / 12.92 : pow(($0 + 0.055) / 1.055, 2.4) }
+            return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+        }
+        let (a, b) = (luminance(lhs), luminance(rhs))
+        return (max(a, b) + 0.05) / (min(a, b) + 0.05)
     }
 
     func testSnapshotRoundTripAndAuthorityAccountFences() throws {
@@ -406,7 +485,8 @@ final class HomeWidgetTests: XCTestCase {
             width: CGFloat,
             height: CGFloat,
             padding: CGFloat,
-            directory: URL
+            directory: URL,
+            scheme: ColorScheme = .dark
         ) throws {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let gallery = VStack(spacing: 0) {
@@ -418,14 +498,14 @@ final class HomeWidgetTests: XCTestCase {
                         familyOverrideForPreview: family
                     )
                     ZStack {
-                        Color(red: 0.035, green: 0.055, blue: 0.095)
+                        HomeWidgetPalette(colorScheme: scheme).background
                         base.padding(padding)
                     }
                     .frame(width: width, height: height)
                     .clipShape(RoundedRectangle(cornerRadius: family == .systemSmall ? 22 : 26, style: .continuous))
                 }
             }
-            .environment(\.colorScheme, .dark)
+            .environment(\.colorScheme, scheme)
             let renderer = ImageRenderer(content: gallery)
             renderer.proposedSize = ProposedViewSize(width: width, height: height * Double(cases.count))
             renderer.scale = 3
@@ -445,7 +525,15 @@ final class HomeWidgetTests: XCTestCase {
             }
         }
 
-        try render(family: .systemSmall, width: 170, height: 170, padding: 12, directory: output)
+        try render(family: .systemSmall, width: 170, height: 170, padding: 16, directory: output)
+        try render(
+            family: .systemSmall,
+            width: 170,
+            height: 170,
+            padding: 16,
+            directory: output.appendingPathComponent("mineral-light", isDirectory: true),
+            scheme: .light
+        )
         try render(
             family: .systemLarge,
             width: 360,
@@ -523,4 +611,42 @@ final class HomeWidgetTests: XCTestCase {
 private actor HomeWidgetRefreshIntentCapture {
     private(set) var value: String?
     func record(_ value: String) { self.value = value }
+}
+
+/// Acceptance renders of the shipping square against the Founder-approved
+/// Option B design renders (branch claude/build93-widget-design-options-20261008),
+/// on the same fixture: Founder-reported 1,139 cal / 649 active cal / 12m,
+/// illustrative macros. Opt-in (`WIDGET_ACCEPTANCE_DIR`).
+final class HomeWidgetOptionBAcceptanceRenderTests: XCTestCase {
+    @MainActor
+    func testRenderShippingSquareOnTheApprovedDesignFixture() throws {
+#if canImport(UIKit)
+        guard let directory = ProcessInfo.processInfo.environment["WIDGET_ACCEPTANCE_DIR"].map(URL.init(fileURLWithPath:)) else {
+            throw XCTSkip("Acceptance renders are produced on request (WIDGET_ACCEPTANCE_DIR).")
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for scheme in [ColorScheme.dark, .light] {
+            for weight in [false, true] {
+                var snapshot = HomeWidgetSamples.snapshot(weight: weight)
+                snapshot.lastSuccessfulReadAt = HomeWidgetSnapshotClock.string(from: HomeWidgetSamples.referenceDate.addingTimeInterval(-12 * 60))
+                snapshot.nutrition = .init(calories: 1_139, proteinG: 96, carbsG: 104, fatG: 38)
+                snapshot.activity = .init(activeCalories: 649, isPartialDay: true)
+                let tile = ZStack {
+                    HomeWidgetPalette(colorScheme: scheme).background
+                    HomeLoggedTodayWidgetView(snapshot: snapshot, date: HomeWidgetSamples.referenceDate, familyOverrideForPreview: .systemSmall)
+                        .padding(16)
+                }
+                .frame(width: 170, height: 170)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .environment(\.colorScheme, scheme)
+                let renderer = ImageRenderer(content: tile)
+                renderer.proposedSize = ProposedViewSize(width: 170, height: 170)
+                renderer.scale = 3
+                let data = try XCTUnwrap(renderer.uiImage?.pngData())
+                let name = "shipping-option-b\(weight ? "-with-weight" : "")-\(scheme == .dark ? "dark" : "mineral-light").png"
+                try data.write(to: directory.appendingPathComponent(name), options: .atomic)
+            }
+        }
+#endif
+    }
 }
