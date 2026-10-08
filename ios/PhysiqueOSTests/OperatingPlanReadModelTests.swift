@@ -1203,9 +1203,49 @@ final class Build91OperatingPlanTests: XCTestCase {
         XCTAssertEqual(OperatingPlanStrategyDetailView.startedValue("July 19, 2026"), "July 19, 2026")
     }
 
+    func testHistoricalEnergyTargetCopyDistinguishesRecordedMissingAndUnavailable() {
+        XCTAssertEqual(
+            OperatingPlanStrategyDetailView.targetText(.init(availability: "available", value: 2450, unit: "kcal/day")),
+            "2,450 kcal/day"
+        )
+        XCTAssertEqual(
+            OperatingPlanStrategyDetailView.targetText(.init(availability: "not_recorded", value: nil, unit: nil)),
+            "Not recorded"
+        )
+        XCTAssertEqual(
+            OperatingPlanStrategyDetailView.targetText(.init(availability: "unavailable", value: nil, unit: nil)),
+            "Unavailable"
+        )
+        XCTAssertNotEqual(
+            OperatingPlanStrategyDetailView.targetText(.init(availability: "not_recorded", value: nil, unit: nil)),
+            "0"
+        )
+    }
+
+    func testHistoricalEnergyRevisionHeadingPreservesEndExclusiveBoundary() {
+        let revision = OperatingPlanEnergyPhaseRevisionReadModel(
+            id: "v1", protocolId: "energy", protocolVersionId: "v1", protocolVersionNumber: 1,
+            goalId: "goal", phaseId: "phase", effectiveFrom: "2026-07-19", effectiveTo: "2026-08-01",
+            dateSemantics: "owner_local_calendar_date", timeZone: "America/Los_Angeles",
+            caloricIntakeTarget: .init(availability: "available", value: 2450, unit: "kcal/day"),
+            activityExpenditureTarget: .init(availability: "available", value: 500, unit: "active kcal/day"),
+            provenance: .init(
+                source: "canonical_protocol_version", phaseAttribution: "protocol_version.phaseId",
+                goalAttribution: "protocol_version.goalLinks", targetAttribution: "protocol_version.change.reviewedChanges",
+                strategyId: nil, confirmationAuthority: nil
+            )
+        )
+        XCTAssertEqual(
+            OperatingPlanStrategyDetailView.revisionHeading(revision, ordinal: 1),
+            "Revision 1 · Effective Jul 19, 2026 until Aug 1, 2026"
+        )
+    }
+
     func testEnergyStaysReadOnlyAndPhaseHistoryIsNotFabricated() throws {
         let detail = try source("PhysiqueOS/Presentation/OperatingPlan/OperatingPlanStrategyDetailView.swift")
-        XCTAssertTrue(detail.contains("energyPhaseHistory: []"), "D7: no Energy phase-history projection in Build 91")
+        XCTAssertTrue(detail.contains("Planned targets from canonical Strategy versions"))
+        XCTAssertTrue(detail.contains("Historical targets"))
+        XCTAssertTrue(detail.contains("Unavailable"))
         XCTAssertTrue(detail.contains("if let editLabel = detail.editLabel, let editDestination = detail.editDestination"))
         let store = OperatingPlanSandboxStore()
         let energy = try XCTUnwrap(store.strategyDetail(strategyType: "energy", strategyId: "strategy_fixture_energy"))

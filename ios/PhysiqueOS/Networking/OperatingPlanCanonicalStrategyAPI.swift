@@ -5,6 +5,8 @@ protocol EnergyStrategyAPI: Sendable {
 }
 
 struct EnergyStrategyDetail: Decodable, Equatable, Sendable {
+    static let supportedPhaseHistorySchemaVersion = "operating_plan_energy_phase_history_v1"
+
     var protocolId: String
     var title: String
     var purpose: String
@@ -14,14 +16,90 @@ struct EnergyStrategyDetail: Decodable, Equatable, Sendable {
     var fields: [OperatingPlanStrategyFieldReadModel]
     var editLabel: String?
     var intentionallyReadOnly: Bool
+    var energyPhaseHistorySchemaVersion: String?
+    var energyPhaseHistory: [OperatingPlanEnergyPhaseHistoryPayload]
+
+    private enum CodingKeys: String, CodingKey {
+        case protocolId, title, purpose, goal, startedDate, status, fields, editLabel, intentionallyReadOnly
+        case energyPhaseHistorySchemaVersion, energyPhaseHistory
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        protocolId = try values.decode(String.self, forKey: .protocolId)
+        title = try values.decode(String.self, forKey: .title)
+        purpose = try values.decode(String.self, forKey: .purpose)
+        goal = try values.decode(String.self, forKey: .goal)
+        startedDate = try values.decode(String.self, forKey: .startedDate)
+        status = try values.decode(String.self, forKey: .status)
+        fields = try values.decode([OperatingPlanStrategyFieldReadModel].self, forKey: .fields)
+        editLabel = try values.decodeIfPresent(String.self, forKey: .editLabel)
+        intentionallyReadOnly = try values.decode(Bool.self, forKey: .intentionallyReadOnly)
+        energyPhaseHistorySchemaVersion = try values.decodeIfPresent(String.self, forKey: .energyPhaseHistorySchemaVersion)
+        energyPhaseHistory = try values.decodeIfPresent(
+            [OperatingPlanEnergyPhaseHistoryPayload].self, forKey: .energyPhaseHistory
+        ) ?? []
+    }
 
     var readModel: OperatingPlanStrategyDetailReadModel {
         .init(
             strategyType: .energy, strategyId: protocolId, title: title, purpose: purpose,
             goal: goal, startedDate: startedDate, status: status, fields: fields,
-            editLabel: nil, energyPhaseHistory: []
+            editLabel: nil, energyPhaseHistory: projectedPhaseHistory
         )
     }
+
+    /// The schema marker gates this additive projection so an unknown future
+    /// shape cannot leak values into the UI. Active phases remain solely in
+    /// `fields`; any cross-Goal or cross-Phase revision causes the entire
+    /// phase's target values to be withheld.
+    private var projectedPhaseHistory: [OperatingPlanEnergyPhaseSnapshotReadModel] {
+        guard energyPhaseHistorySchemaVersion == Self.supportedPhaseHistorySchemaVersion else { return [] }
+        return energyPhaseHistory.compactMap { phase in
+            guard ["completed", "superseded"].contains(phase.phaseStatus) else { return nil }
+            let attributionMismatch = phase.id != phase.phaseId || phase.revisions.contains {
+                $0.goalId != phase.goalId || $0.phaseId != phase.phaseId
+            }
+            return OperatingPlanEnergyPhaseSnapshotReadModel(
+                id: phase.id,
+                goalId: phase.goalId,
+                phaseName: phase.phaseName,
+                phaseOrder: phase.phaseOrder,
+                isActive: false,
+                caloricIntake: "",
+                activityTarget: "",
+                reviewCadence: "",
+                note: "",
+                phaseId: phase.phaseId,
+                phaseStatus: phase.phaseStatus,
+                startedOn: phase.startedOn,
+                endedOn: phase.endedOn,
+                dateSemantics: phase.dateSemantics,
+                timeZone: phase.timeZone,
+                availability: attributionMismatch ? "untrusted" : phase.availability,
+                absenceKind: attributionMismatch ? "source_untrusted" : phase.absenceKind,
+                reason: attributionMismatch ? "native_attribution_mismatch" : phase.reason,
+                revisions: attributionMismatch ? [] : phase.revisions
+            )
+        }
+    }
+}
+
+struct OperatingPlanEnergyPhaseHistoryPayload: Decodable, Equatable, Sendable {
+    var id: String
+    var goalId: String
+    var phaseId: String
+    var phaseName: String
+    var phaseOrder: Int
+    var phaseStatus: String
+    var startedOn: String?
+    var endedOn: String?
+    var dateSemantics: String
+    var timeZone: String?
+    var availability: String
+    var absenceKind: String?
+    var reason: String?
+    var revisions: [OperatingPlanEnergyPhaseRevisionReadModel]
 }
 
 struct ProductionEnergyStrategyAPI: EnergyStrategyAPI {

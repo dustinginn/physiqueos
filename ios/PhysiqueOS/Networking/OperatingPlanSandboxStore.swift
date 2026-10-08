@@ -73,6 +73,9 @@ final class OperatingPlanSandboxStore {
         self.supplementLifecycle = fixture.supplementLifecycle
         self.goalOptions = fixture.goalOptions
         self.goalTitle = fixture.goalOptions.first?.title ?? "Build Lean Mass"
+#if DEBUG
+        installEnergyHistoryReviewFixture()
+#endif
         if startWithoutActiveTrainingProtocol {
             trainingEditors[Self.trainingBuilderStrategyId] = nil
             strategyDetails[Self.trainingBuilderStrategyId] = nil
@@ -156,6 +159,65 @@ final class OperatingPlanSandboxStore {
     // MARK: - Phase 2 Energy Strategy (honest domain-contract extension — see GoalsSandboxModel.swift)
 
     private static let energyStrategyId = "strategy_fixture_energy"
+
+#if DEBUG
+    /// Screenshot-only canonical history shape. It is assembled in Debug so
+    /// neither these synthetic target values nor their review marker can ship
+    /// in the Release app bundle.
+    private func installEnergyHistoryReviewFixture() {
+        guard var detail = strategyDetails[Self.energyStrategyId],
+              let index = detail.energyPhaseHistory.firstIndex(where: { !$0.isActive }) else { return }
+        var phase = detail.energyPhaseHistory[index]
+        phase.phaseId = phase.id
+        phase.phaseStatus = "completed"
+        phase.startedOn = "2026-07-19"
+        phase.endedOn = "2026-08-16"
+        phase.dateSemantics = "owner_local_calendar_date"
+        phase.timeZone = "America/Los_Angeles"
+        phase.availability = "partial"
+        phase.absenceKind = "recorded_without_targets"
+        phase.reason = "one_or_more_target_fields_not_recorded"
+        phase.isSyntheticFixture = true
+        phase.revisions = [
+            Self.reviewEnergyRevision(
+                id: "review_energy_version_1", number: 1,
+                from: "2026-07-19", to: "2026-08-01",
+                calories: .init(availability: "available", value: 2450, unit: "kcal/day"),
+                activity: .init(availability: "available", value: 500, unit: "active kcal/day")
+            ),
+            Self.reviewEnergyRevision(
+                id: "review_energy_version_2", number: 2,
+                from: "2026-08-01", to: "2026-08-16",
+                calories: .init(availability: "available", value: 2500, unit: "kcal/day"),
+                activity: .init(availability: "not_recorded", value: nil, unit: nil)
+            ),
+        ]
+        detail.energyPhaseHistory[index] = phase
+        strategyDetails[Self.energyStrategyId] = detail
+    }
+
+    private static func reviewEnergyRevision(
+        id: String,
+        number: Int,
+        from: String,
+        to: String,
+        calories: OperatingPlanEnergyHistoricalTargetReadModel,
+        activity: OperatingPlanEnergyHistoricalTargetReadModel
+    ) -> OperatingPlanEnergyPhaseRevisionReadModel {
+        .init(
+            id: id, protocolId: Self.energyStrategyId, protocolVersionId: id, protocolVersionNumber: number,
+            goalId: "goal_fixture_build_lean_mass", phaseId: "phase_fixture_maintenance",
+            effectiveFrom: from, effectiveTo: to, dateSemantics: "owner_local_calendar_date",
+            timeZone: "America/Los_Angeles", caloricIntakeTarget: calories,
+            activityExpenditureTarget: activity,
+            provenance: .init(
+                source: "canonical_protocol_version", phaseAttribution: "protocol_version.phaseId",
+                goalAttribution: "protocol_version.goalLinks", targetAttribution: "protocol_version.change.reviewedChanges",
+                strategyId: "review_strategy", confirmationAuthority: "synthetic_review_fixture"
+            )
+        )
+    }
+#endif
 
     func hasEnergyStrategy(forPhaseId phaseId: String) -> Bool {
         strategyDetails[Self.energyStrategyId]?.energyPhaseHistory.contains { $0.id == phaseId } ?? false

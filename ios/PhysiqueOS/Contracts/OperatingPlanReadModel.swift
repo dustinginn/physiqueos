@@ -9,14 +9,10 @@ import Foundation
 /// Native does not evaluate strategy, does not compute review cadence, and
 /// does not own protocol persistence. A future live `OperatingPlanAPI` will
 /// decode the same server-owned presentation facts the fixture supplies
-/// today. One deliberate native-only addition is called out explicitly
-/// where it appears (`OperatingPlanEnergyPhaseSnapshotReadModel`): the web's
-/// `OperatingPlanEnergyStrategyService` only ever resolves the single
-/// *current* phase-bound Energy strategy and does not itself expose prior
-/// phases' Energy strategies as a list, even though that history remains in
-/// `goal.phases[]` — this type exists so the Native read model/UI
-/// architecture does not erase that historical distinction while the real
-/// history endpoint doesn't exist yet.
+/// today. Energy phase history is additive: older Server responses omit it,
+/// while Build 93 projects only explicitly Goal/Phase-bound immutable
+/// protocol versions. Native never derives historical targets from the
+/// current strategy or from observed Nutrition/Activity evidence.
 struct OperatingPlanReadModel: Codable, Equatable {
     var sections: [OperatingPlanSectionReadModel]
 }
@@ -97,8 +93,8 @@ struct OperatingPlanStrategyDetailReadModel: Codable, Equatable {
     var status: String
     var fields: [OperatingPlanStrategyFieldReadModel]
     var editLabel: String?
-    /// Native-only addition — see the type-level doc comment above.
-    /// Always empty for non-`.energy` strategy types.
+    /// Additive Build 93 history. Always empty for non-`.energy` types and
+    /// for Build 92 Server responses.
     var energyPhaseHistory: [OperatingPlanEnergyPhaseSnapshotReadModel]
 
     var editDestination: AppDestination? {
@@ -107,12 +103,9 @@ struct OperatingPlanStrategyDetailReadModel: Codable, Equatable {
     }
 }
 
-/// A single phase's Energy strategy, current or historical. Reuses the
-/// same goal/phase identity the Goals vertical's own fixture already
-/// establishes (`goal_fixture_build_lean_mass`, `phase_fixture_maintenance`,
-/// `phase_fixture_lean_mass_build`) so the two verticals describe one
-/// consistent product story rather than inventing a second, contradictory
-/// one.
+/// Presentation snapshot. The original scalar fields remain for the local
+/// Sandbox transition demo; `revisions` and the accompanying metadata are
+/// the only source used for canonical Founder Production history.
 struct OperatingPlanEnergyPhaseSnapshotReadModel: Codable, Equatable, Identifiable {
     var id: String
     var goalId: String
@@ -123,6 +116,96 @@ struct OperatingPlanEnergyPhaseSnapshotReadModel: Codable, Equatable, Identifiab
     var activityTarget: String
     var reviewCadence: String
     var note: String
+    var phaseId: String?
+    var phaseStatus: String?
+    var startedOn: String?
+    var endedOn: String?
+    var dateSemantics: String?
+    var timeZone: String?
+    var availability: String?
+    var absenceKind: String?
+    var reason: String?
+    var revisions: [OperatingPlanEnergyPhaseRevisionReadModel]?
+    /// Debug review captures may use deterministic synthetic values, but must
+    /// label them visibly so they cannot be mistaken for Founder history.
+    var isSyntheticFixture: Bool?
+
+    init(
+        id: String,
+        goalId: String,
+        phaseName: String,
+        phaseOrder: Int,
+        isActive: Bool,
+        caloricIntake: String,
+        activityTarget: String,
+        reviewCadence: String,
+        note: String,
+        phaseId: String? = nil,
+        phaseStatus: String? = nil,
+        startedOn: String? = nil,
+        endedOn: String? = nil,
+        dateSemantics: String? = nil,
+        timeZone: String? = nil,
+        availability: String? = nil,
+        absenceKind: String? = nil,
+        reason: String? = nil,
+        revisions: [OperatingPlanEnergyPhaseRevisionReadModel]? = nil,
+        isSyntheticFixture: Bool? = nil
+    ) {
+        self.id = id
+        self.goalId = goalId
+        self.phaseName = phaseName
+        self.phaseOrder = phaseOrder
+        self.isActive = isActive
+        self.caloricIntake = caloricIntake
+        self.activityTarget = activityTarget
+        self.reviewCadence = reviewCadence
+        self.note = note
+        self.phaseId = phaseId
+        self.phaseStatus = phaseStatus
+        self.startedOn = startedOn
+        self.endedOn = endedOn
+        self.dateSemantics = dateSemantics
+        self.timeZone = timeZone
+        self.availability = availability
+        self.absenceKind = absenceKind
+        self.reason = reason
+        self.revisions = revisions
+        self.isSyntheticFixture = isSyntheticFixture
+    }
+
+    var isCanonicalHistory: Bool { phaseId != nil }
+}
+
+struct OperatingPlanEnergyPhaseRevisionReadModel: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    var protocolId: String
+    var protocolVersionId: String
+    var protocolVersionNumber: Int?
+    var goalId: String
+    var phaseId: String
+    var effectiveFrom: String
+    var effectiveTo: String
+    var dateSemantics: String
+    var timeZone: String?
+    var caloricIntakeTarget: OperatingPlanEnergyHistoricalTargetReadModel
+    var activityExpenditureTarget: OperatingPlanEnergyHistoricalTargetReadModel
+    var provenance: OperatingPlanEnergyHistoryProvenanceReadModel
+}
+
+struct OperatingPlanEnergyHistoricalTargetReadModel: Codable, Equatable, Sendable {
+    var availability: String
+    var value: Double?
+    var unit: String?
+}
+
+struct OperatingPlanEnergyHistoryProvenanceReadModel: Codable, Equatable, Sendable {
+    var source: String
+    var phaseAttribution: String
+    var goalAttribution: String
+    var targetAttribution: String
+    var strategyId: String?
+    var confirmationAuthority: String?
 }
 
 // MARK: - Strategy editors (nutrition, training, coaching updates)

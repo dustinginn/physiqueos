@@ -1605,6 +1605,25 @@ final class OperatingPlanRedesignUITests: XCTestCase {
         XCTAssertTrue(element(app, "operatingPlan.landing.energy").exists)
     }
 
+    func testEnergyPhaseHistoryShowsSyntheticCanonicalRevisionsInDarkAndMineral() throws {
+        for appearance in ["dark", "light"] {
+            let app = launch("op:landing;strategy=energy/strategy_fixture_energy", appearance: appearance)
+            XCTAssertTrue(app.staticTexts["Current Strategy"].waitForExistence(timeout: 20))
+            let history = app.staticTexts["Energy Phase History"].firstMatch
+            scrollTo(history, in: app, attempts: 12)
+            XCTAssertTrue(history.exists)
+            XCTAssertTrue(app.staticTexts["SYNTHETIC FIXTURE · REVIEW ONLY"].exists)
+            XCTAssertTrue(app.staticTexts["Revision 1 · Effective Jul 19, 2026 until Aug 1, 2026"].exists)
+            let secondRevision = app.staticTexts["Revision 2 · Effective Aug 1, 2026 until Aug 16, 2026"].firstMatch
+            scrollTo(secondRevision, in: app, attempts: 8)
+            XCTAssertTrue(secondRevision.exists)
+            XCTAssertTrue(app.staticTexts["Not recorded"].exists)
+            XCTAssertFalse(app.staticTexts["0"].exists)
+            try capture(app, "build93-energy-phase-history-\(appearance)")
+            app.terminate()
+        }
+    }
+
     func testLandingToPeptidesToExecutionCarriesCrumbsAndFullSizeActions() {
         let app = launch("op:landing", appearance: "light")
         let peptides = element(app, "operatingPlan.landing.peptide")
@@ -1661,5 +1680,17 @@ final class OperatingPlanRedesignUITests: XCTestCase {
         edit.tap()
         XCTAssertTrue(app.buttons["operatingPlan.tracking.save"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertEqual(crumb(app).label, "Tracking")
+    }
+
+    private func capture(_ app: XCUIApplication, _ name: String) throws {
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let directory = ProcessInfo.processInfo.environment["B93_ENERGY_HISTORY_CAPTURE_DIR"] else { return }
+        let destination = URL(fileURLWithPath: directory, isDirectory: true)
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        try screenshot.pngRepresentation.write(to: destination.appendingPathComponent("\(name).png"))
     }
 }

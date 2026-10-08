@@ -1885,10 +1885,86 @@ final class FounderServerAPITests: XCTestCase {
         let detail = try await api.fetchDetail(strategyId: "energy")
         XCTAssertNil(detail?.readModel.editDestination)
         XCTAssertEqual(detail?.readModel.fields.first?.value, "2300 kcal/day")
+        XCTAssertTrue(detail?.readModel.energyPhaseHistory.isEmpty == true, "Build 92 responses omit additive history and must still decode.")
         do {
             _ = try await api.fetchDetail(strategyId: "missing")
             XCTFail("Production failures must not return a fixture detail")
         } catch {}
+    }
+
+    func testProductionEnergyHistoryDecodesAuthenticRangesWithoutContaminatingCurrentStrategy() throws {
+        let json = #"""
+        {
+          "protocolId":"energy-current","title":"Current Strategy","purpose":"Current purpose","goal":"Current goal",
+          "startedDate":"October 1, 2026","status":"Active",
+          "fields":[{"label":"Caloric Intake","value":"CURRENT VALUE"}],"editLabel":null,"intentionallyReadOnly":true,
+          "energyPhaseHistorySchemaVersion":"operating_plan_energy_phase_history_v1",
+          "energyPhaseHistory":[
+            {
+              "id":"phase-known","goalId":"goal-a","phaseId":"phase-known","phaseName":"Maintenance","phaseOrder":1,
+              "phaseStatus":"completed","startedOn":"2026-07-01","endedOn":"2026-08-01",
+              "dateSemantics":"owner_local_calendar_date","timeZone":"America/Los_Angeles","availability":"partial",
+              "absenceKind":"recorded_without_targets","reason":"one_or_more_target_fields_not_recorded",
+              "revisions":[
+                {
+                  "id":"version-1","protocolId":"energy-current","protocolVersionId":"version-1","protocolVersionNumber":1,
+                  "goalId":"goal-a","phaseId":"phase-known","effectiveFrom":"2026-07-01","effectiveTo":"2026-07-15",
+                  "dateSemantics":"owner_local_calendar_date","timeZone":"America/Los_Angeles",
+                  "caloricIntakeTarget":{"availability":"available","value":2400,"unit":"kcal/day"},
+                  "activityExpenditureTarget":{"availability":"available","value":480,"unit":"active kcal/day"},
+                  "provenance":{"source":"canonical_protocol_version","phaseAttribution":"protocol_version.phaseId","goalAttribution":"protocol_version.goalLinks","targetAttribution":"protocol_version.change.reviewedChanges","strategyId":"strategy-1","confirmationAuthority":"founder"}
+                },
+                {
+                  "id":"version-2","protocolId":"energy-current","protocolVersionId":"version-2","protocolVersionNumber":2,
+                  "goalId":"goal-a","phaseId":"phase-known","effectiveFrom":"2026-07-15","effectiveTo":"2026-08-01",
+                  "dateSemantics":"owner_local_calendar_date","timeZone":"America/Los_Angeles",
+                  "caloricIntakeTarget":{"availability":"available","value":2500,"unit":"kcal/day"},
+                  "activityExpenditureTarget":{"availability":"not_recorded","value":null,"unit":null},
+                  "provenance":{"source":"canonical_protocol_version","phaseAttribution":"protocol_version.phaseId","goalAttribution":"protocol_version.goalLinks","targetAttribution":"protocol_version.change.reviewedChanges","strategyId":"strategy-2","confirmationAuthority":"founder"}
+                }
+              ]
+            },
+            {
+              "id":"phase-unknown","goalId":"goal-a","phaseId":"phase-unknown","phaseName":"Legacy phase","phaseOrder":2,
+              "phaseStatus":"superseded","startedOn":"2026-08-01","endedOn":"2026-09-01",
+              "dateSemantics":"owner_local_calendar_date","timeZone":"America/Los_Angeles","availability":"unavailable",
+              "absenceKind":"unknown","reason":"no_authoritative_phase_strategy_revision","revisions":[]
+            },
+            {
+              "id":"phase-wrong-goal","goalId":"goal-a","phaseId":"phase-wrong-goal","phaseName":"Wrong goal","phaseOrder":3,
+              "phaseStatus":"completed","startedOn":"2026-09-01","endedOn":"2026-10-01",
+              "dateSemantics":"owner_local_calendar_date","timeZone":"America/Los_Angeles","availability":"available",
+              "absenceKind":null,"reason":null,
+              "revisions":[{
+                "id":"version-wrong","protocolId":"energy-current","protocolVersionId":"version-wrong","protocolVersionNumber":3,
+                "goalId":"goal-b","phaseId":"phase-wrong-goal","effectiveFrom":"2026-09-01","effectiveTo":"2026-10-01",
+                "dateSemantics":"owner_local_calendar_date","timeZone":"America/Los_Angeles",
+                "caloricIntakeTarget":{"availability":"available","value":9999,"unit":"kcal/day"},
+                "activityExpenditureTarget":{"availability":"available","value":9999,"unit":"kcal/day"},
+                "provenance":{"source":"canonical_protocol_version","phaseAttribution":"protocol_version.phaseId","goalAttribution":"protocol_version.goalLinks","targetAttribution":"protocol_version.change.reviewedChanges","strategyId":null,"confirmationAuthority":null}
+              }]
+            },
+            {
+              "id":"phase-active","goalId":"goal-a","phaseId":"phase-active","phaseName":"Active phase","phaseOrder":4,
+              "phaseStatus":"active","startedOn":"2026-10-01","endedOn":null,"dateSemantics":"owner_local_calendar_date",
+              "timeZone":"America/Los_Angeles","availability":"available","absenceKind":null,"reason":null,"revisions":[]
+            }
+          ]
+        }
+        """#
+        let decoded = try JSONDecoder().decode(EnergyStrategyDetail.self, from: Data(json.utf8))
+        let model = decoded.readModel
+
+        XCTAssertEqual(model.fields.first?.value, "CURRENT VALUE", "History must not replace the active Strategy.")
+        XCTAssertEqual(model.energyPhaseHistory.map(\.id), ["phase-known", "phase-unknown", "phase-wrong-goal"], "Active phases stay out of history.")
+        let known = try XCTUnwrap(model.energyPhaseHistory.first)
+        XCTAssertEqual(known.revisions?.map(\.effectiveFrom), ["2026-07-01", "2026-07-15"], "Contiguous within-phase edits retain exact boundaries.")
+        XCTAssertEqual(known.revisions?.last?.activityExpenditureTarget.availability, "not_recorded")
+        XCTAssertEqual(model.energyPhaseHistory[1].availability, "unavailable")
+        XCTAssertTrue(model.energyPhaseHistory[1].revisions?.isEmpty == true)
+        XCTAssertEqual(model.energyPhaseHistory[2].availability, "untrusted")
+        XCTAssertEqual(model.energyPhaseHistory[2].reason, "native_attribution_mismatch")
+        XCTAssertTrue(model.energyPhaseHistory[2].revisions?.isEmpty == true, "Wrong-Goal values must be withheld, not rendered.")
     }
 
     func testProductionCoachingEditorRoundTripsOneCompositeSaveAndAllConcurrencyFences() async throws {

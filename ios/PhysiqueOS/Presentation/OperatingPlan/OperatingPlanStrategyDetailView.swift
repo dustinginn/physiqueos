@@ -149,6 +149,7 @@ struct OperatingPlanStrategyDetailView: View {
         let isCoaching = detail.strategyType == .briefings
         let tiles = isCoaching ? [] : Array(detail.fields.prefix(2))
         let lines = isCoaching ? detail.fields : Array(detail.fields.dropFirst(tiles.count))
+        let historicalEnergyPhases = detail.energyPhaseHistory.filter { !$0.isActive }
         return VStack(alignment: .leading, spacing: 0) {
             OperatingPlanHeroField(
                 eyebrow: isCoaching ? "Coaching Updates" : "\(detail.strategyType.title) Strategy",
@@ -172,10 +173,10 @@ struct OperatingPlanStrategyDetailView: View {
                 OperatingPlanLine(field.label, field.value)
             }
 
-            if !detail.energyPhaseHistory.isEmpty {
-                OperatingPlanGroupTitle("Phase History", icon: "clock.arrow.circlepath")
+            if !historicalEnergyPhases.isEmpty {
+                OperatingPlanGroupTitle("Energy Phase History", icon: "clock.arrow.circlepath")
                 VStack(spacing: 8) {
-                    ForEach(detail.energyPhaseHistory) { snapshot in
+                    ForEach(historicalEnergyPhases) { snapshot in
                         energyPhaseCard(snapshot)
                     }
                 }
@@ -252,18 +253,88 @@ struct OperatingPlanStrategyDetailView: View {
         return "Next: \(OperatingPlanDateValues.readableDate(date))"
     }
 
+    @ViewBuilder
     private func energyPhaseCard(_ snapshot: OperatingPlanEnergyPhaseSnapshotReadModel) -> some View {
-        OperatingPlanSurface(tone: snapshot.isActive ? .field : .paper, verticalPadding: 12) {
+        if snapshot.isCanonicalHistory {
+            canonicalEnergyPhaseCard(snapshot)
+        } else {
+            legacySandboxEnergyPhaseCard(snapshot)
+        }
+    }
+
+    private func canonicalEnergyPhaseCard(_ snapshot: OperatingPlanEnergyPhaseSnapshotReadModel) -> some View {
+        OperatingPlanSurface(tone: .paper, verticalPadding: 12) {
             HStack {
                 Text("Phase \(snapshot.phaseOrder)")
                     .physiqueOSFont(PhysiqueOSTypography.operatingPlanEyebrow)
-                    .foregroundStyle(snapshot.isActive ? OperatingPlanColor.fieldInk : OperatingPlanColor.muted)
+                    .foregroundStyle(OperatingPlanColor.muted)
                 Spacer()
-                OperatingPlanStatusPill(text: snapshot.isActive ? "Active" : "Completed", tone: snapshot.isActive ? .green : .muted)
+                OperatingPlanStatusPill(text: Self.phaseStatus(snapshot.phaseStatus), tone: .muted)
             }
             Text(snapshot.phaseName)
                 .physiqueOSFont(PhysiqueOSTypography.operatingPlanCardTitle)
-                .foregroundStyle(snapshot.isActive ? OperatingPlanColor.fieldInk : OperatingPlanColor.ink)
+                .foregroundStyle(OperatingPlanColor.ink)
+                .padding(.top, 4)
+            if let chronology = Self.phaseChronology(snapshot) {
+                Text(chronology)
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                    .foregroundStyle(OperatingPlanColor.muted)
+                    .padding(.top, 2)
+            }
+#if DEBUG
+            if snapshot.isSyntheticFixture == true {
+                Text("SYNTHETIC FIXTURE · REVIEW ONLY")
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanEyebrow)
+                    .foregroundStyle(OperatingPlanColor.muted)
+                    .padding(.top, 8)
+            }
+#endif
+
+            if let revisions = snapshot.revisions, !revisions.isEmpty {
+                ForEach(Array(revisions.enumerated()), id: \.element.id) { index, revision in
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(Self.revisionHeading(revision, ordinal: revisions.count > 1 ? index + 1 : nil))
+                            .physiqueOSFont(PhysiqueOSTypography.operatingPlanEyebrow)
+                            .foregroundStyle(OperatingPlanColor.muted)
+                            .padding(.top, 12)
+                        OperatingPlanLine("Calorie target", Self.targetText(revision.caloricIntakeTarget))
+                        OperatingPlanLine(
+                            "Activity / expenditure target",
+                            Self.targetText(revision.activityExpenditureTarget),
+                            showsRule: false
+                        )
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("operatingPlan.energyHistory.revision.\(revision.id)")
+                }
+                Text("Planned targets from canonical Strategy versions · effective end dates are exclusive.")
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                    .foregroundStyle(OperatingPlanColor.muted)
+                    .padding(.top, 8)
+            } else {
+                OperatingPlanLine("Historical targets", "Unavailable", showsRule: false)
+                    .padding(.top, 4)
+                Text(Self.unavailableHistoryMessage(snapshot))
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
+                    .foregroundStyle(OperatingPlanColor.muted)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("operatingPlan.energyHistory.phase.\(snapshot.id)")
+    }
+
+    private func legacySandboxEnergyPhaseCard(_ snapshot: OperatingPlanEnergyPhaseSnapshotReadModel) -> some View {
+        OperatingPlanSurface(tone: .paper, verticalPadding: 12) {
+            HStack {
+                Text("Phase \(snapshot.phaseOrder)")
+                    .physiqueOSFont(PhysiqueOSTypography.operatingPlanEyebrow)
+                    .foregroundStyle(OperatingPlanColor.muted)
+                Spacer()
+                OperatingPlanStatusPill(text: "Completed", tone: .muted)
+            }
+            Text(snapshot.phaseName)
+                .physiqueOSFont(PhysiqueOSTypography.operatingPlanCardTitle)
+                .foregroundStyle(OperatingPlanColor.ink)
                 .padding(.top, 4)
             OperatingPlanLine("Caloric Intake", snapshot.caloricIntake)
             OperatingPlanLine("Activity Target", snapshot.activityTarget)
@@ -272,5 +343,55 @@ struct OperatingPlanStrategyDetailView: View {
                 .physiqueOSFont(PhysiqueOSTypography.operatingPlanFieldDetail)
                 .foregroundStyle(OperatingPlanColor.muted)
         }
+    }
+
+    static func phaseStatus(_ value: String?) -> String {
+        value == "superseded" ? "Superseded" : "Completed"
+    }
+
+    static func phaseChronology(_ snapshot: OperatingPlanEnergyPhaseSnapshotReadModel) -> String? {
+        switch (snapshot.startedOn, snapshot.endedOn) {
+        case let (start?, end?):
+            "\(OperatingPlanDateValues.readableDate(start)) – \(OperatingPlanDateValues.readableDate(end))"
+        case let (start?, nil):
+            "Started \(OperatingPlanDateValues.readableDate(start))"
+        case let (nil, end?):
+            "Ended \(OperatingPlanDateValues.readableDate(end))"
+        case (nil, nil):
+            nil
+        }
+    }
+
+    static func revisionHeading(_ revision: OperatingPlanEnergyPhaseRevisionReadModel, ordinal: Int?) -> String {
+        let prefix = ordinal.map { "Revision \($0) · " } ?? ""
+        return "\(prefix)Effective \(OperatingPlanDateValues.readableDate(revision.effectiveFrom)) until \(OperatingPlanDateValues.readableDate(revision.effectiveTo))"
+    }
+
+    static func targetText(_ target: OperatingPlanEnergyHistoricalTargetReadModel) -> String {
+        guard target.availability == "available", let value = target.value,
+              let unit = target.unit?.trimmingCharacters(in: .whitespacesAndNewlines), !unit.isEmpty else {
+            return target.availability == "not_recorded" ? "Not recorded" : "Unavailable"
+        }
+        guard let number = historicalTargetNumberFormatter.string(from: NSNumber(value: value)) else {
+            return "Unavailable"
+        }
+        return "\(number) \(unit)"
+    }
+
+    private static let historicalTargetNumberFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = true
+        formatter.groupingSize = 3
+        formatter.maximumFractionDigits = 2
+        return formatter
+    }()
+
+    static func unavailableHistoryMessage(_ snapshot: OperatingPlanEnergyPhaseSnapshotReadModel) -> String {
+        if snapshot.availability == "untrusted" {
+            return "Historical Strategy records conflict or do not match this Goal and Phase, so target values are withheld."
+        }
+        return "No authoritative Goal- and Phase-bound Strategy revision recorded targets for this phase."
     }
 }
