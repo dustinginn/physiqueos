@@ -17,6 +17,13 @@ Agent handoff reports describe implementation state. This backlog describes what
 
 
 NEXT BUILD 93 — FOUNDER NOTES CONSOLIDATED (CANDIDATES; SCOPE AND RELEASE NOT YET AUTHORIZED)
+CLAUDE B PAUSE/RESUME DEPENDENCY — FOUNDER INSTRUCTION 2026-10-08
+- Claude B paused its Watch/Live Activity color and theme-parity lane to investigate the Recovery card's previously approved designs and missing Foam Rolling context. This is a TEMPORARY PRIORITY PAUSE, not cancellation of the other assignment.
+- When Claude publishes its NEXT Recovery audit report, coordinator must read it, bring the exact approved boards and foam/content findings to Founder for confirmation, and then explicitly hand Claude back to the outstanding Watch + Live Activity + Home Screen Widget amber/theme implementation. Do not silently mark Recovery approved or resume Recovery integration before Founder review.
+- Resume source assignment: agent-handoffs/inbox/prompts/20261008-build93-claude-watch-live-activity-theme.md (staged commit 364636a8158525c24d4e018ff5faf2d39d7ab6e8), augmented by Home Screen Widget Start Logger amber parity requirement in this backlog (commit c8e8d8a7c90021a61138555e13960026d1bcb07f). Four surfaces: iPhone Finish Workout existing amber authority, Watch Complete Set, Live Activity Complete Set, Widget Start Logger. Both Dark and Mineral Light, actual semantic token, no broad redesign.
+- Coordinator must give a fresh short resume prompt to the EXISTING Claude B conversation after reading the Recovery report. Do not create a new Claude chat or assume the report publication automatically restarts the paused task. Preserve Codex integration lane and shared Mac storage safeguards.
+- Status: CLAUDE THEME LANE PAUSED PENDING RECOVERY AUDIT REPORT; MUST RESUME AFTER REPORT REVIEW/FOUNDER CONFIRMATION.
+
 RECOVERY CARD FOUNDER ACCEPTANCE HOLD — 2026-10-08
 - Founder supplied pre-redesign Green/Yellow/Red Recovery V1 cards as CONTENT/HIERARCHY references, not visual design authority. They include a small Foam Rolling row with actual weekly completion counts and contextual note; the new Server c493eb06 currently reports foam unavailable, so new Native e0a4706d hides that row. This is a confirmed content gap relative to earlier examples, NOT proof that foam status should influence Recovery classification.
 - Founder explicitly says later Weekly/Monthly Recovery card designs were already approved and requests Claude to retrieve the exact authentic approved boards/approval history, show them for confirmation, and reconcile Foam Rolling tidbit BEFORE proceeding with Recovery integration. Do not ask for a new design or silently accept current new screenshots as final.
