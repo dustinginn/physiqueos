@@ -1,0 +1,15 @@
+# Codex — recover established PC production read-only audit path (no privilege escalation)
+Founder decision: Today Widget Option B approved in Dark and Mineral Light; preserve amber Start Logger CTA, but widget implementation separately gated. This task concerns ONLY the previously built PC read-only audit path for historical Static Hold/Super Set.
+
+Read agent-handoffs/PRODUCTION_READONLY_ACCESS.md, agent-handoffs/reports/20261008T190804Z-build93-historical-static-hold-superset-readonly-dryrun.md, backlog, comprehensive Build93 handoff, and search earlier GitHub reports/commits for the original approximately ten patches that established the PC DigitalOcean console runner. Distinguish Mac Claude/Codex session from the PC Codex environment. The Mac source-only report was a location/access boundary, NOT proof that PC Codex requires admin privileges.
+
+Approved PC repository: C:\Users\dusti\Documents\GitHub\physiqueos
+Approved runner: .tmp/digitalocean/run-app-console-context-gzip-source-on-open.mjs
+Saved doctl context: physiqueos-final-cutover-config
+Runner arguments: saved context, freshly verified app id, freshly verified component, gzip-base64 Node source. The Node audit runs inside production App Platform using existing component DB URL/CA bindings, never copies secrets to PC. Historical app ID bf57cf56-48cc-4cd6-90e4-a23ee5381741 and component web are HINTS ONLY; verify current control plane and runtime.
+
+Investigate and document whether the runner exists on the PC, its dependencies, the normal user-level doctl context, shell invocation, prior success markers, and which earlier reports prove the approved non-admin path. DO NOT request admin/elevation, change ACLs, install privileged services, decrypt tokens, create new credentials, print env bindings, or substitute Mac transport. If the current session is Mac-only, publish an exact PC Codex handoff and stop rather than claiming a fresh audit.
+
+If running inside the actual approved PC Codex environment and existing non-elevated access works, perform only the already authorized bounded owner-scoped read-only Static Hold and Super Set census/preview, verifying app/deployment/SHA/owner first. Each SQL transaction BEGIN REPEATABLE READ READ ONLY; verify transaction_read_only=on before application SELECT; bounded selects, ROLLBACK and sanitized success marker. Stop on 401/403, authority mismatch, missing binding, uncertain owner, or unexpected permissions. No seed, APPLY, writes, deploy, credentials exposure, broad export, or Build93 changes.
+
+Publish a detailed GitHub report documenting recovered path, whether the actual PC read-only audit was run, sanitized counts/digests and the remaining APPLY gates. Keep private IDs/Founder evidence in secure local manifest only. Narrow non-force candidate pushes and additive report-only main publication preapproved, no release pointer updates. Do not alter Claude Recovery or Widget candidates or Codex Build93 integration.
