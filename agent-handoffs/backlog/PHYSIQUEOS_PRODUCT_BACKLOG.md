@@ -17,6 +17,13 @@ Agent handoff reports describe implementation state. This backlog describes what
 
 
 NEXT BUILD 93 — FOUNDER NOTES CONSOLIDATED (CANDIDATES; SCOPE AND RELEASE NOT YET AUTHORIZED)
+PRIMARY WORKOUT CTA CONTINUITY — FOUNDER REQUIREMENT 2026-10-08 (COLOR DECISION NOT YET RECONCILED)
+- Founder requests one matching primary-action button color PER APPEARANCE across THREE surfaces: iPhone Logger "Finish Workout", Watch workout "Complete Set", and iPhone Live Activity "Complete Set". No mismatched Watch purple vs iPhone amber or Live Activity teal.
+- Earlier LIVE ACTIVITY selections: Dark WARM AMBER primary/highlight, Mineral Light OPTION B MINERAL NEUTRAL with DARK INK primary and restrained amber accents. These are still recorded design preferences, but founder now prioritizes three-surface continuity and asks to reconcile them with the actual existing iPhone Finish Workout tokens before finalizing implementation. DO NOT silently assume that the two prior Live Activity swatch values equal the shipping iPhone button tokens.
+- First coder task: audit actual shipping iPhone Finish Workout button semantic token separately in Dark and Mineral Light, then present exact comparison against the two previously selected Live Activity directions. Do not invent values or make a unilateral global accent decision. If they differ, request one concise Founder choice: retain the prior Live Activity colors across all three, or use actual iPhone Finish Workout colors across all three. Until resolved, do not ship mismatched colors.
+- Shared semantic workout CTA token (per theme) is preferred for all three surfaces where supported; ensure readable foreground text, ActivityKit/Watch propagation, accessibility and status contrast. Do not recolor unrelated app controls.
+- Status: CONTINUITY REQUIREMENT APPROVED; exact per-theme color authority pending source audit/Founder reconciliation. Build93 implementation pending.
+
 
 TRAINING LOGGER PROGRESSION SUGGESTION ACTIONABILITY — BUILD 93 FOUNDER DEVICE FINDING 2026-10-08
 - Founder physical Build92 screenshots: Seated Hip Adductions displays "Progress manually if today's performance supports it" and appropriately disables "Use suggestion" because no actionable proposed change exists. Hip Thrusts displays "MAINTAIN CURRENT PERFORMANCE 75 lb x 15" yet still ENABLES "Use suggestion"; tapping it applies no visible reps/load change. This inconsistency is a misleading no-op action.
