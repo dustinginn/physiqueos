@@ -4,11 +4,31 @@ export const RECOVERY_BRIEFING_SHADOW_RESULT_VERSION =
   "recovery_briefing_shadow_result_v1";
 export const RECOVERY_SHADOW_INPUT_AUTHORITY_VERSION =
   "recovery_shadow_input_authority_v1";
+export const RECOVERY_SLEEP_INPUT_PROJECTION_VERSION =
+  "recovery_sleep_input_projection_v1";
+export const RECOVERY_BRIEFING_PUBLICATION_AUTHORITY_VERSION =
+  "recovery_briefing_publication_authority_v1";
+export const BRIEFING_RECOVERY_ASSESSMENT_SCHEMA_VERSION =
+  "briefing_recovery_assessment_v1";
 
+// Founder product lock (2026-10-07, backlog a06ed153): the Recovery card
+// exists ONLY on the Weekly and Monthly recurring briefings. Midweek, DEXA,
+// Photo and every other briefing type never carry a Recovery field, card,
+// placeholder or graph. The older Midweek design is superseded, so Midweek is
+// not a Recovery cadence at all: the assessment refuses it.
 export const RecoveryBriefingCadence = Object.freeze({
-  MIDWEEK: "midweek",
   WEEKLY: "weekly",
   MONTHLY: "monthly",
+});
+export const RECOVERY_BRIEFING_CADENCES = Object.freeze(
+  Object.values(RecoveryBriefingCadence)
+);
+
+export const RecoveryAssessmentMode = Object.freeze({
+  // Non-user-facing validation output. Never persisted or published.
+  SHADOW: "shadow",
+  // An authorized, future-only Weekly/Monthly artifact field.
+  PUBLICATION: "publication",
 });
 
 export const RecoveryBriefingStatus = Object.freeze({
@@ -49,16 +69,6 @@ export const RECOVERY_STATUS_POLICY_V1 = deepFreeze({
     },
   },
   cadences: {
-    midweek: {
-      expectedNights: 3,
-      minimumPeriodNights: 3,
-      yellow: {
-        minimumMaterialLowNights: 2,
-        minimumMaterialRun: 2,
-        averageDeltaFloorMinutes: 45,
-      },
-      redAllowed: false,
-    },
     weekly: {
       expectedNights: 7,
       minimumPeriodNights: 5,
@@ -94,7 +104,6 @@ export const RECOVERY_STATUS_POLICY_V1 = deepFreeze({
     minimumTypicalSessions: 2,
     minimumReductionRatio: 0.25,
     minimumReductionSessions: {
-      midweek: 1,
       weekly: 1,
       monthly: 3,
     },

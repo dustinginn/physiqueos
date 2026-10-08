@@ -5,13 +5,14 @@ import {
 import {
   RECOVERY_BRIEFING_SHADOW_RESULT_VERSION,
   RECOVERY_SHADOW_INPUT_AUTHORITY_VERSION,
+  RecoveryAssessmentMode,
   RecoveryShadowInputMode,
 } from "./RecoveryBriefingPolicyV1.js";
+import { projectRecoverySleepInputsV1 } from "./RecoveryBriefingSleepInputProjectionV1.js";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ALLOWED_PURPOSE_BY_MODE = Object.freeze({
   [RecoveryShadowInputMode.SYNTHETIC]: "synthetic_shadow_fixture",
-  [RecoveryShadowInputMode.PROSPECTIVE_VALIDATION_ONLY]: "validation_only",
 });
 
 // Storage-free and persistence-free by construction. A composition root
@@ -20,13 +21,37 @@ const ALLOWED_PURPOSE_BY_MODE = Object.freeze({
 export function runRecoveryBriefingShadowV1({ inputAuthority, assessmentInput } = {}) {
   const authority = resolveRecoveryShadowInputAuthorityV1(inputAuthority);
   if (!authority.enabled) return blocked(authority.invalidReason);
-  const sleep = selectAuthorizedSleep({
-    records: assessmentInput?.sleepRecords ?? [],
-    authority,
-    evidenceCutoff: assessmentInput?.evidenceCutoff,
-  });
+  // Prospective validation-only input is ONLY canonical sleep-canon-v3 days,
+  // through the fail-closed Recovery projection (per-night ledger, prospective
+  // floor, as-of-cutoff revisions). Synthetic fixtures keep the reviewed
+  // fixture selection below and can never be mixed with real canonical days.
+  const prospective = authority.mode === RecoveryShadowInputMode.PROSPECTIVE_VALIDATION_ONLY;
+  if (prospective && assessmentInput?.sleepRecords !== undefined) {
+    return blocked("validation_only_requires_canonical_sleep_days");
+  }
+  if (!prospective && assessmentInput?.sleepDays !== undefined) {
+    return blocked("synthetic_mode_refuses_canonical_sleep_days");
+  }
+  const projection = prospective ? projectRecoverySleepInputsV1({
+    sleepDays: assessmentInput?.sleepDays ?? [],
+    activationPolicyRecord: assessmentInput?.activationPolicyRecord ?? null,
+    algorithmPolicyRecord: assessmentInput?.algorithmPolicyRecord ?? null,
+    recoveryEffectiveSleepDay: authority.effectiveSleepDay,
+    period: assessmentInput?.period ?? null,
+    evidenceCutoff: assessmentInput?.evidenceCutoff ?? null,
+    ownerUserId: assessmentInput?.ownerUserId ?? null,
+  }) : null;
+  if (projection && projection.status !== "projected") return blocked(projection.blockedReason);
+  const sleep = projection
+    ? { authorized: true, reason: null, records: projection.records }
+    : selectAuthorizedSleep({
+      records: assessmentInput?.sleepRecords ?? [],
+      authority,
+      evidenceCutoff: assessmentInput?.evidenceCutoff,
+    });
   if (!sleep.authorized) return blocked(sleep.reason);
   const assessment = createRecoveryBriefingAssessmentV1({
+    mode: RecoveryAssessmentMode.SHADOW,
     period: assessmentInput?.period,
     evidenceCutoff: assessmentInput?.evidenceCutoff,
     evaluatedAt: assessmentInput?.evaluatedAt,
@@ -40,6 +65,8 @@ export function runRecoveryBriefingShadowV1({ inputAuthority, assessmentInput } 
     shadow: true,
     status: "shadow_evaluated",
     assessment,
+    eligibility: projection ? { floor: projection.floor, windows: projection.windows,
+      accounting: projection.accounting } : null,
     authority: {
       schemaVersion: authority.schemaVersion,
       mode: authority.mode,
@@ -57,6 +84,8 @@ export function runRecoveryBriefingShadowV1({ inputAuthority, assessmentInput } 
     },
   });
 }
+
+/** Only for the synthetic fixture mode: prospective input never comes here. */
 
 export function resolveRecoveryShadowInputAuthorityV1(value) {
   const off = (invalidReason) => deepFreeze({
@@ -117,26 +146,22 @@ function selectAuthorizedSleep({ records, authority, evidenceCutoff }) {
     if (purposes.length !== 1 || purposes[0] !== requiredPurpose) {
       return { authorized: false, reason: "sleep_purpose_not_authorized_for_shadow" };
     }
-    const purpose = purposes[0];
     const sleepDay = record?.sleepDay ?? record?.date;
     if (!validDate(sleepDay)) continue;
     if (authority.effectiveSleepDay && sleepDay < authority.effectiveSleepDay) continue;
     const availableAt = record.availableAt ?? record.ingestedAt ?? record.recordedAt ??
       record.computedAt ?? record.provenance?.computedAt ?? null;
-    if (authority.mode === RecoveryShadowInputMode.PROSPECTIVE_VALIDATION_ONLY) {
-      if (!validTimestamp(availableAt)) {
-        return { authorized: false, reason: "validation_only_sleep_availability_missing" };
-      }
-      if (!validTimestamp(evidenceCutoff)) {
-        return { authorized: false, reason: "recovery_shadow_evidence_cutoff_invalid" };
-      }
+    // A fixture night without an availability instant is never assumed to
+    // have been on time; the assessment then treats it as unreliable.
+    if (!validTimestamp(evidenceCutoff)) {
+      return { authorized: false, reason: "recovery_shadow_evidence_cutoff_invalid" };
     }
     const seconds = Number(record?.mainSleep?.asleepSeconds ?? record?.asleepSeconds);
     if (record?.status !== "asleep_recorded" || !Number.isFinite(seconds) || seconds <= 0) continue;
     const episode = record?.episodes?.[record.mainEpisodeIndex] ??
       record?.episodes?.find((item) => item?.kind === "main") ?? null;
     const timeZoneUncertain = record?.timeZoneUncertain === true ||
-      (episode?.timeZoneSource === "device_at_ingest" && purpose === "historical_evidence_import");
+      episode?.timeZoneSource === "device_at_ingest";
     eligible.push({
       id: String(record.id ?? `sleep|${sleepDay}`),
       sleepDay,
