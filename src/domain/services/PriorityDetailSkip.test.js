@@ -121,7 +121,7 @@ describe("Priority Detail skip contract", () => {
     });
   });
 
-  it("projects the universal command for the current execution-backed DEXA stage", async () => {
+  it("keeps an execution-backed DEXA stage informational and non-skippable", async () => {
     const appointment = {
       id: "execution_next_dexa", userId: "user", type: "dexa_appointment", active: true,
       status: "scheduled", preferredSchedule: { date: "2026-09-17", timeOfDay: "07:30", daysOfWeek: [] },
@@ -135,13 +135,10 @@ describe("Priority Detail skip contract", () => {
       id,
       status: "Upcoming",
       action: { label: "View DEXA Appointment" },
-      skippable: true,
-      skipCommand: {
-        commandType: "priority.skip.v1",
-        expectedVersion: 9,
-        payload: { priorityId: id, occurrenceDate: TODAY },
-      },
-      notificationAction: { skipCommand: { commandType: "priority.skip.v1" } },
+      completable: false,
+      skippable: false,
+      skipCommand: null,
+      notificationAction: { completionCommand: null, skipCommand: null },
     });
   });
 
