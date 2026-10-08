@@ -901,7 +901,11 @@ final class LoggerParityCaptureUITests: XCTestCase {
         let suggestion = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "trainingLogger.useSuggestion.")
         ).firstMatch
+        for _ in 0..<6 where !(suggestion.exists && suggestion.isHittable) {
+            app.swipeUp()
+        }
         XCTAssertTrue(suggestion.waitForExistence(timeout: 5))
+        XCTAssertTrue(suggestion.isHittable)
         XCTAssertTrue(suggestion.isEnabled, "The 50 lb x 12 target changes the fixture's lower-rep editable rows.")
         XCTAssertGreaterThanOrEqual(suggestion.frame.height, 44)
 
