@@ -265,6 +265,8 @@ struct MorningCheckInView: View {
     @State private var recoveryMessage: String?
     @State private var briefingMessage: String?
     @State private var isSubmitting = false
+    @State private var isLoadingContext = false
+    @State private var contextMessage: String?
     /// Founder Production's own read of `morning-check-in` — `nil` under
     /// Sandbox (which reads `store` directly instead) or before the first
     /// load completes.
@@ -355,11 +357,35 @@ struct MorningCheckInView: View {
                         }
                         CaptureSectionTitle(title: "What’s your weight today?")
                         weightField.captureSurface(padding: 15)
+                        if isProduction, productionCheckIn == nil {
+                            if isLoadingContext {
+                                CaptureMessage(text: "Loading today’s check-in…", tone: .processing)
+                                    .accessibilityIdentifier("morningCheckIn.contextLoading")
+                            } else if let contextMessage {
+                                CaptureMessage(text: contextMessage, tone: .error)
+                                    .accessibilityIdentifier("morningCheckIn.contextError")
+                                Button("Retry loading context") {
+                                    Task { await loadProductionContext(automaticallyRetrying: false) }
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(PhysiqueOSTheme.captureTeal)
+                                .frame(minHeight: 44)
+                                .accessibilityIdentifier("morningCheckIn.contextRetry")
+                            }
+                        }
                         if let message {
                             CaptureMessage(text: message, tone: messageTone(message))
                                 .accessibilityIdentifier("morningCheckIn.message")
                         }
-                        CapturePrimaryButton(title: isSubmitting ? "Saving…" : "Complete Morning Weigh-In", enabled: !isSubmitting) { save() }
+                        CapturePrimaryButton(
+                            title: isSubmitting ? "Saving…" : "Complete Morning Weigh-In",
+                            enabled: MorningCheckInContextLoader.canSubmit(
+                                isProduction: isProduction,
+                                context: productionCheckIn,
+                                isLoading: isLoadingContext,
+                                isSubmitting: isSubmitting
+                            )
+                        ) { save() }
                             .accessibilityIdentifier("morningCheckIn.save")
                         if showsSandboxCards { recoveryEvidenceCard }
                     }
@@ -390,8 +416,35 @@ struct MorningCheckInView: View {
                 if let entry = store.weighIn(on: Date()) { weightText = formatWeight(entry.value) }
                 return
             }
-            productionCheckIn = try? await environment.morningCheckInAPI.fetchMorningCheckIn()
-            if let existing = productionCheckIn?.existingWeight { weightText = formatWeight(existing) }
+            await loadProductionContext(automaticallyRetrying: true)
+        }
+    }
+
+    /// Loads the Server-owned day and reconciliation identities before this
+    /// screen can write. A transient initial failure receives one bounded
+    /// retry; the visible Retry remains user-initiated and single-attempt.
+    /// Neither path clears or overwrites an entry the Founder already typed.
+    @MainActor
+    private func loadProductionContext(automaticallyRetrying: Bool) async {
+        guard !isLoadingContext else { return }
+        isLoadingContext = true
+        contextMessage = nil
+        defer { isLoadingContext = false }
+        do {
+            let context = try await MorningCheckInContextLoader.fetch(
+                from: environment.morningCheckInAPI,
+                automaticallyRetrying: automaticallyRetrying
+            )
+            productionCheckIn = context
+            weightText = MorningCheckInContextLoader.preservedWeightText(
+                current: weightText,
+                existingWeight: context.existingWeight
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            productionCheckIn = nil
+            contextMessage = MorningCheckInContextLoader.message(for: error)
         }
     }
 
@@ -732,6 +785,72 @@ struct MorningCheckInView: View {
         }
     }
     private static let fullDate: DateFormatter = { let f = DateFormatter(); f.dateStyle = .full; return f }()
+}
+
+/// Small, testable policy for the production context read. The Server remains
+/// the only authority for `today` and occurrence identities; this helper never
+/// fabricates a date or an empty reconciliation selection after a failed read.
+enum MorningCheckInContextLoader {
+    typealias Sleep = @Sendable (UInt64) async throws -> Void
+
+    static func fetch(
+        from api: any MorningCheckInAPI,
+        automaticallyRetrying: Bool,
+        retryDelayNanoseconds: UInt64 = 250_000_000,
+        sleep: @escaping Sleep = { try await Task.sleep(nanoseconds: $0) }
+    ) async throws -> MorningCheckInReadModel {
+        let maximumAttempts = automaticallyRetrying ? 2 : 1
+        for attempt in 0..<maximumAttempts {
+            do {
+                return try await api.fetchMorningCheckIn()
+            } catch {
+                if Task.isCancelled { throw CancellationError() }
+                guard attempt + 1 < maximumAttempts,
+                      shouldAutomaticallyRetry(error)
+                else { throw error }
+                try await sleep(retryDelayNanoseconds)
+            }
+        }
+        preconditionFailure("Morning Check-In context attempts must terminate")
+    }
+
+    static func shouldAutomaticallyRetry(_ error: Error) -> Bool {
+        switch error as? ProductionNativeError {
+        case .networkFailure, .temporaryServer, .sessionRecoveryUnavailable: true
+        default: false
+        }
+    }
+
+    static func message(for error: Error) -> String {
+        switch error as? ProductionNativeError {
+        case .networkFailure, .temporaryServer:
+            "Morning Weigh-In couldn’t reach PhysiqueOS. Your entry is still here. Check the connection and retry."
+        case .sessionRecoveryUnavailable:
+            "Your secure session is still recovering. Your entry is still here. Check the connection and retry."
+        case .reconnectRequired, .notPaired, .unauthenticated:
+            "This iPhone must reconnect to Founder Production before Morning Weigh-In can continue. Your entry is still here."
+        case .invalidResponse, .incompatibleContractVersion, .resourceMismatch, .authorityMismatch:
+            "PhysiqueOS returned an unreadable Morning Weigh-In context. Your entry is still here. Retry before completing."
+        default:
+            "Today’s Morning Weigh-In context could not be loaded. Your entry is still here. Retry before completing."
+        }
+    }
+
+    static func preservedWeightText(current: String, existingWeight: Double?) -> String {
+        guard current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let existingWeight
+        else { return current }
+        return formatWeight(existingWeight)
+    }
+
+    static func canSubmit(
+        isProduction: Bool,
+        context: MorningCheckInReadModel?,
+        isLoading: Bool,
+        isSubmitting: Bool
+    ) -> Bool {
+        !isSubmitting && !isLoading && (!isProduction || context != nil)
+    }
 }
 
 // MARK: - Manual / backdated Weight

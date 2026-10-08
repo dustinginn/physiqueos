@@ -5101,6 +5101,77 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(result.unfinishedPriorities.first?.occurrenceKey, "reminder-1:2026-09-10")
     }
 
+    func testProductionMorningCheckInReadDecodesUniversalSkipEvidenceShapeAndNullOptionals() async throws {
+        // Production's client-safe projection replaces the domain service's
+        // action href with this typed destination before sending the Native
+        // envelope. Build 92 required href and rejected this valid response.
+        let body = #"{"contractVersion":"1","resource":"morning-check-in","authority":"founder-production","generatedAt":"2026-10-08T13:00:00.000Z","data":{"today":"2026-10-08","existingWeight":null,"previousWeight":179.4,"reconciliationItems":[{"id":"reminder-photos","occurrenceKey":"reminder-photos:2026-10-07","date":"2026-10-07","title":"Progress Photos","context":null,"kind":"execution_reconciliation","evidenceRequired":true,"evidenceType":"photo_session","statusLabel":"Yesterday’s Progress Photos are still missing","primaryAction":{"label":"Upload Photos","destination":{"id":"photo.upload","parameters":{}}}},{"id":"evidence_recovery_nutrition_2026-10-07","occurrenceKey":"protocol:nutrition:2026-10-07","date":"2026-10-07","title":"Nutrition","kind":"evidence_recovery","evidenceRequired":false,"evidenceType":"nutrition","statusLabel":"Yesterday’s nutrition hasn’t been logged","primaryAction":{"label":"Add Nutrition","destination":{"id":"log","parameters":{}}}}]}}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, body)])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let result = try await ProductionMorningCheckInAPI(api: api).fetchMorningCheckIn()
+
+        XCTAssertEqual(result.today, "2026-10-08")
+        XCTAssertEqual(result.scheduledEvidencePriorities.map(\.id), ["reminder-photos"])
+        XCTAssertEqual(result.recoveryOnlyItems.map(\.id), ["evidence_recovery_nutrition_2026-10-07"])
+        XCTAssertNil(result.existingWeight)
+        XCTAssertEqual(result.reconciliationItems[0].evidenceDestination, .photoUpload)
+        XCTAssertEqual(result.reconciliationItems[1].evidenceDestination, .evidenceIntake)
+    }
+
+    func testProductionMorningCheckInReadStillAcceptsLegacyHrefActionShape() async throws {
+        let body = #"{"contractVersion":"1","resource":"morning-check-in","authority":"founder-production","generatedAt":"2026-10-08T13:00:00.000Z","data":{"today":"2026-10-08","existingWeight":null,"previousWeight":179.4,"reconciliationItems":[{"id":"reminder-training","occurrenceKey":"reminder-training:2026-10-07","date":"2026-10-07","title":"Training","kind":"execution_reconciliation","evidenceRequired":true,"evidenceType":"training","primaryAction":{"label":"Add workout details","href":"/log?recovery=1"}}]}}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, body)])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let result = try await ProductionMorningCheckInAPI(api: api).fetchMorningCheckIn()
+
+        XCTAssertEqual(result.reconciliationItems.first?.evidenceDestination, .trainingLogger)
+    }
+
+    func testProductionMorningCheckInReadFailsClosedWhenActionHasNoDestination() async throws {
+        let body = #"{"contractVersion":"1","resource":"morning-check-in","authority":"founder-production","generatedAt":"2026-10-08T13:00:00.000Z","data":{"today":"2026-10-08","existingWeight":null,"previousWeight":179.4,"reconciliationItems":[{"id":"reminder-training","occurrenceKey":"reminder-training:2026-10-07","date":"2026-10-07","title":"Training","kind":"execution_reconciliation","evidenceRequired":true,"evidenceType":"training","primaryAction":{"label":"Add workout details"}}]}}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, body)])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        await XCTAssertThrowsErrorAsync(try await ProductionMorningCheckInAPI(api: api).fetchMorningCheckIn()) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .invalidResponse)
+        }
+    }
+
+    func testProductionMorningCheckInReadFailsClosedWhenCanonicalOccurrenceIdentityIsMissing() async throws {
+        let body = #"{"contractVersion":"1","resource":"morning-check-in","authority":"founder-production","generatedAt":"2026-10-08T13:00:00.000Z","data":{"today":"2026-10-08","existingWeight":null,"previousWeight":179.4,"reconciliationItems":[{"id":"reminder-1","date":"2026-10-07","title":"Train","kind":"execution_reconciliation"}]}}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, body)])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        await XCTAssertThrowsErrorAsync(try await ProductionMorningCheckInAPI(api: api).fetchMorningCheckIn()) { error in
+            XCTAssertEqual(error as? ProductionNativeError, .invalidResponse)
+        }
+    }
+
+    func testProductionMorningCheckInRetryAlwaysReloadsFreshServerContext() async throws {
+        let first = #"{"contractVersion":"1","resource":"morning-check-in","authority":"founder-production","generatedAt":"2026-10-08T13:00:00.000Z","data":{"today":"2026-10-08","existingWeight":null,"previousWeight":179.4,"reconciliationItems":[]}}"#
+        let second = #"{"contractVersion":"1","resource":"morning-check-in","authority":"founder-production","generatedAt":"2026-10-09T13:00:00.000Z","data":{"today":"2026-10-09","existingWeight":180.1,"previousWeight":179.4,"reconciliationItems":[]}}"#
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(200, first), .json(200, second),
+        ])
+        let api = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await api.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+        let morning = ProductionMorningCheckInAPI(api: api)
+
+        let firstResult = try await morning.fetchMorningCheckIn()
+        let secondResult = try await morning.fetchMorningCheckIn()
+        let requests = await transport.requests
+        XCTAssertEqual(firstResult.today, "2026-10-08")
+        XCTAssertEqual(secondResult.today, "2026-10-09")
+        XCTAssertEqual(requests.count, 3)
+    }
+
     func testProductionTrainingCommitReplaysStagedReceiptUntilExplicitDurability() async throws {
         let result = #"{"status":"confirmation_requested","reviewId":"review-1","reviewRevision":1,"sessionId":"native-session-1","intendedDate":"2026-09-11","exerciseIds":["barbell_bench_press","pull_up"]}"#
         let response = #"{"outcome":"committed","receipt":{"status":"committed","result":"# + result + #", "operationId":null,"commandId":"01911111-1111-7111-8111-111111111111"},"confirmation":{"state":"processing","accepted":true,"reviewId":"review-1","continuationKey":"continuation","completedStep":null,"publication":null}}"#
