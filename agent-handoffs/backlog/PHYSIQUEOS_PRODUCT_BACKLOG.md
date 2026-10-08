@@ -17,6 +17,12 @@ Agent handoff reports describe implementation state. This backlog describes what
 
 
 NEXT BUILD 93 — FOUNDER NOTES CONSOLIDATED (CANDIDATES; SCOPE AND RELEASE NOT YET AUTHORIZED)
+RECOVERY CARD FOUNDER ACCEPTANCE HOLD — 2026-10-08
+- Founder supplied pre-redesign Green/Yellow/Red Recovery V1 cards as CONTENT/HIERARCHY references, not visual design authority. They include a small Foam Rolling row with actual weekly completion counts and contextual note; the new Server c493eb06 currently reports foam unavailable, so new Native e0a4706d hides that row. This is a confirmed content gap relative to earlier examples, NOT proof that foam status should influence Recovery classification.
+- Founder explicitly says later Weekly/Monthly Recovery card designs were already approved and requests Claude to retrieve the exact authentic approved boards/approval history, show them for confirmation, and reconcile Foam Rolling tidbit BEFORE proceeding with Recovery integration. Do not ask for a new design or silently accept current new screenshots as final.
+- Claude B scoped GH audit handoff agent-handoffs/inbox/prompts/20261008-build93-recovery-approved-design-foam-audit.md (commit e88ef6fed7e3615be160f4fa289124fdc843acb8). Audit only, source and approved artifacts, no real Founder data, no Recovery code mutation or deployment. Recovery candidate e0a4706d and Server c493eb06 remain ISOLATED ON HOLD pending Founder review and a separately approved accurate Foam projection plan. Weekly/Monthly only, never Midweek. Unrelated Watch/Live Activity work may proceed.
+- Status: FOUNDER REVIEW HOLD; missing Foam row needs canonical source/projection resolution; not approved for Build93 final integration yet.
+
 
 BUILD 93 NEXT TWO CODER LANES — STAGED 2026-10-08, AWAITING USER SEND
 - CODEX A (existing Operating Plan/redesign conversation): Logger "Use suggestion" no-op actionability repair + guarded integration of already-tested DEXA Server a7854feb and Recovery Server c493eb06 into one OFF-by-default Server candidate. GH full handoff agent-handoffs/inbox/prompts/20261008-build93-codex-logger-server-integration.md, staged commit cf14e2f7dd04ce0a3e579f85235bc7242955c703. Isolated Native Logger and Server integration branches; tests and report, no deploy or release. Does not touch Claude's Watch/Live Activity lane.
