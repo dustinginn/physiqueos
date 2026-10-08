@@ -116,11 +116,12 @@ struct HomeLoggedTodayWidgetView: View {
                 )) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(palette.refreshAccent)
+                        .foregroundStyle(palette.onRefreshAccent)
                         .frame(
                             width: HomeWidgetInteractionMetrics.smallRefreshGlyphFrame,
                             height: HomeWidgetInteractionMetrics.smallRefreshGlyphFrame
                         )
+                        .background(palette.refreshAccent, in: Circle())
                         .frame(
                             minWidth: HomeWidgetInteractionMetrics.refreshHitTarget,
                             minHeight: HomeWidgetInteractionMetrics.refreshHitTarget
@@ -197,11 +198,12 @@ struct HomeLoggedTodayWidgetView: View {
             ).url) {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(palette.refreshAccent)
+                    .foregroundStyle(palette.onRefreshAccent)
                     .frame(
                         width: HomeWidgetInteractionMetrics.largeRefreshGlyphFrame,
                         height: HomeWidgetInteractionMetrics.largeRefreshGlyphFrame
                     )
+                    .background(palette.refreshAccent, in: Circle())
                     .frame(
                         minWidth: HomeWidgetInteractionMetrics.refreshHitTarget,
                         minHeight: HomeWidgetInteractionMetrics.refreshHitTarget
@@ -543,7 +545,6 @@ struct HomeWidgetPalette {
     let secondary: Color
     let tertiary: Color
     let divider: Color
-    let actionAccent: Color
     let warning: Color
     let training: Color
     let nutrition: Color
@@ -556,9 +557,12 @@ struct HomeWidgetPalette {
     let workoutAction: Color
     let onWorkoutAction: Color
 
-    /// Refresh keeps the widget's teal action accent (Founder: no recolor of
-    /// refresh/status yet); only the workout CTA moved to amber.
-    var refreshAccent: Color { actionAccent }
+    /// Founder 2026-10-08: refresh joins the amber action. It is an amber
+    /// disc with the execution-ink glyph, the same pairing as Start Logger:
+    /// a bare #C88228 glyph on the Mineral Light canvas would fall below the
+    /// 3:1 non-text contrast minimum.
+    var refreshAccent: Color { workoutAction }
+    var onRefreshAccent: Color { onWorkoutAction }
 
     init(colorScheme: ColorScheme) {
         if colorScheme == .dark {
@@ -567,7 +571,6 @@ struct HomeWidgetPalette {
             secondary = Color(hex: 0x91A6AE)
             tertiary = Color(hex: 0x647A84)
             divider = Color(hex: 0x203441)
-            actionAccent = Color(hex: 0x20BDB2)
             warning = Color(hex: 0xF3BA49)
             training = Color(hex: 0x9F7CFF)
             nutrition = Color(hex: 0x4EE09A)
@@ -581,7 +584,6 @@ struct HomeWidgetPalette {
             secondary = Color(hex: 0x60737C)
             tertiary = Color(hex: 0x7A8B91)
             divider = Color(hex: 0xCAD4CF)
-            actionAccent = Color(hex: 0x0B817F)
             warning = Color(hex: 0xB47510)
             training = Color(hex: 0x7255DC)
             nutrition = Color(hex: 0x0C9363)

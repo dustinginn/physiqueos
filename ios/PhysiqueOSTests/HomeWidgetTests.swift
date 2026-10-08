@@ -10,12 +10,18 @@ final class HomeWidgetTests: XCTestCase {
         XCTAssertLessThan(HomeWidgetInteractionMetrics.largeRefreshGlyphFrame, HomeWidgetInteractionMetrics.refreshHitTarget)
     }
 
-    func testRefreshKeepsTheTealActionAccentWhileStartLoggerUsesTheWorkoutAmber() {
+    /// Founder 2026-10-08: refresh is the same amber action as Start Logger,
+    /// drawn as an amber disc with execution ink so it stays legible on both
+    /// canvases; status colors (freshness warning, metric icons) are unchanged.
+    func testRefreshUsesTheAmberActionAsAContrastSafeDisc() {
         for colorScheme in [ColorScheme.dark, .light] {
             let palette = HomeWidgetPalette(colorScheme: colorScheme)
-            XCTAssertEqual(palette.refreshAccent, palette.actionAccent)
-            XCTAssertEqual(Self.hex(palette.refreshAccent), colorScheme == .dark ? 0x20BDB2 : 0x0B817F, "refresh/status stay teal")
-            XCTAssertNotEqual(Self.hex(palette.refreshAccent), Self.hex(palette.workoutAction))
+            XCTAssertEqual(Self.hex(palette.refreshAccent), Self.hex(palette.workoutAction))
+            XCTAssertEqual(Self.hex(palette.onRefreshAccent), WorkoutActivityPrimaryAction.foregroundHex)
+            XCTAssertGreaterThanOrEqual(Self.contrast(palette.refreshAccent, palette.onRefreshAccent), 4.5)
+            XCTAssertGreaterThanOrEqual(Self.contrast(palette.refreshAccent, palette.background), colorScheme == .dark ? 3 : 2.5,
+                                        "the disc reads against the widget canvas")
+            XCTAssertEqual(Self.hex(palette.warning), colorScheme == .dark ? 0xF3BA49 : 0xB47510, "status colors unchanged")
         }
     }
 
