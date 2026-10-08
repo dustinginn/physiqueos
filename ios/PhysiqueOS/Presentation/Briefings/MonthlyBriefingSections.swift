@@ -12,7 +12,7 @@ import SwiftUI
 /// target KPIs, the two-endpoint scale rail, the strategy recommendation
 /// tag) are omitted rather than invented. No "Still Unresolved" section.
 struct MonthlyBriefingSections: View {
-    static let sectionInventory = ["Integrated Lead", "Goal Milestone", "Training Progress", "Energy Evolution", "New Baseline", "What Changed", "Defining Moments", "Coach's Take", "Month Ahead"]
+    static let sectionInventory = ["Integrated Lead", "Goal Milestone", "Training Progress", "Energy Evolution", "Recovery", "New Baseline", "What Changed", "Defining Moments", "Coach's Take", "Month Ahead"]
     static let leadFeatureDomains = ["Training", "New Baseline", "Calories"]
     static let trainingPresentationStyle = "record-rows"
     static let heroTypeLabel = "MONTHLY BRIEFING"
@@ -27,6 +27,9 @@ struct MonthlyBriefingSections: View {
             if let goalMilestone = content.goalMilestone { goalMilestoneSection(goalMilestone) }
             if let trainingProgress = content.trainingProgress { MonthlyTrainingSection(training: trainingProgress) }
             if let energyEvolution = content.energyEvolution { MonthlyEnergySection(energy: energyEvolution) }
+            // Locked slot (Energy → Recovery → New Baseline); absent card,
+            // absent section.
+            if let recovery = content.recovery { BriefingRecoverySection(card: recovery) }
             if let newBaseline = content.newBaseline { MonthlyBaselineSection(baseline: newBaseline) }
             if !changeItems.isEmpty {
                 MonthlyNumberedSection(glyph: "◎", label: "What Changed", tone: .cyan, title: whatChangedTitle, items: changeItems, identifier: "briefing.monthly.whatChanged")

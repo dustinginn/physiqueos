@@ -322,6 +322,7 @@
 		00000000000000000000129D /* GoalsAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00000000000000000000129C /* GoalsAcceptanceUITests.swift */; };
 		0000000000000000000013B7 /* RecoverySleepAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */; };
 		000000000000000000001C01 /* FoamRollingPriorityDetailUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001C00 /* FoamRollingPriorityDetailUITests.swift */; };
+		000000000000000000002109 /* BriefingRecoveryAcceptanceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000002108 /* BriefingRecoveryAcceptanceUITests.swift */; };
 		0000000000000000000012AC /* HealthKitCapabilityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012AB /* HealthKitCapabilityModels.swift */; };
 		0000000000000000000012AE /* HealthKitTypeRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012AD /* HealthKitTypeRegistry.swift */; };
 		0000000000000000000012B0 /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012AF /* HealthKitService.swift */; };
@@ -386,6 +387,9 @@
 		000000000000000000001D05 /* EvidenceRecordComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D04 /* EvidenceRecordComponents.swift */; };
 		000000000000000000001D07 /* EvidenceWorkflowKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D06 /* EvidenceWorkflowKit.swift */; };
 		000000000000000000001D09 /* EvidenceReviewWorkflowFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001D08 /* EvidenceReviewWorkflowFixture.swift */; };
+		000000000000000000002101 /* BriefingRecoveryReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000002100 /* BriefingRecoveryReadModel.swift */; };
+		000000000000000000002103 /* BriefingRecoveryReviewFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000002102 /* BriefingRecoveryReviewFixture.swift */; };
+		000000000000000000002105 /* BriefingRecoverySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000002104 /* BriefingRecoverySection.swift */; };
 		0000000000000000000012D9 /* HealthKitSynchronizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012D8 /* HealthKitSynchronizationTests.swift */; };
 		0000000000000000000012DB /* HealthKitSleepIngestionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DA /* HealthKitSleepIngestionTests.swift */; };
 		0000000000000000000012DD /* HealthKitSleepHistoricalValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012DC /* HealthKitSleepHistoricalValidationTests.swift */; };
@@ -409,6 +413,7 @@
 		000000000000000000001807 /* HomeWidgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001806 /* HomeWidgetTests.swift */; };
 		000000000000000000001A07 /* Build83FinishLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001A06 /* Build83FinishLifecycleTests.swift */; };
 		000000000000000000001B03 /* DEXAHealthKitWritebackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001B02 /* DEXAHealthKitWritebackTests.swift */; };
+		000000000000000000002107 /* BriefingRecoveryCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000002106 /* BriefingRecoveryCardTests.swift */; };
 		0000000000000000000012B7 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B6 /* HealthKit.framework */; };
 		0000000000000000000012B9 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0000000000000000000012B8 /* WatchConnectivity.framework */; };
 		000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000000000000000000001614 /* WorkoutActivityAttributes.swift */; };
@@ -829,6 +834,9 @@
 		000000000000000000001D04 /* EvidenceRecordComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceRecordComponents.swift"; sourceTree = "<group>"; };
 		000000000000000000001D06 /* EvidenceWorkflowKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceWorkflowKit.swift"; sourceTree = "<group>"; };
 		000000000000000000001D08 /* EvidenceReviewWorkflowFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EvidenceReviewWorkflowFixture.swift"; sourceTree = "<group>"; };
+		000000000000000000002100 /* BriefingRecoveryReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingRecoveryReadModel.swift"; sourceTree = "<group>"; };
+		000000000000000000002102 /* BriefingRecoveryReviewFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingRecoveryReviewFixture.swift"; sourceTree = "<group>"; };
+		000000000000000000002104 /* BriefingRecoverySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingRecoverySection.swift"; sourceTree = "<group>"; };
 		0000000000000000000011E9 /* HomeFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011EB /* HomeRedesignReviewFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "HomeRedesignReviewFixture.json"; sourceTree = "<group>"; };
 		0000000000000000000011ED /* PriorityFixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "PriorityFixture.json"; sourceTree = "<group>"; };
@@ -922,10 +930,12 @@
 		000000000000000000001806 /* HomeWidgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeWidgetTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001A06 /* Build83FinishLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Build83FinishLifecycleTests.swift"; sourceTree = "<group>"; };
 		000000000000000000001B02 /* DEXAHealthKitWritebackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DEXAHealthKitWritebackTests.swift"; sourceTree = "<group>"; };
+		000000000000000000002106 /* BriefingRecoveryCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingRecoveryCardTests.swift"; sourceTree = "<group>"; };
 		00000000000000000000129A /* TrainingAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TrainingAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		00000000000000000000129C /* GoalsAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "GoalsAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RecoverySleepAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		000000000000000000001C00 /* FoamRollingPriorityDetailUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FoamRollingPriorityDetailUITests.swift"; sourceTree = "<group>"; };
+		000000000000000000002108 /* BriefingRecoveryAcceptanceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BriefingRecoveryAcceptanceUITests.swift"; sourceTree = "<group>"; };
 		0000000000000000000012B6 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		0000000000000000000012B8 /* WatchConnectivity.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WatchConnectivity.framework; path = System/Library/Frameworks/WatchConnectivity.framework; sourceTree = SDKROOT; };
 		000000000000000000001284 /* PhysiqueOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhysiqueOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1112,6 +1122,7 @@
 				000000000000000000001600 /* WorkoutActivityContentMapper.swift */,
 				000000000000000000001700 /* PriorityOccurrenceCapabilities.swift */,
 				000000000000000000001800 /* HomeWidgetNavigation.swift */,
+				000000000000000000002100 /* BriefingRecoveryReadModel.swift */,
 			);
 			path = Contracts;
 			sourceTree = "<group>";
@@ -1205,6 +1216,7 @@
 				000000000000000000001A00 /* TrainingSessionTerminalLedger.swift */,
 				000000000000000000001A02 /* NetworkDiagnosticsExport.swift */,
 				000000000000000000001B00 /* DEXAHealthKitWriteback.swift */,
+				000000000000000000002102 /* BriefingRecoveryReviewFixture.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -1316,6 +1328,7 @@
 				000000000000000000001135 /* MonthlyBriefingSections.swift */,
 				000000000000000000001137 /* DEXABriefingSections.swift */,
 				000000000000000000001139 /* PhotoBriefingSections.swift */,
+				000000000000000000002104 /* BriefingRecoverySection.swift */,
 			);
 			path = Briefings;
 			sourceTree = "<group>";
@@ -1595,6 +1608,7 @@
 				000000000000000000001806 /* HomeWidgetTests.swift */,
 				000000000000000000001A06 /* Build83FinishLifecycleTests.swift */,
 				000000000000000000001B02 /* DEXAHealthKitWritebackTests.swift */,
+				000000000000000000002106 /* BriefingRecoveryCardTests.swift */,
 			);
 			path = PhysiqueOSTests;
 			sourceTree = "<group>";
@@ -1606,6 +1620,7 @@
 				00000000000000000000129C /* GoalsAcceptanceUITests.swift */,
 				0000000000000000000013B6 /* RecoverySleepAcceptanceUITests.swift */,
 				000000000000000000001C00 /* FoamRollingPriorityDetailUITests.swift */,
+				000000000000000000002108 /* BriefingRecoveryAcceptanceUITests.swift */,
 			);
 			path = PhysiqueOSUITests;
 			sourceTree = "<group>";
@@ -2266,6 +2281,9 @@
 				000000000000000000001D05 /* EvidenceRecordComponents.swift in Sources */,
 				000000000000000000001D07 /* EvidenceWorkflowKit.swift in Sources */,
 				000000000000000000001D09 /* EvidenceReviewWorkflowFixture.swift in Sources */,
+				000000000000000000002101 /* BriefingRecoveryReadModel.swift in Sources */,
+				000000000000000000002103 /* BriefingRecoveryReviewFixture.swift in Sources */,
+				000000000000000000002105 /* BriefingRecoverySection.swift in Sources */,
 				000000000000000000001615 /* WorkoutActivityAttributes.swift in Sources */,
 				000000000000000000001618 /* CompleteWorkoutSetIntent.swift in Sources */,
 				00000000000000000000161B /* WorkoutLiveActivityViews.swift in Sources */,
@@ -2352,6 +2370,7 @@
 				000000000000000000001807 /* HomeWidgetTests.swift in Sources */,
 				000000000000000000001A07 /* Build83FinishLifecycleTests.swift in Sources */,
 				000000000000000000001B03 /* DEXAHealthKitWritebackTests.swift in Sources */,
+				000000000000000000002107 /* BriefingRecoveryCardTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2363,6 +2382,7 @@
 				00000000000000000000129D /* GoalsAcceptanceUITests.swift in Sources */,
 				0000000000000000000013B7 /* RecoverySleepAcceptanceUITests.swift in Sources */,
 				000000000000000000001C01 /* FoamRollingPriorityDetailUITests.swift in Sources */,
+				000000000000000000002109 /* BriefingRecoveryAcceptanceUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -9,10 +9,10 @@ import SwiftUI
 /// Locked omissions: the recurring Photos card and the "Still Unresolved"
 /// section are not Weekly sections in the locked family (Photo Briefing
 /// stays a separate event path; Still Unresolved was a client presentation
-/// discrepancy). Recovery enters only through its own future contract
-/// after the 14-night rule; the current Native contract carries none.
+/// discrepancy). Recovery appears only when the Server publishes the
+/// optional `recovery_card_v1` (after the 14-reliable-night rule).
 struct WeeklyBriefingSections: View {
-    static let sectionInventory = ["Integrated Lead", "Energy", "Weight", "Body Composition", "Training", "Coach's Take"]
+    static let sectionInventory = ["Integrated Lead", "Energy", "Weight", "Body Composition", "Training", "Recovery", "Coach's Take"]
     static let heroTypeLabel = "WEEKLY BRIEFING"
     let content: WeeklyBriefingContent
     let confidence: BriefingConfidenceReadModel?
@@ -40,6 +40,9 @@ struct WeeklyBriefingSections: View {
                 )
             }
             if let training = content.training { BriefingTrainingResponseCard(training: training) }
+            // Locked slot (Training → Recovery → Coach's Take); absent card,
+            // absent section — no header, placeholder or gap.
+            if let recovery = content.recovery { BriefingRecoverySection(card: recovery) }
             BriefingCoachFinale(
                 takeaway: content.coachTake.biggestTakeaway,
                 recommendation: content.coachTake.recommendation,

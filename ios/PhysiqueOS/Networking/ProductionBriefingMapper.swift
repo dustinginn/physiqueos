@@ -91,13 +91,16 @@ enum ProductionBriefingMapper {
         let attributionValue = root["goalPhaseAttribution"]
         if cadence == "weekly" {
             let hero = presentation["hero"]
+            var content = weekly(from: presentation)
+            // Optional, fail-closed: a missing or malformed card renders nothing.
+            content.recovery = BriefingRecoveryCardDecoder.decode(root["recovery"], cadence: .weekly, window: window)
             return try makeBase(
                 id: id, cadence: .weekly,
                 generatedAt: artifact["publicationDate"]?.string ?? "",
                 window: window,
                 attribution: attribution(from: attributionValue, fallbackTitle: hero?["goalLabel"]?.string ?? "Goal at publication"),
                 confidence: try confidence(from: hero?["confidence"]),
-                weekly: weekly(from: presentation)
+                weekly: content
             )
         }
         guard cadence == "midweek" else { throw ProductionNativeError.invalidResponse }
@@ -133,11 +136,15 @@ enum ProductionBriefingMapper {
         switch cadence {
         case .monthly:
             guard let presentation = briefing?["monthlyPresentation"] else { return nil }
+            var content = monthly(from: presentation, strategicSummaryV3: briefing?["monthlyNarrative"]?["strategicSummaryV3"] ?? briefing?["narrativeV3"])
+            // Only the response's top-level card; a raw stored envelope inside
+            // the artifact is never read.
+            content.recovery = BriefingRecoveryCardDecoder.decode(context["recovery"], cadence: .monthly, window: window)
             return try makeBase(
                 id: id, cadence: .monthly, generatedAt: generatedAt, window: window,
                 attribution: attribution(from: rawAttribution, fallbackTitle: presentation["hero"]?["goal"]?.string ?? goalTitle),
                 confidence: try confidence(from: presentation["hero"]?["confidence"]),
-                monthly: monthly(from: presentation, strategicSummaryV3: briefing?["monthlyNarrative"]?["strategicSummaryV3"] ?? briefing?["narrativeV3"])
+                monthly: content
             )
         case .event:
             if let narrative = briefing?["dexaEventNarrative"] {
