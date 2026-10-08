@@ -60,6 +60,10 @@ import {
   resolveScheduledTime,
 } from "../../domain/services/ReminderOccurrenceCompletion.js";
 import { indexConfirmedHealthKitWorkoutAttachments } from "../../domain/services/HealthKitWorkoutPresentationService.js";
+import {
+  OPERATING_PLAN_ENERGY_PHASE_HISTORY_SCHEMA_VERSION,
+  resolveOperatingPlanEnergyPhaseHistory,
+} from "../../domain/services/OperatingPlanEnergyPhaseHistoryService.js";
 
 export const CORE_NAVIGATION_COLLECTIONS = Object.freeze({
   home: Object.freeze([
@@ -541,18 +545,40 @@ export function createCoreNavigationReadService({
       });
     },
     getEnergyStrategyDetail({ strategyId }) {
-      return withContext("core.navigation.energy-strategy-detail", "operatingPlan", async ({ ownerUserId, repositories }) => {
+      return withContext("core.navigation.energy-strategy-detail", "operatingPlan", async ({ ownerUserId, repositories, runtime }) => {
         const protocol = await repositories.protocols.getProtocolById(strategyId);
         if (!protocol || protocol.userId !== ownerUserId || protocol.status !== "active" ||
             (protocol.protocolType ?? protocol.category) !== "energy") return null;
-        const [version, goals, nutritionContext] = await Promise.all([
+        const [version, goals, nutritionContext, protocols] = await Promise.all([
           protocol.currentVersionId ? repositories.protocolVersions.getVersionById(protocol.currentVersionId) : null,
           repositories.goals.listGoals(ownerUserId),
           repositories.nutritionContext.getNutritionContext(ownerUserId),
+          repositories.protocols.listProtocols(ownerUserId),
         ]);
         const detail = composeOperatingPlanStrategyDetail({ goals, nutritionContext, protocol, strategyType: "energy", version });
         if (!detail) return null;
-        return Object.freeze({ ...projectOperatingPlanStrategyDetail(protocol, detail), intentionallyReadOnly: true });
+        const goalId = protocol.currentGoalIds?.[0] ?? protocol.relatedGoalIds?.[0] ??
+          protocol.goalIds?.[0] ?? protocol.goalLinks?.[0]?.goalId ?? version?.goalLinks?.[0]?.goalId;
+        const goal = goals.find((item) => item.id === goalId && item.userId === ownerUserId) ?? null;
+        const energyProtocols = protocols.filter((item) =>
+          item.userId === ownerUserId &&
+          (item.protocolType === "energy" || item.category === "energy")
+        );
+        const protocolVersions = (await Promise.all(energyProtocols.map((item) =>
+          repositories.protocolVersions.listVersions(item.id)
+        ))).flat();
+        return Object.freeze({
+          ...projectOperatingPlanStrategyDetail(protocol, detail),
+          intentionallyReadOnly: true,
+          energyPhaseHistorySchemaVersion: OPERATING_PLAN_ENERGY_PHASE_HISTORY_SCHEMA_VERSION,
+          energyPhaseHistory: resolveOperatingPlanEnergyPhaseHistory({
+            goal,
+            protocols: energyProtocols,
+            protocolVersions,
+            ownerUserId,
+            ownerTimeZone: runtime.user?.timeZone ?? runtime.user?.timezone ?? null,
+          }),
+        });
       });
     },
     getCoachingUpdatesDetail({ strategyId }) {

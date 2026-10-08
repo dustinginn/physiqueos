@@ -67,6 +67,60 @@ describe("provider-native core navigation reads", () => {
     );
   });
 
+  it("adds source-authentic historical Energy revisions without changing the active detail", async () => {
+    const { narrow, runtime } = services();
+    const goal = runtime.goals[0];
+    goal.currentPhaseId = "phase-current";
+    goal.phases = [
+      { id: "phase-prior", goalId: goal.id, name: "Maintenance", purpose: "Calibrate.", order: 0,
+        status: "completed", startedAt: "2026-07-01", completedAt: "2026-08-01" },
+      { id: "phase-current", goalId: goal.id, name: "Build", purpose: "Build.", order: 1,
+        status: "active", startedAt: "2026-08-01", completedAt: null },
+    ];
+    runtime.protocols.push({
+      id: "energy-history-test", userId: runtime.user.id, protocolType: "energy", category: "energy",
+      status: "active", currentVersionId: "energy-history-test-v2", relatedGoalIds: [goal.id],
+      phaseId: "phase-current", effectiveStrategy: { mode: "Phase Execution",
+        caloricIntakeTarget: { value: 2800, unit: "kcal/day" },
+        activityExpenditureTarget: { value: 600, unit: "kcal/day" } },
+    });
+    runtime.protocolVersions.push(
+      { id: "energy-history-test-v1", protocolId: "energy-history-test", versionNumber: 1,
+        status: "superseded", effectiveAt: "2026-07-01", endedAt: "2026-08-01",
+        phaseId: "phase-prior", strategyId: "strategy-prior",
+        goalLinks: [{ goalId: goal.id, relationship: "supports" }],
+        confirmation: { authority: "authorized_phase_review" }, change: { reviewedChanges: {
+          caloricIntakeTarget: { value: 2500, unit: "kcal/day" },
+          activityExpenditureTarget: { value: 500, unit: "kcal/day" },
+        } } },
+      { id: "energy-history-test-v2", protocolId: "energy-history-test", versionNumber: 2,
+        status: "active", effectiveAt: "2026-08-01", endedAt: null,
+        phaseId: "phase-current", goalLinks: [{ goalId: goal.id, relationship: "supports" }] },
+    );
+
+    const result = await narrow.getEnergyStrategyDetail({ strategyId: "energy-history-test" });
+    expect(result).toMatchObject({
+      intentionallyReadOnly: true,
+      energyPhaseHistorySchemaVersion: "operating_plan_energy_phase_history_v1",
+      energyPhaseHistory: [{
+        goalId: goal.id,
+        phaseId: "phase-prior",
+        availability: "available",
+        revisions: [{
+          effectiveFrom: "2026-07-01",
+          effectiveTo: "2026-08-01",
+          caloricIntakeTarget: { value: 2500, unit: "kcal/day" },
+          activityExpenditureTarget: { value: 500, unit: "kcal/day" },
+        }],
+      }],
+    });
+    expect(result.fields).toEqual(expect.arrayContaining([
+      { label: "Caloric Intake", value: "2,800 kcal/day" },
+      { label: "Activity Target", value: "600 kcal/day" },
+    ]));
+    expect(JSON.stringify(result.energyPhaseHistory)).not.toContain("2800");
+  });
+
   it("keeps the Profile output equivalent", async () => {
     const { legacyRepositories, narrow } = services();
     expect(await narrow.getProfile()).toEqual(
