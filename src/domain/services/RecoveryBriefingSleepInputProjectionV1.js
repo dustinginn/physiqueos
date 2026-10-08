@@ -12,7 +12,7 @@ import {
   RECOVERY_STATUS_POLICY_V1,
 } from "./RecoveryBriefingPolicyV1.js";
 
-// Canonical HealthKit Sleep day (healthKitSleepDays, quarantined, unchanged)
+// Canonical HealthKit Sleep day record (quarantined, unchanged; loaded by the caller)
 //   -> THIS non-strategic, read-only, prospective-only projection
 //   -> reliable Recovery nights for the pure Recovery assessment, and nothing
 //      else.
@@ -63,7 +63,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const DAY_MS = 86_400_000;
 
 /**
- * @param sleepDays canonical healthKitSleepDays records (any order, may include
+ * @param sleepDays stored canonical Sleep day records (any order, may include
  *   rows outside the windows; they are ignored)
  * @param activationPolicyRecord / algorithmPolicyRecord the raw Server-owned
  *   Sleep policy records (resolved here with the production resolvers)
