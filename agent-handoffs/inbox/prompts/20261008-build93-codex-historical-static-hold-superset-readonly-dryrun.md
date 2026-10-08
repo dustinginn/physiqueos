@@ -1,0 +1,12 @@
+# Codex A — Build93 historical Static Hold and Super Set read-only dry run
+Founder authorization 2026-10-08: investigate both historical correction groups in parallel with Claude B Recovery candidate. READ ONLY only; no apply, no seed, no update, no deploy.
+
+Read current agent-handoffs/backlog/PHYSIQUEOS_PRODUCT_BACKLOG.md, latest.json, comprehensive 20261008T163000Z handoff, relevant prior Static Hold seed and Super Set audit reports, and check newest main commits. Use existing Codex A Operating Plan/redesign conversation and isolated worktree. Do not touch Claude Recovery Native/Server candidate or Codex Build93 integration branches.
+
+Static Hold: identify exactly two original canonical definitions, Spider Curls and Pendulum Squat Machine. Inspect existing seed utilities and proposed records; verify original weighted sets, reps, loads and identities, not fabricated duration or isometric semantics. Produce bounded proposed changes, record counts, preconditions, idempotency, failure/rollback and post-apply verification plan.
+
+Super Sets: audit exactly three historically misclassified occurrences associated with Leg Extensions/Sissy Squats and Hip Adductions/Abductions. Determine actual canonical relationship and safest correction/supersession without losing set/reps/load or other history. Identify record IDs only in secure local read-only output; GitHub report must avoid private Founder data. Explain ambiguity or HOLD if evidence insufficient.
+
+For any production SQL, use ONLY the previously approved PC read-only console runner with verified current app/component/context. BEGIN READ ONLY, verify transaction_read_only=on, bounded owner-scoped SELECT only. No credentials printed/exported; no production data mutation, schema changes, seed, API writes, deployment, or unapproved scope. Stop on access/authority/read-only verification failures. Do not use any alternate production access route. If safe read-only access is unavailable, produce a source-only plan and clearly mark not verified.
+
+Publish a detailed report with exact scope, provenance, findings, dry-run result, separate Static Hold and Super Set APPLY proposals, verification and rollback gates, and Founder decisions required. Report-only additive main publication and narrowly scoped non-force candidate pushes to verified dustinginn/physiqueos are preapproved, but no changes to latest.json/latest.md, production, release, or Build93 candidates. No heavy Xcode work; preserve Claude worktree and Mac storage. Await separate explicit Founder approval before any APPLY.
