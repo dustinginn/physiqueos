@@ -29,7 +29,12 @@ final class BriefingSandboxStore: @unchecked Sendable {
         else {
             fatalError("BriefingsFixture.json is missing or malformed — it ships in the app bundle and must always decode.")
         }
+        #if DEBUG
+        // Review-only synthetic Recovery overlay (a no-op without its flag).
+        self.briefings = BriefingRecoveryReviewFixture.apply(to: decoded)
+        #else
         self.briefings = decoded
+        #endif
     }
 
     // MARK: - Identity

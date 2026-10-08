@@ -477,6 +477,8 @@ struct WeeklyBriefingContent: Codable, Equatable {
     var coachTake: WeeklyCoachTakeSection
     /// Server `uncertainty[]` for a canonical V3 Weekly; nil for frozen V2.
     var uncertainty: [BriefingUncertaintyItem]? = nil
+    /// The optional Recovery card (Weekly/Monthly only); nil renders nothing.
+    var recovery: BriefingRecoveryCard? = nil
 }
 
 // MARK: - Midweek content (verified DISTINCT, smaller surface: Energy
@@ -738,6 +740,8 @@ struct MonthlyBriefingContent: Codable, Equatable {
     /// Server `strategicSummaryV3` for a Monthly published with canonical
     /// V3 intelligence (first run Oct 1); nil for frozen V2 Monthly.
     var strategicSummaryV3: MonthlyStrategicSummaryV3? = nil
+    /// The optional Recovery card (Weekly/Monthly only); nil renders nothing.
+    var recovery: BriefingRecoveryCard? = nil
 }
 
 /// The Server's canonical V3 monthly strategic read, rendered verbatim.
