@@ -170,7 +170,9 @@ enum PhysiqueOSTheme {
     static let redesignInkSecondary = dynamic(dark: 0xC3D2D9, light: 0x526970)
     static let redesignPurple = dynamic(dark: 0xAA98FF, light: 0x5C3FD2)
     static let redesignGreen = dynamic(dark: 0x55E39A, light: 0x16875F)
-    static let redesignAmber = dynamic(dark: 0xEFB84F, light: 0xC88228)
+    // The iPhone Finish Workout amber IS the shared primary workout action
+    // token (unchanged values: Dark #EFB84F, Mineral Light #C88228).
+    static let redesignAmber = dynamic(dark: WorkoutPrimaryActionToken.darkHex, light: WorkoutPrimaryActionToken.mineralLightHex)
     static let redesignTeal = dynamic(dark: 0x3BD2CA, light: 0x087E78)
     static let redesignCyan = dynamic(dark: 0x3BC6DD, light: 0x107F99)
     static let redesignFieldStart = dynamic(dark: 0x087B70, light: 0xCBE6E2)
@@ -194,7 +196,7 @@ enum PhysiqueOSTheme {
     // Batch 2 Training Logger utility roles (locked utility package).
     static let redesignUtilityMuted = dynamic(dark: 0x92A5AF, light: 0x6B7E85)
     static let redesignRed = dynamic(dark: 0xFF697A, light: 0xB83D4B)
-    static let redesignOnExecution = Color(hex: 0x10202A)
+    static let redesignOnExecution = Color(hex: WorkoutPrimaryActionToken.foregroundHex)
     static let redesignUtilityField = dynamic(dark: 0x087B70, light: 0xD5ECE6)
     static let redesignUtilityNavy = dynamic(dark: 0x132751, light: 0xB8CFDF)
     /// Suggested Today eyebrow on the teal field (#E9FFFF on dark field;

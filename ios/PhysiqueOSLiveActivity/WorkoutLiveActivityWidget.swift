@@ -9,8 +9,9 @@ struct WorkoutLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutActivityAttributes.self) { context in
             WorkoutLockScreenView(attributes: context.attributes, state: context.state, isStale: context.isStale)
-                .activityBackgroundTint(WorkoutActivityPalette.background.opacity(0.96))
-                .activitySystemActionForegroundColor(WorkoutActivityPalette.accent)
+                // The app-owned appearance (System follows iOS, as before).
+                .activityBackgroundTint(WorkoutActivityTheme.backgroundTint(for: context.state.appearance))
+                .activitySystemActionForegroundColor(WorkoutActivityTheme.systemActionForeground(for: context.state.appearance))
                 .widgetURL(WorkoutActivityDeepLink.url(sessionId: context.attributes.sessionId))
         } dynamicIsland: { context in
             DynamicIsland {

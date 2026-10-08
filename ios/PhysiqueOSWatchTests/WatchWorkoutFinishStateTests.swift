@@ -457,6 +457,30 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: WatchWorkoutStore.appearanceKey), "dark")
     }
 
+    /// Build 93 (Founder 2026-10-08): Complete Set / Finish use the iPhone
+    /// Finish Workout amber of the Watch's appearance with the iPhone ink;
+    /// purple is no longer the primary workout action.
+    func testPrimaryWorkoutActionIsTheIPhoneFinishWorkoutAmberPerAppearance() {
+        let saved = WatchPhysiqueOSTheme.current
+        defer { WatchPhysiqueOSTheme.current = saved }
+        XCTAssertEqual(WatchPalette.dark.workoutPrimary, Color(watchHex: 0xEFB84F))
+        XCTAssertEqual(WatchPalette.mineralLight.workoutPrimary, Color(watchHex: 0xC88228))
+        XCTAssertEqual(WatchPalette.dark.onWorkoutPrimary, Color(watchHex: 0x10202A))
+        XCTAssertEqual(WatchPalette.mineralLight.onWorkoutPrimary, Color(watchHex: 0x10202A))
+        XCTAssertEqual(WatchPalette.dark.workoutPrimary, Color(watchHex: WorkoutPrimaryActionToken.darkHex))
+        XCTAssertEqual(WatchPalette.mineralLight.workoutPrimary, Color(watchHex: WorkoutPrimaryActionToken.mineralLightHex))
+        for palette in [WatchPalette.dark, .mineralLight] {
+            WatchPhysiqueOSTheme.current = palette
+            let button = WatchEdgeCapsuleButton(title: "Complete Set", layout: WatchExecutionLayout(size: CGSize(width: 198, height: 242)), action: {})
+            XCTAssertEqual(button.tint, palette.workoutPrimary, "the primary capsule defaults to the amber")
+            XCTAssertEqual(button.foreground, palette.onWorkoutPrimary)
+            XCTAssertNotEqual(button.tint, palette.purple)
+        }
+        // Purple remains the brand/navigation accent (not recolored).
+        XCTAssertEqual(WatchPalette.dark.purple, Color(watchHex: 0xAA98FF))
+        XCTAssertEqual(WatchPalette.mineralLight.purple, Color(watchHex: 0x5C3FD2))
+    }
+
     func testEveryWatchScreenResolvesTheSelectedPalette() {
         let saved = WatchPhysiqueOSTheme.current
         defer { WatchPhysiqueOSTheme.current = saved }

@@ -10,9 +10,18 @@ final class WorkoutLiveActivityBridge {
     let coordinator: WorkoutLiveActivityCoordinator
     private unowned let environment: AppEnvironment
 
-    init(environment: AppEnvironment, client: WorkoutLiveActivityClient = ActivityKitWorkoutLiveActivityClient()) {
+    init(
+        environment: AppEnvironment,
+        client: WorkoutLiveActivityClient = ActivityKitWorkoutLiveActivityClient(),
+        appearance: @escaping @MainActor () -> WorkoutActivityAttributes.ContentState.Appearance = { .system }
+    ) {
         self.environment = environment
-        self.coordinator = WorkoutLiveActivityCoordinator(client: client, areaLabels: { [:] })
+        self.coordinator = WorkoutLiveActivityCoordinator(client: client, areaLabels: { [:] }, appearance: appearance)
+    }
+
+    /// The PhysiqueOS appearance changed: restyle the running activity.
+    func appearanceDidChange() {
+        coordinator.appearanceDidChange()
     }
 
     /// Installs the intent handler. Called from the App initializer (a

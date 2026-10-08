@@ -35,6 +35,9 @@ final class WorkoutLiveActivityCoordinator {
     private let now: @MainActor () -> Date
     private let defaults: UserDefaults
     private let areaLabels: @MainActor () -> [String: String]
+    /// The user's in-app PhysiqueOS appearance, stamped into every state so
+    /// the Lock Screen follows it (not just the iOS appearance).
+    private let appearance: @MainActor () -> WorkoutActivityAttributes.ContentState.Appearance
 
     private var authority: TrainingSessionAuthority?
     private var authorityEnvironment: NativeAPIEnvironment = .sandbox
@@ -85,12 +88,14 @@ final class WorkoutLiveActivityCoordinator {
         client: WorkoutLiveActivityClient,
         defaults: UserDefaults = .standard,
         now: @escaping @MainActor () -> Date = { Date() },
-        areaLabels: @escaping @MainActor () -> [String: String] = { [:] }
+        areaLabels: @escaping @MainActor () -> [String: String] = { [:] },
+        appearance: @escaping @MainActor () -> WorkoutActivityAttributes.ContentState.Appearance = { .system }
     ) {
         self.client = client
         self.defaults = defaults
         self.now = now
         self.areaLabels = areaLabels
+        self.appearance = appearance
     }
 
     // MARK: - Wiring
@@ -166,6 +171,16 @@ final class WorkoutLiveActivityCoordinator {
     func reconcile() {
         pruneSuppressed()
         requestSync()
+    }
+
+    /// The user changed the PhysiqueOS appearance: re-render the live
+    /// activity at once (an appearance change is a significant change). The
+    /// app is foreground when the choice is made, so the update can always
+    /// be delivered; ActivityKit cannot restyle without an update.
+    func appearanceDidChange() {
+        Task { @MainActor [weak self] in
+            await self?.runSync(coalesceValuesOnly: false)
+        }
     }
 
     /// Flush any coalesced update now (used by the Complete Set intent so
@@ -249,7 +264,7 @@ final class WorkoutLiveActivityCoordinator {
         lastProjection[subject.id] = projection
         let state = WorkoutActivityAttributes.ContentState(
             projection: projection, finishing: authority.isSubmitting(sessionId: subject.id)
-        )
+        ).withAppearance(appearance())
         let attributes = WorkoutActivityAttributes(
             projection: projection, authority: authorityEnvironment, startedAtFallback: current
         )
@@ -339,7 +354,8 @@ final class WorkoutLiveActivityCoordinator {
             let sessionId = snapshot.attributes.sessionId
             if endedReasons[sessionId] == .committed, let projection = lastProjection[sessionId] {
                 // Durable commit: a short-lived "Workout saved" state.
-                let saved = WorkoutActivityAttributes.ContentState(projection: projection).saved(completedAt: now())
+                let saved = WorkoutActivityAttributes.ContentState(projection: projection)
+                    .saved(completedAt: now()).withAppearance(appearance())
                 await end(snapshot, state: saved, dismissal: .after(now().addingTimeInterval(Self.savedDismissalDelay)))
             } else {
                 await end(snapshot, state: nil, dismissal: .immediate)

@@ -177,18 +177,42 @@ final class WorkoutLiveActivityViewTests: XCTestCase {
         }
     }
 
-    /// Locked translation tokens: the Lock Screen follows the system
-    /// appearance; the Dynamic Island is always the Dark (system black) set.
+    /// Tokens: with no app appearance the Lock Screen follows the system
+    /// appearance (Build 92 behaviour for older activities); the Dynamic
+    /// Island is always the Dark (system black) set. Build 93: warm amber
+    /// replaces teal and Complete Set is the iPhone Finish Workout amber.
     func testLockedThemeFollowsTheSystemAppearanceAndTheIslandStaysDark() {
         XCTAssertEqual(WorkoutActivityTheme.of(.dark), .dark)
         XCTAssertEqual(WorkoutActivityTheme.of(.light), .mineralLight)
-        XCTAssertEqual(WorkoutActivityTheme.dark.teal, Color.activityHex(0x3BD2CA))
+        XCTAssertEqual(WorkoutActivityTheme.dark.accent, Color.activityHex(0xEFB84F))
+        XCTAssertEqual(WorkoutActivityTheme.dark.primaryAction, Color.activityHex(0xEFB84F))
         XCTAssertEqual(WorkoutActivityTheme.dark.green, Color.activityHex(0x55E39A))
-        XCTAssertEqual(WorkoutActivityTheme.mineralLight.teal, Color.activityHex(0x087E78))
+        XCTAssertEqual(WorkoutActivityTheme.mineralLight.primaryAction, Color.activityHex(0xC88228))
         XCTAssertEqual(WorkoutActivityTheme.mineralLight.page, Color.activityHex(0xE8ECE5))
         // The Island resolves Dark whatever the environment says.
         let lightIsland = WorkoutIslandExpandedBottom(attributes: attributes(), state: normal).environment(\.colorScheme, .light)
         XCTAssertLessThanOrEqual(fittingHeight(lightIsland.padding(12), width: 371), 160)
+    }
+
+    /// Build 93: the Lock Screen follows the in-app PhysiqueOS appearance even
+    /// when iOS is the other way round (shipping views rendered off-ActivityKit).
+    func testLockScreenFollowsTheAppAppearanceAgainstTheSystemAppearance() throws {
+        for (appearance, system, name) in [(State.Appearance.mineralLight, ColorScheme.dark, "theme-mineral-light-app-on-dark-ios"),
+                                           (State.Appearance.dark, ColorScheme.light, "theme-dark-app-on-light-ios")] {
+            let state = normal.withAppearance(appearance)
+            let resolved = WorkoutActivityTheme.resolve(appearance, system: system)
+            let view = WorkoutLockScreenView(attributes: attributes(), state: state)
+                .frame(width: 365)
+                .background(RoundedRectangle(cornerRadius: 23, style: .continuous).fill(WorkoutActivityTheme.backgroundTint(for: appearance)))
+                .environment(\.colorScheme, system)
+            XCTAssertLessThanOrEqual(fittingHeight(view, width: 365), 160)
+            let image = render(scene(view, scheme: resolved == .mineralLight ? .light : .dark), size: CGSize(width: 393, height: 852), scheme: system)
+            assertNotBlank(image, name)
+            try save(image, named: name)
+        }
+        let island = WorkoutIslandExpandedBottom(attributes: attributes(), state: normal.withAppearance(.mineralLight))
+            .padding(12).frame(width: 371).background(Color.black, in: RoundedRectangle(cornerRadius: 44))
+        try save(render(island, size: CGSize(width: 371, height: 170), scheme: .light), named: "theme-island-expanded-always-dark")
     }
 
     func testCompleteSetIsPresentOnlyWhileInProgressAndMeetsTheTouchTarget() throws {

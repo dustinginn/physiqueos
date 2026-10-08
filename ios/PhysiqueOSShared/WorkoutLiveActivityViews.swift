@@ -11,11 +11,24 @@ import SwiftUI
 // Timers use the system's date-based `Text(timerInterval:)`, so the rest
 // clock and workout elapsed tick with no per-second activity updates.
 
-/// Locked Live Activity translation (Founder lock 2026-10-04, design package
-/// `utility-surfaces-design-20261004`): navy/teal fields, restrained purple,
-/// semantic green/amber. The Lock Screen follows the system appearance (the
-/// platform's rule, never an app setting): Dark is deep navy, Light is the
-/// Mineral translation. The Dynamic Island is system black in both.
+/// Mirror of the app/Watch `WorkoutPrimaryActionToken` for the extension
+/// (the Widget Extension does not compile the Watch contract). Tests hold the
+/// two equal. The iPhone Logger's Finish Workout amber per appearance, with its
+/// dark ink label in both (Founder decision 2026-10-08).
+enum WorkoutActivityPrimaryAction {
+    static let darkHex: UInt32 = 0xEFB84F
+    static let mineralLightHex: UInt32 = 0xC88228
+    static let foregroundHex: UInt32 = 0x10202A
+}
+
+/// Live Activity palettes (Founder decisions 2026-10-08): Dark keeps the deep
+/// navy field with WARM AMBER highlights replacing teal; Mineral Light is the
+/// Option B mineral-neutral treatment (light mineral page, paper rows, ink
+/// text, restrained amber highlights). In both, Complete Set is the iPhone
+/// Finish Workout amber with the iPhone execution ink. Green stays rest and
+/// success; purple stays finishing/reviewing. The Lock Screen follows the
+/// app-owned PhysiqueOS appearance carried in the state (System = the iOS
+/// appearance); the Dynamic Island is system black, so it always uses Dark.
 struct WorkoutActivityTheme: Equatable {
     var page: Color
     var row: Color
@@ -23,9 +36,11 @@ struct WorkoutActivityTheme: Equatable {
     var text: Color
     var secondaryText: Color
     var mutedText: Color
-    /// Current / up-next labels and the Complete Set action.
-    var teal: Color
-    var onTeal: Color
+    /// Current / up-next labels and highlight tints (warm amber).
+    var accent: Color
+    /// The Complete Set fill and its label (iPhone Finish Workout amber + ink).
+    var primaryAction: Color
+    var onPrimaryAction: Color
     /// Rest and lifecycle success.
     var green: Color
     /// Needs-update and the final-set cue.
@@ -36,20 +51,46 @@ struct WorkoutActivityTheme: Equatable {
     static let dark = WorkoutActivityTheme(
         page: .activityHex(0x061019), row: .activityHex(0x132735), privacyRow: .activityHex(0x172235),
         text: .activityHex(0xF3F8FA), secondaryText: .activityHex(0xC3D2D9), mutedText: .activityHex(0x92A5AF),
-        teal: .activityHex(0x3BD2CA), onTeal: .activityHex(0x061019), green: .activityHex(0x55E39A),
-        amber: .activityHex(0xEFB84F), purple: .activityHex(0xAA98FF)
+        accent: .activityHex(0xEFB84F),
+        primaryAction: .activityHex(WorkoutActivityPrimaryAction.darkHex),
+        onPrimaryAction: .activityHex(WorkoutActivityPrimaryAction.foregroundHex),
+        green: .activityHex(0x55E39A), amber: .activityHex(0xEFB84F), purple: .activityHex(0xAA98FF)
     )
 
+    /// Option B: the existing Mineral Light canvas/paper/ink; small amber
+    /// text uses the deeper amber ink (#925500) so it reads on paper.
     static let mineralLight = WorkoutActivityTheme(
         page: .activityHex(0xE8ECE5), row: .activityHex(0xFBFAF4), privacyRow: .activityHex(0xFBFAF4),
         text: .activityHex(0x102431), secondaryText: .activityHex(0x526970), mutedText: .activityHex(0x526970),
-        teal: .activityHex(0x087E78), onTeal: .white, green: .activityHex(0x16875F),
-        amber: .activityHex(0xC88228), purple: .activityHex(0x5C3FD2)
+        accent: .activityHex(0x925500),
+        primaryAction: .activityHex(WorkoutActivityPrimaryAction.mineralLightHex),
+        onPrimaryAction: .activityHex(WorkoutActivityPrimaryAction.foregroundHex),
+        green: .activityHex(0x16875F), amber: .activityHex(0x925500), purple: .activityHex(0x5C3FD2)
     )
 
-    /// The Lock Screen's palette for the system appearance. The Dynamic
-    /// Island is always system black, so it always uses `.dark`.
-    static func of(_ scheme: ColorScheme) -> Self { scheme == .light ? .mineralLight : .dark }
+    /// The Lock Screen palette: the app-owned appearance when the state
+    /// carries one; System (or an older activity with none) follows iOS.
+    static func resolve(_ appearance: WorkoutActivityState.Appearance?, system scheme: ColorScheme) -> Self {
+        switch appearance {
+        case .dark: .dark
+        case .mineralLight: .mineralLight
+        case .system, nil: scheme == .light ? .mineralLight : .dark
+        }
+    }
+
+    /// The system-appearance palette (kept for callers without a state).
+    static func of(_ scheme: ColorScheme) -> Self { resolve(nil, system: scheme) }
+
+    /// ActivityKit's container tint (drawn behind the view): the Mineral page
+    /// for an explicit Mineral Light choice, otherwise the navy field.
+    static func backgroundTint(for appearance: WorkoutActivityState.Appearance?) -> Color {
+        appearance == .mineralLight ? mineralLight.page : dark.page.opacity(0.96)
+    }
+
+    /// System action (e.g. the dismiss control) foreground for the appearance.
+    static func systemActionForeground(for appearance: WorkoutActivityState.Appearance?) -> Color {
+        appearance == .mineralLight ? mineralLight.text : dark.accent
+    }
 }
 
 /// Fixed tokens kept for ActivityKit modifiers and test backdrops. Every
@@ -60,7 +101,7 @@ enum WorkoutActivityPalette {
     static let background = Color.activityHex(0x061019)
     static let elevated = Color.activityHex(0x132735)
     static let muted = Color.activityHex(0x172235)
-    static let accent = Color.activityHex(0x3BD2CA)
+    static let accent = Color.activityHex(0xEFB84F)
     static let success = Color.activityHex(0x55E39A)
     static let warning = Color.activityHex(0xEFB84F)
     static let primaryText = Color.activityHex(0xF3F8FA)
@@ -195,7 +236,7 @@ struct WorkoutCompleteSetButton: View {
 
     var body: some View {
         if let target = state.target, state.canCompleteSet {
-            let theme = forceDark ? WorkoutActivityTheme.dark : .of(colorScheme)
+            let theme = forceDark ? WorkoutActivityTheme.dark : .resolve(state.appearance, system: colorScheme)
             Button(intent: CompleteWorkoutSetIntent(
                 sessionId: attributes.sessionId, authority: attributes.authority,
                 exerciseId: target.exerciseId, setId: target.setId, expectedRevision: state.revision
@@ -204,10 +245,10 @@ struct WorkoutCompleteSetButton: View {
                     Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
                     Text("Complete Set").font(WorkoutActivityType.font(compact ? 11 : 13, 760))
                 }
-                .foregroundStyle(theme.onTeal)
+                .foregroundStyle(theme.onPrimaryAction)
                 .frame(maxWidth: compact ? 124 : .infinity, minHeight: 44)
                 .padding(.horizontal, compact ? 6 : 0)
-                .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(theme.teal))
+                .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(theme.primaryAction))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Complete Set")
@@ -290,7 +331,7 @@ private struct WorkoutClockBlock: View {
     }
 }
 
-/// One 31 pt context row: a 57 pt role column (teal for current / up next),
+/// One 31 pt context row: a 57 pt role column (amber for current / up next),
 /// the exercise, and the set position + value.
 private struct WorkoutContextRow: View {
     let row: WorkoutActivityState.Row
@@ -302,7 +343,7 @@ private struct WorkoutContextRow: View {
             Text(WorkoutRoleStyle.label(row.role))
                 .font(WorkoutActivityType.font(7, 780))
                 .tracking(0.49)
-                .foregroundStyle(emphasized ? theme.teal : theme.mutedText)
+                .foregroundStyle(emphasized ? theme.accent : theme.mutedText)
                 .frame(width: 57, alignment: .leading)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -311,10 +352,10 @@ private struct WorkoutContextRow: View {
                     if let label = row.supersetLabel {
                         Text("\(label)\(row.setNumber)")
                             .font(WorkoutActivityType.font(8, 760))
-                            .foregroundStyle(theme.onTeal)
+                            .foregroundStyle(theme.onPrimaryAction)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
-                            .background(Capsule().fill(theme.amber))
+                            .background(Capsule().fill(theme.primaryAction))
                     }
                     Text(row.exerciseName)
                         .font(WorkoutActivityType.font(11, 700))
@@ -358,7 +399,7 @@ struct WorkoutLockScreenView: View {
     @Environment(\.redactionReasons) private var redactionReasons
     @Environment(\.colorScheme) private var colorScheme
 
-    private var theme: WorkoutActivityTheme { .of(colorScheme) }
+    private var theme: WorkoutActivityTheme { .resolve(state.appearance, system: colorScheme) }
     private var isPrivate: Bool { !WorkoutActivityPrivacy.showsSetDetails(redaction: redactionReasons) }
 
     private var presentation: WorkoutActivityPresentation {
@@ -390,7 +431,7 @@ struct WorkoutLockScreenView: View {
         .padding(.vertical, 8)
         .foregroundStyle(theme.text)
         // The page is drawn here (not as a dynamic activity tint) so the
-        // Lock Screen follows the system appearance with archivable colors.
+        // Lock Screen follows the app-owned appearance with archivable colors.
         .background(theme.page)
         .environment(\.workoutActivityStartedAt, attributes.startedAt)
         .accessibilityElement(children: .contain)
@@ -498,7 +539,7 @@ struct WorkoutIslandExpandedBottom: View {
                     Text("Set details hidden")
                         .font(WorkoutActivityType.font(12, 700))
                         .frame(maxWidth: .infinity, minHeight: 38)
-                        .background(RoundedRectangle(cornerRadius: 9).fill(theme.teal.opacity(0.125)))
+                        .background(RoundedRectangle(cornerRadius: 9).fill(theme.accent.opacity(0.125)))
                 } else {
                     HStack(spacing: 7) {
                         ForEach(Array(state.rows.prefix(2).enumerated()), id: \.offset) { _, row in
@@ -538,8 +579,8 @@ struct WorkoutIslandExpandedBottom: View {
             switch row.role {
             case .previous: theme.mutedText
             case .completed: theme.green
-            case .current: isFinalCurrent ? theme.amber : theme.teal
-            case .upNext: theme.teal
+            case .current: theme.accent
+            case .upNext: theme.accent
             }
         }()
         return VStack(alignment: .leading, spacing: 3) {

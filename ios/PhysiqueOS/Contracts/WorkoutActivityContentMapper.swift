@@ -68,6 +68,13 @@ extension WorkoutActivityAttributes.ContentState {
         )
     }
 
+    /// The same state stamped with the app-owned appearance.
+    func withAppearance(_ appearance: Appearance) -> Self {
+        var copy = self
+        copy.appearance = appearance
+        return copy
+    }
+
     /// The same state with the saved presentation, for the short-lived
     /// "Workout saved" Live Activity after a durable commit.
     func saved(completedAt: Date) -> Self {
@@ -90,5 +97,16 @@ extension WorkoutActivityAttributes.ContentState {
         copy.rows = rows.map { var row = $0; row.valueText = nil; return row }
         copy.revision = 0
         return copy
+    }
+}
+
+extension WorkoutActivityAttributes.ContentState.Appearance {
+    /// The PhysiqueOS in-app appearance choice (System / Dark / Mineral Light).
+    init(_ appearance: AppAppearance) {
+        switch appearance {
+        case .system: self = .system
+        case .dark: self = .dark
+        case .light: self = .mineralLight
+        }
     }
 }
