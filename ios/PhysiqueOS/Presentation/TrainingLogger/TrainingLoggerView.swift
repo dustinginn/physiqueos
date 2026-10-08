@@ -226,6 +226,14 @@ struct TrainingLoggerView: View {
             guard case .success(let urls) = result else { return }
             attachAndInterpretFiles(urls)
         }
+        .sheet(item: Binding(
+            get: { viewModel?.variantCreation },
+            set: { if $0 == nil { viewModel?.cancelCreatingVariant() } }
+        )) { request in
+            if let viewModel {
+                TrainingExecutionVariantCreateSheet(viewModel: viewModel, request: request)
+            }
+        }
         .alert(
             "Discard this saved workout?",
             isPresented: $showingDiscardFailedFinishConfirmation
@@ -1109,14 +1117,54 @@ struct TrainingLoggerView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    /// Build 92: Ordinary, then the Server's canonical choices for THIS
+    /// exercise only, then Create Variant… when the Server supports it.
+    /// Switching keeps the exercise's sets/reps/load (variants inherit them).
+    @ViewBuilder
+    private func executionVariantMenu(_ exercise: TrainingLoggerDraftExercise, viewModel: TrainingLoggerViewModel) -> some View {
+        let choices = viewModel.variantChoices(for: exercise)
+        let selectedIdentity = TrainingExecutionVariantIdentity.identity(of: exercise.executionVariant, choices: choices)
+        Menu("Execution variant") {
+            Button {
+                viewModel.selectVariant(nil, for: exercise.id)
+            } label: {
+                variantMenuLabel("Ordinary", selected: exercise.executionVariant == nil)
+            }
+            .accessibilityIdentifier("trainingLogger.variant.ordinary.\(exercise.name)")
+            ForEach(choices) { choice in
+                Button {
+                    viewModel.selectVariant(choice, for: exercise.id)
+                } label: {
+                    variantMenuLabel(choice.label, selected: selectedIdentity == choice.variantId)
+                }
+                .accessibilityIdentifier("trainingLogger.variant.choice.\(choice.label)")
+            }
+            // A restored selection that is no longer offered (retired, or a
+            // legacy label) stays visible and truthful, never silently dropped.
+            if let current = exercise.executionVariant, !choices.contains(where: { $0.variantId == selectedIdentity }) {
+                Button {} label: { variantMenuLabel(current.label, selected: true) }
+                    .disabled(true)
+            }
+            if viewModel.canCreateVariant(for: exercise) {
+                Divider()
+                Button("Create Variant…") { viewModel.beginCreatingVariant(for: exercise) }
+                    .accessibilityIdentifier("trainingLogger.variant.create.\(exercise.name)")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func variantMenuLabel(_ title: String, selected: Bool) -> some View {
+        if selected {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
+        }
+    }
+
     private func exerciseMenu(_ exercise: TrainingLoggerDraftExercise, viewModel: TrainingLoggerViewModel) -> some View {
         Menu {
-            Menu("Execution variant") {
-                Button("Ordinary") { viewModel.update { $0.applyVariant(nil, to: exercise.id, catalog: viewModel.configuration?.exercises ?? []) } }
-                ForEach(viewModel.configuration?.variants ?? [], id: \.key) { variant in
-                    Button(variant.label) { viewModel.update { $0.applyVariant(variant, to: exercise.id, catalog: viewModel.configuration?.exercises ?? []) } }
-                }
-            }
+            executionVariantMenu(exercise, viewModel: viewModel)
             if let others = viewModel.draft?.exercises.filter({ $0.id != exercise.id }), !others.isEmpty {
                 Menu("Superset") {
                     ForEach(others) { other in
@@ -2436,5 +2484,76 @@ struct TrainingLoggerWatchStatusChip: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Recording on Apple Watch")
         .accessibilityIdentifier("trainingLogger.watchStatus")
+    }
+}
+
+/// Build 92 Create Variant: name only. The Server owns normalization,
+/// identity and duplicates; a created, reused or reactivated variant is
+/// selected immediately. On failure the sheet stays open with the Server's
+/// or the network's truthful message and the current selection is unchanged.
+struct TrainingExecutionVariantCreateSheet: View {
+    let viewModel: TrainingLoggerViewModel
+    let request: TrainingExecutionVariantCreationRequest
+    @State private var name = ""
+    @FocusState private var isNameFocused: Bool
+
+    private var trimmedName: String {
+        name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Variant name", text: $name)
+                        .focused($isNameFocused)
+                        .textInputAutocapitalization(.words)
+                        .submitLabel(.done)
+                        .onSubmit(submit)
+                        .onChange(of: name) {
+                            if name.count > TrainingLoggerViewModel.variantNameMaximumLength {
+                                name = String(name.prefix(TrainingLoggerViewModel.variantNameMaximumLength))
+                            }
+                        }
+                        .disabled(viewModel.isSubmittingVariant)
+                        .accessibilityIdentifier("trainingLogger.variant.createName")
+                } footer: {
+                    Text("For \(request.exerciseName) only. Uses the same sets, reps and load as Ordinary.")
+                }
+                if let message = viewModel.variantCreationMessage {
+                    Section {
+                        Text(message)
+                            .foregroundStyle(PhysiqueOSTheme.redesignRed)
+                            .accessibilityIdentifier("trainingLogger.variant.createError")
+                    }
+                }
+            }
+            .navigationTitle("New Variant")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { viewModel.cancelCreatingVariant() }
+                        .disabled(viewModel.isSubmittingVariant)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if viewModel.isSubmittingVariant {
+                        ProgressView()
+                    } else {
+                        Button(viewModel.variantCreationMessage == nil ? "Create" : "Retry", action: submit)
+                            .disabled(trimmedName.isEmpty)
+                            .accessibilityIdentifier("trainingLogger.variant.createSubmit")
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .interactiveDismissDisabled(viewModel.isSubmittingVariant)
+        .onAppear { isNameFocused = true }
+    }
+
+    private func submit() {
+        guard !trimmedName.isEmpty, !viewModel.isSubmittingVariant else { return }
+        let submitted = trimmedName
+        Task { await viewModel.submitNewVariant(name: submitted) }
     }
 }

@@ -858,6 +858,27 @@ final class LoggerParityCaptureUITests: XCTestCase {
     func testCheckpoint2ActiveWorkoutDark() { checkpoint2(appearance: "dark") }
     func testCheckpoint2ActiveWorkoutMineralLight() { checkpoint2(appearance: "light") }
 
+    /// Build 92: without the Server's per-exercise variant projection (the
+    /// Sandbox, or an older Server) the Execution variant menu offers
+    /// Ordinary only: no Create Variant, and no legacy global fixture list.
+    func testExecutionVariantMenuWithoutServerChoicesOffersOrdinaryOnly() {
+        launch(appearance: "dark", route: "training-logger")
+        startWorkout(areas: ["chest"], exercises: ["Bench Press"])
+        let actions = app.buttons["trainingLogger.exerciseActions.Bench Press"]
+        XCTAssertTrue(actions.waitForExistence(timeout: 5))
+        actions.tap()
+        let variantMenu = app.buttons["Execution variant"]
+        XCTAssertTrue(variantMenu.waitForExistence(timeout: 3))
+        variantMenu.tap()
+        XCTAssertTrue(app.buttons["Ordinary"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["Create Variant…"].exists)
+        XCTAssertFalse(app.buttons["Static Hold"].exists)
+        XCTAssertFalse(app.buttons["3-Second Pause"].exists)
+        capture("b92-variant-menu-ordinary-only")
+        app.buttons["Ordinary"].tap()
+        XCTAssertTrue(actions.waitForExistence(timeout: 3), "Selecting Ordinary returns to the workout unchanged")
+    }
+
     private func checkpoint2(appearance: String) {
         launch(appearance: appearance, route: "training-logger")
         startWorkout(areas: ["chest", "core"], exercises: ["Bench Press", "Cable Fly", "Push-ups", "Planks"])

@@ -84,13 +84,17 @@ enum TrainingExerciseHistoryCalculator {
         in occurrences: [TrainingExerciseHistoryOccurrence],
         before workoutDate: String,
         executionVariant: TrainingExecutionVariant?,
-        relationship: TrainingExerciseRelationshipContext?
+        relationship: TrainingExerciseRelationshipContext?,
+        variantChoices: [TrainingExecutionVariantChoice] = []
     ) -> TrainingExerciseHistoryOccurrence? {
-        let requestedVariant = executionVariant?.key ?? ordinaryVariantKey
+        // Build 92: stable canonical identity when this exercise has choices
+        // (a legacy "static_hold" occurrence and a new variantId selection of
+        // the same definition match); otherwise exactly the legacy key.
+        let requestedVariant = TrainingExecutionVariantIdentity.identity(of: executionVariant, choices: variantChoices)
         let requestedRelationship = relationshipKey(relationship)
         return occurrences
             .filter { $0.sessionDate < workoutDate }
-            .filter { variantKey($0.exercise) == requestedVariant }
+            .filter { TrainingExecutionVariantIdentity.identity(of: $0.exercise.executionVariant, choices: variantChoices) == requestedVariant }
             .filter { relationshipKey($0.relationship) == requestedRelationship }
             .sorted { $0.sessionDate > $1.sessionDate }
             .first

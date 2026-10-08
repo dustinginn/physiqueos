@@ -182,6 +182,11 @@ struct WatchWorkoutProjection: Codable, Equatable, Sendable {
         /// shows the set's real value instead of an empty reps tile. Optional
         /// and additive: an older Watch ignores it, an older phone omits it.
         var durationText: String? = nil
+        /// Build 92: the phone-selected canonical execution variant's label
+        /// (for example "Static Hold"). Display only: the Watch never edits,
+        /// creates or times a variant. Optional and additive: an older Watch
+        /// ignores it, an older phone omits it.
+        var variantLabel: String? = nil
         var supersetLabel: String?
         var partnerName: String?
         var isCompletionTarget: Bool

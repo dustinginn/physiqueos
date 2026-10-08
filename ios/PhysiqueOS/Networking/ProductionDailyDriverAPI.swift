@@ -1637,6 +1637,13 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
             grouping: (payload.contextualProgressionRecommendations ?? []).compactMap(\.value),
             by: \.canonicalExerciseId
         )
+        // Build 92 additive contract: Server-owned per-exercise variant
+        // choices. A missing field (older Server) means Ordinary only and no
+        // Create Variant; a malformed or non-selectable entry is dropped
+        // alone. Never derived from history.
+        let variantChoices = (payload.executionVariantsByExercise ?? [:]).mapValues { entries in
+            entries.compactMap(\.value).filter(\.isSelectable)
+        }
         return TrainingLoggerConfiguration(
             areas: catalog.areas.map { TrainingLoggerArea(id: $0.id, label: $0.label) },
             variants: [],
@@ -1653,11 +1660,13 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
                         inMyLibrary: payload.initialMyLibraryExerciseIds.contains(exercise.canonicalExerciseId),
                         history: Self.history(for: exercise.canonicalExerciseId, defaultLoadType: exercise.defaultLoadType, in: history),
                         progressionRecommendation: recommendations[exercise.canonicalExerciseId],
-                        contextualProgressionRecommendations: contextual[exercise.canonicalExerciseId]?.map(\.contextual)
+                        contextualProgressionRecommendations: contextual[exercise.canonicalExerciseId]?.map(\.contextual),
+                        executionVariants: variantChoices[exercise.canonicalExerciseId]
                     )
                 }
             },
-            categorySuggestion: payload.initialCategorySuggestion
+            categorySuggestion: payload.initialCategorySuggestion,
+            supportsExecutionVariantCreation: payload.executionVariantsByExercise != nil
         )
     }
 
@@ -1698,6 +1707,12 @@ struct ProductionTrainingLoggerAPI: TrainingLoggerAPI {
         var initialProgressionRecommendations: [RawRecommendation]?
         var contextualProgressionRecommendations: [FailableContextualRecommendation]?
         var initialCategorySuggestion: TrainingLoggerCategorySuggestion?
+        var executionVariantsByExercise: [String: [FailableVariantChoice]]?
+    }
+
+    struct FailableVariantChoice: Decodable {
+        let value: TrainingExecutionVariantChoice?
+        init(from decoder: Decoder) throws { value = try? TrainingExecutionVariantChoice(from: decoder) }
     }
 
     /// `coreNavigation.getTrainingLogger`'s `initialHistorySessions` are a

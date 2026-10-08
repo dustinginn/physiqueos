@@ -73,6 +73,10 @@ final class TrainingLoggerViewModel {
     var newExerciseMessage: String?
     var newExerciseCandidates: [CanonicalExerciseMatch] = []
     var isSubmittingNewExercise = false
+    /// Build 92 Create Variant sheet state. `nil` means no sheet.
+    var variantCreation: TrainingExecutionVariantCreationRequest?
+    var variantCreationMessage: String?
+    var isSubmittingVariant = false
     var validationMessage: String?
     var isSubmitting = false
     /// Set only when a workout already committed canonically but a
@@ -986,6 +990,98 @@ final class TrainingLoggerViewModel {
         }
     }
 
+    // MARK: - Execution variants (Build 92 Create + Select)
+
+    /// Canonical, Server-projected variant choices for exactly this draft
+    /// exercise. A provisional or unknown exercise has none (Ordinary only),
+    /// and one exercise's choices are never offered on another.
+    func variantChoices(for exercise: TrainingLoggerDraftExercise) -> [TrainingExecutionVariantChoice] {
+        guard let canonicalId = exercise.canonicalExerciseId,
+              let item = configuration?.exercises.first(where: { $0.canonicalExerciseId == canonicalId }) else { return [] }
+        return item.executionVariantChoices
+    }
+
+    /// Create Variant… is offered only against a Server that projects the
+    /// canonical variant contract, under Founder Production, for a canonical
+    /// catalog exercise. Never a local-only variant.
+    func canCreateVariant(for exercise: TrainingLoggerDraftExercise) -> Bool {
+        guard authority == .founderProduction,
+              configuration?.supportsExecutionVariantCreation == true,
+              let canonicalId = exercise.canonicalExerciseId else { return false }
+        return configuration?.exercises.contains(where: { $0.canonicalExerciseId == canonicalId }) == true
+    }
+
+    func selectVariant(_ choice: TrainingExecutionVariantChoice?, for exerciseId: String) {
+        let catalog = configuration?.exercises ?? []
+        update { $0.applyVariant(choice?.selection, to: exerciseId, catalog: catalog) }
+    }
+
+    func beginCreatingVariant(for exercise: TrainingLoggerDraftExercise) {
+        guard canCreateVariant(for: exercise), let canonicalId = exercise.canonicalExerciseId else { return }
+        variantCreationMessage = nil
+        variantCreation = TrainingExecutionVariantCreationRequest(
+            exerciseId: exercise.id, canonicalExerciseId: canonicalId, exerciseName: exercise.name
+        )
+    }
+
+    func cancelCreatingVariant() {
+        guard !isSubmittingVariant else { return }
+        variantCreation = nil
+        variantCreationMessage = nil
+    }
+
+    /// Creates (or reuses/reactivates) one canonical variant and selects it
+    /// on the exercise that asked for it. Failure never changes the current
+    /// selection and leaves the sheet open with a truthful message; a retry
+    /// reuses the same idempotency key, so a lost response cannot create a
+    /// duplicate definition.
+    func submitNewVariant(name: String) async {
+        guard let request = variantCreation, !isSubmittingVariant else { return }
+        let trimmed = name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard !trimmed.isEmpty else { return }
+        guard trimmed.count <= Self.variantNameMaximumLength else {
+            variantCreationMessage = "Use \(Self.variantNameMaximumLength) characters or fewer."
+            return
+        }
+        isSubmittingVariant = true
+        variantCreationMessage = nil
+        defer { isSubmittingVariant = false }
+        do {
+            let created = try await catalogWriteAPI.createExecutionVariant(
+                canonicalExerciseId: request.canonicalExerciseId, displayName: trimmed
+            )
+            insertVariantChoice(created.choice, canonicalExerciseId: request.canonicalExerciseId)
+            // The workout may have changed while the request was in flight
+            // (exercise removed or swapped): select only on the same
+            // canonical exercise occurrence that asked.
+            if draft?.exercises.contains(where: {
+                $0.id == request.exerciseId && $0.canonicalExerciseId == request.canonicalExerciseId
+            }) == true {
+                selectVariant(created.choice, for: request.exerciseId)
+            }
+            variantCreation = nil
+        } catch let rejection as TrainingExecutionVariantRejection {
+            variantCreationMessage = rejection.message
+        } catch {
+            variantCreationMessage = "This variant couldn't be created. Your current selection hasn't changed. Check your connection and try again."
+        }
+    }
+
+    private func insertVariantChoice(_ choice: TrainingExecutionVariantChoice, canonicalExerciseId: String) {
+        guard var configuration,
+              let index = configuration.exercises.firstIndex(where: { $0.canonicalExerciseId == canonicalExerciseId }) else { return }
+        var choices = (configuration.exercises[index].executionVariants ?? []).filter { $0.variantId != choice.variantId }
+        choices.append(choice)
+        choices.sort {
+            let order = $0.label.localizedCaseInsensitiveCompare($1.label)
+            return order == .orderedSame ? $0.variantId < $1.variantId : order == .orderedAscending
+        }
+        configuration.exercises[index].executionVariants = choices
+        self.configuration = configuration
+    }
+
+    static let variantNameMaximumLength = 40
+
     func selectExistingExercise(_ candidate: CanonicalExerciseMatch) async {
         guard authority == .founderProduction, newExerciseCandidates.contains(candidate), !isSubmittingNewExercise else { return }
         isSubmittingNewExercise = true
@@ -1219,4 +1315,12 @@ final class TrainingWatchHandoffModel {
         flowSessionId = nil
         requestUndelivered = false
     }
+}
+
+/// The draft exercise a Create Variant sheet was opened for.
+struct TrainingExecutionVariantCreationRequest: Identifiable, Equatable {
+    var exerciseId: String
+    var canonicalExerciseId: String
+    var exerciseName: String
+    var id: String { exerciseId }
 }
