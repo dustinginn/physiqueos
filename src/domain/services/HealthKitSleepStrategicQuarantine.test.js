@@ -61,6 +61,13 @@ const SLEEP_ALLOWED = new Set([
   "domain/services/HealthKitSleepGraduation.js",
   "platform/database/HealthKitGraduationReader.js",
   "platform/operations/HealthKitGraduationPolicyRunner.js",
+  // Recovery Briefing V1 (Weekly/Monthly only): a NON-strategic,
+  // prospective-only projection of canonical sleep-canon-v3 days into
+  // Recovery-only rows (never `sleep_night` V3 evidence, never the graduation
+  // scope), its bounded read-only reader (unwired), and synthetic test support.
+  "domain/services/RecoveryBriefingSleepInputProjectionV1.js",
+  "platform/database/RecoverySleepInputReaderV1.js",
+  "testSupport/recoverySleepSynthetic.js",
 ]);
 const STRATEGIC_DIRECTORIES = ["domain/intelligence", "app/briefings", "app/confidence", "application/core", "application/progress", "application/read-models"];
 
