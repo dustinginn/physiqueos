@@ -55,14 +55,9 @@ extension HealthKitSynchronizationEngine: HealthKitAutomaticSynchronizing {}
 /// `bootstrap()` is idempotent and safe to call on every foreground
 /// transition (cold launch and resume both look the same to SwiftUI's
 /// `scenePhase`):
-///   1. If HealthKit authorization has not been asked *this process*, ask.
-///      iOS silently no-ops a repeat request once the user has already
-///      answered (grant or deny) -- this can never show a second prompt for
-///      an already-decided Founder, and is the standard, documented pattern
-///      for a HealthKit app to re-establish its authorization state after a
-///      fresh launch (the OS grant is durable; this Swift wrapper's
-///      `authorizationWasRequested` flag is not, since it is fresh in-memory
-///      state on every launch).
+///   1. Preflight the exact permanent read scope. A background launch only
+///      checks status; consent UI is possible solely from a visible
+///      foreground bootstrap when HealthKit reports that new consent is due.
 ///   2. Once available, register the local observer and iOS background
 ///      delivery for Activity, Nutrition, and Workouts (both idempotent; a duplicate
 ///      registration is a no-op, confirmed by reading
@@ -175,6 +170,9 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     private var requestedGeneration: UInt64 = 0
     private var activeGeneration: UInt64 = 0
     private var completedGeneration: UInt64 = 0
+    /// A visible foreground request arriving during a background/recovery
+    /// pass queues a newer pass that is allowed to present required consent.
+    private var foregroundAuthorizationRequested = false
 
     init(
         authorization: any HealthKitCanaryAuthorizationCoordinating,
@@ -288,10 +286,12 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     @discardableResult
     func registerObserversForBackgroundLaunch() async -> HealthKitAutomaticBootstrapOutcome {
         var outcome = HealthKitAutomaticBootstrapOutcome()
-        if !authorization.authorizationWasRequested {
-            outcome.authorizationOutcome = await authorization.requestAuthorization(for: .initialRead)
-        }
-        guard case .available = authorization.currentAvailability else {
+        let authorizationOutcome = await authorization.requestAuthorization(
+            for: .automaticRead,
+            presentation: .prohibited
+        )
+        outcome.authorizationOutcome = authorizationOutcome
+        guard authorizationOutcome == .completed else {
             outcome.skippedReason = "authorization_not_available"
             return outcome
         }
@@ -323,7 +323,15 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             let scope = Self.sleepScope(ownerIdentity: ownerIdentity, deviceIdentity: deviceIdentity)
             if sleepActivation.activeFloor(at: now()) != nil {
                 outcome.sleepActive = true
-                await registerSleep(scope: scope, gate: sleepActivation, outcome: &outcome)
+                let sleepAuthorization = await authorization.requestAuthorization(
+                    for: .sleepRead,
+                    presentation: .prohibited
+                )
+                if sleepAuthorization == .completed {
+                    await registerSleep(scope: scope, gate: sleepActivation, outcome: &outcome)
+                } else {
+                    outcome.streamErrors[.sleepAnalysis, default: []].append("authorization_not_available")
+                }
             } else {
                 await teardownSleepIfRegistered(scope: scope, gate: sleepActivation, outcome: &outcome)
             }
@@ -386,6 +394,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     private func runSleepLane(
         ownerIdentity: String,
         deviceIdentity: String,
+        allowsAuthorizationPrompt: Bool,
         outcome: inout HealthKitAutomaticBootstrapOutcome
     ) async {
         guard let sleepActivation else { return }
@@ -406,6 +415,14 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             return
         }
         outcome.sleepActive = true
+        let authorizationOutcome = await authorization.requestAuthorization(
+            for: .sleepRead,
+            presentation: allowsAuthorizationPrompt ? .foreground : .prohibited
+        )
+        guard authorizationOutcome == .completed else {
+            outcome.streamErrors[.sleepAnalysis, default: []].append("authorization_not_available")
+            return
+        }
         await registerSleep(scope: scope, gate: sleepActivation, outcome: &outcome)
         switch await boundedStep({ try await self.synchronizer.synchronize(scope: scope, stagingCompletion: nil) }) {
         case .succeeded:
@@ -428,7 +445,8 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
 
     @MainActor
     @discardableResult
-    func bootstrap() async -> HealthKitAutomaticBootstrapOutcome {
+    func bootstrap(allowsAuthorizationPrompt: Bool = true) async -> HealthKitAutomaticBootstrapOutcome {
+        foregroundAuthorizationRequested = foregroundAuthorizationRequested || allowsAuthorizationPrompt
         if let inFlightTask {
             let currentOrScheduledGeneration = max(activeGeneration, completedGeneration + 1)
             if requestedGeneration <= currentOrScheduledGeneration {
@@ -441,7 +459,9 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             var outcome = HealthKitAutomaticBootstrapOutcome()
             while self.completedGeneration < self.requestedGeneration {
                 self.activeGeneration = self.completedGeneration + 1
-                outcome = await self.runBootstrap()
+                let permitsPrompt = self.foregroundAuthorizationRequested
+                self.foregroundAuthorizationRequested = false
+                outcome = await self.runBootstrap(allowsAuthorizationPrompt: permitsPrompt)
                 self.completedGeneration = self.activeGeneration
             }
             // Clear before completing the task. This closes the narrow actor-
@@ -457,21 +477,14 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     }
 
     @MainActor
-    private func runBootstrap() async -> HealthKitAutomaticBootstrapOutcome {
+    private func runBootstrap(allowsAuthorizationPrompt: Bool) async -> HealthKitAutomaticBootstrapOutcome {
         var outcome = HealthKitAutomaticBootstrapOutcome()
-        if !authorization.authorizationWasRequested {
-            // Known, reviewed tradeoff (not fixed here; a Founder decision):
-            // `.initialRead` is the SAME full V1 read scope (Activity,
-            // Nutrition, Workouts, Sleep) the diagnostic screen's button has
-            // always requested -- this diff does not widen WHAT is asked for,
-            // only WHEN, moving it from a deliberate Founder tap to the first
-            // automatic foreground. For an already-decided Founder (the real
-            // case today) this is a silent no-op; for a hypothetical fresh
-            // install it would show the standard one-time HealthKit consent
-            // prompt automatically rather than only after a screen visit.
-            outcome.authorizationOutcome = await authorization.requestAuthorization(for: .initialRead)
-        }
-        guard case .available = authorization.currentAvailability else {
+        let authorizationOutcome = await authorization.requestAuthorization(
+            for: .automaticRead,
+            presentation: allowsAuthorizationPrompt ? .foreground : .prohibited
+        )
+        outcome.authorizationOutcome = authorizationOutcome
+        guard authorizationOutcome == .completed else {
             outcome.skippedReason = "authorization_not_available"
             lastBootstrapOutcome = outcome
             return outcome
@@ -599,7 +612,12 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         }
         // The dormant Sleep lane runs last, so every pre-existing step keeps
         // its exact prior ordering and timing whether or not Sleep is active.
-        await runSleepLane(ownerIdentity: ownerIdentity, deviceIdentity: deviceIdentity, outcome: &outcome)
+        await runSleepLane(
+            ownerIdentity: ownerIdentity,
+            deviceIdentity: deviceIdentity,
+            allowsAuthorizationPrompt: allowsAuthorizationPrompt,
+            outcome: &outcome
+        )
         lastBootstrapOutcome = outcome
         return outcome
     }

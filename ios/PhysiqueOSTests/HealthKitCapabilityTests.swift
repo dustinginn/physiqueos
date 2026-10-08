@@ -2,6 +2,7 @@ import HealthKit
 import XCTest
 @testable import PhysiqueOS
 
+@MainActor
 final class HealthKitCapabilityTests: XCTestCase {
     func testN0FeatureGateDisablesEveryRuntimeOperation() {
         let gate = HealthKitFeatureGate.n0Disabled
@@ -35,7 +36,7 @@ final class HealthKitCapabilityTests: XCTestCase {
         )
         let coordinator = coordinator(service: service, authorizationEnabled: true)
 
-        let availability = await coordinator.evaluateAuthorizationRequirement(for: .initialRead)
+        let availability = await coordinator.evaluateAuthorizationRequirement(for: .automaticRead)
         XCTAssertEqual(availability, .authorizationRequestRequired)
         XCTAssertEqual(coordinator.availabilityAfterEmptyRead(), .availableNoVisibleData)
         XCTAssertEqual(service.requirementCalls, 1)
@@ -47,7 +48,7 @@ final class HealthKitCapabilityTests: XCTestCase {
             requestError: HealthKitServiceError.operational(code: "synthetic_failure")
         )
         let result = await coordinator(service: service, authorizationEnabled: true)
-            .requestAuthorization(for: .initialRead)
+            .requestAuthorization(for: .automaticRead)
         XCTAssertEqual(result, .failed(.operationalError(code: "synthetic_failure")))
     }
 
@@ -101,16 +102,18 @@ final class HealthKitCapabilityTests: XCTestCase {
         XCTAssertEqual(write, [try identifier(.leanBodyMass), try identifier(.bodyFatPercentage)])
     }
 
-    func testAuthorizationConstructionSeparatesInitialReadsFromFutureWrites() {
+    func testAuthorizationConstructionSeparatesAutomaticSleepAndFutureWrites() {
         let registry = HealthKitTypeRegistry.physiqueOSV1
-        let initial = registry.authorizationRequest(for: .initialRead)
+        let automatic = registry.authorizationRequest(for: .automaticRead)
+        let sleep = registry.authorizationRequest(for: .sleepRead)
         let futureWrite = registry.authorizationRequest(for: .futureBodyMeasurementWrite)
 
-        XCTAssertFalse(initial.readTypes.isEmpty)
-        XCTAssertTrue(initial.writeTypes.isEmpty)
+        XCTAssertFalse(automatic.readTypes.isEmpty)
+        XCTAssertTrue(automatic.writeTypes.isEmpty)
+        XCTAssertEqual(sleep.readTypeIdentifiers, Set(registry.readTypesByDomain[.sleep, default: []].map(\.identifier)))
+        XCTAssertTrue(automatic.readTypeIdentifiers.isDisjoint(with: sleep.readTypeIdentifiers))
         XCTAssertTrue(futureWrite.readTypes.isEmpty)
         XCTAssertFalse(futureWrite.writeTypes.isEmpty)
-        XCTAssertEqual(initial.readTypeIdentifiers, Set(registry.allReadTypes.map(\.identifier)))
         XCTAssertEqual(futureWrite.writeTypeIdentifiers, Set(registry.allWriteTypes.map(\.identifier)))
     }
 
@@ -118,7 +121,7 @@ final class HealthKitCapabilityTests: XCTestCase {
         let service = MockHealthKitService(deviceAvailability: .available)
         let coordinator = coordinator(service: service)
 
-        let outcome = await coordinator.requestAuthorization(for: .initialRead)
+        let outcome = await coordinator.requestAuthorization(for: .automaticRead)
         XCTAssertEqual(outcome, .blockedByFeatureGate)
         XCTAssertEqual(service.authorizationCalls, 0)
         XCTAssertEqual(service.requirementCalls, 0)
@@ -128,16 +131,61 @@ final class HealthKitCapabilityTests: XCTestCase {
         let service = MockHealthKitService(deviceAvailability: .available)
         let coordinator = coordinator(service: service, authorizationEnabled: true)
 
-        let outcome = await coordinator.requestAuthorization(for: .initialRead)
+        let outcome = await coordinator.requestAuthorization(for: .automaticRead)
         XCTAssertEqual(outcome, .completed)
-        XCTAssertEqual(service.authorizationCalls, 1)
-        XCTAssertEqual(service.lastRequest?.scope, .initialRead)
+        XCTAssertEqual(service.authorizationCalls, 0)
+        XCTAssertEqual(service.requirementCalls, 1)
+        XCTAssertEqual(service.lastRequest?.scope, .automaticRead)
         XCTAssertEqual(
             service.lastRequest?.readTypeIdentifiers,
-            Set(HealthKitTypeRegistry.physiqueOSV1.allReadTypes.map(\.identifier))
+            HealthKitTypeRegistry.physiqueOSV1.authorizationRequest(for: .automaticRead).readTypeIdentifiers
         )
         XCTAssertTrue(service.lastRequest?.writeTypes.isEmpty == true)
         XCTAssertEqual(coordinator.currentAvailability, .available)
+    }
+
+    @MainActor
+    func testBackgroundPreflightNeverPresentsRequiredConsent() async {
+        let service = MockHealthKitService(
+            deviceAvailability: .available,
+            requestRequirement: .shouldRequest
+        )
+        let coordinator = coordinator(service: service, authorizationEnabled: true)
+
+        let outcome = await coordinator.requestAuthorization(
+            for: .automaticRead,
+            presentation: .prohibited
+        )
+
+        XCTAssertEqual(outcome, .requestRequired)
+        XCTAssertEqual(service.requirementCalls, 1)
+        XCTAssertEqual(service.authorizationCalls, 0)
+    }
+
+    @MainActor
+    func testForegroundJoiningBackgroundPreflightRetriesAndPromptsExactlyOnce() async {
+        let service = SuspendingHealthKitService()
+        let coordinator = HealthKitAuthorizationCoordinator(
+            service: service,
+            featureGate: HealthKitFeatureGate(enabledOperations: [.requestAuthorization])
+        )
+
+        async let background = coordinator.requestAuthorization(
+            for: .automaticRead,
+            presentation: .prohibited
+        )
+        while service.requirementCalls == 0 { await Task.yield() }
+        async let foreground = coordinator.requestAuthorization(
+            for: .automaticRead,
+            presentation: .foreground
+        )
+        service.releaseFirstRequirement(as: .shouldRequest)
+
+        let (backgroundOutcome, foregroundOutcome) = await (background, foreground)
+        XCTAssertEqual(backgroundOutcome, .requestRequired)
+        XCTAssertEqual(foregroundOutcome, .completed)
+        XCTAssertEqual(service.requirementCalls, 2)
+        XCTAssertEqual(service.authorizationCalls, 1)
     }
 
     func testAppEnvironmentDoesNotRequestAuthorizationOnLaunchConstruction() {
@@ -231,6 +279,43 @@ private final class MockHealthKitService: HealthKitService {
         lastRequest = request
         if let requestError { throw requestError }
         return requestCompleted
+    }
+}
+
+private final class SuspendingHealthKitService: HealthKitService, @unchecked Sendable {
+    let deviceAvailability: HealthKitDeviceAvailability = .available
+    private let lock = NSLock()
+    private var pendingRequirement: CheckedContinuation<HealthKitAuthorizationRequestRequirement, Never>?
+    private var storedRequirementCalls = 0
+    private var storedAuthorizationCalls = 0
+
+    var requirementCalls: Int { lock.withLock { storedRequirementCalls } }
+    var authorizationCalls: Int { lock.withLock { storedAuthorizationCalls } }
+
+    func authorizationRequestRequirement(
+        for request: HealthKitAuthorizationRequest
+    ) async throws -> HealthKitAuthorizationRequestRequirement {
+        let call = lock.withLock { () -> Int in
+            storedRequirementCalls += 1
+            return storedRequirementCalls
+        }
+        if call > 1 { return .shouldRequest }
+        return await withCheckedContinuation { continuation in
+            lock.withLock { pendingRequirement = continuation }
+        }
+    }
+
+    func releaseFirstRequirement(as requirement: HealthKitAuthorizationRequestRequirement) {
+        let continuation = lock.withLock { () -> CheckedContinuation<HealthKitAuthorizationRequestRequirement, Never>? in
+            defer { pendingRequirement = nil }
+            return pendingRequirement
+        }
+        continuation?.resume(returning: requirement)
+    }
+
+    func requestAuthorization(_ request: HealthKitAuthorizationRequest) async throws -> Bool {
+        lock.withLock { storedAuthorizationCalls += 1 }
+        return true
     }
 }
 

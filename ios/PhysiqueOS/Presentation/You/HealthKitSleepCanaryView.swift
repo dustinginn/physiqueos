@@ -61,6 +61,7 @@ struct HealthKitSleepCanaryView: View {
                 case .completed: authorizationMessage = "Apple Health authorization flow completed. If Sleep reads return nothing, check Health › Apps › PhysiqueOS › Sleep."
                 case .blockedByFeatureGate: authorizationMessage = "Enable the Sleep canary first."
                 case .unavailable: authorizationMessage = "HealthKit is unavailable on this device."
+                case .requestRequired: authorizationMessage = "Apple Health authorization requires the app to be active."
                 case let .failed(availability): authorizationMessage = "Authorization did not complete: \(String(describing: availability))."
                 }
                 isWorking = false

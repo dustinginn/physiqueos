@@ -132,7 +132,6 @@ struct DEXAHealthKitOwnedSample: Equatable, Sendable {
 }
 
 protocol DEXAHealthKitSampleStore: AnyObject {
-    @MainActor func requestAuthorization() async throws -> Bool
     @MainActor func authorizationStatus(for kind: DEXAHealthKitMeasurementKind) -> HKAuthorizationStatus
     @MainActor func ownedSamples(for intent: DEXAHealthKitIntent) async throws -> [DEXAHealthKitOwnedSample]
     @MainActor func save(_ intent: DEXAHealthKitIntent) async throws
@@ -148,19 +147,6 @@ final class SystemDEXAHealthKitSampleStore: DEXAHealthKitSampleStore {
     init(healthStore: HKHealthStore = HKHealthStore(), bundleIdentifier: String = Bundle.main.bundleIdentifier ?? "") {
         self.healthStore = healthStore
         self.bundleIdentifier = bundleIdentifier
-    }
-
-    @MainActor func requestAuthorization() async throws -> Bool {
-        let types: Set<HKSampleType> = [
-            DEXAHealthKitMeasurementKind.bodyFatPercentage.quantityType,
-            DEXAHealthKitMeasurementKind.leanBodyMassFatFree.quantityType,
-        ]
-        return try await withCheckedThrowingContinuation { continuation in
-            healthStore.requestAuthorization(toShare: types, read: []) { accepted, error in
-                if let error { continuation.resume(throwing: error) }
-                else { continuation.resume(returning: accepted) }
-            }
-        }
     }
 
     @MainActor func authorizationStatus(for kind: DEXAHealthKitMeasurementKind) -> HKAuthorizationStatus {
@@ -338,6 +324,7 @@ final class DEXAHealthKitWritebackCoordinator {
     private let server: any DEXAHealthKitWritebackServer
     private let samples: any DEXAHealthKitSampleStore
     private let preferences: any DEXAHealthKitWritebackPreferenceStore
+    private let authorization: (any HealthKitCanaryAuthorizationCoordinating)?
     private var running = false
     private(set) var state: DEXAHealthKitWritebackState
     private(set) var lastCompletedAt: Date?
@@ -347,15 +334,22 @@ final class DEXAHealthKitWritebackCoordinator {
     init(
         server: any DEXAHealthKitWritebackServer,
         samples: any DEXAHealthKitSampleStore,
-        preferences: any DEXAHealthKitWritebackPreferenceStore
+        preferences: any DEXAHealthKitWritebackPreferenceStore,
+        authorization: (any HealthKitCanaryAuthorizationCoordinating)? = nil
     ) {
         self.server = server; self.samples = samples; self.preferences = preferences
+        self.authorization = authorization
         self.state = preferences.isEnabled ? .ready : .off
     }
 
     @MainActor func enable() async {
         do {
-            _ = try await samples.requestAuthorization()
+            guard let authorization else { throw DEXAHealthKitWritebackError.unauthorized }
+            let outcome = await authorization.requestAuthorization(
+                for: .futureBodyMeasurementWrite,
+                presentation: .foreground
+            )
+            guard outcome == .completed else { throw DEXAHealthKitWritebackError.unauthorized }
             preferences.isEnabled = true
             state = .ready
             await reconcilePermanent()

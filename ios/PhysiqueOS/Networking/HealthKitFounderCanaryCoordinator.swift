@@ -4,8 +4,10 @@ import Security
 @MainActor
 protocol HealthKitCanaryAuthorizationCoordinating: AnyObject {
     var currentAvailability: HealthKitAvailability { get }
-    var authorizationWasRequested: Bool { get }
-    func requestAuthorization(for scope: HealthKitAuthorizationScope) async -> HealthKitAuthorizationOutcome
+    func requestAuthorization(
+        for scope: HealthKitAuthorizationScope,
+        presentation: HealthKitAuthorizationPresentation
+    ) async -> HealthKitAuthorizationOutcome
 }
 
 extension HealthKitAuthorizationCoordinator: HealthKitCanaryAuthorizationCoordinating {}
@@ -187,6 +189,7 @@ final class HealthKitFounderCanaryCoordinator {
     private let canonicalizationLedger: HealthKitCanonicalizationLedger?
 
     @MainActor private(set) var isEnabled = false
+    @MainActor private(set) var authorizationWasExplicitlyRequested = false
 
     init(
         authorization: any HealthKitCanaryAuthorizationCoordinating,
@@ -207,7 +210,6 @@ final class HealthKitFounderCanaryCoordinator {
     }
 
     @MainActor var availability: HealthKitAvailability { authorization.currentAvailability }
-    @MainActor var authorizationWasExplicitlyRequested: Bool { authorization.authorizationWasRequested }
 
     @MainActor
     func setEnabled(_ enabled: Bool) {
@@ -217,7 +219,9 @@ final class HealthKitFounderCanaryCoordinator {
     @MainActor
     func requestAuthorization() async -> HealthKitAuthorizationOutcome {
         guard isEnabled else { return .blockedByFeatureGate }
-        return await authorization.requestAuthorization(for: .initialRead)
+        let outcome = await authorization.requestAuthorization(for: .sleepRead, presentation: .foreground)
+        if outcome == .completed { authorizationWasExplicitlyRequested = true }
+        return outcome
     }
 
     /// Foreground, exact-day Activity + Nutrition upload for the controlled
@@ -227,7 +231,7 @@ final class HealthKitFounderCanaryCoordinator {
     @MainActor
     func synchronizeCanonicalTestDay(_ testDay: HealthKitCanonicalTestDay) async throws -> HealthKitCanonicalTestDayRunResult {
         guard isEnabled else { throw HealthKitCanaryError.disabled }
-        guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
+        guard authorizationWasExplicitlyRequested else { throw HealthKitCanaryError.authorizationRequired }
         guard let synchronizer = synchronizer as? any HealthKitCanonicalTestDaySynchronizing else {
             throw HealthKitCanaryError.canonicalTestDayUnsupported
         }
@@ -272,7 +276,7 @@ final class HealthKitFounderCanaryCoordinator {
     @MainActor
     func synchronizeWorkoutCanary(_ day: HealthKitWorkoutCanaryDay) async throws -> HealthKitWorkoutCanaryRunResult {
         guard isEnabled else { throw HealthKitCanaryError.disabled }
-        guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
+        guard authorizationWasExplicitlyRequested else { throw HealthKitCanaryError.authorizationRequired }
         guard let synchronizer = synchronizer as? any HealthKitWorkoutCanarySynchronizing else {
             throw HealthKitCanaryError.workoutCanaryUnsupported
         }
@@ -301,7 +305,7 @@ final class HealthKitFounderCanaryCoordinator {
     @MainActor
     func dryRunSeptember23ActivityRepair() async throws -> HealthKitSeptember23ActivityRepairDryRun {
         guard isEnabled else { throw HealthKitCanaryError.disabled }
-        guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
+        guard authorizationWasExplicitlyRequested else { throw HealthKitCanaryError.authorizationRequired }
         guard let synchronizer = synchronizer as? any HealthKitSeptember23ActivityRepairSynchronizing else {
             throw HealthKitCanaryError.september23RepairBoundaryViolation
         }
@@ -327,7 +331,7 @@ final class HealthKitFounderCanaryCoordinator {
         authorization repairAuthorization: HealthKitSeptember23ActivityRepairAuthorization?
     ) async throws -> HealthKitSeptember23ActivityRepairApplyResult {
         guard isEnabled else { throw HealthKitCanaryError.disabled }
-        guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
+        guard authorizationWasExplicitlyRequested else { throw HealthKitCanaryError.authorizationRequired }
         guard let synchronizer = synchronizer as? any HealthKitSeptember23ActivityRepairSynchronizing else {
             throw HealthKitCanaryError.september23RepairBoundaryViolation
         }
@@ -350,7 +354,7 @@ final class HealthKitFounderCanaryCoordinator {
     @MainActor
     func synchronize(window: HealthKitActivityValidationWindow) async throws -> HealthKitFounderCanaryRunResult {
         guard isEnabled else { throw HealthKitCanaryError.disabled }
-        guard authorization.authorizationWasRequested else { throw HealthKitCanaryError.authorizationRequired }
+        guard authorizationWasExplicitlyRequested else { throw HealthKitCanaryError.authorizationRequired }
 
         let contract = try await server.healthKitCanaryContract()
         guard contract.isCompatible else { throw HealthKitCanaryError.serverContractMismatch }

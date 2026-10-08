@@ -916,8 +916,10 @@ private final class SleepCadenceStore: HealthKitSleepManifestCadenceStore, @unch
 @MainActor
 private final class SleepAuthorizationMock: HealthKitCanaryAuthorizationCoordinating {
     var currentAvailability: HealthKitAvailability = .available
-    private(set) var authorizationWasRequested = true
-    func requestAuthorization(for scope: HealthKitAuthorizationScope) async -> HealthKitAuthorizationOutcome { .completed }
+    func requestAuthorization(
+        for scope: HealthKitAuthorizationScope,
+        presentation: HealthKitAuthorizationPresentation
+    ) async -> HealthKitAuthorizationOutcome { .completed }
 }
 
 private actor SleepSynchronizerMock: HealthKitAutomaticSynchronizing {

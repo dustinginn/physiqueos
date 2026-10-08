@@ -119,12 +119,13 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
     }
 
     @MainActor
-    func testRequestsAuthorizationOnlyOnceAcrossRepeatedBootstraps() async {
+    func testPreflightsAuthorizationAcrossRepeatedBootstraps() async {
         let harness = AutomaticCoordinatorHarness()
         _ = await harness.coordinator.bootstrap()
         _ = await harness.coordinator.bootstrap()
         _ = await harness.coordinator.bootstrap()
-        XCTAssertEqual(harness.authorization.requestCount, 1)
+        XCTAssertEqual(harness.authorization.requestCount, 3)
+        XCTAssertTrue(harness.authorization.requests.allSatisfy { $0.0 == .automaticRead && $0.1 == .foreground })
     }
 
     @MainActor
@@ -358,7 +359,7 @@ final class HealthKitAutomaticSynchronizationCoordinatorTests: XCTestCase {
         let (outcomeA, outcomeB) = await (first, second)
 
         XCTAssertEqual(outcomeA, outcomeB)
-        XCTAssertEqual(harness.authorization.requestCount, 1)
+        XCTAssertEqual(harness.authorization.requestCount, 2)
         let observeCount = await synchronizer.observeCallCount()
         let syncCount = await synchronizer.syncCallCount()
         let ownerIdentityCalls = await server.ownerIdentityCallCount()
@@ -537,14 +538,17 @@ private enum AutomaticCoordinatorTestError: Error {
 @MainActor
 private final class AutomaticAuthorizationMock: HealthKitCanaryAuthorizationCoordinating {
     var currentAvailability: HealthKitAvailability = .availableAuthorizationNotRequested
-    private(set) var authorizationWasRequested = false
     private(set) var requestCount = 0
+    private(set) var requests: [(HealthKitAuthorizationScope, HealthKitAuthorizationPresentation)] = []
     var outcomeToReturn: HealthKitAuthorizationOutcome = .completed
     var availabilityAfterRequest: HealthKitAvailability = .available
 
-    func requestAuthorization(for scope: HealthKitAuthorizationScope) async -> HealthKitAuthorizationOutcome {
+    func requestAuthorization(
+        for scope: HealthKitAuthorizationScope,
+        presentation: HealthKitAuthorizationPresentation
+    ) async -> HealthKitAuthorizationOutcome {
         requestCount += 1
-        authorizationWasRequested = true
+        requests.append((scope, presentation))
         currentAvailability = availabilityAfterRequest
         return outcomeToReturn
     }

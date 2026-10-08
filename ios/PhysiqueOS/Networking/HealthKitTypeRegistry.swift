@@ -68,10 +68,20 @@ struct HealthKitTypeRegistry {
 
     func authorizationRequest(for scope: HealthKitAuthorizationScope) -> HealthKitAuthorizationRequest {
         switch scope {
-        case .initialRead:
-            HealthKitAuthorizationRequest(scope: scope, readTypes: allReadTypes, writeTypes: [])
+        case .automaticRead:
+            let types = [HealthKitReadDomain.activity, .nutrition, .workouts]
+                .reduce(into: Set<HKObjectType>()) { result, domain in
+                    result.formUnion(readTypesByDomain[domain, default: []])
+                }
+            return HealthKitAuthorizationRequest(scope: scope, readTypes: types, writeTypes: [])
+        case .sleepRead:
+            return HealthKitAuthorizationRequest(
+                scope: scope,
+                readTypes: readTypesByDomain[.sleep, default: []],
+                writeTypes: []
+            )
         case .futureBodyMeasurementWrite:
-            HealthKitAuthorizationRequest(scope: scope, readTypes: [], writeTypes: allWriteTypes)
+            return HealthKitAuthorizationRequest(scope: scope, readTypes: [], writeTypes: allWriteTypes)
         }
     }
 }

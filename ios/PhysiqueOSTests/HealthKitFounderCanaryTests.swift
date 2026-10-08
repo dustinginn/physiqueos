@@ -105,6 +105,7 @@ final class HealthKitFounderCanaryTests: XCTestCase {
         let result = try await harness.coordinator.synchronize(window: Self.window())
         let scopes = await harness.synchronizer.scopes()
         XCTAssertEqual(harness.authorization.requestCount, 1)
+        XCTAssertEqual(harness.authorization.requestedScopes, [.sleepRead])
         XCTAssertEqual(scopes.count, 1)
         XCTAssertEqual(scopes[0].ownerIdentity, "user_founder_001")
         XCTAssertEqual(scopes[0].enrolledDeviceIdentity, "founder-device-stable")
@@ -407,12 +408,15 @@ final class HealthKitFounderCanaryTests: XCTestCase {
 @MainActor
 private final class CanaryAuthorizationMock: HealthKitCanaryAuthorizationCoordinating {
     var currentAvailability: HealthKitAvailability = .availableAuthorizationNotRequested
-    private(set) var authorizationWasRequested = false
     private(set) var requestCount = 0
+    private(set) var requestedScopes: [HealthKitAuthorizationScope] = []
 
-    func requestAuthorization(for scope: HealthKitAuthorizationScope) async -> HealthKitAuthorizationOutcome {
+    func requestAuthorization(
+        for scope: HealthKitAuthorizationScope,
+        presentation: HealthKitAuthorizationPresentation
+    ) async -> HealthKitAuthorizationOutcome {
         requestCount += 1
-        authorizationWasRequested = true
+        requestedScopes.append(scope)
         currentAvailability = .available
         return .completed
     }

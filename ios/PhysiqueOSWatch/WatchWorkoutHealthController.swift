@@ -2,6 +2,117 @@ import Foundation
 import HealthKit
 import Observation
 
+enum WatchHealthAuthorizationPresentation: Equatable {
+    case automatic
+    case direct
+}
+
+@MainActor
+protocol WatchHealthAuthorizationServicing: AnyObject {
+    var isHealthDataAvailable: Bool { get }
+    func requestStatus() async throws -> HKAuthorizationRequestStatus
+    func requestAuthorization() async throws
+}
+
+@MainActor
+final class SystemWatchHealthAuthorizationService: WatchHealthAuthorizationServicing {
+    private let healthStore: HKHealthStore
+
+    init(healthStore: HKHealthStore) { self.healthStore = healthStore }
+
+    var isHealthDataAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
+
+    func requestStatus() async throws -> HKAuthorizationRequestStatus {
+        let types = try authorizationTypes()
+        return try await withCheckedThrowingContinuation { continuation in
+            healthStore.getRequestStatusForAuthorization(toShare: types.share, read: types.read) { status, error in
+                if let error { continuation.resume(throwing: error) }
+                else { continuation.resume(returning: status) }
+            }
+        }
+    }
+
+    func requestAuthorization() async throws {
+        let types = try authorizationTypes()
+        try await healthStore.requestAuthorization(toShare: types.share, read: types.read)
+    }
+
+    private func authorizationTypes() throws -> (share: Set<HKSampleType>, read: Set<HKObjectType>) {
+        guard let heartRate = HKObjectType.quantityType(forIdentifier: .heartRate),
+              let active = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned),
+              let basal = HKObjectType.quantityType(forIdentifier: .basalEnergyBurned)
+        else { throw WatchHealthAuthorizationError.missingTypes }
+        return ([HKObjectType.workoutType()], [heartRate, active, basal])
+    }
+}
+
+enum WatchHealthAuthorizationError: Error, Equatable {
+    case unavailable
+    case missingTypes
+    case requestRequiredOnWatch
+    case requestStatusUnknown
+}
+
+/// Shared Watch-side preflight/request lane for the exact workout scope.
+@MainActor
+final class WatchHealthAuthorizationCoordinator {
+    private let service: any WatchHealthAuthorizationServicing
+    private var inFlight: InFlight?
+
+    private struct InFlight {
+        let id: UUID
+        let task: Task<Result<Void, Error>, Never>
+    }
+
+    init(service: any WatchHealthAuthorizationServicing) { self.service = service }
+
+    func ensureAuthorization(presentation: WatchHealthAuthorizationPresentation) async throws {
+        if let active = inFlight {
+            let result = await active.task.value
+            if inFlight?.id == active.id { inFlight = nil }
+            do {
+                try result.get()
+                return
+            } catch WatchHealthAuthorizationError.requestRequiredOnWatch where presentation == .direct {
+                return try await ensureAuthorization(presentation: .direct)
+            } catch {
+                throw error
+            }
+        }
+
+        let id = UUID()
+        let task = Task { @MainActor [weak self] () -> Result<Void, Error> in
+            guard let self else { return .failure(WatchHealthAuthorizationError.unavailable) }
+            do {
+                try await self.perform(presentation: presentation)
+                return .success(())
+            } catch {
+                return .failure(error)
+            }
+        }
+        inFlight = InFlight(id: id, task: task)
+        let result = await task.value
+        if inFlight?.id == id { inFlight = nil }
+        try result.get()
+    }
+
+    private func perform(presentation: WatchHealthAuthorizationPresentation) async throws {
+        guard service.isHealthDataAvailable else { throw WatchHealthAuthorizationError.unavailable }
+        switch try await service.requestStatus() {
+        case .unnecessary:
+            return
+        case .shouldRequest where presentation == .automatic:
+            throw WatchHealthAuthorizationError.requestRequiredOnWatch
+        case .shouldRequest:
+            try await service.requestAuthorization()
+        case .unknown:
+            throw WatchHealthAuthorizationError.requestStatusUnknown
+        @unknown default:
+            throw WatchHealthAuthorizationError.requestStatusUnknown
+        }
+    }
+}
+
 /// Everything `WatchWorkoutStore` and the Watch views need from the Watch's
 /// HealthKit workout. The shipping implementation is
 /// `WatchWorkoutHealthController`; tests substitute a deterministic fake so
@@ -23,7 +134,10 @@ protocol WatchWorkoutHealthRecording: AnyObject {
     func hasSaved(structuredSessionId: String) -> Bool
     /// Returns the HealthKit workout's start instant.
     @discardableResult
-    func start(structuredSessionId: String) async throws -> Date
+    func start(
+        structuredSessionId: String,
+        authorizationPresentation: WatchHealthAuthorizationPresentation
+    ) async throws -> Date
     func pause()
     func resume()
     func finish(structuredSessionId: String?, endAt: Date?) async throws
@@ -60,7 +174,7 @@ final class WatchWorkoutHealthController: NSObject, WatchWorkoutHealthRecording,
         case idle, authorizing, starting, running, paused, ending, cancelled, saved, failed
     }
 
-    enum ControllerError: Error { case anotherSessionActive, missingTypes, notRunning, saveFailed }
+    enum ControllerError: Error { case anotherSessionActive, notRunning, saveFailed }
 
     private(set) var lifecycle: Lifecycle = .idle
     private(set) var currentHeartRateBPM: Double?
@@ -76,7 +190,8 @@ final class WatchWorkoutHealthController: NSObject, WatchWorkoutHealthRecording,
         return activeCalories + basalCalories
     }
 
-    private let healthStore = HKHealthStore()
+    private let healthStore: HKHealthStore
+    private let authorization: WatchHealthAuthorizationCoordinator
     private var workoutSession: HKWorkoutSession?
     private var builder: HKLiveWorkoutBuilder?
     private var cancellationInFlight = false
@@ -112,6 +227,22 @@ final class WatchWorkoutHealthController: NSObject, WatchWorkoutHealthRecording,
     /// retried save goes straight to `finishWorkout`.
     private var collectionEnded = false
 
+    override convenience init() {
+        let healthStore = HKHealthStore()
+        self.init(
+            healthStore: healthStore,
+            authorization: WatchHealthAuthorizationCoordinator(
+                service: SystemWatchHealthAuthorizationService(healthStore: healthStore)
+            )
+        )
+    }
+
+    init(healthStore: HKHealthStore, authorization: WatchHealthAuthorizationCoordinator) {
+        self.healthStore = healthStore
+        self.authorization = authorization
+        super.init()
+    }
+
     /// The last structured session whose workout this controller saved.
     private(set) var lastSavedCorrelationId: String?
 
@@ -133,7 +264,10 @@ final class WatchWorkoutHealthController: NSObject, WatchWorkoutHealthRecording,
     private(set) var workoutStartedAt: Date?
 
     @discardableResult
-    func start(structuredSessionId: String) async throws -> Date {
+    func start(
+        structuredSessionId: String,
+        authorizationPresentation: WatchHealthAuthorizationPresentation
+    ) async throws -> Date {
         if correlationId == structuredSessionId, [.starting, .running, .paused].contains(lifecycle) {
             return workoutStartedAt ?? builder?.startDate ?? Date()
         }
@@ -145,7 +279,7 @@ final class WatchWorkoutHealthController: NSObject, WatchWorkoutHealthRecording,
         configuration.locationType = .indoor
         let session: HKWorkoutSession
         do {
-            try await authorize()
+            try await authorization.ensureAuthorization(presentation: authorizationPresentation)
             session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
         } catch {
             lifecycle = .failed
@@ -351,18 +485,6 @@ final class WatchWorkoutHealthController: NSObject, WatchWorkoutHealthRecording,
         collectionEnded = false
         correlationId = stored
         lifecycle = recovered.state == .paused ? .paused : .running
-    }
-
-    private func authorize() async throws {
-        guard HKHealthStore.isHealthDataAvailable(),
-              let heartRate = HKObjectType.quantityType(forIdentifier: .heartRate),
-              let active = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned),
-              let basal = HKObjectType.quantityType(forIdentifier: .basalEnergyBurned)
-        else { throw ControllerError.missingTypes }
-        try await healthStore.requestAuthorization(
-            toShare: [HKObjectType.workoutType()],
-            read: [heartRate, active, basal]
-        )
     }
 
     nonisolated func workoutSession(
