@@ -1005,7 +1005,7 @@ final class TrainingLoggerViewModel {
     /// canonical variant contract, under Founder Production, for a canonical
     /// catalog exercise. Never a local-only variant.
     func canCreateVariant(for exercise: TrainingLoggerDraftExercise) -> Bool {
-        guard authority == .founderProduction,
+        guard authority == .founderProduction || Self.variantReviewAllowsCreation,
               configuration?.supportsExecutionVariantCreation == true,
               let canonicalId = exercise.canonicalExerciseId else { return false }
         return configuration?.exercises.contains(where: { $0.canonicalExerciseId == canonicalId }) == true
@@ -1081,6 +1081,17 @@ final class TrainingLoggerViewModel {
     }
 
     static let variantNameMaximumLength = 40
+
+    /// Visual-review branch only: lets the DEBUG Sandbox harness show the
+    /// same Create Variant entry Founder Production shows. Always false in
+    /// Release and whenever the review flag is absent.
+    private static var variantReviewAllowsCreation: Bool {
+#if DEBUG
+        TrainingVariantsReview.isEnabled
+#else
+        false
+#endif
+    }
 
     func selectExistingExercise(_ candidate: CanonicalExerciseMatch) async {
         guard authority == .founderProduction, newExerciseCandidates.contains(candidate), !isSubmittingNewExercise else { return }

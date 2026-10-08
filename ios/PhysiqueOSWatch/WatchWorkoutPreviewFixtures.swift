@@ -121,6 +121,14 @@ enum WatchWorkoutPreviewFixtures {
                 row(role: "current", name: "DB Curl", set: 2, count: 3, load: "35", reps: "10", target: true, superset: "SUPERSET · ROUND 2"),
                 row(role: "upNext", name: "Rope Pressdown", set: 2, count: 3, load: "55", reps: "12", target: false, superset: "B"),
             ]
+        case "variant":
+            // Build 92 visual review: the phone-selected execution variant
+            // shown as a display-only row label.
+            fixture.projection.title = "Arms"
+            fixture.projection.rows = [
+                row(role: "previous", name: "Spider Curls", set: 1, count: 3, load: "30", reps: "10", target: false, variant: "Static Hold"),
+                row(role: "current", name: "Spider Curls", set: 2, count: 3, load: "30", reps: "10", target: true, variant: "Static Hold"),
+            ]
         case "single-set":
             fixture.projection.totalSets = 1
             fixture.projection.completedSets = 0
@@ -247,7 +255,8 @@ enum WatchWorkoutPreviewFixtures {
         reps: String,
         target: Bool,
         superset: String? = nil,
-        duration: String? = nil
+        duration: String? = nil,
+        variant: String? = nil
     ) -> WatchWorkoutProjection.Row {
         .init(
             role: role,
@@ -260,6 +269,7 @@ enum WatchWorkoutPreviewFixtures {
             loadText: load,
             repsText: duration == nil ? reps : nil,
             durationText: duration,
+            variantLabel: variant,
             supersetLabel: superset,
             partnerName: nil,
             isCompletionTarget: target

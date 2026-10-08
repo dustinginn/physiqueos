@@ -1650,3 +1650,118 @@ final class OperatingPlanRedesignUITests: XCTestCase {
         XCTAssertEqual(crumb(app).label, "Tracking")
     }
 }
+
+/// Build 92 VISUAL REVIEW ONLY (non-shipping review branch). Drives the real
+/// Sandbox app through the DEBUG `-physiqueos.training-variants-review`
+/// harness and saves full-screen captures of the shipping SwiftUI surfaces
+/// to `VARIANT_REVIEW_DIR`.
+@MainActor
+final class TrainingVariantsVisualReviewUITests: XCTestCase {
+    private let app = XCUIApplication()
+
+    override func setUp() {
+        super.setUp()
+        continueAfterFailure = false
+    }
+
+    func testVariantsReviewDark() { journeys(appearance: "dark") }
+    func testVariantsReviewMineralLight() { journeys(appearance: "light") }
+
+    private func journeys(appearance: String) {
+        // 1. Spider Curls already has the canonical Static Hold definition.
+        start(appearance: appearance, state: "existing")
+        capture("01-workout-ordinary", appearance)
+        openVariantMenu()
+        capture("02-variant-menu-existing", appearance)
+        tap(app.buttons["Static Hold"])
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Static Hold")).firstMatch.waitForExistence(timeout: 5))
+        capture("03-selected-static-hold", appearance)
+        openVariantMenu()
+        capture("04-variant-menu-static-hold-selected", appearance)
+        app.buttons["Static Hold"].firstMatch.tap()
+
+        // 2. No definitions yet: Create Variant creates and selects Static Hold.
+        start(appearance: appearance, state: "none")
+        openVariantMenu()
+        capture("05-variant-menu-no-variants", appearance)
+        tap(app.buttons["Create Variant…"])
+        let name = app.textFields["trainingLogger.variant.createName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        dismissKeyboardOnboardingTip()
+        capture("06-create-sheet-empty", appearance)
+        name.typeText("Static Hold")
+        capture("07-create-sheet-named", appearance)
+        tap(app.buttons["trainingLogger.variant.createSubmit"])
+        XCTAssertTrue(name.waitForNonExistence(timeout: 8))
+        capture("08-created-and-selected", appearance)
+
+        // 3. Create fails (offline): truthful inline retry, selection unchanged.
+        start(appearance: appearance, state: "create-fails")
+        openVariantMenu()
+        tap(app.buttons["Create Variant…"])
+        let failingName = app.textFields["trainingLogger.variant.createName"]
+        XCTAssertTrue(failingName.waitForExistence(timeout: 5))
+        failingName.typeText("Static Hold")
+        tap(app.buttons["trainingLogger.variant.createSubmit"])
+        XCTAssertTrue(app.staticTexts["trainingLogger.variant.createError"].waitForExistence(timeout: 8))
+        capture("09-create-error-retry", appearance)
+    }
+
+    private func start(appearance: String, state: String) {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance.preference.v1", appearance,
+            "-physiqueos.appearance-review.route", "training-logger",
+            "-physiqueos.training-variants-review", state,
+        ]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        tap(app.buttons["trainingLogger.start"], timeout: 10)
+        tap(app.buttons["trainingLogger.area.biceps"])
+        tap(app.buttons["Choose exercises"])
+        var row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Spider Curls,")).firstMatch
+        for _ in 0..<6 where !(row.exists && row.isHittable) { app.swipeUp() }
+        if !row.exists {
+            for _ in 0..<8 { app.swipeDown() }
+            let browse = app.buttons["trainingLogger.browseAll"]
+            if browse.waitForExistence(timeout: 2) { browse.tap() }
+            row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Spider Curls,")).firstMatch
+            for _ in 0..<10 where !(row.exists && row.isHittable) { app.swipeUp() }
+        }
+        tap(row)
+        tap(app.buttons["trainingLogger.startLogging"])
+        XCTAssertTrue(app.descendants(matching: .any)["trainingLogger.workoutIdentity"].waitForExistence(timeout: 5))
+    }
+
+    /// A fresh simulator shows iOS's one-time "slide to type" keyboard tip
+    /// over the first keyboard; it is system onboarding, not app UI.
+    private func dismissKeyboardOnboardingTip() {
+        let tip = app.buttons["Continue"]
+        if tip.waitForExistence(timeout: 2) { tip.tap() }
+    }
+
+    private func openVariantMenu() {
+        tap(app.buttons["trainingLogger.exerciseActions.Spider Curls"])
+        tap(app.buttons["Execution variant"])
+    }
+
+    private func tap(_ element: XCUIElement, timeout: TimeInterval = 5) {
+        let target = element.firstMatch
+        XCTAssertTrue(target.waitForExistence(timeout: timeout), "\(target) not found")
+        target.tap()
+    }
+
+    private func capture(_ name: String, _ appearance: String) {
+        Thread.sleep(forTimeInterval: 1.2)
+        let screenshot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "\(name)-\(appearance)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let directory = ProcessInfo.processInfo.environment["VARIANT_REVIEW_DIR"] else { return }
+        try? screenshot.pngRepresentation.write(
+            to: URL(fileURLWithPath: directory).appendingPathComponent("\(name)-\(appearance == "light" ? "mineral-light" : "dark").png")
+        )
+    }
+}

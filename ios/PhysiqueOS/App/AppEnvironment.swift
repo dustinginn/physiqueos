@@ -507,7 +507,10 @@ final class AppEnvironment {
     }
 
     var trainingExerciseCatalogWriteAPI: TrainingExerciseCatalogWriteAPI {
-        switch nativeAuthority {
+#if DEBUG
+        if nativeAuthority == .sandbox, let review = TrainingVariantsReview.catalogWriteAPI { return review }
+#endif
+        return switch nativeAuthority {
         case .sandbox: NotAvailableTrainingExerciseCatalogWriteAPI()
         case .founderProduction: ProductionTrainingExerciseCatalogWriteAPI(api: productionNativeAPI, idempotencyStore: productionIdempotencyKeyStore)
         }
@@ -619,7 +622,12 @@ final class AppEnvironment {
     }
 
     var trainingLoggerAPI: TrainingLoggerAPI {
-        nativeAuthority == .founderProduction ? ProductionTrainingLoggerAPI(api: productionNativeAPI) : sandboxTrainingLoggerAPI
+        if nativeAuthority == .founderProduction { return ProductionTrainingLoggerAPI(api: productionNativeAPI) }
+#if DEBUG
+        return TrainingVariantsReview.loggerAPI(wrapping: sandboxTrainingLoggerAPI)
+#else
+        return sandboxTrainingLoggerAPI
+#endif
     }
 
     var operatingPlanAPI: OperatingPlanAPI? {
