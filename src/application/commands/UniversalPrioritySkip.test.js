@@ -77,7 +77,7 @@ describe("Universal Priority Skip canonical command", () => {
     expect(snapshot.canonicalEvidenceObjects).toEqual([]);
   });
 
-  it("resolves and locks the DEXA execution item while preserving its appointment", async () => {
+  it("rejects DEXA appointment Skip as an informational reminder without touching its record", async () => {
     const appointment = {
       id: "execution_next_dexa", userId: USER, type: "dexa_appointment", active: true,
       status: "scheduled", preferredSchedule: { date: "2026-08-12", timeOfDay: "07:30", daysOfWeek: [] },
@@ -86,21 +86,18 @@ describe("Universal Priority Skip canonical command", () => {
     };
     const records = store({ executionItems: [appointment] });
     const priorityId = createDexaPriorityId("2026-08-12", DexaPriorityStage.DAY_BEFORE);
-    const outcome = await skip(records, priorityId, 5);
-    const stored = records.snapshot().executionItems[0];
-    expect(outcome.result.execution).toMatchObject({ priorityId, expectedVersion: 6 });
-    expect(stored).toMatchObject({
-      id: appointment.id,
-      status: "scheduled",
-      active: true,
-      preferredSchedule: appointment.preferredSchedule,
-      executionRevision: 8,
-      version: 6,
+    await expect(skip(records, priorityId, 5)).rejects.toMatchObject({
+      status: 422,
+      code: "PRIORITY_SKIP_UNSUPPORTED",
+      recovery: { workflow: "dexa_appointment" },
     });
+    const stored = records.snapshot().executionItems[0];
+    expect(stored).toEqual(appointment);
+    expect(records.snapshot().dailyCheckIns).toEqual([]);
     expect(records.snapshot().dexaScans).toEqual([]);
   });
 
-  it("does not skip a DEXA occurrence already satisfied by matching scan evidence", async () => {
+  it("rejects DEXA Skip even when matching scan evidence already satisfies the appointment", async () => {
     const appointment = {
       id: "execution_next_dexa", userId: USER, type: "dexa_appointment", active: true,
       status: "scheduled", preferredSchedule: { date: "2026-08-12", timeOfDay: "07:30", daysOfWeek: [] },
@@ -112,8 +109,9 @@ describe("Universal Priority Skip canonical command", () => {
       dexaScans: [{ id: "dexa", userId: USER, measuredAt: "2026-08-12T15:00:00.000Z", version: 1 }],
     });
     const priorityId = createDexaPriorityId("2026-08-12", DexaPriorityStage.DAY_BEFORE);
-    const outcome = await skip(records, priorityId, 5);
-    expect(outcome.result.status).toBe("already_completed");
+    await expect(skip(records, priorityId, 5)).rejects.toMatchObject({
+      status: 422, code: "PRIORITY_SKIP_UNSUPPORTED",
+    });
     expect(records.snapshot().dailyCheckIns).toEqual([]);
     expect(records.snapshot().executionItems[0].version).toBe(5);
   });

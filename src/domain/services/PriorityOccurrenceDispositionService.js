@@ -1,7 +1,6 @@
 import {
   DexaPriorityStage,
   parseDexaPriorityId,
-  projectDexaAppointmentPriority,
 } from "./DexaAppointmentLifecycleService.js";
 import {
   ExecutionPriorityOperationalState,
@@ -113,20 +112,10 @@ export function resolveActionablePriorityDisposition({
   if (!source || !isOpenSource(source.record)) return null;
 
   if (source.kind === PriorityDispositionTargetKind.EXECUTION) {
-    const projection = projectDexaAppointmentPriority({
-      appointment: source.record,
-      now,
-      timeZone: source.record?.timezone ?? timeZone,
-    });
-    if (!projection || projection.priorityId !== priorityId) return null;
-    return Object.freeze({
-      source,
-      executionContract: resolvePriorityDispositionExecutionContract(source, {
-        occurrenceDate,
-        priorityId,
-        destination: projection.href,
-      }),
-    });
+    // The only execution-backed priority family is the scheduled DEXA
+    // appointment. It is informational/navigation-only; confirmed scan
+    // evidence owns completion and no direct disposition is actionable.
+    return null;
   }
 
   const reminder = source.record;

@@ -81,6 +81,24 @@ describe("PriorityCompletionService", () => {
     });
   });
 
+  it("cannot complete an execution-backed DEXA appointment through the reminder command", async () => {
+    const appointment = {
+      id: "execution_next_dexa", active: true, status: "scheduled",
+      preferredSchedule: { date: "2026-08-31", timeOfDay: "07:30" }, version: 4,
+    };
+    let candidate;
+    const mutateCanonicalRuntime = async (options) => {
+      candidate = { reminders: [], executionItems: [structuredClone(appointment)] };
+      return { result: await options.mutate(candidate), changedCollections: [] };
+    };
+
+    await expect(createPriorityCompletionService({ mutateCanonicalRuntime }).complete({
+      priorityId: "dexa-appointment:2026-08-31:appointment",
+      occurrenceDate: "2026-08-31",
+    })).rejects.toMatchObject({ code: "PRIORITY_NOT_FOUND" });
+    expect(candidate.executionItems[0]).toEqual(appointment);
+  });
+
   it("allows a genuinely new occurrence without treating the prior day as complete", async () => {
     let candidate;
     const mutateCanonicalRuntime = async (options) => {

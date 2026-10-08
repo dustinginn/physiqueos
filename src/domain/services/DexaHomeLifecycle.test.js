@@ -6,7 +6,9 @@ describe("Home DEXA lifecycle orchestration", () => {
     ["before eligibility", "2026-08-13T15:00:00.000Z", null],
     ["one day before", "2026-08-14T15:00:00.000Z", "DEXA tomorrow"],
     ["appointment morning", "2026-08-15T14:00:00.000Z", "DEXA this morning"],
-    ["after appointment", "2026-08-15T14:31:00.000Z", "Upload DEXA results"],
+    ["after appointment time", "2026-08-15T14:31:00.000Z", "DEXA appointment"],
+    ["late on appointment day", "2026-08-16T06:59:00.000Z", "DEXA appointment"],
+    ["after local midnight", "2026-08-16T07:01:00.000Z", "Upload DEXA results"],
   ])("passes the canonical appointment through Home and projects %s", async (_label, instant, expected) => {
     const home = await createHomeBriefingService({
       repositories: repositories([appointment()]),
@@ -14,7 +16,15 @@ describe("Home DEXA lifecycle orchestration", () => {
     }).getHomeBriefing("user");
     const dexa = home.todaysFocus.find((item) => item.executionId === "execution_next_dexa");
     expect(dexa?.label ?? null).toBe(expected);
-    if (dexa) expect(dexa.href).toBe(`/priorities/${dexa.id}`);
+    if (dexa) {
+      expect(dexa.href).toBe(`/priorities/${dexa.id}`);
+      expect(dexa.completable).toBe(false);
+      expect(dexa.executionContract.expectedVersion).toBeNull();
+      expect(dexa.notificationAction).toMatchObject({
+        completionCommand: null,
+        skipCommand: null,
+      });
+    }
   });
 
   it("suppresses DEXA after matching evidence has completed the canonical appointment", async () => {
