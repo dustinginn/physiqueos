@@ -22,9 +22,11 @@ enum HealthKitServiceError: Error, Equatable {
 /// accidentally begin synchronization.
 protocol HealthKitService: AnyObject {
     var deviceAvailability: HealthKitDeviceAvailability { get }
+    @MainActor
     func authorizationRequestRequirement(
         for request: HealthKitAuthorizationRequest
     ) async throws -> HealthKitAuthorizationRequestRequirement
+    @MainActor
     func requestAuthorization(_ request: HealthKitAuthorizationRequest) async throws -> Bool
 }
 

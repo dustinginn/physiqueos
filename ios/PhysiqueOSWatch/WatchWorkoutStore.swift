@@ -1191,7 +1191,10 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             guard let self else { return }
             let startedAt: Date
             do {
-                startedAt = try await health.start(structuredSessionId: sessionId)
+                startedAt = try await health.start(
+                    structuredSessionId: sessionId,
+                    authorizationPresentation: automatic ? .automatic : .direct
+                )
             } catch {
                 healthStartTask = nil
                 trace(.healthStartFailed)

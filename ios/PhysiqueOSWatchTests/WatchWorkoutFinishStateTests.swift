@@ -1,5 +1,6 @@
 import XCTest
 import SwiftUI
+import HealthKit
 @testable import PhysiqueOSWatch
 
 /// Build 83 Watch finish state machine, HealthKit save/discard resolution,
@@ -670,6 +671,72 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
     }
 }
 
+@MainActor
+final class WatchHealthAuthorizationTests: XCTestCase {
+    func testAnsweredScopePreflightsWithoutRawRequest() async throws {
+        let service = WatchAuthorizationServiceFake(statuses: [.unnecessary])
+        let coordinator = WatchHealthAuthorizationCoordinator(service: service)
+
+        try await coordinator.ensureAuthorization(presentation: .automatic)
+
+        XCTAssertEqual(service.statusCalls, 1)
+        XCTAssertEqual(service.requestCalls, 0)
+    }
+
+    func testAutomaticStartNeverPresentsFirstTimeConsent() async {
+        let service = WatchAuthorizationServiceFake(statuses: [.shouldRequest])
+        let coordinator = WatchHealthAuthorizationCoordinator(service: service)
+
+        do {
+            try await coordinator.ensureAuthorization(presentation: .automatic)
+            XCTFail("Automatic start must fail closed when Watch consent is due.")
+        } catch {
+            XCTAssertEqual(error as? WatchHealthAuthorizationError, .requestRequiredOnWatch)
+        }
+        XCTAssertEqual(service.requestCalls, 0)
+    }
+
+    func testDirectWatchActionMayPresentConsentAfterPreflight() async throws {
+        let service = WatchAuthorizationServiceFake(statuses: [.shouldRequest])
+        let coordinator = WatchHealthAuthorizationCoordinator(service: service)
+
+        try await coordinator.ensureAuthorization(presentation: .direct)
+
+        XCTAssertEqual(service.statusCalls, 1)
+        XCTAssertEqual(service.requestCalls, 1)
+    }
+
+    func testUnknownStatusFailsClosedWithoutRawRequest() async {
+        let service = WatchAuthorizationServiceFake(statuses: [.unknown])
+        let coordinator = WatchHealthAuthorizationCoordinator(service: service)
+
+        do {
+            try await coordinator.ensureAuthorization(presentation: .direct)
+            XCTFail("Unknown authorization status must fail closed.")
+        } catch {
+            XCTAssertEqual(error as? WatchHealthAuthorizationError, .requestStatusUnknown)
+        }
+        XCTAssertEqual(service.requestCalls, 0)
+    }
+}
+
+@MainActor
+private final class WatchAuthorizationServiceFake: WatchHealthAuthorizationServicing {
+    let isHealthDataAvailable = true
+    private var statuses: [HKAuthorizationRequestStatus]
+    private(set) var statusCalls = 0
+    private(set) var requestCalls = 0
+
+    init(statuses: [HKAuthorizationRequestStatus]) { self.statuses = statuses }
+
+    func requestStatus() async throws -> HKAuthorizationRequestStatus {
+        statusCalls += 1
+        return statuses.isEmpty ? .unknown : statuses.removeFirst()
+    }
+
+    func requestAuthorization() async throws { requestCalls += 1 }
+}
+
 // MARK: - Build 86: Watch HealthKit start, truthful status, refresh lane
 
 /// Deterministic stand-in for the Watch HealthKit workout. Mirrors the
@@ -699,6 +766,7 @@ final class FakeWatchHealth: WatchWorkoutHealthRecording {
     var holdNextStart = false
     private var heldStart: CheckedContinuation<Void, Never>?
     private(set) var startCalls: [String] = []
+    private(set) var authorizationPresentations: [WatchHealthAuthorizationPresentation] = []
     private(set) var pauseCalls = 0
     private(set) var resumeCalls = 0
     private(set) var finishCalls: [String?] = []
@@ -718,8 +786,12 @@ final class FakeWatchHealth: WatchWorkoutHealthRecording {
         savedSessionIds.contains(structuredSessionId) || savedCorrelationPendingReport == structuredSessionId
     }
 
-    func start(structuredSessionId: String) async throws -> Date {
+    func start(
+        structuredSessionId: String,
+        authorizationPresentation: WatchHealthAuthorizationPresentation
+    ) async throws -> Date {
         startCalls.append(structuredSessionId)
+        authorizationPresentations.append(authorizationPresentation)
         lifecycle = .starting
         if holdNextStart {
             holdNextStart = false
@@ -832,6 +904,7 @@ extension WatchWorkoutFinishStateTests {
         await settle(store)
 
         XCTAssertEqual(health.startCalls, [active.sessionId])
+        XCTAssertEqual(health.authorizationPresentations, [.automatic])
         XCTAssertEqual(store.healthStatus, .recording)
         XCTAssertNil(store.healthHeaderText, "Recording shows the workout title, not a Health warning.")
         XCTAssertEqual(log.commands.map(\.kind), [.reportHealthStarted])
@@ -990,6 +1063,7 @@ extension WatchWorkoutFinishStateTests {
         store.retryHealthStart()
         await settle(store)
         XCTAssertEqual(health.startCalls.count, 2)
+        XCTAssertEqual(health.authorizationPresentations, [.automatic, .direct])
         XCTAssertEqual(store.healthStatus, .recording)
         XCTAssertNil(store.notice)
         XCTAssertFalse(store.canStartHealthManually)

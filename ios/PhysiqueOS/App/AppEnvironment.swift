@@ -346,9 +346,9 @@ final class AppEnvironment {
     let healthKitSleepHistoricalValidationRunner: HealthKitSleepHistoricalValidationRunner?
     let healthKitSleepHistoricalEvidenceRunner: HealthKitSleepHistoricalEvidenceRunner?
     /// Founder Production diagnostic screen: manual foreground sync and
-    /// acceptance-audit tooling. Its own narrower capability shell
-    /// (`.founderActivityValidation`) and cursor namespace never overlap
-    /// with the automatic path's.
+    /// acceptance-audit tooling. It shares the one authorization request
+    /// lane while retaining its separate query/upload capability shell and
+    /// cursor namespace.
     let healthKitFounderCanaryCoordinator: HealthKitFounderCanaryCoordinator
     /// Explicitly opted-in DEXA export. Its preference defaults false, the
     /// Server permanent policy defaults disabled, and it never participates
@@ -747,19 +747,21 @@ final class AppEnvironment {
         self.founderProductionPhotoMediaStore = FounderProductionPhotoMediaStore(api: productionNativeAPI)
         let productionIdempotencyKeyStore = ProductionIdempotencyKeyStore()
         self.productionIdempotencyKeyStore = productionIdempotencyKeyStore
+        self.stagedPhotoIntakeStore = stagedPhotoIntakeStore ?? FileStagedPhotoIntakeStore()
+        self.healthKitFeatureGate = healthKitFeatureGate
+        let sharedHealthKitAuthorization = HealthKitAuthorizationCoordinator(
+            service: healthKitService,
+            featureGate: healthKitFeatureGate
+        )
+        self.healthKitAuthorizationCoordinator = sharedHealthKitAuthorization
         self.dexaHealthKitWritebackCoordinator = DEXAHealthKitWritebackCoordinator(
             server: ProductionDEXAHealthKitWritebackServer(
                 api: productionNativeAPI,
                 idempotencyStore: productionIdempotencyKeyStore
             ),
             samples: SystemDEXAHealthKitSampleStore(),
-            preferences: UserDefaultsDEXAHealthKitWritebackPreferenceStore()
-        )
-        self.stagedPhotoIntakeStore = stagedPhotoIntakeStore ?? FileStagedPhotoIntakeStore()
-        self.healthKitFeatureGate = healthKitFeatureGate
-        self.healthKitAuthorizationCoordinator = HealthKitAuthorizationCoordinator(
-            service: healthKitService,
-            featureGate: healthKitFeatureGate
+            preferences: UserDefaultsDEXAHealthKitWritebackPreferenceStore(),
+            authorization: sharedHealthKitAuthorization
         )
         let canonicalizationLedger = HealthKitCanonicalizationLedger()
         let founderProductionAuthorityFlag = FounderProductionAuthorityFlag(resolvedNativeAuthority == .founderProduction)
@@ -846,10 +848,6 @@ final class AppEnvironment {
             trustedWorkoutCorrelationCapabilitySource: productionNativeAPI
         )
         let canaryGate = HealthKitFeatureGate.founderActivityValidation
-        let canaryAuthorization = HealthKitAuthorizationCoordinator(
-            service: healthKitService,
-            featureGate: canaryGate
-        )
         let canarySynchronizer = HealthKitSynchronizationEngine(
             queryClient: healthKitQueryClient,
             observerClient: healthKitObserverClient,
@@ -858,7 +856,7 @@ final class AppEnvironment {
             featureGate: canaryGate
         )
         self.healthKitFounderCanaryCoordinator = HealthKitFounderCanaryCoordinator(
-            authorization: canaryAuthorization,
+            authorization: sharedHealthKitAuthorization,
             synchronizer: canarySynchronizer,
             server: productionNativeAPI,
             canonicalizationLedger: canonicalizationLedger
@@ -883,7 +881,7 @@ final class AppEnvironment {
     @MainActor
     func recoverHealthKitAfterProtectedDataAvailable() async {
         guard nativeAuthority == .founderProduction else { return }
-        await healthKitAutomaticSynchronizationCoordinator.bootstrap()
+        await healthKitAutomaticSynchronizationCoordinator.bootstrap(allowsAuthorizationPrompt: false)
     }
 
     func selectNativeAuthority(_ authority: NativeAPIEnvironment) {

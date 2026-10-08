@@ -67,14 +67,27 @@ enum HealthKitWriteDomain: String, CaseIterable, Hashable, Sendable {
     case bodyComposition
 }
 
-enum HealthKitAuthorizationScope: Equatable, Sendable {
-    case initialRead
+enum HealthKitAuthorizationScope: Equatable, Hashable, Sendable {
+    /// Permanent Activity, Nutrition, and Workout ingestion. Sleep is kept
+    /// separate so a dormant feature cannot expand a launch-time request.
+    case automaticRead
+    /// Sleep-only read access for the active lane and Founder diagnostic.
+    case sleepRead
     case futureBodyMeasurementWrite
+}
+
+enum HealthKitAuthorizationPresentation: Equatable, Sendable {
+    /// Status may be inspected, but HealthKit UI must not be presented.
+    case prohibited
+    /// The app is active and user-visible, so required consent may be shown.
+    case foreground
 }
 
 enum HealthKitAuthorizationOutcome: Equatable, Sendable {
     case blockedByFeatureGate
     case unavailable(HealthKitAvailability)
+    /// The exact scope still needs consent, but this caller cannot present UI.
+    case requestRequired
     case completed
     case failed(HealthKitAvailability)
 }

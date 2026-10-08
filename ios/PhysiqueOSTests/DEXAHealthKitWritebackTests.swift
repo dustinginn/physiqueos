@@ -32,6 +32,24 @@ final class DEXAHealthKitWritebackTests: XCTestCase {
         XCTAssertFalse(identifiers.contains(HKQuantityTypeIdentifier.bodyMass.rawValue))
     }
 
+    func testEnableUsesSharedCoordinatorForExactDEXAWriteScope() async {
+        let authorization = DEXAAuthorizationMock()
+        let preferences = MemoryDEXAPreferences(enabled: false)
+        let coordinator = DEXAHealthKitWritebackCoordinator(
+            server: FakeDEXAServer(projection: projection(enabled: false, intents: [])),
+            samples: FakeDEXASamples(),
+            preferences: preferences,
+            authorization: authorization
+        )
+
+        await coordinator.enable()
+
+        XCTAssertEqual(authorization.requests.count, 1)
+        XCTAssertEqual(authorization.requests.first?.0, .futureBodyMeasurementWrite)
+        XCTAssertEqual(authorization.requests.first?.1, .foreground)
+        XCTAssertTrue(preferences.isEnabled)
+    }
+
     func testDisabledPermanentPolicyPerformsNoHealthKitMutation() async {
         let server = FakeDEXAServer(projection: projection(enabled: false, intents: [intent()]))
         let samples = FakeDEXASamples()
@@ -168,7 +186,10 @@ final class DEXAHealthKitWritebackTests: XCTestCase {
         samples.statuses[.leanBodyMassFatFree] = .sharingDenied
         let preferences = MemoryDEXAPreferences(enabled: false)
         let coordinator = DEXAHealthKitWritebackCoordinator(
-            server: server, samples: samples, preferences: preferences
+            server: server,
+            samples: samples,
+            preferences: preferences,
+            authorization: DEXAAuthorizationMock()
         )
 
         await coordinator.enable()
@@ -455,7 +476,6 @@ private final class FakeDEXASamples: DEXAHealthKitSampleStore {
     var saveCount = 0
     var deleteCount = 0
     var failQueries = false
-    func requestAuthorization() async throws -> Bool { true }
     func authorizationStatus(for kind: DEXAHealthKitMeasurementKind) -> HKAuthorizationStatus { statuses[kind] ?? .notDetermined }
     func ownedSamples(for intent: DEXAHealthKitIntent) async throws -> [DEXAHealthKitOwnedSample] {
         if failQueries { throw CocoaError(.fileReadNoPermission) }
@@ -469,6 +489,19 @@ private final class FakeDEXASamples: DEXAHealthKitSampleStore {
     func delete(_ sample: DEXAHealthKitOwnedSample, for intent: DEXAHealthKitIntent) async throws {
         deleteCount += 1
         stored[intent.syncIdentifier] = []
+    }
+}
+
+@MainActor
+private final class DEXAAuthorizationMock: HealthKitCanaryAuthorizationCoordinating {
+    var currentAvailability: HealthKitAvailability = .available
+    private(set) var requests: [(HealthKitAuthorizationScope, HealthKitAuthorizationPresentation)] = []
+    func requestAuthorization(
+        for scope: HealthKitAuthorizationScope,
+        presentation: HealthKitAuthorizationPresentation
+    ) async -> HealthKitAuthorizationOutcome {
+        requests.append((scope, presentation))
+        return .completed
     }
 }
 
