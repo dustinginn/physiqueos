@@ -4,7 +4,9 @@ import {
   validateRecoveryBriefingAssessmentV1,
 } from "./RecoveryBriefingAssessmentServiceV1.js";
 import {
+  RECOVERY_BRIEFING_CADENCES,
   RECOVERY_BRIEFING_SCHEMA_VERSION,
+  RECOVERY_STATUS_POLICY_V1,
   RECOVERY_STATUS_POLICY_VERSION,
 } from "./RecoveryBriefingPolicyV1.js";
 
@@ -252,19 +254,64 @@ describe("RecoveryBriefingAssessmentServiceV1", () => {
     }
   );
 
-  it("keeps Midweek Red unavailable even when every night is severe", () => {
-    const assessment = createRecoveryBriefingAssessmentV1(midweekInput({
-      values: [300, 300, 300],
-      training: constrainedTraining(),
-    }));
-    expect(assessment.status.state).toBe("yellow");
-    expect(assessment.status.reasonCodes).toEqual(["persistent_low_sleep"]);
+  it("refuses Midweek outright: Recovery is a Weekly and Monthly cadence only", () => {
+    for (const values of [[300, 300, 300], [420, 420, 420], [300, 300]]) {
+      expect(() => createRecoveryBriefingAssessmentV1(midweekInput({ values })))
+        .toThrow("Recovery Briefing V1 requires a supported cadence.");
+    }
+    expect(RECOVERY_STATUS_POLICY_V1.cadences.midweek).toBeUndefined();
+    expect(RECOVERY_STATUS_POLICY_V1.training.minimumReductionSessions.midweek).toBeUndefined();
+    expect(RECOVERY_BRIEFING_CADENCES).toEqual(["weekly", "monthly"]);
   });
 
-  it("requires all three Midweek nights", () => {
-    const assessment = createRecoveryBriefingAssessmentV1(midweekInput({ values: [300, 300] }));
-    expect(assessment.status.state).toBe("unavailable");
-    expect(assessment.status.reasonCodes).toContain("insufficient_period_nights");
+  it.each(["dexa_event", "photo_event", "daily", "event", undefined])(
+    "refuses the excluded %s briefing type",
+    (cadence) => {
+      const input = weeklyInput();
+      expect(() => createRecoveryBriefingAssessmentV1({
+        ...input, period: { ...input.period, cadence },
+      })).toThrow("Recovery Briefing V1 requires a supported cadence.");
+    }
+  );
+
+  it("requires a Sunday-Saturday Weekly period", () => {
+    const input = weeklyInput();
+    expect(() => createRecoveryBriefingAssessmentV1({
+      ...input, period: { ...input.period, startDate: "2026-10-05", endDate: "2026-10-11" },
+    })).toThrow("Sunday-Saturday");
+  });
+
+  it("treats a night without a trusted availability instant as unreliable, never as on time", () => {
+    const input = weeklyInput({ values: Array(7).fill(300) });
+    const withoutAvailability = createRecoveryBriefingAssessmentV1({
+      ...input,
+      sleepEvidence: input.sleepEvidence.map((row) => (row.id.startsWith("period-")
+        ? { ...row, availableAt: undefined } : row)),
+    });
+    expect(withoutAvailability.status.state).toBe("unavailable");
+    expect(withoutAvailability.sleep.periodSummary.averageMinutes).toBeNull();
+    expect(withoutAvailability.dataLimitations).toContain("sleep_availability_unknown_excluded");
+    const invalid = createRecoveryBriefingAssessmentV1({
+      ...input,
+      sleepEvidence: input.sleepEvidence.map((row) => ({ ...row, availableAt: "not-a-time" })),
+    });
+    expect(invalid.status.reasonCodes).toEqual(["insufficient_baseline_nights", "insufficient_period_nights"]);
+  });
+
+  it("separates shadow and publication modes in identity and validation", () => {
+    const shadow = createRecoveryBriefingAssessmentV1(weeklyInput());
+    const published = createRecoveryBriefingAssessmentV1({ ...weeklyInput(), mode: "publication" });
+    expect(shadow).toMatchObject({ mode: "shadow", shadow: true, provenance: { shadow: true } });
+    expect(published).toMatchObject({ mode: "publication", shadow: false,
+      provenance: { shadow: false, strategicEligibility: "excluded" } });
+    expect(published.status).toEqual(shadow.status);
+    expect(published.assessmentId).not.toBe(shadow.assessmentId);
+    expect(() => validateRecoveryBriefingAssessmentV1(published)).not.toThrow();
+    const forged = structuredClone(published);
+    forged.shadow = true;
+    expect(() => validateRecoveryBriefingAssessmentV1(forged)).toThrow("Invalid Recovery Briefing V1 assessment.");
+    expect(() => createRecoveryBriefingAssessmentV1({ ...weeklyInput(), mode: "strategic" }))
+      .toThrow("supported mode");
   });
 
   it("applies Monthly Yellow from twelve material-low nights", () => {
@@ -461,6 +508,7 @@ function midweekInput({
     cadence: "midweek",
     startDate: "2026-10-04",
     endDate: "2026-10-06",
+    // Historical Midweek fixture retained only to prove the refusal.
     values,
     baselineValues,
     training,
@@ -513,6 +561,8 @@ function sleep(id, sleepDay, totalSleepMinutes, overrides = {}) {
     durationReliable: true,
     timeZoneUncertain: false,
     clockTimeReliable: true,
+    // Synced the morning after the wake-date night, Pacific time.
+    availableAt: `${sleepDay}T16:00:00.000Z`,
     ...overrides,
   };
 }

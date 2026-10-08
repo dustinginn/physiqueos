@@ -3,6 +3,7 @@ import {
   RECOVERY_BRIEFING_SCHEMA_VERSION,
   RECOVERY_STATUS_POLICY_V1,
   RECOVERY_STATUS_POLICY_VERSION,
+  RecoveryAssessmentMode,
   RecoveryBriefingCadence,
   RecoveryBriefingStatus,
 } from "./RecoveryBriefingPolicyV1.js";
@@ -10,6 +11,7 @@ import {
 const DAY_MS = 86_400_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ALLOWED_CADENCES = new Set(Object.values(RecoveryBriefingCadence));
+const ALLOWED_MODES = new Set(Object.values(RecoveryAssessmentMode));
 const ALLOWED_FOAM_STATUSES = new Set(["scheduled", "completed", "missed", "excused"]);
 const ALLOWED_TRAINING_RELATIONS = new Set(["same_period", "sleep_precedes_signal"]);
 const TRAINING_EXCLUSION_FLAGS = Object.freeze([
@@ -21,6 +23,9 @@ export const RECOVERY_BRIEFING_ASSESSMENT_SERVICE_VERSION =
 
 export function createRecoveryBriefingAssessmentV1(input = {}) {
   const before = stableSerialize(input);
+  const mode = input.mode ?? RecoveryAssessmentMode.SHADOW;
+  if (!ALLOWED_MODES.has(mode)) throw new Error("Recovery Briefing V1 requires a supported mode.");
+  const shadow = mode === RecoveryAssessmentMode.SHADOW;
   const period = normalizePeriod(input.period);
   const evidenceCutoff = timestamp(input.evidenceCutoff, "evidenceCutoff");
   const evaluatedAt = timestamp(input.evaluatedAt, "evaluatedAt");
@@ -62,7 +67,8 @@ export function createRecoveryBriefingAssessmentV1(input = {}) {
   ]);
   const body = {
     schemaVersion: RECOVERY_BRIEFING_SCHEMA_VERSION,
-    shadow: true,
+    mode,
+    shadow,
     period: {
       cadence: period.cadence,
       startDate: period.startDate,
@@ -113,7 +119,7 @@ export function createRecoveryBriefingAssessmentV1(input = {}) {
     provenance: {
       producer: "recovery_briefing_assessment_service_v1",
       producerVersion: RECOVERY_BRIEFING_ASSESSMENT_SERVICE_VERSION,
-      shadow: true,
+      shadow,
       strategicEligibility: "excluded",
       evidenceCutoff,
       generatedAt: evaluatedAt,
@@ -127,6 +133,7 @@ export function createRecoveryBriefingAssessmentV1(input = {}) {
   };
   const semantic = {
     schemaVersion: body.schemaVersion,
+    mode: body.mode,
     period: body.period,
     status: body.status,
     sleep: body.sleep,
@@ -158,7 +165,9 @@ export function createRecoveryBriefingAssessmentV1(input = {}) {
 
 export function validateRecoveryBriefingAssessmentV1(value) {
   if (!value || value.schemaVersion !== RECOVERY_BRIEFING_SCHEMA_VERSION ||
-      value.shadow !== true || !String(value.assessmentId).startsWith("recovery_briefing_v1|") ||
+      !ALLOWED_MODES.has(value.mode) ||
+      value.shadow !== (value.mode === RecoveryAssessmentMode.SHADOW) ||
+      !String(value.assessmentId).startsWith("recovery_briefing_v1|") ||
       value.policy?.version !== RECOVERY_STATUS_POLICY_VERSION ||
       value.policy?.confidenceCoupling !== "none" ||
       value.policy?.foamCanSetStatus !== false ||
@@ -168,7 +177,7 @@ export function validateRecoveryBriefingAssessmentV1(value) {
       value.policy?.causalClaimsAllowed !== false ||
       value.policy?.medicalThresholds !== false ||
       value.foamRolling?.displayRole !== "execution_context_only" ||
-      value.provenance?.shadow !== true ||
+      value.provenance?.shadow !== value.shadow ||
       value.provenance?.strategicEligibility !== "excluded" ||
       value.provenance?.repositoryReads !== 0 ||
       value.provenance?.persistenceWrites !== 0 ||
@@ -179,6 +188,7 @@ export function validateRecoveryBriefingAssessmentV1(value) {
   const { assessmentId: _assessmentId, integrity: _integrity, ...body } = value;
   const semantic = {
     schemaVersion: body.schemaVersion,
+    mode: body.mode,
     period: body.period,
     status: body.status,
     sleep: body.sleep,
@@ -209,11 +219,9 @@ function normalizePeriod(value) {
   const endDate = date(value.endDate, "period.endDate");
   if (startDate > endDate) throw new Error("Recovery period must be closed and bounded.");
   const expectedNights = daysBetween(startDate, endDate) + 1;
-  if (value.cadence === RecoveryBriefingCadence.MIDWEEK && expectedNights !== 3) {
-    throw new Error("Midweek Recovery requires an exact three-night period.");
-  }
-  if (value.cadence === RecoveryBriefingCadence.WEEKLY && expectedNights !== 7) {
-    throw new Error("Weekly Recovery requires an exact seven-night period.");
+  if (value.cadence === RecoveryBriefingCadence.WEEKLY &&
+      (expectedNights !== 7 || new Date(`${startDate}T12:00:00Z`).getUTCDay() !== 0)) {
+    throw new Error("Weekly Recovery requires an exact Sunday-Saturday seven-night period.");
   }
   if (value.cadence === RecoveryBriefingCadence.MONTHLY &&
       (expectedNights < 28 || expectedNights > 31 || !startDate.endsWith("-01") ||
@@ -237,21 +245,22 @@ function selectSleepEvidence({ records, period, evidenceCutoff }) {
   const baselineStart = shift(period.startDate, -RECOVERY_STATUS_POLICY_V1.baseline.lookbackNights);
   const selected = [];
   let unreliable = 0;
+  let unavailable = 0;
   for (const raw of records) {
     const sleepDay = raw?.sleepDay ?? raw?.date;
     if (!isValidDateText(sleepDay)) continue;
     if (sleepDay > period.endDate || sleepDay > cutoffDate) {
       continue;
     }
-    const availableAt = raw?.availableAt ?? raw?.ingestedAt ?? raw?.recordedAt ?? null;
-    if (availableAt !== null) {
-      if (!Number.isFinite(Date.parse(availableAt))) {
-        unreliable += 1;
-        continue;
-      }
-      if (new Date(availableAt).toISOString() > evidenceCutoff) continue;
-    }
     if (sleepDay < baselineStart) continue;
+    // No lookahead is provable only for a night whose availability instant is
+    // known: a night without one is unreliable, never assumed to be on time.
+    const availableAt = raw?.availableAt ?? raw?.ingestedAt ?? raw?.recordedAt ?? null;
+    if (typeof availableAt !== "string" || !Number.isFinite(Date.parse(availableAt))) {
+      unavailable += 1;
+      continue;
+    }
+    if (new Date(availableAt).toISOString() > evidenceCutoff) continue;
     if (raw.durationReliable !== true || !Number.isFinite(Number(raw.totalSleepMinutes))) {
       unreliable += 1;
       continue;
@@ -288,6 +297,7 @@ function selectSleepEvidence({ records, period, evidenceCutoff }) {
     periodRows,
     limitations: unique([
       unreliable ? "unreliable_sleep_duration_excluded" : null,
+      unavailable ? "sleep_availability_unknown_excluded" : null,
       periodRows.some((row) => row.timeZoneUncertain)
         ? "clock_metrics_ineligible_for_timezone_uncertain_sleep" : null,
     ]),
@@ -381,15 +391,7 @@ function classify({ cadence, expectedNights, baseline, periodSleep, training }) 
   let sleepYellow = false;
   let sleepOnlyRed = false;
   let corroboratedRed = false;
-  if (cadence === RecoveryBriefingCadence.MIDWEEK) {
-    const threshold = Math.max(
-      policy.yellow.averageDeltaFloorMinutes,
-      baseline.exactRobustSpreadMinutes
-    );
-    sleepYellow = periodSleep.materialLowNights >= policy.yellow.minimumMaterialLowNights &&
-      periodSleep.materialRun >= policy.yellow.minimumMaterialRun &&
-      averageDelta <= -threshold;
-  } else if (cadence === RecoveryBriefingCadence.WEEKLY) {
+  if (cadence === RecoveryBriefingCadence.WEEKLY) {
     sleepYellow = periodSleep.materialLowNights >= policy.yellow.minimumMaterialLowNights &&
       periodSleep.materialRun >= policy.yellow.minimumMaterialRun &&
       averageDelta <= -materialThreshold;

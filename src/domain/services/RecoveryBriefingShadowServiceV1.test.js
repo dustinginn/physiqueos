@@ -10,8 +10,41 @@ import {
   RECOVERY_SHADOW_INPUT_AUTHORITY_VERSION,
   RecoveryShadowInputMode,
 } from "./RecoveryBriefingPolicyV1.js";
+import {
+  OWNER,
+  SLEEP_D0,
+  canonicalNights,
+  recoveryActivationRecord,
+  recoveryAlgorithmRecord,
+} from "../../testSupport/recoverySleepSynthetic.js";
 
 const DAY_MS = 86_400_000;
+const ELIGIBLE_WEEKLY = Object.freeze({ cadence: "weekly", startDate: "2026-10-18", endDate: "2026-10-24", timeZone: "America/Los_Angeles" });
+const ELIGIBLE_CUTOFF = "2026-10-25T06:59:59.999Z";
+
+function prospectiveAuthority() {
+  return {
+    ...syntheticAuthority(),
+    mode: RecoveryShadowInputMode.PROSPECTIVE_VALIDATION_ONLY,
+    effectiveSleepDay: SLEEP_D0,
+  };
+}
+
+function prospectiveAssessmentInput({ period = null, cutoff = "2026-10-11T06:59:59.999Z" } = {}) {
+  const resolved = period ?? { cadence: "weekly", startDate: "2026-10-04", endDate: "2026-10-10", timeZone: "America/Los_Angeles" };
+  return {
+    period: resolved,
+    evidenceCutoff: cutoff,
+    evaluatedAt: "2026-10-26T12:00:00.000Z",
+    ownerUserId: OWNER,
+    // Canonical rows from Sep 6 on: those before D0 are pre-policy-era rows.
+    sleepDays: canonicalNights("2026-09-06", Array(49).fill(420)),
+    activationPolicyRecord: recoveryActivationRecord(),
+    algorithmPolicyRecord: recoveryAlgorithmRecord(),
+    foamRolling: null,
+    training: null,
+  };
+}
 
 describe("RecoveryBriefingShadowServiceV1 isolation", () => {
   it("fails closed when explicit non-strategic input authority is absent", () => {
@@ -98,48 +131,61 @@ describe("RecoveryBriefingShadowServiceV1 isolation", () => {
   });
 
   it("allows prospective validation-only input only at or after its explicit floor", () => {
-    const input = syntheticAssessmentInput();
-    input.sleepRecords = input.sleepRecords.map((record) => ({
-      ...record,
-      ingestionPurpose: "validation_only",
-      recordedAt: `${record.sleepDay}T12:00:00.000Z`,
-    }));
+    // Weekly Oct 4-10: its baseline (Sep 6-Oct 3) holds only two nights on or
+    // after D0 Oct 2, however many canonical rows exist before it.
     const result = runRecoveryBriefingShadowV1({
-      inputAuthority: {
-        ...syntheticAuthority(),
-        mode: RecoveryShadowInputMode.PROSPECTIVE_VALIDATION_ONLY,
-        effectiveSleepDay: "2026-10-02",
-      },
-      assessmentInput: input,
+      inputAuthority: prospectiveAuthority(),
+      assessmentInput: prospectiveAssessmentInput(),
     });
     expect(result.status).toBe("shadow_evaluated");
     expect(result.assessment.status.state).toBe("unavailable");
     expect(result.assessment.status.reasonCodes).toContain("insufficient_baseline_nights");
+    expect(result.assessment.sleep.baseline.usableNights).toBe(2);
+    expect(result.eligibility.accounting.baseline).toMatchObject({
+      expectedNights: 28, reliableNights: 2, beforeProspectiveFloorNights: 26,
+    });
     expect(result.authority).toMatchObject({
       mode: "prospective_validation_only",
       strategicEvidenceEligibility: "excluded",
     });
   });
 
-  it("fails closed when prospective validation-only Sleep lacks trusted availability", () => {
-    const input = syntheticAssessmentInput();
-    input.sleepRecords = input.sleepRecords.map((record) => ({
-      ...record,
-      ingestionPurpose: "validation_only",
-    }));
+  it("evaluates an eligible prospective Weekly from canonical sleep-canon-v3 days", () => {
     const result = runRecoveryBriefingShadowV1({
-      inputAuthority: {
-        ...syntheticAuthority(),
-        mode: RecoveryShadowInputMode.PROSPECTIVE_VALIDATION_ONLY,
-        effectiveSleepDay: "2026-10-02",
-      },
-      assessmentInput: input,
+      inputAuthority: prospectiveAuthority(),
+      assessmentInput: prospectiveAssessmentInput({ period: ELIGIBLE_WEEKLY, cutoff: ELIGIBLE_CUTOFF }),
     });
-    expect(result).toMatchObject({
-      status: "shadow_blocked",
-      reason: "validation_only_sleep_availability_missing",
-      assessment: null,
+    expect(result.status).toBe("shadow_evaluated");
+    expect(result.assessment).toMatchObject({ mode: "shadow", shadow: true });
+    expect(result.assessment.status.state).toBe("green");
+    expect(result.eligibility.accounting.baseline.reliableNights).toBe(16);
+    expect(result.isolation).toEqual(isolationLedger());
+  });
+
+  it("fails closed when prospective validation-only Sleep lacks trusted availability", () => {
+    const input = prospectiveAssessmentInput({ period: ELIGIBLE_WEEKLY, cutoff: ELIGIBLE_CUTOFF });
+    input.sleepDays = input.sleepDays.map((day) => ({ ...day, computedAt: undefined }));
+    const result = runRecoveryBriefingShadowV1({ inputAuthority: prospectiveAuthority(), assessmentInput: input });
+    expect(result.status).toBe("shadow_evaluated");
+    expect(result.assessment.status.state).toBe("unavailable");
+    expect(result.eligibility.accounting.period.withheldByReason).toEqual({ availability_unknown: 7 });
+  });
+
+  it("never mixes fixture rows with canonical days or historical Sleep", () => {
+    const fixtureInProspective = runRecoveryBriefingShadowV1({
+      inputAuthority: prospectiveAuthority(),
+      assessmentInput: { ...prospectiveAssessmentInput(), sleepRecords: [] },
     });
+    expect(fixtureInProspective.reason).toBe("validation_only_requires_canonical_sleep_days");
+    const canonicalInSynthetic = runRecoveryBriefingShadowV1({
+      inputAuthority: syntheticAuthority(),
+      assessmentInput: { ...syntheticAssessmentInput(), sleepDays: [] },
+    });
+    expect(canonicalInSynthetic.reason).toBe("synthetic_mode_refuses_canonical_sleep_days");
+    const input = prospectiveAssessmentInput();
+    input.sleepDays[0] = { ...input.sleepDays[0], ingestionPurpose: "historical_evidence_import" };
+    expect(runRecoveryBriefingShadowV1({ inputAuthority: prospectiveAuthority(), assessmentInput: input }))
+      .toMatchObject({ status: "shadow_blocked", reason: "historical_sleep_categorically_forbidden", assessment: null });
   });
 
   it("rejects impossible calendar dates in prospective authority", () => {
@@ -172,6 +218,7 @@ describe("RecoveryBriefingShadowServiceV1 isolation", () => {
     expect(imports).toEqual([
       "./RecoveryBriefingAssessmentServiceV1.js",
       "./RecoveryBriefingPolicyV1.js",
+      "./RecoveryBriefingSleepInputProjectionV1.js",
     ]);
     expect(source).not.toMatch(/Repository|publicationService|artifactService|store\.|\.publish\(|\.save\(|\.create\(/);
   });
@@ -226,6 +273,7 @@ function syntheticAssessmentInput() {
       mainSleep: { asleepSeconds: 420 * 60 },
       mainEpisodeIndex: 0,
       episodes: [{ kind: "main", timeZone: "America/Los_Angeles", timeZoneSource: "sample_metadata" }],
+      availableAt: `${sleepDay}T16:00:00.000Z`,
     })),
     foamRolling: null,
     training: null,
