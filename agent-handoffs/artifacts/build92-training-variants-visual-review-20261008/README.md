@@ -32,3 +32,16 @@ This is a visual acceptance package. It is not shipping code.
 | 10 | `10-watch-variant-label.png` | Watch row "Spider Curls · Static Hold" (display only) |
 
 Raw full-resolution captures are in `captures/`.
+
+## Direct image links
+
+1. [Workout, Ordinary](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/01-workout-ordinary.png)
+2. [Execution variant menu with an existing Static Hold](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/02-variant-menu-existing.png)
+3. [Static Hold selected](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/03-selected-static-hold.png)
+4. [Menu with Static Hold checked](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/04-variant-menu-selected.png)
+5. [No saved variants yet](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/05-variant-menu-no-variants.png)
+6. [Create Variant sheet, empty](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/06-create-sheet-empty.png)
+7. [Create Variant sheet, "Static Hold"](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/07-create-sheet-named.png)
+8. [Created and selected immediately](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/08-created-and-selected.png)
+9. [Create failed offline, inline Retry](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/09-create-error-retry.png)
+10. [Apple Watch variant label](https://raw.githubusercontent.com/dustinginn/physiqueos/claude/native-build92-training-variants-visual-review-20261008/agent-handoffs/artifacts/build92-training-variants-visual-review-20261008/boards/10-watch-variant-label.png)
