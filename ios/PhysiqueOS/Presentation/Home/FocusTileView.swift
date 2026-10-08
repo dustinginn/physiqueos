@@ -79,7 +79,7 @@ struct FocusTileView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(accessibilityLabel)
                 .accessibilityHint("Opens priority details")
-            if item.completable, !item.completed, !isCompleting, !isSkipping {
+            if item.allowsHomeInlineCompletion, !isCompleting, !isSkipping {
                 Button { onComplete(item) } label: { completeButton }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Mark \(item.title) complete")
@@ -113,7 +113,9 @@ struct FocusTileView: View {
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(item.color.foreground.opacity(0.32), lineWidth: 1)
         )
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home.priority.\(item.id)")
     }
 
     private var rowBody: some View {
@@ -122,10 +124,14 @@ struct FocusTileView: View {
                 Text(item.title)
                     .physiqueOSFont(PhysiqueOSTypography.focusLabel)
                     .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let executionContext = PriorityExecutionContextPresentation.primaryLine(for: item) {
                     Text(executionContext)
                         .physiqueOSFont(PhysiqueOSTypography.focusSubtitle)
                         .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if (density == .expanded || item.changeLabel != nil), let metadata = item.metadata {
                     Text(metadata)
@@ -146,7 +152,7 @@ struct FocusTileView: View {
             if !item.completable || item.completed {
                 if let actionLabel = item.actionLabel {
                     StatusChip(text: actionLabel, color: .effort)
-                } else {
+                } else if !item.isMorningWeighIn && !item.isDexaAppointmentReminder {
                     completionIndicator
                 }
             }
@@ -157,7 +163,15 @@ struct FocusTileView: View {
         var parts = [item.title]
         if let context = PriorityExecutionContextPresentation.primaryLine(for: item) { parts.append(context) }
         if let metadata = item.metadata { parts.append(metadata) }
-        parts.append(item.actionLabel ?? (item.completed ? "Completed" : "Not completed"))
+        if let actionLabel = item.actionLabel {
+            parts.append(actionLabel)
+        } else if item.completed {
+            parts.append("Completed")
+        } else if item.isMorningWeighIn || item.isDexaAppointmentReminder {
+            parts.append("Open")
+        } else {
+            parts.append("Not completed")
+        }
         return parts.joined(separator: ", ")
     }
 

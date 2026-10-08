@@ -217,14 +217,13 @@ extension CompletionFeedbackAndNotificationCapabilityTests {
     }
 
     @MainActor
-    func testEvidenceAndSupplementDetailsUseTheSameProjectedSkipWithoutCompletionOrEvidence() async {
+    func testSkippableEvidenceAndSupplementDetailsUseTheSameProjectedSkipWithoutCompletionOrEvidence() async {
         let writes = SplitWrites()
         let feedback = RecordingFeedbackClient()
         let variants: [(String, AppDestination?)] = [
             ("Fadogia", nil),
             ("Morning Weight", .checkIn(checkInType: "morning")),
             ("Progress Photos", .photoUpload),
-            ("DEXA", .operatingPlanDexaAppointment),
         ]
         for (index, variant) in variants.enumerated() {
             let priorityId = "priority-\(index)"
@@ -254,5 +253,45 @@ extension CompletionFeedbackAndNotificationCapabilityTests {
         XCTAssertEqual(skips.count, variants.count)
         XCTAssertTrue(completions.isEmpty, "Universal Skip never routes through completion or fabricates evidence.")
         XCTAssertEqual(feedback.events, Array(repeating: .prioritySkipped, count: variants.count))
+    }
+
+    @MainActor
+    func testDexaReminderRefusesForgedCompleteAndSkipThroughDetailModel() async {
+        let writes = SplitWrites()
+        let feedback = RecordingFeedbackClient()
+        let priorityId = "dexa-appointment:2026-10-08:appointment"
+        var occurrence = PriorityOccurrence(
+            id: priorityId, routePriorityId: priorityId, executionItemId: "execution_next_dexa",
+            date: "2026-10-08", title: "DEXA appointment", subtitle: "Today at 7:30 AM",
+            metadata: nil, changeLabel: nil, icon: .target, color: .evidence, urgency: .upcoming,
+            completed: false, completable: true, expectedVersion: 8,
+            actionLabel: "View DEXA Appointment", completionContext: .init(occurrenceDate: "2026-10-08"),
+            continueActionDestination: .operatingPlanDexaAppointment,
+            notificationAction: .init(
+                classification: .specializedWorkflowRequired, workflow: "dexa_appointment",
+                scheduledTime: "07:30", completionCommand: nil,
+                skipCommand: .init(
+                    commandType: ProductionCommandType.skipPriority, expectedVersion: 8,
+                    payload: .init(priorityId: priorityId, occurrenceDate: "2026-10-08")
+                )
+            )
+        )
+        occurrence.projectedSkipCommand = occurrence.notificationAction?.skipCommand
+        let viewModel = PriorityDetailViewModel(
+            api: PriorityReads(occurrence), writeAPI: writes,
+            morningCheckInAPI: NotAvailableMorningCheckInAPI(), store: LoggingSandboxStore(),
+            authority: .founderProduction, priorityId: priorityId,
+            occurrenceDate: occurrence.date, feedback: feedback
+        )
+
+        await viewModel.load()
+        await viewModel.complete()
+        await viewModel.skip()
+
+        let completions = await writes.completions
+        let skips = await writes.skips
+        XCTAssertTrue(completions.isEmpty)
+        XCTAssertTrue(skips.isEmpty)
+        XCTAssertTrue(feedback.events.isEmpty)
     }
 }

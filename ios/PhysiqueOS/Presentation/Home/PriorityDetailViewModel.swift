@@ -200,7 +200,7 @@ enum PriorityFamilyReviewFixtures {
             o.urgency = .upcoming
             o.actionLabel = "View DEXA Appointment"
             o.continueActionDestination = .operatingPlanDexaAppointment
-            return withSkip(o)
+            return o
         case "completed":
             var o = foam
             o.completed = true
@@ -300,7 +300,10 @@ final class PriorityDetailViewModel {
     func complete(dose: String? = nil) async {
         guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: authority)) != nil else { return }
         guard case .loaded(.some(let occurrence)) = state else { return }
-        guard !occurrence.paused else { return }
+        guard !occurrence.paused,
+              !occurrence.isMorningWeighIn,
+              !occurrence.isDexaAppointmentReminder
+        else { return }
         let context = Self.completionContext(for: occurrence, dose: dose)
         if authority == .sandbox {
             store.completePriority(occurrenceId: occurrence.id, context: context)

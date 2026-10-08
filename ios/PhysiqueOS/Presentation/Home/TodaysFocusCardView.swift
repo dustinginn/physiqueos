@@ -3,6 +3,7 @@ import SwiftUI
 /// Mirrors `TodaysFocusCard.jsx`, including the full-width grouped session
 /// card used by Morning Check-In.
 struct TodaysFocusCardView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let items: [PriorityOccurrence]
     var completingIDs: Set<String> = []
     var skippingIDs: Set<String> = []
@@ -12,7 +13,11 @@ struct TodaysFocusCardView: View {
     var onSkipSessionItem: (String, PrioritySessionItem) -> Void = { _, _ in }
 
     private var useSingleColumn: Bool {
-        items.count == 1 || items.contains { $0.actionLabel != nil || $0.sessionItems != nil }
+        TodaysFocusGridLayout.usesSingleColumn(
+            itemCount: items.count,
+            containsExpandedContent: items.contains { $0.actionLabel != nil || $0.sessionItems != nil },
+            dynamicTypeSize: dynamicTypeSize
+        )
     }
 
     private var density: FocusTileView.Density {
@@ -54,15 +59,18 @@ struct TodaysFocusCardView: View {
                         }
                     }
                 } else {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible())], spacing: 8) {
-                        ForEach(items) {
-                            FocusTileView(
-                                item: $0, density: density, onTap: onTap,
-                                onComplete: onComplete, onSkip: onSkip,
-                                isCompleting: completingIDs.contains($0.id),
-                                isSkipping: skippingIDs.contains($0.id)
-                            )
-                                .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                    Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                        ForEach(TodaysFocusGridLayout.rows(itemCount: items.count), id: \.lowerBound) { row in
+                            if row.count == 1, let index = row.first {
+                                focusTile(items[index])
+                                    .gridCellColumns(2)
+                            } else {
+                                GridRow {
+                                    ForEach(Array(row), id: \.self) { index in
+                                        focusTile(items[index])
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -72,6 +80,37 @@ struct TodaysFocusCardView: View {
         .background(PhysiqueOSTheme.redesignPaper)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(PhysiqueOSTheme.redesignRule))
+    }
+
+    private func focusTile(_ item: PriorityOccurrence) -> some View {
+        FocusTileView(
+            item: item, density: density, onTap: onTap,
+            onComplete: onComplete, onSkip: onSkip,
+            isCompleting: completingIDs.contains(item.id),
+            isSkipping: skippingIDs.contains(item.id)
+        )
+        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+    }
+}
+
+/// Deterministic two-column packing for Home priorities. Every complete pair
+/// occupies a normal row; an odd final item gets the full two-column span.
+/// Accessibility Dynamic Type switches the whole set to the existing expanded
+/// single-column treatment instead of squeezing readable copy or controls.
+enum TodaysFocusGridLayout {
+    static func rows(itemCount: Int) -> [Range<Int>] {
+        guard itemCount > 0 else { return [] }
+        return stride(from: 0, to: itemCount, by: 2).map {
+            $0..<min($0 + 2, itemCount)
+        }
+    }
+
+    static func usesSingleColumn(
+        itemCount: Int,
+        containsExpandedContent: Bool,
+        dynamicTypeSize: DynamicTypeSize
+    ) -> Bool {
+        itemCount == 1 || containsExpandedContent || dynamicTypeSize.isAccessibilitySize
     }
 }
 

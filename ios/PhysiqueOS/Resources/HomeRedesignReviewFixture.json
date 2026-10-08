@@ -79,13 +79,13 @@
     "title": "Morning Weigh-In", "subtitle": "Before food or fluids", "icon": "scale", "color": "evidence",
     "urgency": "available", "completed": false, "completable": false
   }, {
-    "id": "review-foam", "executionItemId": "execution_foam_roll", "date": "2026-10-04",
-    "title": "Foam Rolling", "subtitle": "7:15 PM", "icon": "activity", "color": "effort",
-    "urgency": "upcoming", "completed": false, "completable": true
+    "id": "dexa-appointment:2026-10-05:day-before", "executionItemId": "execution_next_dexa", "date": "2026-10-04",
+    "title": "DEXA tomorrow", "subtitle": "Tomorrow at 7:30 AM", "icon": "target", "color": "evidence",
+    "urgency": "upcoming", "completed": false, "completable": false,
+    "notificationAction": { "classification": "specialized_workflow_required", "workflow": "dexa_appointment", "scheduledTime": "07:30", "completionCommand": null }
   }, {
-    "id": "review-tesamorelin", "executionItemId": "execution_tesamorelin", "date": "2026-10-04",
-    "title": "Tesamorelin", "subtitle": "10:29 PM · 0.5 mg", "icon": "syringe", "color": "primary",
-    "urgency": "upcoming", "completed": false, "completable": true,
-    "completionContext": { "occurrenceDate": "2026-10-04", "dose": "0.5 mg", "protocolId": "tesamorelin" }
+    "id": "review-foam", "executionItemId": "execution_foam_roll", "date": "2026-10-04",
+    "title": "Foam Rolling", "subtitle": "7:15 PM · Lower-body recovery and mobility", "icon": "activity", "color": "effort",
+    "urgency": "upcoming", "completed": false, "completable": true
   }]
 }

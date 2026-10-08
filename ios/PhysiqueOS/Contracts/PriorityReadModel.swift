@@ -430,6 +430,10 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     /// command presence; the synthesized fallback only keeps cached Build 78
     /// detail payloads/tests source-compatible while they age out.
     var canonicalSkipCommand: PriorityNotificationSkipCommand? {
+        // A scheduled DEXA appointment is an informational reminder. Even
+        // while an older Server still projects a generic Skip command, Native
+        // must not turn that reminder into a mutation affordance.
+        guard !isDexaAppointmentReminder else { return nil }
         if let command = projectedSkipCommand ?? notificationAction?.skipCommand,
            command.isValid(forPriorityId: routePriorityId ?? id, occurrenceDate: date) {
             return command
@@ -453,6 +457,31 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
         return .priorityOccurrence(priorityId: routePriorityId ?? id, occurrenceDate: date)
     }
 
+    /// Morning weight completes only through the atomic Morning Weigh-In
+    /// workflow. Home and Priority Detail may navigate or Skip when the
+    /// Server offers it, but they must never synthesize direct completion.
+    var isMorningWeighIn: Bool {
+        Self.isMorningWeighIn(executionItemId: executionItemId, id: id)
+            || routePriorityId == "morning-check-in"
+            || notificationAction?.workflow == "morning_check_in"
+            || continueActionDestination == .checkIn(checkInType: "morning")
+    }
+
+    /// The execution-backed DEXA appointment family is reminder/navigation
+    /// only. Confirmed scan evidence owns completion; neither Complete nor
+    /// Skip is a valid disposition for these projected stage rows.
+    var isDexaAppointmentReminder: Bool {
+        executionItemId == "execution_next_dexa"
+            || id.hasPrefix("dexa-appointment:")
+            || routePriorityId?.hasPrefix("dexa-appointment:") == true
+            || notificationAction?.workflow == "dexa_appointment"
+            || notificationAction?.workflow == "dexa_evidence"
+    }
+
+    var allowsHomeInlineCompletion: Bool {
+        completable && !completed && !isMorningWeighIn && !isDexaAppointmentReminder
+    }
+
     /// Checked against both `executionItemId` and `id` because the exact
     /// field the real `home` resource uses for this comparison was only
     /// verified against founder-seed fixture data, not confirmed live
@@ -462,7 +491,9 @@ struct PriorityOccurrence: Codable, Equatable, Identifiable {
     /// (`MORNING_WEIGH_IN_REMINDER_ID`) avoids silently falling through to
     /// generic Priority Detail if production sends the other one.
     static func isMorningWeighIn(executionItemId: String, id: String) -> Bool {
-        let candidates: Set<String> = ["execution_morning_weigh_in", "reminder_morning_weight"]
+        let candidates: Set<String> = [
+            "execution_morning_weigh_in", "reminder_morning_weight", "morning-check-in",
+        ]
         return candidates.contains(executionItemId) || candidates.contains(id)
     }
 }

@@ -454,6 +454,32 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertTrue(plan.toRemove.contains("priority.scheduled.morning-check-in.2026-09-16"))
     }
 
+    func testProductionHomeTreatsLegacyDexaSkipProjectionAsInformationalOnly() async throws {
+        let priorityID = "dexa-appointment:2026-10-08:appointment"
+        let homeJSON = productionEnvelope(resource: "home", data: #"{"header":{"greeting":"Good morning","name":"Founder"},"hero":{"mode":"active","goalLabel":"Current Goal","headline":"On track","supportLine":"Canonical state"},"nextBestAction":{"title":"DEXA appointment","icon":"target","destination":{"id":"priority.detail","parameters":{"priorityId":"dexa-appointment:2026-10-08:appointment","occurrenceDate":"2026-10-08"}}},"briefingCards":[],"goals":[],"timezone":"America/Los_Angeles","todaysFocus":[{"id":"dexa-appointment:2026-10-08:appointment","executionId":"execution_next_dexa","occurrenceDate":"2026-10-08","label":"DEXA appointment","subtitle":"7:30 AM","metadata":"Thursday, Oct 8","icon":"target","color":"evidence","state":"upcoming","completed":false,"completable":false,"executionContract":{"priorityId":"dexa-appointment:2026-10-08:appointment","occurrenceDate":"2026-10-08","expectedVersion":8},"notificationAction":{"classification":"specialized_workflow_required","workflow":"dexa_appointment","scheduledTime":"07:30","completionCommand":null,"skipCommand":{"commandType":"priority.skip.v1","expectedVersion":8,"payload":{"priorityId":"dexa-appointment:2026-10-08:appointment","occurrenceDate":"2026-10-08"}}}}]}"#)
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"), byResource: ["home": homeJSON]
+        )
+        let native = ProductionNativeAPI(
+            baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport
+        )
+        _ = try await native.pair(
+            pairingCredential: String(repeating: "p", count: 43), displayName: "Isolated fixture"
+        )
+
+        let home = try await ProductionHomeAPI(api: native).fetchHome()
+        let item = try XCTUnwrap(home.todaysFocus.first)
+        XCTAssertEqual(item.id, priorityID)
+        XCTAssertTrue(item.isDexaAppointmentReminder)
+        XCTAssertFalse(item.allowsHomeInlineCompletion)
+        XCTAssertNil(item.canonicalSkipCommand)
+        XCTAssertEqual(PriorityOccurrenceCapabilities.resolve(item.notificationAction), .openOnly)
+        XCTAssertEqual(
+            item.destination,
+            .priorityOccurrence(priorityId: priorityID, occurrenceDate: "2026-10-08")
+        )
+    }
+
     func testInvalidatedReviewReadCannotJoinOldFlightOrEraseNewFlight() async throws {
         actor HeldReviewTransport: FounderHTTPTransport {
             let responses: [String]
