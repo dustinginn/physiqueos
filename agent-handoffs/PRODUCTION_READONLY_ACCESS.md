@@ -66,16 +66,11 @@ Read-only access is not permission to repair, replay, confirm, dismiss, enqueue,
 
 ## Mac / Remote Control sessions
 
-Normal Claude Remote Control Native sessions run on the Mac. The approved runner above is a **PC production-inspection path**. If the task requires production inspection and the current Mac session cannot reach that approved path through an already-established authorized mechanism, do not invent a new credential path and do not weaken permissions.
+Mac Codex and Claude Remote Control sessions may use the recovered approved Mac console runner when the existing saved context, prerequisites, current application authority, component and owner scope are independently verified. The October 2 smoke test proves console access, **not** permission to read arbitrary production records or write data. A task still requires its own bounded read-only audit authorization.
 
-Instead:
+The least-privilege context may return 403 for `doctl account get`; this was expected on October 2 and does **not** establish App Platform console failure. A real 401/403 on required app/console operations, missing binding, authority mismatch or failed read-only verification remains a stop condition. Never broaden or rotate the PAT merely because unrelated account endpoints are denied.
 
-- continue source/local analysis that is independently valid;
-- clearly mark conclusions that require production evidence as unproven;
-- report that the approved PC read-only audit is required;
-- stop the affected diagnosis if production evidence is necessary for correctness.
-
-A task may explicitly establish another approved read-only path in the future. Until then, absence of PC access is a stop condition, not permission to improvise.
+If the authorized Mac runner cannot be restored or the required console operation fails, continue only independently valid source analysis, mark production findings unverified, and stop affected production inspection. Do not invent a credential path, escalate privileges, or automatically redirect to PC.
 
 ## Agent startup rule
 
