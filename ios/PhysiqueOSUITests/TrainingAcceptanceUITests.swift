@@ -921,6 +921,15 @@ final class LoggerParityCaptureUITests: XCTestCase {
 
     private func startPushdownWorkout() {
         let start = app.buttons["trainingLogger.start"]
+        if !start.waitForExistence(timeout: 2),
+           app.descendants(matching: .any)["trainingLogger.workoutIdentity"].exists {
+            let cancel = app.buttons["trainingLogger.cancelWorkout"]
+            XCTAssertTrue(cancel.waitForExistence(timeout: 3))
+            cancel.tap()
+            let confirm = app.alerts.buttons["Cancel Workout"]
+            XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+            confirm.tap()
+        }
         XCTAssertTrue(start.waitForExistence(timeout: 10))
         start.tap()
         let area = app.buttons["trainingLogger.area.triceps"]
