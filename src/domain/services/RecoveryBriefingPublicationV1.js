@@ -178,8 +178,13 @@ export function composeRecoveryAssessmentForBriefingV1({
   return Object.freeze({ proceed: true, attach: true, reason: RecoveryPublicationReason.PUBLISHED, eligibility, recoveryAssessment });
 }
 
-export function validateBriefingRecoveryAssessmentV1(value, { cadence = null, artifactId = null } = {}) {
+export function validateBriefingRecoveryAssessmentV1(value, { cadence = null, artifactId = null, evidenceWindow = null } = {}) {
   const isolation = isolationContract();
+  if (evidenceWindow !== null && (value?.evidenceWindowId !== (evidenceWindow.id ?? null) ||
+      value?.assessment?.period?.startDate !== evidenceWindow.startDate ||
+      value?.assessment?.period?.endDate !== evidenceWindow.endDate)) {
+    throw recoveryError("Briefing Recovery assessment does not belong to this evidence window.");
+  }
   if (!value || typeof value !== "object" || Array.isArray(value) ||
       value.schemaVersion !== BRIEFING_RECOVERY_ASSESSMENT_SCHEMA_VERSION ||
       value.publicationVersion !== RECOVERY_BRIEFING_PUBLICATION_VERSION ||
@@ -203,7 +208,7 @@ export function validateBriefingRecoveryAssessmentV1(value, { cadence = null, ar
 export function attachRecoveryAssessmentV1(artifact, decision) {
   if (!decision?.attach) return artifact;
   const envelope = decision.recoveryAssessment;
-  validateBriefingRecoveryAssessmentV1(envelope, { cadence: artifact?.cadence, artifactId: artifact?.id });
+  validateBriefingRecoveryAssessmentV1(envelope, { cadence: artifact?.cadence, artifactId: artifact?.id, evidenceWindow: artifact?.evidenceWindow ?? {} });
   if (artifact.artifactType === "event") throw recoveryError("Recovery is forbidden on event briefings.");
   const result = { ...artifact, briefing: { ...artifact.briefing, [RECOVERY_ASSESSMENT_FIELD]: envelope } };
   assertRecoveryCadenceInvariantV1(result);
@@ -236,7 +241,7 @@ export function assertRecoveryCadenceInvariantV1(artifact) {
     throw recoveryError("Recovery is published only on Weekly and Monthly briefings.");
   }
   validateBriefingRecoveryAssessmentV1(artifact.briefing[RECOVERY_ASSESSMENT_FIELD], {
-    cadence: artifact.cadence, artifactId: artifact.id,
+    cadence: artifact.cadence, artifactId: artifact.id, evidenceWindow: artifact.evidenceWindow ?? {},
   });
   return artifact;
 }
@@ -248,7 +253,7 @@ export function projectRecoveryCardForNativeV1(artifact) {
   let envelope;
   try {
     envelope = validateBriefingRecoveryAssessmentV1(artifact.briefing[RECOVERY_ASSESSMENT_FIELD], {
-      cadence: artifact.cadence, artifactId: artifact.id,
+      cadence: artifact.cadence, artifactId: artifact.id, evidenceWindow: artifact.evidenceWindow ?? {},
     });
   } catch {
     return null;

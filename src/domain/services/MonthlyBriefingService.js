@@ -27,6 +27,7 @@ import { resolveCommittedPhaseContext } from "./FounderPhaseCorrectionService";
 import { attachBriefingDependencyManifest } from
   "./BriefingDependencyManifestService";
 import { attachEvidenceSettlement } from "./BriefingEvidenceSettlementArtifact.js";
+import { carryForwardRecoveryAssessmentV1 } from "./RecoveryBriefingPublicationV1.js";
 import { createCadencePIEvidenceEnvelope } from
   "./CadencePIEvidenceEnvelopeService";
 import { createStrategicInterpretationPublicationServiceV3 } from
@@ -47,16 +48,20 @@ export function createFounderMonthlyBriefingService({
   repositories,
   now = () => new Date(),
   publicationService = createCanonicalBriefingConfidencePublicationService({ now }),
+  recoveryComposer = null,
 } = {}) {
-  return createMonthlyBriefingService({ repositories, now, publicationService });
+  return createMonthlyBriefingService({ repositories, now, publicationService, recoveryComposer });
 }
 
+// `recoveryComposer` (RecoveryBriefingComposerV1) is an optional, unwired seam:
+// absent, every Monthly is exactly as before.
 export function createMonthlyBriefingService({
   repositories,
   now = () => new Date(),
   publicationService,
   occurrencePreparer = prepareMonthlyOccurrence,
   occurrencePublisher = publishMonthlyOccurrence,
+  recoveryComposer = null,
 } = {}) {
   if (!repositories) throw new Error("Monthly repositories are required.");
   if (!publicationService) throw new Error("Monthly publication service is required.");
@@ -94,6 +99,12 @@ export function createMonthlyBriefingService({
       });
       // Immutable evidence-settlement watermark, frozen with the artifact at first publication.
       if (settlement) prepared.artifact = attachEvidenceSettlement(prepared.artifact, settlement);
+      // A NEW occurrence only (a completed one returned above). Never throws.
+      if (recoveryComposer) {
+        prepared.artifact = (await recoveryComposer.composeForNewArtifact({
+          cadence: "monthly", artifact: prepared.artifact,
+        })).artifact;
+      }
       try {
         return await occurrencePublisher({
           prepared, publicationService, now, operation: "create",
@@ -136,6 +147,8 @@ export function createMonthlyBriefingService({
         window: existing.evidenceWindow, artifactId: existing.id,
         generatedAt: now().toISOString(), existing,
       });
+      // A correction never adds, drops or recomputes a published Recovery card.
+      prepared.artifact = carryForwardRecoveryAssessmentV1({ existing, artifact: prepared.artifact });
       prepared.artifact.publicationReconciliation = {
         ...(prepared.artifact.publicationReconciliation ?? {}),
         state: "current_after_revision",

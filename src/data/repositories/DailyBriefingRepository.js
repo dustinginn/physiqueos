@@ -4,6 +4,9 @@ import {
   preserveOccurrenceEvidenceSettlement,
 } from "../../domain/services/BriefingEvidenceSettlementArtifact.js";
 import { assertFlatBriefingHistory, classifyBriefingCadence, createBriefingHistoryEntry, flattenBriefingHistory, getBriefingOccurrenceIdentity } from "./DailyBriefingHistory";
+// Product invariant at the single artifact write funnel: a Recovery field is
+// published only on Weekly and Monthly briefings (never Midweek/DEXA/Photo).
+import { assertRecoveryCadenceInvariantV1 } from "../../domain/services/RecoveryBriefingPublicationV1.js";
 
 export function createDailyBriefingRepository(dailyBriefings = [], options = {}) {
   // A persisted evidence-settlement watermark is immutable on readback too: the
@@ -98,6 +101,7 @@ export function createDailyBriefingRepository(dailyBriefings = [], options = {})
     },
 
     async completeScheduledBriefing(artifact) {
+      assertRecoveryCadenceInvariantV1(artifact);
       const index = dailyBriefings.findIndex((item) => item.id === artifact.id);
       if (index < 0) throw new Error(`Scheduled briefing claim ${artifact.id} was not found.`);
       const completed = preserveOccurrenceEvidenceSettlement(
@@ -142,6 +146,7 @@ export function createDailyBriefingRepository(dailyBriefings = [], options = {})
     },
 
     async createDailyBriefing(briefing, { replacementReason = null } = {}) {
+      assertRecoveryCadenceInvariantV1(briefing);
       const matchingBriefings = dailyBriefings.filter((item) =>
         hasSameBriefingOccurrence(item, briefing)
       );
