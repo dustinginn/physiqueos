@@ -1087,12 +1087,21 @@ struct TrainingLoggerView: View {
                     .foregroundStyle(PhysiqueOSTheme.redesignInk)
             }
             Spacer(minLength: 4)
-            progressionChoice("Use suggestion", selected: exercise.progressionChoice == .suggestion, enabled: recommendation.hasExplicitTarget) {
+            progressionChoice(
+                "Use suggestion",
+                selected: exercise.progressionChoice == .suggestion,
+                enabled: exercise.canApplyProgressionSuggestion
+            ) {
                 viewModel.update { $0.applyProgressionSuggestion(to: exercise.id) }
             }
+            .accessibilityIdentifier("trainingLogger.useSuggestion.\(exercise.id)")
+            .accessibilityHint(exercise.canApplyProgressionSuggestion
+                ? "Applies the suggested reps and load to editable sets"
+                : "No editable set changes are available")
             progressionChoice("Keep previous", selected: exercise.progressionChoice == .previous, enabled: true) {
                 viewModel.update { $0.keepPreviousPerformance(for: exercise.id) }
             }
+            .accessibilityIdentifier("trainingLogger.keepPrevious.\(exercise.id)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -1115,7 +1124,7 @@ struct TrainingLoggerView: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.45)
+        .opacity(enabled ? 1 : 0.55)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 

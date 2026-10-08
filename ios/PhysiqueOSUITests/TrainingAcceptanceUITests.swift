@@ -892,6 +892,49 @@ final class LoggerParityCaptureUITests: XCTestCase {
         XCTAssertTrue(actions.waitForExistence(timeout: 3), "Selecting Ordinary returns to the workout unchanged")
     }
 
+    func testProgressionSuggestionActionabilityDark() { progressionSuggestionActionability(appearance: "dark") }
+    func testProgressionSuggestionActionabilityMineralLight() { progressionSuggestionActionability(appearance: "light") }
+
+    private func progressionSuggestionActionability(appearance: String) {
+        launch(appearance: appearance, route: "training-logger")
+        startPushdownWorkout()
+        let suggestion = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "trainingLogger.useSuggestion.")
+        ).firstMatch
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 5))
+        XCTAssertTrue(suggestion.isEnabled, "The 50 lb x 12 target changes the fixture's lower-rep editable rows.")
+        XCTAssertGreaterThanOrEqual(suggestion.frame.height, 44)
+
+        suggestion.tap()
+        let disabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == false"), object: suggestion)
+        XCTAssertEqual(XCTWaiter.wait(for: [disabled], timeout: 3), .completed)
+        XCTAssertFalse(suggestion.isEnabled, "Once every editable row matches, Use suggestion must be unavailable.")
+        XCTAssertTrue(suggestion.isSelected)
+        for setNumber in 1...3 {
+            XCTAssertEqual(app.textFields["Set \(setNumber) reps"].value as? String, "12")
+        }
+    }
+
+    private func startPushdownWorkout() {
+        let start = app.buttons["trainingLogger.start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
+        let area = app.buttons["trainingLogger.area.triceps"]
+        XCTAssertTrue(area.waitForExistence(timeout: 5))
+        area.tap()
+        app.buttons["Choose exercises"].tap()
+        let browse = app.buttons["trainingLogger.browseAll"]
+        XCTAssertTrue(browse.waitForExistence(timeout: 5))
+        browse.tap()
+        let pushdown = app.buttons["trainingLogger.exercise.cable_pushdown"]
+        XCTAssertTrue(pushdown.waitForExistence(timeout: 5))
+        pushdown.tap()
+        let startLogging = app.buttons["trainingLogger.startLogging"]
+        XCTAssertTrue(startLogging.waitForExistence(timeout: 5))
+        startLogging.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["trainingLogger.workoutIdentity"].waitForExistence(timeout: 5))
+    }
+
     private func checkpoint2(appearance: String) {
         launch(appearance: appearance, route: "training-logger")
         startWorkout(areas: ["chest", "core"], exercises: ["Bench Press", "Cable Fly", "Push-ups", "Planks"])

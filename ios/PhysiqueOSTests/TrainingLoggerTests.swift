@@ -41,6 +41,36 @@ final class TrainingLoggerTests: XCTestCase {
         return draft
     }
 
+    private func progressionExercise(
+        name: String,
+        measurement: TrainingLoggerMeasurement = .repsLoad,
+        defaultLoadType: String? = nil,
+        rows: [(reps: Double?, load: Double?, completed: Bool)],
+        recommendation: TrainingLoggerProgressionRecommendation?
+    ) -> TrainingLoggerDraftExercise {
+        TrainingLoggerDraftExercise(
+            id: "progression-\(name)", canonicalExerciseId: name.lowercased().replacingOccurrences(of: " ", with: "-"),
+            name: name, areaId: "test", measurement: measurement, defaultLoadType: defaultLoadType,
+            executionVariant: nil,
+            sets: rows.enumerated().map { offset, row in
+                TrainingLoggerDraftSet(
+                    id: "progression-\(name)-\(offset)", setNumber: offset + 1, reps: row.reps,
+                    load: row.load, loadType: row.load == nil && defaultLoadType == "bodyweight" ? "bodyweight" : "external_load",
+                    durationSeconds: nil, isCompleted: row.completed
+                )
+            },
+            previousPerformance: nil, progressionRecommendation: recommendation,
+            progressionChoice: recommendation == nil ? nil : .previous,
+            isProvisional: false, provenance: "test"
+        )
+    }
+
+    private func progressionDraft(_ exercise: TrainingLoggerDraftExercise) -> TrainingLoggerDraft {
+        var result = draft(areas: [exercise.areaId])
+        result.exercises = [exercise]
+        return result
+    }
+
     func testTrainingLoggerRouteKeepsServerLogDestinationContract() {
         XCTAssertEqual(AppDestination.trainingLogger.serverDestinationId, "log")
     }
@@ -240,14 +270,179 @@ final class TrainingLoggerTests: XCTestCase {
         let exerciseId = try XCTUnwrap(draft.exercises.first?.id)
         XCTAssertEqual(draft.exercises.first?.progressionRecommendation?.eyebrow, "Maintain current performance")
         XCTAssertEqual(draft.exercises.first?.progressionChoice, .previous)
+        XCTAssertEqual(draft.exercises.first?.canApplyProgressionSuggestion, true)
         draft.applyProgressionSuggestion(to: exerciseId)
         XCTAssertEqual(draft.exercises.first?.progressionChoice, .suggestion)
         XCTAssertEqual(draft.exercises.first?.sets.map(\.reps), [12, 12, 12])
         XCTAssertEqual(draft.exercises.first?.sets.map(\.load), [50, 50, 50])
+        XCTAssertEqual(draft.exercises.first?.canApplyProgressionSuggestion, false)
         draft.applyVariant(variant, to: exerciseId, catalog: config.exercises)
         XCTAssertNil(draft.exercises.first?.previousPerformance)
         XCTAssertNil(draft.exercises.first?.progressionRecommendation)
         XCTAssertNil(draft.exercises.first?.progressionChoice)
+        XCTAssertEqual(draft.exercises.first?.canApplyProgressionSuggestion, false)
+    }
+
+    func testMaintenanceSuggestionsDisableWhenTheyCannotChangeEditableRows() {
+        let hipThrust = TrainingLoggerProgressionRecommendation(
+            state: .maintain, eyebrow: "Maintain current performance", message: "Stay here.",
+            prescription: "75 lb x 15", suggestedLoad: 75, suggestedLoadType: "external_load",
+            suggestedReps: 15, suggestedUnit: "lb"
+        )
+        let legCurl = TrainingLoggerProgressionRecommendation(
+            state: .maintain, eyebrow: "Maintain current performance", message: "Stay here.",
+            prescription: "60 lb x 12", suggestedLoad: 60, suggestedLoadType: "external_load",
+            suggestedReps: 12, suggestedUnit: "lb"
+        )
+        let noTarget = TrainingLoggerProgressionRecommendation(
+            state: .maintain, eyebrow: "Maintain current performance", message: "No exact target.",
+            prescription: "", suggestedLoad: nil, suggestedLoadType: nil,
+            suggestedReps: nil, suggestedUnit: nil
+        )
+        for exercise in [
+            progressionExercise(
+                name: "Hip Thrusts", rows: [(15, 75, false), (15, 75, false), (15, 75, false)],
+                recommendation: hipThrust
+            ),
+            progressionExercise(
+                name: "Lying Leg Curls", rows: [(12, 60, false), (12, 60, false)],
+                recommendation: legCurl
+            ),
+            progressionExercise(
+                name: "Seated Hip Adductions", rows: [(15, 80, false)], recommendation: noTarget
+            ),
+        ] {
+            var workout = progressionDraft(exercise)
+            let before = workout
+            XCTAssertFalse(exercise.canApplyProgressionSuggestion, exercise.name)
+            workout.applyProgressionSuggestion(to: exercise.id)
+            XCTAssertEqual(workout, before, "A disabled suggestion must be a true no-op for \(exercise.name).")
+        }
+    }
+
+    func testActionableSuggestionChangesOnlyDifferingIncompleteRowsThenDisables() {
+        let recommendation = TrainingLoggerProgressionRecommendation(
+            state: .opportunity, eyebrow: "Progression opportunity", message: "Add a rep.",
+            prescription: "75 lb x 16", suggestedLoad: 75, suggestedLoadType: "external_load",
+            suggestedReps: 16, suggestedUnit: "lb"
+        )
+        var exercise = progressionExercise(
+            name: "Hip Thrusts",
+            rows: [(15, 70, true), (16, 75, false), (14, 75, false)],
+            recommendation: recommendation
+        )
+        exercise.sets[2].isManuallyEdited = true
+        let completed = exercise.sets[0]
+        var workout = progressionDraft(exercise)
+
+        XCTAssertTrue(workout.exercises[0].canApplyProgressionSuggestion)
+        workout.applyProgressionSuggestion(to: exercise.id)
+
+        XCTAssertEqual(workout.exercises[0].sets[0], completed, "Completed performance is immutable guidance history.")
+        XCTAssertEqual(workout.exercises[0].sets[1].reps, 16, "An already-matching row remains the same.")
+        XCTAssertEqual(workout.exercises[0].sets[2].reps, 16, "A manually edited incomplete row is intentionally replaced.")
+        XCTAssertEqual(workout.exercises[0].sets[2].load, 75)
+        XCTAssertEqual(workout.exercises[0].progressionChoice, .suggestion)
+        XCTAssertFalse(workout.exercises[0].canApplyProgressionSuggestion)
+    }
+
+    func testSuggestionNormalizesKilogramsToLoggerPoundsBeforeComparingAndApplying() {
+        let equivalent = TrainingLoggerProgressionRecommendation(
+            state: .maintain, eyebrow: "Maintain", message: "Equivalent units.", prescription: "",
+            suggestedLoad: 34.019_4, suggestedLoadType: "external_load", suggestedReps: 15, suggestedUnit: "kg"
+        )
+        var workout = progressionDraft(progressionExercise(
+            name: "Hip Thrusts", rows: [(15, 75, false)], recommendation: equivalent
+        ))
+        let before = workout
+        XCTAssertFalse(workout.exercises[0].canApplyProgressionSuggestion)
+        workout.applyProgressionSuggestion(to: workout.exercises[0].id)
+        XCTAssertEqual(workout, before)
+
+        workout.exercises[0].progressionRecommendation = .init(
+            state: .opportunity, eyebrow: "Progress", message: "Increase load.", prescription: "",
+            suggestedLoad: 36.287_4, suggestedLoadType: "external_load", suggestedReps: 15, suggestedUnit: "kg"
+        )
+        XCTAssertTrue(workout.exercises[0].canApplyProgressionSuggestion)
+        workout.applyProgressionSuggestion(to: workout.exercises[0].id)
+        XCTAssertEqual(workout.exercises[0].sets[0].load, 80)
+        XCTAssertFalse(workout.exercises[0].canApplyProgressionSuggestion)
+    }
+
+    func testBodyweightSuggestionComparesLoadSemanticsWithoutInventingLoad() {
+        let recommendation = TrainingLoggerProgressionRecommendation(
+            state: .opportunity, eyebrow: "Progress", message: "Add a rep.", prescription: "BW x 11",
+            suggestedLoad: nil, suggestedLoadType: "bodyweight", suggestedReps: 11, suggestedUnit: nil
+        )
+        var workout = progressionDraft(progressionExercise(
+            name: "Push-ups", measurement: .bodyweightReps, defaultLoadType: "bodyweight",
+            rows: [(10, nil, false)], recommendation: recommendation
+        ))
+
+        XCTAssertTrue(workout.exercises[0].canApplyProgressionSuggestion)
+        workout.applyProgressionSuggestion(to: workout.exercises[0].id)
+        XCTAssertEqual(workout.exercises[0].sets[0].reps, 11)
+        XCTAssertNil(workout.exercises[0].sets[0].load)
+        XCTAssertEqual(workout.exercises[0].sets[0].loadType, "bodyweight")
+        XCTAssertFalse(workout.exercises[0].canApplyProgressionSuggestion)
+    }
+
+    func testSuggestionActionabilityFailsClosedForMalformedAndUnsupportedTargets() {
+        let malformed: [TrainingLoggerProgressionRecommendation] = [
+            .init(state: .maintain, eyebrow: "Bad", message: "Missing reps.", prescription: "",
+                  suggestedLoad: 75, suggestedLoadType: "external_load", suggestedReps: nil, suggestedUnit: "lb"),
+            .init(state: .maintain, eyebrow: "Bad", message: "NaN reps.", prescription: "",
+                  suggestedLoad: 75, suggestedLoadType: "external_load", suggestedReps: .nan, suggestedUnit: "lb"),
+            .init(state: .maintain, eyebrow: "Bad", message: "Negative load.", prescription: "",
+                  suggestedLoad: -1, suggestedLoadType: "external_load", suggestedReps: 15, suggestedUnit: "lb"),
+            .init(state: .maintain, eyebrow: "Bad", message: "Unknown unit.", prescription: "",
+                  suggestedLoad: 75, suggestedLoadType: "external_load", suggestedReps: 15, suggestedUnit: "stone"),
+        ]
+        for recommendation in malformed {
+            let exercise = progressionExercise(name: "Invalid", rows: [(12, 50, false)], recommendation: recommendation)
+            var workout = progressionDraft(exercise)
+            let before = workout
+            XCTAssertFalse(exercise.canApplyProgressionSuggestion)
+            workout.applyProgressionSuggestion(to: exercise.id)
+            XCTAssertEqual(workout, before)
+        }
+
+        let timed = progressionExercise(
+            name: "Plank", measurement: .duration, defaultLoadType: "bodyweight",
+            rows: [(nil, nil, false)],
+            recommendation: .init(
+                state: .opportunity, eyebrow: "Bad", message: "Timed target.", prescription: "",
+                suggestedLoad: nil, suggestedLoadType: "bodyweight", suggestedReps: 1, suggestedUnit: nil
+            )
+        )
+        XCTAssertFalse(timed.canApplyProgressionSuggestion)
+    }
+
+    @MainActor
+    func testDisabledSuggestionCannotWriteThroughSessionAuthority() {
+        let recommendation = TrainingLoggerProgressionRecommendation(
+            state: .maintain, eyebrow: "Maintain", message: "Already exact.", prescription: "",
+            suggestedLoad: 75, suggestedLoadType: "external_load", suggestedReps: 15, suggestedUnit: "lb"
+        )
+        var initial = progressionDraft(progressionExercise(
+            name: "Hip Thrusts", rows: [(15, 75, false)], recommendation: recommendation
+        ))
+        initial.id = "no-op-progression"
+        initial.revision = 7
+        let store = MemoryTrainingLoggerDraftStore(draft: initial)
+        let authority = TrainingSessionAuthority(
+            store: store, environment: .founderProduction,
+            restPreferences: FixedTrainingRestPreferences(nil),
+            terminalLedger: MemoryTrainingSessionTerminalLedgerStore()
+        )
+
+        let outcome: TrainingSessionMutationOutcome = authority.edit(sessionId: initial.id) {
+            $0.applyProgressionSuggestion(to: initial.exercises[0].id)
+        }
+
+        XCTAssertEqual(outcome, .unchanged(revision: 7))
+        XCTAssertEqual(authority.draft(id: initial.id), initial)
+        XCTAssertEqual(store.draft, initial)
     }
 
     func testBodyweightDefaultExercisesAlwaysAllowOptionalPerSetExternalLoad() {
