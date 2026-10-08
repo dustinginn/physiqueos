@@ -1,10 +1,72 @@
 import XCTest
+import SwiftUI
 @testable import PhysiqueOS
 
 /// Regression coverage for the Home read-model contract introduced in this
 /// slice. These tests protect the boundary the Native V1 design depends on:
 /// native must decode and display server-owned values, never derive them.
 final class HomeReadModelTests: XCTestCase {
+
+    func testPriorityGridPacksOneThroughFiveItemsAndSpansEveryOddTail() {
+        XCTAssertEqual(TodaysFocusGridLayout.rows(itemCount: 1).map(Array.init), [[0]])
+        XCTAssertEqual(TodaysFocusGridLayout.rows(itemCount: 2).map(Array.init), [[0, 1]])
+        XCTAssertEqual(TodaysFocusGridLayout.rows(itemCount: 3).map(Array.init), [[0, 1], [2]])
+        XCTAssertEqual(TodaysFocusGridLayout.rows(itemCount: 4).map(Array.init), [[0, 1], [2, 3]])
+        XCTAssertEqual(TodaysFocusGridLayout.rows(itemCount: 5).map(Array.init), [[0, 1], [2, 3], [4]])
+        XCTAssertTrue(TodaysFocusGridLayout.rows(itemCount: 0).isEmpty)
+    }
+
+    func testPriorityGridUsesExpandedRowsForAccessibilityDynamicType() {
+        XCTAssertFalse(TodaysFocusGridLayout.usesSingleColumn(
+            itemCount: 3, containsExpandedContent: false, dynamicTypeSize: .large
+        ))
+        XCTAssertTrue(TodaysFocusGridLayout.usesSingleColumn(
+            itemCount: 3, containsExpandedContent: false, dynamicTypeSize: .accessibility1
+        ))
+        XCTAssertTrue(TodaysFocusGridLayout.usesSingleColumn(
+            itemCount: 2, containsExpandedContent: true, dynamicTypeSize: .large
+        ))
+        XCTAssertTrue(TodaysFocusGridLayout.usesSingleColumn(
+            itemCount: 1, containsExpandedContent: false, dynamicTypeSize: .large
+        ))
+    }
+
+    func testMorningRemovesOnlyInlineCompleteWhileKeepingNavigationAndProjectedSkip() {
+        var morning = Self.executionContextItem(title: "Morning Weigh-In", time: "05:30", dose: nil)
+        morning.id = "reminder_morning_weight"
+        morning.routePriorityId = "reminder_morning_weight"
+        morning.executionItemId = "execution_morning_weigh_in"
+        morning.continueActionDestination = .checkIn(checkInType: "morning")
+        morning.notificationAction?.workflow = "morning_check_in"
+        morning.notificationAction?.skipCommand = .init(
+            commandType: ProductionCommandType.skipPriority,
+            expectedVersion: 7,
+            payload: .init(priorityId: "reminder_morning_weight", occurrenceDate: morning.date)
+        )
+
+        XCTAssertTrue(morning.isMorningWeighIn)
+        XCTAssertFalse(morning.allowsHomeInlineCompletion, "Morning completion belongs only to Morning Weigh-In submit.")
+        XCTAssertEqual(morning.destination, .checkIn(checkInType: "morning"))
+        XCTAssertNotNil(morning.canonicalSkipCommand, "The separate canonical Skip capability remains intact.")
+    }
+
+    func testDexaAppointmentRejectsCompleteAndSkipCapabilitiesFromOlderPayloads() {
+        var dexa = Self.executionContextItem(title: "DEXA tomorrow", time: "07:30", dose: nil)
+        dexa.id = "dexa-appointment:2026-10-09:day-before"
+        dexa.routePriorityId = dexa.id
+        dexa.executionItemId = "execution_next_dexa"
+        dexa.notificationAction?.workflow = "dexa_appointment"
+        dexa.notificationAction?.skipCommand = .init(
+            commandType: ProductionCommandType.skipPriority,
+            expectedVersion: 4,
+            payload: .init(priorityId: dexa.id, occurrenceDate: dexa.date)
+        )
+
+        XCTAssertTrue(dexa.isDexaAppointmentReminder)
+        XCTAssertFalse(dexa.allowsHomeInlineCompletion)
+        XCTAssertNil(dexa.canonicalSkipCommand, "An old Server command cannot turn a reminder into a mutation.")
+        XCTAssertEqual(PriorityOccurrenceCapabilities.resolve(dexa.notificationAction), .openOnly)
+    }
 
     func testHomePriorityAcknowledgementHasStableTerminalIdentityAndCopy() {
         let completed = HomePriorityAcknowledgement(occurrenceID: "priority-1", kind: .completed)

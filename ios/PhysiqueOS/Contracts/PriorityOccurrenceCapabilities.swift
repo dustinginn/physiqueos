@@ -48,6 +48,12 @@ struct PriorityOccurrenceCapabilities: Equatable, Sendable {
 
     static func resolve(_ action: PriorityNotificationAction?) -> Self {
         guard let action else { return .openOnly }
+        // DEXA appointment stages are informational/navigation reminders.
+        // Keep the notification itself, but never expose Complete or Skip
+        // even when an older Server payload carries a generic skip command.
+        if action.workflow == "dexa_appointment" || action.workflow == "dexa_evidence" {
+            return .openOnly
+        }
         return Self(completion: completion(action), skipAllowed: skipAllowed(action))
     }
 

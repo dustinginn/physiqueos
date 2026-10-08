@@ -37,7 +37,7 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
             ("morning", ["priorityDetail.logWeight", "priorityDetail.markSkipped"], ["priorityDetail.markComplete"]),
             ("morning-completed", ["priorityDetail.viewWeight"], ["priorityDetail.markComplete", "priorityDetail.markSkipped", "priorityDetail.logWeight"]),
             ("photos", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner", "priorityDetail.markSkipped"], ["priorityDetail.markComplete"]),
-            ("dexa", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner", "priorityDetail.markSkipped"], ["priorityDetail.markComplete"]),
+            ("dexa", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
             ("completed", ["priorityDetail.completed"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
             ("skipped", ["priorityDetail.skipped"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
             ("setup", ["priorityDetail.reviewSupport"], ["priorityDetail.markComplete"]),
@@ -161,6 +161,46 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         launch(appearance: "light")
         assertLockedContentAndGeometry()
         capture("foam-rolling-simulator-light")
+    }
+
+    func testHomeOddFinalPrioritySpansTheBottomRowInDarkAndMineralLight() {
+        for appearance in ["dark", "light"] {
+            launchHomeParity(appearance: appearance)
+            let morning = app.descendants(matching: .any)["home.priority.review-morning-weight"]
+            let dexa = app.descendants(matching: .any)["home.priority.dexa-appointment:2026-10-05:day-before"]
+            let foam = app.descendants(matching: .any)["home.priority.review-foam"]
+            XCTAssertTrue(morning.waitForExistence(timeout: 5), appearance)
+            XCTAssertTrue(dexa.exists, appearance)
+            XCTAssertTrue(foam.exists, appearance)
+            XCTAssertEqual(morning.frame.minY, dexa.frame.minY, accuracy: 2, appearance)
+            XCTAssertGreaterThan(foam.frame.minY, morning.frame.maxY, appearance)
+            XCTAssertGreaterThan(foam.frame.width, morning.frame.width * 1.7, appearance)
+            XCTAssertTrue(app.staticTexts["7:15 PM · Lower-body recovery and mobility"].exists)
+        }
+    }
+
+    func testHomeAccessibilityDynamicTypeUsesReadableSingleColumnPriorities() {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance-review.value", "dark",
+            "-physiqueos.appearance-review.route", "home",
+            "-physiqueos.redesign-review",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+        ]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["4 weeks"].waitForExistence(timeout: 8))
+        let ids = [
+            "home.priority.review-morning-weight",
+            "home.priority.dexa-appointment:2026-10-05:day-before",
+            "home.priority.review-foam",
+        ]
+        let tiles = ids.map { app.descendants(matching: .any)[$0] }
+        XCTAssertTrue(tiles.allSatisfy(\.exists))
+        XCTAssertGreaterThan(tiles[1].frame.minY, tiles[0].frame.maxY)
+        XCTAssertGreaterThan(tiles[2].frame.minY, tiles[1].frame.maxY)
+        XCTAssertEqual(tiles[0].frame.width, tiles[1].frame.width, accuracy: 2)
+        XCTAssertEqual(tiles[1].frame.width, tiles[2].frame.width, accuracy: 2)
     }
 
     func testAppearanceControlAppliesImmediateNonColorSelectionState() {

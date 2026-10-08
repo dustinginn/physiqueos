@@ -298,6 +298,7 @@ struct HomeView: View {
                         skippingIDs: skippingPriorityIDs,
                         onTap: onNavigate,
                         onComplete: { occurrence in
+                        guard occurrence.allowsHomeInlineCompletion else { return }
                         guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: environment.nativeAuthority)) != nil else { return }
                         guard !completingPriorityIDs.contains(occurrence.id),
                               !skippingPriorityIDs.contains(occurrence.id) else { return }
