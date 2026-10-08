@@ -45,6 +45,7 @@ extension WatchWorkoutProjection {
                     loadText: Self.loadText(row.set),
                     repsText: Self.number(row.set.reps),
                     durationText: Self.durationText(row),
+                    variantLabel: row.exercise?.variantLabel,
                     supersetLabel: row.exercise?.supersetLabel,
                     partnerName: row.exercise?.supersetPartnerName,
                     isCompletionTarget: canComplete && row.isCompletionTarget

@@ -371,6 +371,20 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
                        "Missing values stay an honest em dash.")
     }
 
+    // MARK: Build 92 — phone-selected execution variant (display only)
+
+    func testRowShowsThePhoneSelectedVariantLabelAndOlderPhonesDecodeUnchanged() throws {
+        var row = try XCTUnwrap(try fixture("normal").rows.first(where: \.isCompletionTarget))
+        XCTAssertNil(row.variantLabel, "An older phone omits the label")
+        XCTAssertEqual(WatchExecutionValues.rowTitle(row), row.exerciseName)
+        row.variantLabel = "Static Hold"
+        row.supersetLabel = "A"
+        XCTAssertEqual(WatchExecutionValues.rowTitle(row), "A · \(row.exerciseName) · Static Hold")
+        XCTAssertEqual(WatchExecutionValues(row: row).primaryLabel, "REPS", "A variant never changes the set's reps/load tiles")
+        let decoded = try JSONDecoder().decode(WatchWorkoutProjection.Row.self, from: JSONEncoder().encode(row))
+        XCTAssertEqual(decoded.variantLabel, "Static Hold")
+    }
+
     @MainActor
     func testPhoneReviewDisablesCompleteSetAndNamesTheReason() throws {
         let (store, _) = makeStore("laneA.review")

@@ -31,12 +31,19 @@ struct TrainingLoggerArea: Codable, Equatable, Identifiable {
 
 struct TrainingLoggerConfiguration: Codable, Equatable {
     var areas: [TrainingLoggerArea]
+    /// Legacy global list. Build 92 never offers it as choices: choices are
+    /// per exercise (`TrainingLoggerCatalogExercise.executionVariants`).
     var variants: [TrainingExecutionVariant]
     var exercises: [TrainingLoggerCatalogExercise]
     /// Server-owned learned category suggestion derived from confirmed
     /// canonical Training history. Optional keeps older fixtures and
     /// production payloads forward-decodable.
     var categorySuggestion: TrainingLoggerCategorySuggestion? = nil
+    /// True only when the Server projected `executionVariantsByExercise`
+    /// (the Build 92 variant contract). An older Server omits it, which means
+    /// Ordinary only and no Create Variant. Optional so older fixtures and
+    /// saved configurations decode unchanged.
+    var supportsExecutionVariantCreation: Bool? = nil
 }
 
 struct TrainingLoggerCategorySuggestion: Codable, Equatable, Identifiable {
@@ -84,6 +91,14 @@ struct TrainingLoggerCatalogExercise: Codable, Equatable, Identifiable {
     /// (`contextualProgressionRecommendations`). Optional so older payloads,
     /// fixtures and saved configurations decode unchanged.
     var contextualProgressionRecommendations: [TrainingLoggerContextualProgressionRecommendation]? = nil
+    /// Server-owned canonical execution-variant choices for exactly this
+    /// exercise (Build 92). `nil`/empty means Ordinary only; never inferred
+    /// from history.
+    var executionVariants: [TrainingExecutionVariantChoice]? = nil
+
+    var executionVariantChoices: [TrainingExecutionVariantChoice] {
+        (executionVariants ?? []).filter(\.isSelectable)
+    }
 
     /// The Server recommendation for exactly this execution/relationship
     /// context, or `nil`. Native never derives progression: standalone uses
@@ -864,7 +879,8 @@ extension TrainingLoggerDraft {
             in: item.historyOccurrences,
             before: workoutDate,
             executionVariant: variant,
-            relationship: relationship
+            relationship: relationship,
+            variantChoices: item.executionVariantChoices
         ) else { return nil }
         let context = [occurrence.exercise.executionVariant?.label, occurrence.relationship?.label].compactMap { $0 }.joined(separator: " · ")
         return .init(

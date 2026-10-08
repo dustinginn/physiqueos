@@ -2483,6 +2483,33 @@ final class Build87SupersetHistoryContextTests: XCTestCase {
         XCTAssertNotNil(target.supersetLabel)
     }
 
+    /// Build 92: the phone-selected canonical variant reaches the Watch as a
+    /// display-only label; the set's own values are unchanged.
+    func testSelectedExecutionVariantLabelReachesTheWatchProjectionThroughTheAuthority() throws {
+        let catalog = try catalog()
+        var initial = freshDraft()
+        initial.id = "session-b92-variant"
+        initial.addExercise(catalog[0])
+        let store = Build83FinishLifecycleTests.Store([initial])
+        let authority = TrainingSessionAuthority(
+            store: store, environment: .founderProduction,
+            restPreferences: FixedTrainingRestPreferences(nil),
+            terminalLedger: MemoryTrainingSessionTerminalLedgerStore(),
+            now: { Date(timeIntervalSince1970: 1_790_000_000) }
+        )
+        let exerciseId = initial.exercises[0].id
+        let before = try XCTUnwrap(WatchWorkoutProjection.make(draft: initial, authority: authority, now: Date(timeIntervalSince1970: 1_790_000_000)))
+        XCTAssertNil(before.rows.first { $0.isCompletionTarget }?.variantLabel)
+        let selection = TrainingExecutionVariant(key: "static_hold", label: "Static Hold", rawLabel: "Static Hold", variantId: "tev_static_hold_fixture")
+        _ = authority.edit(sessionId: "session-b92-variant") { $0.applyVariant(selection, to: exerciseId, catalog: catalog) }
+        let draft = try XCTUnwrap(authority.draft(id: "session-b92-variant"))
+        XCTAssertEqual(draft.exercises[0].sets, initial.exercises[0].sets)
+        let projection = try XCTUnwrap(WatchWorkoutProjection.make(draft: draft, authority: authority, now: Date(timeIntervalSince1970: 1_790_000_000)))
+        let target = try XCTUnwrap(projection.rows.first { $0.isCompletionTarget })
+        XCTAssertEqual(target.variantLabel, "Static Hold")
+        XCTAssertEqual(target.repsText, before.rows.first { $0.isCompletionTarget }?.repsText)
+    }
+
     // MARK: 2-B contextual row refill (Founder-approved 2026-10-05)
 
     /// Adds a third exercise with only standalone history (no superset
@@ -2668,5 +2695,256 @@ final class Build87SupersetHistoryContextTests: XCTestCase {
         XCTAssertEqual(target.repsText, "15")
         XCTAssertEqual(target.loadText?.contains("80"), true)
         XCTAssertGreaterThan(applied.currentRevision, paired.currentRevision)
+    }
+}
+
+
+// MARK: - Build 92 Training Execution Variants (Create + Select)
+
+final class TrainingExecutionVariantTests: XCTestCase {
+    private static let staticHold = TrainingExecutionVariantChoice(
+        variantId: "tev_spider_static_hold", key: "static_hold", label: "Static Hold",
+        legacyKeys: ["static_hold"], status: "active", provenance: "legacy_seed",
+        selection: TrainingExecutionVariant(key: "static_hold", label: "Static Hold", rawLabel: "Static Hold", variantId: "tev_spider_static_hold")
+    )
+    private static let slowEccentric = TrainingExecutionVariantChoice(
+        variantId: "tev_spider_slow_eccentric", key: "slow_eccentric", label: "Slow Eccentric",
+        legacyKeys: [], status: "active", provenance: "user_created",
+        selection: TrainingExecutionVariant(key: "slow_eccentric", label: "Slow Eccentric", rawLabel: "Slow Eccentric", variantId: "tev_spider_slow_eccentric")
+    )
+    private static let legacyStaticHold = TrainingExecutionVariant(key: "static_hold", label: "Static Hold", rawLabel: "static hold")
+
+    private func record(_ date: String, load: Double, reps: Double, variant: TrainingExecutionVariant? = nil) -> TrainingLoggerHistoryRecord {
+        TrainingLoggerHistoryRecord(
+            sessionId: "session-\(date)", workoutDate: date, executionVariant: variant, relationship: nil,
+            sets: [TrainingSet(setNumber: 1, reps: reps, weight: load, weightUnit: "lb", durationSeconds: nil, loadType: "external_load", setType: nil)]
+        )
+    }
+
+    private func spider(choices: [TrainingExecutionVariantChoice]? = [staticHold]) -> TrainingLoggerCatalogExercise {
+        TrainingLoggerCatalogExercise(
+            canonicalExerciseId: "spider_curl", name: "Spider Curls", areaId: "biceps", equipment: nil,
+            measurement: .repsLoad, previouslyPerformed: true, inMyLibrary: true,
+            history: [
+                record("2026-09-01", load: 100, reps: 10),
+                record("2026-09-05", load: 35, reps: 12, variant: Self.legacyStaticHold),
+            ],
+            progressionRecommendation: nil, executionVariants: choices
+        )
+    }
+
+    private func bench() -> TrainingLoggerCatalogExercise {
+        TrainingLoggerCatalogExercise(
+            canonicalExerciseId: "bench_press", name: "Bench Press", areaId: "chest", equipment: nil,
+            measurement: .repsLoad, previouslyPerformed: false, inMyLibrary: true, history: [], progressionRecommendation: nil
+        )
+    }
+
+    func testIdentityIsStableAcrossLegacyKeysAndSelectionsAndLegacyWithoutChoices() {
+        let choices = [Self.staticHold, Self.slowEccentric]
+        XCTAssertEqual(TrainingExecutionVariantIdentity.identity(of: nil, choices: choices), "ordinary")
+        XCTAssertEqual(TrainingExecutionVariantIdentity.identity(of: Self.legacyStaticHold, choices: choices), "tev_spider_static_hold")
+        XCTAssertEqual(TrainingExecutionVariantIdentity.identity(of: Self.staticHold.selection, choices: choices), "tev_spider_static_hold")
+        // No choices: exactly the pre-Build-92 key partition.
+        XCTAssertEqual(TrainingExecutionVariantIdentity.identity(of: Self.staticHold.selection, choices: []), "static_hold")
+        let superSet = TrainingExecutionVariant(key: "super_set", label: "Super Set", rawLabel: "super set")
+        XCTAssertEqual(TrainingExecutionVariantIdentity.identity(of: superSet, choices: choices), "super_set")
+        var reserved = Self.staticHold
+        reserved.key = "super_set"
+        XCTAssertFalse(reserved.isSelectable, "A Super Set choice is never selectable")
+        var retired = Self.staticHold
+        retired.status = "retired"
+        XCTAssertFalse(retired.isSelectable)
+    }
+
+    func testPreviousPerformanceUsesStableIdentityKeepsSetsAndStaysPartitionedFromOrdinary() throws {
+        let catalog = [spider(choices: [Self.staticHold, Self.slowEccentric])]
+        var draft = TrainingLoggerDraft.fresh(mode: .live, workoutDate: "2026-09-10")
+        draft.addExercise(catalog[0])
+        let id = try XCTUnwrap(draft.exercises.first?.id)
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.sets.first?.weight, 100, "Ordinary history only")
+        draft.exercises[0].sets[0].reps = 9
+        draft.exercises[0].sets[0].load = 90
+        let setsBefore = draft.exercises[0].sets
+
+        draft.applyVariant(Self.staticHold.selection, to: id, catalog: catalog)
+        XCTAssertEqual(draft.exercises[0].executionVariant?.variantId, "tev_spider_static_hold")
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.workoutDate, "2026-09-05", "Legacy Static Hold history resolves to the definition")
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.sets.first?.weight, 35)
+        XCTAssertEqual(draft.exercises[0].sets, setsBefore, "Switching a variant never clears or rewrites sets")
+
+        draft.applyVariant(Self.slowEccentric.selection, to: id, catalog: catalog)
+        XCTAssertNil(draft.exercises[0].previousPerformance, "A new variant borrows no Ordinary or Static Hold evidence")
+        XCTAssertNil(draft.exercises[0].progressionRecommendation)
+
+        draft.applyVariant(nil, to: id, catalog: catalog)
+        XCTAssertEqual(draft.exercises[0].previousPerformance?.sets.first?.weight, 100)
+        XCTAssertEqual(draft.exercises[0].sets, setsBefore)
+    }
+
+    func testSelectedVariantSurvivesDraftPersistenceAndLegacyDraftsDecode() throws {
+        var draft = TrainingLoggerDraft.fresh(mode: .live, workoutDate: "2026-09-10")
+        draft.addExercise(spider())
+        draft.applyVariant(Self.staticHold.selection, to: draft.exercises[0].id, catalog: [spider()])
+        let restored = try JSONDecoder().decode(TrainingLoggerDraft.self, from: JSONEncoder().encode(draft))
+        XCTAssertEqual(restored.exercises[0].executionVariant, Self.staticHold.selection)
+        let encoded = try XCTUnwrap(String(data: JSONEncoder().encode(Self.staticHold.selection), encoding: .utf8))
+        XCTAssertTrue(encoded.contains("\"variantId\":\"tev_spider_static_hold\""), "The finish payload carries the stable identity")
+        let legacy = try JSONDecoder().decode(TrainingExecutionVariant.self, from: Data(#"{"key":"static_hold","label":"Static Hold","rawLabel":"Static Hold"}"#.utf8))
+        XCTAssertNil(legacy.variantId)
+        XCTAssertFalse(String(data: try JSONEncoder().encode(legacy), encoding: .utf8)!.contains("variantId"), "Ordinary/legacy writes are unchanged")
+        let oldConfiguration = try JSONDecoder().decode(
+            TrainingLoggerConfiguration.self,
+            from: Data(#"{"areas":[],"variants":[],"exercises":[]}"#.utf8)
+        )
+        XCTAssertNil(oldConfiguration.supportsExecutionVariantCreation)
+    }
+
+    @MainActor
+    func testChoicesArePerExerciseAndCreateRequiresTheServerContract() async throws {
+        let writer = VariantCatalogWriter()
+        let viewModel = try await workout(exercises: [spider(), bench()], writer: writer, supportsCreation: true)
+        let spiderExercise = try XCTUnwrap(viewModel.draft?.exercises.first { $0.canonicalExerciseId == "spider_curl" })
+        let benchExercise = try XCTUnwrap(viewModel.draft?.exercises.first { $0.canonicalExerciseId == "bench_press" })
+        XCTAssertEqual(viewModel.variantChoices(for: spiderExercise).map(\.variantId), ["tev_spider_static_hold"])
+        XCTAssertEqual(viewModel.variantChoices(for: benchExercise), [], "One exercise's variants never leak to another")
+        XCTAssertTrue(viewModel.canCreateVariant(for: benchExercise))
+
+        let oldServer = try await workout(exercises: [spider(choices: nil)], writer: writer, supportsCreation: nil)
+        let oldSpider = try XCTUnwrap(oldServer.draft?.exercises.first)
+        XCTAssertEqual(oldServer.variantChoices(for: oldSpider), [])
+        XCTAssertFalse(oldServer.canCreateVariant(for: oldSpider), "An older Server offers Ordinary only, no Create")
+
+        let sandbox = try await workout(exercises: [spider()], writer: writer, supportsCreation: true, authority: .sandbox)
+        XCTAssertFalse(sandbox.canCreateVariant(for: try XCTUnwrap(sandbox.draft?.exercises.first)), "No local-only variants")
+    }
+
+    @MainActor
+    func testCreatedVariantIsInsertedForThatExerciseAndSelectedImmediately() async throws {
+        let writer = VariantCatalogWriter()
+        writer.results = [.success(TrainingExecutionVariantCreation(status: "created", choice: Self.slowEccentric))]
+        let viewModel = try await workout(exercises: [spider(), bench()], writer: writer, supportsCreation: true)
+        let target = try XCTUnwrap(viewModel.draft?.exercises.first { $0.canonicalExerciseId == "spider_curl" })
+        viewModel.beginCreatingVariant(for: target)
+        await viewModel.submitNewVariant(name: "  Slow   Eccentric ")
+        XCTAssertEqual(writer.requests.map(\.displayName), ["Slow Eccentric"])
+        XCTAssertEqual(writer.requests.map(\.canonicalExerciseId), ["spider_curl"])
+        XCTAssertNil(viewModel.variantCreation, "The sheet closes on success")
+        let selected = try XCTUnwrap(viewModel.draft?.exercises.first { $0.id == target.id })
+        XCTAssertEqual(selected.executionVariant?.variantId, "tev_spider_slow_eccentric")
+        XCTAssertEqual(viewModel.variantChoices(for: selected).map(\.label), ["Slow Eccentric", "Static Hold"])
+        let benchExercise = try XCTUnwrap(viewModel.draft?.exercises.first { $0.canonicalExerciseId == "bench_press" })
+        XCTAssertEqual(viewModel.variantChoices(for: benchExercise), [])
+    }
+
+    @MainActor
+    func testExistingOrReactivatedVariantIsReusedNotDuplicated() async throws {
+        let writer = VariantCatalogWriter()
+        writer.results = [.success(TrainingExecutionVariantCreation(status: "already_exists", choice: Self.staticHold))]
+        let viewModel = try await workout(exercises: [spider()], writer: writer, supportsCreation: true)
+        let target = try XCTUnwrap(viewModel.draft?.exercises.first)
+        viewModel.beginCreatingVariant(for: target)
+        await viewModel.submitNewVariant(name: "static hold")
+        let selected = try XCTUnwrap(viewModel.draft?.exercises.first)
+        XCTAssertEqual(selected.executionVariant?.variantId, "tev_spider_static_hold")
+        XCTAssertEqual(viewModel.variantChoices(for: selected).map(\.variantId), ["tev_spider_static_hold"], "No duplicate choice")
+    }
+
+    @MainActor
+    func testFailedCreateKeepsPriorSelectionAndRetrySucceeds() async throws {
+        let writer = VariantCatalogWriter()
+        writer.results = [
+            .failure(URLError(.notConnectedToInternet)),
+            .failure(TrainingExecutionVariantRejection(code: "TRAINING_EXECUTION_VARIANT_NAME_RESERVED", message: "Ordinary is the default execution and is always available.")),
+            .success(TrainingExecutionVariantCreation(status: "created", choice: Self.slowEccentric)),
+        ]
+        let viewModel = try await workout(exercises: [spider()], writer: writer, supportsCreation: true)
+        let target = try XCTUnwrap(viewModel.draft?.exercises.first)
+        viewModel.selectVariant(Self.staticHold, for: target.id)
+        viewModel.beginCreatingVariant(for: target)
+
+        await viewModel.submitNewVariant(name: "Slow Eccentric")
+        XCTAssertNotNil(viewModel.variantCreation, "The sheet stays open for a truthful retry")
+        XCTAssertTrue(viewModel.variantCreationMessage?.contains("hasn't changed") == true)
+        XCTAssertEqual(viewModel.draft?.exercises.first?.executionVariant?.variantId, "tev_spider_static_hold")
+
+        await viewModel.submitNewVariant(name: "Ordinary")
+        XCTAssertEqual(viewModel.variantCreationMessage, "Ordinary is the default execution and is always available.")
+        XCTAssertEqual(viewModel.draft?.exercises.first?.executionVariant?.variantId, "tev_spider_static_hold")
+
+        await viewModel.submitNewVariant(name: "Slow Eccentric")
+        XCTAssertNil(viewModel.variantCreation)
+        XCTAssertNil(viewModel.variantCreationMessage)
+        XCTAssertEqual(viewModel.draft?.exercises.first?.executionVariant?.variantId, "tev_spider_slow_eccentric")
+        XCTAssertEqual(writer.requests.count, 3)
+
+        viewModel.beginCreatingVariant(for: try XCTUnwrap(viewModel.draft?.exercises.first))
+        await viewModel.submitNewVariant(name: String(repeating: "x", count: 41))
+        XCTAssertEqual(writer.requests.count, 3, "Over-length names never reach the Server")
+        XCTAssertNotNil(viewModel.variantCreationMessage)
+    }
+
+    @MainActor
+    func testCreateDoesNotSelectOnAnExerciseRemovedWhileTheRequestWasInFlight() async throws {
+        let writer = VariantCatalogWriter()
+        writer.results = [.success(TrainingExecutionVariantCreation(status: "created", choice: Self.slowEccentric))]
+        let viewModel = try await workout(exercises: [spider(), bench()], writer: writer, supportsCreation: true)
+        let target = try XCTUnwrap(viewModel.draft?.exercises.first { $0.canonicalExerciseId == "spider_curl" })
+        let catalog = viewModel.configuration?.exercises ?? []
+        writer.onCreate = { @MainActor in viewModel.update { $0.removeExercise(id: target.id, catalog: catalog) } }
+        viewModel.beginCreatingVariant(for: target)
+        await viewModel.submitNewVariant(name: "Slow Eccentric")
+        XCTAssertNil(viewModel.draft?.exercises.first { $0.id == target.id })
+        XCTAssertNil(viewModel.draft?.exercises.first { $0.canonicalExerciseId == "bench_press" }?.executionVariant, "Never applied to another exercise")
+        XCTAssertEqual(viewModel.configuration?.exercises.first { $0.canonicalExerciseId == "spider_curl" }?.executionVariantChoices.map(\.variantId),
+                       ["tev_spider_slow_eccentric", "tev_spider_static_hold"], "The canonical choice is still available next time")
+    }
+
+    // MARK: Helpers
+
+    @MainActor
+    private func workout(
+        exercises: [TrainingLoggerCatalogExercise],
+        writer: VariantCatalogWriter,
+        supportsCreation: Bool?,
+        authority: NativeAPIEnvironment = .founderProduction
+    ) async throws -> TrainingLoggerViewModel {
+        let viewModel = TrainingLoggerViewModel(
+            api: VariantLoggerAPI(exercises: exercises, supportsCreation: supportsCreation),
+            catalogWriteAPI: writer, draftStore: MemoryTrainingLoggerDraftStore(), authority: authority
+        )
+        await viewModel.load()
+        viewModel.start(mode: .live)
+        let catalog = viewModel.configuration?.exercises ?? []
+        viewModel.update { draft in catalog.forEach { draft.addExercise($0) } }
+        return viewModel
+    }
+
+    private struct VariantLoggerAPI: TrainingLoggerAPI {
+        var exercises: [TrainingLoggerCatalogExercise]
+        var supportsCreation: Bool?
+        func fetchConfiguration() async throws -> TrainingLoggerConfiguration {
+            TrainingLoggerConfiguration(
+                areas: [TrainingLoggerArea(id: "biceps", label: "Biceps"), TrainingLoggerArea(id: "chest", label: "Chest")],
+                variants: [], exercises: exercises, supportsExecutionVariantCreation: supportsCreation
+            )
+        }
+    }
+
+    private final class VariantCatalogWriter: TrainingExerciseCatalogWriteAPI, @unchecked Sendable {
+        var results: [Result<TrainingExecutionVariantCreation, Error>] = []
+        var onCreate: (@MainActor () -> Void)?
+        private(set) var requests: [(canonicalExerciseId: String, displayName: String)] = []
+
+        func addToMyLibrary(canonicalExerciseId: String) async throws {}
+        func createExercise(
+            canonicalName: String, primaryMuscleGroupId: String, equipment: String?, aliases: [String]
+        ) async throws -> CreateCanonicalExerciseOutcome { .created(canonicalExerciseId: "unused") }
+        func createExecutionVariant(canonicalExerciseId: String, displayName: String) async throws -> TrainingExecutionVariantCreation {
+            requests.append((canonicalExerciseId, displayName))
+            if let onCreate { await onCreate() }
+            guard !results.isEmpty else { throw URLError(.badServerResponse) }
+            return try results.removeFirst().get()
+        }
     }
 }

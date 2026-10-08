@@ -26,6 +26,7 @@ enum ProductionCommandType {
     static let saveNutritionStrategy = "operating-plan.nutrition-strategy.save.v1"
     static let addToMyLibrary = "training-catalog.my-library.add.v1"
     static let createCanonicalExercise = "training-catalog.exercise.create.v1"
+    static let createTrainingExecutionVariant = "training-catalog.execution-variant.create.v1"
     static let saveTrainingStrategy = "operating-plan.training-strategy.save.v1"
     static let savePeptideSupport = "operating-plan.peptide-support.save.v1"
     static let saveSupplementSupport = "operating-plan.supplement-support.save.v1"

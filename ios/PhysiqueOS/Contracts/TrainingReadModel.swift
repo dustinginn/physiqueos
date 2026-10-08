@@ -468,10 +468,69 @@ struct TrainingExerciseOccurrence: Codable, Equatable, Identifiable {
 /// captured text ("Static Hold", "3-Second Pause", "Slow Eccentric" are
 /// real examples from the web's own test fixtures), not a closed enum;
 /// native must not constrain this to a fixed case set.
+///
+/// Build 92: a variant selected from a Server-owned canonical definition
+/// also carries that definition's immutable `variantId`. It is optional so
+/// every historical occurrence, older saved draft and older Server payload
+/// decodes unchanged; the legacy `key`/`label`/`rawLabel` shape stays the
+/// compatibility contract.
 struct TrainingExecutionVariant: Codable, Equatable {
     var key: String
     var label: String
     var rawLabel: String
+    var variantId: String? = nil
+}
+
+/// One Server-projected execution-variant choice for exactly one canonical
+/// exercise (`training-logger` `executionVariantsByExercise`, Build 92). V1
+/// variants inherit the exercise's normal sets/reps/load semantics; there is
+/// no timing or per-variant set schema. Native never invents choices: an
+/// exercise without projected choices offers Ordinary only.
+struct TrainingExecutionVariantChoice: Codable, Equatable, Identifiable {
+    var variantId: String
+    var key: String
+    var label: String
+    var legacyKeys: [String]? = nil
+    var status: String? = nil
+    var provenance: String? = nil
+    /// The exact `executionVariant` to select and send at finish.
+    var selection: TrainingExecutionVariant
+
+    var id: String { variantId }
+
+    /// A choice is usable only when it is an active canonical definition
+    /// whose selection names itself, and never the Ordinary sentinel or the
+    /// misfiled legacy "Super Set" relationship context.
+    var isSelectable: Bool {
+        variantId.hasPrefix("tev_")
+            && selection.variantId == variantId
+            && !key.isEmpty
+            && (status ?? "active") == "active"
+            && !TrainingExecutionVariantIdentity.reservedKeys.contains(key)
+    }
+}
+
+/// Mirrors the Server's single occurrence -> variant-context resolver
+/// (`createTrainingExecutionVariantResolver`) for the one exercise whose
+/// `choices` are supplied: a `variantId` or key/legacy key of a choice
+/// resolves to that choice's stable id; anything else stays its legacy key;
+/// no variant is Ordinary. With no choices it is exactly the pre-Build-92
+/// key comparison, so existing partitions never move.
+enum TrainingExecutionVariantIdentity {
+    static let ordinary = "ordinary"
+    static let reservedKeys: Set<String> = ["ordinary", "super_set", "super_sets", "superset", "supersets"]
+
+    static func identity(of variant: TrainingExecutionVariant?, choices: [TrainingExecutionVariantChoice]) -> String {
+        guard let variant, variant.key != ordinary else { return ordinary }
+        if let variantId = variant.variantId, choices.contains(where: { $0.variantId == variantId }) {
+            return variantId
+        }
+        if let choice = choices.first(where: { $0.key == variant.key })
+            ?? choices.first(where: { ($0.legacyKeys ?? []).contains(variant.key) }) {
+            return choice.variantId
+        }
+        return variant.key
+    }
 }
 
 /// Mirrors `normalizeTrainingSets` (`trainingSessionEvidence.js:3153-3212`)

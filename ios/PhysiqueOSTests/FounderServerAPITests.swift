@@ -519,6 +519,115 @@ final class FounderServerAPITests: XCTestCase {
         let requests = await transport.requests
         XCTAssertEqual(requests.count, 2, "A duplicate response must not silently add membership or choose a candidate.")
     }
+    // MARK: Build 92 Training Execution Variants
+
+    private static let staticHoldChoiceJSON = #"{"variantId":"tev_spider_static_hold","key":"static_hold","label":"Static Hold","legacyKeys":["static_hold"],"status":"active","provenance":"legacy_seed","selection":{"variantId":"tev_spider_static_hold","key":"static_hold","label":"Static Hold","rawLabel":"Static Hold"}}"#
+
+    private func variantLoggerJSON(projection: String?) -> String {
+        var json = productionTrainingLoggerJSON(exerciseID: "spider_curl", muscleGroup: "Biceps")
+            .replacingOccurrences(
+                of: #""exercises":[{"id":"exercise-occurrence-canonical","canonicalExerciseId":"spider_curl","#,
+                with: #""exercises":[{"id":"exercise-occurrence-canonical","canonicalExerciseId":"spider_curl","executionVariant":{"key":"static_hold","label":"Static Hold","rawLabel":"static hold"},"#
+            )
+        if let projection {
+            json = json.replacingOccurrences(of: #""initialMyLibraryExerciseIds":"#, with: #""executionVariantsByExercise":\#(projection),"initialMyLibraryExerciseIds":"#)
+        }
+        return json
+    }
+
+    func testTrainingLoggerProjectsOnlySelectablePerExerciseVariantChoices() async throws {
+        let retired = Self.staticHoldChoiceJSON
+            .replacingOccurrences(of: "tev_spider_static_hold", with: "tev_spider_retired_pause")
+            .replacingOccurrences(of: #""status":"active""#, with: #""status":"retired""#)
+        let superSet = Self.staticHoldChoiceJSON
+            .replacingOccurrences(of: "tev_spider_static_hold", with: "tev_super_set")
+            .replacingOccurrences(of: "static_hold", with: "super_set")
+        let projection = #"{"spider_curl":[\#(Self.staticHoldChoiceJSON),\#(retired),\#(superSet),{"variantId":7}],"bench_press":[\#(Self.staticHoldChoiceJSON.replacingOccurrences(of: "tev_spider_static_hold", with: "tev_bench_pause"))]}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, variantLoggerJSON(projection: projection))])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Variant test")
+        let configuration = try await ProductionTrainingLoggerAPI(api: native).fetchConfiguration()
+        XCTAssertEqual(configuration.supportsExecutionVariantCreation, true)
+        let spider = try XCTUnwrap(configuration.exercises.first { $0.canonicalExerciseId == "spider_curl" })
+        // Retired, Super Set and malformed entries are dropped; another
+        // exercise's choice never leaks onto this one.
+        XCTAssertEqual(spider.executionVariantChoices.map(\.variantId), ["tev_spider_static_hold"])
+        XCTAssertTrue(configuration.variants.isEmpty)
+        // Legacy key-only history resolves to the canonical definition.
+        let legacy = try XCTUnwrap(spider.history.first?.executionVariant)
+        XCTAssertNil(legacy.variantId)
+        XCTAssertEqual(TrainingExecutionVariantIdentity.identity(of: legacy, choices: spider.executionVariantChoices), "tev_spider_static_hold")
+    }
+
+    func testTrainingLoggerWithoutVariantProjectionIsOrdinaryOnlyAndNeverInfersFromHistory() async throws {
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(200, variantLoggerJSON(projection: nil))])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Old Server test")
+        let configuration = try await ProductionTrainingLoggerAPI(api: native).fetchConfiguration()
+        XCTAssertNotEqual(configuration.supportsExecutionVariantCreation, true)
+        let spider = try XCTUnwrap(configuration.exercises.first)
+        XCTAssertEqual(spider.history.first?.executionVariant?.key, "static_hold", "History still carries the legacy variant")
+        XCTAssertTrue(spider.executionVariantChoices.isEmpty, "Historical variants are never offered as choices")
+    }
+
+    func testCreateExecutionVariantSendsNameOnlyReusesKeyOnRetryAndReturnsCanonicalChoice() async throws {
+        let created = productionCommandOutcomeJSON(result: #"{"status":"created","variant":{"variantId":"tev_spider_slow_eccentric","canonicalExerciseId":"spider_curl","key":"slow_eccentric","label":"Slow Eccentric","legacyKeys":[],"status":"active","provenance":"user_created","createdAt":"2026-10-07T00:00:00.000Z","updatedAt":"2026-10-07T00:00:00.000Z","retiredAt":null},"selection":{"variantId":"tev_spider_slow_eccentric","key":"slow_eccentric","label":"Slow Eccentric","rawLabel":"Slow Eccentric"}}"#)
+        let existing = created.replacingOccurrences(of: #""status":"created""#, with: #""status":"already_exists""#)
+        let transport = SequencedFounderTransport([
+            .json(200, sessionJSON(access: "a", refresh: "r")),
+            .json(503, #"{"status":503,"code":"SERVICE_UNAVAILABLE","title":"Try again","detail":null}"#),
+            .json(200, created),
+            .json(200, existing),
+        ])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Create variant test")
+        let api = ProductionTrainingExerciseCatalogWriteAPI(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+
+        do {
+            _ = try await api.createExecutionVariant(canonicalExerciseId: "spider_curl", displayName: "Slow Eccentric")
+            XCTFail("A temporary Server failure must surface, never a local-only variant")
+        } catch is TrainingExecutionVariantRejection {
+            XCTFail("A transport failure is not a name rejection")
+        } catch {}
+        let first = try await api.createExecutionVariant(canonicalExerciseId: "spider_curl", displayName: "  slow   eccentric ")
+        XCTAssertEqual(first.status, "created")
+        XCTAssertEqual(first.choice.variantId, "tev_spider_slow_eccentric")
+        XCTAssertEqual(first.choice.selection.variantId, "tev_spider_slow_eccentric")
+        XCTAssertTrue(first.choice.isSelectable)
+        let again = try await api.createExecutionVariant(canonicalExerciseId: "spider_curl", displayName: "Slow Eccentric")
+        XCTAssertEqual(again.status, "already_exists")
+        XCTAssertEqual(again.choice.variantId, first.choice.variantId)
+
+        let commands = await transport.requests.filter { $0.url?.path.hasSuffix("/commands") == true }
+        let bodies = commands.compactMap { $0.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } }
+        XCTAssertEqual(bodies.count, 3)
+        let keys = bodies.compactMap { ($0["metadata"] as? [String: Any])?["idempotencyKey"] as? String }
+        XCTAssertEqual(keys.count, 3)
+        XCTAssertEqual(keys[0], keys[1], "A retry of the same logical create reuses its idempotency key")
+        XCTAssertNotEqual(keys[1], keys[2], "A terminal answer forgets the key; a later create is a fresh command")
+        for body in bodies {
+            XCTAssertEqual(body["commandType"] as? String, "training-catalog.execution-variant.create.v1")
+            let payload = try XCTUnwrap(body["payload"] as? [String: Any])
+            XCTAssertEqual(Set(payload.keys), ["canonicalExerciseId", "displayName"], "Native never sends ids, keys or timing")
+            XCTAssertEqual(payload["canonicalExerciseId"] as? String, "spider_curl")
+        }
+    }
+
+    func testCreateExecutionVariantSurfacesTheServersReservedNameExplanation() async throws {
+        let problem = #"{"status":400,"code":"TRAINING_EXECUTION_VARIANT_NAME_RESERVED","title":"Supersets are recorded as an exercise relationship, not an execution variant.","detail":null,"fieldErrors":[]}"#
+        let transport = SequencedFounderTransport([.json(200, sessionJSON(access: "a", refresh: "r")), .json(400, problem)])
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Reserved variant test")
+        let api = ProductionTrainingExerciseCatalogWriteAPI(api: native, idempotencyStore: ProductionIdempotencyKeyStore(defaults: Self.freshDefaults()))
+        do {
+            _ = try await api.createExecutionVariant(canonicalExerciseId: "leg_extension", displayName: "Super Set")
+            XCTFail("Reserved names are refused")
+        } catch let rejection as TrainingExecutionVariantRejection {
+            XCTAssertEqual(rejection.code, "TRAINING_EXECUTION_VARIANT_NAME_RESERVED")
+            XCTAssertTrue(rejection.message.contains("relationship"))
+        }
+    }
+
     func testProductionReadCacheReusesCanonicalEnvelopeAndInvalidatesNarrowly() async throws {
         let transport = RoutedFounderTransport(
             pairing: sessionJSON(access: "a", refresh: "r"),

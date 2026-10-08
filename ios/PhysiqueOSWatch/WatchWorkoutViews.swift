@@ -848,7 +848,7 @@ struct WatchWorkoutExecutionView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .frame(width: 42, alignment: .leading)
-                    Text([row.supersetLabel, row.exerciseName].compactMap { $0 }.joined(separator: " · "))
+                    Text(WatchExecutionValues.rowTitle(row))
                         .font(WatchType.font(10, 700))
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -960,6 +960,12 @@ struct WatchExecutionValues: Equatable {
         self.load = load
         self.primary = primary
         self.primaryLabel = primaryLabel
+    }
+
+    /// "A · Spider Curls · Static Hold": superset letter, exercise, then the
+    /// phone-selected execution variant (display only, Build 92).
+    static func rowTitle(_ row: WatchWorkoutProjection.Row) -> String {
+        [row.supersetLabel, row.exerciseName, row.variantLabel].compactMap { $0 }.joined(separator: " · ")
     }
 
     init(row: WatchWorkoutProjection.Row) {
