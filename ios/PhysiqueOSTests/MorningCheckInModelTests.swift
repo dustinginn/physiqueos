@@ -4,6 +4,117 @@ import XCTest
 @MainActor
 final class MorningCheckInModelTests: XCTestCase {
 
+    func testContextLoaderRetriesOneTransientFailureThenSucceeds() async throws {
+        let expected = MorningCheckInReadModel(
+            today: "2026-10-08", existingWeight: nil, previousWeight: nil,
+            reconciliationItems: []
+        )
+        let api = SequencedMorningCheckInAPI([
+            .failure(ProductionNativeError.networkFailure),
+            .success(expected),
+        ])
+
+        let result = try await MorningCheckInContextLoader.fetch(
+            from: api, automaticallyRetrying: true, retryDelayNanoseconds: 0,
+            sleep: { _ in }
+        )
+
+        XCTAssertEqual(result, expected)
+        let requestCount = await api.requestCount
+        XCTAssertEqual(requestCount, 2)
+    }
+
+    func testContextLoaderPersistentFailureStopsAfterBoundedRetry() async {
+        let api = SequencedMorningCheckInAPI([
+            .failure(ProductionNativeError.temporaryServer(nil)),
+            .failure(ProductionNativeError.temporaryServer(nil)),
+        ])
+
+        do {
+            _ = try await MorningCheckInContextLoader.fetch(
+                from: api, automaticallyRetrying: true, retryDelayNanoseconds: 0,
+                sleep: { _ in }
+            )
+            XCTFail("Expected the bounded retry to surface the persistent failure.")
+        } catch {
+            XCTAssertEqual(error as? ProductionNativeError, .temporaryServer(nil))
+        }
+        let requestCount = await api.requestCount
+        XCTAssertEqual(requestCount, 2)
+    }
+
+    func testContextLoaderDoesNotAutomaticallyRetryAuthenticationOrContractFailure() async {
+        for error in [ProductionNativeError.unauthenticated(nil), .invalidResponse] {
+            let api = SequencedMorningCheckInAPI([.failure(error)])
+            do {
+                _ = try await MorningCheckInContextLoader.fetch(
+                    from: api, automaticallyRetrying: true, retryDelayNanoseconds: 0,
+                    sleep: { _ in }
+                )
+                XCTFail("Authentication and contract failures must fail closed without an automatic retry.")
+            } catch {}
+            let requestCount = await api.requestCount
+            XCTAssertEqual(requestCount, 1)
+        }
+    }
+
+    func testManualRetryIsExactlyOneAttemptAndSurfacesTruthfulContractCopy() async {
+        let api = SequencedMorningCheckInAPI([
+            .failure(ProductionNativeError.invalidResponse),
+            .success(MorningCheckInReadModel(
+                today: "2026-10-08", existingWeight: nil, previousWeight: nil,
+                reconciliationItems: []
+            )),
+        ])
+
+        do {
+            _ = try await MorningCheckInContextLoader.fetch(
+                from: api, automaticallyRetrying: false, retryDelayNanoseconds: 0,
+                sleep: { _ in }
+            )
+            XCTFail("A manual retry must remain a single bounded attempt.")
+        } catch {
+            XCTAssertEqual(error as? ProductionNativeError, .invalidResponse)
+            XCTAssertTrue(MorningCheckInContextLoader.message(for: error).contains("unreadable"))
+        }
+        let requestCount = await api.requestCount
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    func testRetryPreservesTypedWeightAndOnlyHydratesAnEmptyField() {
+        XCTAssertEqual(
+            MorningCheckInContextLoader.preservedWeightText(current: "181.2", existingWeight: 179.4),
+            "181.2"
+        )
+        XCTAssertEqual(
+            MorningCheckInContextLoader.preservedWeightText(current: "", existingWeight: 179.4),
+            "179.4"
+        )
+        XCTAssertEqual(
+            MorningCheckInContextLoader.preservedWeightText(current: "  ", existingWeight: nil),
+            "  "
+        )
+    }
+
+    func testProductionSubmitRemainsDisabledUntilFreshContextLoads() {
+        XCTAssertFalse(MorningCheckInContextLoader.canSubmit(
+            isProduction: true, context: nil, isLoading: false, isSubmitting: false
+        ))
+        XCTAssertFalse(MorningCheckInContextLoader.canSubmit(
+            isProduction: true,
+            context: MorningCheckInReadModel(today: "2026-10-08", existingWeight: nil, previousWeight: nil, reconciliationItems: []),
+            isLoading: true, isSubmitting: false
+        ))
+        XCTAssertTrue(MorningCheckInContextLoader.canSubmit(
+            isProduction: true,
+            context: MorningCheckInReadModel(today: "2026-10-08", existingWeight: nil, previousWeight: nil, reconciliationItems: []),
+            isLoading: false, isSubmitting: false
+        ))
+        XCTAssertTrue(MorningCheckInContextLoader.canSubmit(
+            isProduction: false, context: nil, isLoading: false, isSubmitting: false
+        ))
+    }
+
     func testScheduledEvidenceGetsEvidenceActionAndSkipWhileRecoveryOnlyDoesNot() {
         let scheduled = MorningCheckInReconciliationItem(
             id: "reminder_progress_photos", occurrenceKey: "reminder_progress_photos:2026-10-06",
@@ -461,5 +572,20 @@ final class MorningCheckInModelTests: XCTestCase {
         case .success: XCTFail("Expected failure", file: file, line: line)
         case .failure(let error): XCTAssertEqual(error.message, message, file: file, line: line)
         }
+    }
+}
+
+private actor SequencedMorningCheckInAPI: MorningCheckInAPI {
+    private var results: [Result<MorningCheckInReadModel, ProductionNativeError>]
+    private(set) var requestCount = 0
+
+    init(_ results: [Result<MorningCheckInReadModel, ProductionNativeError>]) {
+        self.results = results
+    }
+
+    func fetchMorningCheckIn() async throws -> MorningCheckInReadModel {
+        requestCount += 1
+        guard !results.isEmpty else { throw ProductionNativeError.invalidResponse }
+        return try results.removeFirst().get()
     }
 }

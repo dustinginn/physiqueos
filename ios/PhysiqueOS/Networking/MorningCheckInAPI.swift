@@ -8,7 +8,13 @@ struct ProductionMorningCheckInAPI: MorningCheckInAPI {
     let api: ProductionNativeAPI
 
     func fetchMorningCheckIn() async throws -> MorningCheckInReadModel {
-        let payload = try await api.readResource("morning-check-in", as: Payload.self).data
+        // This resource authorizes a date-bound atomic write. Never reuse the
+        // generic 90-second read cache here: a retry (or a screen opened across
+        // local midnight) must obtain fresh Server authority before enabling
+        // Complete Morning Weigh-In.
+        let payload = try await api.readResource(
+            "morning-check-in", policy: .reload, as: Payload.self
+        ).data
         return MorningCheckInReadModel(
             today: payload.today,
             existingWeight: payload.existingWeight,
