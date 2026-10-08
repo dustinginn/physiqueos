@@ -524,3 +524,275 @@ private actor HomeWidgetRefreshIntentCapture {
     private(set) var value: String?
     func record(_ value: String) { self.value = value }
 }
+
+// MARK: - Build 93 Today widget DESIGN OPTIONS (design branch only; never shipped)
+//
+// Three Founder-review alternatives for the `systemSmall` Today widget, rendered
+// by the same ImageRenderer harness as `testShippingViewsRenderAllRequiredStates`
+// at the real square size (170 × 170 pt, 16 pt WidgetKit content margins, 3×).
+// They reuse the shipping palette, formatter, freshness rule and deep links;
+// only layout and the CTA fill (iPhone Finish Workout amber per theme) differ.
+
+/// iPhone Finish Workout amber (`PhysiqueOSTheme.redesignAmber` /
+/// `redesignOnExecution`), the approved CTA token.
+private enum WidgetDesignCTA {
+    static func fill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0xEF / 255, green: 0xB8 / 255, blue: 0x4F / 255)
+            : Color(red: 0xC8 / 255, green: 0x82 / 255, blue: 0x28 / 255)
+    }
+    static let foreground = Color(red: 0x10 / 255, green: 0x20 / 255, blue: 0x2A / 255)
+}
+
+private enum WidgetDesignOption: String, CaseIterable {
+    case a, b, c
+}
+
+private struct WidgetDesignOptionView: View {
+    let option: WidgetDesignOption
+    let snapshot: HomeWidgetSnapshot
+    let date: Date
+    @Environment(\.colorScheme) private var scheme
+
+    private var palette: HomeWidgetPalette { HomeWidgetPalette(colorScheme: scheme) }
+    private var nutrition: HomeWidgetNutritionSummary? { snapshot.nutrition }
+    private var calories: String { HomeWidgetValueFormatter.calories(nutrition?.calories) }
+    private var active: String { HomeWidgetValueFormatter.activeCalories(snapshot.activity?.activeCalories) }
+    private var weight: String? { HomeWidgetValueFormatter.weight(snapshot.weight) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            switch option {
+            case .a: balanced
+            case .b: columns
+            case .c: ledger
+            }
+            Spacer(minLength: 4)
+            cta
+        }
+    }
+
+    // MARK: Shared pieces (same content and semantics as the shipping square)
+
+    private var header: some View {
+        HStack(spacing: 4) {
+            Text("Today")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(palette.text)
+            Spacer(minLength: 2)
+            Text(freshness)
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(palette.secondary)
+                .lineLimit(1)
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(palette.refreshAccent)
+                .frame(width: 22, height: 22)
+                // 44 pt hit target kept; the negative padding stops it from
+                // consuming layout height (the shipping row is 44 pt tall).
+                .frame(minWidth: 44, minHeight: 44)
+                .padding(.vertical, -11)
+                .padding(.trailing, -11)
+        }
+        .frame(height: 22)
+    }
+
+    private var freshness: String {
+        guard let read = snapshot.lastSuccessfulReadAt.flatMap(HomeWidgetSnapshotClock.date(from:)) else { return "Refresh" }
+        let minutes = Int(date.timeIntervalSince(read) / 60)
+        return minutes < 2 ? "Now" : "\(minutes)m"
+    }
+
+    private func label(_ text: String, size: CGFloat = 8) -> some View {
+        Text(text)
+            .font(.system(size: size, weight: .bold, design: .rounded))
+            .tracking(0.6)
+            .foregroundStyle(palette.secondary)
+    }
+
+    private func figure(_ value: String, unit: String, size: CGFloat, unitSize: CGFloat? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+            Text(value)
+                .font(.system(size: size, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(palette.text)
+            Text(unit)
+                .font(.system(size: unitSize ?? max(9, size * 0.5), weight: .bold, design: .rounded))
+                .foregroundStyle(palette.secondary)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
+    }
+
+    private var macros: String {
+        "P \(HomeWidgetValueFormatter.grams(nutrition?.proteinG))  ·  C \(HomeWidgetValueFormatter.grams(nutrition?.carbsG))  ·  F \(HomeWidgetValueFormatter.grams(nutrition?.fatG))"
+    }
+
+    private var cta: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "plus.circle.fill").font(.system(size: 11, weight: .semibold))
+            Text("Start Logger")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Image(systemName: "arrow.up.right").font(.system(size: 8, weight: .bold))
+        }
+        .foregroundStyle(WidgetDesignCTA.foreground)
+        .padding(.horizontal, 9)
+        .frame(maxWidth: .infinity, minHeight: 30)
+        .background(WidgetDesignCTA.fill(scheme), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Start Workout Logger")
+    }
+
+    // MARK: A — Balanced stack: Active at the same prominence as Nutrition
+
+    private var balanced: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            label("NUTRITION").padding(.top, 7)
+            figure(calories, unit: "cal", size: 19)
+            Text(macros)
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .foregroundStyle(palette.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .padding(.top, 1)
+            Rectangle().fill(palette.divider).frame(height: 1).padding(.vertical, 6)
+            HStack(alignment: .firstTextBaseline) {
+                label("ACTIVE")
+                Spacer(minLength: 4)
+                if let weight { label(weight) }
+            }
+            figure(active, unit: "cal", size: 19)
+        }
+    }
+
+    // MARK: B — Two columns: equal metric cells, macros legible beneath
+
+    private var columns: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 1) {
+                    label("NUTRITION")
+                    figure(calories, unit: "cal", size: 17, unitSize: 8)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Rectangle().fill(palette.divider).frame(width: 1, height: 32).padding(.horizontal, 6)
+                VStack(alignment: .leading, spacing: 1) {
+                    label("ACTIVE")
+                    figure(active, unit: "cal", size: 17, unitSize: 8)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.top, 8)
+            HStack(spacing: 4) {
+                macroCell("P", nutrition?.proteinG)
+                macroCell("C", nutrition?.carbsG)
+                macroCell("F", nutrition?.fatG)
+            }
+            .padding(.top, 8)
+            if let weight {
+                label("WEIGHT  \(weight)").padding(.top, 5)
+            }
+        }
+    }
+
+    private func macroCell(_ letter: String, _ grams: Double?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+            Text(letter)
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(palette.secondary)
+            Text(HomeWidgetValueFormatter.grams(grams))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(palette.text)
+            Text("g")
+                .font(.system(size: 8, weight: .semibold, design: .rounded))
+                .foregroundStyle(palette.secondary)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .frame(maxWidth: .infinity, minHeight: 20)
+        .background(palette.divider.opacity(0.55), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    // MARK: C — Refined ledger: right-aligned figures, Active largest
+
+    private var ledger: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .lastTextBaseline) {
+                label("NUTRITION")
+                Spacer(minLength: 4)
+                figure(calories, unit: "cal", size: 17)
+            }
+            .padding(.top, 9)
+            HStack {
+                Spacer(minLength: 0)
+                Text(macros)
+                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .foregroundStyle(palette.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .padding(.top, 1)
+            Rectangle().fill(palette.divider).frame(height: 1).padding(.vertical, 7)
+            HStack(alignment: .lastTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    label("ACTIVE")
+                    if let weight { label(weight, size: 7) }
+                }
+                Spacer(minLength: 4)
+                figure(active, unit: "cal", size: 24)
+            }
+        }
+    }
+}
+
+final class HomeWidgetDesignOptionsRenderTests: XCTestCase {
+    /// Founder-reported values (Nutrition 1,139 cal, Active 649 cal, updated
+    /// 12 min ago); macros are illustrative fixture values.
+    private static func founderExample(weight: Bool = false) -> HomeWidgetSnapshot {
+        var snapshot = HomeWidgetSamples.snapshot(weight: weight)
+        snapshot.lastSuccessfulReadAt = HomeWidgetSnapshotClock.string(from: HomeWidgetSamples.referenceDate.addingTimeInterval(-12 * 60))
+        snapshot.nutrition = .init(calories: 1_139, proteinG: 96, carbsG: 104, fatG: 38)
+        snapshot.activity = .init(activeCalories: 649, isPartialDay: true)
+        return snapshot
+    }
+
+    @MainActor
+    func testRenderTodayWidgetDesignOptions() throws {
+#if canImport(UIKit)
+        guard let directory = ProcessInfo.processInfo.environment["WIDGET_DESIGN_DIR"].map(URL.init(fileURLWithPath:)) else {
+            throw XCTSkip("Design renders are produced on request (WIDGET_DESIGN_DIR).")
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for scheme in [ColorScheme.dark, .light] {
+            let theme = scheme == .dark ? "dark" : "mineral-light"
+            let palette = HomeWidgetPalette(colorScheme: scheme)
+            let cases: [(String, AnyView)] = [
+                ("current", AnyView(HomeLoggedTodayWidgetView(snapshot: Self.founderExample(), date: HomeWidgetSamples.referenceDate, familyOverrideForPreview: .systemSmall))),
+                ("option-a", AnyView(WidgetDesignOptionView(option: .a, snapshot: Self.founderExample(), date: HomeWidgetSamples.referenceDate))),
+                ("option-b", AnyView(WidgetDesignOptionView(option: .b, snapshot: Self.founderExample(), date: HomeWidgetSamples.referenceDate))),
+                ("option-c", AnyView(WidgetDesignOptionView(option: .c, snapshot: Self.founderExample(), date: HomeWidgetSamples.referenceDate))),
+                ("option-a-with-weight", AnyView(WidgetDesignOptionView(option: .a, snapshot: Self.founderExample(weight: true), date: HomeWidgetSamples.referenceDate))),
+                ("option-b-with-weight", AnyView(WidgetDesignOptionView(option: .b, snapshot: Self.founderExample(weight: true), date: HomeWidgetSamples.referenceDate))),
+                ("option-c-with-weight", AnyView(WidgetDesignOptionView(option: .c, snapshot: Self.founderExample(weight: true), date: HomeWidgetSamples.referenceDate))),
+            ]
+            for (name, view) in cases {
+                let tile = ZStack {
+                    palette.background
+                    view.padding(16)
+                }
+                .frame(width: 170, height: 170)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .environment(\.colorScheme, scheme)
+                let renderer = ImageRenderer(content: tile)
+                renderer.proposedSize = ProposedViewSize(width: 170, height: 170)
+                renderer.scale = 3
+                let data = try XCTUnwrap(renderer.uiImage?.pngData())
+                try data.write(to: directory.appendingPathComponent("widget-\(name)-\(theme).png"), options: .atomic)
+            }
+        }
+#endif
+    }
+}

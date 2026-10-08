@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Today Widget Options</title>
+<style>
+  :root { --bg: #f4f2ec; --ink: #102431; --muted: #5b6b74; --line: #d9d6cc; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0b1520; --ink: #e8eef2; --muted: #9aaab3; --line: #22313d; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  p.note { color: var(--muted); margin: 0 0 20px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 10px 8px; border-top: 1px solid var(--line); text-align: center; vertical-align: top; }
+  th { font-size: 13px; color: var(--muted); font-weight: 600; }
+  td:first-child { text-align: left; font-weight: 600; width: 140px; }
+  img { width: 100%; max-width: 230px; height: auto; display: block; margin: 0 auto; }
+  .wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Today widget — design options (systemSmall)</h1>
+  <p class="note">Design only. Same ImageRenderer harness as the shipping widget PNGs (170 × 170 pt, 16 pt margins, 3×); not WidgetKit Home Screen screenshots. Nutrition 1,139 / Active 649 / 12m from the Founder's report; macros illustrative.</p>
+  <div class="wrap">
+  <table>
+    <tr><th></th><th>Dark</th><th>Mineral Light</th><th>Dark · with weight</th></tr>
+    <tr><td>Current (shipping)</td><td><img src="widget-current-dark.png" alt="Current widget, Dark"></td><td><img src="widget-current-mineral-light.png" alt="Current widget, Mineral Light"></td><td></td></tr>
+    <tr><td>A — Balanced stack</td><td><img src="widget-option-a-dark.png" alt="Option A, Dark"></td><td><img src="widget-option-a-mineral-light.png" alt="Option A, Mineral Light"></td><td><img src="widget-option-a-with-weight-dark.png" alt="Option A with weight, Dark"></td></tr>
+    <tr><td>B — Two columns (recommended)</td><td><img src="widget-option-b-dark.png" alt="Option B, Dark"></td><td><img src="widget-option-b-mineral-light.png" alt="Option B, Mineral Light"></td><td><img src="widget-option-b-with-weight-dark.png" alt="Option B with weight, Dark"></td></tr>
+    <tr><td>C — Refined ledger</td><td><img src="widget-option-c-dark.png" alt="Option C, Dark"></td><td><img src="widget-option-c-mineral-light.png" alt="Option C, Mineral Light"></td><td><img src="widget-option-c-with-weight-dark.png" alt="Option C with weight, Dark"></td></tr>
+  </table>
+  </div>
+</main>
+</body>
+</html>
