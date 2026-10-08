@@ -5,4 +5,6 @@
 - Fixture: Nutrition 1,139 cal, Active 649 cal and "12m" are Founder-reported; the P/C/F macros (96 / 104 / 38) are illustrative.
 - Not WidgetKit Home Screen screenshots. Physical Home Screen acceptance follows integration and a release build.
 
+Follow-up (Founder 2026-10-08, "the refresh button should be amber as well"): refresh in both families is now an amber disc (the same `WorkoutActivityPrimaryAction` token) with the execution-ink glyph. A bare #C88228 glyph on the Mineral Light canvas would be about 2.8:1, below the 3:1 icon minimum; the ink glyph on amber is at least 4.5:1 in both themes. The `shipping/` renders and the `home-screen-widget-v1` renders were regenerated.
+
 Known delta: the header sits about 2 pt lower than the design because the shipping refresh glyph frame is 24 pt. With today's weight, the chip and weight spacing tighten by 3 pt so the square fits its 138 pt content area (enforced by `testOptionBSquareFitsTheSystemSmallContentAreaInEveryState`).
