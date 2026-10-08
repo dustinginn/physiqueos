@@ -569,6 +569,104 @@ struct TrainingLoggerProgressionRecommendation: Codable, Equatable {
     }
 }
 
+/// The exact values a Logger suggestion can put into its pound-based editable
+/// rows. Resolution is deliberately fail-closed: malformed numbers, unknown
+/// units and unsupported timed recommendations never become mutation actions.
+struct TrainingLoggerProgressionTarget: Equatable {
+    private static let poundsPerKilogram = 2.204_622_621_8
+    private static let comparisonScale = 10.0
+
+    let reps: Double
+    let load: Double?
+    let loadType: String
+
+    static func resolve(
+        _ recommendation: TrainingLoggerProgressionRecommendation,
+        measurement: TrainingLoggerMeasurement,
+        defaultLoadType: String?
+    ) -> Self? {
+        guard measurement != .duration,
+              let suggestedReps = recommendation.suggestedReps,
+              suggestedReps.isFinite, suggestedReps > 0
+        else { return nil }
+
+        let semantics = TrainingSetLoadSemantics.classify(
+            weight: recommendation.suggestedLoad,
+            weightUnit: recommendation.suggestedUnit,
+            loadType: recommendation.suggestedLoadType,
+            defaultLoadType: defaultLoadType
+        )
+        switch semantics {
+        case .bodyweight:
+            return .init(reps: normalized(suggestedReps), load: nil, loadType: "bodyweight")
+        case .weightedBodyweight, .externalLoad:
+            guard let suggestedLoad = recommendation.suggestedLoad,
+                  let pounds = pounds(suggestedLoad, unit: recommendation.suggestedUnit)
+            else { return nil }
+            return .init(reps: normalized(suggestedReps), load: pounds, loadType: "external_load")
+        case .unknown:
+            return nil
+        }
+    }
+
+    func changes(_ set: TrainingLoggerDraftSet, defaultLoadType: String?) -> Bool {
+        guard !set.isCompleted else { return false }
+        if !Self.equal(set.reps, reps) { return true }
+        let currentSemantics = set.loadSemantics(defaultLoadType: defaultLoadType)
+        let targetSemantics = TrainingSetLoadSemantics.classify(
+            weight: load, loadType: loadType, defaultLoadType: defaultLoadType
+        )
+        guard currentSemantics == targetSemantics else { return true }
+        switch targetSemantics {
+        case .bodyweight:
+            return false
+        case .weightedBodyweight, .externalLoad:
+            return !Self.equal(set.load, load)
+        case .unknown:
+            return false
+        }
+    }
+
+    private static func pounds(_ value: Double, unit: String?) -> Double? {
+        guard value.isFinite, value >= 0 else { return nil }
+        let unit = unit?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let pounds: Double
+        switch unit {
+        case nil, "", "lb", "lbs", "pound", "pounds":
+            pounds = value
+        case "kg", "kgs", "kilogram", "kilograms":
+            pounds = value * poundsPerKilogram
+        default:
+            return nil
+        }
+        return normalized(pounds)
+    }
+
+    private static func normalized(_ value: Double) -> Double {
+        (value * comparisonScale).rounded() / comparisonScale
+    }
+
+    private static func equal(_ left: Double?, _ right: Double?) -> Bool {
+        guard let left, let right, left.isFinite, right.isFinite else { return left == nil && right == nil }
+        return normalized(left) == normalized(right)
+    }
+}
+
+extension TrainingLoggerDraftExercise {
+    var progressionSuggestionTarget: TrainingLoggerProgressionTarget? {
+        progressionRecommendation.flatMap {
+            TrainingLoggerProgressionTarget.resolve(
+                $0, measurement: measurement, defaultLoadType: defaultLoadType
+            )
+        }
+    }
+
+    var canApplyProgressionSuggestion: Bool {
+        guard let target = progressionSuggestionTarget else { return false }
+        return sets.contains { target.changes($0, defaultLoadType: defaultLoadType) }
+    }
+}
+
 struct TrainingLoggerDraftRelationship: Codable, Equatable, Identifiable {
     var id: String
     var relationshipType: String
@@ -777,19 +875,16 @@ extension TrainingLoggerDraft {
 
     mutating func applyProgressionSuggestion(to exerciseId: String) {
         guard let index = exercises.firstIndex(where: { $0.id == exerciseId }),
-              let recommendation = exercises[index].progressionRecommendation,
-              recommendation.hasExplicitTarget,
-              let suggestedReps = recommendation.suggestedReps else { return }
+              exercises[index].canApplyProgressionSuggestion,
+              let target = exercises[index].progressionSuggestionTarget
+        else { return }
         exercises[index].progressionChoice = .suggestion
         // Completed sets are performed history: guidance only fills the rest.
-        for setIndex in exercises[index].sets.indices where !exercises[index].sets[setIndex].isCompleted {
-            exercises[index].sets[setIndex].reps = suggestedReps
-            let suggestedSemantics = TrainingSetLoadSemantics.classify(
-                weight: recommendation.suggestedLoad, loadType: recommendation.suggestedLoadType,
-                defaultLoadType: exercises[index].defaultLoadType
-            )
-            exercises[index].sets[setIndex].load = suggestedSemantics == .bodyweight ? nil : recommendation.suggestedLoad
-            exercises[index].sets[setIndex].loadType = suggestedSemantics == .bodyweight ? "bodyweight" : recommendation.suggestedLoadType
+        for setIndex in exercises[index].sets.indices
+        where target.changes(exercises[index].sets[setIndex], defaultLoadType: exercises[index].defaultLoadType) {
+            exercises[index].sets[setIndex].reps = target.reps
+            exercises[index].sets[setIndex].load = target.load
+            exercises[index].sets[setIndex].loadType = target.loadType
             exercises[index].sets[setIndex].isCompleted = false
         }
     }
