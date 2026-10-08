@@ -9,6 +9,7 @@ import { getTrainingExecutionVariantKey } from "../../domain/models/trainingExec
 
 export const HISTORICAL_TRAINING_SUPERSET_OWNER = "user_founder_001";
 export const HISTORICAL_TRAINING_SUPERSET_COLLECTION = "canonicalEvidenceObjects";
+export const HISTORICAL_TRAINING_SUPERSET_AUTHORITY_TASK = "9519b672";
 
 const LEGACY_KEY = "super_set";
 const TARGET_EXERCISE_IDS = Object.freeze([
@@ -298,7 +299,14 @@ function validateCandidate({ row, outer, workout, affected, target, lineageById 
 }
 
 function buildPlan({ row, outer, workout, affected }) {
-  const relationshipGroup = relationshipFor(workout, affected);
+  const payloadDigest = digest(row.payload);
+  const version = Number(row.version);
+  const relationshipGroup = relationshipFor(workout, affected, {
+    schemaVersion: "historical_training_superset_correction_v1",
+    authorityTask: HISTORICAL_TRAINING_SUPERSET_AUTHORITY_TASK,
+    priorVersion: version,
+    priorPayloadDigest: payloadDigest,
+  });
   const correctedWorkout = structuredClone(workout);
   const affectedIds = new Set(affected.map((exercise) => exercise.id));
   correctedWorkout.exercises = correctedWorkout.exercises.map((exercise) => {
@@ -311,7 +319,6 @@ function buildPlan({ row, outer, workout, affected }) {
   const correctedPayload = outer?.payload
     ? { ...structuredClone(outer), payload: correctedWorkout }
     : correctedWorkout;
-  const version = Number(row.version);
   const expectedStoredPayload = { ...structuredClone(correctedPayload), version: version + 1 };
   const members = affected.map((exercise, index) => ({
     occurrenceId: exercise.id,
@@ -325,7 +332,7 @@ function buildPlan({ row, outer, workout, affected }) {
     canonicalId: outer.canonicalId ?? null,
     sessionId: workout.id ?? null,
     version,
-    payloadDigest: digest(row.payload),
+    payloadDigest,
     correctedPayload,
     expectedAfterPayloadDigest: digest(expectedStoredPayload),
     relationshipGroup,
@@ -334,18 +341,21 @@ function buildPlan({ row, outer, workout, affected }) {
   };
 }
 
-function relationshipFor(workout, affected) {
+function relationshipFor(workout, affected, correction = null) {
   const refs = unique([
     ...(workout?.provenance?.source_artifact_refs ?? []),
     ...(workout?.source?.source_artifact_refs ?? []),
   ]);
   const provenanceRef = refs[0] ?? "typed_evidence_0";
-  return createTrainingExerciseRelationshipGroup({
+  const relationship = createTrainingExerciseRelationshipGroup({
     relationshipType: "superset",
     memberExerciseIds: affected.map((exercise) => exercise.id),
     provenance_ref: provenanceRef,
     provenance: { source_artifact_refs: refs.length ? refs : [provenanceRef] },
   });
+  return correction
+    ? { ...relationship, provenance: { ...relationship.provenance, correction: { ...correction } } }
+    : relationship;
 }
 
 function deriveImpact(rows, events, plans) {

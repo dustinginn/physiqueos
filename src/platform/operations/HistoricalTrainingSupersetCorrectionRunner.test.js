@@ -68,6 +68,14 @@ describe("historical Training Super Set correction", () => {
           id: target.relationshipGroupId,
           relationshipType: "superset",
           memberExerciseIds: target.memberExerciseIds,
+          provenance: expect.objectContaining({
+            correction: {
+              schemaVersion: "historical_training_superset_correction_v1",
+              authorityTask: "9519b672",
+              priorVersion: target.version,
+              priorPayloadDigest: target.payloadDigest,
+            },
+          }),
         }),
       ]);
     }
