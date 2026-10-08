@@ -1106,7 +1106,7 @@ struct TrainingLoggerView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(PhysiqueOSTheme.redesignSoft)
-        .accessibilityIdentifier("trainingLogger.progression.\(exercise.id)")
+        .accessibilityElement(children: .contain)
     }
 
     private func progressionChoice(_ title: String, selected: Bool, enabled: Bool, action: @escaping () -> Void) -> some View {
