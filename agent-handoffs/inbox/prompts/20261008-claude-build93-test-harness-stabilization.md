@@ -1,0 +1,9 @@
+# Claude B — Build93 test-only stabilization
+Founder requests Claude continue outstanding Native lane while Codex handles historical production corrections. Use existing Claude B Briefings/Native Remote Control conversation. Read agent-handoffs/reports/20261008T214007Z-build93-widget-option-b-and-native-lane-audit.md, Build92 release report, current backlog and latest main. Do not change production behavior or touch Codex historical Server work.
+
+Task 1: Fix Watch UI harness missing WCSession for testFinalSetFinishShowsConfirmationOnThePrimarySurfaceAndNotYetReturns, using deterministic test fixture/stub only; retain production Watch connectivity and real-device semantics.
+Task 2: Fix six order-dependent Sandbox iPhone UI tests by resetting isolated draft/workout state per test; avoid masking real app regressions, broad test skipping or weakening assertions. Reproduce baseline where feasible, then show tests passing in repeated mixed-order and isolated runs.
+
+Create isolated test-only Native candidate from Build92-compatible baseline; avoid overlaps with Widget Option B candidate 293976fd, Recovery 766bd9dc, theme 741d3562 and Codex Home/Logger branches. Verify Xcode generator/pbxproj pinned blocks, tests, full relevant UI gates and release configuration as disk allows. Serialize heavy builds; prefer >=20 GiB, HOLD below 12 GiB; preserve Archives 85–92, other lanes' simulators, worktrees and credentials.
+
+Publish candidate SHA, exact test counts, prior failure vs fixed evidence, merge guidance, any remaining real-device acceptance limitations, and GitHub report. Do not autonomously begin integration or DEXA cleanup. Narrow non-force candidate push and additive report-only main publication preapproved. No deploy, Build bump, archive, TestFlight, Recovery activation, production data mutation or release pointer changes.
