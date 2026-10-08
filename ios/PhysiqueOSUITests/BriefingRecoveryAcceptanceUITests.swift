@@ -26,19 +26,37 @@ final class BriefingRecoveryAcceptanceUITests: XCTestCase {
             XCTAssertEqual(element("briefing.recovery.commentary").exists, scenario == "yellow" || scenario == "red", "\(scenario): commentary is Yellow/Red only")
             XCTAssertEqual(element("briefing.recovery.chart").exists, scenario != "unavailable")
             XCTAssertEqual(element("briefing.recovery.unavailable").exists, scenario == "unavailable")
-            XCTAssertFalse(element("briefing.recovery.foam").exists, "unavailable foam authority hides the row")
+            XCTAssertEqual(element("briefing.recovery.foam").exists, scenario != "unavailable", "\(scenario): the foam row shows whenever the schedule is authoritative")
             XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] '_unavailable' OR label CONTAINS[c] 'score'")).firstMatch.exists, "no diagnostic codes or score copy")
         }
     }
 
     func testWeeklyChartAndFoamAreAccessible() {
-        launch(briefing: weeklyId, scenario: "foam", appearance: "dark")
+        launch(briefing: weeklyId, scenario: "green", appearance: "dark")
         scroll(to: "briefing.recovery.average")
         XCTAssertTrue(element("briefing.recovery.average").label.hasPrefix("Period average"))
+        XCTAssertEqual(element("briefing.recovery.summary").label, "6h 47m average · 7 of 7 nights")
         scroll(to: "briefing.recovery.foam")
         XCTAssertTrue(element("briefing.recovery.chart").label.hasPrefix("Weekly Sleep trend: Sunday"))
         XCTAssertTrue(element("briefing.recovery.chart").label.contains("Personal baseline 6 hours 45 minutes"))
-        XCTAssertTrue(element("briefing.recovery.foam").exists)
+        let foam = element("briefing.recovery.foam").label
+        XCTAssertTrue(foam.contains("Three misses · status unchanged") && foam.contains("4 of 7 completed"), foam)
+        launch(briefing: weeklyId, scenario: "nofoam", appearance: "dark")
+        scroll(to: "briefing.recovery.caveat")
+        XCTAssertFalse(element("briefing.recovery.foam").exists, "no schedule authority hides the row")
+    }
+
+    func testMonthlyCarriesTheLockedContent() {
+        launch(briefing: monthlyId, scenario: "yellow", appearance: "light")
+        scroll(to: "briefing.recovery.status")
+        // The title is a paragraph container; its leaf text carries the label.
+        XCTAssertTrue(element("text:Sleep softened across the second half").exists, "editorial Monthly title")
+        XCTAssertEqual(element("briefing.recovery.summary").label, "6 hr 30 min average · 28 of 31 nights")
+        scroll(to: "briefing.recovery.foam")
+        XCTAssertTrue(element("briefing.recovery.commentary").label.hasPrefix("A multi-week shift. Two completed weeks were meaningfully below"))
+        XCTAssertTrue(element("briefing.recovery.commentary").label.contains("No downstream training constraint was established."))
+        let foam = element("briefing.recovery.foam").label
+        XCTAssertTrue(foam.contains("3 excused · 1 missed") && foam.contains("18 of 22 completed"), foam)
     }
 
     func testMonthlyCardSitsBetweenEnergyAndNewBaselineWithWeeklyAggregates() {
@@ -79,7 +97,11 @@ final class BriefingRecoveryAcceptanceUITests: XCTestCase {
                 launch(briefing: briefing, scenario: scenario, appearance: appearance)
                 scroll(to: "briefing.recovery.status")
                 bringToTop(element("briefing.recovery.status"))
+                XCTAssertTrue(element("briefing.recovery.fixtureFlag").exists, "review captures carry the locked fixture flag")
                 capture("recovery-\(name)-\(appearance == "light" ? "mineral-light" : "dark")")
+                // The lower half (commentary, foam row, caveat) clear of the tab bar.
+                drag(by: 0.3)
+                capture("recovery-\(name)-\(appearance == "light" ? "mineral-light" : "dark")-lower")
             }
         }
     }

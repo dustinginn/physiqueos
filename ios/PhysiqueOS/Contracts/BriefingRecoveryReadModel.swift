@@ -39,13 +39,21 @@ struct BriefingRecoveryCard: Codable, Equatable {
     }
 
     struct Commentary: Codable, Equatable {
+        /// Server-authored editorial title of a Yellow/Red card.
         var headline: String
+        /// Monthly's distinct commentary-block title ("A multi-week shift");
+        /// nil on Weekly.
+        var title: String?
         var body: String
     }
 
+    /// Execution context only: it never sets or changes the status.
+    /// `completed + missed + excused == scheduled`; explicit Skips are excused.
     struct FoamRolling: Codable, Equatable {
         var completed: Int
         var scheduled: Int
+        var missed: Int
+        var excused: Int
     }
 
     var assessmentId: String
@@ -174,7 +182,7 @@ enum BriefingRecoveryCardDecoder {
            value["commentary"]?["visible"]?.bool == true,
            let headline = boundedText(value["commentary"]?["headline"]?.literalString),
            let body = boundedText(value["commentary"]?["body"]?.literalString) {
-            commentary = .init(headline: headline, body: body)
+            commentary = .init(headline: headline, title: boundedText(value["commentary"]?["title"]?.literalString), body: body)
         } else {
             commentary = nil
         }
@@ -226,7 +234,13 @@ enum BriefingRecoveryCardDecoder {
               let scheduled = integer(value?["scheduledOccurrences"]), scheduled > 0,
               let completed = integer(value?["completedOccurrences"]), (0...scheduled).contains(completed)
         else { return nil }
-        return .init(completed: completed, scheduled: scheduled)
+        // A card without the split (pre-correction Server) reads every
+        // not-completed occurrence as missed; a present split must add up.
+        let excused = value?["excusedOccurrences"].flatMap(integer) ?? 0
+        let missed = value?["missedOccurrences"].flatMap(integer) ?? scheduled - completed - excused
+        guard missed >= 0, completed + missed + excused == scheduled,
+              (state == "mixed") == (missed > 0) else { return nil }
+        return .init(completed: completed, scheduled: scheduled, missed: missed, excused: excused)
     }
 
     private static func minutes(_ value: BriefingJSONValue?) -> Double? {

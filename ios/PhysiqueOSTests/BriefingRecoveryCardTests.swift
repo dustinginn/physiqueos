@@ -152,11 +152,50 @@ final class BriefingRecoveryCardTests: XCTestCase {
     }
 
     func testFoamRowNeedsAuthoritativeCounts() throws {
-        XCTAssertEqual(try XCTUnwrap(decodeWeekly(weeklyPayload(.foam))).foamRolling, .init(completed: 4, scheduled: 7))
-        let over = weeklyPayload(.foam).setting(["foamRolling", "completedOccurrences"], .number(8))
+        XCTAssertEqual(try XCTUnwrap(decodeWeekly(weeklyPayload(.green))).foamRolling, .init(completed: 4, scheduled: 7, missed: 3, excused: 0))
+        let over = weeklyPayload(.green).setting(["foamRolling", "completedOccurrences"], .number(8))
         XCTAssertNil(try XCTUnwrap(decodeWeekly(over)).foamRolling)
-        let observedOnly = weeklyPayload(.foam).setting(["foamRolling", "state"], .string("observed_only"))
+        let observedOnly = weeklyPayload(.green).setting(["foamRolling", "state"], .string("observed_only"))
         XCTAssertNil(try XCTUnwrap(decodeWeekly(observedOnly)).foamRolling)
+        XCTAssertNil(try XCTUnwrap(decodeWeekly(weeklyPayload(.nofoam))).foamRolling, "no schedule authority hides the row")
+        XCTAssertNil(try XCTUnwrap(decodeWeekly(weeklyPayload(.unavailable))).foamRolling, "observed-only foam hides the row")
+    }
+
+    func testFoamKeepsMissedAndExcusedSeparateAndMustAddUp() throws {
+        let monthly = try XCTUnwrap(BriefingRecoveryCardDecoder.decode(monthlyPayload(.yellow), cadence: .monthly, window: monthlyWindow, now: now))
+        XCTAssertEqual(monthly.foamRolling, .init(completed: 18, scheduled: 22, missed: 1, excused: 3))
+        let mismatched = weeklyPayload(.green).setting(["foamRolling", "excusedOccurrences"], .number(2))
+        XCTAssertNil(try XCTUnwrap(decodeWeekly(mismatched)).foamRolling, "a split that does not add up is refused")
+        let wrongState = weeklyPayload(.green).setting(["foamRolling", "state"], .string("on_track"))
+        XCTAssertNil(try XCTUnwrap(decodeWeekly(wrongState)).foamRolling, "missed occurrences must read as mixed")
+        // A pre-correction card without the split reads not-completed as missed.
+        let legacy = weeklyPayload(.green)
+            .setting(["foamRolling", "missedOccurrences"], nil)
+            .setting(["foamRolling", "excusedOccurrences"], nil)
+        XCTAssertEqual(try XCTUnwrap(decodeWeekly(legacy)).foamRolling, .init(completed: 4, scheduled: 7, missed: 3, excused: 0))
+        let allExcused = weeklyPayload(.green)
+            .setting(["foamRolling", "state"], .string("on_track"))
+            .setting(["foamRolling", "missedOccurrences"], .number(0))
+            .setting(["foamRolling", "excusedOccurrences"], .number(3))
+        XCTAssertEqual(try XCTUnwrap(decodeWeekly(allExcused)).foamRolling, .init(completed: 4, scheduled: 7, missed: 0, excused: 3))
+    }
+
+    func testEditorialTitlesAndTheMonthlyTitledCommentaryBlock() throws {
+        let monthly = try XCTUnwrap(BriefingRecoveryCardDecoder.decode(monthlyPayload(.yellow), cadence: .monthly, window: monthlyWindow, now: now))
+        XCTAssertEqual(BriefingRecoveryCopy.title(monthly), "Sleep softened across the second half")
+        XCTAssertEqual(monthly.commentary, .init(
+            headline: "Sleep softened across the second half",
+            title: "A multi-week shift",
+            body: "Two completed weeks were meaningfully below your prior 28-night baseline. No downstream training constraint was established."))
+        let weekly = try XCTUnwrap(decodeWeekly(weeklyPayload(.yellow)))
+        XCTAssertEqual(BriefingRecoveryCopy.title(weekly), "Sleep was persistently below baseline")
+        XCTAssertNil(weekly.commentary?.title, "Weekly commentary has no block title")
+        XCTAssertEqual(weekly.commentary?.body, "Five nights were materially low. No downstream training constraint was established.")
+        XCTAssertEqual(BriefingRecoveryCopy.title(try XCTUnwrap(decodeWeekly(weeklyPayload(.green)))), "Sleep stayed in your usual range", "Green keeps its fixed title")
+        let longTitle = monthlyPayload(.yellow).setting(["commentary", "title"], .string(String(repeating: "x", count: 401)))
+        let dropped = try XCTUnwrap(BriefingRecoveryCardDecoder.decode(longTitle, cadence: .monthly, window: monthlyWindow, now: now))
+        XCTAssertNil(dropped.commentary?.title)
+        XCTAssertNotNil(dropped.commentary, "an oversized block title drops only the title")
     }
 
     // MARK: Mapper non-leakage (Weekly and Monthly only)
@@ -231,8 +270,8 @@ final class BriefingRecoveryCardTests: XCTestCase {
     func testCopyIsTruthfulAndNeverAScore() throws {
         let yellow = try XCTUnwrap(decodeWeekly(try json(Self.serverWeeklyJSON)))
         XCTAssertEqual(BriefingRecoveryCopy.title(yellow), "Sleep was persistently below your personal baseline.")
-        XCTAssertEqual(BriefingRecoveryCopy.summary(yellow), "6h 02m average · −43m vs baseline · 7 of 7 nights")
-        XCTAssertEqual(BriefingRecoveryCopy.caveat(yellow), "Sleep uses the prior 28 reliable nights and excludes this period. Associations do not imply causation.")
+        XCTAssertEqual(BriefingRecoveryCopy.summary(yellow), "6h 02m average · 7 of 7 nights", "locked layout: no baseline delta in the summary")
+        XCTAssertEqual(BriefingRecoveryCopy.caveat(yellow), "Personal baseline excludes this period. Associations do not imply causation.")
         let green = try XCTUnwrap(decodeWeekly(weeklyPayload(.green)))
         XCTAssertEqual(BriefingRecoveryCopy.title(green), "Sleep stayed in your usual range")
         XCTAssertNil(green.commentary)
@@ -241,13 +280,15 @@ final class BriefingRecoveryCardTests: XCTestCase {
         XCTAssertNil(unavailable.deltaMinutes)
         XCTAssertEqual(BriefingRecoveryCopy.summary(unavailable), "3 of 7 nights available")
         XCTAssertTrue(BriefingRecoveryCopy.unavailableDetail(unavailable).contains("5 of 7 nights"))
-        let foam = try XCTUnwrap(decodeWeekly(weeklyPayload(.foam)))
-        XCTAssertTrue(BriefingRecoveryCopy.caveat(foam).contains("Foam rolling cannot set the Recovery status."))
-        XCTAssertEqual(BriefingRecoveryCopy.foamDetail(.init(completed: 4, scheduled: 7)), "3 not completed · status unchanged")
-        XCTAssertEqual(BriefingRecoveryCopy.signedMinutes(2.4), "+2m")
-        XCTAssertEqual(BriefingRecoveryCopy.signedMinutes(-0.2), "±0m")
+        let foam = try XCTUnwrap(decodeWeekly(weeklyPayload(.green)))
+        XCTAssertEqual(BriefingRecoveryCopy.summary(foam), "6h 47m average · 7 of 7 nights")
+        XCTAssertEqual(BriefingRecoveryCopy.caveat(foam), "Personal baseline excludes this period. Foam rolling cannot change status. Associations do not imply causation.")
+        let monthly = try XCTUnwrap(BriefingRecoveryCardDecoder.decode(monthlyPayload(.yellow), cadence: .monthly, window: monthlyWindow, now: now))
+        XCTAssertEqual(BriefingRecoveryCopy.summary(monthly), "6 hr 30 min average · 28 of 31 nights")
+        XCTAssertEqual(BriefingRecoveryCopy.caveat(monthly), "Sleep uses the prior 28 reliable nights and excludes this period. Foam rolling cannot set the Recovery status. Associations do not imply causation.")
         XCTAssertEqual(BriefingRecoveryCopy.duration(407), "6h 47m")
-        for card in [yellow, green, unavailable, foam] {
+        XCTAssertEqual(BriefingRecoveryCopy.longDuration(385), "6 hr 25 min")
+        for card in [yellow, green, unavailable, foam, monthly] {
             let all = [BriefingRecoveryCopy.title(card), BriefingRecoveryCopy.summary(card), BriefingRecoveryCopy.caveat(card), BriefingRecoveryCopy.chartSummary(card)].joined(separator: " ").lowercased()
             XCTAssertFalse(all.contains("score"))
             XCTAssertFalse(all.contains("caused"))
@@ -267,11 +308,30 @@ final class BriefingRecoveryCardTests: XCTestCase {
         XCTAssertLessThan(plot.minimum, unavailable.baselineMinutes)
         XCTAssertGreaterThan(plot.maximum, unavailable.baselineMinutes)
         XCTAssertTrue(BriefingRecoveryCopy.chartSummary(unavailable).hasPrefix("Weekly Sleep trend: Sunday 6 hours 41 minutes, Tuesday"))
+        let locked = try XCTUnwrap(BriefingRecoveryCardDecoder.decode(monthlyPayload(.yellow), cadence: .monthly, window: monthlyWindow, now: now))
+        XCTAssertEqual(BriefingRecoveryTrendChart.plot(locked).labels, ["W1", "W2", "W3", "W4", "W5"])
+        XCTAssertEqual(locked.points.map(\.totalSleepMinutes), [411, 402, 390, 372, 348])
+    }
+
+    func testFoamSublineMatchesTheLockedWording() {
+        XCTAssertEqual(BriefingRecoveryCopy.foamDetail(.init(completed: 4, scheduled: 7, missed: 3, excused: 0), cadence: .weekly), "Three misses · status unchanged")
+        XCTAssertEqual(BriefingRecoveryCopy.foamDetail(.init(completed: 6, scheduled: 7, missed: 1, excused: 0), cadence: .weekly), "One miss · status unchanged")
+        XCTAssertEqual(BriefingRecoveryCopy.foamDetail(.init(completed: 4, scheduled: 7, missed: 1, excused: 2), cadence: .weekly), "One miss · 2 excused · status unchanged")
+        XCTAssertEqual(BriefingRecoveryCopy.foamDetail(.init(completed: 7, scheduled: 7, missed: 0, excused: 0), cadence: .weekly), "Full execution · status unchanged")
+        XCTAssertEqual(BriefingRecoveryCopy.foamDetail(.init(completed: 18, scheduled: 22, missed: 1, excused: 3), cadence: .monthly), "3 excused · 1 missed")
+        XCTAssertEqual(BriefingRecoveryCopy.foamDetail(.init(completed: 20, scheduled: 22, missed: 2, excused: 0), cadence: .monthly), "2 missed")
+        XCTAssertEqual(BriefingRecoveryCopy.foamDetail(.init(completed: 22, scheduled: 22, missed: 0, excused: 0), cadence: .monthly), "Full execution")
+    }
+
+    func testReviewAnnotationsNeverAppearOutsideTheReviewFixture() throws {
+        XCTAssertFalse(BriefingRecoveryCopy.showsReviewAnnotations)
+        let card = try XCTUnwrap(decodeWeekly(weeklyPayload(.green)))
+        XCTAssertFalse(BriefingRecoveryCopy.caveat(card).contains("Confidence"))
     }
 
     @MainActor
     func testSectionRendersInBothAppearancesForEveryStatus() throws {
-        for scenario in [BriefingRecoveryReviewFixture.Scenario.green, .yellow, .red, .unavailable, .foam] {
+        for scenario in [BriefingRecoveryReviewFixture.Scenario.green, .yellow, .red, .unavailable, .nofoam] {
             for scheme in [ColorScheme.dark, .light] {
                 for card in [decodeWeekly(weeklyPayload(scenario)), BriefingRecoveryCardDecoder.decode(monthlyPayload(scenario), cadence: .monthly, window: monthlyWindow, now: now)] {
                     let renderer = ImageRenderer(content: BriefingRecoverySection(card: try XCTUnwrap(card))

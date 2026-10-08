@@ -9,11 +9,26 @@ import Foundation
 /// that artifact's own window) and runs it through the REAL
 /// `BriefingRecoveryCardDecoder`, so UI tests and captures exercise the
 /// shipping decode + SwiftUI path. Absent from Release builds.
+///
+/// The Green Weekly and Yellow Monthly scenarios carry the content of the
+/// Founder-locked 2026-10-04 boards (Weekly `weekly-recovery-dark.png`,
+/// Monthly `RECOVERY-MONTHLY-FUTURE-FIXTURE.json`), shaped by the sandbox
+/// artifact's own window.
 enum BriefingRecoveryReviewFixture {
     static let argument = "-physiqueos.recovery-review.scenario"
 
     enum Scenario: String, CaseIterable {
-        case green, yellow, red, unavailable, foam, malformed
+        /// Green with the foam row (Weekly lock: 4 of 7, three misses).
+        case green
+        /// Yellow (Monthly lock: editorial title, titled block, 3 excused · 1 missed).
+        case yellow
+        /// Sleep-only Red (training corroboration stays disabled).
+        case red
+        /// Not enough data; foam observed only, so the row stays hidden.
+        case unavailable
+        /// Green without foam schedule authority: no foam row.
+        case nofoam
+        case malformed
     }
 
     static var scenario: Scenario? {
@@ -52,20 +67,33 @@ enum BriefingRecoveryReviewFixture {
         let start = BriefingRecoveryCardDecoder.calendarDate(window.startDate)
         let end = BriefingRecoveryCardDecoder.calendarDate(window.endDate)
         let days = start.flatMap { start in end.map { Int(($0.timeIntervalSince(start) / 86_400).rounded()) + 1 } } ?? 0
-        let baseline = 405.0
+        let utc = TimeZone(secondsFromGMT: 0)!
+        let startWeekday = start.map { (Calendar(identifier: .gregorian).dateComponents(in: utc, from: $0).weekday ?? 1) - 1 } ?? 0
+        let lockedMonthly = cadence == .monthly && scenario == .yellow
+        // Weekly lock 405 (6h 45m); Monthly lock 404 (6h 44m).
+        let baseline = lockedMonthly ? 404.0 : 405.0
         let nightly: [Double?] = switch scenario {
-        case .green, .foam, .malformed: [403, 412, 395, 418, 407, 399, 416]
+        case .green, .nofoam, .malformed: [403, 412, 395, 418, 407, 399, 416]
         case .yellow: [399, 348, 337, 344, 359, 352, 397]
         case .red: [324, 301, 287, 296, 310, 293, 276]
         case .unavailable: [401, nil, 388, nil, nil, nil, 410]
         }
+        // Monthly lock: Sunday-week averages 411 · 402 · 390 · 372 · 348, three
+        // nights unavailable (a partial leading week is one of them).
+        let lockedWeeks: [Double] = [411, 402, 390, 372, 348]
         var nights: [(String, Double)] = []
         if let start {
             for offset in 0..<days {
-                // Monthly softens week by week for Yellow/Red so the weekly
-                // aggregates show a trend; Weekly uses the nightly pattern.
-                let drift = cadence == .monthly && (scenario == .yellow || scenario == .red) ? Double(offset / 7) * 9 - 18 : 0
-                if let value = nightly[offset % nightly.count].map({ $0 - drift }) {
+                let value: Double?
+                if lockedMonthly {
+                    let week = (offset + startWeekday) / 7 - (startWeekday == 0 ? 0 : 1)
+                    value = week < 0 || offset == 11 || offset == 19 ? nil : lockedWeeks[min(week, lockedWeeks.count - 1)]
+                } else {
+                    // Monthly Red softens week by week so the aggregates show a trend.
+                    let drift = cadence == .monthly && scenario == .red ? Double(offset / 7) * 9 - 18 : 0
+                    value = nightly[offset % nightly.count].map { $0 - drift }
+                }
+                if let value {
                     nights.append((BriefingRecoveryCardDecoder.key(start.addingTimeInterval(Double(offset) * 86_400)), value))
                 }
             }
@@ -78,7 +106,7 @@ enum BriefingRecoveryReviewFixture {
             var weeks: [(String, [Double])] = []
             for (date, value) in nights {
                 guard let day = BriefingRecoveryCardDecoder.calendarDate(date) else { continue }
-                let weekday = Calendar(identifier: .gregorian).dateComponents(in: TimeZone(secondsFromGMT: 0)!, from: day).weekday ?? 1
+                let weekday = Calendar(identifier: .gregorian).dateComponents(in: utc, from: day).weekday ?? 1
                 let sunday = BriefingRecoveryCardDecoder.key(day.addingTimeInterval(-Double(weekday - 1) * 86_400))
                 if weeks.last?.0 == sunday { weeks[weeks.count - 1].1.append(value) } else { weeks.append((sunday, [value])) }
             }
@@ -97,18 +125,40 @@ enum BriefingRecoveryReviewFixture {
         } else {
             state = "green"
         }
-        // The Server's commentary sentences, with this synthetic period's own
-        // counts (material: >= 30 min below baseline; severe: >= 75 min).
+        // The Server's editorial copy (RecoveryBriefingAssessmentServiceV1)
+        // with this synthetic period's own counts (material: >= 30 min below
+        // baseline; severe: >= 75 min).
         let materialLow = nights.filter { $0.1 <= baseline - 30 }.count
         let severeLow = nights.filter { $0.1 <= baseline - 75 }.count
-        let commentary: BriefingJSONValue = switch state {
-        case "yellow": .object(["visible": .bool(true), "headline": .string("Sleep was persistently below your personal baseline."), "body": .string("\(materialLow) nights were materially low.")])
-        case "red": .object(["visible": .bool(true), "headline": .string("Sleep strain was severe and persistent."), "body": .string("\(severeLow) nights were severely low.")])
-        default: .object(["visible": .bool(false), "headline": .null, "body": .null])
+        let commentary: BriefingJSONValue
+        switch (state, cadence) {
+        case ("yellow", .weekly):
+            commentary = .object(["visible": .bool(true), "headline": .string("Sleep was persistently below baseline"), "title": .null,
+                                  "body": .string("\(countWord(materialLow)) nights were materially low. No downstream training constraint was established.")])
+        case ("yellow", .monthly):
+            commentary = .object(["visible": .bool(true), "headline": .string("Sleep softened across the second half"), "title": .string("A multi-week shift"),
+                                  "body": .string("Two completed weeks were meaningfully below your prior 28-night baseline. No downstream training constraint was established.")])
+        case ("red", _):
+            commentary = .object(["visible": .bool(true), "headline": .string("Sleep strain was severe and persistent"),
+                                  "title": cadence == .monthly ? .string("A severe, persistent shift") : .null,
+                                  "body": .string("\(countWord(severeLow)) nights were severely low and the \(cadence == .monthly ? "month" : "period") average remained well below baseline.")])
+        default:
+            commentary = .object(["visible": .bool(false), "headline": .null, "title": .null, "body": .null])
         }
-        let foam: BriefingJSONValue = scenario == .foam
-            ? .object(["state": .string("mixed"), "scheduledOccurrences": .number(7), "completedOccurrences": .number(4)])
-            : .object(["state": .string("unavailable"), "scheduledOccurrences": .null, "completedOccurrences": .number(0)])
+        let foam: BriefingJSONValue
+        switch scenario {
+        case .nofoam, .malformed:
+            foam = .object(["state": .string("unavailable"), "scheduledOccurrences": .null, "completedOccurrences": .number(0), "missedOccurrences": .null, "excusedOccurrences": .null])
+        case .unavailable:
+            foam = .object(["state": .string("observed_only"), "scheduledOccurrences": .null, "completedOccurrences": .number(3), "missedOccurrences": .null, "excusedOccurrences": .null])
+        default:
+            let counts = foamCounts(cadence, scenario: scenario, days: days)
+            foam = .object([
+                "state": .string(counts.missed > 0 ? "mixed" : "on_track"),
+                "scheduledOccurrences": .number(Double(counts.scheduled)), "completedOccurrences": .number(Double(counts.completed)),
+                "missedOccurrences": .number(Double(counts.missed)), "excusedOccurrences": .number(Double(counts.excused)),
+            ])
+        }
         return .object([
             "schemaVersion": .string(scenario == .malformed ? "recovery_card_v0" : BriefingRecoveryCardDecoder.schemaVersion),
             "presentation": .string(BriefingRecoveryCardDecoder.presentation),
@@ -133,8 +183,24 @@ enum BriefingRecoveryReviewFixture {
             "commentary": commentary,
             "foamRolling": foam,
             // Diagnostic codes are part of the payload but never rendered.
-            "dataLimitations": .array([.string("foam_schedule_authority_unavailable_for_period"), .string("training_context_unavailable")]),
+            "dataLimitations": .array([.string("training_corroboration_disabled_for_publication")]),
         ])
+    }
+
+    /// Locked foam rows: Weekly 4 of 7 (three misses); Monthly 18 of 22
+    /// (3 excused · 1 missed, schedule effective mid-month).
+    private static func foamCounts(_ cadence: BriefingRecoveryCard.Cadence, scenario: Scenario, days: Int) -> (scheduled: Int, completed: Int, missed: Int, excused: Int) {
+        switch (cadence, scenario) {
+        case (.weekly, .yellow): (7, 6, 1, 0)
+        case (.weekly, _): (7, 4, 3, 0)
+        case (.monthly, .yellow): (22, 18, 1, 3)
+        case (.monthly, _): (days, days - 4, 2, 2)
+        }
+    }
+
+    private static func countWord(_ value: Int) -> String {
+        let words = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]
+        return words.indices.contains(value) ? words[value] : "\(value)"
     }
 }
 #endif

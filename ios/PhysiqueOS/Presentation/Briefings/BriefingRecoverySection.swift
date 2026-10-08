@@ -55,7 +55,9 @@ private struct BriefingRecoveryContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            BriefingSectionHead(glyph: "◒", label: "Recovery", tone: .cyan)
+            BriefingSectionHead(glyph: "◒", label: "Recovery", tone: .cyan) {
+                if BriefingRecoveryCopy.showsReviewAnnotations { fixtureFlag }
+            }
             lead
             metrics
             if card.status == .unavailable {
@@ -103,9 +105,11 @@ private struct BriefingRecoveryContent: View {
     private var metrics: some View {
         HStack(alignment: .bottom, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
+                // Locked 2026-10-04: Weekly leads with the large figure;
+                // Monthly keeps the compact uppercase figure over its label.
                 Text(card.averageMinutes.map(BriefingRecoveryCopy.duration) ?? "—")
-                    .briefingText(.j(30, 800, 1))
-                    .foregroundStyle(c.ink)
+                    .briefingText(card.cadence == .monthly ? .j(9, 800, tracking: 0.08, uppercase: true) : .j(30, 800, 1))
+                    .foregroundStyle(card.cadence == .monthly ? c.secondary : c.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text(card.cadence == .monthly ? "Month average" : "Period average")
@@ -154,7 +158,7 @@ private struct BriefingRecoveryContent: View {
                 Text("Foam rolling")
                     .briefingText(.j(12, 800))
                     .foregroundStyle(c.ink)
-                Text(BriefingRecoveryCopy.foamDetail(foam))
+                Text(BriefingRecoveryCopy.foamDetail(foam, cadence: card.cadence))
                     .briefingText(.j(10, 400))
                     .foregroundStyle(c.muted)
             }
@@ -172,6 +176,18 @@ private struct BriefingRecoveryContent: View {
     }
 
     private var statusColor: Color { BriefingRecoveryCopy.statusColor(card.status, c) }
+
+    /// `.fixture-flag`: DEBUG review captures only, never a shipping card.
+    private var fixtureFlag: some View {
+        Text("FUTURE CONTRACT · FIXTURE ONLY")
+            .briefingText(.j(8, 800, tracking: 0.04))
+            .foregroundStyle(BriefingPalette.fixed(0x73E2EA))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .overlay(Capsule().stroke(BriefingPalette.fixed(0x73E2EA, 0.4), lineWidth: 1))
+            .fixedSize()
+            .accessibilityIdentifier("briefing.recovery.fixtureFlag")
+    }
 }
 
 /// `.recovery-comment`: one inline block with a status-colored rule; never a
@@ -182,17 +198,24 @@ private struct BriefingRecoveryCommentary: View {
     let accent: Color
 
     var body: some View {
-        BriefingParagraph(commentary.body, .j(12, 400, 1.5), color: c.secondary)
-            .padding(.vertical, 13)
-            .padding(.horizontal, 14)
-            .padding(.leading, 3)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(c.ink.opacity(0.055))
-            .overlay(alignment: .leading) { Rectangle().fill(accent).frame(width: 3) }
-            .padding(.top, 17)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(commentary.body)
-            .accessibilityIdentifier("briefing.recovery.commentary")
+        VStack(alignment: .leading, spacing: 5) {
+            if let title = commentary.title {
+                Text(title)
+                    .briefingText(.j(12, 800))
+                    .foregroundStyle(accent)
+            }
+            BriefingParagraph(commentary.body, .j(12, 400, 1.5), color: c.secondary)
+        }
+        .padding(.vertical, 13)
+        .padding(.horizontal, 14)
+        .padding(.leading, 3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(c.ink.opacity(0.055))
+        .overlay(alignment: .leading) { Rectangle().fill(accent).frame(width: 3) }
+        .padding(.top, 17)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([commentary.title, commentary.body].compactMap { $0 }.joined(separator: ". "))
+        .accessibilityIdentifier("briefing.recovery.commentary")
     }
 }
 
@@ -334,13 +357,14 @@ enum BriefingRecoveryCopy {
         }
     }
 
+    /// Locked 2026-10-04: `6h 47m average · 7 of 7 nights` (Weekly) and
+    /// `6 hr 25 min average · 27 of 30 nights` (Monthly). The baseline
+    /// comparison lives in the metric row and graph, not here.
     static func summary(_ card: BriefingRecoveryCard) -> String {
         let coverage = "\(card.observedNights) of \(card.expectedNights) nights"
         guard let average = card.averageMinutes else { return "\(coverage) available" }
-        var parts = ["\(duration(average)) average"]
-        if let delta = card.deltaMinutes { parts.append("\(signedMinutes(delta)) vs baseline") }
-        parts.append(coverage)
-        return parts.joined(separator: " · ")
+        let figure = card.cadence == .monthly ? longDuration(average) : duration(average)
+        return "\(figure) average · \(coverage)"
     }
 
     static func unavailableDetail(_ card: BriefingRecoveryCard) -> String {
@@ -349,16 +373,57 @@ enum BriefingRecoveryCopy {
             : "Recovery needs at least 5 of 7 nights for a weekly status. Your personal baseline is ready."
     }
 
-    static func foamDetail(_ foam: BriefingRecoveryCard.FoamRolling) -> String {
-        let remaining = foam.scheduled - foam.completed
-        return remaining == 0 ? "Full execution · status unchanged" : "\(remaining) not completed · status unchanged"
+    /// Missed and excused stay separate (explicit Skips are excused).
+    /// Locked: Weekly `Three misses · status unchanged`; Monthly
+    /// `3 excused · 1 missed`.
+    static func foamDetail(_ foam: BriefingRecoveryCard.FoamRolling, cadence: BriefingRecoveryCard.Cadence) -> String {
+        switch cadence {
+        case .weekly:
+            guard foam.missed > 0 || foam.excused > 0 else { return "Full execution · status unchanged" }
+            var parts: [String] = []
+            if foam.missed > 0 { parts.append(foam.missed == 1 ? "One miss" : "\(countWord(foam.missed)) misses") }
+            if foam.excused > 0 { parts.append("\(foam.excused) excused") }
+            parts.append("status unchanged")
+            return parts.joined(separator: " · ")
+        case .monthly:
+            guard foam.missed > 0 || foam.excused > 0 else { return "Full execution" }
+            var parts: [String] = []
+            if foam.excused > 0 { parts.append("\(foam.excused) excused") }
+            if foam.missed > 0 { parts.append("\(foam.missed) missed") }
+            return parts.joined(separator: " · ")
+        }
     }
 
+    /// The locked caveat semantics per cadence. The design annotation
+    /// "Confidence coupling: none." is a review-fixture mark only.
     static func caveat(_ card: BriefingRecoveryCard) -> String {
-        var sentences = ["Sleep uses the prior 28 reliable nights and excludes this period."]
-        if card.foamRolling != nil { sentences.append("Foam rolling cannot set the Recovery status.") }
+        var sentences: [String]
+        switch card.cadence {
+        case .weekly:
+            sentences = ["Personal baseline excludes this period."]
+            if card.foamRolling != nil { sentences.append("Foam rolling cannot change status.") }
+        case .monthly:
+            sentences = ["Sleep uses the prior 28 reliable nights and excludes this period."]
+            if card.foamRolling != nil { sentences.append("Foam rolling cannot set the Recovery status.") }
+        }
         sentences.append("Associations do not imply causation.")
+        if showsReviewAnnotations { sentences.append("Confidence coupling: none.") }
         return sentences.joined(separator: " ")
+    }
+
+    /// DEBUG review captures reproduce the locked boards' design marks
+    /// (fixture flag, Confidence-coupling note); Release never shows them.
+    static var showsReviewAnnotations: Bool {
+        #if DEBUG
+        BriefingRecoveryReviewFixture.scenario != nil
+        #else
+        false
+        #endif
+    }
+
+    private static func countWord(_ value: Int) -> String {
+        let words = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven"]
+        return words.indices.contains(value) ? words[value] : "\(value)"
     }
 
     static func chartSummary(_ card: BriefingRecoveryCard) -> String {
@@ -378,17 +443,15 @@ enum BriefingRecoveryCopy {
         return "\(total / 60)h \(String(format: "%02d", total % 60))m"
     }
 
+    /// `6 hr 25 min` (Monthly summary).
+    static func longDuration(_ minutes: Double) -> String {
+        let total = Int(minutes.rounded())
+        return "\(total / 60) hr \(total % 60) min"
+    }
+
     static func spokenDuration(_ minutes: Double) -> String {
         let total = Int(minutes.rounded())
         return "\(total / 60) hours \(total % 60) minutes"
-    }
-
-    /// `+2m` / `−43m` (true minus) / `±0m`.
-    static func signedMinutes(_ value: Double) -> String {
-        let rounded = Int(value.rounded())
-        if rounded > 0 { return "+\(rounded)m" }
-        if rounded < 0 { return "−\(abs(rounded))m" }
-        return "±0m"
     }
 
     static func statusColor(_ status: BriefingRecoveryCard.Status, _ c: BriefingPalette) -> Color {
