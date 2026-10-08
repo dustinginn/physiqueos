@@ -180,6 +180,31 @@ describe("Recovery publication composition", () => {
 });
 
 describe("Recovery artifact boundary", () => {
+  it("survives a JSON (Postgres JSONB) round trip for every status, so a stored card always re-validates", () => {
+    const periods = [Array(7).fill(420), [420, 375, 375, 375, 375, 375, 420], [300, 300, 300, 300, 300, 420, 420],
+      [420, 420, 420, 420, null, null, null], [421.3, 389.7, 402.25, 377.9, 455.1, 300.05, 410]];
+    for (const period of periods) {
+      const attached = attachRecoveryAssessmentV1(artifactFor("weekly"), compose({ sleepDays: weeklySleep(period) }));
+      // JSONB also reorders keys; stable serialization must not care.
+      const reordered = JSON.parse(JSON.stringify(attached, (_key, value) => (value && typeof value === "object" && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value).reverse()) : value)));
+      expect(() => assertRecoveryCadenceInvariantV1(reordered)).not.toThrow();
+      expect(projectRecoveryCardForNativeV1(reordered)).toEqual(projectRecoveryCardForNativeV1(attached));
+    }
+    const monthly = attachRecoveryAssessmentV1(artifactFor("monthly"), compose({ cadence: "monthly", window: monthlyWindow(), sleepDays: monthlySleep() }));
+    expect(() => assertRecoveryCadenceInvariantV1(JSON.parse(JSON.stringify(monthly)))).not.toThrow();
+  });
+
+  it("lets a stored Weekly with a card be replaced through the write funnel", async () => {
+    const { createDailyBriefingRepository } = await import("../../data/repositories/DailyBriefingRepository.js");
+    const stored = JSON.parse(JSON.stringify(attachRecoveryAssessmentV1(artifactFor("weekly"), compose())));
+    const records = [stored];
+    const repository = createDailyBriefingRepository(records);
+    const replacement = carryForwardRecoveryAssessmentV1({ existing: stored, artifact: { ...artifactFor("weekly"), generatedAt: "2026-10-26T10:00:00.000Z" } });
+    await expect(repository.createDailyBriefing(replacement, { replacementReason: "late_evidence" })).resolves.toBeTruthy();
+    expect(records.at(-1).briefing[RECOVERY_ASSESSMENT_FIELD]).toEqual(stored.briefing[RECOVERY_ASSESSMENT_FIELD]);
+  });
+
   it("returns the SAME artifact object when nothing is attached", () => {
     const artifact = artifactFor("weekly");
     expect(attachRecoveryAssessmentV1(artifact, { attach: false })).toBe(artifact);
