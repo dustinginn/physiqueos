@@ -66,7 +66,8 @@ const ALLOWED = new Set([
   "platform/operations/HealthKitSleepCanonV3Activation.js",
   // Recovery Briefing V1 (Weekly/Monthly only): the bounded, read-only loader of
   // ordinary canonical Sleep days for the NON-strategic Recovery projection.
-  // Unwired (no composition constructs it); it never loads historical Sleep.
+  // Wired for Weekly/Monthly only; OFF without the authority record; it never
+  // loads historical Sleep.
   "platform/database/RecoverySleepInputReaderV1.js",
 ]);
 const NEEDLES = [

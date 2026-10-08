@@ -25,6 +25,8 @@ import { createHealthKitGraduationReader } from "../../platform/database/HealthK
 import { HealthKitGraduationPurpose } from "../../domain/services/HealthKitGraduation.js";
 import { createBriefingCadenceSettlementGate } from "../../domain/services/BriefingCadenceSettlementGate.js";
 import { createBriefingSettlementObserver } from "../../domain/services/BriefingSettlementObservability.js";
+import { createRecoveryBriefingComposerV1 } from "../../domain/services/RecoveryBriefingComposerV1.js";
+import { createRecoverySleepInputReaderV1 } from "../../platform/database/RecoverySleepInputReaderV1.js";
 
 export function createProviderBriefingCadenceRunner({
   pool,
@@ -70,6 +72,28 @@ export function createProviderBriefingCadenceRunner({
   // window, no repeated readiness_satisfied, ...) must outlive a single tick,
   // and this runner builds a fresh executor every tick.
   const settlementObserver = createBriefingSettlementObserver({ logger });
+  // Recovery Briefing V1 (Weekly and Monthly ONLY; never Midweek). OFF unless
+  // the Server-owned `recovery_briefing_publication_authority` record exists
+  // and is valid; none is installed. While it is absent, a NEW Weekly/Monthly
+  // costs one single-row authority lookup and ZERO Sleep reads, and the
+  // artifact is byte-identical. It never holds, fails or reorders a briefing,
+  // never touches settlement, Confidence, V3 or recommendations, and only
+  // reads ordinary prospective canonical Sleep days (non-strategic).
+  const recoveryReader = createRecoverySleepInputReaderV1({
+    query: (text, values) => pool.query(text, values),
+    ownerUserId,
+  });
+  const recoveryComposer = createRecoveryBriefingComposerV1({
+    readAuthorityRecord: recoveryReader.readAuthorityRecord,
+    readSleepInputs: recoveryReader.readSleepInputs,
+    // Decision codes only — never a Sleep value.
+    onDecision: (decision) => {
+      if (decision.reason === "publication_authority_disabled") return;
+      logger?.info?.("recovery_briefing_decision", {
+        cadence: decision.cadence, reason: decision.reason, detail: decision.detail ?? null,
+      });
+    },
+  });
   const tick = {
     async execute({ asOf = now() } = {}) {
       // ONE run == one tick == one coherent HealthKit evidence view (review
@@ -145,6 +169,7 @@ export function createProviderBriefingCadenceRunner({
             now: () => asOf,
             confidenceStoreResolver: async () => canonicalRuntime,
             cadenceLifecycle,
+            recoveryComposer,
           }),
           midweek: createMidweekBriefingService({
             repositories,
@@ -156,6 +181,7 @@ export function createProviderBriefingCadenceRunner({
             repositories,
             now: () => asOf,
             publicationService,
+            recoveryComposer,
           }),
         },
         executionStore,
