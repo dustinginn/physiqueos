@@ -77,23 +77,18 @@ struct FocusTileView: View {
         HStack(spacing: 8) {
             Button { onTap(item.destination) } label: { rowBody }
                 .buttonStyle(.plain)
+                .accessibilityLabel(accessibilityLabel)
+                .accessibilityHint("Opens priority details")
             if item.completable, !item.completed, !isCompleting, !isSkipping {
                 Button { onComplete(item) } label: { completeButton }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Mark \(item.title) complete")
             }
             if item.canonicalSkipCommand != nil, !item.completed, !isSkipping, !isCompleting {
-                Menu {
-                    Button("Skip", systemImage: "forward.end") { onSkip(item) }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("More actions for \(item.title)")
-                .accessibilityIdentifier("home.priority.\(item.id).actions")
+                HomePrioritySkipButton(
+                    title: item.title,
+                    identifier: "home.priority.\(item.id).skip"
+                ) { onSkip(item) }
             }
             if isCompleting {
                 Circle().fill(PhysiqueOSTheme.chartSuccess)
@@ -102,25 +97,23 @@ struct FocusTileView: View {
                     .accessibilityLabel("Completed")
             }
             if isSkipping {
-                Image(systemName: "forward.end")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
-                    .frame(width: 24, height: 24)
-                    .accessibilityLabel("Skipped")
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(PhysiqueOSTheme.redesignRed)
+                    .frame(width: 44, height: 44)
+                    .accessibilityLabel("Skipping \(item.title)")
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(minHeight: 62)
-        .background(item.color.background.opacity(0.72))
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(item.color.foreground.opacity(0.24), lineWidth: 1)
+                .strokeBorder(item.color.foreground.opacity(0.32), lineWidth: 1)
         )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityAddTraits(.isButton)
+        .accessibilityElement(children: .contain)
     }
 
     private var rowBody: some View {
@@ -128,16 +121,16 @@ struct FocusTileView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .physiqueOSFont(PhysiqueOSTypography.focusLabel)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 if let executionContext = PriorityExecutionContextPresentation.primaryLine(for: item) {
                     Text(executionContext)
                         .physiqueOSFont(PhysiqueOSTypography.focusSubtitle)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 if (density == .expanded || item.changeLabel != nil), let metadata = item.metadata {
                     Text(metadata)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 }
                 if let changeLabel = item.changeLabel {
                     Text(changeLabel)
@@ -187,8 +180,38 @@ struct FocusTileView: View {
     private var completeButton: some View {
         Circle()
             .fill(.clear)
-            .overlay(Circle().stroke(item.color.foreground, lineWidth: 1.2))
+            .overlay(Circle().stroke(PhysiqueOSTheme.redesignGreen, lineWidth: 1.5))
+            .overlay(
+                Image(systemName: "checkmark")
+                    .font(.system(size: 10, weight: .black))
+                    .foregroundStyle(PhysiqueOSTheme.redesignGreen)
+            )
             .frame(width: 28, height: 28)
             .frame(minWidth: 44, minHeight: 44)
+    }
+}
+
+/// Home's terminal Skip is intentionally a direct, independent action.
+/// The visible red circle is compact; the outer 44-point frame is the
+/// actual hit region and is kept separate from row navigation and Complete.
+struct HomePrioritySkipButton: View {
+    let title: String
+    let identifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "minus")
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(.white)
+                .frame(width: 28, height: 28)
+                .background(PhysiqueOSTheme.redesignRed, in: Circle())
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Skip \(title)")
+        .accessibilityHint("Marks only this occurrence skipped")
+        .accessibilityIdentifier(identifier)
     }
 }

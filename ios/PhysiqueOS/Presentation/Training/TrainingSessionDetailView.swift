@@ -407,26 +407,73 @@ struct TrainingSessionDetailView: View {
 private struct TrainingSupportingMediaImage: View {
     @Environment(AppEnvironment.self) private var environment
     let mediaId: String
+    private let m = EvidenceMetrics(family: .training)
 
     var body: some View {
         Group {
             switch environment.founderProductionPhotoMediaStore.imageStates[mediaId] ?? .idle {
             case .idle, .loading:
-                ProgressView().tint(PhysiqueOSTheme.accent).frame(maxWidth: .infinity, minHeight: 120)
+                supportingState(icon: nil, title: "Loading screenshot…", loading: true)
             case .loaded(let image):
                 Image(uiImage: image).resizable().scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .clipShape(RoundedRectangle(cornerRadius: m.pt(12), style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: m.pt(12), style: .continuous).strokeBorder(m.c.line, lineWidth: m.pt(1)))
+                    .accessibilityLabel("Supporting workout screenshot")
             case .failed:
-                Button("Retry screenshot") {
+                Button {
                     Task { await environment.founderProductionPhotoMediaStore.retryImage(mediaId: mediaId) }
+                } label: {
+                    supportingState(
+                        icon: "arrow.clockwise",
+                        title: "Screenshot couldn't load",
+                        detail: "Tap to try again"
+                    )
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Retry supporting screenshot")
             case .unavailable:
-                Text("Screenshot unavailable")
-                    .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                supportingState(
+                    icon: "photo.badge.exclamationmark",
+                    title: "Screenshot unavailable",
+                    detail: "The workout record remains available without this image."
+                )
             }
         }
+        .accessibilityIdentifier("training.session.media.\(mediaId)")
         .task(id: mediaId) { await environment.founderProductionPhotoMediaStore.loadImage(mediaId: mediaId) }
+    }
+
+    private func supportingState(
+        icon: String?,
+        title: String,
+        detail: String? = nil,
+        loading: Bool = false
+    ) -> some View {
+        VStack(spacing: m.pt(7)) {
+            if loading {
+                ProgressView().tint(m.c.accent)
+            } else if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: m.pt(17), weight: .semibold))
+                    .foregroundStyle(m.c.accent)
+                    .accessibilityHidden(true)
+            }
+            Text(title)
+                .evidenceText(.normal(11, 800))
+                .foregroundStyle(m.c.ink)
+            if let detail {
+                Text(detail)
+                    .evidenceText(EvidenceTextStyle(size: 9, weight: 400, lineHeight: 12.6))
+                    .foregroundStyle(m.c.muted)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding(m.pt(14))
+        .frame(maxWidth: .infinity, minHeight: m.pt(120))
+        .background(m.c.surface2, in: RoundedRectangle(cornerRadius: m.pt(12), style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: m.pt(12), style: .continuous).strokeBorder(m.c.line, lineWidth: m.pt(1)))
+        .contentShape(RoundedRectangle(cornerRadius: m.pt(12), style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 }
 

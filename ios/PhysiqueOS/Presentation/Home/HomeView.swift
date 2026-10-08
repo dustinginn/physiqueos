@@ -25,7 +25,7 @@ struct HomeView: View {
     @State private var confidenceDetailPresentation: (confidence: Int, detail: ConfidenceDetail)?
     @State private var completingPriorityIDs: Set<String> = []
     @State private var skippingPriorityIDs: Set<String> = []
-    @State private var skipCandidate: HomePrioritySkipCandidate?
+    @State private var priorityAcknowledgements: [HomePriorityAcknowledgement] = []
     @State private var priorityActionError: String?
     var onNavigate: (AppDestination) -> Void
 
@@ -95,21 +95,6 @@ struct HomeView: View {
             Button("OK", role: .cancel) { priorityActionError = nil }
         } message: {
             Text(priorityActionError ?? "Please try again.")
-        }
-        .confirmationDialog(
-            "Skip \(skipCandidate?.title ?? "this priority")?",
-            isPresented: Binding(
-                get: { skipCandidate != nil },
-                set: { if !$0 { skipCandidate = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Mark Skipped", role: .destructive) {
-                if let candidate = skipCandidate { performSkip(candidate) }
-            }
-            Button("Cancel", role: .cancel) { skipCandidate = nil }
-        } message: {
-            Text("Only this occurrence will be skipped. Its schedule and future occurrences stay unchanged.")
         }
         .sheet(item: Binding(
             get: { confidenceDetailPresentation.map(ConfidenceDetailPresentation.init) },
@@ -210,25 +195,33 @@ struct HomeView: View {
     private var content: some View {
         switch viewModel?.state {
         case .none, .loading:
-            ProgressView()
-                .tint(PhysiqueOSTheme.accent)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            HomeStatePanel(
+                icon: nil,
+                title: "Loading today…",
+                detail: "Checking your latest priorities, evidence, and goal progress.",
+                isLoading: true
+            )
         case .failed(let message):
-            Text(message)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                .frame(maxWidth: .infinity, minHeight: 300)
+            HomeStatePanel(
+                icon: "exclamationmark.triangle.fill",
+                title: "Home couldn't refresh",
+                detail: message + " Pull to refresh."
+            )
         case .reconnectRequired:
-            VStack(spacing: 14) {
-                Text("This secure session ended. Reconnect this iPhone to continue; canonical data is unchanged.")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
-                    .multilineTextAlignment(.center)
-                PrimaryActionButton(title: "Reconnect this iPhone") {
-                    onNavigate(.founderServerConnection)
+            HomeStatePanel(
+                icon: "iphone.and.arrow.forward",
+                title: "Reconnect this iPhone",
+                detail: "This secure session ended. Canonical data is unchanged."
+            ) {
+                Button { onNavigate(.founderServerConnection) } label: {
+                    Text("Reconnect this iPhone")
+                        .font(.system(size: 14, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(PhysiqueOSTheme.redesignPurple, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
+                .buttonStyle(.plain)
             }
-            .frame(maxWidth: .infinity, minHeight: 300)
         case .loaded(let home):
             VStack(alignment: .leading, spacing: 12) {
                 HomeHeaderView(header: home.header)
@@ -275,6 +268,22 @@ struct HomeView: View {
                     GoalsCardView(goals: Array(home.goals.dropFirst()), onTap: onNavigate)
                 }
 
+                if let acknowledgement = priorityAcknowledgements.first {
+                    HomePriorityAcknowledgementView(acknowledgement: acknowledgement)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        .task(id: acknowledgement.id) {
+                            try? await Task.sleep(for: .milliseconds(1_300))
+                            guard priorityAcknowledgements.first?.id == acknowledgement.id else { return }
+                            if reduceMotion {
+                                priorityAcknowledgements.removeFirst()
+                            } else {
+                                withAnimation(.easeOut(duration: 0.22)) {
+                                    priorityAcknowledgements.removeFirst()
+                                }
+                            }
+                        }
+                }
+
                 if home.hasTodaysFocus {
                     if environment.notificationAuthorizationStatus == .denied,
                        hasScheduleableFocusItem(
@@ -290,11 +299,14 @@ struct HomeView: View {
                         onTap: onNavigate,
                         onComplete: { occurrence in
                         guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: environment.nativeAuthority)) != nil else { return }
+                        guard !completingPriorityIDs.contains(occurrence.id),
+                              !skippingPriorityIDs.contains(occurrence.id) else { return }
                         completingPriorityIDs.insert(occurrence.id)
                         Task { @MainActor in
                             if environment.nativeAuthority == .sandbox {
                                 environment.loggingSandboxStore.completePriority(occurrenceId: occurrence.id, context: occurrence.completionContext)
                                 environment.feedback.play(.priorityCompleted)
+                                enqueuePriorityAcknowledgement(.init(occurrenceID: occurrence.id, kind: .completed))
                                 await settlePriorityCompletion(occurrence.id) { viewModel?.refreshTodaysFocus() }
                                 return
                             }
@@ -312,6 +324,7 @@ struct HomeView: View {
                                 )
                                 // Confirmed canonical completion only, never the tap.
                                 environment.feedback.play(.priorityCompleted)
+                                enqueuePriorityAcknowledgement(.init(occurrenceID: occurrence.id, kind: .completed))
                                 await PriorityNotificationScheduler.cleanupCompletedOccurrence(
                                     priorityId: occurrence.routePriorityId ?? occurrence.id,
                                     occurrenceDate: occurrence.date
@@ -328,19 +341,19 @@ struct HomeView: View {
                         },
                         onSkip: { occurrence in
                             guard let command = occurrence.canonicalSkipCommand else { return }
-                            skipCandidate = .init(
+                            performSkip(.init(
                                 occurrenceID: occurrence.id,
                                 title: occurrence.title,
                                 command: command
-                            )
+                            ))
                         },
                         onSkipSessionItem: { _, child in
                             guard let command = child.canonicalSkipCommand else { return }
-                            skipCandidate = .init(
+                            performSkip(.init(
                                 occurrenceID: child.id,
                                 title: child.label,
                                 command: command
-                            )
+                            ))
                         }
                     )
                     .transition(.opacity)
@@ -373,15 +386,17 @@ struct HomeView: View {
     /// The acknowledged occurrence is removed only after the canonical write;
     /// uncertain/stale failures remain visible and invite a truthful refresh.
     private func performSkip(_ candidate: HomePrioritySkipCandidate) {
-        skipCandidate = nil
         guard (try? NativeProductWriteGuard.authorize(.priorityCompletion, in: environment.nativeAuthority)) != nil,
-              environment.nativeAuthority == .founderProduction
+              environment.nativeAuthority == .founderProduction,
+              !skippingPriorityIDs.contains(candidate.occurrenceID),
+              !completingPriorityIDs.contains(candidate.occurrenceID)
         else { return }
         skippingPriorityIDs.insert(candidate.occurrenceID)
         Task { @MainActor in
             do {
                 try await environment.priorityCompletionWriteAPI.skip(command: candidate.command)
                 environment.feedback.play(.prioritySkipped)
+                enqueuePriorityAcknowledgement(.init(occurrenceID: candidate.occurrenceID, kind: .skipped))
                 await PriorityNotificationScheduler.cleanupCompletedOccurrence(
                     priorityId: candidate.command.payload.priorityId,
                     occurrenceDate: candidate.command.payload.occurrenceDate
@@ -400,6 +415,15 @@ struct HomeView: View {
             }
         }
     }
+
+    /// Confirmed terminal writes are queued so simultaneous child and
+    /// top-level actions never replace or duplicate one another's feedback.
+    /// The acknowledgement lives above the list, so it remains visible when
+    /// reconciliation removes the final priority row.
+    private func enqueuePriorityAcknowledgement(_ acknowledgement: HomePriorityAcknowledgement) {
+        guard !priorityAcknowledgements.contains(where: { $0.id == acknowledgement.id }) else { return }
+        priorityAcknowledgements.append(acknowledgement)
+    }
 }
 
 private struct HomePrioritySkipCandidate: Identifiable {
@@ -407,6 +431,107 @@ private struct HomePrioritySkipCandidate: Identifiable {
     let title: String
     let command: PriorityNotificationSkipCommand
     var id: String { "\(command.payload.priorityId)|\(command.payload.occurrenceDate)" }
+}
+
+enum HomePriorityAcknowledgementKind: String, Equatable {
+    case completed
+    case skipped
+
+    var title: String { rawValue.capitalized }
+    var systemImage: String { self == .completed ? "checkmark" : "minus" }
+}
+
+struct HomePriorityAcknowledgement: Identifiable, Equatable {
+    let occurrenceID: String
+    let kind: HomePriorityAcknowledgementKind
+    var id: String { "\(occurrenceID)|\(kind.rawValue)" }
+}
+
+private struct HomePriorityAcknowledgementView: View {
+    let acknowledgement: HomePriorityAcknowledgement
+
+    private var tone: Color {
+        acknowledgement.kind == .completed ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignRed
+    }
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: acknowledgement.kind.systemImage)
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(tone, in: Circle())
+                .accessibilityHidden(true)
+            Text(acknowledgement.kind.title)
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .background(PhysiqueOSTheme.redesignPaper, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(tone.opacity(0.42), lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(acknowledgement.kind.title)
+        .accessibilityIdentifier("home.priority.acknowledgement.\(acknowledgement.kind.rawValue)")
+    }
+}
+
+private struct HomeStatePanel<Action: View>: View {
+    let icon: String?
+    let title: String
+    let detail: String?
+    var isLoading = false
+    @ViewBuilder var action: Action
+
+    init(
+        icon: String?,
+        title: String,
+        detail: String? = nil,
+        isLoading: Bool = false,
+        @ViewBuilder action: () -> Action
+    ) {
+        self.icon = icon
+        self.title = title
+        self.detail = detail
+        self.isLoading = isLoading
+        self.action = action()
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            if isLoading {
+                ProgressView().tint(PhysiqueOSTheme.redesignTeal)
+            } else if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(PhysiqueOSTheme.redesignPurple)
+                    .accessibilityHidden(true)
+            }
+            Text(title)
+                .font(.system(size: 17, weight: .heavy))
+                .foregroundStyle(PhysiqueOSTheme.redesignInk)
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            action
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .background(PhysiqueOSTheme.redesignPaper, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(PhysiqueOSTheme.redesignRule))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home.state.\(isLoading ? "loading" : "message")")
+    }
+}
+
+private extension HomeStatePanel where Action == EmptyView {
+    init(icon: String?, title: String, detail: String? = nil, isLoading: Bool = false) {
+        self.init(icon: icon, title: title, detail: detail, isLoading: isLoading) { EmptyView() }
+    }
 }
 
 private struct ConfidenceDetailPresentation: Identifiable {
@@ -426,10 +551,10 @@ private struct NotificationsDisabledNotice: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "bell.slash.fill")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignAmberInk)
                 Text("Notifications are off, so scheduled priority reminders won't fire. Enable them in Settings to get reminded.")
                     .physiqueOSFont(PhysiqueOSTypography.caption12Medium)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
             }
         }
         .accessibilityIdentifier("home.notificationsDisabledNotice")
@@ -457,7 +582,7 @@ private struct LastKnownHomeNotice: View {
                 ? "Couldn't refresh. Showing your last update\(asOf) — pull to refresh."
                 : "Updating your last update\(asOf)…")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("home.lastKnownNotice")

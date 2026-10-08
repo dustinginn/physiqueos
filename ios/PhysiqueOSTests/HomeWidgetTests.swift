@@ -4,6 +4,12 @@ import XCTest
 @testable import PhysiqueOS
 
 final class HomeWidgetTests: XCTestCase {
+    func testRefreshKeepsCompactGlyphInsideMinimumAccessibleTarget() {
+        XCTAssertEqual(HomeWidgetInteractionMetrics.refreshHitTarget, 44)
+        XCTAssertLessThan(HomeWidgetInteractionMetrics.smallRefreshGlyphFrame, HomeWidgetInteractionMetrics.refreshHitTarget)
+        XCTAssertLessThan(HomeWidgetInteractionMetrics.largeRefreshGlyphFrame, HomeWidgetInteractionMetrics.refreshHitTarget)
+    }
+
     func testRefreshAccentUsesTheStartLoggerActionSemanticInBothAppearances() {
         for colorScheme in [ColorScheme.dark, .light] {
             let palette = HomeWidgetPalette(colorScheme: colorScheme)

@@ -43,6 +43,12 @@ enum HomeWidgetValueFormatter {
     }
 }
 
+enum HomeWidgetInteractionMetrics {
+    static let refreshHitTarget: CGFloat = 44
+    static let smallRefreshGlyphFrame: CGFloat = 24
+    static let largeRefreshGlyphFrame: CGFloat = 28
+}
+
 struct HomeLoggedTodayWidgetView: View {
     let snapshot: HomeWidgetSnapshot?
     let date: Date
@@ -105,7 +111,14 @@ struct HomeLoggedTodayWidgetView: View {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(palette.refreshAccent)
-                        .frame(width: 24, height: 24)
+                        .frame(
+                            width: HomeWidgetInteractionMetrics.smallRefreshGlyphFrame,
+                            height: HomeWidgetInteractionMetrics.smallRefreshGlyphFrame
+                        )
+                        .frame(
+                            minWidth: HomeWidgetInteractionMetrics.refreshHitTarget,
+                            minHeight: HomeWidgetInteractionMetrics.refreshHitTarget
+                        )
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -167,7 +180,14 @@ struct HomeLoggedTodayWidgetView: View {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(palette.refreshAccent)
-                    .frame(width: 28, height: 28)
+                    .frame(
+                        width: HomeWidgetInteractionMetrics.largeRefreshGlyphFrame,
+                        height: HomeWidgetInteractionMetrics.largeRefreshGlyphFrame
+                    )
+                    .frame(
+                        minWidth: HomeWidgetInteractionMetrics.refreshHitTarget,
+                        minHeight: HomeWidgetInteractionMetrics.refreshHitTarget
+                    )
                     .contentShape(Rectangle())
             }
             .accessibilityLabel("Refresh totals in PhysiqueOS")

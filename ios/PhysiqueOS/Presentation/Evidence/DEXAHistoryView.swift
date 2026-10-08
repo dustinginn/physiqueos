@@ -81,7 +81,7 @@ struct DEXAHistoryView: View {
         case .none, .loading:
             EvidenceStateCard(kind: .loading("Loading DEXA Evidence…"), identifier: "dexa.loading")
         case .failed(let message):
-            EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "dexa.failure")
+            EvidenceStateCard(kind: .failure(title: message, detail: "Pull to refresh or try again."), identifier: "dexa.failure")
         case .loaded(let report):
             EvidenceHeaderView(domain: .dexa, eyebrow: "Evidence Report", title: report.title, subtitle: report.subtitle, exposesTexts: true)
             EvidenceScopePicker(scope: report.scope) { pillID in
@@ -620,15 +620,32 @@ private struct DEXAPDFSheet: View {
 
     var body: some View {
         NavigationStack {
-            DEXAPDFView(data: presentation.data)
-                .background(PhysiqueOSTheme.background)
+            ZStack {
+                PhysiqueOSTheme.redesignCanvas.ignoresSafeArea()
+                DEXAPDFView(data: presentation.data)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(PhysiqueOSTheme.redesignRule))
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 10)
+            }
                 .navigationTitle("BodySpec Report")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(PhysiqueOSTheme.redesignCanvas, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Label("Read-only PDF", systemImage: "doc.richtext")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                            .accessibilityLabel("Read-only BodySpec PDF")
+                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { dismiss() }
+                            .fontWeight(.bold)
+                            .tint(PhysiqueOSTheme.redesignTeal)
                     }
                 }
+                .accessibilityIdentifier("dexa.pdf.sheet")
         }
     }
 }
@@ -641,7 +658,7 @@ private struct DEXAPDFView: UIViewRepresentable {
         view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
-        view.backgroundColor = UIColor(PhysiqueOSTheme.background)
+        view.backgroundColor = UIColor(PhysiqueOSTheme.redesignPaper)
         view.document = PDFDocument(data: data)
         return view
     }

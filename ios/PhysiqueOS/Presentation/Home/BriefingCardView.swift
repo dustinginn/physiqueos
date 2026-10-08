@@ -7,7 +7,7 @@ struct BriefingCardView: View {
     var onTap: (AppDestination) -> Void
 
     var body: some View {
-        let content = CardContainer(padding: .sm) {
+        let content = CardContainer(padding: .sm, background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading(card.sectionLabel) {
                     if card.destination != nil {
@@ -25,17 +25,17 @@ struct BriefingCardView: View {
                         HStack(alignment: .top) {
                             Text(card.title)
                                 .physiqueOSFont(PhysiqueOSTypography.briefingTitle)
-                                .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInk)
                             Spacer(minLength: 8)
                             if let relative = card.createdAt.flatMap({ Self.relativeDateLabel(from: $0) }) {
                                 Text(relative)
                                     .physiqueOSFont(PhysiqueOSTypography.briefingTimestamp)
-                                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             }
                         }
                         Text(card.prompt)
                             .physiqueOSFont(PhysiqueOSTypography.briefingPrompt)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     }
                 }
             }

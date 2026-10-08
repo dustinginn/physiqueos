@@ -6,6 +6,32 @@ import XCTest
 /// native must decode and display server-owned values, never derive them.
 final class HomeReadModelTests: XCTestCase {
 
+    func testHomePriorityAcknowledgementHasStableTerminalIdentityAndCopy() {
+        let completed = HomePriorityAcknowledgement(occurrenceID: "priority-1", kind: .completed)
+        let skipped = HomePriorityAcknowledgement(occurrenceID: "priority-1", kind: .skipped)
+        XCTAssertEqual(completed.id, "priority-1|completed")
+        XCTAssertEqual(completed.kind.title, "Completed")
+        XCTAssertEqual(skipped.id, "priority-1|skipped")
+        XCTAssertEqual(skipped.kind.title, "Skipped")
+        XCTAssertNotEqual(completed, skipped)
+    }
+
+    func testHomeSkipIsDirectAndKeepsIndependentAccessibleHitRegion() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let home = root.appendingPathComponent("PhysiqueOS/Presentation/Home")
+        let focus = try String(contentsOf: home.appendingPathComponent("FocusTileView.swift"), encoding: .utf8)
+        let grouped = try String(contentsOf: home.appendingPathComponent("TodaysFocusCardView.swift"), encoding: .utf8)
+        let screen = try String(contentsOf: home.appendingPathComponent("HomeView.swift"), encoding: .utf8)
+
+        XCTAssertFalse(focus.contains("Menu {"), "A top-level Home priority must not hide Skip in a menu.")
+        XCTAssertFalse(grouped.contains("Menu {"), "A grouped child priority must not hide Skip in a menu.")
+        XCTAssertFalse(screen.contains("skipCandidate"), "Home must submit an eligible projected Skip directly.")
+        XCTAssertFalse(screen.contains(".confirmationDialog("), "Home Skip must not add a second confirmation tap.")
+        XCTAssertTrue(focus.contains("minWidth: 44"))
+        XCTAssertTrue(focus.contains("accessibilityLabel(\"Skip \\(title)\")"))
+        XCTAssertTrue(grouped.contains("HomePrioritySkipButton("))
+    }
+
     func testHomeSkipComesOnlyFromExactProjectedCommand() {
         var actionable = Self.executionContextItem(title: "Fadogia", time: "08:00", dose: nil)
         actionable.routePriorityId = "reminder_fadogia"

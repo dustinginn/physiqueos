@@ -49,17 +49,17 @@ struct GoalRowView: View {
                 }
                 Text(goal.title)
                     .physiqueOSFont(PhysiqueOSTypography.goalTitle)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     .lineLimit(1)
                 if isPrimary {
                     Text("\(goal.current)\(goal.unit) → \(goal.target)\(goal.unit)")
                         .physiqueOSFont(PhysiqueOSTypography.goalRange)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
                 if let phaseLabel {
                     Text(phaseLabel)
                         .physiqueOSFont(PhysiqueOSTypography.goalRange)
-                        .foregroundStyle(PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(PhysiqueOSTheme.redesignMuted)
                         .lineLimit(1)
                 }
             }
@@ -103,17 +103,17 @@ struct GoalRowView: View {
                         .foregroundStyle(goal.color.foreground)
                     Text("Complete")
                         .physiqueOSFont(PhysiqueOSTypography.goalProgressCaption)
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
         case .supporting(let status, let detail):
             VStack(alignment: .trailing, spacing: 2) {
                 Text(status)
                     .physiqueOSFont(PhysiqueOSTypography.goalStatusValue)
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 Text(detail)
                     .physiqueOSFont(PhysiqueOSTypography.goalStatusDetail)
-                    .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     .multilineTextAlignment(.trailing)
                     .lineLimit(2)
             }
@@ -315,7 +315,7 @@ struct GoalsCardView: View {
     var onTap: (AppDestination) -> Void
 
     var body: some View {
-        CardContainer(padding: .sm) {
+        CardContainer(padding: .sm, background: PhysiqueOSTheme.redesignPaper) {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Your Goals")
                 VStack(spacing: 0) {

@@ -207,7 +207,8 @@ struct EvidenceSectionTitle: View {
 struct EvidenceStateCard: View {
     enum Kind: Equatable {
         case loading(String)
-        case message(title: String, detail: String?)
+        case empty(title: String, detail: String?)
+        case failure(title: String, detail: String?)
     }
 
     let kind: Kind
@@ -224,10 +225,30 @@ struct EvidenceStateCard: View {
                 Text(copy)
                     .evidenceLockedText(S.stateCopy)
                     .foregroundStyle(S.muted)
-            case .message(let title, let detail):
+            case .empty(let title, let detail):
+                Image(systemName: "tray")
+                    .font(.system(size: S.pt(18), weight: .semibold))
+                    .foregroundStyle(S.muted)
+                    .padding(.bottom, S.pt(8))
+                    .accessibilityHidden(true)
                 Text(title)
                     .evidenceLockedText(S.stateTitle)
                     .foregroundStyle(S.ink)
+                if let detail {
+                    Text(detail)
+                        .evidenceLockedText(S.stateCopy)
+                        .foregroundStyle(S.muted)
+                        .padding(.top, S.pt(4))
+                }
+            case .failure(let title, let detail):
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: S.pt(18), weight: .semibold))
+                    .foregroundStyle(S.red)
+                    .padding(.bottom, S.pt(8))
+                    .accessibilityHidden(true)
+                Text(title)
+                    .evidenceLockedText(S.stateTitle)
+                    .foregroundStyle(S.red)
                 if let detail {
                     Text(detail)
                         .evidenceLockedText(S.stateCopy)
