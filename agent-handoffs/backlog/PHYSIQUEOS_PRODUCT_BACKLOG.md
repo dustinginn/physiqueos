@@ -17,12 +17,14 @@ Agent handoff reports describe implementation state. This backlog describes what
 
 
 NEXT BUILD 93 — FOUNDER NOTES CONSOLIDATED (CANDIDATES; SCOPE AND RELEASE NOT YET AUTHORIZED)
-PRIMARY WORKOUT CTA CONTINUITY — FOUNDER REQUIREMENT 2026-10-08 (COLOR DECISION NOT YET RECONCILED)
+PRIMARY WORKOUT CTA CONTINUITY — MINERAL LIGHT LOCKED; DARK SOURCE AUDIT PENDING (2026-10-08)
 - Founder requests one matching primary-action button color PER APPEARANCE across THREE surfaces: iPhone Logger "Finish Workout", Watch workout "Complete Set", and iPhone Live Activity "Complete Set". No mismatched Watch purple vs iPhone amber or Live Activity teal.
+- FOUNDER FINAL MINERAL LIGHT DECISION: use the EXISTING warm/darkish AMBER color of the iPhone Logger "Finish Workout" button in Mineral Light as the authoritative primary button color on ALL THREE surfaces. This supersedes prior Mineral Light Live Activity Option B DARK INK button selection, while its neutral mineral surfaces and restrained accents may remain. Do not recolor the existing iPhone Finish Workout button; reuse its actual semantic color token on Watch and Live Activity, with contrast-safe foreground.
+- DARK MODE OPEN QUESTION: identify the ACTUAL current shipping iPhone Dark Finish Workout button token/color from exact Build92 source and an authentic Dark screenshot. Report that value to Founder before deciding Dark parity across all three. Do not assume Dark is amber merely because the Light button is amber, and do not apply the prior Dark Live Activity amber swatch to iPhone/Watch without the Founder's follow-up.
 - Earlier LIVE ACTIVITY selections: Dark WARM AMBER primary/highlight, Mineral Light OPTION B MINERAL NEUTRAL with DARK INK primary and restrained amber accents. These are still recorded design preferences, but founder now prioritizes three-surface continuity and asks to reconcile them with the actual existing iPhone Finish Workout tokens before finalizing implementation. DO NOT silently assume that the two prior Live Activity swatch values equal the shipping iPhone button tokens.
 - First coder task: audit actual shipping iPhone Finish Workout button semantic token separately in Dark and Mineral Light, then present exact comparison against the two previously selected Live Activity directions. Do not invent values or make a unilateral global accent decision. If they differ, request one concise Founder choice: retain the prior Live Activity colors across all three, or use actual iPhone Finish Workout colors across all three. Until resolved, do not ship mismatched colors.
 - Shared semantic workout CTA token (per theme) is preferred for all three surfaces where supported; ensure readable foreground text, ActivityKit/Watch propagation, accessibility and status contrast. Do not recolor unrelated app controls.
-- Status: CONTINUITY REQUIREMENT APPROVED; exact per-theme color authority pending source audit/Founder reconciliation. Build93 implementation pending.
+- Status: MINERAL LIGHT AMBER PRIMARY CTA APPROVED FOR ALL THREE SURFACES. DARK MODE ACTUAL IPHONE FINISH WORKOUT COLOR UNVERIFIED, pending coder source inspection and Founder decision. Build93 implementation pending.
 
 
 TRAINING LOGGER PROGRESSION SUGGESTION ACTIONABILITY — BUILD 93 FOUNDER DEVICE FINDING 2026-10-08
