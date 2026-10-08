@@ -93,11 +93,11 @@ private struct SessionPriorityCardView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.title)
                             .physiqueOSFont(.init(size: 14, weight: .heavy))
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         if let subtitle = item.subtitle {
                             Text(subtitle)
                                 .physiqueOSFont(.init(size: 11, weight: .medium))
-                                .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                                .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -111,25 +111,23 @@ private struct SessionPriorityCardView: View {
             ForEach(visibleItems) { child in
                 HStack(spacing: 9) {
                     Image(systemName: child.completed ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(child.completed ? PhysiqueOSTheme.chartSuccess : PhysiqueOSTheme.textMuted)
+                        .foregroundStyle(child.completed ? PhysiqueOSTheme.redesignGreen : PhysiqueOSTheme.redesignInkSecondary)
                     Text(child.label)
                         .physiqueOSFont(.init(size: 12, weight: .semibold))
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Spacer(minLength: 8)
                     if child.canonicalSkipCommand != nil, !child.completed,
                        !skippingIDs.contains(child.id) {
-                        Menu {
-                            Button("Skip", systemImage: "forward.end") { onSkip(child) }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .frame(minWidth: 44, minHeight: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .accessibilityLabel("More actions for \(child.label)")
-                        .accessibilityIdentifier("home.priority.\(child.id).actions")
+                        HomePrioritySkipButton(
+                            title: child.label,
+                            identifier: "home.priority.\(child.id).skip"
+                        ) { onSkip(child) }
                     } else if skippingIDs.contains(child.id) {
-                        Image(systemName: "forward.end")
-                            .accessibilityLabel("Skipped")
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(PhysiqueOSTheme.redesignRed)
+                            .frame(width: 44, height: 44)
+                            .accessibilityLabel("Skipping \(child.label)")
                     }
                 }
                 .padding(.leading, 48)
@@ -137,30 +135,30 @@ private struct SessionPriorityCardView: View {
             if sessionItems.count > visibleItems.count {
                 Text("+\(sessionItems.count - visibleItems.count) more")
                     .physiqueOSFont(.init(size: 11, weight: .semibold))
-                    .foregroundStyle(PhysiqueOSTheme.textMuted)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                     .padding(.leading, 48)
             }
 
             HStack(spacing: 12) {
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(PhysiqueOSTheme.divider)
-                        Capsule().fill(PhysiqueOSTheme.accent)
+                        Capsule().fill(PhysiqueOSTheme.redesignRule)
+                        Capsule().fill(PhysiqueOSTheme.redesignPurple)
                             .frame(width: proxy.size.width * (sessionItems.isEmpty ? 0 : CGFloat(completedCount) / CGFloat(sessionItems.count)))
                     }
                 }
                 .frame(height: 8)
                 Text("\(completedCount)/\(sessionItems.count) complete")
                     .physiqueOSFont(.init(size: 11, weight: .bold))
-                    .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                    .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     .fixedSize()
             }
             .padding(.leading, 48)
         }
         .padding(12)
-        .background(PhysiqueOSTheme.surfaceElevated)
+        .background(PhysiqueOSTheme.redesignSoft)
         .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(item.color.foreground.opacity(0.35), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(item.color.foreground.opacity(0.32), lineWidth: 1))
         .accessibilityElement(children: .contain)
     }
 }

@@ -239,8 +239,8 @@ struct EvidenceReviewDetailView: View {
     @ViewBuilder
     private func workoutMatchActions(_ review: EvidenceReviewDetailReadModel) -> some View {
         switch actionState {
-        case .idle where review.status == "pending":
-            if let reconciliation = review.workoutReconciliation {
+        case .idle:
+            if review.status == "pending", let reconciliation = review.workoutReconciliation {
                 VStack(spacing: 12) {
                     ForEach(Array(reconciliation.candidates.enumerated()), id: \.element.id) { index, candidate in
                         Group {
@@ -261,7 +261,53 @@ struct EvidenceReviewDetailView: View {
                     }
                     .accessibilityIdentifier("evidenceReview.workoutReconciliation.noMatch")
                 }
+            } else if review.status == "confirmed" {
+                workoutMatchResolved(
+                    label: "Match confirmed",
+                    detail: "This Workout Match is already confirmed. Logger detail and strategic eligibility were not changed."
+                )
+            } else {
+                workoutMatchState(
+                    .muted,
+                    title: "Review unavailable",
+                    detail: "This Workout Match is no longer actionable. Refresh the review before trying again.",
+                    identifier: "evidenceReview.workoutMatch.unavailable"
+                )
             }
+        case .editingMeasurements:
+            workoutMatchState(
+                .error,
+                title: "Workout Match can't edit measurements",
+                detail: "Return to the review and choose a match or No match.",
+                identifier: "evidenceReview.workoutMatch.invalidState"
+            )
+        case .savingMeasurements:
+            workoutMatchState(.progress, title: "Saving…", identifier: "evidenceReview.workoutMatch.saving")
+        case .confirming(let message):
+            workoutMatchState(.progress, title: message, identifier: "evidenceReview.workoutMatch.confirming")
+        case .dismissing:
+            workoutMatchState(.progress, title: "Dismissing review…", identifier: "evidenceReview.workoutMatch.dismissing")
+        case .dismissed:
+            workoutMatchState(
+                .muted,
+                title: "Dismissed",
+                detail: "No workout match was written.",
+                actionTitle: "Back to Log",
+                identifier: "evidenceReview.workoutMatch.dismissed"
+            ) { onReturnToLog(); dismiss() }
+        case .accepted:
+            workoutMatchState(
+                .success,
+                title: "Confirmation accepted",
+                detail: Self.backgroundCopy,
+                actionTitle: "Back to Log",
+                identifier: "evidenceReview.workoutMatch.accepted"
+            ) { onReturnToLog(); dismiss() }
+        case .confirmed:
+            workoutMatchResolved(
+                label: "Match confirmed",
+                detail: "The Workout Match is confirmed. Logger detail and strategic eligibility were not changed."
+            )
         case .workoutReconciliationResolved(let action):
             workoutMatchResolved(
                 label: action == "no_match" ? "No match recorded" : "Match confirmed",
@@ -269,11 +315,107 @@ struct EvidenceReviewDetailView: View {
                     ? "The Apple Health workout remains unlinked. Logger detail and strategic eligibility were not changed."
                     : "The Apple Health workout is linked to the selected Logger session. Logger detail and strategic eligibility were not changed."
             )
-        default:
-            // Confirming, refresh-required, still-processing, failure and
-            // terminal states keep their existing canonical presentation.
-            actionSection(for: review)
+        case .stillProcessing:
+            workoutMatchState(
+                .waiting,
+                title: "Still confirming",
+                detail: "This is taking longer than usual. Confirmation continues on the server even if you leave this screen.",
+                actionTitle: "Check Now",
+                identifier: "evidenceReview.workoutMatch.stillConfirming"
+            ) { Task { await load(); actionState = .idle } }
+        case .refreshRequired(let message):
+            workoutMatchState(
+                .waiting,
+                title: "Refresh required",
+                detail: message,
+                actionTitle: "Refresh Review",
+                identifier: "evidenceReview.workoutMatch.refreshRequired"
+            ) { Task { actionState = .idle; await load() } }
+        case .failed(let message):
+            workoutMatchState(
+                .error,
+                title: "Workout Match wasn't saved",
+                detail: message,
+                actionTitle: "Try Again",
+                identifier: "evidenceReview.workoutMatch.failed"
+            ) { actionState = .idle }
         }
+    }
+
+    private enum WorkoutMatchStateTone: Equatable {
+        case progress, success, waiting, error, muted
+
+        var color: Color {
+            switch self {
+            case .progress: PhysiqueOSTheme.redesignTeal
+            case .success: PhysiqueOSTheme.redesignGreen
+            case .waiting: PhysiqueOSTheme.redesignAmberInk
+            case .error: PhysiqueOSTheme.redesignRed
+            case .muted: PhysiqueOSTheme.redesignUtilityMuted
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .progress: "arrow.trianglehead.2.clockwise.rotate.90"
+            case .success: "checkmark"
+            case .waiting: "clock"
+            case .error: "exclamationmark"
+            case .muted: "minus"
+            }
+        }
+    }
+
+    private func workoutMatchState(
+        _ tone: WorkoutMatchStateTone,
+        title: String,
+        detail: String? = nil,
+        actionTitle: String? = nil,
+        identifier: String,
+        action: (() -> Void)? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 9) {
+                if tone == .progress {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(tone.color)
+                        .frame(width: 24, height: 24)
+                } else {
+                    Image(systemName: tone.icon)
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 24, height: 24)
+                        .background(tone.color, in: Circle())
+                        .accessibilityHidden(true)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .logText(LoggerType.surfaceTitle16)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                    if let detail {
+                        Text(detail)
+                            .logText(LoggerType.body11)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            if let actionTitle, let action {
+                Button(action: action) {
+                    Text(actionTitle)
+                        .logText(LoggerType.control14)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(PhysiqueOSTheme.redesignSoft, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(tone.color.opacity(0.5), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .loggerSurface(tone: tone.color, toneFill: 0.11, toneRule: 0.38)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(identifier)
     }
 
     private func workoutMatchButton(_ title: String, destructive: Bool, action: @escaping () -> Void) -> some View {

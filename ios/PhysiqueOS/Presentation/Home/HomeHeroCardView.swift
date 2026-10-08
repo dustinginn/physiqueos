@@ -13,7 +13,7 @@ struct HomeHeroCardView: View {
             padding: .sm,
             background: hero.mode == .phaseTrajectory
                 ? PhysiqueOSTheme.trajectorySurface
-                : PhysiqueOSTheme.surfaceElevated
+                : PhysiqueOSTheme.redesignPaper
         ) {
             VStack(alignment: .leading, spacing: 0) {
                 SectionHeading("Trajectory")
@@ -29,7 +29,7 @@ struct HomeHeroCardView: View {
                         }
                         Text(hero.headline)
                             .physiqueOSFont(PhysiqueOSTypography.heroHeadline)
-                            .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInk)
                         if hero.mode == .phaseTrajectory, let timeline = hero.primaryTimeline {
                             Text(timeline)
                                 .font(.system(size: 18, weight: .bold))
@@ -38,7 +38,7 @@ struct HomeHeroCardView: View {
                         Text(hero.supportLine)
                             .physiqueOSFont(PhysiqueOSTypography.heroSupportLine)
                             .lineSpacing(2)
-                            .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                            .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
@@ -75,14 +75,14 @@ struct HomeHeroCardView: View {
             .accessibilityHint("Opens an explanation of what supports and limits this confidence")
         } else {
             ZStack {
-                Circle().stroke(PhysiqueOSTheme.divider, lineWidth: 6)
+                Circle().stroke(PhysiqueOSTheme.redesignRule, lineWidth: 6)
                 VStack(spacing: 2) {
                     Text("—")
                         .font(.system(size: 18, weight: .heavy))
-                        .foregroundStyle(PhysiqueOSTheme.textPrimary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     Text("Confidence")
                         .physiqueOSFont(.init(size: 9, weight: .bold))
-                        .foregroundStyle(PhysiqueOSTheme.textSecondary)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                 }
             }
             .frame(width: 82, height: 82)

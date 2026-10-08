@@ -71,7 +71,7 @@ struct PhotosHistoryView: View {
         case .none, .loading:
             EvidenceStateCard(kind: .loading("Loading Progress Photos…"), identifier: "photos.loading")
         case .failed(let message):
-            EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "photos.failure")
+            EvidenceStateCard(kind: .failure(title: message, detail: "Pull to refresh or try again."), identifier: "photos.failure")
         case .loaded(let landing):
             let displayed = environment.nativeAuthority == .sandbox
                 ? (environment.founderPhotoMediaStore.projectedLanding(

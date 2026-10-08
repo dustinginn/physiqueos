@@ -66,7 +66,7 @@ struct EvidenceView: View {
             EvidenceStateCard(kind: .loading("Loading Evidence…"), identifier: "evidence.hub.loading")
         case .failed(let message):
             VStack(spacing: S.pt(12)) {
-                EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "evidence.hub.failure")
+                EvidenceStateCard(kind: .failure(title: message, detail: "Pull to refresh or try again."), identifier: "evidence.hub.failure")
                 Button("Try Again") { Task { await viewModel?.load(trigger: .retry) } }
                     .buttonStyle(.bordered)
                     .tint(S.ink)

@@ -687,26 +687,44 @@ struct WorkflowDateRow: View {
         .accessibilityIdentifier("evidenceWorkflow.date")
         .sheet(isPresented: $isPresented) {
             NavigationStack {
-                DatePicker("Date", selection: $date, in: Date.distantPast...maximumDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(WorkflowColor.teal)
-                    .padding()
-                    .background(WorkflowColor.bg)
-                    .navigationTitle("Date")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Today") {
-                                if let today = DateField.selectableToday(minimumDate: nil, maximumDate: maximumDate) { date = today }
-                            }
-                            .accessibilityIdentifier("datePicker.today")
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("EVIDENCE DATE")
+                        .evidenceText(WorkflowText.eyebrow)
+                        .foregroundStyle(WorkflowColor.purple)
+                        .padding(.horizontal, 18)
+                    DatePicker("Date", selection: $date, in: Date.distantPast...maximumDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .tint(WorkflowColor.teal)
+                        .padding(10)
+                        .background(WorkflowColor.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(WorkflowColor.line, lineWidth: 1))
+                        .padding(.horizontal, 18)
+                }
+                .padding(.top, 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(WorkflowColor.bg)
+                .navigationTitle("Choose Date")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(WorkflowColor.bg, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Today") {
+                            if let today = DateField.selectableToday(minimumDate: nil, maximumDate: maximumDate) { date = today }
                         }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { isPresented = false }
-                        }
+                        .tint(WorkflowColor.teal)
+                        .accessibilityIdentifier("datePicker.today")
                     }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { isPresented = false }
+                            .fontWeight(.bold)
+                            .tint(WorkflowColor.teal)
+                    }
+                }
             }
             .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(WorkflowColor.bg)
         }
     }
 

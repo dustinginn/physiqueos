@@ -62,7 +62,7 @@ struct TimelineView: View {
         case .none, .loading:
             EvidenceStateCard(kind: .loading("Loading Timeline…"), identifier: "evidence.timeline.loading")
         case .failed(let message):
-            EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "evidence.timeline.failure")
+            EvidenceStateCard(kind: .failure(title: message, detail: "Pull to refresh or try again."), identifier: "evidence.timeline.failure")
         case .loaded(let timeline):
             VStack(alignment: .leading, spacing: 0) {
                 EvidenceHeaderView(
@@ -73,7 +73,7 @@ struct TimelineView: View {
                 )
                 if timeline.items.isEmpty {
                     EvidenceStateCard(
-                        kind: .message(title: "No Timeline entries yet.", detail: nil),
+                        kind: .empty(title: "No Timeline entries yet.", detail: nil),
                         identifier: "evidence.timeline.empty"
                     )
                 } else {

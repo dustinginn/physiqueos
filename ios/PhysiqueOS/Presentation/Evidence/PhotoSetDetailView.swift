@@ -60,13 +60,13 @@ struct PhotoSetDetailView: View {
         case .none, .loading:
             EvidenceStateCard(kind: .loading("Loading photo set…"), identifier: "photos.detail.loading")
         case .failed(let message):
-            EvidenceStateCard(kind: .message(title: message, detail: nil), identifier: "photos.detail.failure")
+            EvidenceStateCard(kind: .failure(title: message, detail: "Try opening this photo set again."), identifier: "photos.detail.failure")
         case .loaded(.none):
             if environment.nativeAuthority == .sandbox,
                let set = environment.founderPhotoMediaStore.projectedSetsByID[setId] {
                 setContent(set)
             } else {
-                EvidenceStateCard(kind: .message(title: "No photo set found for this date.", detail: nil), identifier: "photos.detail.empty")
+                EvidenceStateCard(kind: .empty(title: "No photo set found for this date.", detail: nil), identifier: "photos.detail.empty")
             }
         case .loaded(.some(let set)):
             setContent(set)
@@ -76,7 +76,7 @@ struct PhotoSetDetailView: View {
     private func setContent(_ set: PhotoSetRecord) -> some View {
         Group {
             if set.views.isEmpty {
-                EvidenceStateCard(kind: .message(title: "No confirmed views are available for this photo set.", detail: nil), identifier: "photos.detail.empty")
+                EvidenceStateCard(kind: .empty(title: "No confirmed views are available for this photo set.", detail: nil), identifier: "photos.detail.empty")
             } else {
                 let clampedIndex = min(selectedViewIndex, set.views.count - 1)
                 let view = set.views[clampedIndex]

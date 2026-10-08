@@ -12,6 +12,40 @@ import XCTest
 /// scan. The header now reads the evidence's own occurrence date instead.
 @MainActor
 final class EvidenceReviewHeaderDateTests: XCTestCase {
+    func testVisualCloseoutKeepsEveryWorkoutMatchTransactionStateInItsLockedFamily() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(
+            contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Evidence/EvidenceReviewDetailView.swift"),
+            encoding: .utf8
+        )
+        for state in ["confirming", "dismissed", "stillConfirming", "refreshRequired", "failed"] {
+            XCTAssertTrue(source.contains("evidenceReview.workoutMatch.\(state)"), "Workout Match is missing its \(state) presentation.")
+        }
+        XCTAssertTrue(source.contains(".loggerSurface(tone:"))
+        XCTAssertTrue(source.contains("minHeight: 48"), "Workout Match retry/back controls keep accessible height.")
+    }
+
+    func testEvidenceWrappersUseTheApprovedAppOwnedChrome() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let evidence = root.appendingPathComponent("PhysiqueOS/Presentation/Evidence")
+        let dexa = try String(contentsOf: evidence.appendingPathComponent("DEXAHistoryView.swift"), encoding: .utf8)
+        let workflow = try String(contentsOf: evidence.appendingPathComponent("EvidenceWorkflowKit.swift"), encoding: .utf8)
+        let states = try String(contentsOf: evidence.appendingPathComponent("EvidenceHeaderView.swift"), encoding: .utf8)
+        let training = try String(
+            contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/Training/TrainingSessionDetailView.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(dexa.contains("dexa.pdf.sheet"))
+        XCTAssertTrue(dexa.contains("Read-only BodySpec PDF"))
+        XCTAssertTrue(workflow.contains("presentationBackground(WorkflowColor.bg)"))
+        XCTAssertTrue(workflow.contains("EVIDENCE DATE"))
+        XCTAssertTrue(states.contains("case empty(title:"))
+        XCTAssertTrue(states.contains("case failure(title:"))
+        XCTAssertTrue(training.contains("training.session.media.\\(mediaId)"))
+        XCTAssertTrue(training.contains("Screenshot couldn't load"))
+    }
+
     private func review(
         createdAt: String?,
         items: [EvidenceReviewDetailItem]
