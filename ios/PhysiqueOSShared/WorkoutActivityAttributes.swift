@@ -61,6 +61,20 @@ struct WorkoutActivityAttributes: ActivityAttributes, Hashable {
         var rest: Rest?
         /// Freezes workout elapsed once Finish begins.
         var finishedAt: Date?
+        /// The app-owned PhysiqueOS appearance this state was rendered for
+        /// (the user's in-app choice, which can differ from iOS). Optional:
+        /// an activity started by an older build decodes as nil and renders
+        /// exactly as before (follows the system appearance) until the app's
+        /// next update re-stamps it.
+        var appearance: Appearance? = nil
+
+        enum Appearance: String, WorkoutActivitySafeEnum {
+            /// PhysiqueOS "System": follow the iOS appearance.
+            case system
+            case dark
+            case mineralLight
+            static var fallback: Self { .system }
+        }
 
         enum Phase: String, WorkoutActivitySafeEnum {
             case inProgress

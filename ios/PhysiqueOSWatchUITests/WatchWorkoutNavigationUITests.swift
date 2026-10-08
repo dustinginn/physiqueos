@@ -182,3 +182,43 @@ final class WatchPanelFooterUITests: XCTestCase {
         XCTAssertTrue(discard.isHittable, "The last action stays reachable by scrolling.")
     }
 }
+
+/// Build 93 primary workout action continuity: Complete Set (execution),
+/// Finish Workout (final set) and the Finish confirmation render the iPhone
+/// Finish Workout amber in each Watch appearance. Real shipping SwiftUI via
+/// the DEBUG fixture harness; captures are simulator code-acceptance only.
+final class WatchPrimaryActionThemeUITests: XCTestCase {
+    override func setUp() { continueAfterFailure = false }
+
+    func testPrimaryWorkoutActionsRenderInBothAppearances() {
+        let cases: [(String, String)] = [
+            ("normal", "watch.execution.completeSet"),
+            ("final-workout", "watch.execution.finishWorkout"),
+            ("finish-confirmation", "watch.finishConfirmation.finish"),
+        ]
+        for appearance in ["dark", "mineralLight"] {
+            for (fixture, identifier) in cases {
+                let app = XCUIApplication()
+                app.launchArguments = ["-watchFixture", fixture, "-watchAppearance", appearance]
+                app.launch()
+                let action = app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+                XCTAssertTrue(action.waitForExistence(timeout: 15), "\(fixture) \(appearance)")
+                XCTAssertTrue(action.isHittable, "\(fixture) \(appearance): the primary action is on screen")
+                capture(app, name: "watch-\(fixture)-\(appearance)")
+                app.terminate()
+            }
+        }
+    }
+
+    private func capture(_ app: XCUIApplication, name: String) {
+        Thread.sleep(forTimeInterval: 0.8)
+        let screenshot = XCUIScreen.main.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        guard let directory = ProcessInfo.processInfo.environment["WATCH_THEME_SCREENSHOT_DIR"], !directory.isEmpty else { return }
+        let size = app.windows.firstMatch.frame.height >= 240 ? "large" : "small"
+        try? screenshot.pngRepresentation.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name)-\(size).png"))
+    }
+}

@@ -33,6 +33,11 @@ struct WatchPalette: Equatable {
     /// compact ink capsule behind the time keeps it legible (Founder-selected
     /// Option A, 2026-10-06); Dark needs none.
     var clockCapsule: Color? = nil
+    /// The primary workout action (Complete Set / Finish): the iPhone Logger's
+    /// Finish Workout amber for this appearance, with its dark ink label
+    /// (`WorkoutPrimaryActionToken`, Founder decision 2026-10-08).
+    var workoutPrimary: Color = Color(watchHex: WorkoutPrimaryActionToken.darkHex)
+    var onWorkoutPrimary: Color = Color(watchHex: WorkoutPrimaryActionToken.foregroundHex)
 
     /// OLED Dark (the default).
     static let dark = WatchPalette(
@@ -80,7 +85,9 @@ struct WatchPalette: Equatable {
         heartRateAccent: Color(watchHex: 0xC73850),
         reducedSaturation: 0.5,
         reducedBrightness: -0.05,
-        clockCapsule: Color(watchHex: 0x102431)
+        clockCapsule: Color(watchHex: 0x102431),
+        workoutPrimary: Color(watchHex: WorkoutPrimaryActionToken.mineralLightHex),
+        onWorkoutPrimary: Color(watchHex: WorkoutPrimaryActionToken.foregroundHex)
     )
 
     static func of(_ appearance: WatchAppearancePreference) -> WatchPalette {
@@ -111,6 +118,8 @@ enum WatchPhysiqueOSTheme {
     static var warning: Color { current.warning }
     static var destructive: Color { current.destructive }
     static var onPrimary: Color { current.onPrimary }
+    static var workoutPrimary: Color { current.workoutPrimary }
+    static var onWorkoutPrimary: Color { current.onWorkoutPrimary }
     /// Set progress shares the success green.
     static var progress: Color { current.success }
     static var timeAccent: Color { current.timeAccent }
@@ -382,7 +391,9 @@ struct WatchActionButton: View {
 
     private var foreground: Color {
         switch style {
-        case .primary, .warning: return WatchPhysiqueOSTheme.onPrimary
+        case .primary: return WatchPhysiqueOSTheme.onPrimary
+        // Amber fill: the iPhone execution ink, legible in both appearances.
+        case .warning: return WatchPhysiqueOSTheme.onWorkoutPrimary
         case .destructive: return .white
         case .quiet: return WatchPhysiqueOSTheme.text
         case .quietDestructive: return WatchPhysiqueOSTheme.destructive
@@ -1008,8 +1019,10 @@ struct WatchEdgeCapsuleButton: View {
     var systemImage: String? = nil
     let layout: WatchExecutionLayout
     var enabled = true
-    var tint: Color = WatchPhysiqueOSTheme.purple
-    var foreground: Color = WatchPhysiqueOSTheme.onPrimary
+    /// Defaults to the primary workout action (iPhone Finish Workout amber);
+    /// warning / destructive callers pass their own tint.
+    var tint: Color = WatchPhysiqueOSTheme.workoutPrimary
+    var foreground: Color = WatchPhysiqueOSTheme.onWorkoutPrimary
     let action: () -> Void
 
     var body: some View {

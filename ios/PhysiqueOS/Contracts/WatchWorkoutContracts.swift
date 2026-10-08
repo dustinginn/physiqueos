@@ -28,6 +28,23 @@ enum WatchWorkoutContract {
     static let applicationContextAppearanceKey = "physiqueos.watch.appearance.v1"
 }
 
+/// The ONE primary workout action color (Founder decision 2026-10-08): the
+/// iPhone Logger's Finish Workout amber, reused per appearance for the Watch
+/// Complete Set / Finish actions and the Live Activity Complete Set. The iPhone
+/// theme (`PhysiqueOSTheme.redesignAmber` / `redesignOnExecution`) is built
+/// from these values, so the shipping iPhone button is unchanged. Plain sRGB
+/// hex (no UIKit) because the Watch and the ActivityKit extension must be able
+/// to archive/resolve it; the extension mirrors it in
+/// `WorkoutActivityPrimaryAction` and tests hold all copies equal.
+enum WorkoutPrimaryActionToken {
+    /// Dark appearance fill (`redesignAmber` dark).
+    static let darkHex: UInt32 = 0xEFB84F
+    /// Mineral Light appearance fill (`redesignAmber` light).
+    static let mineralLightHex: UInt32 = 0xC88228
+    /// Label on the amber fill in BOTH appearances (`redesignOnExecution`).
+    static let foregroundHex: UInt32 = 0x10202A
+}
+
 /// The Apple Watch app's own appearance: a PhysiqueOS palette choice, not a
 /// watchOS system mode (watchOS has no system light appearance to follow,
 /// so there is deliberately no `system` case). Configured on the iPhone's

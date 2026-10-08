@@ -73,7 +73,9 @@ struct PhysiqueOSApp: App {
         let isUnitTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         let liveActivity = WorkoutLiveActivityBridge(
             environment: environment,
-            client: isUnitTestHost ? InertWorkoutLiveActivityClient() : ActivityKitWorkoutLiveActivityClient()
+            client: isUnitTestHost ? InertWorkoutLiveActivityClient() : ActivityKitWorkoutLiveActivityClient(),
+            // The user's in-app appearance (System / Dark / Mineral Light).
+            appearance: { [appearance] in .init(appearance.selection) }
         )
         liveActivity.install()
         _workoutLiveActivity = State(initialValue: liveActivity)
@@ -130,6 +132,10 @@ struct PhysiqueOSApp: App {
                 // the Watch next connects (never blocked on reachability).
                 .onChange(of: appearance.watchSelection) { _, selection in
                     watchWorkoutConnectivity.publishWatchAppearance(selection)
+                }
+                // The Live Activity follows the iPhone PhysiqueOS appearance.
+                .onChange(of: appearance.selection) { _, _ in
+                    workoutLiveActivity.appearanceDidChange()
                 }
                 .task {
                     // Idempotent defensive refresh. The action-response path
