@@ -20,6 +20,11 @@ import { RECOVERY_BRIEFING_CADENCES } from "./RecoveryBriefingPolicyV1.js";
 // `readAuthorityRecord()` returns the Server-owned publication authority record
 // (null = OFF). `readSleepInputs({ ownerUserId, startDate, endDate })` returns
 // `{ sleepDays, activationPolicyRecord, algorithmPolicyRecord }` read-only.
+//
+// The generator passes its own read-only canonical snapshot `repositories`;
+// the foam and training execution context is projected from it in memory
+// (no new store query or permission), and only after the authority and
+// cadence gates pass.
 
 export function createRecoveryBriefingComposerV1({
   readAuthorityRecord,
@@ -39,7 +44,7 @@ export function createRecoveryBriefingComposerV1({
   };
   return Object.freeze({
     /** For a NEW occurrence only. Returns `{ artifact, decision }`. */
-    async composeForNewArtifact({ cadence, artifact } = {}) {
+    async composeForNewArtifact({ cadence, artifact, repositories = null } = {}) {
       const unchanged = (reason, extra = {}) => ({
         artifact, decision: report({ cadence, attach: false, reason, ...extra }),
       });
@@ -62,6 +67,7 @@ export function createRecoveryBriefingComposerV1({
           // The artifact's own generation instant: deterministic per occurrence.
           evaluatedAt: artifact.generatedAt,
           sleepInputs,
+          executionInputs: await readExecutionInputs(repositories, artifact.userId ?? null),
         });
         report({ cadence, ...decision });
         return { artifact: attachRecoveryAssessmentV1(artifact, decision), decision };
@@ -76,4 +82,21 @@ export function createRecoveryBriefingComposerV1({
       return carryForwardRecoveryAssessmentV1({ existing, artifact });
     },
   });
+}
+
+// In-memory snapshot reads only. Any failure = no execution context (the card
+// is still composed from Sleep alone, with the limitation recorded).
+async function readExecutionInputs(repositories, userId) {
+  if (!repositories) return null;
+  try {
+    const [reminders, executionItems, dailyCheckIns, canonicalEvidenceObjects] = await Promise.all([
+      repositories.reminders?.listReminders?.(userId) ?? [],
+      repositories.executionItems?.listExecutionItems?.(userId) ?? [],
+      repositories.dailyCheckIns?.listCheckIns?.(userId) ?? [],
+      repositories.canonicalEvidence?.listCanonicalEvidenceObjects?.(userId) ?? [],
+    ]);
+    return { reminders, executionItems, dailyCheckIns, canonicalEvidenceObjects };
+  } catch {
+    return null;
+  }
 }

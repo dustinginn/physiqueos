@@ -102,7 +102,7 @@ export function createMonthlyBriefingService({
       // A NEW occurrence only (a completed one returned above). Never throws.
       if (recoveryComposer) {
         prepared.artifact = (await recoveryComposer.composeForNewArtifact({
-          cadence: "monthly", artifact: prepared.artifact,
+          cadence: "monthly", artifact: prepared.artifact, repositories,
         })).artifact;
       }
       try {

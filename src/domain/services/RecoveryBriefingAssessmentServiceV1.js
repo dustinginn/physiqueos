@@ -40,7 +40,7 @@ export function createRecoveryBriefingAssessmentV1(input = {}) {
     baseline,
     cadence: period.cadence,
   });
-  const training = assessTrainingContext(input.training, period);
+  const training = gateTrainingCorroboration(assessTrainingContext(input.training, period), mode);
   const classification = classify({
     cadence: period.cadence,
     expectedNights: period.expectedNights,
@@ -54,7 +54,7 @@ export function createRecoveryBriefingAssessmentV1(input = {}) {
     evidenceCutoff,
   });
   const corroboration = createCorroboration({ classification, training });
-  const commentary = createCommentary({ classification, periodSleep, training });
+  const commentary = createCommentary({ classification, periodSleep, training, period });
   const dataLimitations = unique([
     ...sleepSelection.limitations,
     ...classification.limitations,
@@ -358,9 +358,9 @@ function assessPeriodSleep({ rows, baseline, cadence }) {
     severeLowNights: severeDates.length,
     materialRun: longestConsecutiveRun(materialDates),
     severeRun: longestConsecutiveRun(severeDates),
-    yellowSubperiods: cadence === RecoveryBriefingCadence.MONTHLY
-      ? countMonthlyYellowSubperiods(evaluated, baseline.materialThresholdMinutes)
-      : 0,
+    yellowWeeks: cadence === RecoveryBriefingCadence.MONTHLY
+      ? monthlyYellowWeeks(evaluated, baseline.materialThresholdMinutes)
+      : [],
   };
 }
 
@@ -402,7 +402,7 @@ function classify({ cadence, expectedNights, baseline, periodSleep, training }) 
       periodSleep.severeLowNights >= policy.red.corroboratedMinimumSevereLowNights &&
       training.qualifies;
   } else {
-    sleepYellow = periodSleep.yellowSubperiods >= policy.yellow.minimumYellowSubperiods ||
+    sleepYellow = periodSleep.yellowWeeks.length >= policy.yellow.minimumYellowSubperiods ||
       periodSleep.materialLowNights >= policy.yellow.minimumMaterialLowNights;
     sleepOnlyRed = periodSleep.rows.length > 0 &&
       periodSleep.severeLowNights / periodSleep.rows.length >= policy.red.severeNightRatio &&
@@ -496,6 +496,11 @@ function assessTrainingContext(value, period) {
     reduction != null && reduction >= minimumReduction;
   const held = current.performanceHeld === true && current.materialConstraint !== true &&
     currentEvidenceIds.length > 0;
+  // Comparable evidence exists and the period's sessions were not materially
+  // reduced: the only basis for "No downstream training constraint was
+  // established." Never a causal or performance claim.
+  const noConstraintEstablished = !qualifies && current.materialConstraint !== true &&
+    reduction != null && reduction < minimumReduction;
   const limitations = unique([
     current.materialConstraint === true && currentEvidenceIds.length === 0
       ? "training_constraint_evidence_missing" : null,
@@ -513,7 +518,7 @@ function assessTrainingContext(value, period) {
     evidenceIds,
     limitations,
     typicalSessions,
-    { completedSessions, expectedSessions, reduction, minimumReduction, temporalRelation }
+    { completedSessions, expectedSessions, reduction, minimumReduction, temporalRelation, noConstraintEstablished }
   );
 }
 
@@ -530,7 +535,26 @@ function trainingResult(state, qualifies, held, evidenceIds, limitations, typica
     reduction: detail.reduction ?? null,
     minimumReduction: detail.minimumReduction ?? null,
     temporalRelation: detail.temporalRelation ?? null,
+    noConstraintEstablished: detail.noConstraintEstablished === true,
     causality: "not_inferred",
+  };
+}
+
+// Founder decision 6 (2026-10-08): a PUBLISHED assessment never escalates on
+// training. Until travel/illness/injury/planned-rest/deload exclusions have
+// an authoritative source, a training constraint cannot corroborate Red; the
+// Sleep-only status policy is unchanged and shadow validation still models it.
+function gateTrainingCorroboration(training, mode) {
+  if (mode !== RecoveryAssessmentMode.PUBLICATION ||
+      RECOVERY_STATUS_POLICY_V1.training.publicationCorroboration === "enabled" || !training.qualifies) {
+    return training;
+  }
+  return {
+    ...training,
+    state: "corroboration_disabled",
+    qualifies: false,
+    noConstraintEstablished: false,
+    limitations: unique([...training.limitations, "training_corroboration_disabled_for_publication"]),
   };
 }
 
@@ -600,25 +624,72 @@ function createCorroboration({ classification, training }) {
   }];
 }
 
-function createCommentary({ classification, periodSleep, training }) {
+// Editorial copy (Founder decision 3): Green stays quiet under its fixed
+// title; Yellow/Red carry a Server-authored editorial `headline` (the card
+// title), and Monthly adds the distinct titled commentary block. Every clause
+// is derived from the published values; the training clause is
+// non-escalating and appears only when its evidence warrants it.
+function createCommentary({ classification, periodSleep, training, period }) {
   if (classification.status === RecoveryBriefingStatus.GREEN ||
       classification.status === RecoveryBriefingStatus.UNAVAILABLE) {
-    return { visible: false, headline: null, body: null };
+    return { visible: false, headline: null, title: null, body: null };
   }
+  const monthly = period.cadence === RecoveryBriefingCadence.MONTHLY;
+  const trainingClause = training.held
+    ? " Training performance held."
+    : training.noConstraintEstablished ? " No downstream training constraint was established." : "";
   if (classification.status === RecoveryBriefingStatus.YELLOW) {
+    if (!monthly) {
+      return {
+        visible: true,
+        headline: "Sleep was persistently below baseline",
+        title: null,
+        body: `${countPhrase(periodSleep.materialLowNights)} nights were materially low.${trainingClause}`,
+      };
+    }
+    const weeks = periodSleep.yellowWeeks;
+    if (weeks.length >= RECOVERY_STATUS_POLICY_V1.cadences.monthly.yellow.minimumYellowSubperiods) {
+      const complete = weeks.every((weekStart) => weekStart >= period.startDate && shift(weekStart, 6) <= period.endDate);
+      return {
+        visible: true,
+        headline: monthlyShiftHeadline(weeks, period),
+        title: "A multi-week shift",
+        body: `${countPhrase(weeks.length)} ${complete ? "completed " : ""}weeks were meaningfully below your prior 28-night baseline.${trainingClause}`,
+      };
+    }
     return {
       visible: true,
-      headline: "Sleep was persistently below your personal baseline.",
-      body: `${periodSleep.materialLowNights} nights were materially low.${training.held ? " Training performance held." : ""}`,
+      headline: "Sleep softened across the month",
+      title: "A persistent shift",
+      body: `${countPhrase(periodSleep.materialLowNights)} nights were materially below your prior 28-night baseline.${trainingClause}`,
     };
   }
   return {
     visible: true,
-    headline: "Sleep strain was severe and persistent.",
+    headline: "Sleep strain was severe and persistent",
+    title: monthly ? "A severe, persistent shift" : null,
+    // A corroborated Red exists only in shadow validation (publication gates
+    // it off); it keeps its non-causal association sentence.
     body: classification.redKind === "corroborated"
-      ? `${periodSleep.severeLowNights} nights were severely low. A material training constraint accompanied the Sleep pattern; causation is not inferred.`
-      : `${periodSleep.severeLowNights} nights were severely low.`,
+      ? `${countPhrase(periodSleep.severeLowNights)} nights were severely low. A material training constraint accompanied the Sleep pattern; causation is not inferred.`
+      : `${countPhrase(periodSleep.severeLowNights)} nights were severely low and the ${monthly ? "month" : "period"} average remained well below baseline.${trainingClause}`,
   };
+}
+
+// Where the Yellow weeks sit within the month, by each week's midpoint.
+function monthlyShiftHeadline(weeks, period) {
+  const midpoint = shift(period.startDate, Math.floor(period.expectedNights / 2));
+  const centers = weeks.map((weekStart) => shift(weekStart, 3));
+  if (centers.every((center) => center >= midpoint)) return "Sleep softened across the second half";
+  if (centers.every((center) => center < midpoint)) return "Sleep softened across the first half";
+  return "Sleep softened across the month";
+}
+
+const COUNT_WORDS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty"];
+
+function countPhrase(value) {
+  return COUNT_WORDS[value] ?? String(value);
 }
 
 function createTrendProjection(cadence, rows) {
@@ -654,8 +725,8 @@ function createTrendProjection(cadence, rows) {
   };
 }
 
-function countMonthlyYellowSubperiods(rows, materialThreshold) {
-  if (!Number.isFinite(materialThreshold)) return 0;
+function monthlyYellowWeeks(rows, materialThreshold) {
+  if (!Number.isFinite(materialThreshold)) return [];
   const groups = new Map();
   for (const row of rows) {
     const weekStart = sunday(row.sleepDay);
@@ -663,12 +734,12 @@ function countMonthlyYellowSubperiods(rows, materialThreshold) {
     group.push(row);
     groups.set(weekStart, group);
   }
-  return [...groups.values()].filter((week) => {
+  return [...groups].filter(([, week]) => {
     const lows = week.filter((row) => row.materialLow);
     return week.length >= 4 && lows.length >= 3 &&
       longestConsecutiveRun(lows.map((row) => row.sleepDay)) >= 2 &&
       mean(week.map((row) => row.deltaMinutes)) <= -materialThreshold;
-  }).length;
+  }).map(([weekStart]) => weekStart).sort();
 }
 
 function longestConsecutiveRun(values) {

@@ -11,6 +11,10 @@ import {
   RecoveryAssessmentMode,
 } from "./RecoveryBriefingPolicyV1.js";
 import { projectRecoverySleepInputsV1 } from "./RecoveryBriefingSleepInputProjectionV1.js";
+import {
+  projectRecoveryFoamContextV1,
+  projectRecoveryTrainingContextV1,
+} from "./RecoveryExecutionContextProjectionV1.js";
 import { resolveIntelligenceEvidenceCutoff } from "./IntelligenceLifecycleIdentityService.js";
 
 // Future-only Recovery card publication for NEW Weekly and Monthly artifacts.
@@ -123,10 +127,14 @@ export function preflightRecoveryPublicationV1({ authority, cadence, window } = 
 
 /**
  * Pure composition. `sleepInputs` = `{ sleepDays, activationPolicyRecord,
- * algorithmPolicyRecord }` read for `preflight.readRange`.
+ * algorithmPolicyRecord }` read for `preflight.readRange`. `executionInputs`
+ * = `{ reminders, executionItems, dailyCheckIns, canonicalEvidenceObjects }`
+ * from the generator's already-loaded canonical snapshot (null = no foam or
+ * training context, as before).
  */
 export function composeRecoveryAssessmentForBriefingV1({
   authority, cadence, window, artifactId, ownerUserId = null, evaluatedAt, sleepInputs = null,
+  executionInputs = null,
 } = {}) {
   const preflight = preflightRecoveryPublicationV1({ authority, cadence, window });
   if (!preflight.proceed) return preflight;
@@ -142,16 +150,18 @@ export function composeRecoveryAssessmentForBriefingV1({
   if (projection.status !== "projected") {
     return refusal(RecoveryPublicationReason.SLEEP_INPUT_BLOCKED, { detail: projection.blockedReason });
   }
+  const period = { cadence, startDate: window.startDate, endDate: window.endDate, timeZone: window.timeZone };
+  const context = projectExecutionContext({ executionInputs, period, evidenceCutoff: preflight.evidenceCutoff });
   const assessment = createRecoveryBriefingAssessmentV1({
     mode: RecoveryAssessmentMode.PUBLICATION,
-    period: { cadence, startDate: window.startDate, endDate: window.endDate, timeZone: window.timeZone },
+    period,
     evidenceCutoff: preflight.evidenceCutoff,
     evaluatedAt,
     sleepEvidence: projection.records,
-    // No authoritative foam schedule or bounded training-constraint source is
-    // wired to Recovery yet: both are explicit limitations, never invented.
-    foamRolling: null,
-    training: null,
+    // Execution context only: foam never sets, escalates or rescues status,
+    // and training never escalates a published card (Founder decisions 6, 7).
+    foamRolling: context.foamRolling,
+    training: context.training,
   });
   const eligibility = createEligibility({ cadence, projection });
   if (eligibility.baselineReliableNights < eligibility.baselineRequiredNights) {
@@ -289,9 +299,41 @@ export function projectRecoveryCardForNativeV1(artifact) {
       state: assessment.foamRolling.state,
       scheduledOccurrences: assessment.foamRolling.scheduledOccurrences,
       completedOccurrences: assessment.foamRolling.completedOccurrences,
+      missedOccurrences: assessment.foamRolling.missedOccurrences,
+      excusedOccurrences: assessment.foamRolling.exceptionOccurrences,
     },
     dataLimitations: assessment.dataLimitations,
   });
+}
+
+// Foam and training context from the generator's in-memory snapshot. A
+// projection failure leaves that context absent (an explicit limitation in
+// the assessment), never a failed or invented card.
+function projectExecutionContext({ executionInputs, period, evidenceCutoff }) {
+  if (!executionInputs) return { foamRolling: null, training: null };
+  let foamRolling = null;
+  let training = null;
+  try {
+    foamRolling = projectRecoveryFoamContextV1({
+      reminders: executionInputs.reminders,
+      executionItems: executionInputs.executionItems,
+      dailyCheckIns: executionInputs.dailyCheckIns,
+      period,
+      evidenceCutoff,
+    }).foamRolling;
+  } catch {
+    foamRolling = null;
+  }
+  try {
+    training = projectRecoveryTrainingContextV1({
+      canonicalEvidenceObjects: executionInputs.canonicalEvidenceObjects,
+      period,
+      evidenceCutoff,
+    });
+  } catch {
+    training = null;
+  }
+  return { foamRolling, training };
 }
 
 // The window's own cutoff, or (a closed-window contract carries none) the end

@@ -23,7 +23,7 @@ describe("RecoveryBriefingAssessmentServiceV1", () => {
     expect(first.status).toEqual({
       state: "green", label: "Green", reasonCodes: ["period_typical"],
     });
-    expect(first.commentary).toEqual({ visible: false, headline: null, body: null });
+    expect(first.commentary).toEqual({ visible: false, headline: null, title: null, body: null });
     expect(first.policy).toMatchObject({
       confidenceCoupling: "none",
       foamCanSetStatus: false,
@@ -614,3 +614,89 @@ function shift(value, amount) {
   return new Date(Date.parse(`${value}T12:00:00Z`) + amount * DAY_MS)
     .toISOString().slice(0, 10);
 }
+
+describe("RecoveryBriefingAssessmentServiceV1 — Founder content decisions (2026-10-08)", () => {
+  const steadyTraining = () => {
+    const value = constrainedTraining({ currentSessions: 5, baselineSessions: 5 });
+    value.current.materialConstraint = false;
+    return value;
+  };
+
+  it("a PUBLISHED assessment never escalates on training; shadow still models corroboration", () => {
+    const input = weeklyInput({ values: [330, 330, 375, 375, 375, 420, 420], training: constrainedTraining() });
+    const shadow = createRecoveryBriefingAssessmentV1(input);
+    const published = createRecoveryBriefingAssessmentV1({ ...input, mode: "publication" });
+    expect(shadow.status.state).toBe("red");
+    expect(published.status.state).toBe("yellow");
+    expect(published.status.reasonCodes).toEqual(["persistent_low_sleep"]);
+    expect(published.corroboration).toEqual([]);
+    expect(published.dataLimitations).toContain("training_corroboration_disabled_for_publication");
+    expect(published.commentary.body).toBe("Five nights were materially low.");
+    expect(RECOVERY_STATUS_POLICY_V1.training.publicationCorroboration).toBe("disabled_pending_exclusion_authority");
+  });
+
+  it("keeps the Sleep-only Red policy unchanged in publication", () => {
+    const published = createRecoveryBriefingAssessmentV1({
+      ...weeklyInput({ values: [300, 300, 300, 300, 300, 420, 420] }), mode: "publication",
+    });
+    expect(published.status.state).toBe("red");
+    expect(published.commentary).toEqual({
+      visible: true,
+      headline: "Sleep strain was severe and persistent",
+      title: null,
+      body: "Five nights were severely low and the period average remained well below baseline.",
+    });
+  });
+
+  it("adds the non-escalating training sentence only when comparison evidence warrants it", () => {
+    const values = [330, 330, 375, 375, 375, 420, 420];
+    const steady = createRecoveryBriefingAssessmentV1({ ...weeklyInput({ values, training: steadyTraining() }), mode: "publication" });
+    expect(steady.commentary).toEqual({
+      visible: true,
+      headline: "Sleep was persistently below baseline",
+      title: null,
+      body: "Five nights were materially low. No downstream training constraint was established.",
+    });
+    const reduced = steadyTraining();
+    reduced.current.completedSessions = 2;
+    expect(createRecoveryBriefingAssessmentV1({ ...weeklyInput({ values, training: reduced }), mode: "publication" })
+      .commentary.body).toBe("Five nights were materially low.");
+    // Missing evidence => omitted, never assumed.
+    expect(createRecoveryBriefingAssessmentV1({ ...weeklyInput({ values }), mode: "publication" })
+      .commentary.body).toBe("Five nights were materially low.");
+    const fewComparable = steadyTraining();
+    fewComparable.baselinePeriods = fewComparable.baselinePeriods.slice(0, 2);
+    expect(createRecoveryBriefingAssessmentV1({ ...weeklyInput({ values, training: fewComparable }), mode: "publication" })
+      .commentary.body).toBe("Five nights were materially low.");
+  });
+
+  it("titles Monthly Yellow editorially with the distinct titled commentary block", () => {
+    // Oct 2026: the weeks of Oct 18-24 and Oct 25-31 are materially low (second half).
+    const values = Array(31).fill(420).map((value, index) => index >= 17 ? 370 : value);
+    // Five sessions a week for the month (a 31-night month expects ~22).
+    const training = steadyTraining();
+    training.current.completedSessions = 22;
+    const monthly = createRecoveryBriefingAssessmentV1({ ...monthlyInput({ values, training }), mode: "publication" });
+    expect(monthly.status.state).toBe("yellow");
+    expect(monthly.commentary).toEqual({
+      visible: true,
+      headline: "Sleep softened across the second half",
+      title: "A multi-week shift",
+      body: "Two completed weeks were meaningfully below your prior 28-night baseline. No downstream training constraint was established.",
+    });
+    const early = Array(31).fill(420).map((value, index) => index >= 3 && index < 17 ? 370 : value);
+    expect(createRecoveryBriefingAssessmentV1(monthlyInput({ values: early })).commentary.headline)
+      .toBe("Sleep softened across the first half");
+  });
+
+  it("foam is execution context only: it never changes status or commentary", () => {
+    const values = [330, 330, 375, 375, 375, 420, 420];
+    const all = createRecoveryBriefingAssessmentV1({ ...weeklyInput({ values }), mode: "publication" });
+    const none = createRecoveryBriefingAssessmentV1({
+      ...weeklyInput({ values }), mode: "publication", foamRolling: foam(Array(7).fill("missed")),
+    });
+    expect(none.status).toEqual(all.status);
+    expect(none.commentary).toEqual(all.commentary);
+    expect(none.foamRolling).toMatchObject({ scheduledOccurrences: 7, completedOccurrences: 0, missedOccurrences: 7 });
+  });
+});

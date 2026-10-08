@@ -109,6 +109,10 @@ export const RECOVERY_STATUS_POLICY_V1 = deepFreeze({
     },
     causality: "not_inferred",
     canManufactureNonGreenStatus: false,
+    // Founder decision 6 (2026-10-08): a published card never escalates to a
+    // training-corroborated Red until travel/illness/injury/planned-rest/
+    // deload exclusions have authoritative handling. Shadow mode still models it.
+    publicationCorroboration: "disabled_pending_exclusion_authority",
   },
   foamRolling: {
     displayRole: "execution_context_only",
