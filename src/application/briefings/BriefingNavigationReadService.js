@@ -7,6 +7,7 @@ import { projectConfidenceExplanationForSurface } from "../../domain/presentatio
 import { projectPersistedMonthlyPresentationForRendering } from "../../domain/services/MonthlyPersistedArtifactCompatibilityService.js";
 import { createProviderMediaReferenceResolver } from "../media/ProviderMediaReferenceResolver.js";
 import { resolveNarrativeMedia } from "./PhotoEventBriefingReadService.js";
+import { RECOVERY_ASSESSMENT_FIELD, projectRecoveryCardForNativeV1 } from "../../domain/services/RecoveryBriefingPublicationV1.js";
 
 export function createBriefingNavigationReadService({ store } = {}) {
   if (!store?.getAnalysis || !store?.getArtifact || !store?.listHistory) throw new Error("Briefing navigation requires a read store.");
@@ -66,12 +67,12 @@ export function createBriefingNavigationReadService({ store } = {}) {
             { assessment: context.confidenceAssessment, surface: "weekly" }
           ),
         };
-        return nativeBriefingDetail({
+        return withRecoveryCard(nativeBriefingDetail({
           artifact,
           cadence: "weekly",
           attribution: weeklyAttribution(artifact, finished),
           presentation: createWeeklyBriefingScreenPresentation(finished),
-        });
+        }), artifact);
       }
       if (artifact.cadence === "midweek" && artifact.briefing) {
         const briefing = prepareMidweekBriefingReviewPresentation({ artifact,
@@ -94,9 +95,9 @@ export function createBriefingNavigationReadService({ store } = {}) {
         const presentation = projectPersistedMonthlyPresentationForRendering(
           artifact.briefing.monthlyPresentation
         );
-        return persistedNativeDetail(context, {
+        return withRecoveryCard(persistedNativeDetail(context, {
           ...artifact,
-          briefing: { ...artifact.briefing, monthlyPresentation: {
+          briefing: { ...withoutRecoveryField(artifact.briefing), monthlyPresentation: {
             ...presentation,
             // A Monthly review carries its compact Confidence line in the
             // stored artifact; it is rendered as stored, never re-expanded.
@@ -107,13 +108,13 @@ export function createBriefingNavigationReadService({ store } = {}) {
                 { assessment: context.confidenceAssessment, surface: "monthly" }
               ) },
           } },
-        });
+        }), artifact);
       }
       if (artifact.briefing?.dexaEventNarrative) {
         const narrative = artifact.briefing.dexaEventNarrative;
         return persistedNativeDetail(context, {
           ...artifact,
-          briefing: { ...artifact.briefing, dexaEventNarrative: {
+          briefing: { ...withoutRecoveryField(artifact.briefing), dexaEventNarrative: {
             ...narrative,
             goalConfidence: projectConfidenceExplanationForSurface(
               narrative.goalConfidence,
@@ -128,7 +129,7 @@ export function createBriefingNavigationReadService({ store } = {}) {
         const narrative = resolveNarrativeMedia(artifact.briefing.photoEventNarrative, resolver);
         return persistedNativeDetail(context, {
           ...artifact,
-          briefing: { ...artifact.briefing, photoEventNarrative: {
+          briefing: { ...withoutRecoveryField(artifact.briefing), photoEventNarrative: {
             ...narrative,
             goalConfidence: projectConfidenceExplanationForSurface(
               narrative.goalConfidence,
@@ -153,6 +154,23 @@ export function createBriefingNavigationReadService({ store } = {}) {
       return store.getConfidenceAssessment?.({ assessmentId }) ?? null;
     },
   });
+}
+
+// The single Recovery card is an optional top-level `recovery` key, present
+// ONLY for a Weekly/Monthly artifact that carries a valid published envelope;
+// otherwise the key is omitted (never null), so every existing response and
+// every older client is unchanged.
+function withRecoveryCard(detail, artifact) {
+  const card = projectRecoveryCardForNativeV1(artifact);
+  return card ? Object.freeze({ ...detail, recovery: card }) : detail;
+}
+
+// Event briefings never carry Recovery (the write funnel refuses it); a
+// persisted passthrough also never forwards one.
+function withoutRecoveryField(briefing) {
+  if (!briefing || !Object.prototype.hasOwnProperty.call(briefing, RECOVERY_ASSESSMENT_FIELD)) return briefing;
+  const { [RECOVERY_ASSESSMENT_FIELD]: _excluded, ...rest } = briefing;
+  return rest;
 }
 
 function persistedNativeDetail(context, artifact) {
