@@ -37,10 +37,11 @@ export function projectDexaAppointmentPriority({
   }
   if (dayOffset > 0) return null;
 
-  const appointmentPassed = dayOffset < 0 || (
-    dayOffset === 0 && appointmentTime && local.time >= appointmentTime
-  );
-  if (appointmentPassed) {
+  // The appointment is an informational reminder for its entire scheduled
+  // local day. Do not turn it into an overdue/upload task at the appointment
+  // clock minute; actual confirmed scan evidence owns completion. The
+  // optional upload reminder begins only after local midnight.
+  if (dayOffset < 0) {
     return appointment.uploadReminder
       ? createProjection(
           appointment,
@@ -50,7 +51,9 @@ export function projectDexaAppointmentPriority({
         )
       : null;
   }
-  if (dayOffset === 0 && preferences.has(PREPARATION_PREFERENCES[DexaPriorityStage.MORNING_OF])) {
+  if (dayOffset === 0 &&
+      preferences.has(PREPARATION_PREFERENCES[DexaPriorityStage.MORNING_OF]) &&
+      (!appointmentTime || local.time < appointmentTime)) {
     return createProjection(appointment, DexaPriorityStage.MORNING_OF, scheduledDate, appointmentTime);
   }
   if (dayOffset === 0) {

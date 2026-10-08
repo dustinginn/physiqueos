@@ -2549,6 +2549,14 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         title: "This priority occurrence is unavailable.",
       });
     }
+    if (source.kind === PriorityDispositionTargetKind.EXECUTION && source.dexa) {
+      throw new ApplicationProblem({
+        status: 422,
+        code: "PRIORITY_SKIP_UNSUPPORTED",
+        title: "DEXA appointments are informational reminders and cannot be skipped.",
+        recovery: { workflow: "dexa_appointment" },
+      });
+    }
     const current = source.record;
     const fallbackExecution = resolvePriorityDispositionExecutionContract(source, {
       occurrenceDate,

@@ -17,7 +17,9 @@ describe("DEXA appointment priority lifecycle", () => {
     ["one week before when disabled", "2026-08-08T15:00:00.000Z", null],
     ["one day before", "2026-08-14T15:00:00.000Z", DexaPriorityStage.DAY_BEFORE],
     ["morning of", "2026-08-15T14:00:00.000Z", DexaPriorityStage.MORNING_OF],
-    ["after the appointment", "2026-08-15T14:30:00.000Z", DexaPriorityStage.UPLOAD_RESULTS],
+    ["at the appointment time", "2026-08-15T14:30:00.000Z", DexaPriorityStage.APPOINTMENT],
+    ["late on appointment day", "2026-08-16T06:59:00.000Z", DexaPriorityStage.APPOINTMENT],
+    ["after local midnight", "2026-08-16T07:01:00.000Z", DexaPriorityStage.UPLOAD_RESULTS],
   ])("projects %s", (_label, instant, expectedStage) => {
     const result = projectDexaAppointmentPriority({ appointment: appointment(), now: new Date(instant) });
     expect(result?.stage ?? null).toBe(expectedStage);
@@ -39,6 +41,10 @@ describe("DEXA appointment priority lifecycle", () => {
     expect(projectDexaAppointmentPriority({
       appointment: appointment({ reminderPreferences: [], uploadReminder: false }),
       now: new Date("2026-08-15T14:31:00.000Z"),
+    })?.stage).toBe(DexaPriorityStage.APPOINTMENT);
+    expect(projectDexaAppointmentPriority({
+      appointment: appointment({ reminderPreferences: [], uploadReminder: false }),
+      now: new Date("2026-08-16T07:01:00.000Z"),
     })).toBeNull();
   });
 

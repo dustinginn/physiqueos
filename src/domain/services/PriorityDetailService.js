@@ -120,32 +120,31 @@ export function createPriorityDetailService({ repositories, now = () => new Date
         if (isCurrentScheduledDexaAppointment(appointment) &&
             appointment.preferredSchedule?.date === dexaPriority.scheduledDate &&
             projection?.priorityId === priorityId) {
-          const skipEntry = isPriorityOccurrenceSkipped(occurrenceCheckIn, priorityId, occurrenceDate)
-            ? findPriorityOccurrenceReconciliation(occurrenceCheckIn, priorityId, occurrenceDate)
-            : null;
           const detail = createDexaAppointmentPriorityDetail({
             appointment,
             goals,
             operatingPlan,
             stage: dexaPriority.stage,
             occurrenceDate,
-            executionContract: disposition?.executionContract ?? resolveExecutionPriorityContract({
-              executionItem: appointment,
-              occurrenceDate,
-              priorityId,
-              workflow: dexaPriority.stage === DexaPriorityStage.UPLOAD_RESULTS
-                ? "dexa_evidence"
-                : "dexa_appointment",
-              destination: dexaPriority.stage === DexaPriorityStage.UPLOAD_RESULTS
-                ? "/evidence/dexa"
-                : "/profile/operating-plan/execution/dexa",
+            executionContract: Object.freeze({
+              ...resolveExecutionPriorityContract({
+                executionItem: appointment,
+                occurrenceDate,
+                priorityId,
+                workflow: dexaPriority.stage === DexaPriorityStage.UPLOAD_RESULTS
+                  ? "dexa_evidence"
+                  : "dexa_appointment",
+                destination: dexaPriority.stage === DexaPriorityStage.UPLOAD_RESULTS
+                  ? "/evidence/dexa"
+                  : "/profile/operating-plan/execution/dexa",
+              }),
+              expectedVersion: null,
             }),
-            skipEntry,
           });
           return withSkipContract(detail, {
             occurrenceDate,
             today,
-            open: !skipEntry && Boolean(disposition),
+            open: false,
           });
         }
         return null;
@@ -1091,11 +1090,9 @@ function createDexaAppointmentPriorityDetail({
   goals,
   occurrenceDate,
   operatingPlan,
-  skipEntry = null,
   stage,
 }) {
   const upload = stage === DexaPriorityStage.UPLOAD_RESULTS;
-  const skipped = Boolean(skipEntry);
   const preparationNote = String(appointment.preparationNote ?? "").trim();
   const date = formatDexaDate(appointment.preferredSchedule.date);
   const time = formatTimeOfDay(appointment.preferredSchedule.timeOfDay);
@@ -1106,23 +1103,17 @@ function createDexaAppointmentPriorityDetail({
     title,
     eyebrow: "Priority Detail",
     subtitle: getDexaPrioritySubtitle(stage, time),
-    status: skipped ? "Skipped" : upload ? "Action needed" : "Upcoming",
+    status: upload ? "Action needed" : "Upcoming",
     completable: false,
     executionContract,
-    skipContext: skipped
-      ? {
-          occurrenceDate,
-          note: skipEntry.note ?? null,
-          skippedAt: skipEntry.recordedAt ?? null,
-        }
-      : null,
+    skipContext: null,
     notificationAction: specializedNotificationAction({
       workflow: upload ? "dexa_evidence" : "dexa_appointment",
       priorityId: createDexaPriorityId(appointment.preferredSchedule.date, stage),
       occurrenceDate,
       timeOfDay: appointment.preferredSchedule.timeOfDay,
       executionContract,
-      skippable: !skipped,
+      skippable: false,
     }),
     action: {
       label: upload ? "Upload DEXA Results" : "View DEXA Appointment",

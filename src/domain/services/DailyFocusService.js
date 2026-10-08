@@ -651,12 +651,17 @@ function getDexaAppointmentItems({ executionItems, now, timeZone, today }) {
   });
   if (!projection) return [];
   const upload = projection.stage === DexaPriorityStage.UPLOAD_RESULTS;
-  const executionContract = resolveExecutionPriorityContract({
-    executionItem: appointment,
-    occurrenceDate: today,
-    priorityId: projection.priorityId,
-    workflow: upload ? "dexa_evidence" : "dexa_appointment",
-    destination: projection.href,
+  const executionContract = Object.freeze({
+    ...resolveExecutionPriorityContract({
+      executionItem: appointment,
+      occurrenceDate: today,
+      priorityId: projection.priorityId,
+      workflow: upload ? "dexa_evidence" : "dexa_appointment",
+      destination: projection.href,
+    }),
+    // DEXA appointment priorities navigate only. A record revision is not a
+    // completion/skip capability and must not be projected as one.
+    expectedVersion: null,
   });
 
   return [{
@@ -683,7 +688,7 @@ function getDexaAppointmentItems({ executionItems, now, timeZone, today }) {
       occurrenceDate: today,
       timeOfDay: appointment.preferredSchedule?.timeOfDay,
       executionContract,
-      skippable: true,
+      skippable: false,
     }),
   }];
 }

@@ -18,7 +18,11 @@ describe("DEXA Priority Detail", () => {
         classification: "specialized_workflow_required",
         workflow: "dexa_appointment",
         completionCommand: null,
+        skipCommand: null,
       },
+      skippable: false,
+      skipCommand: null,
+      executionContract: { expectedVersion: null },
     });
     expect(section(detail, "Preparation").items[0].detail).toBe("Use the saved clinic instructions.");
     expect(section(detail, "When").items[0].label).toContain("7:30 AM");
@@ -31,7 +35,7 @@ describe("DEXA Priority Detail", () => {
   });
 
   it("uses upload copy and the existing evidence route after the appointment without stale prep guidance", async () => {
-    const detail = await service(appointment({ preparationNote: "Do not surface this after the scan." }), "2026-08-15T15:00:00.000Z")
+    const detail = await service(appointment({ preparationNote: "Do not surface this after the scan." }), "2026-08-16T15:00:00.000Z")
       .getPriorityDetail(createDexaPriorityId("2026-08-15", DexaPriorityStage.UPLOAD_RESULTS));
     expect(detail).toMatchObject({
       title: "Upload DEXA results",
@@ -41,14 +45,18 @@ describe("DEXA Priority Detail", () => {
         classification: "specialized_workflow_required",
         workflow: "dexa_evidence",
         completionCommand: null,
+        skipCommand: null,
       },
+      skippable: false,
+      skipCommand: null,
+      executionContract: { expectedVersion: null },
     });
     expect(section(detail, "What").items[0].detail).toContain("scheduled scan time has passed");
     expect(section(detail, "Preparation")).toBeUndefined();
   });
 
   it("does not resolve a stale derived priority after the appointment is completed", async () => {
-    const detail = await service(appointment({ active: false, status: "completed" }), "2026-08-15T15:00:00.000Z")
+    const detail = await service(appointment({ active: false, status: "completed" }), "2026-08-16T15:00:00.000Z")
       .getPriorityDetail(createDexaPriorityId("2026-08-15", DexaPriorityStage.UPLOAD_RESULTS));
     expect(detail).toBeNull();
   });
