@@ -64,7 +64,8 @@ const SLEEP_ALLOWED = new Set([
   // Recovery Briefing V1 (Weekly/Monthly only): a NON-strategic,
   // prospective-only projection of canonical sleep-canon-v3 days into
   // Recovery-only rows (never `sleep_night` V3 evidence, never the graduation
-  // scope), its bounded read-only reader (unwired), and synthetic test support.
+  // scope), its bounded read-only reader (Weekly/Monthly only, OFF without the
+  // publication authority), and synthetic test support.
   "domain/services/RecoveryBriefingSleepInputProjectionV1.js",
   "platform/database/RecoverySleepInputReaderV1.js",
   "testSupport/recoverySleepSynthetic.js",

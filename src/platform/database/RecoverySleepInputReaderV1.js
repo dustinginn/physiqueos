@@ -16,9 +16,9 @@ import {
 // activation record and the canonical-algorithm record, plus the single
 // Recovery publication authority record. It has no write method.
 //
-// NOT WIRED: no composition constructs this reader. Wiring it into the provider
-// briefing cadence composition is a separately reviewed activation step, and
-// the authority record it reads does not exist in production (absent = OFF).
+// Wired into the provider briefing cadence composition for Weekly and Monthly
+// only. It reads Sleep only after the Recovery publication authority is found
+// valid; that record does not exist in production (absent = OFF).
 
 export const RECOVERY_BRIEFING_PUBLICATION_AUTHORITY_RECORD_ID = "recovery_briefing_publication_authority";
 // The Server-owned configuration collection the Sleep policies already live in.

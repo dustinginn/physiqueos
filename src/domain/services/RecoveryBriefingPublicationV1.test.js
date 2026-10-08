@@ -342,12 +342,15 @@ describe("Recovery Sleep input reader", () => {
     expect(RECOVERY_BRIEFING_PUBLICATION_AUTHORITY_RECORD_ID).toBe("recovery_briefing_publication_authority");
   });
 
-  it("is not constructed by any composition (not wired)", () => {
-    const sources = ["src/application/composition/providerBriefingCadenceComposition.js",
-      "src/application/composition/providerBriefingReconciliationComposition.js"]
-      .map((file) => fs.readFileSync(file, "utf8"));
-    for (const source of sources) {
-      expect(source).not.toMatch(/Recovery(SleepInputReader|BriefingComposer|BriefingPublication)/);
-    }
+  it("is wired only into the provider Weekly and Monthly generators, never Midweek or reconciliation", () => {
+    const cadence = fs.readFileSync("src/application/composition/providerBriefingCadenceComposition.js", "utf8");
+    expect(cadence).toMatch(/createRecoverySleepInputReaderV1\(/);
+    expect(cadence).toMatch(/createRecoveryBriefingComposerV1\(/);
+    const midweekBlock = cadence.slice(cadence.indexOf("midweek: createMidweekBriefingService("), cadence.indexOf("monthly: createFounderMonthlyBriefingService("));
+    expect(midweekBlock).not.toMatch(/recovery/i);
+    expect(cadence.match(/recoveryComposer,/g)).toHaveLength(2);
+    const reconciliation = fs.readFileSync("src/application/composition/providerBriefingReconciliationComposition.js", "utf8");
+    expect(reconciliation).not.toMatch(/Recovery(SleepInputReader|BriefingComposer|BriefingPublication)|recoveryComposer/);
+    expect(fs.readFileSync("src/domain/services/MidweekBriefingService.js", "utf8")).not.toMatch(/recovery(Composer|Assessment)|RecoveryBriefing/);
   });
 });
