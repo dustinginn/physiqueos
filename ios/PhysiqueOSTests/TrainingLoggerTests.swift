@@ -45,6 +45,77 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(AppDestination.trainingLogger.serverDestinationId, "log")
     }
 
+    @MainActor
+    func testRepeatedPristineStartCreatesOnlyOneSession() async throws {
+        let store = MemoryTrainingLoggerDraftStore()
+        let viewModel = TrainingLoggerViewModel(api: api, draftStore: store)
+        await viewModel.load()
+        let start = try XCTUnwrap(Self.testDate("2026-10-07T18:30:00Z"))
+
+        viewModel.start(mode: .live, date: start)
+        let firstID = try XCTUnwrap(viewModel.draft?.id)
+        viewModel.start(mode: .live, date: start)
+
+        XCTAssertEqual(viewModel.draft?.id, firstID)
+        XCTAssertEqual(store.loadAll().count, 1, "A double tap must not create a sibling workout.")
+    }
+
+    @MainActor
+    func testLoggerRefusalCopyIsTruthfulAndNonDestructive() {
+        XCTAssertEqual(
+            TrainingLoggerViewModel.refusalMessage(for: .sessionPaused),
+            "Resume this workout before changing sets or notes."
+        )
+        XCTAssertEqual(
+            TrainingLoggerViewModel.refusalMessage(for: .staleRevision(current: 4)),
+            "This workout changed elsewhere. Review the latest values before trying again."
+        )
+        XCTAssertEqual(
+            TrainingLoggerViewModel.refusalMessage(for: .sessionNotMutable),
+            "This workout is being saved and can't be changed right now."
+        )
+        XCTAssertEqual(
+            TrainingLoggerViewModel.refusalMessage(for: .persistenceFailed),
+            "This change couldn't be saved on this device. Your workout is unchanged; try again."
+        )
+    }
+
+    @MainActor
+    func testDiscardRefusalKeepsExactDraftAndShowsInlineReason() async throws {
+        var saved = draft(mode: .live, date: "2026-10-07", areas: ["biceps"])
+        saved.id = "saving-draft"
+        let store = MemoryTrainingLoggerDraftStore(draft: saved)
+        let viewModel = TrainingLoggerViewModel(api: api, draftStore: store)
+        await viewModel.load()
+        XCTAssertTrue(viewModel.sessionAuthority.beginSubmission(sessionId: saved.id))
+
+        viewModel.discardSavedDraft(draftId: saved.id)
+
+        XCTAssertEqual(store.loadAll(), [saved])
+        XCTAssertEqual(viewModel.savedDrafts, [saved])
+        XCTAssertEqual(
+            viewModel.validationMessage,
+            "This workout is being saved and can't be changed right now."
+        )
+        viewModel.sessionAuthority.endSubmission(sessionId: saved.id)
+    }
+
+    func testLoggerRefusalPresentationAndLogHelperUseShippingIdentifiers() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let view = try String(
+            contentsOf: root.appendingPathComponent("PhysiqueOS/Presentation/TrainingLogger/TrainingLoggerView.swift"),
+            encoding: .utf8
+        )
+        let ui = try String(
+            contentsOf: root.appendingPathComponent("PhysiqueOSUITests/TrainingAcceptanceUITests.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(view.contains("accessibilityIdentifier(\"trainingLogger.validation\")"))
+        XCTAssertTrue(view.contains("validation(viewModel)"), "Entry and active Logger flows must surface refusals inline.")
+        XCTAssertTrue(ui.contains("matching(identifier: \"log.trainingLogger\")"))
+        XCTAssertTrue(ui.contains("[\"trainingLogger.workoutIdentity\"]"), "The helper must handle Log's live-workout routing rule.")
+    }
+
     func testCanonicalAreasDecodeInWebOrderAndSupportMultiSelect() async throws {
         let config = try await configuration()
         XCTAssertEqual(config.areas.map(\.label), ["Chest", "Back", "Shoulders", "Biceps", "Triceps", "Core", "Quads", "Hamstrings", "Glutes", "Calves"])

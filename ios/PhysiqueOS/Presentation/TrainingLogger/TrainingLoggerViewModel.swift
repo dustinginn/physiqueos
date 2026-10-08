@@ -218,6 +218,18 @@ final class TrainingLoggerViewModel {
     func start(mode: TrainingLoggerMode, date: Date = Date()) {
         guard canWrite else { return }
         let workoutDate = Self.dateKey(date)
+        // A second tap can arrive before SwiftUI removes the entry action.
+        // Treat only the exact pristine start it just created as the same
+        // request; saved siblings and an intentionally prepared workout keep
+        // their independent identities.
+        if let current = draft,
+           current.step == .areas,
+           current.mode == mode,
+           current.workoutDate == workoutDate,
+           current.selectedAreaIds.isEmpty,
+           current.exercises.isEmpty {
+            return
+        }
         let startedAt = mode == .live ? ISO8601DateFormatter().string(from: date) : nil
         completedPerformanceRecords = []
         completedDraft = nil
@@ -278,8 +290,9 @@ final class TrainingLoggerViewModel {
         guard savedDrafts.contains(where: { $0.id == draftId }) else { return }
         // Refused while a commit for it is in flight; files are removed only
         // once the authority actually ended it.
-        guard sessionAuthority.endSession(sessionId: draftId, reason: .discarded).isAccepted else {
-            validationMessage = "This workout is being saved and can't be discarded right now."
+        let outcome = sessionAuthority.endSession(sessionId: draftId, reason: .discarded)
+        guard outcome.isAccepted else {
+            noteRejection(outcome)
             return
         }
         attachmentStore.removeAll(draftId: draftId)
@@ -302,7 +315,11 @@ final class TrainingLoggerViewModel {
     func cancelWorkout() {
         guard canWrite, !isFinishConfirmed else { return }
         if let draftId = draft?.id {
-            guard sessionAuthority.endSession(sessionId: draftId, reason: .cancelled).isAccepted else { return }
+            let outcome = sessionAuthority.endSession(sessionId: draftId, reason: .cancelled)
+            guard outcome.isAccepted else {
+                noteRejection(outcome)
+                return
+            }
             attachmentStore.removeAll(draftId: draftId)
         }
         draft = nil
@@ -371,11 +388,39 @@ final class TrainingLoggerViewModel {
         noteRejection(sessionAuthority.endRest(sessionId: selectedDraftId, restId: restId))
     }
 
-    /// Only a failed device write is worth telling the Founder about; the
-    /// screen already reflects authoritative state for every other outcome.
+    /// Every rejected UI write gets one truthful, non-destructive message.
+    /// The authority has already preserved the current draft, sets and
+    /// variant selection; presentation must never imply the rejected state
+    /// was applied or ask the Founder to recreate it.
     private func noteRejection(_ outcome: TrainingSessionMutationOutcome) {
-        if outcome == .rejected(.persistenceFailed) {
-            validationMessage = "This change couldn't be saved on this device. Try again."
+        guard case .rejected(let rejection) = outcome else { return }
+        validationMessage = Self.refusalMessage(for: rejection)
+    }
+
+    static func refusalMessage(for rejection: TrainingSessionMutationRejection) -> String {
+        switch rejection {
+        case .writesNotAuthorized:
+            "Training Logger is read-only right now."
+        case .sessionNotFound:
+            "This workout isn't available anymore. Return to Log and reopen it."
+        case .sessionEnded:
+            "This workout has already ended. Return to Log to see the latest state."
+        case .revisionRequired, .staleRevision:
+            "This workout changed elsewhere. Review the latest values before trying again."
+        case .exerciseNotFound, .setNotFound, .restNotFound:
+            "This workout changed. Review the latest sets before trying again."
+        case .sessionNotMutable:
+            "This workout is being saved and can't be changed right now."
+        case .sessionPaused:
+            "Resume this workout before changing sets or notes."
+        case .originNotPermitted:
+            "This change isn't available from Training Logger."
+        case .setValuesIncomplete:
+            "Enter valid set values before marking this set complete."
+        case .persistenceFailed:
+            "This change couldn't be saved on this device. Your workout is unchanged; try again."
+        case .noCompletedSets:
+            "Complete at least one valid set before finishing."
         }
     }
 

@@ -462,6 +462,8 @@ struct TrainingLoggerView: View {
                     .loggerSurface()
             }
 
+            validation(viewModel)
+
             // L1 order: Start Workout, Saved workouts, Log Past Workout.
             Button { viewModel.start(mode: .live) } label: {
                 loggerActionRow(icon: "play.fill", title: "Start Workout", detail: "Begin a live session using today’s date.")
@@ -1508,11 +1510,7 @@ struct TrainingLoggerView: View {
                 }
             }
             .loggerSurface(tone: PhysiqueOSTheme.redesignGreen, toneFill: 0.13, toneRule: 0.36)
-            if let message = viewModel.validationMessage {
-                Text(message)
-                    .logText(LoggerType.fieldTitle12)
-                    .foregroundStyle(PhysiqueOSTheme.redesignRed)
-            }
+            validation(viewModel)
             if let message = viewModel.processingMessage {
                 Text(message)
                     .logText(LoggerType.fieldTitle12)
@@ -1854,9 +1852,26 @@ struct TrainingLoggerView: View {
     private func validation(_ viewModel: TrainingLoggerViewModel) -> some View {
         Group {
             if let message = viewModel.validationMessage {
-                Text(message)
-                    .logText(LoggerType.fieldTitle12)
-                    .foregroundStyle(PhysiqueOSTheme.redesignRed)
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: "exclamationmark")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 24, height: 24)
+                        .background(PhysiqueOSTheme.redesignRed, in: Circle())
+                        .accessibilityHidden(true)
+                    Text(message)
+                        .logText(LoggerType.fieldTitle12)
+                        .foregroundStyle(PhysiqueOSTheme.redesignInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(PhysiqueOSTheme.redesignRed.opacity(0.09), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(PhysiqueOSTheme.redesignRed.opacity(0.42), lineWidth: 1))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Training Logger issue. \(message)")
+                .accessibilityIdentifier("trainingLogger.validation")
             }
         }
     }

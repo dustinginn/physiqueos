@@ -633,7 +633,20 @@ final class TrainingAcceptanceUITests: XCTestCase {
 
     private func openWorkoutLoggerFromLog() {
         app.tabBars.buttons["Log"].tap()
-        let logger = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Training Logger")).firstMatch
+
+        // Entering Log from another tab intentionally resumes a live workout.
+        // Return to the shipping Log landing without mutating that draft so
+        // callers can exercise a fresh Logger push deterministically.
+        let routedWorkout = app.descendants(matching: .any)["trainingLogger.workoutIdentity"]
+        if routedWorkout.waitForExistence(timeout: 3) {
+            let back = app.navigationBars.buttons.element(boundBy: 0)
+            XCTAssertTrue(back.waitForExistence(timeout: 3), "The routed workout had no Back control to reach Log.")
+            back.tap()
+        }
+
+        let logger = app.descendants(matching: .any)
+            .matching(identifier: "log.trainingLogger")
+            .firstMatch
         XCTAssertTrue(logger.waitForExistence(timeout: 5), "Training Logger was not available from Log.")
         logger.tap()
     }
