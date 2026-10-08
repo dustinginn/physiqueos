@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recovery Lock Comparison</title>
+<style>
+  :root { --bg: #f4f2ec; --ink: #102431; --muted: #5b6b74; --line: #d9d6cc; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0b1520; --ink: #e8eef2; --muted: #9aaab3; --line: #22313d; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, system-ui, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  p.note { color: var(--muted); margin: 0 0 24px; }
+  section { border-top: 1px solid var(--line); padding: 20px 0; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: start; }
+  figure { margin: 0; }
+  figcaption { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  img { width: 100%; height: auto; border-radius: 10px; display: block; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Build 93 Recovery — locked design vs correction candidate</h1>
+  <p class="note">Left: Founder-locked 2026-10-04 boards (crops of the four locked images on main). Right: the correction candidate's shipping SwiftUI on the iOS Simulator with the DEBUG review fixture (synthetic data, no Founder Sleep, not a device capture). The fixture flag and the Confidence-coupling note are review-fixture marks only and never ship.</p>
+  <section>
+    <h2>Weekly · Dark</h2>
+    <div class="row">
+      <figure><figcaption>Locked · weekly-recovery-dark.png</figcaption><img src="locked/weekly-dark.png" alt="Locked Weekly Recovery, Dark"></figure>
+      <figure><figcaption>Candidate · Weekly Green</figcaption><img src="candidate/recovery-weekly-green-dark.png" alt="Candidate Weekly Recovery, Dark"></figure>
+      <figure><figcaption>Candidate · lower half</figcaption><img src="candidate/recovery-weekly-green-dark-lower.png" alt="Candidate Weekly Recovery lower half, Dark"></figure>
+    </div>
+  </section>
+  <section>
+    <h2>Weekly · Mineral Light (rich field)</h2>
+    <div class="row">
+      <figure><figcaption>Locked · weekly-light-rich-fields-full.png (Recovery crop)</figcaption><img src="locked/weekly-mineral-light.png" alt="Locked Weekly Recovery, Mineral Light"></figure>
+      <figure><figcaption>Candidate · Weekly Green</figcaption><img src="candidate/recovery-weekly-green-mineral-light.png" alt="Candidate Weekly Recovery, Mineral Light"></figure>
+      <figure><figcaption>Candidate · lower half</figcaption><img src="candidate/recovery-weekly-green-mineral-light-lower.png" alt="Candidate Weekly Recovery lower half, Mineral Light"></figure>
+    </div>
+  </section>
+  <section>
+    <h2>Monthly · Dark</h2>
+    <div class="row">
+      <figure><figcaption>Locked · monthly-corrected-dark-full.png (Recovery crop)</figcaption><img src="locked/monthly-dark.png" alt="Locked Monthly Recovery, Dark"></figure>
+      <figure><figcaption>Candidate · Monthly Yellow</figcaption><img src="candidate/recovery-monthly-yellow-dark.png" alt="Candidate Monthly Recovery, Dark"></figure>
+      <figure><figcaption>Candidate · lower half</figcaption><img src="candidate/recovery-monthly-yellow-dark-lower.png" alt="Candidate Monthly Recovery lower half, Dark"></figure>
+    </div>
+  </section>
+  <section>
+    <h2>Monthly · Mineral Light</h2>
+    <div class="row">
+      <figure><figcaption>Locked · monthly-corrected-light-full.png (Recovery crop)</figcaption><img src="locked/monthly-mineral-light.png" alt="Locked Monthly Recovery, Mineral Light"></figure>
+      <figure><figcaption>Candidate · Monthly Yellow</figcaption><img src="candidate/recovery-monthly-yellow-mineral-light.png" alt="Candidate Monthly Recovery, Mineral Light"></figure>
+      <figure><figcaption>Candidate · lower half</figcaption><img src="candidate/recovery-monthly-yellow-mineral-light-lower.png" alt="Candidate Monthly Recovery lower half, Mineral Light"></figure>
+    </div>
+  </section>
+</main>
+</body>
+</html>
