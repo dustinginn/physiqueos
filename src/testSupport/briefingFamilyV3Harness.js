@@ -8,6 +8,7 @@ import midweekV2 from "../fixtures/briefingFamilyV3/midweekBriefingV2.json";
 import weeklyArtifact from "../fixtures/briefingFamilyV3/weeklyArtifactV3Bound.json";
 import dexaEventArtifact from "../fixtures/briefingFamilyV3/dexaEventArtifact.json";
 import photoEventArtifact from "../fixtures/briefingFamilyV3/photoEventArtifact.json";
+import dexaEventOct9Narrative from "../fixtures/briefingFamilyV3/dexaEventOct9Narrative.json";
 import { adaptCadenceEvidenceObservationsV3, adaptCanonicalDexaScans, adaptCanonicalPhotoObservations } from "../domain/intelligence/ProductionConfidenceNarrativeV3Adapter.js";
 import {
   applyNarrativeV3ToBriefingArtifact,
@@ -18,6 +19,8 @@ import { createEnergyPIObservations } from "../domain/services/EnergyPIObservati
 import { withStructuredPhotoObservationsV3 } from "../domain/intelligence/PhotoEventStructuredObservationsV3.js";
 import { resolveCommittedPhaseContext } from "../domain/services/FounderPhaseCorrectionService.js";
 import { createStrategicInterpretationPublicationServiceV3 } from "../domain/services/StrategicInterpretationPublicationServiceV3.js";
+import { createDEXAEventNarrativeService } from "../domain/services/DEXAEventNarrativeService.js";
+import { createSeedRepositories } from "../data/repositories/createSeedRepositories.js";
 
 // Permanent golden forensic harness for the Sep 13–19 Weekly.
 //
@@ -36,6 +39,7 @@ export const WEEKLY_SEP13_19 = Object.freeze({
 export const fixtures = Object.freeze({
   strategyAuthority, nutritionActivity, dexaScans, weightEntries, weeklyPi,
   weeklyBaseline, midweekV2, weeklyArtifact, dexaEventArtifact, photoEventArtifact,
+  dexaEventOct9Narrative,
 });
 
 export function currentGoalAndPhase() {
@@ -375,3 +379,77 @@ export async function preparePhotoV3({ structured = false, withPriorWeekly = fal
   });
   return { prepared, artifact: composed, stored: photoEventArtifact };
 }
+
+// October 9 2026 DEXA Event: the published narrative is reproduced end to end
+// by the production code path (DEXA Event composer, then the V3 finalizer,
+// then the briefing projection) from the Oct 9 scan and the Sep 12 prior.
+// `withRoles: false` projects the same plan with the prior section mapping,
+// so before and after are compared on identical inputs.
+export const DEXA_OCT9_SCAN_ID = "dexa_event_oct9_regression_scan_2026_10_09";
+
+export async function prepareDexaOct9V3({ withRoles = true, mutateScan = null } = {}) {
+  const goal = structuredClone(strategyAuthority.goal);
+  const phase = resolveCommittedPhaseContext(goal, { asOf: "2026-10-09" }).activePhase;
+  const prior = dexaScans.find((item) => item.id === DEXA_SCAN_ID);
+  const values = dexaEventOct9Narrative.scan;
+  const scan = {
+    ...structuredClone(prior), id: DEXA_OCT9_SCAN_ID, canonicalId: `dexa_scan|${prior.userId}|2026-10-09`,
+    measuredAt: values.measuredAt, observed_at: `${values.measuredAt}T00:00:00.000Z`,
+    totalMass: { value: values.totalMass, unit: "lb" }, bodyFatPercentage: values.bodyFatPercentage,
+    fatMass: { value: values.fatMass, unit: "lb" }, leanMass: { value: values.leanMass, unit: "lb" },
+    boneMineralContent: { value: values.boneMineralContent, unit: "lb" },
+    restingMetabolicRate: { value: values.restingMetabolicRate, unit: "kcal/day" },
+  };
+  mutateScan?.(scan);
+  const generatedAt = "2026-10-09T18:05:00.000Z";
+  const cutoff = "2026-10-10T06:59:59.999Z";
+  const repositories = createSeedRepositories({
+    user: { id: prior.userId, timeZone: "America/Los_Angeles" }, goals: [structuredClone(goal)],
+    protocols: structuredClone(strategyAuthority.protocols), protocolVersions: structuredClone(strategyAuthority.protocolVersions),
+    phaseStrategies: [structuredClone(strategyAuthority.phaseStrategy)],
+    dexaScans: [...structuredClone(dexaScans), structuredClone(scan)], weightEntries: structuredClone(weightEntries),
+    executionItems: [], dailyBriefings: [], canonicalEvidenceObjects: [],
+  });
+  const legacy = await createDEXAEventNarrativeService({ repositories, now: () => new Date(generatedAt) })
+    .preview({ userId: prior.userId, scanId: scan.id });
+  const artifact = {
+    id: `dexa_event_${scan.id}`, userId: prior.userId, artifactType: "event", cadence: "event", generatedAt,
+    trigger: { evidenceType: "dexa", evidenceId: scan.id, occurredAt: values.measuredAt },
+    briefing: { version: legacy.version, presentationVersion: legacy.presentationVersion, dexaEventNarrative: legacy },
+  };
+  let composed = null;
+  const finalizer = createStrategicInterpretationPublicationServiceV3({ now: () => new Date(generatedAt) });
+  const prepared = await finalizer.prepare({
+    publisherType: "dexa_event_briefing", userId: prior.userId,
+    occurrenceId: artifact.id, artifactId: artifact.id, cadenceOrEventType: "dexa", goal, phase,
+    store: { ...eventStore(goal), dexaScans: [...structuredClone(dexaScans), structuredClone(scan)] },
+    evidenceWindowId: `dexa_event|${scan.id}`, evidenceWindowClosed: true,
+    buildAdditionalObservations: ({ goalContract }) => adaptCanonicalDexaScans({
+      goalContract, phase, scans: [prior, scan], cutoff,
+    }),
+    previousCanonicalAssessment: {
+      ...eventPredecessor({ goal, phase, sourceCutoff: "2026-10-04T06:59:59.999Z" }),
+      currentPercentage: dexaEventOct9Narrative.stored.goalConfidence.priorScore,
+    },
+    evidenceCutoff: cutoff, finalizedAt: generatedAt,
+    idempotencyKey: "golden|dexa|oct9", sourceLineage: { reason: "golden_regression_oct9" },
+    evaluationType: "event_evidence_boundary", surface: "dexa_event_briefing",
+    composeArtifact: (outputs) => {
+      const narrativePlan = withRoles ? outputs.narrativePlan : withoutEventPresentation(outputs.narrativePlan);
+      composed = applyNarrativeV3ToBriefingArtifact({
+        artifact, publicationType: "dexa", narrativePlan, strategicInterpretation: outputs.strategicInterpretation,
+      });
+      composed.briefing.dexaEventNarrative.goalConfidence = createBriefingGoalConfidenceBlockFromV3({
+        assessment: outputs.confidenceAssessment, narrativePlan, capturedAt: generatedAt,
+      });
+      return { artifact: composed };
+    },
+  });
+  return { prepared, artifact: composed, legacy };
+}
+
+function withoutEventPresentation(narrativePlan) {
+  const { eventPresentation: _ignored, ...composition } = narrativePlan.composition;
+  return { ...narrativePlan, composition };
+}
+
