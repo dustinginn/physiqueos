@@ -1,6 +1,6 @@
 PhysiqueOS product backlog — durable authority
 
-Last updated: 2026-10-08
+Last updated: 2026-10-09
 Owner: Founder
 Purpose: durable cross-chat authority for outstanding product work, accepted deferrals, natural acceptance gates, and next-build integration items.
 
@@ -17,6 +17,15 @@ Agent handoff reports describe implementation state. This backlog describes what
 
 
 
+BUILD 93 — RELEASED TO TESTFLIGHT, PHYSICAL ACCEPTANCE PENDING (2026-10-09)
+- Accepted Native release authority: `9d0a206908fc3c4a64976e9cc3840e23cab0ba55`, PhysiqueOS 1.0 (93), delivery `15ae3b39-2594-47a7-a686-7920b3a7faf0`, build VALID / import VALID / present on App Store Connect. Detailed evidence: `agent-handoffs/reports/20261009T171605Z-build93-testflight-valid.md`.
+- Production Server authority at release: `e03f6768627f49175c476208eca79c99ae3d5ee9`, deployment `69a8dc14-461f-4680-91a3-14e42522494f`, ACTIVE 9/9; web and worker exact, live/ready green, schema remains migration 000014.
+- Release gates passed: credited exact-SHA iPhone unit target 2,283 total / 0 failed; Founder-approved iPhone UI matrix 12/12; Watch units 76/76; Watch UI 11/11 on both 42mm and 49mm; deterministic project generation, generic Release, seam, signing, archive and upload gates all green.
+- Recovery code is deployed **OFF by default**. Post-deploy production READ ONLY audit found zero publication-authority rows and zero historical Recovery-bearing briefings. Weekly/Monthly are the only allowed future cadences. No Sleep read/backfill, historical rewrite or activation occurred. Real-data calibration and any publication authority remain separately gated.
+- Founder physical acceptance remains open: install Build 93 and verify Morning Weight, Home priority layout/actions, Logger suggestion behavior, DEXA reminder behavior, Watch actions and Home widget on real devices.
+- Build 93 deliberately excludes Claude's separate DEXA confirmation recovery `539f7006`, next-build adaptive Home/DEXA feedback, Recovery activation, historical Recovery work and any data-repair replay.
+
+
 NEXT NATIVE BUILD AFTER 93 — FOUNDER DEVICE FEEDBACK (2026-10-09)
 - HealthKit authorization prompt recurrence (iPhone + Watch): On 2026-10-09 Founder saw Apple Health 'Health Access' permission sheet once on each device, with Workouts read access displayed, despite prior HealthKit use. Normal app updates should preserve previously granted permissions; investigate whether this was a newly requested data type, per-device authorization state, reinstall/identity change, or unnecessary requestAuthorization invocation. Verify iPhone and Watch authorization lifecycle, entitlements and requested type sets against prior shipped builds, without resetting permissions or accessing Founder health data. Non-blocking next-build backlog unless prompt recurs frequently, permission fails to persist, or HealthKit syncing is impaired. Preserve Build93 release scope.
 - DEXA appointment priority: at scheduled appointment time, provide a prominent direct 'Upload DEXA Results' action opening the existing PDF picker/upload flow (not generic priority Complete/Skip). Only clear the reminder after confirmed canonical PDF ingestion and appointment reconciliation; cancel/failure leaves it available, no false completion. Before appointment preserve informational state. Screenshots show Build92 priority detail still exposing Mark Complete and Mark Skipped and Home tile with 'Results needed'. Audit current Build93 DEXA candidate before implementing to avoid regressions. Maintain no automatic weight writeback and DEXA HealthKit constraints.
@@ -24,7 +33,7 @@ NEXT NATIVE BUILD AFTER 93 — FOUNDER DEVICE FEEDBACK (2026-10-09)
 - Founder device failure (2026-10-09 ~7:26 AM Pacific): tapping 'Mark Complete' on 'Upload DEXA results' priority detail displays full-screen error 'This priority was not marked complete. Refresh before retrying.' with Try Again. Do not assume a successful canonical mutation; investigate exact Server refusal/contract and whether other priority completions are affected. For DEXA appointment specifically replace manual Complete/Skip with direct PDF upload and evidence-confirmed reconciliation; no blind retries or forced completion. Screenshot supplied in ChatGPT conversation. Triage source/read-only only while Build93 urgent release is underway; do not mutate Build93 candidates or production without separate authority.
 - These are BACKLOG FOR NEXT BUILD, NOT authorized changes to urgent Build93 integration/release candidates ac3def4c/e03f6768. No implementation/release authority from this entry. Founder screenshots in current conversation 2026-10-09.
 
-NEXT BUILD 93 — FOUNDER NOTES CONSOLIDATED (CANDIDATES; SCOPE AND RELEASE NOT YET AUTHORIZED)
+BUILD 93 — HISTORICAL CANDIDATE/LANE NOTES (SUPERSEDED BY THE RELEASE AUTHORITY ABOVE)
 NEW CHAT HANDOFF AUTHORITY — 2026-10-08
 - Comprehensive ChatGPT new-conversation handoff published: agent-handoffs/reports/20261008T163000Z-chatgpt-new-chat-comprehensive-build93-handoff.md, main commit 8cc0aa072201fc8b50bd9ba16d589c964e174092. Read that report FIRST alongside this backlog and latest.json when continuing in a new ChatGPT chat.
 - This handoff reconciles newest Codex Logger/Server integration d2b39b6d + Native f92f2291, Claude theme Native d7d915a6, Recovery approved-design audit and Foam context HOLD, Widget amber CTA still open, Build93 integration and historical data operation gates. It is a context handoff, NOT implementation/release authority. Always check for newer GitHub reports before acting.

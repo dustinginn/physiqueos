@@ -1,56 +1,55 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-08T04:47:57Z",
+  "generated_at_utc": "2026-10-09T17:16:05Z",
   "task": {
-    "id": "build92-guarded-testflight-release-20261008",
-    "title": "Build 92 VALID in TestFlight from Founder-authorized three-lane integration 56c51e4f",
-    "agent": "claude",
+    "id": "build93-final-testonly-sha-gated-release-20261009",
+    "title": "Build 93 VALID in TestFlight with guarded Server e03f6768 deployment",
+    "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "56c51e4f7f41b521845dcfc2b9f0583407494e3c",
-    "final_sha": "beaf5eff9d3c4147fba4dec095e8092c0fae9b91",
-    "native_sha": "beaf5eff9d3c4147fba4dec095e8092c0fae9b91",
-    "production_server_sha": "84cc64e4e7205b2540bf78ea43afd1cbfb068d06",
-    "production_deployment": "32143aa4-90d4-496a-81b2-17f35a609fde",
-    "native_build": 92
+    "base_sha": "beaf5eff9d3c4147fba4dec095e8092c0fae9b91",
+    "final_sha": "9d0a206908fc3c4a64976e9cc3840e23cab0ba55",
+    "native_sha": "9d0a206908fc3c4a64976e9cc3840e23cab0ba55",
+    "production_server_sha": "e03f6768627f49175c476208eca79c99ae3d5ee9",
+    "production_deployment": "69a8dc14-461f-4680-91a3-14e42522494f",
+    "native_build": 93
   },
   "result": {
-    "summary": "Build 92 (com.physiqueos.native.dev 1.0 (92)) from beaf5eff (= validated three-lane integration 56c51e4f [Build 91 106f0518 + Training Variants 39b818e2 + final visual closeout f6b39423 + HealthKit authorization repair 6c52df29 + Logger refusal/helper integration] + build-number bump only) uploaded once via the guarded API-key tool; delivery 56b0c334-b8f5-42e4-979b-78e68a6d0573 VALID (build VALID, import VALID). Archive PhysiqueOS-Build92-beaf5eff.xcarchive (2026-10-08); next build 93. Server 84cc64e4/32143aa4 unchanged by this task.",
+    "summary": "Build 93 (com.physiqueos.native.dev 1.0 (93)) from Founder-approved Native 9d0a2069 uploaded once through the guarded API-key path; delivery 15ae3b39-2594-47a7-a686-7920b3a7faf0 is build VALID, import VALID and present on App Store Connect. Exact Server e03f6768 deployed as 69a8dc14-461f-4680-91a3-14e42522494f and is ACTIVE 9/9 with web and worker exact, health/ready green. Recovery remains OFF: post-deploy READ ONLY audit found zero authority rows and zero historical Recovery-bearing briefings.",
     "success": true,
-    "production_mutated": false,
-    "deployed": false,
+    "production_mutated": true,
+    "deployed": true,
     "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Post-bump beaf5eff: release-contract 147/0, full unit 2223/0 (1 designed skip), full iPhone UI 93/93 (87 in full run + 6 order-dependent state failures passing on isolated rerun on an erased simulator), Watch unit 75/0 (49+42mm), verify_release_configuration 1.0 (92) OK, clean generic Release OK (app/Watch/extension 1.0 (92)), seams 0, generator deterministic, diff-check clean, archive verified, guarded dry-run all PASS. Watch UI on integrated candidate 9/10 per size (baseline no-WCSession only)."
+      "summary": "Exact 9d0a2069: credited full iPhone units 2,283 total / 2,281 passed / 2 skipped / 0 failed and focused 265/265; approved integrated iPhone UI matrix 12/12; Watch units 76/76; Watch UI 11/11 on both 42mm and 49mm; deterministic generator, release configuration, generic Release, seam scan, signing, archive and guarded dry-run all passed. Exact e03f6768: fresh final Recovery/HealthKit 93/93 plus prior focused 264/264, accepted broad baseline with zero new failures, lint and production build passed."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder physical acceptance of Build 92 pending (checklist in report); Build 91 Watch footer/haptic acceptance also still pending."
+      "summary": "Founder physical acceptance of Build 93 is pending; exact real-device checklist is in the report."
     },
     "zero_write_audit": {
       "status": "passed",
-      "summary": "Native release only; no Server deploy, seed or production data mutation; Server checked read-only (84cc64e4, 32143aa4 ACTIVE 9/9, ready 9/9)."
+      "summary": "Post-deploy production audit ran in verified REPEATABLE READ READ ONLY and rolled back: Recovery publication authority rows 0, historical Recovery-bearing briefings 0. No Recovery activation, Sleep read/backfill, briefing rewrite, DEXA recovery, historical replay, seed or migration was executed."
     }
   },
   "decisions_required": [
-    "Founder: install Build 92 from TestFlight and run the physical acceptance checklist",
-    "Founder: historical Static Hold seed dry run/apply remains a separate authorization"
+    "Founder: install Build 93 from TestFlight and complete the physical acceptance checklist",
+    "Founder: Recovery real-data calibration and publication activation remain separate future authorization gates"
   ],
   "blockers": [],
-  "unexpected_findings": [
-    "Six TrainingAcceptanceUITests fail only in the long full-suite run from persisted Sandbox workout state; all pass in isolation"
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Reset Sandbox draft state between TrainingAcceptanceUITests cases",
-    "Watch UI no-WCSession harness limitation (testFinalSetFinish)"
+    "Build 93 Founder physical acceptance",
+    "Recovery calibration and separately authorized Weekly/Monthly activation; keep Recovery OFF until then",
+    "Next-build DEXA upload-action and adaptive Home priority layout feedback"
   ],
-  "recommended_next_step": "Founder installs Build 92 via TestFlight and completes physical acceptance.",
-  "full_report_path": "agent-handoffs/reports/20261008T044757Z-build92-testflight-valid.md",
+  "recommended_next_step": "Founder installs Build 93 via TestFlight and completes physical acceptance; keep Recovery OFF pending separate calibration and activation authority.",
+  "full_report_path": "agent-handoffs/reports/20261009T171605Z-build93-testflight-valid.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
