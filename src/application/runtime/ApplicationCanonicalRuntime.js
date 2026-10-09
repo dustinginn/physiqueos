@@ -65,6 +65,9 @@ export async function loadApplicationCanonicalCommitBindings() {
   }
   return Object.freeze({
     mutateCanonicalRuntime: (input) => composition.mutateRuntimeBounded(input),
+    ...(typeof composition.mutateRecordsBounded === "function"
+      ? { mutateCanonicalRecords: (input) => composition.mutateRecordsBounded(input) }
+      : {}),
   });
 }
 

@@ -12,6 +12,7 @@ import { createAuthorizedMediaService } from "../media/AuthorizedMediaService.js
 import { createOpaqueSpacesMediaGateway } from "../../platform/object-storage/OpaqueSpacesMediaGateway.js";
 import {
   createPostgresFounderReadScope,
+  executePostgresFounderRecordMutation,
   executePostgresFounderRuntimeMutation,
 } from "../../platform/database/PostgresFounderRepositoryFacade.js";
 import { loadCanonicalRuntime } from "../../platform/migration/phase4CanonicalImport.js";
@@ -367,6 +368,23 @@ export async function getProductionApplicationCanonicalCommitComposition(
       allowApplicationContextMutation,
       returnReceipt: true,
     }),
+    // Named-record writes that load no collection at all (see
+    // executePostgresFounderRecordMutation); same owner lock and authority.
+    mutateRecordsBounded: ({ commandId, operation, records, mutate }) =>
+      executePostgresFounderRecordMutation({
+        pool: runtime.pool,
+        ownerUserId: runtime.ownerUserId,
+        authorityStore,
+        migrationOperationId: compatibilityMode
+          ? null
+          : env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
+        compatibilityMode,
+        requireCompatibilityAuthority: compatibilityMode,
+        commandId,
+        operation,
+        records,
+        mutate,
+      }),
   });
 }
 

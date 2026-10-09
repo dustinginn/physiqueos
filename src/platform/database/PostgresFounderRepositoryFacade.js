@@ -358,6 +358,172 @@ export async function executePostgresFounderRuntimeMutation({
   }
 }
 
+/**
+ * Mutates a few explicitly named canonical records without loading any
+ * collection. The runtime and bounded mutations above load the whole runtime or
+ * whole collections and rewrite every record of each changed collection; at the
+ * production runtime size that is enough to exhaust a 1 GB instance (the
+ * October 9 DEXA confirmation died twice inside one such write). Here each
+ * named record is read `FOR UPDATE` under the same owner lock and runtime
+ * authority boundary, `mutate` returns replacements for some of them, and only
+ * those rows are written, each fenced on the version it was read at. Row
+ * metadata and version semantics match `replaceCollection`; a new record is
+ * appended after the collection's last ordinal, as a repository push would be.
+ */
+export async function executePostgresFounderRecordMutation({
+  pool,
+  ownerUserId,
+  authorityStore = null,
+  migrationOperationId = null,
+  compatibilityMode = false,
+  requireCompatibilityAuthority = false,
+  now = () => new Date(),
+  commandId = randomUUID(),
+  operation = "application-record-mutation",
+  records = [],
+  mutate,
+} = {}) {
+  if (!pool?.connect || typeof mutate !== "function") throw new Error("PostgreSQL record mutation is not configured.");
+  const targets = normalizeRecordTargets(records);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:${ownerUserId}`]);
+    if (compatibilityMode) {
+      const databaseName = await assertCompatibilityTarget(client);
+      if (requireCompatibilityAuthority || authorityStore?.assertCompatibilityAccess) {
+        await authorityStore.assertCompatibilityAccess({ client, databaseName });
+      }
+    }
+    else if (authorityStore) await authorityStore.claimCanonicalWriteBoundary({ client, migrationOperationId, commandId });
+    else throw Object.assign(new Error("Canonical runtime authority is required."), { code: "CANONICAL_RUNTIME_AUTHORITY_REQUIRED" });
+
+    const current = new Map();
+    for (const target of targets) {
+      const row = (await client.query(
+        `SELECT version,payload FROM physiqueos.${target.table}
+          WHERE owner_user_id=$1 AND collection_name=$2 AND record_id=$3 FOR UPDATE`,
+        [ownerUserId, target.collection, target.recordId],
+      )).rows[0];
+      current.set(target.key, row ? { version: Number(row.version), payload: row.payload } : null);
+    }
+    const read = (collection, recordId) => {
+      const key = recordTargetKey(collection, recordId);
+      if (!current.has(key)) {
+        throw Object.assign(new Error(`Record ${collection}:${recordId} was not declared for this mutation.`), {
+          code: "FOUNDER_RECORD_MUTATION_SCOPE_VIOLATION",
+        });
+      }
+      const entry = current.get(key);
+      return entry ? structuredClone({ ...entry.payload, version: entry.version }) : null;
+    };
+    const outcome = await mutate({ read }, { client, commandId, operation });
+    const writes = outcome?.writes ?? [];
+    const written = [];
+    for (const write of writes) {
+      const key = recordTargetKey(write?.collection, write?.recordId);
+      if (!current.has(key)) {
+        throw Object.assign(new Error(`Record ${write?.collection}:${write?.recordId} was not declared for this mutation.`), {
+          code: "FOUNDER_RECORD_MUTATION_SCOPE_VIOLATION",
+        });
+      }
+      if (written.includes(key)) {
+        throw Object.assign(new Error(`Record ${write.collection}:${write.recordId} was written twice.`), {
+          code: "FOUNDER_RECORD_MUTATION_SCOPE_VIOLATION",
+        });
+      }
+      if (!write.payload || typeof write.payload !== "object" || resolveRecordId(write.payload, -1) !== write.recordId) {
+        throw Object.assign(new Error(`Record ${write.collection}:${write.recordId} payload identity does not match.`), {
+          code: "FOUNDER_RECORD_MUTATION_IDENTITY_MISMATCH",
+        });
+      }
+      const table = assertKnownPhase4Collection(write.collection);
+      const existing = current.get(key);
+      const version = existing ? existing.version + 1 : normalizeVersion(write.payload.version);
+      const payload = { ...structuredClone(write.payload), version };
+      const metadata = extractMetadata(payload);
+      const parameters = [ownerUserId, write.collection, write.recordId, metadata.legacyId, version, metadata.status,
+        metadata.occurrenceDate, metadata.observedAt, metadata.sourceIdentity,
+        JSON.stringify(metadata.provenance), JSON.stringify(payload)];
+      const result = existing
+        ? await client.query(
+          `UPDATE physiqueos.${table}
+              SET legacy_id=$4,version=$5,status=$6,occurrence_date=$7::date,observed_at=$8::timestamptz,
+                  source_identity=$9,provenance=$10::jsonb,payload=$11::jsonb,updated_at=now()
+            WHERE owner_user_id=$1 AND collection_name=$2 AND record_id=$3 AND version=$12`,
+          [...parameters, existing.version],
+        )
+        : await client.query(
+          `INSERT INTO physiqueos.${table}
+            (owner_user_id,collection_name,record_id,source_ordinal,legacy_id,version,status,occurrence_date,
+             observed_at,source_identity,provenance,payload)
+           VALUES ($1,$2,$3,
+             (SELECT COALESCE(MAX(source_ordinal)+1,0) FROM physiqueos.${table} WHERE owner_user_id=$1 AND collection_name=$2),
+             $4,$5,$6,$7::date,$8::timestamptz,$9,$10::jsonb,$11::jsonb)
+           ON CONFLICT (owner_user_id,collection_name,record_id) DO NOTHING`,
+          parameters,
+        );
+      if (result.rowCount !== 1) {
+        throw Object.assign(new Error(`Record ${write.collection}:${write.recordId} changed before it was written.`), {
+          code: "FOUNDER_STORE_REVISION_CONFLICT",
+        });
+      }
+      written.push(key);
+    }
+    const revision = written.length
+      ? await bumpRuntimeMetadata(client, { ownerUserId, commandId, now })
+      : null;
+    await client.query("COMMIT");
+    return Object.freeze({
+      committed: true,
+      commitId: commandId,
+      revision,
+      result: structuredClone(outcome?.result ?? null),
+      changedRecords: Object.freeze(writes.map((write) => Object.freeze({ collection: write.collection, recordId: write.recordId }))),
+      memoryProfile: Object.freeze({
+        runtimeLoadCount: 0,
+        runtimeCloneCount: 0,
+        fullRuntimeSerializationCount: 0,
+        collectionLoadCount: 0,
+        recordLoadCount: targets.length,
+        recordWriteCount: written.length,
+      }),
+    });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function normalizeRecordTargets(records) {
+  if (!Array.isArray(records) || records.length === 0 || records.length > 16) {
+    throw Object.assign(new Error("A record mutation names between one and sixteen records."), {
+      code: "FOUNDER_RECORD_MUTATION_SCOPE_INVALID",
+    });
+  }
+  const seen = new Set();
+  return records.map(({ collection, recordId } = {}) => {
+    const table = assertKnownPhase4Collection(collection);
+    if (singleton(collection) || !String(recordId ?? "").trim()) {
+      throw Object.assign(new Error(`Record target ${collection}:${recordId} is invalid.`), {
+        code: "FOUNDER_RECORD_MUTATION_SCOPE_INVALID",
+      });
+    }
+    const key = recordTargetKey(collection, recordId);
+    if (seen.has(key)) {
+      throw Object.assign(new Error(`Record target ${collection}:${recordId} is duplicated.`), {
+        code: "FOUNDER_RECORD_MUTATION_SCOPE_INVALID",
+      });
+    }
+    seen.add(key);
+    return Object.freeze({ collection, recordId: String(recordId), table, key });
+  });
+}
+
+function recordTargetKey(collection, recordId) { return `${collection}\u0000${recordId}`; }
+
 async function assertCompatibilityTarget(client) {
   const result = await client.query("SELECT current_database() AS database");
   const database = String(result.rows[0]?.database ?? "");

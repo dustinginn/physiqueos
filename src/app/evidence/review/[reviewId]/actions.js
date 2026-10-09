@@ -38,6 +38,10 @@ import {
   createConfirmationAnalysisWriter,
   createConfirmationProgressPhotoWriter,
 } from "../../../../application/evidence/ConfirmationBoundedWriters";
+import {
+  createDexaConfirmationBoundedSteps,
+  isDexaOnlyConfirmationPackage,
+} from "../../../../application/evidence/DexaConfirmationBoundedSteps";
 import { createPendingEvidenceReviewReprocessingService } from "../../../../domain/services/PendingEvidenceReviewReprocessingService";
 import { createApplicationStoredArtifactLoader } from "../../../../application/media/ApplicationUploadService";
 import { createPhotoAnalysisMediaLoader } from "../../../../application/media/PhotoAnalysisMediaLoader";
@@ -800,6 +804,15 @@ function createHandlers({ evidencePackage, reviewId, user,
   let analyses = [];
   let trainingAnalysis = null;
   const committedPackage = { ...evidencePackage, evidence_objects: (evidencePackage.evidence_objects ?? []).filter((item) => item.removed !== true) };
+  // A DEXA-only confirmation reads and writes only what each step consumes
+  // (see DexaConfirmationBoundedSteps); every other evidence type keeps the
+  // repository path below unchanged.
+  const dexaSteps = isDexaOnlyConfirmationPackage(committedPackage)
+    ? createDexaConfirmationBoundedSteps({ userId: user.id, fallbackRepositories: FounderRepositories })
+    : null;
+  const loadCanonicalEvidence = () => dexaSteps
+    ? dexaSteps.readCanonicalEvidence()
+    : FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
   return {
     canonical_commit: async () => {
       const energySourceCommit = committedPackage.evidence_objects.some(
@@ -888,11 +901,14 @@ function createHandlers({ evidencePackage, reviewId, user,
       // which is exactly how the real Sep 12 DEXA confirmation died:
       // commitCompatibilityRepositories' DEXA branch calls canonical.find().
       // Load it the same way scheduled_completion and analysis already do.
-      canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
-      return { status: "completed", records: await commitCompatibilityRepositories({ canonical, evidencePackage, user, persistProgressPhotos }) };
+      canonical ??= await loadCanonicalEvidence();
+      return { status: "completed", records: await commitCompatibilityRepositories({
+        canonical, evidencePackage, user, persistProgressPhotos,
+        persistDexaScan: dexaSteps ? (scan) => dexaSteps.persistCompatibilityScan(scan) : null,
+      }) };
     },
     scheduled_completion: async () => {
-      canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+      canonical ??= await loadCanonicalEvidence();
       const results = evaluateScheduledCompletion({ canonicalObjects: canonical, evidencePackage });
       const completionRecords = [];
       for (const result of results.filter((item) => item.satisfied)) {
@@ -903,6 +919,15 @@ function createHandlers({ evidencePackage, reviewId, user,
             evidenceDate: result.observedDate,
           });
           if (satisfaction.record) completionRecords.push(satisfaction.record.id);
+          continue;
+        }
+        if (result.evidenceType === "dexa" && dexaSteps) {
+          const reconciliation = await dexaSteps.reconcileAppointment({
+            canonicalEvidenceId: result.canonicalEvidenceId,
+            confirmedAt: new Date().toISOString(),
+            evidenceDate: result.observedDate,
+          });
+          if (reconciliation.matched) completionRecords.push(reconciliation.completionId);
           continue;
         }
         if (result.evidenceType === "dexa") {
@@ -928,10 +953,11 @@ function createHandlers({ evidencePackage, reviewId, user,
       return { status: "completed", results, completionRecordIds: completionRecords };
     },
     analysis: async () => {
-      canonical ??= await FounderRepositories.canonicalEvidence.listCanonicalEvidenceObjects(user.id);
+      canonical ??= await loadCanonicalEvidence();
       analyses = await runDomainAnalysis({
         canonical, evidencePackage, user, loadPhotoAnalysisMedia,
         confirmationReads, persistAnalyses, assertLease,
+        readLegacyDexaScans: dexaSteps ? () => dexaSteps.readDexaScans() : undefined,
       });
       trainingAnalysis =
         analyses.find((analysis) => analysis.id === `analysis_training_${evidencePackage.package_id}`) ??
@@ -1009,14 +1035,21 @@ function createHandlers({ evidencePackage, reviewId, user,
         memoryProfile: persistence.memoryProfile ?? null,
       };
     },
-    goal_evaluation: async () => refreshGoalEvaluations({ evidencePackage, user, confirmationReads, persistAnalyses }),
+    goal_evaluation: async () => refreshGoalEvaluations({
+      evidencePackage, user, persistAnalyses,
+      confirmationReads: dexaSteps
+        ? { readGoalEvaluationInputs: () => dexaSteps.readGoalEvaluationInputs() }
+        : confirmationReads,
+    }),
     event_eligibility: async () => {
       const eventObjects = (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed && ["photo_session", "dexa", "dexa_scan", "body_composition"].includes(item.evidence_type));
       return { status: "completed", eligible: eventObjects.filter((item) => item.evidence_type !== "photo_session" || isCompletePhotoSession(item)).map((item) => item.evidence_type) };
     },
     briefing: async ({ results }) => {
       const eligible = results.event_eligibility?.eligible ?? [];
-      const eventPreferences = await confirmationReads.readEventBriefingPreferences(user.id);
+      const eventPreferences = dexaSteps
+        ? await dexaSteps.readEventBriefingPreferences()
+        : await confirmationReads.readEventBriefingPreferences(user.id);
       const briefable = filterEligibleEventBriefingTypes(eligible, eventPreferences);
       const artifacts = [];
       const photoSessionIds = [];
@@ -1055,6 +1088,7 @@ function createHandlers({ evidencePackage, reviewId, user,
         const dexaEventService =
           await createProductionDEXAEventNarrativeService({
             repositories: FounderRepositories,
+            ...(dexaSteps ? { loadCanonicalRuntime: () => dexaSteps.loadDexaEventRuntime() } : {}),
           });
         const artifact = await dexaEventService.generate({
           userId: user.id,
@@ -1182,7 +1216,7 @@ function publishPostConfirmationRefreshes(orchestrationResult) {
   }
 }
 
-async function commitCompatibilityRepositories({ canonical, evidencePackage, user, persistProgressPhotos }) {
+async function commitCompatibilityRepositories({ canonical, evidencePackage, user, persistProgressPhotos, persistDexaScan = null }) {
   // Deliberately NOT defaulted to []. An empty list is not a safe stand-in
   // for "not loaded": the DEXA branch below looks up the just-committed
   // canonical record to carry its canonicalId, dexaRevision and
@@ -1224,7 +1258,9 @@ async function commitCompatibilityRepositories({ canonical, evidencePackage, use
         goalPhaseAttribution: canonicalRecord?.goalPhaseAttribution ?? null,
         userId: user.id,
       });
-      await (FounderRepositories.dexaScans.upsertDEXAScan?.(scan) ?? FounderRepositories.dexaScans.addDEXAScan(scan));
+      await (persistDexaScan
+        ? persistDexaScan(scan)
+        : FounderRepositories.dexaScans.upsertDEXAScan?.(scan) ?? FounderRepositories.dexaScans.addDEXAScan(scan));
       records.push(scan.id);
     }
     if (object.evidence_type === "photo_session") {
@@ -1292,6 +1328,7 @@ function preserveCanonicalTimestamps(existing, candidate) {
 async function runDomainAnalysis({
   canonical, evidencePackage, user, loadPhotoAnalysisMedia,
   confirmationReads, persistAnalyses, assertLease = null,
+  readLegacyDexaScans = () => FounderRepositories.dexaScans.listDEXAScans(user.id),
 }) {
   const created = [];
   for (const object of (evidencePackage.evidence_objects ?? []).filter((item) => !item.removed)) {
@@ -1335,7 +1372,7 @@ async function runDomainAnalysis({
       const canonicalScan = canonical.find((item) => ["dexa", "dexa_scan", "body_composition"].includes(item.evidence_type) && String(item.lastObservedAt).slice(0, 10) === String(object.observed_at).slice(0, 10));
       if (!canonicalScan) throw new Error("Confirmed canonical DEXA was not available for interpretation.");
       const canonicalPrior = canonical.filter((item) => ["dexa", "dexa_scan", "body_composition"].includes(item.evidence_type) && item.quality?.status !== "superseded" && String(item.lastObservedAt) < String(canonicalScan.lastObservedAt)).sort((a, b) => String(b.lastObservedAt).localeCompare(String(a.lastObservedAt)))[0] ?? null;
-      const legacyPrior = selectValidDexaScans(await FounderRepositories.dexaScans.listDEXAScans(user.id))
+      const legacyPrior = selectValidDexaScans(await readLegacyDexaScans())
         .filter((item) => String(item.measuredAt) < String(canonicalScan.lastObservedAt))
         .at(-1) ?? null;
       const priorScan = canonicalPrior ?? (legacyPrior ? { canonicalId: legacyPrior.canonicalId ?? legacyPrior.id, payload: legacyPrior } : null);
