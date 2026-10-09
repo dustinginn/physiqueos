@@ -1,5 +1,6 @@
 import { buildCanonicalNarrativeV3Extensions, projectV3CoachInsight, projectV3Hero } from "./BriefingV3Projection.js";
 import { contractDexaEventInterpretation } from "./DEXAEventPresentationContraction.js";
+import { composeDexaEventPlainLanguage } from "./DEXAEventPlainLanguage.js";
 
 export function createBriefingGoalConfidenceBlock(confidence, {
   capturedAt = null,
@@ -361,7 +362,17 @@ export function applyNarrativeV3ToBriefingArtifact({
       uncertainty: canonical.uncertainty,
       ...(canonical.energy ? { energy: canonical.energy } : {}),
     };
-    if (roles) {
+    // DEXA Events with roles are worded in plain language from the same
+    // assessment (see DEXAEventPlainLanguage); without a prior comparison the
+    // role mapping below is kept.
+    const plain = roles ? composeDexaEventPlainLanguage({ event, narrativePlan, roles }) : null;
+    if (plain) {
+      event.hero = { ...event.hero, title: plain.hero.title, body: plain.hero.body, results: plain.hero.results };
+      event.interpretation = plain.interpretation;
+      event.coachInsight = { ...(event.coachInsight ?? {}), ...plain.coachInsight };
+      event.presentationRolesV3 = structuredClone(roles);
+      event.plainLanguage = { schemaVersion: plain.schemaVersion, claims: plain.claims };
+    } else if (roles) {
       event.coachInsight = {
         ...(event.coachInsight ?? {}),
         biggestWin: roles.biggestWin ?? "",

@@ -319,6 +319,8 @@ function composeEventPresentation(context, { headline, sections }) {
     protect,
     next,
     claims,
+    // Structured state behind the roles, for a surface that words its own copy.
+    goalProgress: goalProgressBand(context),
   };
 }
 
@@ -1253,16 +1255,23 @@ function compactGuardrail(context, finding) {
 }
 
 function goalProgressSentence(context) {
-  const { goalContract, interpretation, objective, objectiveDefinition } = context;
+  const goal = context.goalContract.vocabulary?.goal?.displayName ?? context.goalContract.goalLabel;
+  return ({
+    reached: `You reached ${goal}.`,
+    more_than_half: `You are more than halfway to ${goal}.`,
+    half: `You are halfway to ${goal}.`,
+  })[goalProgressBand(context)] ?? null;
+}
+
+// How far the goal has come, as a band a surface can word for itself.
+function goalProgressBand(context) {
+  const { interpretation, objective, objectiveDefinition } = context;
   if (!objective || !objectiveDefinition || isMaintenanceObjective(objectiveDefinition)) return null;
-  if (["achieved", "exceeded"].includes(interpretation.goalAchievement)) {
-    return `You reached ${goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel}.`;
-  }
+  if (["achieved", "exceeded"].includes(interpretation.goalAchievement)) return "reached";
   if (interpretation.goalAchievement !== "in_progress") return null;
   const ratio = confidenceTrajectory(context)?.fractionAchieved;
-  const goal = goalContract.vocabulary?.goal?.displayName ?? goalContract.goalLabel;
-  if (ratio > 0.5 && ratio < 1) return `You are more than halfway to ${goal}.`;
-  if (ratio === 0.5) return `You are halfway to ${goal}.`;
+  if (ratio > 0.5 && ratio < 1) return "more_than_half";
+  if (ratio === 0.5) return "half";
   return null;
 }
 

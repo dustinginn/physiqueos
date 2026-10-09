@@ -7,8 +7,8 @@ import { applyNarrativeV3ToBriefingArtifact } from "./BriefingGoalConfidencePres
 // strategic assessment (70% Confidence, decreased; lean-tissue progress; the
 // body-fat guardrail breach; address body fat before pushing lean mass harder)
 // but the briefing repeated the same conclusions across the hero, the
-// interpretation and Coach's Insight. The fixture is the published text; the
-// harness reproduces it from the production code path.
+// interpretation and Coach's Insight, in technical language. The fixture is the
+// published text; the harness reproduces it from the production code path.
 
 const STORED = fixtures.dexaEventOct9Narrative.stored;
 
@@ -55,8 +55,14 @@ function repeatedSentences(narrative) {
 const FACTS = {
   leanChange: /1\.3 lb/,
   bodyFatValue: /9\.7%/,
-  coachingPriority: /before pushing harder/i,
-  oneScanCaveat: /one scan cannot prove/i,
+  coachingPriority: /calorie intake/i,
+  oneScanCaveat: /can't tell us exactly how much/i,
+  headline: /making progress toward your muscle-building goal/i,
+  bodyFatAttention: /body fat needs attention/i,
+  goalProgress: /more than halfway/i,
+};
+const PUBLISHED = {
+  leanChange: /1\.3 lb/,
   headline: /strong result, with one important caveat/i,
 };
 const occurrences = (narrative, pattern) => renderedSlots(narrative).filter(([, text]) => pattern.test(text)).length;
@@ -85,8 +91,8 @@ describe("October 9 DEXA Event: faithful reproduction", () => {
     expect(STORED.coachInsight.biggestWin).toBe(STORED.hero.body);
     expect(STORED.interpretation.goalProgress).toBe(STORED.interpretation.opening);
     expect(STORED.interpretation.guardrailStatus).toBe(STORED.interpretation.fatLoss);
-    expect(occurrences(stored, FACTS.leanChange)).toBeGreaterThanOrEqual(5);
-    expect(occurrences(stored, FACTS.headline)).toBe(3);
+    expect(occurrences(stored, PUBLISHED.leanChange)).toBeGreaterThanOrEqual(5);
+    expect(occurrences(stored, PUBLISHED.headline)).toBe(3);
     expect(repeatedSentences(stored).length).toBeGreaterThan(5);
   });
 });
@@ -99,11 +105,7 @@ describe("October 9 DEXA Event: each conclusion said once", () => {
 
   it("states each Oct 9 conclusion in exactly one place", async () => {
     const narrative = (await prepareDexaOct9V3()).artifact.briefing.dexaEventNarrative;
-    expect(occurrences(narrative, FACTS.headline)).toBe(1);
-    expect(occurrences(narrative, FACTS.leanChange)).toBe(1);
-    expect(occurrences(narrative, FACTS.bodyFatValue)).toBe(1);
-    expect(occurrences(narrative, FACTS.coachingPriority)).toBe(1);
-    expect(occurrences(narrative, FACTS.oneScanCaveat)).toBe(1);
+    for (const pattern of Object.values(FACTS)) expect(occurrences(narrative, pattern)).toBe(1);
     expect(narrative.hero.body.startsWith(narrative.hero.title)).toBe(false);
   });
 
@@ -116,28 +118,27 @@ describe("October 9 DEXA Event: each conclusion said once", () => {
 });
 
 describe("October 9 DEXA Event: distinct Coach's Insight responsibilities", () => {
-  it("gives Biggest Win, Protect and Next distinct claims", async () => {
+  it("gives every slot its own claim", async () => {
     const narrative = (await prepareDexaOct9V3()).artifact.briefing.dexaEventNarrative;
-    const { claims } = narrative.presentationRolesV3;
-    const roleClaims = [claims.biggestWin, claims.protect, claims.next].flat();
-    expect(new Set(roleClaims).size).toBe(roleClaims.length);
-    expect(claims.biggestWin).toEqual(["goal_progress", "measured_progress"]);
-    expect(claims.protect).toEqual(["preserve_routine_and_comparability"]);
-    expect(claims.next[0]).toBe("address_guardrail_first");
+    const { claims } = narrative.plainLanguage;
+    const all = Object.values(claims).flat();
+    expect(new Set(all).size).toBe(all.length);
+    expect(claims.biggestWin).toEqual(["goal_progress"]);
+    expect(claims.protect).toEqual(["keep_doing"]);
+    expect(claims.next).toEqual(["coaching_priority"]);
   });
 
   it("keeps each role to its own job", async () => {
     const { biggestWin, protect, next, watch } = (await prepareDexaOct9V3()).artifact.briefing.dexaEventNarrative.coachInsight;
-    // Biggest Win: the earned goal progress, without the caveat or the hero's numbers.
-    expect(biggestWin).toMatch(/more than halfway to the 10 lb lean-mass goal/);
-    expect(biggestWin).not.toMatch(/body fat|caveat|1\.3 lb|9\.7%/i);
-    // Protect: what to keep steady while correcting; not the correction itself.
-    expect(protect).toMatch(/keep the rest of the current routine steady/i);
-    expect(protect).not.toMatch(/body fat|before pushing harder/i);
-    // Next: the single coaching priority, then what the next check decides.
-    expect(next).toMatch(/^Address body fat before pushing harder on lean mass\./);
+    // Biggest Win: how far the goal has come, without the caveat or the hero's numbers.
+    expect(biggestWin).toBe("You're more than halfway to your muscle-building target. That's meaningful progress, and it's worth protecting.");
+    // Protect: what to keep doing while correcting; not the correction itself.
+    expect(protect).toMatch(/^Keep training the way you have been\./);
+    expect(protect).not.toMatch(/body fat|calorie/i);
+    // Next: the single coaching priority, body fat before more weight gain.
+    expect(next).toMatch(/^Take a closer look at your calorie intake before trying to gain more weight\./);
+    expect(next).toMatch(/keeping your muscle-building progress while bringing body fat back toward your target/);
     expect(next).not.toMatch(/1\.3 lb|9\.7%/);
-    // The bounded watch question is part of Next, so it is not repeated.
     expect(watch).toBe("");
     for (const [left, right] of [[biggestWin, protect], [biggestWin, next], [protect, next]]) {
       for (const a of sentences(left)) for (const b of sentences(right)) expect(isSemanticallyEquivalent(a, b)).toBe(false);
@@ -146,32 +147,30 @@ describe("October 9 DEXA Event: distinct Coach's Insight responsibilities", () =
 });
 
 describe("October 9 DEXA Event: optional content contracts", () => {
-  it("omits interpretation fields whose every sentence is said elsewhere, and only those", async () => {
+  it("leaves out interpretation fields the hero and Coach's Insight already cover", async () => {
     const { interpretation } = (await prepareDexaOct9V3()).artifact.briefing.dexaEventNarrative;
-    expect(interpretation.opening).toBe("");
+    expect(interpretation.fatLoss).toBe("");
     expect(interpretation.leanMass).toBe("");
     expect(interpretation.goalProgress).toBeNull();
     expect(interpretation.guardrailStatus).toBeNull();
-    // Unique reasoning stays, unaltered.
-    expect(interpretation.fatLoss).toBe(STORED.interpretation.fatLoss);
-    expect(interpretation.phaseMeaning).toBe(STORED.interpretation.phaseMeaning);
-    expect(interpretation.uncertainty).toBe(STORED.interpretation.uncertainty);
-    expect(interpretation.regional).toMatch(/Regional DEXA changes remain measurements/);
+    // The harness scan has no notable body-part change, so that paragraph is absent.
+    expect(interpretation.regional).toBe("");
+    // Why it matters, what one scan can decide, and what it cannot tell us stay.
+    expect(interpretation.opening).toMatch(/^You also gained 3\.2 lb of fat, more than the lean mass you added\./);
+    expect(interpretation.phaseMeaning).toMatch(/One scan isn't enough to decide/);
+    expect(interpretation.uncertainty).toMatch(/can't tell us exactly how much of the increase in lean mass is new muscle/);
   });
 
-  it("never truncates: every kept sentence is a whole sentence the composers wrote", async () => {
-    const { artifact, legacy } = await prepareDexaOct9V3();
-    const narrative = artifact.briefing.dexaEventNarrative;
-    const written = new Set([
-      ...Object.values(legacy.interpretation).filter((value) => typeof value === "string").flatMap(sentences),
-      ...Object.values(narrative.presentationRolesV3).filter((value) => typeof value === "string").flatMap(sentences),
-      ...sentences(artifact.briefing.narrativeV3.summary),
-    ]);
-    for (const [, text] of renderedSlots(narrative)) for (const value of sentences(text)) expect(written.has(value)).toBe(true);
+  it("writes whole sentences only", async () => {
+    const narrative = (await prepareDexaOct9V3()).artifact.briefing.dexaEventNarrative;
+    for (const [, text] of renderedSlots(narrative)) {
+      expect(text).toMatch(/[.!?]$/);
+      expect(text).not.toMatch(/…|\.\.\./);
+    }
   });
 
-  it("keeps a decrease caution that nothing else says", async () => {
-    const { interpretation } = (await prepareDexaOct9V3({
+  it("keeps a decrease caution, without calling it lost muscle", async () => {
+    const narrative = (await prepareDexaOct9V3({
       // A contract-valid scan whose lean tissue fell 1.2 lb (masses reconcile).
       mutateScan: (scan) => {
         scan.leanMass = { value: 152.1, unit: "lb" };
@@ -179,7 +178,9 @@ describe("October 9 DEXA Event: optional content contracts", () => {
         scan.bodyFatPercentage = 9.9;
       },
     })).artifact.briefing.dexaEventNarrative;
-    expect(`${interpretation.opening} ${interpretation.leanMass}`).toMatch(/one scan|closer look/i);
+    expect(narrative.interpretation.opening).toBe("That's not the direction you want while building muscle.");
+    expect(narrative.interpretation.uncertainty).toMatch(/can't tell us for certain whether a drop in lean mass is lost muscle/);
+    expect(repeatedSentences(narrative)).toEqual([]);
   });
 });
 
@@ -198,15 +199,15 @@ describe("October 9 DEXA Event: the strategic conclusion is preserved", () => {
     expect(after.artifact.briefing.dexaEventNarrative.strategicMeaningV3).toEqual(before.artifact.briefing.dexaEventNarrative.strategicMeaningV3);
   });
 
-  it("still says the strategic conclusion: lean progress, the breach, and fat before lean", async () => {
+  it("still says the strategic conclusion: lean progress, body fat above range, and fat before more gain", async () => {
     const narrative = (await prepareDexaOct9V3()).artifact.briefing.dexaEventNarrative;
+    expect(narrative.hero.title).toBe("You're making progress toward your muscle-building goal, but body fat needs attention.");
+    expect(narrative.hero.body).toBe("Since your September 12 scan, your lean mass (muscle plus water and other non-fat tissue) went up 1.3 lb. Your body fat rose to 9.7%, which is above your 8–9% target range.");
+    expect(narrative.coachInsight.biggestWin).toMatch(/more than halfway/);
+    expect(narrative.coachInsight.next).toMatch(/calorie intake before trying to gain more weight/);
+    // Above the range is said as above, never as nearing it.
     const text = renderedSlots(narrative).map(([, value]) => value).join("\n");
-    expect(narrative.hero.title).toBe(STORED.hero.title);
-    expect(text).toMatch(/You added 1\.3 lb of lean mass since September 12\./);
-    expect(text).toMatch(/Body fat is pressing the limit at 9\.7%\./);
-    expect(text).toMatch(/Body fat is above your chosen 8–9% range\./);
-    expect(text).toMatch(/Address body fat before pushing harder on lean mass\./);
-    expect(text).toMatch(/more than halfway to the 10 lb lean-mass goal/);
+    expect(text).not.toMatch(/pressing|approaching|close to the top/i);
   });
 
   it("does not touch the published 70% Confidence of a stored Oct 9 artifact", () => {
@@ -248,16 +249,15 @@ describe("other briefing types keep their mapping", () => {
 });
 
 describe("DEXA Event roles when nothing needs correcting", () => {
-  it("keeps Protect to comparability so it never repeats Next's instruction", async () => {
+  it("leaves Protect out so it never repeats Next's instruction", async () => {
     // The Sep 12 paired calibration case: lean progress, body fat controlled, continue unchanged.
     const { prepareDexaV3 } = await import("../../testSupport/briefingFamilyV3Harness.js");
     const { prepared, artifact } = await prepareDexaV3();
     expect(prepared.strategicInterpretation.recommendation.action).toBe("continue_current_strategy");
     const narrative = artifact.briefing.dexaEventNarrative;
-    expect(narrative.coachInsight.protect).toBe("Prepare for the next DEXA the same way so the comparison stays fair.");
+    expect(narrative.coachInsight.protect).toBe("");
     expect(narrative.coachInsight.next).toMatch(/^Stay the course\./);
-    // This fixture's interpretation was stored before interpretation claims
-    // existed, so it is served as written; the hero and Coach roles are new.
-    expect(repeatedSentences({ hero: narrative.hero, coachInsight: narrative.coachInsight })).toEqual([]);
+    expect(narrative.hero.title).not.toMatch(/needs attention/);
+    expect(repeatedSentences(narrative)).toEqual([]);
   });
 });
