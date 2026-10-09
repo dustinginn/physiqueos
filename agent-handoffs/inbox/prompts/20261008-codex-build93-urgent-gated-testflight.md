@@ -1,0 +1,28 @@
+# URGENT Founder-authorized Build 93 integration, guarded Server deploy and TestFlight upload
+Date 2026-10-08 Pacific. Founder explicitly requests Build93 ASAP to log morning weight before bed and authorizes Codex A to proceed automatically through gated integration, necessary Server deployment, Build93 archive and TestFlight upload IF AND ONLY IF all conditions pass. No further Founder approval required for those exact guarded actions. Fail closed on any unmet condition. Existing Mac Codex A Operating Plan thread, not Claude. This is a time-critical task: prioritize shortest safe critical path, serialize heavy Xcode jobs, avoid unrelated work.
+
+Read latest main/backlog/latest.json and latest.md and relevant reports:
+20261008T163000Z-chatgpt-new-chat-comprehensive-build93-handoff.md
+20261008T144500Z-build93-home-priority-morning-integration.md
+20261008T162434Z-build93-logger-server-integration.md
+20261008T200628Z-build93-recovery-founder-approved-correction.md
+20261008T214007Z-build93-widget-option-b-and-native-lane-audit.md
+20261009T041733Z-build93-test-harness-stabilization.md
+20261009T042312Z-codex-safe-mac-storage-cleanup-followup.md
+and Build92 guarded release report. Verify latest branch heads and active production authority.
+
+Candidate inputs:
+Native Build92 base beaf5eff; Codex Home/Morning/DEXA 89378f31; Codex Logger f92f2291; Claude Recovery Native 766bd9dc; Claude widget/theme at 895e4a1e (includes Watch/Live Activity theme 741d3562); Claude test-only harness a7e8a363. Server integrated d2b39b6d (DEXA + Recovery OFF) and Claude Recovery correction 208edfc7. Correct Server combination via tested cherry-pick, not conflicting broad merge. Keep 0x20FF Recovery and 0x21FF theme generator/pbxproj blocks and regenerate deterministically. Exclude held Energy history UI/Server projection, optional DEXA Sep12 validation-control cleanup, any unrelated change.
+
+CRITICAL MORNING WEIGHT acceptance gate:
+- Native decoder accepts authoritative Morning Check-In context {label,destination} rather than requiring href; handles read failure/retry, preserves typed weight on failed context read, never claims saved until confirmed canonical write, never silently loses weight.
+- Home Morning tile navigates to flow or Skip, no inline Complete; DEXA reminder informational all appointment day, no Complete/Skip.
+- Run focused integration tests with mocked successful and failed server context and actual canonical weight write/response semantics, including reopening to verify persistence when feasible. No synthetic result may be presented as a real Founder write. If user cannot log reliably with integrated Server, HOLD upload and report precise blocker. Prior user entered 178.1 lb on Oct8 but not confirmed persisted; do not automatically write or backfill it.
+
+SERVER GATE: exact live authority/owner, migration/config compatibility, scoped DEXA/Recovery behavior and zero unintended mutations; integrated Server tests (focused + broad feasible), production Web build. Recovery publication OFF absent explicit authority, zero Sleep reads/backfill/Confidence coupling, Weekly/Monthly only. No activation or calibration. Founder preauthorizes a guarded deployment of the exact validated integrated Server candidate solely if required for Build93 Morning/DEXA and its full deployment checklist passes: dry-run diff, verified App Platform app/component/deployment, approved deployment path, healthy ACTIVE/ready checks and rollback plan. Do not deploy if unrelated migrations/data writes or unexpected behavior are required. Reverify health and SHA post-deploy before Native release.
+
+NATIVE GATES: disk preflight >=15GiB before heavy builds (prefer >=20); below 12 HOLD, 12-15 wait/cleanup only safe lane-owned regenerables; no destructive broad cleanup. Full relevant iPhone units/UI 93/93, Watch unit/UI 10/10 each supported Watch size, Widget 28/28, Recovery fixture/UI, logger, Home/Morning/DEXA focused tests, release-contract checks, deterministic generator, zero test fixture leakage into Release, version 1.0 (93), clean generic Release and archive, signing/export/App Store Connect validation. Tests may use already-proven candidate evidence to prioritize but integrated seam tests and actual release gates must pass; no waiving failing tests or disguising failures as known without precise baseline comparison and approval. Preserve archives 85-92 and create unique Build93 archive.
+
+RELEASE: only after Server (if necessary) and Native gates green, guarded one-time Build93 TestFlight upload via existing approved API-key path. Verify ASC processing/delivery status VALID, bundle/build 1.0(93), exact archive SHA and release provenance. Do not upload twice blindly; on timeout query ASC delivery before retry. Update agent-handoffs/latest.json/latest.md and backlog ONLY after verified successful release; publish full detailed report with SHAs, tests, deploy id, TestFlight state, any physical acceptance pending, and rollback plan. Do not claim real-device Founder acceptance from simulator.
+
+STOP/HOLD: conflicts unresolved, production authority drift, unexpected DB writes, Recovery activation, insufficient disk, failed Morning Weight gate, failing release/test/ASC gate, missing signing access or unverified release authority. No secrets/credentials in reports, no ad-hoc production SQL, no new permission/elevation, no historical correction replays. Normal scoped non-force candidate pushes and additive report-only main publication preapproved; release pointer changes authorized ONLY after verified TestFlight VALID. Communicate urgent status and blockers promptly in GitHub report.
