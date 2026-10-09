@@ -16,6 +16,12 @@ Before proposing or reconstructing the PhysiqueOS backlog:
 Agent handoff reports describe implementation state. This backlog describes what still needs product attention.
 
 
+
+NEXT NATIVE BUILD AFTER 93 — FOUNDER DEVICE FEEDBACK (2026-10-09)
+- DEXA appointment priority: at scheduled appointment time, provide a prominent direct 'Upload DEXA Results' action opening the existing PDF picker/upload flow (not generic priority Complete/Skip). Only clear the reminder after confirmed canonical PDF ingestion and appointment reconciliation; cancel/failure leaves it available, no false completion. Before appointment preserve informational state. Screenshots show Build92 priority detail still exposing Mark Complete and Mark Skipped and Home tile with 'Results needed'. Audit current Build93 DEXA candidate before implementing to avoid regressions. Maintain no automatic weight writeback and DEXA HealthKit constraints.
+- Today's Priorities layout: make card widths content-adaptive and rows dynamic. Long titles/details (e.g. Upload DEXA results) get full-row width; short cards can share a row; a solitary final card ALWAYS spans full width; support 3+ rows, legible text, no clipped labels/actions, stable ordering, Dark/Mineral Light, accessibility/Dynamic Type. Screenshot shows DEXA/Morning in first half-width row and Foam Rolling stranded at half width. Apply generic layout rule, not DEXA-specific hack.
+- These are BACKLOG FOR NEXT BUILD, NOT authorized changes to urgent Build93 integration/release candidates ac3def4c/e03f6768. No implementation/release authority from this entry. Founder screenshots in current conversation 2026-10-09.
+
 NEXT BUILD 93 — FOUNDER NOTES CONSOLIDATED (CANDIDATES; SCOPE AND RELEASE NOT YET AUTHORIZED)
 NEW CHAT HANDOFF AUTHORITY — 2026-10-08
 - Comprehensive ChatGPT new-conversation handoff published: agent-handoffs/reports/20261008T163000Z-chatgpt-new-chat-comprehensive-build93-handoff.md, main commit 8cc0aa072201fc8b50bd9ba16d589c964e174092. Read that report FIRST alongside this backlog and latest.json when continuing in a new ChatGPT chat.
