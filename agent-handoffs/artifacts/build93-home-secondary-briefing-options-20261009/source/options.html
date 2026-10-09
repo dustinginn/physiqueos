@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PhysiqueOS — Secondary Home Briefing Options</title>
+  <style>
+    @font-face {
+      font-family: Jakarta;
+      src: url('../../home-design-exploration-20261003/fonts/PlusJakartaSans.ttf') format('truetype');
+      font-weight: 200 800;
+      font-display: swap;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #08101a;
+      color: #f3f8fa;
+      font-family: Jakarta, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-synthesis: none;
+    }
+    .review {
+      max-width: 1260px;
+      margin: 0 auto;
+      padding: 42px 30px 72px;
+    }
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 28px;
+      align-items: end;
+      margin-bottom: 30px;
+    }
+    .kicker {
+      color: #3bd2ca;
+      font-size: 12px;
+      line-height: 1.2;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 8px 0 0;
+      max-width: 740px;
+      font-size: 42px;
+      line-height: 1.04;
+      letter-spacing: -.035em;
+    }
+    .authority {
+      max-width: 370px;
+      color: #aebfc8;
+      font-size: 13px;
+      line-height: 1.5;
+      text-align: right;
+    }
+    .option {
+      padding: 34px 0 46px;
+      border-top: 1px solid #9db3bd2f;
+    }
+    .option-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+      gap: 30px;
+      align-items: end;
+      margin-bottom: 24px;
+    }
+    .option-name {
+      margin: 0;
+      font-size: 27px;
+      line-height: 1.08;
+      letter-spacing: -.025em;
+    }
+    .option-intent {
+      margin: 7px 0 0;
+      color: #b6c6ce;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .option-note {
+      margin: 0;
+      color: #92a8b3;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .pair {
+      display: grid;
+      grid-template-columns: repeat(2, 402px);
+      gap: 28px;
+      justify-content: center;
+      align-items: start;
+    }
+    .capture-label {
+      margin: 0 0 9px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #a9bbc4;
+    }
+
+    .phone {
+      --canvas: #061019;
+      --paper: #0f1c2a;
+      --soft: #132334;
+      --ink: #f3f8fa;
+      --secondary: #c3d2d9;
+      --teal: #3bd2ca;
+      --hairline: rgba(157, 179, 189, .184);
+      --amber: #f4bc48;
+      --action-ink: #102431;
+      --row-height: 104px;
+      --secondary-top: 764px;
+      --secondary-height: 116px;
+      --bottom-top: 892px;
+      position: relative;
+      width: 402px;
+      height: 1018px;
+      overflow: hidden;
+      background: var(--canvas);
+      color: var(--ink);
+      border-radius: 48px;
+      box-shadow: 0 30px 64px #0009, 0 0 0 1px #ffffff16;
+      isolation: isolate;
+    }
+    .phone.light {
+      --canvas: #e8ece5;
+      --paper: #fbfaf4;
+      --soft: #eef2ed;
+      --ink: #102431;
+      --secondary: #526970;
+      --teal: #087e78;
+      --hairline: rgba(25, 56, 66, .169);
+      --amber: #c98220;
+      --action-ink: #102431;
+      box-shadow: 0 30px 64px #0005, 0 0 0 1px #1024311c;
+    }
+    .phone.large-type {
+      --row-height: 136px;
+      --secondary-top: 796px;
+      --secondary-height: 152px;
+      --bottom-top: 960px;
+      height: 1086px;
+    }
+    .accepted-top,
+    .accepted-bottom {
+      position: absolute;
+      left: 0;
+      width: 402px;
+      overflow: hidden;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .accepted-top { top: 0; height: 635px; }
+    .accepted-bottom { top: var(--bottom-top); height: 126px; }
+    .accepted-top img,
+    .accepted-bottom img {
+      position: absolute;
+      left: 0;
+      width: 402px;
+      height: 874px;
+      max-width: none;
+    }
+    .accepted-top img { top: 0; }
+    /* Start below the accepted action/briefing strip so only the unchanged
+       Today's Priorities + tab-bar region is reintroduced after our card. */
+    .accepted-bottom img { top: -770px; }
+    .lower-field {
+      position: absolute;
+      inset: 635px 0 0;
+      z-index: 0;
+      background:
+        radial-gradient(circle at 104% 18%, color-mix(in srgb, var(--teal) 7%, transparent) 0 85px, transparent 86px),
+        radial-gradient(circle at 104% 18%, transparent 0 116px, color-mix(in srgb, var(--teal) 6%, transparent) 117px 151px, transparent 152px),
+        var(--canvas);
+    }
+    .action-row {
+      position: absolute;
+      z-index: 3;
+      top: 646px;
+      left: 18px;
+      width: 366px;
+      height: var(--row-height);
+      display: grid;
+      grid-template-columns: 206px 150px;
+      gap: 10px;
+    }
+    .morning-action,
+    .primary-briefing {
+      border-radius: 18px;
+      min-width: 0;
+      height: 100%;
+    }
+    .morning-action {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px;
+      background: var(--amber);
+      color: var(--action-ink);
+    }
+    .morning-action strong {
+      max-width: 132px;
+      font-size: 17px;
+      line-height: 1.12;
+      font-weight: 800;
+      letter-spacing: -.015em;
+    }
+    .plus {
+      flex: 0 0 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: #ffffff24;
+      font-size: 32px;
+      line-height: 1;
+      font-weight: 600;
+    }
+    .primary-briefing {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) 14px;
+      gap: 9px;
+      align-items: center;
+      padding: 12px 8px 12px 12px;
+      background: var(--paper);
+      border: 1px solid color-mix(in srgb, var(--teal) 42%, transparent);
+    }
+    .doc-icon {
+      position: relative;
+      display: block;
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      color: var(--teal);
+      background: color-mix(in srgb, var(--teal) 13%, transparent);
+    }
+    .doc-icon::before {
+      content: "";
+      position: absolute;
+      width: 13px;
+      height: 17px;
+      left: 10px;
+      top: 8px;
+      border: 2px solid currentColor;
+      border-radius: 2px;
+    }
+    .doc-icon::after {
+      content: "";
+      position: absolute;
+      width: 7px;
+      height: 2px;
+      left: 14px;
+      top: 16px;
+      background: currentColor;
+      box-shadow: 0 4px 0 currentColor;
+      border-radius: 2px;
+    }
+    .primary-copy { min-width: 0; }
+    .primary-copy strong {
+      display: block;
+      font-size: 14px;
+      line-height: 1.12;
+      font-weight: 800;
+      letter-spacing: -.012em;
+    }
+    .primary-copy small {
+      display: block;
+      margin-top: 4px;
+      color: var(--secondary);
+      font-size: 11px;
+      line-height: 1.1;
+      font-weight: 500;
+    }
+    .arrow {
+      color: var(--teal);
+      font-size: 20px;
+      line-height: 1;
+      font-weight: 800;
+      text-align: center;
+    }
+    .supporting {
+      position: absolute;
+      z-index: 3;
+      top: var(--secondary-top);
+      left: 18px;
+      width: 366px;
+      min-height: var(--secondary-height);
+      color: var(--ink);
+    }
+
+    /* Option A: explicit sibling of the compact primary tile. */
+    .option-a .supporting {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) 28px;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 18px;
+      background: var(--paper);
+      border: 1px solid color-mix(in srgb, var(--teal) 38%, transparent);
+      box-shadow: 0 8px 22px color-mix(in srgb, var(--ink) 5%, transparent);
+    }
+    .option-a .supporting .doc-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+    }
+    .option-a .supporting .doc-icon::before { left: 13px; top: 11px; }
+    .option-a .supporting .doc-icon::after { left: 17px; top: 19px; }
+    .cadence {
+      color: var(--teal);
+      font-size: 10px;
+      line-height: 1.2;
+      font-weight: 800;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .supporting-title {
+      margin-top: 3px;
+      font-size: 16px;
+      line-height: 1.16;
+      font-weight: 800;
+      letter-spacing: -.01em;
+    }
+    .supporting-prompt {
+      margin-top: 4px;
+      color: var(--secondary);
+      font-size: 13px;
+      line-height: 1.28;
+      font-weight: 500;
+    }
+    .supporting-date {
+      margin-top: 5px;
+      color: var(--secondary);
+      font-size: 11px;
+      line-height: 1.15;
+      font-weight: 600;
+    }
+    .option-a .supporting .arrow {
+      width: 28px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+    }
+
+    /* Option B: editorial summary with a cadence rail and compact header. */
+    .option-b .supporting {
+      overflow: hidden;
+      padding: 13px 44px 13px 18px;
+      border-radius: 18px;
+      background: var(--soft);
+      border: 1px solid var(--hairline);
+      box-shadow: 0 8px 22px color-mix(in srgb, var(--ink) 4%, transparent);
+    }
+    .option-b .supporting::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--teal);
+    }
+    .editorial-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .editorial-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+    .mini-doc {
+      position: relative;
+      flex: 0 0 22px;
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      background: color-mix(in srgb, var(--teal) 14%, transparent);
+      color: var(--teal);
+    }
+    .mini-doc::before {
+      content: "";
+      position: absolute;
+      left: 7px;
+      top: 5px;
+      width: 8px;
+      height: 11px;
+      border: 1.5px solid currentColor;
+      border-radius: 1px;
+    }
+    .option-b .cadence { font-size: 9.5px; }
+    .option-b .supporting-date {
+      margin: 0;
+      white-space: nowrap;
+    }
+    .option-b .supporting-title {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.15;
+    }
+    .option-b .supporting-prompt {
+      margin-top: 5px;
+      padding-top: 6px;
+      border-top: 1px solid var(--hairline);
+      font-size: 12px;
+    }
+    .option-b .supporting .arrow {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      width: 28px;
+      height: 44px;
+      margin-top: -22px;
+      display: grid;
+      place-items: center;
+    }
+
+    .large-type .morning-action strong { font-size: 20px; line-height: 1.14; }
+    .large-type .primary-briefing {
+      grid-template-columns: 34px minmax(0, 1fr);
+      grid-template-rows: auto;
+      padding-right: 10px;
+    }
+    .large-type .primary-copy strong { font-size: 17px; line-height: 1.12; }
+    .large-type .primary-copy small { font-size: 14px; }
+    .large-type .primary-briefing > .arrow { display: none; }
+    .large-type .cadence { font-size: 13px; }
+    .large-type .supporting-title { font-size: 21px; line-height: 1.14; }
+    .large-type .supporting-prompt { font-size: 17px; line-height: 1.25; }
+    .large-type .supporting-date { font-size: 14px; }
+    .large-type.option-a .supporting {
+      grid-template-columns: 42px minmax(0, 1fr) 28px;
+      align-items: start;
+    }
+    .large-type.option-b .supporting { padding-top: 15px; padding-bottom: 15px; }
+    .large-type.option-b .option-b-copy { padding-right: 2px; }
+    .large-type.option-b .editorial-meta { margin-bottom: 8px; }
+    .large-type.option-b .supporting-prompt { margin-top: 8px; padding-top: 8px; }
+
+    .stress {
+      margin-top: 27px;
+      padding-top: 24px;
+      border-top: 1px solid #9db3bd2f;
+    }
+    .stress h3 {
+      margin: 0 0 7px;
+      font-size: 18px;
+    }
+    .stress p {
+      margin: 0 0 18px;
+      color: #9fb2bc;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    @media (max-width: 900px) {
+      .review { padding-left: 16px; padding-right: 16px; }
+      .review-header, .option-head { grid-template-columns: 1fr; display: grid; }
+      .authority { text-align: left; }
+      .pair { grid-template-columns: 402px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="review">
+    <header class="review-header">
+      <div>
+        <div class="kicker">PhysiqueOS · Home · design-only review</div>
+        <h1>Secondary briefing, two coherent directions.</h1>
+      </div>
+      <div class="authority">402 pt iPhone width · authentic DEXA + Midweek two-briefing state · accepted Home surroundings retained · no shipping Native source changed.</div>
+    </header>
+    <div id="options"></div>
+  </main>
+  <script>
+    const accepted = {
+      dark: '../../build87-home-physical-parity-corrections-20261005/screens/home-dark.png',
+      light: '../../build87-home-physical-parity-corrections-20261005/screens/home-light.png'
+    };
+
+    const descriptions = {
+      a: {
+        name: 'Option A · Family Card',
+        intent: 'A full-width sibling of the approved DEXA tile: the same teal document language, paper surface, integrated arrow and 18 pt geometry, with enough room for cadence, prompt and date.',
+        note: 'Lowest implementation risk and strongest continuity with the already-accepted Home briefing treatment.'
+      },
+      b: {
+        name: 'Option B · Editorial Rail',
+        intent: 'A more compact editorial summary: a teal cadence rail, small document marker, inline date and ruled prompt make it clearly secondary without returning to the old purple eyebrow/card stack.',
+        note: 'Stronger primary/secondary separation, but introduces one new Home-specific composition.'
+      }
+    };
+
+    function documentIcon(className = 'doc-icon') {
+      return `<span class="${className}" aria-hidden="true"></span>`;
+    }
+
+    function supporting(option) {
+      if (option === 'a') {
+        return `<section class="supporting" aria-label="Midweek Briefing, Midweek Briefing Ready, Review the week so far, Oct 7">
+          ${documentIcon()}
+          <div>
+            <div class="cadence">Midweek Briefing</div>
+            <div class="supporting-title">Midweek Briefing Ready</div>
+            <div class="supporting-prompt">Review the week so far.</div>
+            <div class="supporting-date">Oct 7</div>
+          </div>
+          <span class="arrow" aria-hidden="true">→</span>
+        </section>`;
+      }
+      return `<section class="supporting" aria-label="Midweek Briefing, Midweek Briefing Ready, Review the week so far, Oct 7">
+        <div class="option-b-copy">
+          <div class="editorial-meta">
+            <div class="editorial-label">${documentIcon('mini-doc')}<span class="cadence">Midweek Briefing</span></div>
+            <span class="supporting-date">Oct 7</span>
+          </div>
+          <div class="supporting-title">Midweek Briefing Ready</div>
+          <div class="supporting-prompt">Review the week so far.</div>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+      </section>`;
+    }
+
+    function phone(option, appearance, large = false) {
+      const image = accepted[appearance];
+      const label = appearance === 'dark' ? 'Dark' : 'Mineral Light';
+      return `<div class="capture">
+        <p class="capture-label">${label}${large ? ' · 135% type stress' : ''}</p>
+        <div class="phone option-${option} ${appearance === 'light' ? 'light' : ''} ${large ? 'large-type' : ''}" data-capture="option-${option}-${appearance}${large ? '-large' : ''}" aria-label="Option ${option.toUpperCase()} in ${label}">
+          <div class="accepted-top"><img src="${image}" alt=""></div>
+          <div class="lower-field"></div>
+          <div class="action-row">
+            <div class="morning-action"><strong>Log Morning Weight</strong><span class="plus" aria-hidden="true">+</span></div>
+            <section class="primary-briefing" aria-label="DEXA Analysis Ready, Oct 9">
+              ${documentIcon()}
+              <div class="primary-copy"><strong>DEXA Analysis Ready</strong><small>Oct 9</small></div>
+              <span class="arrow" aria-hidden="true">→</span>
+            </section>
+          </div>
+          ${supporting(option)}
+          <div class="accepted-bottom"><img src="${image}" alt=""></div>
+        </div>
+      </div>`;
+    }
+
+    document.querySelector('#options').innerHTML = ['a', 'b'].map(option => {
+      const d = descriptions[option];
+      return `<article class="option" id="option-${option}">
+        <header class="option-head">
+          <div><h2 class="option-name">${d.name}</h2><p class="option-intent">${d.intent}</p></div>
+          <p class="option-note">${d.note}</p>
+        </header>
+        <div class="pair">${phone(option, 'dark')}${phone(option, 'light')}</div>
+        <section class="stress">
+          <h3>Dynamic Type stress</h3>
+          <p>Exact production copy at 135% briefing type scale; cards grow vertically and keep the full-width hierarchy.</p>
+          <div class="pair">${phone(option, 'dark', true)}${phone(option, 'light', true)}</div>
+        </section>
+      </article>`;
+    }).join('');
+  </script>
+</body>
+</html>
