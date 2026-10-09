@@ -714,6 +714,10 @@ final class AppEnvironment {
         healthKitObservationUploader: (any HealthKitObservationUploader)? = nil,
         stagedPhotoIntakeStore: (any StagedPhotoIntakeStore)? = nil
     ) {
+#if DEBUG
+        // UI-test isolation only (no-op without its launch argument).
+        SandboxTrainingUITestIsolation.applyIfRequested()
+#endif
         self.authoritySelectionStore = authoritySelectionStore
         let resolvedNativeAuthority = nativeAuthority ?? authoritySelectionStore.load() ?? .sandbox
         self.nativeAuthority = resolvedNativeAuthority

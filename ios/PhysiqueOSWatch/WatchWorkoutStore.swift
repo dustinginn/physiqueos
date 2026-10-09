@@ -261,6 +261,8 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
 #if DEBUG
     /// Fixture-only: renders the orphaned Health workout state.
     private(set) var debugOrphanedHealthSessionId: String?
+    /// Fixture-only: commands the reachable fixture iPhone received (never applied).
+    private(set) var debugFixtureCommands: [WatchWorkoutCommand.Kind] = []
 #endif
     private(set) var gate = WatchWorkoutCommandDeliveryGate()
     private(set) var pendingIssuedAt: Date?
@@ -552,6 +554,17 @@ final class WatchWorkoutStore: NSObject, WCSessionDelegate {
             }
             cancelConfirmationVisible = fixture.cancelConfirmationVisible
             debugOrphanedHealthSessionId = fixture.orphanedHealthSessionId
+            // The simulator harness has no WCSession. A fixture that models a
+            // reachable iPhone gets a stand-in that receives commands and
+            // records them without applying anything (the harness accepts no
+            // mutations), so a command does not demote the fixture to
+            // "Phone unavailable". Fixtures that model an unavailable phone
+            // keep the real no-session behavior.
+            if fixture.connectionState == .reachable {
+                commandSinkForTesting = { [weak self] command in
+                    self?.debugFixtureCommands.append(command.kind)
+                }
+            }
             health.installDebugMetrics(
                 heartRate: fixture.heartRate,
                 activeCalories: fixture.activeCalories,
