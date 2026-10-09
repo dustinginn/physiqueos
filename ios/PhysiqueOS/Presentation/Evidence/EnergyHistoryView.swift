@@ -278,7 +278,10 @@ private struct EnergyHistorySheet<Rows: View>: View {
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) { Rectangle().fill(m.c.line).frame(height: m.pt(1)) }
-            .navigationDestination(for: AppDestination.self) { AppDestinationRouterView(destination: $0) }
+            .navigationDestination(for: AppDestination.self) {
+                AppDestinationRouterView(destination: $0)
+                    .environment(\.evidenceBackTrail, trail)
+            }
         }
         .environment(\.evidenceBackTrail, trail)
         .evidenceFamily(.weight)
