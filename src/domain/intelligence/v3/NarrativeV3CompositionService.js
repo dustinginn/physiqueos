@@ -230,6 +230,9 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
       energyAmbiguity: context.energyAmbiguityText ?? null,
       sectionPurposes: NARRATIVE_V3_SECTION_PURPOSES,
       sectionAllocations: context.sectionPlan.allocations,
+      ...(publicationContext.kind === "event" ? {
+        eventPresentation: composeEventPresentation(context, { headline, sections }),
+      } : {}),
     },
   };
   return deepFreeze({
@@ -237,6 +240,100 @@ export function composeNarrativeV3({ goalContract, interpretation, confidence, s
     id: `narrative_plan_v3|${semanticFingerprint(semantic).slice(7)}`,
     semanticFingerprint: semanticFingerprint(semantic),
   });
+}
+
+// Event presentation roles.
+//
+// The canonical sections above are complete prose for a reader who sees only
+// one of them. An event briefing surface can show several at once (its hero
+// and a coaching card), and filling each slot with a section repeated the same
+// conclusions: the hero repeated its own headline, the win repeated the hero,
+// and the next step restated the lead result. Each role here owns distinct
+// claims, composed from the same structured state, so a surface that uses them
+// says each conclusion once. Optional roles are null when the evidence gives
+// them nothing distinct to say. The canonical sections are unchanged.
+export const EVENT_PRESENTATION_SCHEMA = "event_presentation_roles_v1";
+export const EVENT_PRESENTATION_ROLES = deepFreeze({
+  heroBody: "measured_result",
+  biggestWin: "earned_goal_progress",
+  protect: "what_to_preserve",
+  next: "single_coaching_priority",
+});
+
+function composeEventPresentation(context, { headline, sections }) {
+  const { interpretation, objective } = context;
+  const progressed = ["progressed", "satisfied", "stable_success"].includes(objective?.state);
+  const guardrails = naturalList(context.consequentialGuardrails.map((item) =>
+    guardrailLabel(context.goalContract, item)));
+  const objectivePhrase = objectiveLabel(context);
+  const roles = [];
+  const claims = {};
+  const add = (role, parts) => {
+    const kept = [];
+    for (const part of parts) {
+      if (!part?.text) continue;
+      // A sentence any earlier role (or the headline) already says is not said again.
+      const said = [headline, ...roles.flatMap((item) => item.sentences)];
+      if (said.some((text) => isSemanticallyEquivalent(text, part.text))) continue;
+      kept.push(part);
+    }
+    roles.push({ role, sentences: kept.map((part) => part.text) });
+    claims[role] = kept.map((part) => part.claim);
+    return kept.length ? kept.map((part) => part.text).join(" ") : null;
+  };
+
+  const resultSentences = splitSentences(sections.result);
+  const resultBody = resultSentences[0] === headline ? resultSentences.slice(1) : resultSentences;
+  const heroBody = add("heroBody", resultBody.length
+    ? resultBody.map((text, index) => ({ text,
+      claim: index === 0 ? "objective_movement" : context.primaryGuardrail ? "guardrail_status" : "result_detail" }))
+    : splitSentences(sections.meaning).map((text) => ({ text, claim: "goal_meaning" })));
+  const biggestWin = add("biggestWin", progressed ? [
+    { text: goalProgressSentence(context), claim: "goal_progress" },
+    { text: `The measured progress in ${objectivePhrase} is real.`, claim: "measured_progress" },
+  ] : []);
+  // Measurement, not causation: what to keep steady, never what "worked".
+  // While a limit is being corrected, Protect is the rest of the routine; when
+  // nothing changes, Next already says to keep executing, so Protect is only
+  // the comparability of the next check.
+  const correcting = context.consequentialGuardrails.length > 0;
+  const protect = add("protect", progressed ? [correcting
+    ? { text: `Keep the rest of the current routine steady, and prepare for ${nextEvidenceName(context)} the same way so the comparison stays fair.`,
+      claim: "preserve_routine_and_comparability" }
+    : { text: `Prepare for ${nextEvidenceName(context)} the same way so the comparison stays fair.`,
+      claim: "comparable_next_check" },
+  ] : []);
+  const action = interpretation.recommendation.action;
+  const priority = action === "continue_with_guardrail_monitoring" && guardrails
+    ? `Address ${guardrails} before pushing harder on ${objectivePhrase}.`
+    : composeAction(context);
+  const next = add("next", [
+    { text: priority, claim: action === "continue_with_guardrail_monitoring" ? "address_guardrail_first" : "recommended_action" },
+    ...splitSentences(composeWatch(context)).map((text) => ({ text, claim: "next_evidence_purpose" })),
+  ]);
+  assertNarrativeV3Voice([heroBody, biggestWin, protect, next].filter(Boolean).join("\n"));
+  return {
+    schemaVersion: EVENT_PRESENTATION_SCHEMA,
+    heroBody: heroBody ?? sections.result ?? headline,
+    biggestWin,
+    protect,
+    next,
+    claims,
+  };
+}
+
+// Sentences end at a terminator followed by whitespace or the end, as
+// firstSentence reads them, so decimals ("1.3 lb") stay inside their sentence.
+function splitSentences(value) {
+  const sentences = [];
+  let rest = String(value ?? "").trim();
+  while (rest) {
+    const match = /^.*?[.!?](?:\s+|$)/su.exec(rest);
+    const next = match ? match[0] : rest;
+    sentences.push(next.trim());
+    rest = rest.slice(next.length).trim();
+  }
+  return sentences.filter(Boolean);
 }
 
 export function findNarrativeV3VoiceViolations(value) {
