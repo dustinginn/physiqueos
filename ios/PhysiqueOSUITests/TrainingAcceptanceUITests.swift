@@ -3,6 +3,9 @@ import XCTest
 @MainActor
 final class TrainingAcceptanceUITests: XCTestCase {
     private let app = XCUIApplication()
+    /// One Sandbox training reset per test: every launch in this test shares
+    /// it, so a relaunch inside the test keeps the test's own workout.
+    private let sandboxIsolationToken = UUID().uuidString
 
     private func launchInSandbox(appearance: String? = nil) {
         continueAfterFailure = false
@@ -11,6 +14,12 @@ final class TrainingAcceptanceUITests: XCTestCase {
         // pin that authority in the process argument domain instead of
         // inheriting a prior Founder Production selection from Simulator.
         app.launchArguments += ["-physiqueos.native.authority-selection.v1", "sandbox"]
+        // Each journey starts from the bundled Sandbox: a workout an earlier
+        // test left active (or finished with Workout Complete still pending)
+        // would make Log legitimately route into it. DEBUG-only; clears only
+        // Sandbox training state, once per test (a per-test token, so the
+        // relaunches `app.open(_:)` performs keep this test's own workout).
+        app.launchArguments += ["-physiqueos.uitest.fresh-sandbox-training", sandboxIsolationToken]
         if let appearance {
             app.launchArguments += ["-physiqueos.appearance.preference.v1", appearance]
         }
@@ -863,6 +872,9 @@ final class TrainingAcceptanceUITests: XCTestCase {
 @MainActor
 final class LoggerParityCaptureUITests: XCTestCase {
     private let app = XCUIApplication()
+    /// One Sandbox training reset per test: every launch in this test shares
+    /// it, so a relaunch inside the test keeps the test's own workout.
+    private let sandboxIsolationToken = UUID().uuidString
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -1179,6 +1191,7 @@ final class LoggerParityCaptureUITests: XCTestCase {
         app.terminate()
         app.launchArguments = [
             "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.uitest.fresh-sandbox-training", sandboxIsolationToken,
             "-physiqueos.appearance.preference.v1", appearance,
             "-physiqueos.appearance-review.route", route,
         ] + extra
@@ -1239,6 +1252,9 @@ final class LoggerParityCaptureUITests: XCTestCase {
 @MainActor
 final class Build89IntegrationUITests: XCTestCase {
     private let app = XCUIApplication()
+    /// One Sandbox training reset per test: every launch in this test shares
+    /// it, so a relaunch inside the test keeps the test's own workout.
+    private let sandboxIsolationToken = UUID().uuidString
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -1321,6 +1337,7 @@ final class Build89IntegrationUITests: XCTestCase {
         app.terminate()
         app.launchArguments = [
             "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.uitest.fresh-sandbox-training", sandboxIsolationToken,
             "-physiqueos.appearance.preference.v1", appearance,
             "-physiqueos.appearance-review.route", route,
         ]
@@ -1377,6 +1394,9 @@ final class Build89IntegrationUITests: XCTestCase {
 @MainActor
 final class Build90FounderSelectedUITests: XCTestCase {
     private let app = XCUIApplication()
+    /// One Sandbox training reset per test: every launch in this test shares
+    /// it, so a relaunch inside the test keeps the test's own workout.
+    private let sandboxIsolationToken = UUID().uuidString
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -1554,6 +1574,7 @@ final class Build90FounderSelectedUITests: XCTestCase {
         app.terminate()
         app.launchArguments = [
             "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.uitest.fresh-sandbox-training", sandboxIsolationToken,
             "-physiqueos.appearance.preference.v1", appearance,
             "-physiqueos.appearance-review.route", route,
         ] + extra

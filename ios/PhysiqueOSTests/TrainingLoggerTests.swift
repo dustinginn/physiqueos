@@ -873,6 +873,65 @@ final class TrainingLoggerTests: XCTestCase {
         XCTAssertEqual(Set(relaunchedStore.loadAll().map(\.id)), [legacy.id, sibling.id], "Every draft must survive app restart independently.")
     }
 
+    /// The DEBUG UI-test isolation seam clears only the Sandbox draft
+    /// collection (with its attachments) and the rest preference, and only
+    /// when its launch argument is present.
+    @MainActor
+    func testSandboxUITestIsolationClearsOnlySandboxTrainingStateOnRequest() throws {
+        let suite = "SandboxTrainingUITestIsolation.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let attachments = MemoryTrainingLoggerAttachmentStore()
+        let sandbox = UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: SandboxTrainingUITestIsolation.sandboxDraftKey)
+        let founder = UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: "physiqueos.founder-production.trainingLogger.localDraft.v1")
+        var active = draft(mode: .live, date: "2026-10-08", areas: ["chest"])
+        active.id = "sandbox-active"
+        sandbox.save(active)
+        var production = draft(mode: .live, date: "2026-10-08", areas: ["back"])
+        production.id = "founder-active"
+        founder.save(production)
+        let sandboxImage = try attachments.save(data: Data([1]), draftId: active.id, assetId: "a", displayName: "a.png")
+        let founderImage = try attachments.save(data: Data([2]), draftId: production.id, assetId: "b", displayName: "b.png")
+        defaults.set("countdown", forKey: UserDefaultsTrainingRestPreferences.globalKey)
+        defaults.set(Data([1]), forKey: SandboxTrainingUITestIsolation.sandboxTerminalLedgerKey)
+        defaults.set(Data([2]), forKey: "physiqueos.founderProduction.trainingSession.terminalLedger.v1")
+        defaults.set(true, forKey: "physiqueos.workoutComplete.celebrated.\(active.id)")
+        defaults.set(true, forKey: "physiqueos.workoutComplete.celebrated.\(production.id)")
+
+        XCTAssertFalse(SandboxTrainingUITestIsolation.applyIfRequested(arguments: [], defaults: defaults, attachments: attachments))
+        XCTAssertEqual(sandbox.loadAll().map(\.id), [active.id], "No argument, no reset")
+
+        XCTAssertFalse(SandboxTrainingUITestIsolation.applyIfRequested(
+            arguments: [SandboxTrainingUITestIsolation.argument], defaults: defaults, attachments: attachments),
+                       "A reset needs its per-test token")
+        XCTAssertTrue(SandboxTrainingUITestIsolation.applyIfRequested(
+            arguments: [SandboxTrainingUITestIsolation.argument, "test-1"], defaults: defaults, attachments: attachments))
+        XCTAssertTrue(sandbox.loadAll().isEmpty)
+        XCTAssertThrowsError(try attachments.load(reference: sandboxImage))
+        XCTAssertNil(defaults.object(forKey: UserDefaultsTrainingRestPreferences.globalKey))
+        XCTAssertNil(defaults.object(forKey: SandboxTrainingUITestIsolation.sandboxTerminalLedgerKey))
+        XCTAssertNil(defaults.object(forKey: "physiqueos.workoutComplete.celebrated.\(active.id)"))
+        XCTAssertNotNil(defaults.object(forKey: "physiqueos.founderProduction.trainingSession.terminalLedger.v1"))
+        XCTAssertNotNil(defaults.object(forKey: "physiqueos.workoutComplete.celebrated.\(production.id)"))
+        XCTAssertEqual(founder.loadAll().map(\.id), [production.id], "Founder Production drafts are never touched")
+        XCTAssertEqual(try attachments.load(reference: founderImage), Data([2]))
+        XCTAssertEqual(SandboxTrainingUITestIsolation.sandboxDraftKey, "physiqueos.trainingLogger.localDraft.v1",
+                       "must match AppEnvironment's Sandbox draft store key")
+
+        // A relaunch within the same test (XCUITest `open(_:)`) carries the
+        // same token and keeps the workout that test started.
+        var started = draft(mode: .live, date: "2026-10-08", areas: ["shoulders"])
+        started.id = "started-in-test-1"
+        sandbox.save(started)
+        XCTAssertFalse(SandboxTrainingUITestIsolation.applyIfRequested(
+            arguments: [SandboxTrainingUITestIsolation.argument, "test-1"], defaults: defaults, attachments: attachments))
+        XCTAssertEqual(sandbox.loadAll().map(\.id), [started.id])
+        // The next test's token resets again.
+        XCTAssertTrue(SandboxTrainingUITestIsolation.applyIfRequested(
+            arguments: [SandboxTrainingUITestIsolation.argument, "test-2"], defaults: defaults, attachments: attachments))
+        XCTAssertTrue(sandbox.loadAll().isEmpty)
+    }
+
     @MainActor
     func testMultipleSameDayDraftsStartResumeAndDiscardByExactIdentity() async throws {
         var first = draft(mode: .past, date: "2026-09-16", areas: ["biceps"])

@@ -83,6 +83,48 @@ final class UserDefaultsTrainingLoggerDraftStore: TrainingLoggerDraftStore {
     }
 }
 
+#if DEBUG
+/// DEBUG-only UI-test isolation. With `-physiqueos.uitest.fresh-sandbox-training
+/// <token>` the app clears, before it composes its environment, the Sandbox
+/// Workout Logger draft collection (those drafts' attachment folders and
+/// completion markers), the Sandbox terminal-session ledger and the
+/// device-wide rest preference. Each Sandbox UI test then starts from the
+/// bundled Sandbox instead of a previous test's workout — for example a
+/// finished workout whose Workout Complete presentation is still pending,
+/// which Log legitimately routes into (Build 92's six order-dependent
+/// failures). The reset runs once per token: XCUITest relaunches the app
+/// with the same arguments for `open(_:)` URLs, and a relaunch inside one
+/// test must keep that test's own workout. It never touches Founder
+/// Production keys and is compiled out of Release.
+enum SandboxTrainingUITestIsolation {
+    static let argument = "-physiqueos.uitest.fresh-sandbox-training"
+    static let sandboxDraftKey = "physiqueos.trainingLogger.localDraft.v1"
+    static let sandboxTerminalLedgerKey = "physiqueos.sandbox.trainingSession.terminalLedger.v1"
+    static let appliedTokenKey = "physiqueos.uitest.fresh-sandbox-training.appliedToken"
+
+    @discardableResult
+    static func applyIfRequested(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        defaults: UserDefaults = .standard,
+        attachments: TrainingLoggerAttachmentStore = FileTrainingLoggerAttachmentStore()
+    ) -> Bool {
+        guard let index = arguments.firstIndex(of: argument), arguments.indices.contains(index + 1) else { return false }
+        let token = arguments[index + 1]
+        guard !token.isEmpty, defaults.string(forKey: appliedTokenKey) != token else { return false }
+        defaults.set(token, forKey: appliedTokenKey)
+        let sandbox = UserDefaultsTrainingLoggerDraftStore(defaults: defaults, key: sandboxDraftKey)
+        for draft in sandbox.loadAll() {
+            attachments.removeAll(draftId: draft.id)
+            defaults.removeObject(forKey: "physiqueos.workoutComplete.celebrated.\(draft.id)")
+        }
+        defaults.removeObject(forKey: sandboxDraftKey)
+        defaults.removeObject(forKey: sandboxTerminalLedgerKey)
+        defaults.removeObject(forKey: "physiqueos.trainingLogger.restPreference.global.v1")
+        return true
+    }
+}
+#endif
+
 final class MemoryTrainingLoggerDraftStore: TrainingLoggerDraftStore {
     private(set) var drafts: [TrainingLoggerDraft]
     var draft: TrainingLoggerDraft? { drafts.first }
