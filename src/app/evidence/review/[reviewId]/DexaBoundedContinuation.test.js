@@ -389,6 +389,20 @@ describe("October 9 DEXA continuation on the bounded path", () => {
     expect(harness.state.db.stats.recordWrites).toEqual([]);
     expect((await currentReview()).commitProgress.compatibility_writes.attempts).toBe(3);
   });
+
+  it("a Native retry of a dead-lettered review hands every remaining step to the worker", async () => {
+    harness.state.reviewRepository = createEvidenceReviewRepository([{
+      ...october9Review(), status: "partially_committed",
+      commitClaim: { ...october9Review().commitClaim, status: "failed", operationId: "evidence-review-background:dead" },
+    }]);
+    const outcome = await beginNativeEvidenceReviewConfirmation({ reviewId: REVIEW_ID, confirmedBy: OWNER, operationId: "native-retry" });
+    expect(outcome).toMatchObject({ state: "processing", accepted: true });
+    const review = await currentReview();
+    expect(review.commitProgress.compatibility_writes.status).toBe("started");
+    expect(review.commitClaim.status).toBe("available");
+    expect(harness.state.db.stats.recordWrites).toEqual([]);
+    expect(harness.state.releases).toBe(1);
+  });
 });
 
 describe("other evidence types keep their existing path", () => {

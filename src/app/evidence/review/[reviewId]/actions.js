@@ -377,6 +377,17 @@ async function executeEvidenceReviewConfirmation(formData, {
   const isTrainingConfirmation = (evidencePackage.evidence_objects ?? []).some(
     (item) => item.removed !== true && item.evidence_type === "training"
   );
+  // That one synchronous step is canonical_commit. A Native Confirm that
+  // resumes a review whose canonical save is already durable (the retry Native
+  // offers after a dead-lettered continuation) has no synchronous step left:
+  // it claims, releases to the continuation chain, and returns. Running the
+  // next step in the web request instead is how the October 9 DEXA retry
+  // restarted the web process mid-step.
+  const synchronousStepBudget = !supportsDurableCommitClaims
+    ? Number.POSITIVE_INFINITY
+    : nativeStart && isEvidenceReviewCanonicalSaveComplete(claimedReview)
+      ? 0
+      : 1;
   let orchestrationResult;
   let continuationPath = null;
   try {
@@ -392,7 +403,7 @@ async function executeEvidenceReviewConfirmation(formData, {
     });
     orchestrationResult = await orchestrator.run(
       { reviewId, evidencePackage, userId: user.id, commitProgress: claimedReview.commitProgress ?? {} },
-      { maxSteps: supportsDurableCommitClaims ? 1 : Number.POSITIVE_INFINITY, operationId }
+      { maxSteps: synchronousStepBudget, operationId }
     );
     if (!orchestrationResult.complete) {
       await service.pauseCommit(reviewId, { operationId });
