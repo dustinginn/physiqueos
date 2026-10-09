@@ -143,6 +143,13 @@ export function createFakeFounderCanonicalDatabase({ ownerUserId, collections = 
       return [...committed.values()].filter((entry) => entry.collection === collection)
         .sort((left, right) => left.ordinal - right.ordinal).map((entry) => ({ ...parse(entry), version: entry.version }));
     },
+    // Streams one more committed record in (used to build large synthetic
+    // runtimes without ever holding them on the heap).
+    insert(collection, payload) {
+      const recordId = String(payload?.id ?? payload?.package_id ?? payload?.review_id ?? `@index:${committed.size}`);
+      const ordinal = [...committed.values()].reduce((max, entry) => (entry.collection === collection ? Math.max(max, entry.ordinal) : max), -1) + 1;
+      committed.set(rowKey(collection, recordId), row(collection, recordId, ordinal, Number(payload?.version ?? 1), payload));
+    },
     payloadBytes() {
       let bytes = 0;
       for (const entry of committed.values()) bytes += entry.payloadBuffer.length;
