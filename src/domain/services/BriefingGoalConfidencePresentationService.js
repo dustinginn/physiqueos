@@ -1,4 +1,5 @@
 import { buildCanonicalNarrativeV3Extensions, projectV3CoachInsight, projectV3Hero } from "./BriefingV3Projection.js";
+import { contractDexaEventInterpretation } from "./DEXAEventPresentationContraction.js";
 
 export function createBriefingGoalConfidenceBlock(confidence, {
   capturedAt = null,
@@ -343,8 +344,13 @@ export function applyNarrativeV3ToBriefingArtifact({
     const key = publicationType === "dexa"
       ? "dexaEventNarrative" : "photoEventNarrative";
     const event = candidate.briefing[key] ?? {};
+    // Event presentation roles say each conclusion once (see
+    // composeEventPresentation). DEXA uses them; Photo and plans without them
+    // keep the prior mapping.
+    const roles = publicationType === "dexa"
+      ? narrativePlan?.composition?.eventPresentation ?? null : null;
     event.hero = { ...(event.hero ?? {}), title: canonical.summary,
-      body: sections.result ?? canonical.summary };
+      body: roles?.heroBody ?? sections.result ?? canonical.summary };
     event.strategicMeaningV3 = {
       result: sections.result ?? null,
       meaning: sections.meaning ?? null,
@@ -355,7 +361,22 @@ export function applyNarrativeV3ToBriefingArtifact({
       uncertainty: canonical.uncertainty,
       ...(canonical.energy ? { energy: canonical.energy } : {}),
     };
-    if (publicationType === "dexa") {
+    if (roles) {
+      event.coachInsight = {
+        ...(event.coachInsight ?? {}),
+        biggestWin: roles.biggestWin ?? "",
+        protect: roles.protect ?? "",
+        // The bounded next-evidence check is part of Next, so it is not repeated.
+        watch: "",
+        next: roles.next ?? "",
+      };
+      event.presentationRolesV3 = structuredClone(roles);
+      event.interpretation = contractDexaEventInterpretation({
+        interpretation: event.interpretation,
+        interpretationClaims: event.interpretationClaims,
+        roleClaims: roles.claims,
+      });
+    } else if (publicationType === "dexa") {
       event.coachInsight = {
         ...(event.coachInsight ?? {}),
         biggestWin: sections.result ?? canonical.summary,

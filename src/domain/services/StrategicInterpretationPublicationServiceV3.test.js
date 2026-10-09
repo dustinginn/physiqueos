@@ -194,8 +194,14 @@ describe("shared canonical V3 strategic publication", () => {
           .toBe(preview.narrativePlan.composition.coachTake);
       }
       if (publicationType === "dexa") {
-        expect(projected.briefing.dexaEventNarrative.coachInsight.next)
-          .toBe(preview.narrativePlan.composition.coachTake);
+        // DEXA Coach's Insight is served from the V3 event presentation roles,
+        // which say each conclusion once; the canonical coachTake stays in
+        // narrativeV3 (asserted above).
+        const roles = preview.narrativePlan.composition.eventPresentation;
+        expect(projected.briefing.dexaEventNarrative.coachInsight).toMatchObject({
+          biggestWin: roles.biggestWin ?? "", protect: roles.protect ?? "", next: roles.next,
+        });
+        expect(projected.briefing.dexaEventNarrative.hero.body).toBe(roles.heroBody);
       }
       if (publicationType === "photo") {
         expect(projected.briefing.photoEventNarrative.cardContent

@@ -347,6 +347,12 @@ function composeGoalAwareDEXAEventNarrative({
       ? "This result helps us judge the current phase, but one scan is not enough to move into the next one."
       : "Without an active phase to compare against, this scan should not change the plan by itself.";
   const next = nextDecision({ goalAware, leanState, guardrail, phaseCalibration, decisionContext: context?.pi?.decisionContext, futureMilestone: context?.futureMilestone });
+  const leanMassParts = [
+    { claim: "objective_movement", text: `Measured lean tissue ${describeLeanChange(leanDelta)}.` },
+    leanState === "decreased"
+      ? { claim: "lean_decrease_caution", text: "That deserves a closer look, although one scan cannot tell us whether true muscle was lost." }
+      : { claim: "comparable_next_check", text: "Prepare for the next scan the same way so we can see whether the direction holds." },
+  ];
 
   const narrative = {
     eventId,
@@ -403,7 +409,7 @@ function composeGoalAwareDEXAEventNarrative({
       fatLoss: goalAware
         ? guardrailMeaning
         : `Measured fat mass changed ${signed(headline.fatMass.delta)} lb. That change only matters in relation to the goal you are pursuing.`,
-      leanMass: `Measured lean tissue ${describeLeanChange(leanDelta)}. ${leanState === "decreased" ? "That deserves a closer look, although one scan cannot tell us whether true muscle was lost." : "Prepare for the next scan the same way so we can see whether the direction holds."}`,
+      leanMass: leanMassParts.map((part) => part.text).join(" "),
       regional: regionalInterpretation(regionalFat, regionalLean),
       supportingEvidence: supportingText,
       stoodOut: null,
@@ -411,6 +417,22 @@ function composeGoalAwareDEXAEventNarrative({
       goalProgress: goalAware ? primary : null,
       guardrailStatus: goalAware ? guardrailMeaning : null,
       phaseMeaning,
+    },
+    // Which claim each interpretation sentence makes (texts identical to
+    // `interpretation`). goalProgress and guardrailStatus repeat opening and
+    // fatLoss for older readers, so they are declared as aliases.
+    interpretationClaims: {
+      opening: goalAware
+        ? leanMassMeaningParts({ leanState, leanDelta, guardrail, phaseCalibration })
+        : [{ claim: "neutral_meaning", text: primary }],
+      fatLoss: [{ claim: goalAware ? "guardrail_reasoning" : "fat_mass_change", text: null }],
+      leanMass: leanMassParts,
+      regional: [{ claim: "regional", text: null }],
+      phaseMeaning: [{ claim: "phase_meaning", text: null }],
+      supportingEvidence: [{ claim: "supporting_evidence", text: null }],
+      uncertainty: [{ claim: "measurement_uncertainty", text: null }],
+      goalProgress: goalAware ? [{ claim: "alias", of: "opening" }] : [],
+      guardrailStatus: goalAware ? [{ claim: "alias", of: "fatLoss" }] : [],
     },
     coachInsight: {
       biggestWin: goalAware
@@ -465,7 +487,13 @@ function inferSemanticGoalType(goal) {
   return "unknown";
 }
 
-function leanMassMeaning({ leanState, leanDelta, guardrail, phaseCalibration }) {
+function leanMassMeaning(input) {
+  return leanMassMeaningParts(input).map((part) => part.text).join(" ");
+}
+
+// The same sentences as leanMassMeaning, each tagged with the claim it makes,
+// so the V3 presentation can say each conclusion once (interpretationClaims).
+function leanMassMeaningParts({ leanState, leanDelta, guardrail, phaseCalibration }) {
   if (leanState === "increased") {
     const qualification = guardrail.status === "above"
       ? "Lean tissue moved up, but body fat also moved beyond the range you chose."
@@ -474,12 +502,22 @@ function leanMassMeaning({ leanState, leanDelta, guardrail, phaseCalibration }) 
         : guardrail.status === "below"
           ? `Lean tissue moved up while body fat remained below the exact ${guardrail.guardrail.lowerBound}–${guardrail.guardrail.upperBound}% Guardrail you chose.`
           : "Lean tissue moved up, but a canonical body-fat Guardrail is unavailable.";
-    return `Measured lean tissue increased ${format(Math.abs(leanDelta))} lb. ${qualification} That is encouraging, but one scan cannot prove how much of the change is new muscle.`;
+    return [
+      { claim: "objective_movement", text: `Measured lean tissue increased ${format(Math.abs(leanDelta))} lb.` },
+      { claim: "guardrail_status", text: qualification },
+      { claim: "measurement_uncertainty", text: "That is encouraging, but one scan cannot prove how much of the change is new muscle." },
+    ];
   }
   if (leanState === "decreased") {
-    return `Measured lean tissue decreased ${format(Math.abs(leanDelta))} lb. That is not the direction we want, but hydration, glycogen, food, and preparation can all affect one scan. Review training, nutrition, recovery, and the next comparable scan before assuming muscle was lost.`;
+    return [
+      { claim: "objective_movement", text: `Measured lean tissue decreased ${format(Math.abs(leanDelta))} lb.` },
+      { claim: "lean_decrease_caution", text: "That is not the direction we want, but hydration, glycogen, food, and preparation can all affect one scan. Review training, nutrition, recovery, and the next comparable scan before assuming muscle was lost." },
+    ];
   }
-  return `Measured lean tissue was effectively flat at ${signed(leanDelta)} lb. ${phaseCalibration ? "Body fat can still help us judge whether you have reached maintenance, but this scan does not show new muscle yet." : "This scan does not show new muscle yet."}`;
+  return [
+    { claim: "objective_movement", text: `Measured lean tissue was effectively flat at ${signed(leanDelta)} lb.` },
+    { claim: "flat_lean_meaning", text: phaseCalibration ? "Body fat can still help us judge whether you have reached maintenance, but this scan does not show new muscle yet." : "This scan does not show new muscle yet." },
+  ];
 }
 
 function neutralMeaning({ leanState, leanDelta, bodyFatDelta }) {
