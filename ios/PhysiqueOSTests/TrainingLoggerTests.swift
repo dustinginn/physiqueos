@@ -2772,7 +2772,9 @@ final class Build87SupersetHistoryContextTests: XCTestCase {
         draft.exercises[0].sets[0].load = 40
         draft.exercises[0].sets[0].isCompleted = true
         let completed = draft.exercises[0].sets[0]
+        draft.exercises[0].sets[1].load = 70
 
+        XCTAssertTrue(draft.exercises[0].canApplyProgressionSuggestion)
         draft.applyProgressionSuggestion(to: id)
         XCTAssertEqual(draft.exercises[0].sets[0], completed)
         XCTAssertEqual(draft.exercises[0].sets[1].load, 90, "Uncompleted sets take the suggestion.")
@@ -3012,14 +3014,46 @@ final class Build87SupersetHistoryContextTests: XCTestCase {
         let refreshed = try XCTUnwrap(WatchWorkoutProjection.make(draft: paired, authority: authority, now: now))
         XCTAssertEqual(refreshed.rows.first { $0.isCompletionTarget }?.loadText?.contains("80"), true,
                        "Pairing alone already refreshes the Watch through the authority revision.")
-        _ = authority.edit(sessionId: "session-watch-2c") { $0.applyProgressionSuggestion(to: legExtension) }
+        XCTAssertEqual(paired.exercises[0].sets.map(\.reps), [15, 15])
+        XCTAssertEqual(paired.exercises[0].sets.map(\.load), [80, 80])
+        XCTAssertFalse(paired.exercises[0].canApplyProgressionSuggestion,
+                       "Contextual refill already matches the recommendation, so applying it is a no-op.")
+        XCTAssertEqual(
+            authority.edit(sessionId: "session-watch-2c") { $0.applyProgressionSuggestion(to: legExtension) },
+            .unchanged(revision: paired.currentRevision)
+        )
+        XCTAssertEqual(authority.draft(id: "session-watch-2c"), paired,
+                       "A matching suggestion changes neither choice, rows, nor revision.")
+
+        let firstSet = paired.exercises[0].sets[0].id
+        XCTAssertEqual(
+            authority.setValue(
+                sessionId: "session-watch-2c", exerciseId: legExtension, setId: firstSet,
+                field: .load, value: 75
+            ),
+            .applied(revision: paired.currentRevision + 1)
+        )
+        let actionable = try XCTUnwrap(authority.draft(id: "session-watch-2c"))
+        XCTAssertEqual(actionable.exercises[0].sets.map(\.reps), [15, 15])
+        XCTAssertEqual(actionable.exercises[0].sets.map(\.load), [75, 80])
+        XCTAssertTrue(actionable.exercises[0].canApplyProgressionSuggestion)
+
+        XCTAssertEqual(
+            authority.edit(sessionId: "session-watch-2c") { $0.applyProgressionSuggestion(to: legExtension) },
+            .applied(revision: actionable.currentRevision + 1)
+        )
         let applied = try XCTUnwrap(authority.draft(id: "session-watch-2c"))
         XCTAssertEqual(applied.exercises[0].progressionChoice, .suggestion)
+        XCTAssertEqual(applied.exercises[0].sets.map(\.reps), [15, 15])
+        XCTAssertEqual(applied.exercises[0].sets.map(\.load), [80, 80])
+        XCTAssertEqual(applied.exercises[0].sets[1], actionable.exercises[0].sets[1],
+                       "Only the differing editable row is rewritten.")
+        XCTAssertFalse(applied.exercises[0].canApplyProgressionSuggestion)
         let projection = try XCTUnwrap(WatchWorkoutProjection.make(draft: applied, authority: authority, now: now))
         let target = try XCTUnwrap(projection.rows.first { $0.isCompletionTarget })
         XCTAssertEqual(target.repsText, "15")
         XCTAssertEqual(target.loadText?.contains("80"), true)
-        XCTAssertGreaterThan(applied.currentRevision, paired.currentRevision)
+        XCTAssertEqual(applied.currentRevision, actionable.currentRevision + 1)
     }
 }
 
