@@ -1,11 +1,25 @@
 import { createHash } from "node:crypto";
 
 export function createFounderRuntimeSemanticDigest(value) {
-  return createHash("sha256")
-    .update(stableSerialize(value))
-    .digest("hex")
-    .toUpperCase();
+  const hash = createHash("sha256");
+  if (!isComposite(value)) return hash.update(stableSerialize(value)).digest("hex").toUpperCase();
+  // Hash the stable serialization in pieces rather than as one string. A
+  // whole-store digest otherwise materializes the entire runtime as a single
+  // string (about 200 MB of transient heap at production size), which is what
+  // kept the DEXA Event publication near the worker's heap limit.
+  let pending = "";
+  writeStableSerialization(value, (text) => {
+    pending += text;
+    if (pending.length >= DIGEST_CHUNK_LENGTH) {
+      hash.update(pending);
+      pending = "";
+    }
+  });
+  if (pending) hash.update(pending);
+  return hash.digest("hex").toUpperCase();
 }
+
+const DIGEST_CHUNK_LENGTH = 64 * 1024;
 
 const PROGRESS_PHOTOS_EXECUTION_ID = "execution_progress_photos";
 const PROGRESS_PHOTOS_REMINDER_ID = "reminder_weekly_progress_photo_set";
@@ -256,4 +270,39 @@ function stableSerialize(value) {
       `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function isComposite(value) {
+  return Array.isArray(value) || Boolean(value && typeof value === "object");
+}
+
+// Writes exactly the text stableSerialize returns for a composite value, token
+// by token. Pieces never split a token, so the UTF-8 bytes hashed are the same.
+function writeStableSerialization(value, write) {
+  if (Array.isArray(value)) {
+    write("[");
+    for (let index = 0; index < value.length; index += 1) {
+      if (index > 0) write(",");
+      const item = value[index];
+      if (isComposite(item)) writeStableSerialization(item, write);
+      else {
+        // Array#join renders an undefined serialization (and a hole) as "".
+        const text = JSON.stringify(item);
+        if (text !== undefined) write(text);
+      }
+    }
+    write("]");
+    return;
+  }
+  write("{");
+  const keys = Object.keys(value).sort();
+  for (let index = 0; index < keys.length; index += 1) {
+    if (index > 0) write(",");
+    write(`${JSON.stringify(keys[index])}:`);
+    const item = value[keys[index]];
+    // A template literal renders an undefined serialization as "undefined".
+    if (isComposite(item)) writeStableSerialization(item, write);
+    else write(`${JSON.stringify(item)}`);
+  }
+  write("}");
 }
