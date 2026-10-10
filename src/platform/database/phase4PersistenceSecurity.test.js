@@ -33,6 +33,27 @@ describe("Phase 4 persistence ownership boundary", () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
+  it("performs bounded multi-record and multi-collection reads with owner scope", async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{ payload: { id: "b" }, version: "2" }] })
+      .mockResolvedValueOnce({ rows: [
+        { collection_name: "goals", payload: { id: "goal" }, version: "3" },
+        { collection_name: "user", payload: { id: "owner-a" }, version: "1" },
+      ] });
+    const records = createPhase4CanonicalRecordStore({ query });
+    await expect(records.getMany({
+      ownerUserId: "owner-a", collection: "weightEntries", recordIds: ["b", "b", ""],
+    })).resolves.toEqual([{ id: "b", version: 2 }]);
+    expect(query.mock.calls[0][0]).toContain("owner_user_id=$1 AND collection_name=$2 AND record_id=ANY($3::text[])");
+    expect(query.mock.calls[0][1]).toEqual(["owner-a", "weightEntries", ["b"]]);
+
+    await expect(records.listMany({ ownerUserId: "owner-a", collections: ["user", "goals", "user"] }))
+      .resolves.toEqual({ user: [{ id: "owner-a", version: 1 }], goals: [{ id: "goal", version: 3 }] });
+    expect(query.mock.calls[1][0]).toContain("UNION ALL");
+    expect(query.mock.calls[1][0]).toContain("owner_user_id=$1");
+    expect(query.mock.calls[1][1][0]).toBe("owner-a");
+  });
+
   it("rejects unknown collections before constructing SQL", () => {
     const records = createPhase4CanonicalRecordStore({ query: vi.fn() });
     expect(() => records.get({ ownerUserId: "owner", collection: "futureUnknown", recordId: "id" })).rejects.toThrow("Unsupported required canonical collection");

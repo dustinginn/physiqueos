@@ -31,6 +31,7 @@ export async function createPhase4PostgresApplicationComposition({
   compatibilityMode = true,
   requireCompatibilityAuthority = false,
   readDiagnostics = null,
+  commandDiagnostics = null,
   providerReadScope = null,
 } = {}) {
   if (!pool?.query || !pool?.connect) throw new Error("Phase 4 composition requires a PostgreSQL pool.");
@@ -61,7 +62,7 @@ export async function createPhase4PostgresApplicationComposition({
     readResourceVersion: ({ data }) => String(data?.version ?? readScope.currentRuntime()?.revision ?? runtime.revision ?? "1"),
     runInReadScope: (callback, metadata) => readScope.run(callback, metadata),
   });
-  const transactionRunner = createPhase4TransactionRunner({ pool });
+  const transactionRunner = createPhase4TransactionRunner({ pool, onComplete: commandDiagnostics });
   const ports = createTransactionBoundPorts({ now, authorityStore, migrationOperationId, compatibilityMode, requireCompatibilityAuthority });
   const commands = createPhase3CommandService({ transactionRunner, ports, writeFence });
   const media = objectRoot && issueAccessHandle
@@ -118,9 +119,10 @@ export function addFounderNoncanonicalReadContext(canonicalRuntime, ownerUserId)
   return canonicalRuntime;
 }
 
-export function createPhase4TransactionRunner({ pool }) {
+export function createPhase4TransactionRunner({ pool, onComplete = null }) {
   return createPostgresTransactionRunner({
     pool,
+    onComplete,
     createContext(base) {
       const foundation = createFoundationPostgresAdapters({ query: base.query });
       return Object.freeze({
@@ -141,7 +143,11 @@ export function createTransactionBoundPorts({ now, authorityStore, migrationOper
       // Same owner lock/order as Web runtime mutations. It serializes
       // composite plan dependencies with every canonical Native command,
       // while record-specific expected versions remain unchanged.
+      const lockStartedAt = performance.now();
       await context.transaction.client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`physiqueos:${context.ownerUserId}`]);
+      if (context.transaction.diagnostics) {
+        context.transaction.diagnostics.stages.advisoryLockMs = Math.round((performance.now() - lockStartedAt) * 10) / 10;
+      }
       if (compatibilityMode) {
         const result = await context.transaction.client.query("SELECT current_database() AS database");
         const databaseName = String(result.rows[0]?.database ?? "");

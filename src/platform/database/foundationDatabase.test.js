@@ -73,6 +73,30 @@ describe("PostgreSQL foundation", () => {
     expect(client.release).toHaveBeenCalledTimes(2);
   });
 
+  it("reports privacy-safe transaction stages without changing transaction behavior", async () => {
+    const client = { query: vi.fn(async () => ({ rows: [] })), release: vi.fn() };
+    const complete = vi.fn(() => { throw new Error("diagnostics sink unavailable"); });
+    let time = 0;
+    const runner = createPostgresTransactionRunner({
+      pool: { connect: vi.fn(async () => client) },
+      clock: () => ++time,
+      onComplete: complete,
+    });
+    await expect(runner.run(async (transaction) => {
+      transaction.diagnostics.stages.domain = { count: 2 };
+      await transaction.query("SELECT 1", []);
+      return "ok";
+    }, { operation: "phase3-command:ingest-healthkit-observations" })).resolves.toBe("ok");
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({
+      operation: "phase3-command:ingest-healthkit-observations",
+      outcome: "committed",
+      queryCount: 1,
+      stages: { domain: { count: 2 } },
+    }));
+    expect(complete.mock.calls[0][0]).not.toHaveProperty("values");
+    expect(client.query.mock.calls.map(([sql]) => sql)).toEqual(["BEGIN", "SELECT 1", "COMMIT"]);
+  });
+
   it("enforces optimistic versions without numeric precision loss", () => {
     expect(assertExpectedVersion({ expectedVersion: "9007199254740993", actualVersion: 9007199254740993n })).toBe("9007199254740993");
     expect(nextAggregateVersion("9007199254740993")).toBe("9007199254740994");

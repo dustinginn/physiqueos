@@ -467,9 +467,11 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
   }
 
   async function ingestHealthKitObservations(context) {
+    const ingestStartedAt = performance.now();
     if (typeof records.putIfAbsent !== "function") {
       throw new Error("HealthKit ingestion requires atomic create-if-absent record storage.");
     }
+    const normalizationStartedAt = performance.now();
     let batch;
     try {
       batch = normalizeHealthKitObservationBatch({
@@ -486,32 +488,65 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         error.field ? [{ field: error.field, code: "invalid", detail: error.message }] : []
       );
     }
-    const [existingObservations, canonicalObjects, canonicalObjectStorageMetadata, activationPolicyRecord, existingCanonicalDays] = await Promise.all([
-      records.list({ ownerUserId: context.ownerUserId, collection: "healthKitObservations" }),
+    const stageDurations = { normalizationMs: roundedDuration(normalizationStartedAt) };
+    const initialLoadStartedAt = performance.now();
+    const [canonicalObjects, canonicalObjectStorageMetadata, configurationRows, relationshipRows] = await Promise.all([
       records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
       records.listStorageMetadata({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
-      records.get({
+      records.getMany({
         ownerUserId: context.ownerUserId,
         collection: "healthKitConfiguration",
-        recordId: HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
+        recordIds: [
+          HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID,
+          HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
+          HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+        ],
       }),
-      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_CANONICAL_DAY_COLLECTION }),
-    ]);
-    const [workoutPolicyRecord, existingCanonicalWorkouts, existingWorkoutLinks, existingWorkoutLinkClaims, trustedWatchCorrelationPolicyRecord] = await Promise.all([
-      records.get({
+      records.listMany({
         ownerUserId: context.ownerUserId,
-        collection: "healthKitConfiguration",
-        recordId: HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
-      }),
-      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_CANONICAL_WORKOUT_COLLECTION }),
-      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_COLLECTION }),
-      records.list({ ownerUserId: context.ownerUserId, collection: HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION }),
-      records.get({
-        ownerUserId: context.ownerUserId,
-        collection: "healthKitConfiguration",
-        recordId: HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID,
+        collections: [
+          HEALTHKIT_CANONICAL_WORKOUT_COLLECTION,
+          HEALTHKIT_WORKOUT_LINK_COLLECTION,
+          HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION,
+        ],
       }),
     ]);
+    const configurationById = new Map(configurationRows.map((record) => [record.id, record]));
+    const activationPolicyRecord = configurationById.get(HEALTHKIT_CANONICAL_ACTIVATION_POLICY_RECORD_ID) ?? null;
+    const workoutPolicyRecord = configurationById.get(HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID) ?? null;
+    const trustedWatchCorrelationPolicyRecord = configurationById.get(HEALTHKIT_TRUSTED_WATCH_CORRELATION_POLICY_RECORD_ID) ?? null;
+    const existingCanonicalWorkouts = relationshipRows[HEALTHKIT_CANONICAL_WORKOUT_COLLECTION];
+    const existingWorkoutLinks = relationshipRows[HEALTHKIT_WORKOUT_LINK_COLLECTION];
+    const existingWorkoutLinkClaims = relationshipRows[HEALTHKIT_WORKOUT_LINK_CLAIM_COLLECTION];
+    const observationIds = new Set(batch.observations.map((observation) => observation.id));
+    existingCanonicalWorkouts.forEach((workout) => {
+      if (workout.current?.sourceObservationId) observationIds.add(workout.current.sourceObservationId);
+    });
+    const canonicalDayIds = batch.observations.map((observation) => {
+      const domain = healthKitDailySnapshotDomain(observation.observationType);
+      return domain ? getHealthKitCanonicalDayRecordId(domain, observation.occurrence.localDate) : null;
+    }).filter(Boolean);
+    const [existingObservations, existingCanonicalDays] = await Promise.all([
+      records.getMany({
+        ownerUserId: context.ownerUserId,
+        collection: "healthKitObservations",
+        recordIds: [...observationIds],
+      }),
+      records.getMany({
+        ownerUserId: context.ownerUserId,
+        collection: HEALTHKIT_CANONICAL_DAY_COLLECTION,
+        recordIds: canonicalDayIds,
+      }),
+    ]);
+    stageDurations.initialLoadMs = roundedDuration(initialLoadStartedAt);
+    let collisionObservations = null;
+    const loadCollisionObservations = async () => {
+      collisionObservations ??= await records.list({
+        ownerUserId: context.ownerUserId,
+        collection: "healthKitObservations",
+      });
+      return collisionObservations;
+    };
     const trustedWatchCorrelationPolicy = resolveHealthKitTrustedWatchWorkoutCorrelationPolicy(trustedWatchCorrelationPolicyRecord);
     const workoutPolicy = resolveHealthKitWorkoutActivationPolicy(workoutPolicyRecord);
     const workoutActivationSnapshot = workoutPolicy.enabled
@@ -610,6 +645,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       return Object.freeze({ outcome: confirmed.outcome, link: linked });
     };
     const results = [];
+    const observationLoopStartedAt = performance.now();
     for (const observation of batch.observations) {
       const existing = existingById.get(observation.id);
       if (existing && (existing.ingestionPurpose ?? "operational") !== observation.ingestionPurpose) {
@@ -624,7 +660,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           results.push(ignoredWorkoutReplayResult(existing));
           continue;
         }
-        throw healthKitObservationIdentityCollisionProblem(observation, existingObservations);
+        throw healthKitObservationIdentityCollisionProblem(observation, await loadCollisionObservations());
       }
       const dailySnapshotDomain = healthKitDailySnapshotDomain(observation.observationType);
       let reconciliation;
@@ -778,7 +814,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
           );
         }
         throw healthKitObservationIdentityCollisionProblem(observation, [
-          ...existingObservations,
+          ...await loadCollisionObservations(),
           ...(stored ? [stored] : []),
         ]);
       }
@@ -1013,6 +1049,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         ...(canonicalWorkoutOutcome ? { canonicalWorkout: canonicalWorkoutOutcome } : {}),
       });
     }
+    stageDurations.observationLoopMs = roundedDuration(observationLoopStartedAt);
     // Relationship reassessment. Read-mostly and idempotent: it only runs while
     // the separate Workout policy is enabled, only for canonical workouts inside
     // its exact window, and it never touches the Logger session or Evidence.
@@ -1030,6 +1067,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     // running this reassessment unconditionally closes that gap; it stays
     // cheap and side-effect-free when nothing has actually changed.
     let workoutRelationships = { assessed: 0, updated: 0, candidateLinksCreated: 0, candidateLinksReleased: 0 };
+    const relationshipStartedAt = performance.now();
     if (workoutPolicy.enabled) {
       workoutRelationships = await reassessWorkoutRelationships({
         context,
@@ -1044,6 +1082,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         workoutLinkClaims,
       });
     }
+    stageDurations.relationshipReassessmentMs = roundedDuration(relationshipStartedAt);
     workoutRelationships = {
       ...workoutRelationships,
       automaticallyConfirmed: (workoutRelationships.automaticallyConfirmed ?? 0) + trustedExactConfirmedCount,
@@ -1051,6 +1090,18 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     const canonicalizedBy = (domain) => results.filter((item) =>
       item.reconciliation?.state === DAILY_SNAPSHOT_STATES[domain].canonicalized
     ).length;
+    stageDurations.totalPortMs = roundedDuration(ingestStartedAt);
+    if (context.transaction?.diagnostics) {
+      context.transaction.diagnostics.stages.healthKitIngest = Object.freeze({
+        ...stageDurations,
+        batchObservationCount: batch.observations.length,
+        loadedObservationCount: existingObservations.length,
+        loadedCanonicalDayCount: existingCanonicalDays.length,
+        canonicalEvidenceCount: canonicalObjects.length,
+        canonicalWorkoutCount: existingCanonicalWorkouts.length,
+        relationshipAssessmentCount: workoutRelationships.assessed ?? 0,
+      });
+    }
     return {
       status: "committed",
       result: {

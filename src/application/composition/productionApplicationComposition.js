@@ -702,6 +702,9 @@ async function createPostgresComposition({ controlStore, env, providerFullRuntim
     readDiagnostics: env.PHYSIQUEOS_PROVIDER_READ_DIAGNOSTICS === "1"
       ? (event) => console.info("provider.canonical_read_scope.complete", event)
       : null,
+    commandDiagnostics: env.PHYSIQUEOS_PROVIDER_COMMAND_DIAGNOSTICS === "1"
+      ? (event) => console.info("provider.phase3_command.complete", event)
+      : null,
     providerReadScope: runtime.readScope,
   });
   return Object.freeze({

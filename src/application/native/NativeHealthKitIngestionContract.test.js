@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createPairedCalibrationFixtures } from "../../fixtures/confidenceNarrativeV3CalibrationFixtures.js";
 import {
   createCanonicalEvidenceObservationsV3,
@@ -76,6 +76,48 @@ describe("Native HealthKit V1 ingestion contract", () => {
     expect([first.result.createdCount, second.result.createdCount].sort()).toEqual([0, 1]);
     expect(records.snapshot().healthKitObservations).toHaveLength(1);
     expect(records.snapshot().canonicalEvidenceObjects).toEqual([]);
+  });
+
+  it("keeps larger-account source loading bounded to the incoming batch", async () => {
+    const historicalObservations = Array.from({ length: 1_200 }, (_, index) => ({
+      id: `healthkit-historical-${String(index).padStart(4, "0")}`,
+      observationType: "quantity_sample",
+      version: 1,
+    }));
+    const backing = recordStore([], { healthKitObservations: historicalObservations });
+    const calls = [];
+    const records = {
+      ...backing,
+      async list(args) {
+        calls.push({ method: "list", ...args });
+        return backing.list(args);
+      },
+      async getMany(args) {
+        calls.push({ method: "getMany", ...args });
+        return backing.getMany(args);
+      },
+    };
+    const diagnostics = { stages: {} };
+    const ports = createCanonicalPersistenceCommandPorts({ records });
+    const result = await ports.ingestHealthKitObservations({
+      ...context("delivery-bounded", {
+        batchId: "healthkit-bounded-batch",
+        observations: [activitySummary()],
+      }),
+      transaction: { diagnostics },
+    });
+
+    expect(result.result).toMatchObject({ createdCount: 1, activityDayCanonicalizedCount: 1 });
+    expect(calls.filter((call) => call.method === "list" && call.collection === "healthKitObservations")).toEqual([]);
+    const observationRead = calls.find((call) => call.method === "getMany" && call.collection === "healthKitObservations");
+    expect(observationRead.recordIds).toHaveLength(1);
+    expect(backing.snapshot().healthKitObservations).toHaveLength(1_201);
+    expect(diagnostics.stages.healthKitIngest).toMatchObject({
+      batchObservationCount: 1,
+      loadedObservationCount: 0,
+      loadedCanonicalDayCount: 0,
+      canonicalWorkoutCount: 0,
+    });
   });
 
   it("stores source observations separately and never adds workout calories to the daily total", async () => {
@@ -487,11 +529,11 @@ function detailedSession(canonicalId = "training-session-one") {
   };
 }
 
-function recordStore(canonicalEvidenceObjects = []) {
+function recordStore(canonicalEvidenceObjects = [], overrides = {}) {
   return createInMemoryCanonicalRecordStore({
     user: [{ id: OWNER, timeZone: "America/Los_Angeles", version: 1 }],
     goals: [],
-    healthKitObservations: [],
+    healthKitObservations: overrides.healthKitObservations ?? [],
     healthKitCanonicalDays: [],
     healthKitConfiguration: [{
       id: "healthkit_canonical_daily_activation_policy",

@@ -43,7 +43,7 @@ export async function executeIdempotentCommand({ transactionRunner, principal, m
       operationId: outcome?.operationId ?? null,
     });
     return Object.freeze({ outcome: "committed", receipt });
-  });
+  }, { operation: `phase3-command:${commandType}` });
 }
 
 function replayReceipt(receipt, payloadHash) {

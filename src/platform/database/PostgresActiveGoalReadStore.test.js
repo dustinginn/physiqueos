@@ -12,11 +12,15 @@ describe("PostgresActiveGoalReadStore", () => {
     });
     const result = await store.load();
     expect(result).toMatchObject({ goal: null, protocols: [], canonicalEvidence: [] });
-    expect(query).toHaveBeenCalledTimes(10);
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(query.mock.calls.some(([sql, values]) =>
+      sql.includes("UNION ALL")
+      && values.some((value) => Array.isArray(value) && value.includes("goalConfidenceHistory"))
+    )).toBe(true);
     expect(query.mock.calls.some(([sql]) => sql.includes("canonicalEvidenceObjects") && sql.includes("evidence_type"))).toBe(true);
     expect(complete).toHaveBeenCalledWith(expect.objectContaining({
       readModel: "goals.active.build-lean-mass",
-      queryCount: 10,
+      queryCount: 3,
       compatibilityRuntimeLoadCount: 0,
     }));
   });

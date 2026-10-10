@@ -43,8 +43,6 @@ export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplet
       return result;
     },
   });
-  const list = (collection) => records.list({ ownerUserId, collection });
-
   return Object.freeze({
     async load() {
       queryCount = 0;
@@ -52,21 +50,21 @@ export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplet
       payloadBytes = 0;
       const startedAt = performance.now();
       try {
-        const goals = await list("goals");
+        const collectionRows = await records.listMany({
+          ownerUserId,
+          collections: [
+            "goals", "user", "dexaScans", "protocols", "phaseStrategies", "weightEntries",
+            "goalConfidenceSnapshots", "goalConfidenceHistory",
+          ],
+        });
+        const goals = collectionRows.goals;
         // The record store query is already owner-bound; legacy payloads need not
         // duplicate ownerUserId inside the JSON document.
         const goal = selectCanonicalActiveGoal(goals);
         const activePhaseStart = goal
           ? resolveCanonicalGoalPhaseChronology(goal).currentPhase?.startDate ?? "0001-01-01"
           : "0001-01-01";
-        const [users, dexaScans, protocols, phaseStrategies, weightEntries, goalConfidenceSnapshots, goalConfidenceHistory, evidenceRows, briefingRows] = await Promise.all([
-          list("user"),
-          list("dexaScans"),
-          list("protocols"),
-          list("phaseStrategies"),
-          list("weightEntries"),
-          list("goalConfidenceSnapshots"),
-          list("goalConfidenceHistory"),
+        const [evidenceRows, briefingRows] = await Promise.all([
           pool.query(
             `SELECT payload,version FROM physiqueos.canonical_evidence_records
               WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
@@ -77,6 +75,13 @@ export function createPostgresActiveGoalReadStore({ pool, ownerUserId, onComplet
           ),
           pool.query(LATEST_V3_BRIEFING_CANDIDATES_SQL, [ownerUserId]),
         ]);
+        const users = collectionRows.user;
+        const dexaScans = collectionRows.dexaScans;
+        const protocols = collectionRows.protocols;
+        const phaseStrategies = collectionRows.phaseStrategies;
+        const weightEntries = collectionRows.weightEntries;
+        const goalConfidenceSnapshots = collectionRows.goalConfidenceSnapshots;
+        const goalConfidenceHistory = collectionRows.goalConfidenceHistory;
         const selectedBriefing = selectLatestPublishedV3Briefing(briefingRows.rows.map((row) => ({
           ...row, id: row.id ?? row.record_id, briefing: {},
           preview: row.preview === true, lifecycle: row.lifecycle ?? null,

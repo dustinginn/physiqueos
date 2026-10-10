@@ -63,8 +63,12 @@ function queryFixture() {
       }], rowCount: 1 };
     }
     if (sql.includes("canonical_checkin_records") &&
-        (values[1] === "weightEntries" || sql.includes("collection_name='weightEntries'"))) {
-      return { rows, rowCount: rows.length };
+        (values[1] === "weightEntries" || sql.includes("collection_name='weightEntries'") ||
+          values.some((value) => Array.isArray(value) && value.includes("weightEntries")))) {
+      const projected = sql.includes("collection_name,payload,version")
+        ? rows.map((item) => ({ ...item, collection_name: "weightEntries" }))
+        : rows;
+      return { rows: projected, rowCount: projected.length };
     }
     return { rows: [], rowCount: 0 };
   });

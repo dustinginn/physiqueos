@@ -49,6 +49,45 @@ export function createPhase4CanonicalRecordStore({ query }) {
       );
       return result.rows.map(mapRecord);
     },
+    async getMany({ ownerUserId, collection, recordIds }) {
+      const table = assertKnownPhase4Collection(collection);
+      const ids = uniqueRecordIds(recordIds);
+      if (ids.length === 0) return [];
+      const result = await query(
+        `SELECT payload,version FROM physiqueos.${table}
+         WHERE owner_user_id=$1 AND collection_name=$2 AND record_id=ANY($3::text[])
+         ORDER BY record_id`,
+        [ownerUserId, collection, ids]
+      );
+      return result.rows.map(mapRecord);
+    },
+    async listMany({ ownerUserId, collections, sourceOrder = false }) {
+      const names = uniqueCollectionNames(collections);
+      if (names.length === 0) return Object.freeze({});
+      const grouped = new Map();
+      for (const collection of names) {
+        const table = assertKnownPhase4Collection(collection);
+        if (!grouped.has(table)) grouped.set(table, []);
+        grouped.get(table).push(collection);
+      }
+      const values = [ownerUserId];
+      const selections = [...grouped].map(([table, tableCollections], index) => {
+        values.push(tableCollections);
+        return `SELECT collection_name,payload,version,source_ordinal,record_id
+          FROM physiqueos.${table}
+          WHERE owner_user_id=$1 AND collection_name=ANY($${index + 2}::text[])`;
+      });
+      const result = await query(
+        `SELECT collection_name,payload,version FROM (${selections.join(" UNION ALL ")}) AS canonical_records
+         ORDER BY collection_name,${sourceOrder ? "source_ordinal,record_id" : "record_id"}`,
+        values
+      );
+      const output = Object.fromEntries(names.map((name) => [name, []]));
+      for (const row of result.rows) output[row.collection_name].push(mapRecord(row));
+      return Object.freeze(Object.fromEntries(
+        Object.entries(output).map(([name, records]) => [name, Object.freeze(records)])
+      ));
+    },
     // Scoped read over the (owner_user_id, collection_name, occurrence_date,
     // observed_at) index. Inclusive YYYY-MM-DD bounds; rows without an
     // occurrence date are never returned.
@@ -148,6 +187,14 @@ export function createPhase4CanonicalRecordStore({ query }) {
   });
 }
 
+function uniqueRecordIds(values) {
+  return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
+}
+
+function uniqueCollectionNames(values) {
+  return [...new Set((values ?? []).map((value) => String(value ?? "").trim()).filter(Boolean))];
+}
+
 export function createInMemoryCanonicalRecordStore(collections, {
   runtimeMetadata = { revision: 1, version: 1, lastCommandId: null, updatedAt: null },
   storageMetadata = {},
@@ -180,6 +227,16 @@ export function createInMemoryCanonicalRecordStore(collections, {
     },
     async get({ collection, recordId }) { return clone(maps.get(collection)?.get(recordId)); },
     async list({ collection }) { return [...(maps.get(collection)?.values() ?? [])].map(clone); },
+    async getMany({ collection, recordIds }) {
+      const collectionMap = maps.get(collection);
+      return uniqueRecordIds(recordIds).map((recordId) => collectionMap?.get(recordId)).filter(Boolean).map(clone);
+    },
+    async listMany({ collections: names }) {
+      return Object.freeze(Object.fromEntries(uniqueCollectionNames(names).map((collection) => [
+        collection,
+        Object.freeze([...(maps.get(collection)?.values() ?? [])].map(clone)),
+      ])));
+    },
     async listByOccurrenceDateRange({ collection, startDate, endDate }) {
       const start = calendarDate(startDate);
       const end = calendarDate(endDate);
