@@ -69,6 +69,12 @@ const SLEEP_ALLOWED = new Set([
   "domain/services/RecoveryBriefingSleepInputProjectionV1.js",
   "platform/database/RecoverySleepInputReaderV1.js",
   "testSupport/recoverySleepSynthetic.js",
+  // Recovery publication operations (guarded, owner-scoped): the authority
+  // runner reads the Sleep policy records only to validate the authority's
+  // dates (it writes only the Recovery authority record), and the zero-write
+  // preview runs the deployed Recovery projection above through its reader.
+  "platform/operations/RecoveryPublicationAuthorityRunner.js",
+  "platform/operations/RecoveryPublicationPreview.js",
 ]);
 const STRATEGIC_DIRECTORIES = ["domain/intelligence", "app/briefings", "app/confidence", "application/core", "application/progress", "application/read-models"];
 
