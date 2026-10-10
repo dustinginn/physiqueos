@@ -345,6 +345,9 @@ final class AppEnvironment {
     /// Phase C Founder-only historical Sleep validation (nil in tests with a mock query client).
     let healthKitSleepHistoricalValidationRunner: HealthKitSleepHistoricalValidationRunner?
     let healthKitSleepHistoricalEvidenceRunner: HealthKitSleepHistoricalEvidenceRunner?
+    /// Founder-only, explicit, local and value-free coverage preview. It
+    /// never owns an authorization request, upload, or canonical write path.
+    let healthKitHistoricalCutPreviewRunner: HealthKitHistoricalCutPreviewRunner?
     /// Founder Production diagnostic screen: manual foreground sync and
     /// acceptance-audit tooling. It shares the one authorization request
     /// lane while retaining its separate query/upload capability shell and
@@ -829,6 +832,18 @@ final class AppEnvironment {
         } else {
             self.healthKitSleepHistoricalValidationRunner = nil
             self.healthKitSleepHistoricalEvidenceRunner = nil
+        }
+        if let previewReader = healthKitQueryClient as? any HealthKitHistoricalPreviewReading {
+            self.healthKitHistoricalCutPreviewRunner = HealthKitHistoricalCutPreviewRunner(
+                authorization: sharedHealthKitAuthorization,
+                reader: previewReader,
+                canonical: ProductionHealthKitHistoricalPreviewCanonicalCoverageReader(
+                    nutrition: ProductionNutritionAPI(api: productionNativeAPI),
+                    activity: ProductionActivityAPI(api: productionNativeAPI)
+                )
+            )
+        } else {
+            self.healthKitHistoricalCutPreviewRunner = nil
         }
         // Dormant Sleep lane: inert unless the Server manifest enables it.
         let sleepManifestSender: HealthKitSleepWindowManifestSender?

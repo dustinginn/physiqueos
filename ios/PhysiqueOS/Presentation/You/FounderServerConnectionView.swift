@@ -431,6 +431,8 @@ private struct ProductionFounderConnectionView: View {
                 }
 
                 if isConnected {
+                    HealthKitHistoricalCutPreviewSection()
+
                     // Graduated capabilities (Activity, Nutrition, Workouts,
                     // Strength reconciliation, notifications) run
                     // automatically and have no controls here. Only the

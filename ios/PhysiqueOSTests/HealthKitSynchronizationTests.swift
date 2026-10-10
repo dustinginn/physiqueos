@@ -1811,6 +1811,139 @@ final class HealthKitSynchronizationTests: XCTestCase {
             utcOffsetSeconds: -28_800, localDayStartedAt: now, localDayEndedAt: now.addingTimeInterval(86_400)
         )
     }
+
+    func testHistoricalPreviewUsesTwentyOneCancelableSevenDayChunks() async {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let chunks = HealthKitHistoricalCutPreviewRunner.bounds(
+            start: "2026-05-21", end: "2026-10-10", calendar: calendar
+        )
+
+        XCTAssertEqual(chunks?.count, 21)
+        XCTAssertEqual(chunks?.first?.startLocalDate, "2026-05-21")
+        XCTAssertEqual(chunks?.last?.endLocalDate, "2026-10-10")
+        XCTAssertTrue(chunks?.allSatisfy {
+            calendar.dateComponents([.day], from: $0.startDateInclusive, to: $0.endDateExclusive).day ?? 0 <= 7
+        } ?? false)
+
+        let reader = HistoricalPreviewReader(delay: .milliseconds(200))
+        let runner = HealthKitHistoricalCutPreviewRunner(
+            authorization: HistoricalPreviewAuthorization(.available),
+            reader: reader,
+            canonical: HistoricalPreviewCanonical(.init(nutritionDates: [], activityDates: [])),
+            calendar: calendar
+        )
+        let task = Task { await runner.run() }
+        try? await Task.sleep(for: .milliseconds(20))
+        task.cancel()
+        let result = await task.value
+        let readerCalls = await reader.callCount()
+        XCTAssertTrue(result.cancelled)
+        XCTAssertLessThanOrEqual(readerCalls, 1)
+    }
+
+    func testHistoricalPreviewNeverQueriesWhenExistingAuthorizationIsIncomplete() async {
+        let reader = HistoricalPreviewReader()
+        let canonical = HistoricalPreviewCanonical(.init(nutritionDates: [], activityDates: []))
+        let runner = HealthKitHistoricalCutPreviewRunner(
+            authorization: HistoricalPreviewAuthorization(.authorizationRequestRequired),
+            reader: reader,
+            canonical: canonical
+        )
+
+        let result = await runner.run()
+        let readerCalls = await reader.callCount()
+        let canonicalCalls = await canonical.callCount()
+
+        XCTAssertEqual(result.failureCode, "healthkit_historical_preview_authorization_required")
+        XCTAssertEqual(readerCalls, 0)
+        XCTAssertEqual(canonicalCalls, 0)
+    }
+
+    func testHistoricalPreviewReconciliationIsConservativeAndSourceSeparated() {
+        func row(
+            _ domain: HealthKitReadDomain, _ metric: String, _ source: String, _ dates: Set<String>
+        ) -> HealthKitHistoricalPreviewSourceCoverage {
+            .init(
+                domain: domain, metric: metric, sourceBundleIdentifier: source,
+                sourceName: source, sampleCount: dates.count, localDates: dates
+            )
+        }
+        let nutritionDates: Set<String> = ["2026-05-24", "2026-05-25", "2026-05-26"]
+        var summary = HealthKitHistoricalCutPreviewSummary()
+        summary.coverage = [
+            row(.nutrition, "energy", "com.apple.Health", nutritionDates),
+            row(.nutrition, "protein", "com.apple.Health", nutritionDates),
+            row(.nutrition, "carbohydrates", "com.apple.Health", nutritionDates),
+            row(.nutrition, "fat", "com.apple.Health", nutritionDates),
+            row(.nutrition, "energy", "com.example.food", ["2026-05-26"]),
+            row(.activity, "activity_summary", "com.apple.Health", ["2026-05-24", "2026-05-25"]),
+            row(.workouts, "workouts", "com.apple.Health", ["2026-05-24", "2026-05-26"]),
+        ]
+
+        HealthKitHistoricalCutPreviewRunner.reconcile(
+            &summary,
+            canonical: .init(nutritionDates: ["2026-05-24"], activityDates: ["2026-05-24"])
+        )
+
+        XCTAssertEqual(summary.recoverableNutritionDays, 1)
+        XCTAssertEqual(summary.recoverableActivityDays, 1)
+        XCTAssertEqual(summary.cutRecoverableNutritionDays, 1)
+        XCTAssertEqual(summary.cutRecoverableActivityDays, 1)
+        XCTAssertEqual(summary.nutritionDaysRequiringSourceReview, 1)
+        XCTAssertEqual(summary.workoutDaysFound, 2)
+    }
+
+    func testHistoricalPreviewCompletesAllChunksWithoutUploadsOrWrites() async {
+        let reader = HistoricalPreviewReader()
+        let runner = HealthKitHistoricalCutPreviewRunner(
+            authorization: HistoricalPreviewAuthorization(.available),
+            reader: reader,
+            canonical: HistoricalPreviewCanonical(.init(
+                nutritionDates: ["2026-05-24", "2024-01-01"],
+                activityDates: ["2026-07-18", "2027-01-01"]
+            ))
+        )
+
+        let result = await runner.run()
+        let readerCalls = await reader.callCount()
+
+        XCTAssertNil(result.failureCode)
+        XCTAssertFalse(result.cancelled)
+        XCTAssertEqual(result.processedChunks, 21)
+        XCTAssertEqual(readerCalls, 21)
+        XCTAssertEqual(result.canonicalNutritionDays, 1)
+        XCTAssertEqual(result.canonicalActivityDays, 1)
+    }
+}
+
+private final class HistoricalPreviewAuthorization: HealthKitHistoricalPreviewAuthorizationChecking, @unchecked Sendable {
+    private let availability: HealthKitAvailability
+    init(_ availability: HealthKitAvailability) { self.availability = availability }
+    @MainActor func historicalPreviewAuthorizationAvailability() async -> HealthKitAvailability { availability }
+}
+
+private actor HistoricalPreviewCanonical: HealthKitHistoricalPreviewCanonicalCoverageReading {
+    private let coverage: HealthKitHistoricalPreviewCanonicalCoverage
+    private var calls = 0
+    init(_ coverage: HealthKitHistoricalPreviewCanonicalCoverage) { self.coverage = coverage }
+    func historicalPreviewCanonicalCoverage() async throws -> HealthKitHistoricalPreviewCanonicalCoverage {
+        calls += 1
+        return coverage
+    }
+    func callCount() -> Int { calls }
+}
+
+private actor HistoricalPreviewReader: HealthKitHistoricalPreviewReading {
+    private var calls = 0
+    private let delay: Duration?
+    init(delay: Duration? = nil) { self.delay = delay }
+    func historicalPreviewChunk(bounds: HealthKitQueryBounds) async throws -> HealthKitHistoricalPreviewChunk {
+        calls += 1
+        if let delay { try await Task.sleep(for: delay) }
+        return .init(bounds: bounds, coverage: [])
+    }
+    func callCount() -> Int { calls }
 }
 
 private final class Harness {

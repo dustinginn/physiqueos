@@ -896,6 +896,382 @@ private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
+// MARK: - Founder-initiated historical coverage preview
+
+/// Metadata-only coverage from one HealthKit query. This deliberately has no
+/// quantity/value field: Stage 2 may count samples, dates, and source apps on
+/// the iPhone, but it must not materialize or upload health values.
+struct HealthKitHistoricalPreviewSourceCoverage: Equatable, Hashable, Sendable {
+    let domain: HealthKitReadDomain
+    let metric: String
+    let sourceBundleIdentifier: String
+    let sourceName: String
+    let sampleCount: Int
+    let localDates: Set<String>
+}
+
+struct HealthKitHistoricalPreviewChunk: Equatable, Sendable {
+    let bounds: HealthKitQueryBounds
+    let coverage: [HealthKitHistoricalPreviewSourceCoverage]
+}
+
+protocol HealthKitHistoricalPreviewReading: Sendable {
+    func historicalPreviewChunk(bounds: HealthKitQueryBounds) async throws -> HealthKitHistoricalPreviewChunk
+}
+
+protocol HealthKitHistoricalPreviewAuthorizationChecking: Sendable {
+    @MainActor func historicalPreviewAuthorizationAvailability() async -> HealthKitAvailability
+}
+
+extension HealthKitAuthorizationCoordinator: HealthKitHistoricalPreviewAuthorizationChecking {
+    @MainActor func historicalPreviewAuthorizationAvailability() async -> HealthKitAvailability {
+        await evaluateAuthorizationRequirement(for: .automaticRead)
+    }
+}
+
+struct HealthKitHistoricalPreviewCanonicalCoverage: Equatable, Sendable {
+    let nutritionDates: Set<String>
+    let activityDates: Set<String>
+}
+
+protocol HealthKitHistoricalPreviewCanonicalCoverageReading: Sendable {
+    func historicalPreviewCanonicalCoverage() async throws -> HealthKitHistoricalPreviewCanonicalCoverage
+}
+
+struct ProductionHealthKitHistoricalPreviewCanonicalCoverageReader: HealthKitHistoricalPreviewCanonicalCoverageReading {
+    let nutrition: any NutritionAPI
+    let activity: any ActivityAPI
+
+    func historicalPreviewCanonicalCoverage() async throws -> HealthKitHistoricalPreviewCanonicalCoverage {
+        async let nutritionLanding = nutrition.fetchNutritionLanding(scope: .all)
+        async let activityLanding = activity.fetchActivityLanding(scope: .all)
+        return try await HealthKitHistoricalPreviewCanonicalCoverage(
+            nutritionDates: Set(nutritionLanding.nutritionHistory.map(\.date)),
+            activityDates: Set(activityLanding.activityHistory.map(\.date))
+        )
+    }
+}
+
+struct HealthKitHistoricalCutPreviewSummary: Equatable, Sendable {
+    let discoveryStart = "2026-05-21"
+    let discoveryEnd = "2026-10-10"
+    let cutStart = "2026-05-24"
+    let cutEnd = "2026-07-18"
+    var totalChunks = 0
+    var processedChunks = 0
+    var coverage: [HealthKitHistoricalPreviewSourceCoverage] = []
+    var canonicalNutritionDays = 0
+    var canonicalActivityDays = 0
+    var recoverableNutritionDays = 0
+    var recoverableActivityDays = 0
+    var cutRecoverableNutritionDays = 0
+    var cutRecoverableActivityDays = 0
+    var nutritionDaysRequiringSourceReview = 0
+    var workoutDaysFound = 0
+    var missingNutritionDates: [String] = []
+    var missingActivityDates: [String] = []
+    var cancelled = false
+    var failureCode: String?
+}
+
+/// Explicit, foreground-only preview. It never requests authorization,
+/// writes HealthKit, uploads data, invokes ingestion, or mutates canonical
+/// records. Work is split into seven-day queries and cancellation is checked
+/// between every chunk.
+actor HealthKitHistoricalCutPreviewRunner {
+    static let discoveryStart = "2026-05-21"
+    static let discoveryEnd = "2026-10-10"
+    static let cutStart = "2026-05-24"
+    static let cutEnd = "2026-07-18"
+    static let chunkDays = 7
+
+    private let authorization: any HealthKitHistoricalPreviewAuthorizationChecking
+    private let reader: any HealthKitHistoricalPreviewReading
+    private let canonical: any HealthKitHistoricalPreviewCanonicalCoverageReading
+    private let calendar: Calendar
+    private var running = false
+
+    init(
+        authorization: any HealthKitHistoricalPreviewAuthorizationChecking,
+        reader: any HealthKitHistoricalPreviewReading,
+        canonical: any HealthKitHistoricalPreviewCanonicalCoverageReading,
+        calendar: Calendar = .autoupdatingCurrent
+    ) {
+        self.authorization = authorization
+        self.reader = reader
+        self.canonical = canonical
+        self.calendar = calendar
+    }
+
+    func run() async -> HealthKitHistoricalCutPreviewSummary {
+        guard !running else {
+            return .init(failureCode: "healthkit_historical_preview_in_progress")
+        }
+        running = true
+        defer { running = false }
+        var summary = HealthKitHistoricalCutPreviewSummary()
+
+        let availability = await authorization.historicalPreviewAuthorizationAvailability()
+        guard availability == .available || availability == .availableNoVisibleData else {
+            summary.failureCode = availability == .authorizationRequestRequired
+                ? "healthkit_historical_preview_authorization_required"
+                : "healthkit_historical_preview_unavailable"
+            return summary
+        }
+
+        let canonicalCoverage: HealthKitHistoricalPreviewCanonicalCoverage
+        do {
+            canonicalCoverage = try await canonical.historicalPreviewCanonicalCoverage()
+        } catch {
+            summary.failureCode = "healthkit_historical_preview_canonical_read_failed"
+            return summary
+        }
+        let discoveryDates = Set(Self.dateRange(Self.discoveryStart, Self.discoveryEnd))
+        summary.canonicalNutritionDays = canonicalCoverage.nutritionDates.intersection(discoveryDates).count
+        summary.canonicalActivityDays = canonicalCoverage.activityDates.intersection(discoveryDates).count
+
+        guard let chunks = Self.bounds(
+            start: Self.discoveryStart,
+            end: Self.discoveryEnd,
+            calendar: calendar
+        ) else {
+            summary.failureCode = "healthkit_historical_preview_window_invalid"
+            return summary
+        }
+        summary.totalChunks = chunks.count
+        var rows: [HealthKitHistoricalPreviewSourceCoverage] = []
+        do {
+            for bounds in chunks {
+                try Task.checkCancellation()
+                rows.append(contentsOf: try await reader.historicalPreviewChunk(bounds: bounds).coverage)
+                summary.processedChunks += 1
+            }
+        } catch is CancellationError {
+            summary.cancelled = true
+            return summary
+        } catch {
+            summary.failureCode = "healthkit_historical_preview_read_failed"
+            return summary
+        }
+        summary.coverage = Self.merge(rows)
+        Self.reconcile(&summary, canonical: canonicalCoverage)
+        return summary
+    }
+
+    static func bounds(start: String, end: String, calendar input: Calendar) -> [HealthKitQueryBounds]? {
+        var calendar = input
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        let parser = DateFormatter()
+        parser.calendar = calendar
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = calendar.timeZone
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let first = parser.date(from: start), let last = parser.date(from: end), first <= last else { return nil }
+        var output: [HealthKitQueryBounds] = []
+        var cursor = calendar.startOfDay(for: first)
+        let final = calendar.startOfDay(for: last)
+        while cursor <= final {
+            let proposedEnd = calendar.date(byAdding: .day, value: chunkDays, to: cursor) ?? final
+            let endExclusive = min(proposedEnd, calendar.date(byAdding: .day, value: 1, to: final) ?? final)
+            let inclusiveEnd = calendar.date(byAdding: .day, value: -1, to: endExclusive) ?? cursor
+            output.append(HealthKitQueryBounds(
+                startDateInclusive: cursor,
+                endDateExclusive: endExclusive,
+                startLocalDate: localDate(cursor, calendar: calendar),
+                endLocalDate: localDate(inclusiveEnd, calendar: calendar),
+                timeZoneIdentifier: calendar.timeZone.identifier
+            ))
+            cursor = endExclusive
+        }
+        return output
+    }
+
+    static func merge(_ rows: [HealthKitHistoricalPreviewSourceCoverage]) -> [HealthKitHistoricalPreviewSourceCoverage] {
+        struct Key: Hashable { let domain: HealthKitReadDomain; let metric: String; let bundle: String; let name: String }
+        var counts: [Key: Int] = [:]
+        var dates: [Key: Set<String>] = [:]
+        for row in rows {
+            let key = Key(domain: row.domain, metric: row.metric, bundle: row.sourceBundleIdentifier, name: row.sourceName)
+            counts[key, default: 0] += row.sampleCount
+            dates[key, default: []].formUnion(row.localDates)
+        }
+        return counts.keys.map { key in
+            HealthKitHistoricalPreviewSourceCoverage(
+                domain: key.domain, metric: key.metric,
+                sourceBundleIdentifier: key.bundle, sourceName: key.name,
+                sampleCount: counts[key, default: 0], localDates: dates[key, default: []]
+            )
+        }.sorted {
+            ($0.domain.rawValue, $0.metric, $0.sourceBundleIdentifier) <
+            ($1.domain.rawValue, $1.metric, $1.sourceBundleIdentifier)
+        }
+    }
+
+    static func reconcile(
+        _ summary: inout HealthKitHistoricalCutPreviewSummary,
+        canonical: HealthKitHistoricalPreviewCanonicalCoverage
+    ) {
+        let coreNutrition = ["energy", "protein", "carbohydrates", "fat"]
+        let nutritionRows = summary.coverage.filter { $0.domain == .nutrition && coreNutrition.contains($0.metric) }
+        let datesByMetric = Dictionary(grouping: nutritionRows, by: \.metric).mapValues {
+            $0.reduce(into: Set<String>()) { $0.formUnion($1.localDates) }
+        }
+        let completeNutrition = coreNutrition.reduce(nil as Set<String>?) { partial, metric in
+            guard let dates = datesByMetric[metric] else { return [] }
+            return partial.map { $0.intersection(dates) } ?? dates
+        } ?? []
+        let nutritionSourcesByDate = nutritionRows.reduce(into: [String: Set<String>]()) { result, row in
+            row.localDates.forEach { result[$0, default: []].insert(row.sourceBundleIdentifier) }
+        }
+        let needsReview = Set(nutritionSourcesByDate.compactMap { $0.value.count > 1 ? $0.key : nil })
+        let recoverableNutrition = completeNutrition
+            .subtracting(canonical.nutritionDates)
+            .subtracting(needsReview)
+
+        let activityDates = summary.coverage
+            .filter { $0.domain == .activity && $0.metric == "activity_summary" }
+            .reduce(into: Set<String>()) { $0.formUnion($1.localDates) }
+        let recoverableActivity = activityDates.subtracting(canonical.activityDates)
+        let workoutDates = summary.coverage
+            .filter { $0.domain == .workouts }
+            .reduce(into: Set<String>()) { $0.formUnion($1.localDates) }
+        let discoveryDates = Set(dateRange(Self.discoveryStart, Self.discoveryEnd))
+        let cutDates = Set(dateRange(Self.cutStart, Self.cutEnd))
+
+        summary.recoverableNutritionDays = recoverableNutrition.count
+        summary.recoverableActivityDays = recoverableActivity.count
+        summary.cutRecoverableNutritionDays = recoverableNutrition.intersection(cutDates).count
+        summary.cutRecoverableActivityDays = recoverableActivity.intersection(cutDates).count
+        summary.nutritionDaysRequiringSourceReview = needsReview.count
+        summary.workoutDaysFound = workoutDates.count
+        summary.missingNutritionDates = discoveryDates.subtracting(completeNutrition.union(canonical.nutritionDates)).sorted()
+        summary.missingActivityDates = discoveryDates.subtracting(activityDates.union(canonical.activityDates)).sorted()
+    }
+
+    private static func dateRange(_ start: String, _ end: String) -> [String] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        guard let bounds = bounds(start: start, end: end, calendar: calendar) else { return [] }
+        return bounds.flatMap { bounds -> [String] in
+            var output: [String] = []
+            var day = bounds.startDateInclusive
+            while day < bounds.endDateExclusive {
+                output.append(localDate(day, calendar: calendar))
+                day = calendar.date(byAdding: .day, value: 1, to: day) ?? bounds.endDateExclusive
+            }
+            return output
+        }
+    }
+
+    private static func localDate(_ date: Date, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
+    }
+}
+
+extension SystemHealthKitQueryClient: HealthKitHistoricalPreviewReading {
+    private static var historicalPreviewSampleLimit: Int { 50_001 }
+
+    func historicalPreviewChunk(bounds: HealthKitQueryBounds) async throws -> HealthKitHistoricalPreviewChunk {
+        let streams: [(HealthKitSynchronizationStream, String)] = [
+            (.nutritionEnergy, "energy"), (.nutritionProtein, "protein"),
+            (.nutritionCarbohydrates, "carbohydrates"), (.nutritionTotalFat, "fat"),
+            (.nutritionFiber, "fiber"), (.activeEnergy, "active_energy"),
+            (.exerciseTime, "exercise_time"), (.standTime, "stand_time"),
+            (.stepCount, "steps"), (.walkingRunningDistance, "walking_running_distance"),
+            (.flightsClimbed, "flights_climbed"), (.workouts, "workouts"),
+        ]
+        var rows = try await withThrowingTaskGroup(of: [HealthKitHistoricalPreviewSourceCoverage].self) { group in
+            for (stream, metric) in streams {
+                group.addTask { try await self.previewSampleCoverage(stream: stream, metric: metric, bounds: bounds) }
+            }
+            var collected: [HealthKitHistoricalPreviewSourceCoverage] = []
+            for try await result in group { collected.append(contentsOf: result) }
+            return collected
+        }
+        rows.append(contentsOf: try await previewActivitySummaryCoverage(bounds: bounds))
+        return HealthKitHistoricalPreviewChunk(bounds: bounds, coverage: rows)
+    }
+
+    private func previewSampleCoverage(
+        stream: HealthKitSynchronizationStream,
+        metric: String,
+        bounds: HealthKitQueryBounds
+    ) async throws -> [HealthKitHistoricalPreviewSourceCoverage] {
+        guard let sampleType = Self.sampleType(for: stream) else { return [] }
+        let predicate = HKQuery.predicateForSamples(
+            withStart: bounds.startDateInclusive,
+            end: bounds.endDateExclusive,
+            options: [.strictStartDate]
+        )
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: sampleType,
+                predicate: predicate,
+                limit: Self.historicalPreviewSampleLimit,
+                sortDescriptors: nil
+            ) {
+                _, samples, error in
+                guard error == nil else {
+                    continuation.resume(throwing: HealthKitSyncError.operational(code: "healthkit_historical_preview_query_failed"))
+                    return
+                }
+                guard (samples?.count ?? 0) < Self.historicalPreviewSampleLimit else {
+                    continuation.resume(throwing: HealthKitSyncError.operational(code: "healthkit_historical_preview_chunk_too_large"))
+                    return
+                }
+                struct Key: Hashable { let bundle: String; let name: String }
+                var counts: [Key: Int] = [:]
+                var dates: [Key: Set<String>] = [:]
+                for sample in samples ?? [] {
+                    let key = Key(
+                        bundle: sample.sourceRevision.source.bundleIdentifier,
+                        name: sample.sourceRevision.source.name
+                    )
+                    counts[key, default: 0] += 1
+                    dates[key, default: []].insert(Self.localDate(sample.startDate, calendar: self.calendar))
+                }
+                continuation.resume(returning: counts.keys.map { key in
+                    HealthKitHistoricalPreviewSourceCoverage(
+                        domain: stream.domain, metric: metric,
+                        sourceBundleIdentifier: key.bundle, sourceName: key.name,
+                        sampleCount: counts[key, default: 0], localDates: dates[key, default: []]
+                    )
+                })
+            }
+            store.execute(query)
+        }
+    }
+
+    private func previewActivitySummaryCoverage(
+        bounds: HealthKitQueryBounds
+    ) async throws -> [HealthKitHistoricalPreviewSourceCoverage] {
+        let components = Self.activitySummaryPredicateComponents(bounds: bounds, calendar: calendar)
+        let predicate = HKQuery.predicate(forActivitySummariesBetweenStart: components.start, end: components.end)
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKActivitySummaryQuery(predicate: predicate) { _, summaries, error in
+                guard error == nil else {
+                    continuation.resume(throwing: HealthKitSyncError.operational(code: "healthkit_historical_preview_activity_summary_failed"))
+                    return
+                }
+                let dates = Set((summaries ?? []).compactMap { summary -> String? in
+                    let components = summary.dateComponents(for: self.calendar)
+                    guard let date = self.calendar.date(from: components) else { return nil }
+                    let localDate = Self.localDate(date, calendar: self.calendar)
+                    return bounds.contains(localDate: localDate) ? localDate : nil
+                })
+                let row = HealthKitHistoricalPreviewSourceCoverage(
+                    domain: .activity, metric: "activity_summary",
+                    sourceBundleIdentifier: "com.apple.Health", sourceName: "Apple Health",
+                    sampleCount: dates.count, localDates: dates
+                )
+                continuation.resume(returning: dates.isEmpty ? [] : [row])
+            }
+            store.execute(query)
+        }
+    }
+}
+
 /// Pure snapshot rules for HealthKit daily dietary totals.
 ///
 /// One observation per Founder-local day. The per-day fingerprint and device
