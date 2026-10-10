@@ -3,6 +3,7 @@ import {
   isHealthKitWorkoutReconciliationReview,
   projectHealthKitWorkoutReconciliationPresentation,
 } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
+import { projectEvidenceProcessingState } from "../../domain/services/EvidenceProcessingState.js";
 
 export function createEvidenceReviewReadService({ store } = {}) {
   if (!store?.run) throw new Error("Evidence Review reads require a read store.");
@@ -63,7 +64,12 @@ export function createEvidenceReviewReadService({ store } = {}) {
           evidencePackage: review.interpretedEvidence ?? evidencePackage ?? {},
           itemDecisions: review.itemDecisions ?? {},
         });
-        return Object.freeze({ review, evidencePackage, canonicalObjects, presentation });
+        return Object.freeze({
+          review: Object.freeze({ ...review, processing: projectEvidenceProcessingState(review) }),
+          evidencePackage,
+          canonicalObjects,
+          presentation,
+        });
       });
     },
   });

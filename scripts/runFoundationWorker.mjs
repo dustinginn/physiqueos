@@ -9,6 +9,13 @@ import { runWorkerLoop } from "../src/platform/jobs/workerLoop.js";
 import { runBriefingCadenceLoop } from "../src/platform/jobs/BriefingCadenceWorker.js";
 import { readBuildIdentity } from "../src/platform/observability/buildIdentity.js";
 import { createStructuredLogger } from "../src/platform/observability/structuredLogger.js";
+import {
+  createEvidenceProcessingAlertRouter,
+  createEvidenceProcessingOperatorAlertHandler,
+  EVIDENCE_PROCESSING_OPERATOR_ALERT_TOPIC,
+  readEvidenceProcessingAlertRoutingConfig,
+} from "../src/platform/jobs/EvidenceProcessingAlertRouting.js";
+import { createPostgresEvidenceProcessingAlertStore } from "../src/platform/database/PostgresEvidenceProcessingAlertStore.js";
 import { createPostgresProviderMigrationDryRunStore } from "../src/platform/cutover/PostgresProviderMigrationDryRunStore.js";
 import { createProviderMigrationDryRunWorkerHandler } from "../src/platform/cutover/ProviderMigrationDryRunWorker.js";
 import { PROVIDER_MIGRATION_DRY_RUN_TOPIC } from "../src/platform/cutover/ProviderMigrationDryRunContract.js";
@@ -60,6 +67,7 @@ const authorityEnvironment = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1
 const ownerUserId = process.env.PHYSIQUEOS_PROVIDER_FULL_RUNTIME === "1"
   ? required(process.env.PHYSIQUEOS_CANONICAL_OWNER_USER_ID, "PHYSIQUEOS_CANONICAL_OWNER_USER_ID")
   : null;
+const evidenceAlertRoutingConfig = readEvidenceProcessingAlertRoutingConfig(process.env);
 const canonicalExerciseRegistryStore = ownerUserId
   ? createPhase4CanonicalRecordStore({
       query: (text, values) => pool.query(text, values),
@@ -153,6 +161,11 @@ const handlers = Object.freeze({
             collection: "canonicalExerciseLibrary",
           })
         ),
+    }),
+  } : {}),
+  ...(evidenceAlertRoutingConfig ? {
+    [EVIDENCE_PROCESSING_OPERATOR_ALERT_TOPIC]: createEvidenceProcessingOperatorAlertHandler({
+      config: evidenceAlertRoutingConfig,
     }),
   } : {}),
   ...(process.env.PHYSIQUEOS_PROVIDER_MIGRATION_DRY_RUN_ENABLED === "1" ? {
@@ -316,6 +329,15 @@ if (workerBootProbe) {
         workerId: providerWorkerId,
         buildId: buildIdentity.buildId,
         processStartedAt,
+        alertRouter: evidenceAlertRoutingConfig
+          ? createEvidenceProcessingAlertRouter({
+              store: createPostgresEvidenceProcessingAlertStore({
+                pool,
+                ownerUserId,
+                buildId: buildIdentity.buildId,
+              }),
+            })
+          : null,
       });
       loops.push(runEvidenceProcessingReliabilityLoop({
         monitor: reliabilityMonitor,

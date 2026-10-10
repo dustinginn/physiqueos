@@ -17,6 +17,7 @@ export function createEvidenceProcessingReliabilityMonitor({
   heartbeatAgeThresholdMs = DEFAULT_HEARTBEAT_AGE_MS,
   serviceLimitBytes = Number(process.env.PHYSIQUEOS_SERVICE_MEMORY_LIMIT_BYTES) || DEFAULT_SERVICE_LIMIT_BYTES,
   maximumAutoResumes = 2,
+  alertRouter = null,
 } = {}) {
   if (!store?.inspect || !store?.recover) throw new Error("Evidence processing reliability monitor requires a store.");
   return Object.freeze({
@@ -64,6 +65,16 @@ export function createEvidenceProcessingReliabilityMonitor({
       logger?.info?.("evidence.processing.reliability", metrics);
       const alerts = alertCodes({ metrics, inspection, reviewAgeThresholdMs, queueAgeThresholdMs, heartbeatAgeThresholdMs });
       if (alerts.length) logger?.error?.("evidence.processing.alert", { codes: alerts, ...metrics });
+      if (alertRouter?.observe) {
+        try {
+          await alertRouter.observe({ codes: alerts, metrics, observedAt });
+        } catch (error) {
+          // Alert delivery must never stop inspection or safe recovery. The
+          // router persists delivery work in the outbox; this catch covers a
+          // database/configuration fault before durable enqueueing.
+          logger?.error?.("evidence.processing.alert_route_failed", { code: safeCode(error) });
+        }
+      }
 
       let recovery = null;
       // Deployment adoption boundary: a newly installed watchdog may observe

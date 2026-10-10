@@ -37,6 +37,7 @@
     "provider:build:isolated": "node scripts/runIsolatedProviderBuild.mjs",
     "provider:build:windows-protected": "node scripts/runWindowsProtectedProviderBuild.mjs",
     "worker:foundation": "node scripts/runFoundationWorker.mjs",
+    "ops:evidence-alerts:preview": "node scripts/previewEvidenceProcessingAlertRouting.mjs",
     "backup:foundation": "node scripts/foundationBackup.mjs",
     "infra:digitalocean:render": "node infra/digitalocean/renderAppSpec.mjs",
     "fonts:check": "node scripts/checkFontBuild.mjs",

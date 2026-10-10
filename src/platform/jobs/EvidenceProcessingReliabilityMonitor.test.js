@@ -9,6 +9,21 @@ import {
 const now = new Date("2026-10-10T12:00:00.000Z");
 
 describe("evidence processing reliability monitor", () => {
+  it("routes a healthy observation so prior alerts can resolve", async () => {
+    const observe = vi.fn().mockResolvedValue(undefined);
+    const monitor = createEvidenceProcessingReliabilityMonitor({
+      store: {
+        inspect: async () => ({ reviews: [], heartbeat: { ageMs: 1, workerId: "worker" }, adoptionBoundary: "2026-10-10T00:00:00.000Z", adoptionBoundaryStatus: "durable" }),
+        recover: vi.fn(),
+      },
+      logger: { info: vi.fn(), error: vi.fn() }, workerId: "worker", buildId: "build",
+      now: () => new Date("2026-10-10T20:00:00.000Z"), processStartedAt: new Date("2026-10-10T19:00:00.000Z"),
+      sampleMemory: () => ({ rss: 100 }), sampleCpu: () => 0, serviceLimitBytes: 1_000,
+      alertRouter: { observe },
+    });
+    await monitor.runOnce();
+    expect(observe).toHaveBeenCalledWith(expect.objectContaining({ codes: [] }));
+  });
   it("classifies expired claims and missing continuations as stranded", () => {
     expect(isStranded({ status: "committing", claimStatus: "in_progress", claimLeaseExpiresAt: "2026-10-10T11:59:00Z", reviewAgeMs: 180_000 }, now)).toBe(true);
     expect(isStranded({ status: "committing", claimStatus: "available", liveContinuationCount: 0, reviewAgeMs: 180_000 }, now)).toBe(true);
