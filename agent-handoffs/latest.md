@@ -2,14 +2,14 @@
 
 Machine-readable interface: `agent-handoffs/latest.json` (read this first).
 
-- Task: Build 93 VALID in TestFlight with guarded Server e03f6768 deployment (`build93-final-testonly-sha-gated-release-20261009`)
+- Task: Build 94 VALID in TestFlight with guarded Server 85a98025 deployment (`build94-founder-authorized-gated-release-20261009`)
 - Agent: codex
 - Status: completed
-- Generated (UTC): 2026-10-09T17:16:05Z
+- Generated (UTC): 2026-10-10T04:12:14Z
 - Success: true
 
-Summary: Build 93 (com.physiqueos.native.dev 1.0 (93)) from Founder-approved Native 9d0a2069 uploaded once through the guarded API-key path; delivery 15ae3b39-2594-47a7-a686-7920b3a7faf0 is build VALID, import VALID and present on App Store Connect. Exact Server e03f6768 deployed as 69a8dc14-461f-4680-91a3-14e42522494f and is ACTIVE 9/9 with web and worker exact, health/ready green. Recovery remains OFF: post-deploy READ ONLY audit found zero authority rows and zero historical Recovery-bearing briefings.
+Summary: Build 94 (`com.physiqueos.native.dev` 1.0 (94)) from Founder-approved Native `f643d845` plus the deterministic build-number-only commit `49829781` uploaded once; delivery `811cb356-9924-4f53-8ce3-15847c8dd849` is build VALID, import VALID and present on App Store Connect. Exact Server `85a98025` deployed as `40122906-34f0-4d0a-91cf-8c943a15e603` and is ACTIVE 9/9 with Web and Worker exact, health/readiness green. Postdeploy read-only audit confirms Morning Check-In recognizes canonical HealthKit Activity/Nutrition without duplicate evidence or review creation. Recovery remains OFF.
 
-Detailed report: `agent-handoffs/reports/20261009T171605Z-build93-testflight-valid.md`
+Detailed report: `agent-handoffs/reports/20261010T041214Z-build94-testflight-valid.md`
 
 Protocol: `agent-handoffs/README.md`
