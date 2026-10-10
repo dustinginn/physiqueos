@@ -117,7 +117,7 @@ The first UI attempt used a 1,500 ms artificial delay; XCUITest's launch-idlenes
 - `git diff --check` passed;
 - only pre-existing Swift warnings remained;
 - Xcode work was serialized and no Claude/Xcode process overlapped;
-- free space began near 26 GiB and remained near 24 GiB after retained temporary test products, always above the protected 12 GiB floor.
+- free space began near 26 GiB, remained near 24 GiB with both temporary test products present, and returned near 26 GiB after those completed regenerable products were removed; it always stayed above the protected 12 GiB floor.
 
 ## Residual uncertainty and Server follow-up
 
