@@ -84,3 +84,13 @@
 - **History module:** `simulator/personal-history.js` tags every value as either `record` (goal name and dates) or `sim` (all outcome numbers). Scenarios B and C have no earlier cut, so the page says so. A food average logged on fewer than 70% of days is labelled rough.
 - **Source audit:** `source-audit/previous-cut-evidence-audit.md`.
 - **Tests:** personal history 11/11; end-to-end 120/120; energy 25/25 and guardrail 32/32, both unchanged.
+
+## Historical calorie baseline corrected (prompt `eb644ed4`)
+
+- **Fabricated values removed.** Scenario A's 2,117 maintenance and the previous-cut values (1,700 / 850 / 0.8 lb a week / lifts held) are gone.
+- **New maintenance from your records.** `energy-model.js` `calibrateFromPeriods()` computes maintenance from the Oct 10 records snapshot: 2,546 logged − 307 stored ≈ **2,240** (2,020–2,350 by month), with usual activity 900. The sparse cut month is excluded, never imputed.
+- **Cut outcomes as reported.** `personal-history.js` holds the cut's Period Summary as the Founder reported it (2,062 on 10 of 56 days) and its final DEXA month. The cut sets pace only.
+- **"Why this plan?"** now runs: last cut (with a coverage warning) → last 12 weeks → plan. Records provenance tags appear on each card, and the details include the reconciliation.
+- **Downstream screens agree:** Daily Energy, Review, Quick Calibration (starting from 2,240), projections, hub, Home, Goals and the panel. A regression sweep confirms no stale or illustrative values remain.
+- **Write-up:** `source-audit/historical-calorie-baseline-reconciliation.md`.
+- **Tests:** energy 30/30, personal history 11/11, guardrail 32/32, end-to-end 131/131.

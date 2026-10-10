@@ -1,75 +1,85 @@
 [
   {
-    "name": "only goal name and end date are marked as records",
+    "name": "cut Period Summary as reported: 2,062 on 10 of 56 days",
     "pass": true,
     "got": [
-      "goal",
-      "dates"
+      2062,
+      10,
+      56
     ],
     "want": [
-      "goal",
-      "dates"
+      2062,
+      10,
+      56
     ]
   },
   {
-    "name": "every outcome number is marked simulated",
+    "name": "cut coverage 18%",
+    "pass": true,
+    "got": 18,
+    "want": 18
+  },
+  {
+    "name": "10 logged days cannot set calories (needs ≥ 70%)",
+    "pass": true,
+    "got": false,
+    "want": false
+  },
+  {
+    "name": "no fabricated cut values (1,700 / 850 / 0.8 / \"held\" lifts) remain",
+    "pass": true,
+    "got": null,
+    "want": null
+  },
+  {
+    "name": "provenance tags only record / founder / snapshot",
+    "pass": true,
+    "got": [
+      "founder",
+      "record",
+      "snapshot"
+    ],
+    "want": [
+      "founder",
+      "record",
+      "snapshot"
+    ]
+  },
+  {
+    "name": "final cut month measured: −4.3 lb in 28 days ≈ 1.1 lb/week",
+    "pass": true,
+    "got": 1.08,
+    "want": 1.08
+  },
+  {
+    "name": "−450/day (≈0.95 lb/wk) → about the pace of the last cut",
+    "pass": true,
+    "got": "about the pace that kept your lean mass in your last cut",
+    "want": "about the pace that kept your lean mass in your last cut"
+  },
+  {
+    "name": "−750/day → faster",
     "pass": true,
     "got": true,
     "want": true
+  },
+  {
+    "name": "−200/day → gentler",
+    "pass": true,
+    "got": "gentler than your last cut",
+    "want": "gentler than your last cut"
+  },
+  {
+    "name": "no intake or activity comparison functions exported",
+    "pass": true,
+    "got": [],
+    "want": []
   },
   {
     "name": "scenarios B and C have no earlier cut",
     "pass": true,
     "got": [
       null,
-      null
-    ],
-    "want": [
-      null,
-      null
-    ]
-  },
-  {
-    "name": "−450/day → similar pace to 0.8 lb/week",
-    "pass": true,
-    "got": "about the pace that held your lean mass last time",
-    "want": "about the pace that held your lean mass last time"
-  },
-  {
-    "name": "−500/day → a little faster",
-    "pass": true,
-    "got": true,
-    "want": true
-  },
-  {
-    "name": "−250/day → gentler",
-    "pass": true,
-    "got": "gentler than last time",
-    "want": "gentler than last time"
-  },
-  {
-    "name": "eat 1,717 vs 1,700 → about the same",
-    "pass": true,
-    "got": "about what you ate last time",
-    "want": "about what you ate last time"
-  },
-  {
-    "name": "activity 900 vs 850 → close",
-    "pass": true,
-    "got": "close to what you sustained last time",
-    "want": "close to what you sustained last time"
-  },
-  {
-    "name": "activity 1,100 vs 850 → more",
-    "pass": true,
-    "got": "more than you averaged last time",
-    "want": "more than you averaged last time"
-  },
-  {
-    "name": "no history → no comparisons",
-    "pass": true,
-    "got": [
-      null,
       null,
       null
     ],
@@ -77,20 +87,6 @@
       null,
       null,
       null
-    ]
-  },
-  {
-    "name": "food average marked rough below 70% logged days",
-    "pass": true,
-    "got": [
-      false,
-      true,
-      false
-    ],
-    "want": [
-      false,
-      true,
-      false
     ]
   }
 ]

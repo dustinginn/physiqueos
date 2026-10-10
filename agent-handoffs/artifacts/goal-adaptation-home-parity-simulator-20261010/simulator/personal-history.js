@@ -1,43 +1,39 @@
 // ---------------------------------------------------------------------------
-// Personal cut history for "Why this plan?" (design simulation only).
-// Each value carries its provenance:
-//   record — a fact the production Server already holds (goal record, or its hardcoded
-//            cut evidence window EVIDENCE_CONTEXT_WINDOWS["visible-abs"])
-//   sim    — illustrative; NOT read from any record. Shown with a SIMULATED tag.
-// In the real app these come from the completed goal's own logs (see the report's
-// source audit). Nothing here is a validated personal value.
+// Previous-cut history for "Why this plan?" (design simulation only).
+// Provenance of every value:
+//   record   — held by the production Server (goal record; cut evidence window
+//              EVIDENCE_CONTEXT_WINDOWS["visible-abs"])
+//   founder  — the Founder's Nutrition Evidence Period Summary, as reported in prompt eb644ed4
+//   snapshot — sanitized period aggregates from the Oct 10 read-only extraction
+//              (fixtures/founderLeanMassGolden.js on the Phase B branch)
+// Nothing is estimated across days that were not logged.
 // ---------------------------------------------------------------------------
 const CUT_HISTORY = {
   A: {
     goal: { value: 'Visible Abs', prov: 'record' },
-    dates: { value: 'May 24 – Jul 18', prov: 'record' }, // Server cut window; goal transition committed Jul 21
-    intake: { value: 1700, prov: 'sim', coverage: 0.8 }, // average logged kcal/day; share of days logged
-    activity: { value: 850, prov: 'sim' }, // average active kcal/day (cut-era source: activity_day records)
-    rate: { value: 0.8, prov: 'sim' }, // lb/week
-    lean: { value: 'held', prov: 'sim' }, // DEXA lean mass across the cut
-    strength: { value: 'held', prov: 'sim' },
+    dates: { value: 'May 24 – Jul 18', days: 56, prov: 'record' },
+    // Nutrition Evidence → Period Summary for the cut window
+    periodSummary: { avg: 2062, loggedDays: 10, days: 56, prov: 'founder' },
+    // Last scan-to-scan month of the cut (DEXA Jun 20 → Jul 18)
+    finalMonth: { label: 'Jun 20 → Jul 18', days: 28, dFat: -5.6, dLean: 1.3, dTotal: -4.3, intakeDays: 9, prov: 'snapshot' },
   },
   B: null,
   C: null,
 };
 const cutHistory = (key) => CUT_HISTORY[key] || null;
-// Below the calibration coverage rule (70% of days logged) the food average is shown as rough, never hidden.
-const intakeIsRough = (h) => !!h && h.intake.coverage < 0.7;
+const MIN_COVERAGE_FOR_CALORIES = 0.7; // same rule the calibration uses
+const cutCoverage = (h) => (h ? h.periodSummary.loggedDays / h.periodSummary.days : 0);
+// The cut's food logs can set calories only with enough coverage. With 10 of 56 days they can't.
+const cutSetsCalories = (h) => !!h && cutCoverage(h) >= MIN_COVERAGE_FOR_CALORIES;
+// Measured weight change in the cut's final scan-to-scan month (lb/week, loss positive).
+const cutWeeklyLoss = (h) => (h ? (-h.finalMonth.dTotal / h.finalMonth.days) * 7 : null);
 // Expected weekly change for a planned daily balance (same 3,300 kcal/lb loss figure the simulator uses).
 const weeklyLoss = (balance) => (-balance * 7) / 3300;
-// Coach comparisons against the previous cut. Thresholds are presentation choices, not physiology.
+// The only comparison with the cut: pace, because both sides are measured (DEXA weight change).
+// Calories and activity are not compared: the cut logged food on too few days.
 function paceVsLast(balance, h) {
-  if (!h) return null; const now = weeklyLoss(balance), then = h.rate.value;
-  if (Math.abs(now - then) <= 0.2) return 'about the pace that held your lean mass last time';
-  return now > then ? 'a little faster than last time, so the next DEXA checks lean mass' : 'gentler than last time';
+  if (!h) return null; const now = weeklyLoss(balance), then = cutWeeklyLoss(h);
+  if (Math.abs(now - then) <= 0.2) return 'about the pace that kept your lean mass in your last cut';
+  return now > then ? 'faster than your last cut, so the next DEXA checks lean mass' : 'gentler than your last cut';
 }
-function intakeVsLast(eat, h) {
-  if (!h) return null; const d = eat - h.intake.value;
-  if (Math.abs(d) <= 100) return 'about what you ate last time';
-  return d > 0 ? 'more than you ate last time' : 'less than you ate last time';
-}
-function activityVsLast(goal, h) {
-  if (!h || goal == null) return null;
-  return goal <= h.activity.value + 100 ? 'close to what you sustained last time' : 'more than you averaged last time';
-}
-if (typeof module !== 'undefined') module.exports = { CUT_HISTORY, cutHistory, intakeIsRough, weeklyLoss, paceVsLast, intakeVsLast, activityVsLast };
+if (typeof module !== 'undefined') module.exports = { CUT_HISTORY, cutHistory, cutCoverage, cutSetsCalories, cutWeeklyLoss, weeklyLoss, paceVsLast };

@@ -20,7 +20,7 @@
     "info": ""
   },
   {
-    "name": "lean draft default −450 → eat 1,767",
+    "name": "lean draft default −450 → eat 2,240 − 450 + 100 = 1,890",
     "pass": true,
     "info": ""
   },
@@ -40,22 +40,22 @@
     "info": ""
   },
   {
-    "name": "blend −450 → eat 1,892 goal 1,025 (1:1)",
+    "name": "blend −450 → eat 2,015 goal 1,125 (1:1)",
     "pass": true,
-    "info": "{\"mode\":\"build\",\"eat\":1892,\"added\":225,\"goal\":1025,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-450}"
+    "info": "{\"mode\":\"build\",\"eat\":2015,\"added\":225,\"goal\":1125,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-450}"
   },
   {
-    "name": "eat less → 1,667 / 800",
-    "pass": true,
-    "info": ""
-  },
-  {
-    "name": "step −25 → −475, eat 1,642",
+    "name": "eat less → 1,790 / 900",
     "pass": true,
     "info": ""
   },
   {
-    "name": "reset to suggested 1,767/900",
+    "name": "step −25 → −475, eat 1,765",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "reset to suggested 1,890/1,000",
     "pass": true,
     "info": ""
   },
@@ -70,9 +70,9 @@
     "info": ""
   },
   {
-    "name": "Founder case: −500 & +100 → eat 1,717, goal 900",
+    "name": "Founder case: −500 & +100 → eat 1,840, goal 1,000",
     "pass": true,
-    "info": "{\"mode\":\"build\",\"eat\":1717,\"added\":100,\"goal\":900,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-500}"
+    "info": "{\"mode\":\"build\",\"eat\":1840,\"added\":100,\"goal\":1000,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-500}"
   },
   {
     "name": "energy screen shows maintenance source",
@@ -85,22 +85,42 @@
     "info": ""
   },
   {
-    "name": "Why this plan?: title + personal history first (Visible Abs, May 24 – Jul 18)",
+    "name": "Why this plan?: evidence order last cut → last 12 weeks → plan",
     "pass": true,
     "info": ""
   },
   {
-    "name": "history numbers marked simulated + provenance note",
+    "name": "prior cut: 10 of 56 days logged, 2,062 on those days, not used for calories",
     "pass": true,
     "info": ""
   },
   {
-    "name": "what’s different now: 9.7%, maintenance 2,117 (1,977–2,258, illustrative), usual 800",
+    "name": "prior cut measured outcome: DEXA Jun 20 → Jul 18 fat −5.6, lean +1.3, ≈ 1.1 lb/week",
     "pass": true,
     "info": ""
   },
   {
-    "name": "plan: eat 1,717 · move 900; gap 500; coach comparisons; calibrated over time",
+    "name": "recent 12 weeks: 82 of 83 days logged, ≈ 2,550 (2,349–2,714), DEXA +4.6 fat / +7.1 lean, ≈ 310 stored",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "maintenance ≈ 2,240 logged (2,020–2,350 by month) at ~900 activity; records provenance tag",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "plan: eat 1,840 · move 1,000; 500 under; pace vs measured cut; 900 + 100 beats 800 goal; calibrated",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "no fabricated cut comparisons (1,700 / 850 / 0.8 lb / lifts held / ate last time)",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "no 2,117 and no \"illustrative\" on the main page",
     "pass": true,
     "info": ""
   },
@@ -115,12 +135,17 @@
     "info": ""
   },
   {
-    "name": "details: maintenance 2,117 (calibrated, illustrative), range, 2,117 − 500 + 100 extra = 1,717, 800 usual + 100 extra = 900",
+    "name": "details: 2,546 logged − 307 stored ≈ 2,240; densities; by month 2,325 / 2,353 / 2,024; Jun 20–Jul 18 not used (9 of 28)",
     "pass": true,
     "info": ""
   },
   {
-    "name": "details: resting 1,850 DEXA report estimate; formula ≈ 2,944, plan follows results (no speculation)",
+    "name": "details: eat 2,240 − 500 + 100 extra = 1,840; activity 900 usual + 100 extra = 1,000",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "details: provisional densities, DEXA error, why 2,117 was replaced, snapshot not live",
     "pass": true,
     "info": ""
   },
@@ -136,6 +161,11 @@
   },
   {
     "name": "review lists numeric changes only",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "review footer uses records maintenance: 2,240 − 450 + 100 = 1,890; 900 usual + 100 = 1,000",
     "pass": true,
     "info": ""
   },
@@ -157,17 +187,17 @@
   {
     "name": "Quick Calibration offered after 3 slower weeks",
     "pass": true,
-    "info": "{\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1767,\"goal\":900,\"balance\":-450,\"v\":2,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":true,\"stack\":0}"
+    "info": "{\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1890,\"goal\":1000,\"balance\":-450,\"v\":2,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":true,\"stack\":0}"
   },
   {
     "name": "QC blend: eat and goal change 1:1, maintenance recalibrated, planned balance restored",
     "pass": true,
-    "info": "{\"step\":-250,\"fromM\":2117,\"target\":-450} {\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1767,\"goal\":900,\"balance\":-450,\"v\":2,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":true,\"stack\":0} → {\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1642,\"goal\":1025,\"balance\":-450,\"v\":3,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":false,\"stack\":0} M=1867"
+    "info": "{\"step\":-250,\"fromM\":2240,\"target\":-450} {\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1890,\"goal\":1000,\"balance\":-450,\"v\":2,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":true,\"stack\":0} → {\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1765,\"goal\":1125,\"balance\":-450,\"v\":3,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":false,\"stack\":0} M=1990"
   },
   {
-    "name": "QC recalibrated maintenance below 2,117",
+    "name": "QC recalibrated maintenance below 2,240 (within one step)",
     "pass": true,
-    "info": "1867"
+    "info": "1990"
   },
   {
     "name": "Midweek never proposes",
@@ -177,7 +207,7 @@
   {
     "name": "phase completes → DEXA decision",
     "pass": true,
-    "info": "{\"screen\":\"briefing\",\"phase\":\"leaningComplete\",\"eat\":1642,\"goal\":1025,\"balance\":-450,\"v\":3,\"bf\":8.772177937773211,\"gained\":6.832727272727273,\"qc\":false,\"stack\":0}"
+    "info": "{\"screen\":\"briefing\",\"phase\":\"leaningComplete\",\"eat\":1765,\"goal\":1125,\"balance\":-450,\"v\":3,\"bf\":8.772177937773211,\"gained\":6.832727272727273,\"qc\":false,\"stack\":0}"
   },
   {
     "name": "Home phase complete concise + priority",
@@ -347,7 +377,7 @@
   {
     "name": "Review: goal 8–9% → 6.5–8.5% · goal, going forward",
     "pass": true,
-    "info": "9:41\nBack\nReview\nReview your new plan\nChecked against your latest evidence\nSIMULATED\nPhase\nLean Mass Build\nLeaning (temporary)\nGoal guardrail\n8–9%\n6.5–8.5% · goal, going forward\nPhase ends\n≤ 9%\nBody fat ≤ 8.5% · aligned to the new goal upper limit\nWhen building resumes\nPhase 4 · Lean Mass Build (linked to Phase 2) · guardrail 6.5–8.5%\nGoal date\nOct 31\nSet when building resumes\nDaily balance\n+383\n−"
+    "info": "9:41\nBack\nReview\nReview your new plan\nChecked against your latest evidence\nSIMULATED\nPhase\nLean Mass Build\nLeaning (temporary)\nGoal guardrail\n8–9%\n6.5–8.5% · goal, going forward\nPhase ends\n≤ 9%\nBody fat ≤ 8.5% · aligned to the new goal upper limit\nWhen building resumes\nPhase 4 · Lean Mass Build (linked to Phase 2) · guardrail 6.5–8.5%\nGoal date\nOct 31\nSet when building resumes\nDaily balance\n+260\n−"
   },
   {
     "name": "Review: phase ends ≤ 9% → ≤ 8.5% aligned to the new goal upper limit",
@@ -495,6 +525,31 @@
     "info": ""
   },
   {
+    "name": "A: lean setup, Daily Energy, Why and Review all show eat 1,890 / move 1,000",
+    "pass": true,
+    "info": "1890"
+  },
+  {
+    "name": "A: Review balance row: approved +260 → −450 (from records maintenance)",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "A: Quick Calibration starts from the records maintenance 2,240",
+    "pass": true,
+    "info": "2240"
+  },
+  {
+    "name": "A: no stale fabricated or illustrative values on any linked screen or the panel",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "A: approved activity goal stays 800 until a change is approved",
+    "pass": true,
+    "info": ""
+  },
+  {
     "name": "B: provisional 2,926 → lean draft eat 2,576 / goal 900",
     "pass": true,
     "info": "{\"mode\":\"build\",\"eat\":2576,\"added\":100,\"goal\":900,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-450}"
@@ -525,9 +580,9 @@
     "info": "-300"
   },
   {
-    "name": "lab: calibrated 1,917 → draft −450/+100 eat 1,567",
+    "name": "lab: calibrated 1,917 → draft −450/+100 eat 1,567, goal 1,000",
     "pass": true,
-    "info": "{\"mode\":\"build\",\"eat\":1567,\"added\":100,\"goal\":900,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-450}"
+    "info": "{\"mode\":\"build\",\"eat\":1567,\"added\":100,\"goal\":1000,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-450}"
   },
   {
     "name": "lab: approved target unchanged (2,500)",
@@ -597,6 +652,6 @@
   {
     "name": "Why this plan? is short (≤ 1.6 screens of content)",
     "pass": true,
-    "info": "1001"
+    "info": "926"
   }
 ]

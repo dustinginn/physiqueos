@@ -24,32 +24,37 @@ await act('openOptions'); ok('Option B comparison', (await text()).includes('Lea
 await shot('02-options');
 await act('back'); ok('back returns to briefing', (await st()).screen === 'briefing');
 await act('openOptions'); await act('chooseLean');
-let s = await st(); ok('lean draft default −450 → eat 1,767', s.screen === 'leanSetup' && (await p.evaluate(() => S.draft.plan.eat)) === 1767);
+let s = await st(); ok('lean draft default −450 → eat 2,240 − 450 + 100 = 1,890', s.screen === 'leanSetup' && (await p.evaluate(() => S.draft.plan.eat)) === 1890);
 await act('setCompletion', 'hybrid'); await act('weeks', '1'); ok('hybrid with 7 weeks', (await p.evaluate(() => S.draft.completion)).weeks === 7);
 await act('openEnergy'); ok('one-time explainer first', (await st()).screen === 'explainer');
 await act('explainerDone'); ok('energy screen after explainer', (await st()).screen === 'energy');
-await act('split', 'blend'); let d = await p.evaluate(() => S.draft.plan); ok('blend −450 → eat 1,892 goal 1,025 (1:1)', d.eat === 1892 && d.goal === 1025, JSON.stringify(d));
-await act('split', 'eat'); d = await p.evaluate(() => S.draft.plan); ok('eat less → 1,667 / 800', d.eat === 1667 && d.goal === 800);
-await act('bal', '-25'); d = await p.evaluate(() => S.draft.plan); ok('step −25 → −475, eat 1,642', d.balance === -475 && d.eat === 1642);
-await act('balReset'); await act('split', 'suggested'); d = await p.evaluate(() => S.draft.plan); ok('reset to suggested 1,767/900', d.eat === 1767 && d.goal === 900);
+await act('split', 'blend'); let d = await p.evaluate(() => S.draft.plan); ok('blend −450 → eat 2,015 goal 1,125 (1:1)', d.eat === 2015 && d.goal === 1125, JSON.stringify(d));
+await act('split', 'eat'); d = await p.evaluate(() => S.draft.plan); ok('eat less → 1,790 / 900', d.eat === 1790 && d.goal === 900);
+await act('bal', '-25'); d = await p.evaluate(() => S.draft.plan); ok('step −25 → −475, eat 1,765', d.balance === -475 && d.eat === 1765);
+await act('balReset'); await act('split', 'suggested'); d = await p.evaluate(() => S.draft.plan); ok('reset to suggested 1,890/1,000', d.eat === 1890 && d.goal === 1000);
 await shot('03-energy');
 await act('back'); ok('energy back → setup', (await st()).screen === 'leanSetup');
 await act('openEnergy'); ok('explainer not repeated', (await st()).screen === 'energy'); await act('back');
-// Founder case: −500 with +100 extra → 1,717 / 900, reconciled
+// Founder case: −500 with +100 extra → 1,840 / 1,000 from records-based maintenance 2,240
 await act('openEnergy'); await act('bal', '-25'); await act('bal', '-25');
-d = await p.evaluate(() => S.draft.plan); ok('Founder case: −500 & +100 → eat 1,717, goal 900', d.eat === 1717 && d.goal === 900 && d.balance === -500, JSON.stringify(d));
-ok('energy screen shows maintenance source', /Maintenance used: 2,117 \(calibrated, illustrative\)/.test(await text()));
+d = await p.evaluate(() => S.draft.plan); ok('Founder case: −500 & +100 → eat 1,840, goal 1,000', d.eat === 1840 && d.goal === 1000 && d.balance === -500, JSON.stringify(d));
+ok('energy screen shows maintenance source', /Maintenance used: 2,240 \(from your records\)/.test(await text()));
 ok('energy screen links to "Why this plan?"', (await text()).includes('Why this plan?') && !(await text()).includes('Why these numbers'));
 await act('go', 'why'); const why = await text();
-ok('Why this plan?: title + personal history first (Visible Abs, May 24 – Jul 18)', why.includes('Why this plan?') && /WHAT WORKED LAST TIME[\s\S]*Visible Abs · May 24 – Jul 18[\s\S]*WHAT’S DIFFERENT NOW[\s\S]*SO THE PLAN/.test(why));
-ok('history numbers marked simulated + provenance note', /WHAT WORKED LAST TIME\s*SIMULATED/.test(why) && why.includes('The numbers are illustrative here'));
-ok('what’s different now: 9.7%, maintenance 2,117 (1,977–2,258, illustrative), usual 800', why.includes('9.7%') && why.includes('2,117') && why.includes('1,977–2,258, illustrative') && why.includes('about 800 a day'));
-ok('plan: eat 1,717 · move 900; gap 500; coach comparisons; calibrated over time', why.includes('Eat 1,717 · move 900') && why.includes('gap of about 500') && why.includes('a little faster than last time') && why.includes('about what you ate last time') && why.includes('close to what you sustained last time') && why.includes('Targets are calibrated over time'));
+ok('Why this plan?: evidence order last cut → last 12 weeks → plan', why.includes('Why this plan?') && /YOUR LAST CUT[\s\S]*Visible Abs · May 24 – Jul 18[\s\S]*YOUR LAST 12 WEEKS[\s\S]*SO THE PLAN/.test(why));
+ok('prior cut: 10 of 56 days logged, 2,062 on those days, not used for calories', why.includes('logged on only 10 of 56 days (2,062 average on those days)') && why.includes('sets your pace, not your calories'));
+ok('prior cut measured outcome: DEXA Jun 20 → Jul 18 fat −5.6, lean +1.3, ≈ 1.1 lb/week', why.includes('Final month (DEXA Jun 20 → Jul 18): fat −5.6 lb, lean +1.3 lb, weight down about 1.1 lb a week'));
+ok('recent 12 weeks: 82 of 83 days logged, ≈ 2,550 (2,349–2,714), DEXA +4.6 fat / +7.1 lean, ≈ 310 stored', why.includes('Food logged on 82 of 83 days: about 2,550 a day (2,349–2,714 by month)') && why.includes('fat +4.6 lb, lean +7.1 lb, so about 310 a day went into storage'));
+ok('maintenance ≈ 2,240 logged (2,020–2,350 by month) at ~900 activity; records provenance tag', why.includes('maintenance near 2,240 in the calories you log (2,020–2,350 by month), moving about 900 a day') && /RECORDS · OCT 10/.test(why));
+ok('plan: eat 1,840 · move 1,000; 500 under; pace vs measured cut; 900 + 100 beats 800 goal; calibrated', why.includes('Eat 1,840 · move 1,000') && why.includes('500 under maintenance') && why.includes('about the pace that kept your lean mass in your last cut') && why.includes('your usual 900 plus 100 (you’ve averaged above your 800 goal)') && why.includes('Calibrated as you go'));
+ok('no fabricated cut comparisons (1,700 / 850 / 0.8 lb / lifts held / ate last time)', !/1,700|850 active|0\.8 lb|lifts held|what you ate last time|sustained last time/.test(why));
+ok('no 2,117 and no "illustrative" on the main page', !why.includes('2,117') && !/illustrative/i.test(why));
 ok('default page has no digestion, bottom-up walkthrough, naive sum or gap speculation', !/Digestion|digestion|Bottom-up|bottom-up|1,033|not your deficit|2,944|under-logged|RMR \+ activity/.test(why));
 ok('details hidden by default', why.includes('See calculation details') && !why.includes('Maintenance used'));
 await act('whyDetails'); const whyd = await text();
-ok('details: maintenance 2,117 (calibrated, illustrative), range, 2,117 − 500 + 100 extra = 1,717, 800 usual + 100 extra = 900', whyd.includes('2,117 (calibrated, illustrative)') && whyd.includes('1,977–2,258') && whyd.includes('2,117 − 500 + 100 extra = 1,717') && whyd.includes('800 usual + 100 extra = 900'));
-ok('details: resting 1,850 DEXA report estimate; formula ≈ 2,944, plan follows results (no speculation)', whyd.includes('1,850 · DEXA report estimate') && whyd.includes('≈ 2,944') && whyd.includes('plan follows your results') && !whyd.includes('under-logged'));
+ok('details: 2,546 logged − 307 stored ≈ 2,240; densities; by month 2,325 / 2,353 / 2,024; Jun 20–Jul 18 not used (9 of 28)', whyd.includes('2,546 logged − 307 stored ≈ 2,240') && whyd.includes('fat +4.6 lb × 4,250 + lean +7.1 lb × 830, ÷ 83 days') && whyd.includes('Jul 18–Aug 15 2,325 · Aug 15–Sep 12 2,353 · Sep 12–Oct 9 2,024') && whyd.includes('Jun 20–Jul 18: food on 9 of 28 days'));
+ok('details: eat 2,240 − 500 + 100 extra = 1,840; activity 900 usual + 100 extra = 1,000', whyd.includes('2,240 − 500 + 100 extra = 1,840') && whyd.includes('900 usual + 100 extra = 1,000'));
+ok('details: provisional densities, DEXA error, why 2,117 was replaced, snapshot not live', whyd.includes('provisional') && whyd.includes('± about 160 a day') && whyd.includes('replaces the earlier 2,117') && whyd.includes('not a live read'));
 await shotAt('14-why-founder-case', '[data-act="whyDetails"]'); await act('whyDetails'); ok('details collapse again', !(await text()).includes('Maintenance used'));
 await act('back'); await act('balReset'); await act('back');
 await act('openHub'); await shot('04-hub');
@@ -58,7 +63,8 @@ await act('openRecovery'); await act('addRecovery', 'Stretching'); await act('sl
 await act('openSupplements'); await act('addSupp', 'Creatine'); await act('back');
 await act('openTracking'); await act('toggle', 'dexa'); await act('back');
 ok('hub shows changes', /changing/.test(await text()));
-await act('openReview'); const rv = await text(); ok('review lists numeric changes only', rv.includes('1,767') && rv.includes('Conservative') && !/walk/i.test(rv));
+await act('openReview'); const rv = await text(); ok('review lists numeric changes only', rv.includes('1,890') && rv.includes('Conservative') && !/walk/i.test(rv));
+ok('review footer uses records maintenance: 2,240 − 450 + 100 = 1,890; 900 usual + 100 = 1,000', rv.includes('Eat = maintenance 2,240 (from your records) − 450 + 100 extra activity = 1,890') && rv.includes('activity goal = 900 usual + 100 = 1,000'));
 await shot('05-review');
 await act('approve'); s = await st(); ok('approved → Home leaning v2', s.phase === 'leaning' && s.v === 2 && (await text()).includes('Leaning'));
 await shot('06-home-leaning');
@@ -73,7 +79,7 @@ const q0 = await p.evaluate(() => ({ step: S.qc.step, fromM: S.qc.fromM, target:
 await act('qcOpt', 'blend'); const before = await st(); await act('qcAccept'); s = await st();
 const half = Math.round(q0.step / 2 / 25) * 25; const mAfter = await p.evaluate(() => M());
 ok('QC blend: eat and goal change 1:1, maintenance recalibrated, planned balance restored', s.eat === before.eat + half && s.goal === before.goal - (q0.step - half) && mAfter === q0.fromM + q0.step && s.balance === q0.target, `${JSON.stringify(q0)} ${JSON.stringify(before)} → ${JSON.stringify(s)} M=${mAfter}`);
-ok('QC recalibrated maintenance below 2,117', mAfter < 2117 && mAfter >= 1817, String(mAfter));
+ok('QC recalibrated maintenance below 2,240 (within one step)', mAfter < 2240 && mAfter >= 1940, String(mAfter));
 await ctl('jump', 'midweek'); ok('Midweek never proposes', !/Accept|Deepen/.test(await text()));
 await ctl('finish'); s = await st(); ok('phase completes → DEXA decision', s.phase === 'leaningComplete' && s.screen === 'briefing', JSON.stringify(s));
 await shot('09-dexa-complete');
@@ -189,6 +195,28 @@ await ctl('reset'); await act('openBriefing'); await act('openOptions'); await a
 ok('remove: goal scope by default, warning shown', (await text()).includes('no longer triggers reviews') && (await p.evaluate(() => S.draft.gr.scope)) === 'goal');
 await act('grDone'); await act('openReview'); ok('review: 8–9% → None · goal, going forward', (await text()).includes('None · goal, going forward')); await act('approve');
 ok('Home guardrail box: No body-fat guardrail (same slot)', (await text()).includes('No body-fat guardrail') && (await p.evaluate(() => S.guardrail.enabled)) === false);
+// Baseline regression: no stale fabricated numbers anywhere downstream, and every screen agrees (scenario A)
+{
+  await ctl('scenario', 'A');
+  const STALE = /2,117|1,717|1,767|1,700 a day|0\.8 lb a week|lifts held|850 active|illustrative|1,977|2,258/i;
+  const seen = []; const grab = async (name) => { const t = (await text()).replace('replaces the earlier 2,117', ''); seen.push([name, t]); return t; };
+  const panelText = async () => (await p.evaluate(() => document.getElementById('panel').innerText)).replace('replaces the earlier 2,117', '');
+  await grab('home'); await act('openBriefing'); await grab('dexa briefing'); await act('openOptions'); await grab('options');
+  await act('chooseLean'); const ls = await grab('lean setup'); await act('openEnergy'); await act('explainerDone'); const en = await grab('daily energy');
+  await act('go', 'why'); await grab('why'); await act('whyDetails'); await grab('why details'); await act('whyDetails'); await act('back'); await act('back');
+  await act('openHub'); await grab('hub'); await act('back'); await act('openReview'); const rvA = await grab('review');
+  const eatA = await p.evaluate(() => S.draft.plan.eat);
+  ok('A: lean setup, Daily Energy, Why and Review all show eat 1,890 / move 1,000', eatA === 1890 && ls.includes('eat 1,890') && en.includes('1,890') && rvA.includes('1,890 kcal') && rvA.includes('1,000 kcal'), String(eatA));
+  ok('A: Review balance row: approved +260 → −450 (from records maintenance)', /Daily balance\s*\+260\s*−450/.test(rvA));
+  await act('approve'); await grab('home leaning'); await act('openGoals'); await grab('goals'); await act('tab', 'home');
+  await ctl('response', 'slower'); await ctl('advance'); await ctl('advance'); await ctl('advance');
+  const qcFrom = await p.evaluate(() => S.qc && S.qc.fromM); const qcT = await grab('weekly + quick calibration');
+  ok('A: Quick Calibration starts from the records maintenance 2,240', qcFrom === 2240 && /2,240/.test(qcT), String(qcFrom));
+  seen.push(['panel', await panelText()]);
+  const stale = seen.filter(([, t]) => STALE.test(t)).map(([n, t]) => `${n}: ${t.match(STALE)[0]}`);
+  ok('A: no stale fabricated or illustrative values on any linked screen or the panel', stale.length === 0, stale.join(' | '));
+  ok('A: approved activity goal stays 800 until a change is approved', (await p.evaluate(() => S.versions.length > 1)) && (await p.evaluate(() => initialState('A').plan.goal)) === 800);
+}
 // Scenario B: no DEXA (equation RMR), provisional maintenance
 await ctl('scenario', 'B'); await act('openBriefing'); await act('openOptions'); await act('chooseLean');
 d = await p.evaluate(() => S.draft.plan); ok('B: provisional 2,926 → lean draft eat 2,576 / goal 900', d.eat === 2576 && d.goal === 900, JSON.stringify(d));
@@ -204,7 +232,7 @@ const stepB = await p.evaluate(() => S.qc && S.qc.step); ok('B: step limited to 
 await ctl('scenario', 'A'); const approvedEat = await p.evaluate(() => S.plan.eat);
 await act('openBriefing'); await act('openOptions'); await act('chooseLean');
 await p.selectOption('[data-lab="calOn"]', 'on'); await p.fill('[data-lab="cal"]', '1917'); await p.dispatchEvent('[data-lab="cal"]', 'change');
-d = await p.evaluate(() => S.draft.plan); ok('lab: calibrated 1,917 → draft −450/+100 eat 1,567', d.eat === 1567 && d.goal === 900, JSON.stringify(d));
+d = await p.evaluate(() => S.draft.plan); ok('lab: calibrated 1,917 → draft −450/+100 eat 1,567, goal 1,000', d.eat === 1567 && d.goal === 1000, JSON.stringify(d));
 ok('lab: approved target unchanged (2,500)', (await p.evaluate(() => S.plan.eat)) === approvedEat && approvedEat === 2500);
 ok('lab: approved plan now shows derived balance +583', (await p.evaluate(() => planBal(S.plan))) === 583);
 // Scenario C: no wearable, partial logging

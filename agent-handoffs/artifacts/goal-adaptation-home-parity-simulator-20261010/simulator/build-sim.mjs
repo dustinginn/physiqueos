@@ -47,7 +47,7 @@ body { margin:0; background:var(--pg); color:var(--pi); font-family:-apple-syste
 @media (max-width:820px) { .app { grid-template-columns:1fr; } .frame-wrap { position:static; display:flex; flex-direction:column; align-items:center; } }
 </style>
 <div class="app">
-  <div class="intro"><div class="kick">Goal Adaptation · interactive simulator · illustrative data only</div>
+  <div class="intro"><div class="kick">Goal Adaptation · interactive simulator · scenario A uses an Oct 10 snapshot of your records; B and C are illustrative</div>
     <h1>Try adapting Build Lean Mass</h1>
     <div class="simwarn"><b>Functional UX simulation, not the Native visual spec.</b> Screens approximate production visuals so the flow feels real. The released Build 95 Home and app components remain the visual source of truth.</div>
     <p>Start on Home, open the DEXA briefing, review Option B, set up a temporary leaning phase, adjust energy and your plan, approve, then advance simulated weeks to see Home, Goals and briefings respond. Every number is simulated; nothing connects to PhysiqueOS.</p></div>

@@ -1,27 +1,143 @@
 [
   {
-    "name": "A planning maintenance = calibrated 2117",
+    "name": "A: sparse cut month (9/28 logged) excluded, never imputed",
     "pass": true,
-    "got": 2117,
-    "want": 2117
+    "got": [
+      1,
+      "Jun 20",
+      9
+    ],
+    "want": [
+      1,
+      "Jun 20",
+      9
+    ]
   },
   {
-    "name": "A planning source",
+    "name": "A: 3 building periods, 82 of 83 days logged",
     "pass": true,
-    "got": "calibrated",
-    "want": "calibrated"
+    "got": [
+      3,
+      82,
+      83
+    ],
+    "want": [
+      3,
+      82,
+      83
+    ]
   },
   {
-    "name": "A −500 & +100 → eat 1717",
+    "name": "A: mean logged intake 2,546 (monthly 2,349–2,714)",
     "pass": true,
-    "got": 1717,
-    "want": 1717
+    "got": [
+      2546,
+      2349,
+      2714
+    ],
+    "want": [
+      2546,
+      2349,
+      2714
+    ]
   },
   {
-    "name": "A activity goal 800+100 = 900",
+    "name": "A: DEXA fat +4.6, lean +7.1, total +11.6 lb",
     "pass": true,
-    "got": 900,
-    "want": 900
+    "got": [
+      4.6,
+      7.1,
+      11.6
+    ],
+    "want": [
+      4.6,
+      7.1,
+      11.6
+    ]
+  },
+  {
+    "name": "A: stored (4.6×4250 + 7.1×830)/83 = 307/day",
+    "pass": true,
+    "got": 307,
+    "want": 307
+  },
+  {
+    "name": "A: maintenance 2,546 − 307 → 2,240 (rounded to 10)",
+    "pass": true,
+    "got": 2240,
+    "want": 2240
+  },
+  {
+    "name": "A: monthly maintenance 2,325 / 2,353 / 2,024 → range 2,020–2,350",
+    "pass": true,
+    "got": [
+      [
+        2325,
+        2353,
+        2024
+      ],
+      2020,
+      2350
+    ],
+    "want": [
+      [
+        2325,
+        2353,
+        2024
+      ],
+      2020,
+      2350
+    ]
+  },
+  {
+    "name": "A: usual activity = recorded mean 897 → 900, approved Move goal stays 800",
+    "pass": true,
+    "got": [
+      897,
+      900,
+      800
+    ],
+    "want": [
+      897,
+      900,
+      800
+    ]
+  },
+  {
+    "name": "A: no 2,117 anywhere in the scenario",
+    "pass": true,
+    "got": false,
+    "want": false
+  },
+  {
+    "name": "A: maintenance below every month’s intake (gained weight in each)",
+    "pass": true,
+    "got": true,
+    "want": true
+  },
+  {
+    "name": "A planning source calibrated (records)",
+    "pass": true,
+    "got": [
+      "calibrated",
+      "records"
+    ],
+    "want": [
+      "calibrated",
+      "records"
+    ]
+  },
+  {
+    "name": "A −500 & +100 → eat 2,240 − 500 + 100 = 1,840",
+    "pass": true,
+    "got": 1840,
+    "want": 1840
+  },
+  {
+    "name": "A activity goal 900 + 100 = 1,000",
+    "pass": true,
+    "got": 1000,
+    "want": 1000
   },
   {
     "name": "A derived balance −500",
@@ -30,59 +146,29 @@
     "want": -500
   },
   {
-    "name": "Founder regression: naive RMR 1850 + active 900 − intake 1700 = 1050",
+    "name": "A approved 2,500 plan vs 2,240 → +260 (DEXA shows ≈ +307 at 2,546 logged)",
     "pass": true,
-    "got": 1050,
-    "want": 1050
+    "got": 260,
+    "want": 260
   },
   {
-    "name": "naive at 1717 = 1033",
+    "name": "A floor 1,700 (25% below 2,240, rounded up)",
     "pass": true,
-    "got": 1033,
-    "want": 1033
+    "got": 1700,
+    "want": 1700
   },
   {
-    "name": "A bottom-up maintenance (1850+800)/0.9 = 2944",
-    "pass": true,
-    "got": 2944,
-    "want": 2944
-  },
-  {
-    "name": "A gap bottom-up − calibrated = 827",
-    "pass": true,
-    "got": 827,
-    "want": 827
-  },
-  {
-    "name": "A bottom-up difference incl. digestion = −1205",
-    "pass": true,
-    "got": -1205,
-    "want": -1205
-  },
-  {
-    "name": "A approved base plan 2500/800 derived balance +383",
-    "pass": true,
-    "got": 383,
-    "want": 383
-  },
-  {
-    "name": "A floor 1600 (25% below 2117, rounded up)",
-    "pass": true,
-    "got": 1600,
-    "want": 1600
-  },
-  {
-    "name": "A −750 limited to floor 1600, balance −517",
+    "name": "A −750 → 1,490 limited to floor 1,700, balance −540",
     "pass": true,
     "got": [
-      1600,
+      1700,
       true,
-      -517
+      -540
     ],
     "want": [
-      1600,
+      1700,
       true,
-      -517
+      -540
     ]
   },
   {
@@ -100,16 +186,22 @@
     ]
   },
   {
-    "name": "A suggested −450/+100 → 1767/900",
+    "name": "A suggested −450/+100 → 1,890/1,000",
     "pass": true,
     "got": [
-      1767,
-      900
+      1890,
+      1000
     ],
     "want": [
-      1767,
-      900
+      1890,
+      1000
     ]
+  },
+  {
+    "name": "calibration with too few logged days → insufficient, no estimate",
+    "pass": true,
+    "got": "insufficient",
+    "want": "insufficient"
   },
   {
     "name": "B Mifflin–St Jeor (male, 38, 193 cm, 81.2 kg) = 1833",
@@ -192,7 +284,7 @@
     "want": null
   },
   {
-    "name": "after calibration to 1917, approved 1767/+100 shows balance −250",
+    "name": "after recalibration to 2,040, approved 1,890/+100 shows balance −250",
     "pass": true,
     "got": -250,
     "want": -250
