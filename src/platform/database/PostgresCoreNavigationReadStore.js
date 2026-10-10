@@ -6,8 +6,14 @@ import {
 } from "../../domain/services/HealthKitGraduation.js";
 
 // Read models whose Activity / Nutrition rows may show graduated HealthKit days
-// (policy-controlled, OFF by default). Every other model is untouched.
-const HEALTHKIT_GRADUATED_READ_MODELS = new Set(["core.navigation.log", "core.navigation.operating-plan"]);
+// (policy-controlled, OFF by default). Morning Check-In consumes the same
+// owner/date canonical projection so recovery actions cannot contradict Log.
+// Every other model is untouched.
+const HEALTHKIT_GRADUATED_READ_MODELS = new Set([
+  "core.navigation.log",
+  "core.navigation.morning-check-in",
+  "core.navigation.operating-plan",
+]);
 
 export function createPostgresCoreNavigationReadStore({
   pool,

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPostgresCoreNavigationReadStore } from "./PostgresCoreNavigationReadStore.js";
 import { CORE_NAVIGATION_COLLECTIONS } from "../../application/core/CoreNavigationReadService.js";
+import {
+  HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
+  HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION,
+} from "../../domain/services/HealthKitGraduation.js";
 
 describe("PostgreSQL core navigation read store", () => {
   it("accepts the actual Logger collection set including persisted My Library membership", async () => {
@@ -79,6 +83,91 @@ describe("PostgreSQL core navigation read store", () => {
       queryCount: 1,
       compatibilityRuntimeLoadCount: 0,
     }));
+  });
+
+  it("projects owner-scoped HealthKit days into Morning Check-In recovery evidence", async () => {
+    const date = "2026-10-08";
+    const policy = {
+      id: HEALTHKIT_GRADUATION_POLICY_RECORD_ID,
+      schemaVersion: HEALTHKIT_GRADUATION_POLICY_SCHEMA_VERSION,
+      projection: {
+        enabled: true,
+        domains: ["activity", "nutrition"],
+        startLocalDate: "2026-09-21",
+        endLocalDate: null,
+      },
+      evidenceEligibility: { enabled: false },
+      historicalBriefingRegeneration: false,
+    };
+    const activity = {
+      id: `healthkit_canonical_day_activity_${date}`,
+      userId: "owner-one",
+      domain: "activity",
+      localDate: date,
+      revision: 3,
+      semanticFingerprint: "sha256-activity",
+      createdAt: `${date}T07:05:00.000Z`,
+      updatedAt: `${date}T07:10:00.000Z`,
+      current: {
+        coverage: "partial_day",
+        sourceRevision: 3,
+        deliveryDeviceId: "founder-phone",
+        basis: "automatic_background_delivery",
+        values: { dailyActivity: { move_calories: 610 } },
+      },
+      provenance: { sourceObservationIds: ["observation-activity"] },
+    };
+    const nutrition = {
+      ...activity,
+      id: `healthkit_canonical_day_nutrition_${date}`,
+      domain: "nutrition",
+      semanticFingerprint: "sha256-nutrition",
+      current: {
+        ...activity.current,
+        values: {
+          dailyTotals: { calories: 2100, protein_g: 190 },
+          dailyTotalsScope: "partial_day_summary",
+          mealObjects: 0,
+        },
+      },
+    };
+    const query = vi.fn(async (_sql, values) => {
+      if (values?.[1] === "healthKitCanonicalDays") {
+        return { rows: [
+          { payload: activity, version: activity.revision },
+          { payload: nutrition, version: nutrition.revision },
+        ] };
+      }
+      return { rows: [{
+        collection_name: "healthKitConfiguration",
+        source_ordinal: 0,
+        record_id: policy.id,
+        payload: policy,
+      }] };
+    });
+    const store = createPostgresCoreNavigationReadStore({
+      pool: { query },
+      ownerUserId: "owner-one",
+    });
+
+    const result = await store.run(
+      "core.navigation.morning-check-in",
+      ({ readCollections }) => readCollections(["canonicalEvidenceObjects"])
+    );
+
+    expect(result).not.toHaveProperty("healthKitConfiguration");
+    expect(result.canonicalEvidenceObjects).toHaveLength(2);
+    expect(result.canonicalEvidenceObjects.map((item) => [
+      item.userId,
+      item.payload.evidence_type,
+      item.payload.observed_at,
+      item.payload.metadata.coverage,
+    ])).toEqual([
+      ["owner-one", "activity_day", date, "partial_day"],
+      ["owner-one", "nutrition", date, "partial_day"],
+    ]);
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[1][1]).toEqual(["owner-one", "healthKitCanonicalDays"]);
   });
 
   it("rejects unknown collections before querying", async () => {

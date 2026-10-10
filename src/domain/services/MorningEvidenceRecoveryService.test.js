@@ -224,6 +224,29 @@ describe("Morning evidence recovery projection", () => {
     expect(present.evidenceRecoveryItems).toEqual([]);
   });
 
+  it("does not duplicate recovery actions for partial canonical HealthKit days", () => {
+    const activity = dailyProtocol("activity");
+    const nutrition = dailyProtocol("nutrition");
+    const healthKitActivity = canonical("activity_day", {
+      source: { application: "Apple Health", integration: "HealthKit", modality: "direct" },
+      metadata: { coverage: "partial_day" },
+      quality: { status: "partial" },
+    });
+    const healthKitNutrition = canonical("nutrition", {
+      source: { application: "Apple Health", integration: "HealthKit", modality: "direct" },
+      metadata: { completeness: "partial", coverage: "partial_day" },
+      daily_totals: { calories: 1240 },
+      quality: { status: "partial" },
+    });
+    const result = selection({
+      canonicalObjects: [healthKitActivity, healthKitNutrition],
+      protocols: [...activity.protocols, ...nutrition.protocols],
+      protocolVersions: [...activity.protocolVersions, ...nutrition.protocolVersions],
+    });
+
+    expect(result.evidenceRecoveryItems).toEqual([]);
+  });
+
   it("inherits the production-shape daily Activity expectation through accepted protocol lineage", () => {
     const missing = selection(transitionedActivityProtocol());
     expect(missing.evidenceRecoveryItems).toEqual([
