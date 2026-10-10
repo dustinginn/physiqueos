@@ -90,3 +90,17 @@ export function coverageSignalsAsOf(asOf, coverage = FOUNDER_WEEKLY_COVERAGE, wi
 export function adherenceWeeksAsOf(asOf, weeks = FOUNDER_INTAKE_ADHERENCE_WEEKS) {
   return weeks.filter((week) => weekEnded(week.weekStart, asOf));
 }
+
+// Phase B calibration history (production read-only extraction 2026-10-10,
+// sanitized to per-period aggregates between consecutive scans). Intake and
+// activity are mean logged kcal/day; deltas are scan-to-scan in lb.
+export const FOUNDER_CALIBRATION_PERIODS = Object.freeze([
+  { start: "2026-06-20", end: "2026-07-18", days: 28, dLean: 1.3, dFat: -5.6, dTotal: -4.3, intakeDays: 9, intakeMean: 1990, activityDays: 14, activityMean: 1062 },
+  { start: "2026-07-18", end: "2026-08-15", days: 28, dLean: 0.8, dFat: 0, dTotal: 0.9, intakeDays: 27, intakeMean: 2349, activityDays: 27, activityMean: 980 },
+  { start: "2026-08-15", end: "2026-09-12", days: 28, dLean: 5.0, dFat: 1.4, dTotal: 6.4, intakeDays: 28, intakeMean: 2714, activityDays: 28, activityMean: 880 },
+  { start: "2026-09-12", end: "2026-10-09", days: 27, dLean: 1.3, dFat: 3.2, dTotal: 4.3, intakeDays: 27, intakeMean: 2568, activityDays: 27, activityMean: 832 },
+]);
+
+// Oct 9 scan composition and the active Phase 2 targets.
+export const FOUNDER_BODY_OCT9 = Object.freeze({ weightLb: 179.0, leanLb: 154.6, fatLb: 17.4, bodyFatPct: 9.7 });
+export const FOUNDER_PLAN = Object.freeze({ intakeKcal: 2500, activityKcal: 800 });

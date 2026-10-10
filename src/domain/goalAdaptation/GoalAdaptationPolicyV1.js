@@ -157,6 +157,36 @@ export const GOAL_ADAPTATION_POLICY_V1 = deepFreeze({
     calorieDisplayMinimumChangeKcal: 100,
   },
 
+  // Phase B (PROVISIONAL numbers, Founder review required). Energy values are in
+  // the user's own logged-calorie units: calibration compares what the user
+  // logs with what their body did, so a consistent logging bias cancels out.
+  phaseB: {
+    status: "provisional_requires_founder_review",
+    energyDensityKcalPerLb: { fat: 4250, lean: 830, mixedWeightGain: 2500, mixedWeightLoss: 3300 },
+    measurementError: { scanFatLb: 1.0, scanLeanLb: 1.5, intakeLoggingFraction: 0.1 },
+    calibration: {
+      minimumPeriodDays: 21,
+      minimumIntakeCoverage: 0.7,
+      recencyHalfLifeDays: 56,
+      maximumPeriods: 4,
+      confidence: { moderateMaxSpreadKcal: 350, highMaxSpreadKcal: 175, minimumPeriodsForModerate: 2 },
+    },
+    rates: {
+      leaningPercentBodyWeightPerWeek: [0.4, 0.7],
+      leaningFatShareOfLoss: [0.8, 0.95],
+      slowBuildLeanLbPerMonth: [0.5, 1.0],
+      slowBuildSurplusKcal: [150, 250],
+      maintenanceTighteningKcal: [200, 300],
+      cutSlowdownKcal: [150, 250],
+      stallSurplusIncreaseKcal: [100, 200],
+      belowRangeIntakeIncreaseKcal: [100, 200],
+    },
+    guardrailTargetPositionInRange: 0.75,
+    limits: { maximumDeficitFractionOfMaintenance: 0.25, maximumSurplusKcal: 500, roundingKcal: 25 },
+    recommendation: { requireCalibrationConfidenceForEnergyNumbers: "moderate", recommendTopOnlyWhenEvidenceSufficient: true },
+    revalidation: { maximumAgeDays: 14, calibrationShiftKcal: 100 },
+  },
+
   coaching: {
     // Evidence/adherence coaching only ever lands in approved briefing fields.
     placement: {

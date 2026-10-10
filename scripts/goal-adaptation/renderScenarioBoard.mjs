@@ -29,6 +29,45 @@ function scheduleLines(s) {
   ];
 }
 
+const kcal = (rangeValue) => rangeValue ? (rangeValue.low === rangeValue.high ? `${rangeValue.low}` : `${rangeValue.low}–${rangeValue.high}`) : "—";
+const signed = (rangeValue) => rangeValue ? `${rangeValue.low > 0 ? "+" : ""}${rangeValue.low}${rangeValue.low === rangeValue.high ? "" : ` to ${rangeValue.high > 0 ? "+" : ""}${rangeValue.high}`}` : "—";
+function energyCell(e) {
+  if (!e) return "—";
+  if (e.status === "calibrated" || e.status === "unchanged") return `${kcal(e.intakeKcal)} kcal${e.activityKcal != null ? ` · activity ${e.activityKcal}` : ""}${e.changeFromPlanKcal ? `<div class="sub">${signed(e.changeFromPlanKcal)} vs plan${e.clamped ? " · held at safety floor" : ""}</div>` : ""}`;
+  return `<span class="sub">${label(e.status)}</span>`;
+}
+function timelineCell(t) {
+  if (!t) return "—";
+  const parts = [];
+  if (t.phaseWeeks) parts.push(`phase ${t.phaseWeeks.low === t.phaseWeeks.high ? t.phaseWeeks.low : `${t.phaseWeeks.low}–${t.phaseWeeks.high}`} wk`);
+  if (t.goalCompletion) parts.push(`goal ≈ ${t.goalCompletion.earliest} → ${t.goalCompletion.latest}`);
+  return `${parts.join(" · ") || "—"}${t.note ? `<div class="sub">${esc(t.note)}</div>` : ""}`;
+}
+function projectedCell(o) {
+  const p = o.projected ?? {};
+  const bf = p.bodyFatPercentAtCompletion ?? p.bodyFatPercentAtPhaseEnd;
+  const bits = [];
+  if (bf) bits.push(`body fat ${bf.low}–${bf.high}%`);
+  if (p.fatToLoseLb != null) bits.push(`≈${p.fatToLoseLb} lb fat to lose`);
+  if (o.requires?.upperLimitAtLeast) bits.push(`needs upper ≥ ${o.requires.upperLimitAtLeast}%`);
+  if (o.requires?.lowerLimitAtMost) bits.push(`needs lower ≤ ${o.requires.lowerLimitAtMost}%`);
+  return bits.join("<br>") || "—";
+}
+function phaseBSection(r) {
+  const b = r.phaseB;
+  if (!b) return "";
+  const c = b.calibration;
+  const calib = c.status === "calibrated"
+    ? `Maintenance ≈ <b>${c.maintenanceKcal.estimate}</b> logged kcal/day (${c.maintenanceKcal.low}–${c.maintenanceKcal.high})${c.atActivityKcal != null ? ` at ${c.atActivityKcal} kcal activity` : ""} · confidence ${label(c.confidence)} · ${c.periodsUsed} period(s) · ${c.methods.map(label).join(", ")}`
+    : `<b>No calibration</b>: ${label(c.note)}. Calorie targets are withheld.`;
+  const periods = (c.periods ?? []).map((p) => `<tr><td>${p.start} → ${p.end}</td><td>${p.days} d</td><td>${p.intakeMean != null ? Math.round(p.intakeMean) : "—"} (${Math.round((p.intakeCoverage ?? 0) * 100)}% logged)</td><td>${p.activityMean != null ? Math.round(p.activityMean) : "—"}</td><td>${p.used ? `${p.storedKcalPerDay > 0 ? "+" : ""}${p.storedKcalPerDay}` : "—"}</td><td>${p.used ? `${p.maintenanceKcal} ±${p.uncertaintyKcal}` : `<span class="sub">excluded: ${label(p.reason)}</span>`}</td></tr>`).join("");
+  const options = b.options ? `<table class="opts"><tr><th>#</th><th>Option</th><th>Daily intake</th><th>Timeline</th><th>Projected</th><th>Fits limits</th><th>Tradeoffs</th><th>Checks</th></tr>${b.options.options.map((o) => `<tr class="${o.recommended ? "rec" : ""}"><td>${o.rank}</td><td><b>${esc(o.label)}</b>${o.recommended ? ' <span class="pill go">Recommended</span>' : ""}</td><td>${energyCell(o.energy)}</td><td>${timelineCell(o.timeline)}</td><td>${projectedCell(o)}</td><td>${o.fitsLimits === true ? "yes" : o.fitsLimits === false ? "<b>no</b>" : "—"}</td><td>${o.tradeoffs.protects.length ? `<span class="good">+</span> ${esc(o.tradeoffs.protects.join("; "))}` : ""}${o.tradeoffs.costs.length ? `<br><span class="cost">−</span> ${esc(o.tradeoffs.costs.join("; "))}` : ""}</td><td class="sub">${[...o.validation.errors, ...o.validation.warnings].map(label).join("<br>") || "ok"}</td></tr>`).join("")}</table><p class="sub">${esc(label(b.options.note))} · user approval required · nothing applies automatically</p>` : `<p class="sub">No options: Phase A did not reach a proposal for this case.</p>`;
+  const reval = b.revalidation ? `<p><b>Revalidation:</b> ${label(b.revalidation.status)} (${b.revalidation.reasons.map(label).join(", ") || "no material change"}) · age ${b.revalidation.ageDays} days · approval ${b.revalidation.approvalAllowed ? "allowed" : "blocked until refreshed"}</p>` : "";
+  return `<section class="pb"><h4>Phase B: options, calculations and tradeoffs (actual engine output)</h4><p>${calib}</p>
+    ${c.periods?.length ? `<div class="tw"><table class="periods"><tr><th>Period</th><th>Days</th><th>Mean intake</th><th>Activity</th><th>Stored kcal/day</th><th>Maintenance</th></tr>${periods}</table></div>` : ""}
+    <div class="tw">${options}</div>${reval}</section>`;
+}
+
 const rows = run.results.map((r) => `
   <tr data-cat="${r.category}" data-outcome="${r.actual.originatesProposal ? "proposal" : "none"}">
     <td><a href="#s-${r.id}" class="id">${r.id}</a></td>
@@ -38,6 +77,7 @@ const rows = run.results.map((r) => `
     <td>${label(r.actual.eligibility)}</td>
     <td><span class="rung ${r.actual.originatesProposal ? "go" : "hold"}">${label(r.actual.rung)}</span></td>
     <td>${r.actual.originatesProposal ? '<span class="pill go">Proposal</span>' : r.actual.linkOnly ? '<span class="pill">Link only</span>' : '<span class="pill hold">No adaptation</span>'}</td>
+    <td>${r.phaseB?.options ? `${label(r.phaseB.options.options[0].kind)}${r.phaseB.options.recommendedKind ? "" : '<div class="sub">not recommended</div>'}${r.phaseB.options.options[0].energy?.intakeKcal && r.phaseB.options.options[0].energy.status === "calibrated" ? `<div class="sub">${kcal(r.phaseB.options.options[0].energy.intakeKcal)} kcal</div>` : ""}` : r.phaseB?.revalidation ? label(r.phaseB.revalidation.status) : "—"}</td>
     <td>${r.pass ? '<span class="pill pass">PASS</span>' : '<span class="pill fail">FAIL</span>'}</td>
   </tr>`).join("");
 
@@ -78,11 +118,22 @@ const cards = run.results.map((r) => {
         ${r.illustrativeCopy ? `<p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>${esc(r.illustrativeCopy)}</p>` : ""}
       </section>
     </div>
+    ${phaseBSection(r)}
     <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
       ${r.checks.map((c) => `<tr><td>${esc(c.key)}</td><td>${esc(JSON.stringify(c.expected))}</td><td>${esc(JSON.stringify(c.actual))}</td><td>${c.pass ? "✓" : "✗"}</td></tr>`).join("")}
     </table>
   </details>`;
 }).join("");
+
+function featureF1() {
+  const r = run.results.find((item) => item.id === "F1");
+  if (!r?.phaseB?.options) return "";
+  const c = r.phaseB.calibration;
+  return `<div class="feature"><h2 style="margin-top:0">Your Oct 9 situation: what Phase B would offer</h2>
+    <p class="lead">Calibrated from your own logged intake and scans: maintenance ≈ <b>${c.maintenanceKcal.estimate}</b> logged kcal/day (${c.maintenanceKcal.low}–${c.maintenanceKcal.high}) at ${c.atActivityKcal} kcal activity, ${label(c.confidence)} confidence. These are the engine's actual options; the numbers are provisional and nothing changes until you approve.</p>
+    <div class="tw"><table class="opts"><tr><th>#</th><th>Option</th><th>Daily intake</th><th>Timeline</th><th>Projected</th><th>Fits limits</th></tr>${r.phaseB.options.options.map((o) => `<tr class="${o.recommended ? "rec" : ""}"><td>${o.rank}</td><td><b>${esc(o.label)}</b>${o.recommended ? ' <span class="pill go">Recommended</span>' : ""}</td><td>${energyCell(o.energy)}</td><td>${timelineCell(o.timeline)}</td><td>${projectedCell(o)}</td><td>${o.fitsLimits === true ? "yes" : o.fitsLimits === false ? "<b>no</b>" : "—"}</td></tr>`).join("")}</table></div>
+    <p class="sub">See drilldown F1 for the calibration periods and tradeoffs.</p></div>`;
+}
 
 const p = GOAL_ADAPTATION_POLICY_V1;
 const html = `<title>Goal Adaptation Scenario Gate</title>
@@ -125,18 +176,26 @@ table.checks { margin:14px 0 16px } .checks td { overflow-wrap:anywhere }
 .copy { border-radius:12px; padding:10px 12px; margin:0 0 8px; font-size:14px; line-height:1.5 } .copy .tag { display:block; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px }
 .copy.real { background:var(--wash) } .copy.real .tag { color:var(--accent) } .copy.ill { border:1.5px dashed var(--warn) } .copy.ill .tag { color:var(--warn) }
 .notes { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr)); gap:16px } .notes div { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px 18px; font-size:14.5px; line-height:1.55 } .notes ul { margin:6px 0 0; padding-left:18px }
+.pb { background:var(--soft); border-radius:14px; padding:12px 14px; margin-top:16px } .pb p { font-size:14px; line-height:1.55; margin:6px 0 }
+.tw { overflow-x:auto } table.opts, table.periods { width:100%; border-collapse:collapse; font-size:13.5px; margin:8px 0; min-width:860px } .opts th, .opts td, .periods th, .periods td { border-top:1px solid var(--line); padding:7px 8px 7px 0; text-align:left; vertical-align:top } .opts th, .periods th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; border-top:0 }
+tr.rec td { background:var(--wash) } .good { color:var(--good); font-weight:700 } .cost { color:var(--warn); font-weight:700 }
+.feature { background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:16px 20px; margin-top:18px }
 [hidden] { display:none !important }
 </style>
 <div class="wrap">
   <div class="kick">PhysiqueOS · Goal Intelligence · Phase 0/A scenario acceptance gate · dormant, not deployed</div>
   <h1>Goal Adaptation Scenario Gate</h1>
+  <p class="kick" style="margin-top:-2px">Phase B added: ranked options · energy calibration · timelines · validation · revalidation (all numbers provisional)</p>
   <p class="lead">Every row below is produced by the <b>actual Phase A engine</b> (<code>${esc(run.engine)}</code>) under <code>${esc(run.policyVersion)}</code> (draft thresholds, Founder review required). Founder rows reuse sanitized production assessments; all other rows are synthetic and labelled. Coaching text marked "Engine output" is generated by the engine; text marked "Illustrative" is accepted V2 design copy and is not produced by any engine yet.</p>
   <div class="stats">
     <div class="stat"><b>${run.passed}/${run.total}</b><span>scenarios pass expected-vs-actual</span></div>
     <div class="stat"><b>${run.proposalsOriginated}</b><span>would open a proposal for user approval</span></div>
     <div class="stat"><b>${run.noAdaptationOutcomes}</b><span>correctly no adaptation (coaching, watch, link-only, suppressed or nothing)</span></div>
+    <div class="stat"><b>${run.acceptedPhaseAScenarios}</b><span>accepted Phase 0/A scenarios kept as regressions (decisions unchanged)</span></div>
+    <div class="stat"><b>${run.results.filter((item) => item.phaseB?.options?.recommendedKind).length}</b><span>cases with a recommended Phase B option</span></div>
     <div class="stat"><b>0</b><span>automatic goal or phase changes (never allowed)</span></div>
   </div>
+  ${featureF1()}
   <div class="filters" role="group" aria-label="Filter scenarios">
     <button type="button" data-f="all" aria-pressed="true">All</button>
     ${Object.entries(CATEGORY).map(([k, v]) => `<button type="button" data-f="cat:${k}" aria-pressed="false">${v}</button>`).join("")}
@@ -144,7 +203,7 @@ table.checks { margin:14px 0 16px } .checks td { overflow-wrap:anywhere }
     <button type="button" data-f="outcome:none" aria-pressed="false">No adaptation</button>
   </div>
   <div class="tablewrap"><table class="matrix">
-    <tr><th>ID</th><th>Scenario</th><th>Type</th><th>Evidence</th><th>Eligibility</th><th>Engine rung</th><th>Outcome</th><th>Result</th></tr>
+    <tr><th>ID</th><th>Scenario</th><th>Type</th><th>Evidence</th><th>Eligibility</th><th>Engine rung</th><th>Outcome</th><th>Phase B top option</th><th>Result</th></tr>
     ${rows}
   </table></div>
   <h2>Scenario drilldowns</h2>
@@ -165,9 +224,14 @@ table.checks { margin:14px 0 16px } .checks td { overflow-wrap:anywhere }
       <li>Below range while building: watch, review after ${p.belowRange.persistenceWeeklyEvaluations} weekly evaluations or a confirming scan</li>
       <li>Safety exceptions: unsafe-side breach, weight change ≥${p.safetyExceptions.rapidWeightChangePercentPerWeek}%/week, reported health concern</li>
     </ul></div>
-    <div><b>Not exercisable until Phase B/C</b><ul>
-      <li>Ranked options with per-option timing ranges and the energy calibration (Phase B)</li>
-      <li>Persisted recommendations, revalidation on entry/approval, notification and Home priority delivery (Phase B)</li>
+    <div><b>Phase B provisional numbers</b><ul>
+      <li>Energy densities: fat ${p.phaseB.energyDensityKcalPerLb.fat}, lean ${p.phaseB.energyDensityKcalPerLb.lean} kcal/lb; scan error ±${p.phaseB.measurementError.scanFatLb} lb fat, ±${p.phaseB.measurementError.scanLeanLb} lb lean</li>
+      <li>Calibration needs ≥${p.phaseB.calibration.minimumPeriodDays}-day periods with ≥${p.phaseB.calibration.minimumIntakeCoverage * 100}% logged days; recency half-life ${p.phaseB.calibration.recencyHalfLifeDays} days</li>
+      <li>Leaning ${p.phaseB.rates.leaningPercentBodyWeightPerWeek.join("–")}% body weight/week, aiming at ${p.phaseB.guardrailTargetPositionInRange * 100}% of the way up the range; slow build ${p.phaseB.rates.slowBuildLeanLbPerMonth.join("–")} lb lean/month at +${p.phaseB.rates.slowBuildSurplusKcal.join("–")} kcal</li>
+      <li>Safety bounds: never more than ${p.phaseB.limits.maximumDeficitFractionOfMaintenance * 100}% below or ${p.phaseB.limits.maximumSurplusKcal} kcal above calibrated maintenance; recommendations expire after ${p.phaseB.revalidation.maximumAgeDays} days or on a ${p.phaseB.revalidation.calibrationShiftKcal} kcal calibration shift</li>
+    </ul></div>
+    <div><b>Not exercisable until Phase C/D</b><ul>
+      <li>Persisted recommendations, notification and Home priority delivery</li>
       <li>Atomic approval: goal-contract revision, temporary phase, Operating Plan versions, Your Journey events (Phase C)</li>
       <li>Narrative wiring of coaching into published Weekly/Monthly briefings, and all Native screens (Phase C/D)</li>
     </ul></div>
