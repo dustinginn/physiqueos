@@ -1,6 +1,6 @@
 # PhysiqueOS — Backlog Dashboard
 
-**Last reconciled:** 2026-10-09 · **Owner:** Founder  
+**Last reconciled:** 2026-10-09 (Build 95 Founder provisional acceptance) · **Owner:** Founder  
 **Purpose:** Fast, durable status view. Ask ChatGPT: **“Show my PhysiqueOS backlog dashboard”**.
 
 > **Status note:** This is a curated view of known decisions and reports, not a live task runner. Before making release/deployment claims, check the latest GitHub reports and accepted Native release pointers. [Full durable backlog](PHYSIQUEOS_PRODUCT_BACKLOG.md) preserves historical decisions and detailed context. Older entries explicitly superseded by Founder acceptance must not be resurrected.
@@ -9,7 +9,6 @@
 
 | Priority | Workstream | Status / owner | Next meaningful checkpoint | Reference |
 | --- | --- | --- | --- | --- |
-| P1 | **Build 95 — Home startup stabilization** | Codex; tested candidate `cb3d520d`, guarded TestFlight release authorized; final VALID report not yet verified in this dashboard | Confirm release report and physically test cold/warm startup without error flash | [Startup investigation](../reports/20261010T045026Z-build94-postrelease-home-startup-physical-failure.md) |
 | P1 | **Goal Intelligence / Adaptation** | Claude; V2 design accepted; Phase 0 + A authorized, dormant-only | Review Founder-visible actual-engine scenario board (15+ cases), policy thresholds and historical replay before deployment/Phase B | [Roadmap](../reports/20261010T045000Z-goal-adaptation-implementation-roadmap.md) |
 | P2 | **Recovery Intelligence readiness** | New Claude audit assigned; approved Weekly/Monthly design and candidates exist; production publication OFF at last verified audit | Confirm shipped Server/Native integration, qualifying Sleep nights, earliest eligible cadence, and remaining activation gates | [Recovery candidate report](../reports/20261008T200628Z-build93-recovery-founder-approved-correction.md) |
 
@@ -42,7 +41,7 @@
 
 | Item | Closure |
 | --- | --- |
-| Build 94 | TestFlight VALID; Home secondary briefing Option B physically accepted; Home startup subsequently failed physical acceptance and is being stabilized in Build 95 |
+| Build 94 → Build 95 Home startup | Build 95 TestFlight VALID; Founder reports startup working so far. Removed from active backlog; reopen only on a new reported recurrence. |
 | Goal Adaptation V2 designs | Founder accepted Option B and all design decisions; implementation remains separate |
 | Progress Photos flexible cadence | Founder confirmed complete |
 | DEXA → Apple Health prospective writeback | Founder confirmed complete; only optional assurance audit and obsolete UI cleanup remain |
