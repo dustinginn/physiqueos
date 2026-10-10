@@ -1,0 +1,200 @@
+[
+  {
+    "name": "A planning maintenance = calibrated 2117",
+    "pass": true,
+    "got": 2117,
+    "want": 2117
+  },
+  {
+    "name": "A planning source",
+    "pass": true,
+    "got": "calibrated",
+    "want": "calibrated"
+  },
+  {
+    "name": "A −500 & +100 → eat 1717",
+    "pass": true,
+    "got": 1717,
+    "want": 1717
+  },
+  {
+    "name": "A activity goal 800+100 = 900",
+    "pass": true,
+    "got": 900,
+    "want": 900
+  },
+  {
+    "name": "A derived balance −500",
+    "pass": true,
+    "got": -500,
+    "want": -500
+  },
+  {
+    "name": "Founder regression: naive RMR 1850 + active 900 − intake 1700 = 1050",
+    "pass": true,
+    "got": 1050,
+    "want": 1050
+  },
+  {
+    "name": "naive at 1717 = 1033",
+    "pass": true,
+    "got": 1033,
+    "want": 1033
+  },
+  {
+    "name": "A bottom-up maintenance (1850+800)/0.9 = 2944",
+    "pass": true,
+    "got": 2944,
+    "want": 2944
+  },
+  {
+    "name": "A gap bottom-up − calibrated = 827",
+    "pass": true,
+    "got": 827,
+    "want": 827
+  },
+  {
+    "name": "A bottom-up difference incl. digestion = −1205",
+    "pass": true,
+    "got": -1205,
+    "want": -1205
+  },
+  {
+    "name": "A approved base plan 2500/800 derived balance +383",
+    "pass": true,
+    "got": 383,
+    "want": 383
+  },
+  {
+    "name": "A floor 1600 (25% below 2117, rounded up)",
+    "pass": true,
+    "got": 1600,
+    "want": 1600
+  },
+  {
+    "name": "A −750 limited to floor 1600, balance −517",
+    "pass": true,
+    "got": [
+      1600,
+      true,
+      -517
+    ],
+    "want": [
+      1600,
+      true,
+      -517
+    ]
+  },
+  {
+    "name": "1:1: +200 activity → +200 eat and +200 goal",
+    "pass": true,
+    "got": [
+      200,
+      200,
+      -450
+    ],
+    "want": [
+      200,
+      200,
+      -450
+    ]
+  },
+  {
+    "name": "A suggested −450/+100 → 1767/900",
+    "pass": true,
+    "got": [
+      1767,
+      900
+    ],
+    "want": [
+      1767,
+      900
+    ]
+  },
+  {
+    "name": "B Mifflin–St Jeor (male, 38, 193 cm, 81.2 kg) = 1833",
+    "pass": true,
+    "got": 1833,
+    "want": 1833
+  },
+  {
+    "name": "B provisional planning maintenance 2926",
+    "pass": true,
+    "got": [
+      2926,
+      "provisional"
+    ],
+    "want": [
+      2926,
+      "provisional"
+    ]
+  },
+  {
+    "name": "B range is wide (±426)",
+    "pass": true,
+    "got": [
+      2500,
+      3352
+    ],
+    "want": [
+      2500,
+      3352
+    ]
+  },
+  {
+    "name": "B −450/+100 → 2576/900",
+    "pass": true,
+    "got": [
+      2576,
+      900
+    ],
+    "want": [
+      2576,
+      900
+    ]
+  },
+  {
+    "name": "B base plan 2500/800 derived balance −426",
+    "pass": true,
+    "got": -426,
+    "want": -426
+  },
+  {
+    "name": "C bottom-up = RMR × 1.4 = 2566",
+    "pass": true,
+    "got": 2566,
+    "want": 2566
+  },
+  {
+    "name": "C cannot calibrate with partial logging",
+    "pass": true,
+    "got": "provisional",
+    "want": "provisional"
+  },
+  {
+    "name": "C no activity goal, no extra activity; eat 2116",
+    "pass": true,
+    "got": [
+      null,
+      0,
+      2116
+    ],
+    "want": [
+      null,
+      0,
+      2116
+    ]
+  },
+  {
+    "name": "C naive difference unavailable without activity data",
+    "pass": true,
+    "got": null,
+    "want": null
+  },
+  {
+    "name": "after calibration to 1917, approved 1767/+100 shows balance −250",
+    "pass": true,
+    "got": -250,
+    "want": -250
+  }
+]

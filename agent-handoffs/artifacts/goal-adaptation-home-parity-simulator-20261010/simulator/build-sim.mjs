@@ -3,7 +3,7 @@ import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath }
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const r = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
 const css = r('phone.css') + '\n' + r('components.css');
-const js = [r('chrome.js'), r('../home/home-render.js'), r('sim.js')].join('\n;\n').replace(/font-family:Jakarta/g, "font-family:'Plus Jakarta Sans'");
+const js = [r('chrome.js'), r('energy-model.js'), r('../home/home-render.js'), r('sim.js')].join('\n;\n').replace(/font-family:Jakarta/g, "font-family:'Plus Jakarta Sans'");
 const html = `<title>Goal Adaptation Simulator</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
 <style>
@@ -36,6 +36,12 @@ body { margin:0; background:var(--pg); color:var(--pi); font-family:-apple-syste
 .pn-btns button.warn { color:var(--pr); border-color:var(--pr); }
 .pn-btns button:focus-visible, [data-act]:focus-visible { outline:2px solid var(--pt); outline-offset:2px; }
 .pn-note { font-size:12.5px; color:var(--pm); margin:8px 0 0; line-height:1.45; }
+.lab-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+.lab-f { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--pi2); min-width:0; }
+.lab-f input, .lab-f select { font:inherit; font-size:14px; padding:7px 9px; border-radius:9px; border:1px solid var(--pl); background:transparent; color:var(--pi); min-width:0; }
+.lab-f input:focus-visible, .lab-f select:focus-visible { outline:2px solid var(--pt); }
+.lab-t { width:100%; border-collapse:collapse; margin-top:12px; font-size:13px; font-variant-numeric:tabular-nums; }
+.lab-t td { border-top:1px solid var(--pl); padding:6px 4px; vertical-align:top; } .lab-t td:last-child { text-align:right; } .lab-t small { color:var(--pm); }
 .pn-log { margin:0; padding-left:18px; font-size:12.5px; color:var(--pi2); line-height:1.5; max-height:220px; overflow:auto; }
 [data-act] { cursor:pointer; }
 @media (max-width:820px) { .app { grid-template-columns:1fr; } .frame-wrap { position:static; display:flex; flex-direction:column; align-items:center; } }

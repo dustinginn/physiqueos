@@ -42,7 +42,7 @@
   {
     "name": "blend −450 → eat 1,892 goal 1,025 (1:1)",
     "pass": true,
-    "info": "{\"mode\":\"build\",\"balance\":-450,\"eat\":1892,\"added\":225,\"goal\":1025,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false}"
+    "info": "{\"mode\":\"build\",\"eat\":1892,\"added\":225,\"goal\":1025,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-450}"
   },
   {
     "name": "eat less → 1,667 / 800",
@@ -66,6 +66,36 @@
   },
   {
     "name": "explainer not repeated",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Founder case: −500 & +100 → eat 1,717, goal 900",
+    "pass": true,
+    "info": "{\"mode\":\"build\",\"eat\":1717,\"added\":100,\"goal\":900,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-500}"
+  },
+  {
+    "name": "energy screen shows maintenance source",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Why: RMR 1,850 DEXA report estimate",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Why: naive 1,850 + 900 − 1,717 = 1,033 labelled not a deficit",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Why: bottom-up 2,944 vs calibrated 2,117, gap explained",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Why: plan arithmetic 2,117 − 500 + 100 = 1,717 and 800 + 100 = 900",
     "pass": true,
     "info": ""
   },
@@ -100,9 +130,14 @@
     "info": "{\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1767,\"goal\":900,\"balance\":-450,\"v\":2,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":true,\"stack\":0}"
   },
   {
-    "name": "QC blend: eat −100, goal +100, balance −200 deeper",
+    "name": "QC blend: eat and goal change 1:1, maintenance recalibrated, planned balance restored",
     "pass": true,
-    "info": "{\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1767,\"goal\":900,\"balance\":-450,\"v\":2,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":true,\"stack\":0} → {\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1667,\"goal\":1000,\"balance\":-650,\"v\":3,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":false,\"stack\":0}"
+    "info": "{\"step\":-250,\"fromM\":2117,\"target\":-450} {\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1767,\"goal\":900,\"balance\":-450,\"v\":2,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":true,\"stack\":0} → {\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1642,\"goal\":1025,\"balance\":-450,\"v\":3,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":false,\"stack\":0} M=1867"
+  },
+  {
+    "name": "QC recalibrated maintenance below 2,117",
+    "pass": true,
+    "info": "1867"
   },
   {
     "name": "Midweek never proposes",
@@ -112,7 +147,7 @@
   {
     "name": "phase completes → DEXA decision",
     "pass": true,
-    "info": "{\"screen\":\"briefing\",\"phase\":\"leaningComplete\",\"eat\":1667,\"goal\":1000,\"balance\":-650,\"v\":3,\"bf\":8.817885900291248,\"gained\":6.845454545454546,\"qc\":false,\"stack\":0}"
+    "info": "{\"screen\":\"briefing\",\"phase\":\"leaningComplete\",\"eat\":1642,\"goal\":1025,\"balance\":-450,\"v\":3,\"bf\":8.772177937773211,\"gained\":6.832727272727273,\"qc\":false,\"stack\":0}"
   },
   {
     "name": "Home phase complete concise + priority",
@@ -166,6 +201,71 @@
   },
   {
     "name": "simulation label present",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "B: provisional 2,926 → lean draft eat 2,576 / goal 900",
+    "pass": true,
+    "info": "{\"mode\":\"build\",\"eat\":2576,\"added\":100,\"goal\":900,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-450}"
+  },
+  {
+    "name": "B: provisional warning shown",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "B: real maintenance lower than provisional → Quick Calibration offered",
+    "pass": true,
+    "info": "{\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":2576,\"goal\":900,\"balance\":-450,\"v\":2,\"bf\":9.92804556743812,\"gained\":7.6292,\"qc\":true,\"stack\":0}"
+  },
+  {
+    "name": "B: step limited to −300",
+    "pass": true,
+    "info": "-300"
+  },
+  {
+    "name": "lab: calibrated 1,917 → draft −450/+100 eat 1,567",
+    "pass": true,
+    "info": "{\"mode\":\"build\",\"eat\":1567,\"added\":100,\"goal\":900,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-450}"
+  },
+  {
+    "name": "lab: approved target unchanged (2,500)",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "lab: approved plan now shows derived balance +583",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "C: no activity goal, eat 2,566 − 450 = 2,116",
+    "pass": true,
+    "info": "{\"mode\":\"build\",\"eat\":2116,\"added\":0,\"goal\":null,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false,\"balance\":-450}"
+  },
+  {
+    "name": "C: Move more / Blend hidden, activity explained",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "C: partial logging → no Quick Calibration",
+    "pass": true,
+    "info": "{\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":2116,\"goal\":null,\"balance\":-450,\"v\":2,\"bf\":9.599150823741665,\"gained\":7.065381818181818,\"qc\":false,\"stack\":0}"
+  },
+  {
+    "name": "C: complete logging → Quick Calibration with eat-only options",
+    "pass": true,
+    "info": "[\"eat\",\"custom\"]"
+  },
+  {
+    "name": "no inert controls on screen",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "every data-act in source has a handler",
     "pass": true,
     "info": ""
   },

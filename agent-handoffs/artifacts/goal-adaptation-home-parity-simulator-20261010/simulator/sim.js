@@ -14,50 +14,56 @@ const fmt = (v) => Math.round(v).toLocaleString('en-US');
 const sgn = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(v));
 const f1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
 
-const BASE_PLAN = { mode: 'build', balance: 383, eat: 2500, added: 0, goal: 800, trainingGoals: null, progression: 'Moderate', recovery: ['Foam Rolling'], sleepGoal: null, supplements: ['Tongkat Ali', 'Electrolytes'], photos: true, dexa: false };
-function initialState() {
+const BASE_PLAN = { mode: 'build', eat: 2500, added: 0, goal: 800, trainingGoals: null, progression: 'Moderate', recovery: ['Foam Rolling'], sleepGoal: null, supplements: ['Tongkat Ali', 'Electrolytes'], photos: true, dexa: false };
+function initialState(scenario = 'A') {
+  const E = cloneScenario(scenario);
   return {
+    E,
     day: 0, screen: 'home', stack: [], theme: 'dark', toast: null,
     phase: 'building', // building | leaning | leaningComplete | resumed | maintaining | keepBuilding
     phaseStartDay: null, completion: { mode: 'outcome', weeks: 6 },
     body: { weight: 179.0, fat: 17.4, lean: 154.6, other: 7.0 },
-    gained: 7.1, maintenanceEst: 2117, trueMaintenance: 2117, response: 'asEstimated',
+    gained: 7.1, response: 'asEstimated',
     guardrail: { min: 8, max: 9 }, goalDate: 'Oct 31',
-    plan: { ...BASE_PLAN },
+    plan: { ...BASE_PLAN, goal: E.usual == null ? null : E.usual },
     draft: null, explainerSeen: false,
     decision: { open: true, source: 'Oct 9 DEXA', dismissed: false, kind: 'adapt' },
     qc: null, observeUntil: null, lastQcDay: null,
-    versions: [{ v: 1, day: -56, label: 'Lean Mass Build started', detail: 'Eat 2,500 · activity goal 800 · range 8–9%', snap: null }],
-    undo: null, weeklyLog: [], log: ['Simulation started · Oct 10 (simulated)'],
+    versions: [{ v: 1, day: -56, label: 'Lean Mass Build started', detail: `Eat 2,500 · activity goal ${E.usual == null ? '—' : '800'} · range 8–9%`, snap: null }],
+    undo: null, weeklyLog: [], log: [`Simulation started · scenario ${E.key} · Oct 10 (simulated)`],
   };
 }
 let S = initialState();
-const snap = () => JSON.parse(JSON.stringify({ phase: S.phase, phaseStartDay: S.phaseStartDay, completion: S.completion, guardrail: S.guardrail, goalDate: S.goalDate, plan: S.plan, decision: S.decision, qc: S.qc, observeUntil: S.observeUntil }));
+const snap = () => JSON.parse(JSON.stringify({ E: S.E, phase: S.phase, phaseStartDay: S.phaseStartDay, completion: S.completion, guardrail: S.guardrail, goalDate: S.goalDate, plan: S.plan, decision: S.decision, qc: S.qc, observeUntil: S.observeUntil }));
 const bf = (b = S.body) => (b.fat / b.weight) * 100;
 const inPhaseWeeks = () => (S.phaseStartDay == null ? 0 : Math.floor((S.day - S.phaseStartDay) / 7));
 
-// ---------------- energy model (1:1) -----------------
-const FLOOR = (m) => Math.ceil((m * (1 - 0.25)) / 25) * 25;
+// ---------------- energy model (1:1, see energy-model.js) -----------------
+const M = () => planningMaintenance(S.E).value;
+const planBal = (p) => derivedBalance(S.E, p);
+const fmtG = (g) => (g == null ? '—' : fmt(g));
+const hasActivity = () => S.E.usual != null;
+const truth = () => S.E.truth - (S.response === 'slower' ? 250 : 0);
 function energyFrom(balance, split, custom) {
-  const added = split === 'eat' ? 0 : split === 'move' ? Math.min(500, Math.max(0, -balance)) : split === 'blend' ? Math.min(500, Math.max(0, Math.round(-balance / 2))) : split === 'custom' ? Math.max(0, Math.min(500, custom ?? 100)) : (balance < 0 ? 100 : 0);
-  let eat = S.maintenanceEst + balance + added;
-  const floor = FLOOR(S.maintenanceEst);
-  const limited = eat < floor;
-  if (limited) eat = floor;
-  return { balance: limited ? eat - S.maintenanceEst - added : balance, eat, added, goal: 800 + added, limited, floor };
+  const usual = hasActivity();
+  const added = !usual ? 0 : split === 'eat' ? 0 : split === 'move' ? Math.min(500, Math.max(0, -balance)) : split === 'blend' ? Math.min(500, Math.max(0, Math.round(-balance / 2))) : split === 'custom' ? Math.max(0, Math.min(500, custom ?? 100)) : (balance < 0 ? 100 : 0);
+  return targetsFromBalance(S.E, balance, added);
 }
 function rateRange(balance) {
-  const lo = (balance - 141) * 7, hi = (balance + 141) * 7;
+  const pm = planningMaintenance(S.E); const half = (pm.high - pm.low) / 2;
+  const lo = (balance - half) * 7, hi = (balance + half) * 7;
   const d = balance < 0 ? 3300 : 2500;
-  const a = Math.abs(lo / d), b = Math.abs(hi / d);
   if (Math.abs(balance) < 60) return 'about steady';
+  if (lo < 0 && hi > 0) return balance < 0 ? 'could be anywhere from a loss to a small gain (wide estimate)' : 'could be anywhere from a small loss to a gain (wide estimate)';
+  const a = Math.abs(lo / d), b = Math.abs(hi / d);
   return balance < 0 ? `≈ ${f1(Math.min(a, b))}–${f1(Math.max(a, b))} lb/week loss` : `≈ ${f1(Math.min(a, b) * 4.33)}–${f1(Math.max(a, b) * 4.33)} lb/month gain`;
 }
+const maintLabel = () => { const pm = planningMaintenance(S.E); return pm.source === 'calibrated' ? `${fmt(pm.value)} (calibrated${S.E.key === 'A' && !S.E.recalibrated ? ', illustrative' : ''})` : `${fmt(pm.value)} (provisional estimate)`; };
 
 // ---------------- simulated evidence -----------------
 function simulateWeek() {
   const p = S.plan;
-  const net = p.eat - S.trueMaintenance - p.added; // real daily balance
+  const net = p.eat - truth() - (p.added || 0); // simulated real daily balance
   const dw = (net * 7) / (net < 0 ? 3300 : 2500);
   let fatShare, leanShare;
   if (net < 0) { fatShare = 0.85; leanShare = 0.12; } else { fatShare = 0.45; leanShare = 0.5; }
@@ -65,7 +71,7 @@ function simulateWeek() {
   S.body.weight += dw; S.body.fat += dw * fatShare; S.body.lean += dw * leanShare; S.body.other += dw * (1 - fatShare - leanShare);
   S.gained += dw * leanShare;
   S.day += 7;
-  S.weeklyLog.push({ day: S.day, dw, bf: bf(), expected: (S.plan.balance * 7) / 3300 });
+  S.weeklyLog.push({ day: S.day, dw, bf: bf(), expected: (planBal(S.plan) * 7) / 3300 });
   S.log.unshift(`${dateLabel(S.day)} · simulated week: weight ${sgn(dw * 10) === '0' ? '±0' : (dw >= 0 ? '+' : '−') + f1(Math.abs(dw))} lb, body fat ${f1(bf())}%`);
   if (S.undo && S.undo.day < S.day) S.undo = null;
   evaluateAfterWeek(before);
@@ -85,13 +91,13 @@ function evaluateAfterWeek() {
     // Quick Calibration eligibility: ≥3 weeks of evidence, outside observation window, slower than planned
     const last = S.weeklyLog.slice(-3);
     const observed = last.reduce((a, w) => a + w.dw, 0) / Math.max(1, last.length);
-    const expected = (S.plan.balance * 7) / 3300;
-    const eligible = weeks >= 3 && (!S.observeUntil || S.day >= S.observeUntil) && observed > expected * 0.7 && !S.qc;
+    const expected = (planBal(S.plan) * 7) / 3300;
+    const eligible = weeks >= 3 && S.E.logging === 'complete' && (!S.observeUntil || S.day >= S.observeUntil) && observed > expected * 0.7 && !S.qc;
     if (eligible) {
       const impliedNet = (observed * 3300) / 7;
-      const gap = Math.round((S.plan.balance - impliedNet) / 50) * 50; // negative means deficit smaller than planned
-      const step = Math.max(-200, Math.min(-100, gap));
-      S.qc = { step, observed, expected, created: S.day, opt: null, custom: { eatLess: Math.round(-step * 0.75 / 25) * 25, moveMore: Math.round(-step * 0.25 / 25) * 25 } };
+      const gap = Math.round((planBal(S.plan) - impliedNet) / 25) * 25; // negative: real deficit smaller than planned
+      const step = Math.max(-300, Math.min(-100, gap));
+      S.qc = { step, observed, expected, created: S.day, opt: null, fromM: M(), target: planBal(S.plan), custom: { eatLess: hasActivity() ? Math.round(-step * 0.75 / 25) * 25 : -step, moveMore: hasActivity() ? Math.round(-step * 0.25 / 25) * 25 : 0 } };
       S.log.unshift(`${dateLabel(S.day)} · Weekly briefing suggests a Quick Calibration (${sgn(step)} kcal/day)`);
     }
   }
@@ -221,39 +227,42 @@ SCREENS.briefing = () => {
       <p class="t-sm" style="margin-top:6px">${wk ? `Weight ${wk.dw < 0 ? '−' : '+'}${f1(Math.abs(wk.dw))} lb this week · body fat ${f1(wk.bf)}%` : 'No simulated week yet. Use “Advance a week”.'}</p>
       <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${tag(`Strategy: ${leaning ? 'Leaning (temporary)' : 'Lean Mass Build'}`)}${leaning ? tag(`Week ${inPhaseWeeks()}`) : ''}</div></div>
     ${stubCards('Energy · Weight · Body Composition · Training · Recovery (layout unchanged)')}
-    ${coach('Coach’s Take', leaning ? [['Biggest Takeaway', S.qc ? 'You followed the plan, but fat loss is slower than planned.' : 'Fat is coming down and your lifts are holding, so the lean mass you built is protected.'], ['What To Do', 'Keep training heavy; it’s what protects lean mass while you eat less.'], ['Into Next Week', `Eat ${fmt(S.plan.eat)} · activity goal ${fmt(S.plan.goal)}.`]] : [['Biggest Takeaway', 'Training and logging stayed consistent.'], ['Into Next Week', `Eat ${fmt(S.plan.eat)} · activity goal ${fmt(S.plan.goal)}.`]])}
+    ${coach('Coach’s Take', leaning ? [['Biggest Takeaway', S.qc ? 'You followed the plan, but fat loss is slower than planned.' : 'Fat is coming down and your lifts are holding, so the lean mass you built is protected.'], ['What To Do', 'Keep training heavy; it’s what protects lean mass while you eat less.'], ['Into Next Week', `Eat ${fmt(S.plan.eat)} · activity goal ${fmtG(S.plan.goal)}.`]] : [['Biggest Takeaway', 'Training and logging stayed consistent.'], ['Into Next Week', `Eat ${fmt(S.plan.eat)} · activity goal ${fmtG(S.plan.goal)}.`]])}
     ${S.qc ? qcCard() : '<p class="t-xs muted" style="text-align:center">No suggestion this week, so nothing appears below Coach’s Take.</p>'}
   </div>`;
 };
 function qcCard() {
-  const q = S.qc;
-  const opts = { eat: { label: 'Eat less', eat: q.step, move: 0 }, move: { label: 'Move more', eat: 0, move: -q.step }, blend: { label: 'Blend', eat: Math.round(q.step / 2 / 25) * 25, move: -Math.round(q.step / 2 / 25) * 25 }, custom: { label: 'Custom', eat: -q.custom.eatLess, move: q.custom.moveMore } };
+  const q = S.qc; const act = hasActivity();
+  const half = Math.round(q.step / 2 / 25) * 25;
+  const opts = { eat: { label: 'Eat less', eat: q.step, move: 0 }, ...(act ? { move: { label: 'Move more', eat: 0, move: -q.step }, blend: { label: 'Blend', eat: half, move: q.step - half === 0 ? 0 : -(q.step - half) } } : {}), custom: { label: 'Custom', eat: -q.custom.eatLess, move: act ? q.custom.moveMore : 0 } };
   const sel = q.opt ? opts[q.opt] : null;
-  const newEat = sel ? S.plan.eat + sel.eat : S.plan.eat, newGoal = sel ? S.plan.goal + sel.move : S.plan.goal;
+  const newEat = sel ? S.plan.eat + sel.eat : S.plan.eat, newGoal = sel && S.plan.goal != null ? S.plan.goal + sel.move : S.plan.goal;
   const change = sel ? sel.eat - sel.move : q.step;
-  const floor = FLOOR(S.maintenanceEst + q.step);
+  const newM = q.fromM + q.step;
+  const floor = floorFor(newM);
   const bad = sel && (newEat < floor || Math.abs(change) > 300 || change === 0);
   return `<div class="card selected">
     <div class="row between"><span class="eyebrow amber">Quick calibration</span>${tag('Checked', 'teal')}</div>
-    <div class="display h3" style="margin-top:8px">Deepen your daily deficit by ${fmt(-q.step)}</div>
-    <p class="t-sm ink2" style="margin-top:6px">Your ${sgn(S.plan.balance)} plan behaved like about ${sgn(Math.round((q.observed * 3300) / 7 / 10) * 10)}. A modest step brings you back on pace.</p>
-    <div class="qgrid" role="radiogroup" aria-label="How">${Object.entries(opts).map(([k, o]) => `<div class="qtile ${q.opt === k ? 'on' : ''}" role="radio" aria-checked="${q.opt === k}" tabindex="0" data-act="qcOpt" data-arg="${k}"><b>${o.label}</b><span>${k === 'custom' ? 'Set your own' : `eat ${fmt(S.plan.eat + o.eat)} · goal ${fmt(S.plan.goal + o.move)}`}</span></div>`).join('')}</div>
+    <div class="display h3" style="margin-top:8px">Add ${fmt(-q.step)} to your daily deficit</div>
+    <p class="t-sm ink2" style="margin-top:6px">Your logged intake and weight trend suggest maintenance is about ${fmt(newM)}, not ${fmt(q.fromM)}. So your ${sgn(q.target)} plan has been closer to ${sgn(q.target - q.step)}. Adding ${fmt(-q.step)} a day keeps you on pace.</p>
+    <div class="qgrid" role="radiogroup" aria-label="How">${Object.entries(opts).map(([k, o]) => `<div class="qtile ${q.opt === k ? 'on' : ''}" role="radio" aria-checked="${q.opt === k}" tabindex="0" data-act="qcOpt" data-arg="${k}"><b>${o.label}</b><span>${k === 'custom' ? 'Set your own' : `eat ${fmt(S.plan.eat + o.eat)}${act ? ` · goal ${fmtG(S.plan.goal + o.move)}` : ''}`}</span></div>`).join('')}</div>
+    ${act ? '' : '<p class="t-xs muted" style="margin-top:6px">Move more and Blend need activity data.</p>'}
     ${q.opt === 'custom' ? `<div class="row between" style="margin-top:10px"><span class="t-sm ink2">Eat less by</span><div class="mini-step"><span data-act="qcStep" data-arg="eatLess:-25" role="button" tabindex="0">−25</span><span data-act="qcStep" data-arg="eatLess:25" role="button" tabindex="0">+25</span></div><b>${q.custom.eatLess}</b></div>
-      <div class="row between" style="margin-top:8px"><span class="t-sm ink2">Move more by</span><div class="mini-step"><span data-act="qcStep" data-arg="moveMore:-25" role="button" tabindex="0">−25</span><span data-act="qcStep" data-arg="moveMore:25" role="button" tabindex="0">+25</span></div><b>${q.custom.moveMore}</b></div>` : ''}
-    <div class="card soft" style="margin-top:10px;padding:8px 12px"><div class="kv" style="padding:5px 0"><span class="k">Eat</span><span class="v">${fmt(newEat)}</span></div><div class="kv" style="padding:5px 0"><span class="k">Activity goal</span><span class="v">${fmt(newGoal)}</span></div><div class="kv" style="padding:5px 0"><span class="k">Planned balance</span><span class="v">${sgn(S.plan.balance + change)}</span></div></div>
+      ${act ? `<div class="row between" style="margin-top:8px"><span class="t-sm ink2">Move more by</span><div class="mini-step"><span data-act="qcStep" data-arg="moveMore:-25" role="button" tabindex="0">−25</span><span data-act="qcStep" data-arg="moveMore:25" role="button" tabindex="0">+25</span></div><b>${q.custom.moveMore}</b></div>` : ''}` : ''}
+    <div class="card soft" style="margin-top:10px;padding:8px 12px"><div class="kv" style="padding:5px 0"><span class="k">Eat</span><span class="v">${fmt(newEat)}</span></div><div class="kv" style="padding:5px 0"><span class="k">Activity goal</span><span class="v">${fmtG(newGoal)}</span></div><div class="kv" style="padding:5px 0"><span class="k">Planned balance (vs ${fmt(newM)})</span><span class="v">${sgn(newEat - newM - ((S.plan.added || 0) + (sel ? sel.move : 0)))}</span></div></div>
     ${sel && newEat < floor ? `<div class="ewarn red">${I.warn}<span>Eating can’t go below ${fmt(floor)} (provisional floor).</span></div>` : ''}
     ${sel && Math.abs(change) > 300 ? `<div class="ewarn amber">${I.warn}<span>Changes over 300 a day go to a full plan review.</span></div>` : ''}
-    <div class="row" style="margin-top:12px">${sel ? btn(bad ? 'Adjust the amount' : `Accept: eat ${fmt(newEat)} · goal ${fmt(newGoal)}`, bad ? 'noop' : 'qcAccept', bad ? 'disabled grow' : 'primary grow') : '<div class="btn disabled grow">Choose how</div>'}</div>
+    <div class="row" style="margin-top:12px">${sel ? btn(bad ? 'Adjust the amount' : `Accept: eat ${fmt(newEat)}${act ? ` · goal ${fmtG(newGoal)}` : ''}`, bad ? 'noop' : 'qcAccept', bad ? 'disabled grow' : 'primary grow') : '<div class="btn disabled grow">Choose how</div>'}</div>
     <div class="row between" style="margin-top:6px"><span class="t-sm semi" style="color:var(--teal)" data-act="go" data-arg="qcWhy" role="button" tabindex="0">Why?</span><span class="t-sm semi muted" data-act="qcLater" role="button" tabindex="0">Not now</span></div>
   </div>`;
 }
-SCREENS.qcWhy = () => { const q = S.qc; return `${statusBar()}${sNav('Weekly', 'Why this change')}
+SCREENS.qcWhy = () => { const q = S.qc; const real = Math.round((q.observed * 3300) / 7 / 10) * 10; return `${statusBar()}${sNav('Weekly', 'Why this change')}
   <div class="content stack"><div class="display h2">Why ${fmt(-q.step)}?</div>
-  <div class="card"><div class="kv"><span class="k">You followed the plan</span><span class="v">logging and activity on plan ${simTag}</span></div>
+  <div class="card"><div class="kv"><span class="k">Logging</span><span class="v">complete enough to calibrate ${simTag}</span></div>
   <div class="kv"><span class="k">Weight trend</span><span class="v">${f1(q.observed)} lb/week (planned ${f1(q.expected)})</span></div>
-  <div class="kv"><span class="k">What that means</span><span class="v">Real balance ≈ ${sgn(Math.round((q.observed * 3300) / 7 / 10) * 10)}/day</span></div></div>
-  <p class="t-sm ink2">Logs and wearables have margins of error; results show the real balance. We suggest a modest step, then watch for 3 weeks before suggesting anything else.</p></div>`; };
-
+  <div class="kv"><span class="k">Real balance implied</span><span class="v">≈ ${sgn(real)}/day (planned ${sgn(q.target)})</span></div>
+  <div class="kv"><span class="k">Maintenance</span><span class="delta"><s>${fmt(q.fromM)}</s><span class="v">≈ ${fmt(q.fromM + q.step)}</span></span></div></div>
+  <p class="t-sm ink2">These are logged calories: the comparison between what you logged and how your weight changed. Logs, wearables and RMR estimates all carry error, so we move in modest steps and watch for 3 weeks before suggesting anything else.</p></div>`; };
 SCREENS.monthly = () => { const leaning = S.phase === 'leaning'; return `${statusBar()}${sNav('Home', 'Monthly Briefing')}
   <div class="content stack"><div class="row between"><span class="eyebrow">Monthly · ${dateLabel(S.day)}</span>${simTag}</div>
   ${stubCards('Hero · Goal Milestone · Training · Energy · Recovery · New Baseline · What Changed · Defining Moments (layout unchanged)')}
@@ -309,7 +318,7 @@ SCREENS.leanSetup = () => { const d = S.draft; return `${statusBar()}${sNav('Opt
       ${[['outcome', 'When I’m back in range', '8–9% body fat. A DEXA confirms it best; otherwise we estimate from trends.'], ['time', 'After a set time', 'Then we review together'], ['hybrid', 'Whichever comes first', 'Back in range, or the time limit']].map(([k, t, sub]) => `<div class="choice" data-act="setCompletion" data-arg="${k}" role="radio" aria-checked="${d.completion.mode === k}" tabindex="0">${radio(d.completion.mode === k)}<div class="grow"><div class="t-body strong">${t}</div><div class="t-sm ink2">${sub}</div></div></div>`).join('')}
     </div>${d.completion.mode !== 'outcome' ? `<div class="row between" style="margin-top:6px"><span class="t-sm ink2">Time limit</span><div class="stepper"><span data-act="weeks" data-arg="-1" role="button" tabindex="0">−</span><b>${d.completion.weeks} weeks</b><span data-act="weeks" data-arg="1" role="button" tabindex="0">+</span></div></div>` : ''}
     <p class="t-xs muted" style="margin-top:6px">Nothing ends or restarts on its own; you choose what’s next.</p></div>
-    <div class="card" style="padding:0 16px"><div class="srow" data-act="openEnergy" role="button" tabindex="0"><span class="ic amber">${I.bolt}</span><div class="grow"><div class="nm">Daily energy</div><div class="dt"><b style="color:var(--ink)">${sgn(d.plan.balance)} a day</b> · eat ${fmt(d.plan.eat)} · activity goal ${fmt(d.plan.goal)}</div></div><span class="edit">Edit</span></div></div>
+    <div class="card" style="padding:0 16px"><div class="srow" data-act="openEnergy" role="button" tabindex="0"><span class="ic amber">${I.bolt}</span><div class="grow"><div class="nm">Daily energy</div><div class="dt"><b style="color:var(--ink)">${sgn(d.plan.balance)} a day</b> · eat ${fmt(d.plan.eat)} · activity goal ${fmtG(d.plan.goal)}</div></div><span class="edit">Edit</span></div></div>
     <div class="card" style="padding:12px 16px" data-act="openHub" role="button" tabindex="0"><div class="row between"><div><div class="t-body strong">Your plan</div><div class="t-sm ink2">Training, recovery, supplements and tracking carry forward</div></div>${I.chev}</div></div>
     ${btn('Review', 'openReview')}
   </div>`; };
@@ -338,39 +347,57 @@ SCREENS.explainer = () => `${statusBar()}${sNav('Back', 'Daily Energy')}
   ${btn('Continue', 'explainerDone')}
   <p class="t-xs muted" style="text-align:center">Shown once.</p></div>`;
 
-SCREENS.energy = () => { const d = S.draft; const e = energyFrom(d.plan.balance, d.split, d.custom); return `${statusBar()}${sNav('Back', 'Daily Energy', '<span data-act="back" role="button" tabindex="0" style="font-weight:700">Done</span>')}
+SCREENS.energy = () => { const d = S.draft; const e = energyFrom(d.plan.balance, d.split, d.custom); const pm = planningMaintenance(S.E); const act = hasActivity(); return `${statusBar()}${sNav('Back', 'Daily Energy', '<span data-act="back" role="button" tabindex="0" style="font-weight:700">Done</span>')}
   <div class="content stack">
-    <div class="card"><div class="row between"><span class="eyebrow amber">Daily balance</span><span class="t-xs muted">Suggested ${S.draft.kind === 'lean' ? '−450' : '+200'}</span></div>
-      <div class="bigval" style="margin-top:10px">${sgn(e.balance)}<small>kcal/day</small>${e.limited ? ' <span style="font-size:.4em;color:var(--red)">limited</span>' : ''}</div>
-      <div class="t-xs muted" style="margin-top:4px">${rateRange(e.balance)} · simulated range</div>
+    <div class="card"><div class="row between"><span class="eyebrow amber">Daily balance</span><span class="t-xs muted">Suggested ${S.draft.kind === 'lean' ? '−450' : S.draft.kind === 'next' ? '' : '+200'}</span></div>
+      <div class="bigval" style="margin-top:10px" data-e="balance">${sgn(e.balance)}<small>kcal/day</small>${e.limited ? ' <span style="font-size:.4em;color:var(--red)">limited</span>' : ''}</div>
+      <div class="t-xs muted" style="margin-top:4px">${rateRange(e.balance)} · simulated</div>
       <div class="rng"><div class="track"></div><input type="range" aria-label="Daily balance" data-in="balance" min="-750" max="500" step="25" value="${d.plan.balance}"></div>
       <div class="ticks"><span>−750</span><span>0</span><span>+500</span></div>
       <div class="row" style="justify-content:center;gap:10px;margin-top:6px"><div class="mini-step"><span data-act="bal" data-arg="-25" role="button" tabindex="0">−25</span><span data-act="bal" data-arg="25" role="button" tabindex="0">+25</span></div><span class="t-sm semi" style="color:var(--teal)" data-act="balReset" role="button" tabindex="0">Reset</span></div></div>
     <div class="t-sm strong">How you get there</div>
-    <div class="chips" role="radiogroup">${[['suggested', '★ Suggested'], ['eat', 'Eat less'], ['move', 'Move more'], ['blend', 'Blend'], ['custom', 'Custom']].map(([k, l]) => `<span class="chip ${d.split === k ? 'on' : ''}" data-act="split" data-arg="${k}" role="radio" aria-checked="${d.split === k}" tabindex="0">${l}</span>`).join('')}</div>
-    ${d.split === 'custom' ? `<div class="row between"><span class="t-sm ink2">Extra activity</span><div class="mini-step"><span data-act="custom" data-arg="-25" role="button" tabindex="0">−25</span><span data-act="custom" data-arg="25" role="button" tabindex="0">+25</span></div><b>+${fmt(e.added)}</b></div>` : ''}
+    <div class="chips" role="radiogroup">${[['suggested', '★ Suggested'], ['eat', 'Eat less'], ['move', 'Move more'], ['blend', 'Blend'], ['custom', 'Custom']].filter(([k]) => act || k === 'suggested' || k === 'eat').map(([k, l]) => `<span class="chip ${d.split === k ? 'on' : ''}" data-act="split" data-arg="${k}" role="radio" aria-checked="${d.split === k}" tabindex="0">${l}</span>`).join('')}</div>
+    ${act ? '' : '<p class="t-xs muted">No activity data, so the balance comes from eating. Connect Apple Health to plan extra activity.</p>'}
+    ${d.split === 'custom' && act ? `<div class="row between"><span class="t-sm ink2">Extra activity</span><div class="mini-step"><span data-act="custom" data-arg="-25" role="button" tabindex="0">−25</span><span data-act="custom" data-arg="25" role="button" tabindex="0">+25</span></div><b>+${fmt(e.added)}</b></div>` : ''}
     <div class="card soft">
-      <div class="kv"><span class="k">Eat each day</span><span class="v">${fmt(e.eat)} kcal</span></div>
-      <div class="kv"><span class="k">Activity goal</span><span class="v">${fmt(e.goal)} kcal <span class="t-xs muted">(usual 800 +${fmt(e.added)})</span></span></div>
-      <p class="t-xs muted" style="margin-top:6px">${fmt(S.maintenanceEst)} ${e.balance < 0 ? '−' : '+'} ${fmt(Math.abs(e.balance))} + ${fmt(e.added)} = <b>${fmt(e.eat)}</b> · 1:1</p>
+      <div class="kv"><span class="k">Eat each day</span><span class="v" data-e="eat">${fmt(e.eat)} kcal</span></div>
+      <div class="kv"><span class="k">Activity goal</span><span class="v" data-e="goal">${act ? `${fmt(e.goal)} kcal <span class="t-xs muted">(usual ${fmt(S.E.usual)} +${fmt(e.added)})</span>` : '—'}</span></div>
+      <p class="t-xs muted" style="margin-top:6px" data-e="formula">Eat = maintenance ${fmt(pm.value)} ${e.balance < 0 ? '−' : '+'} ${fmt(Math.abs(e.balance))}${act ? ` + extra ${fmt(e.added)}` : ''} = <b>${fmt(e.eat)}</b></p>
+      <p class="t-xs muted">Maintenance used: ${maintLabel()}${pm.source === 'provisional' ? ', range ' + fmt(pm.low) + '–' + fmt(pm.high) : ''}.</p>
       ${e.added ? `<p class="t-xs muted">For example, ≈ ${fmt(Math.round(e.added * 22 / 100) * 100)} more steps a day. Any activity counts.</p>` : ''}</div>
+    ${pm.source === 'provisional' ? `<div class="ewarn amber">${I.warn}<span>This is a starting estimate, not calibrated from your results yet. Targets will be checked against your weight trend after about 3 weeks of logging.</span></div>` : ''}
     ${e.limited ? `<div class="ewarn red">${I.warn}<span>Eating is held at ${fmt(e.floor)} (provisional floor). Add activity or choose a smaller deficit.</span></div>` : ''}
-    ${e.eat >= S.maintenanceEst && e.added > 0 && e.balance < 0 ? `<div class="ewarn amber">${I.warn}<span>You’d eat at or above maintenance and rely on extra activity for the whole deficit.</span></div>` : ''}
+    ${e.eat >= pm.value && e.added > 0 && e.balance < 0 ? `<div class="ewarn amber">${I.warn}<span>You’d eat at or above maintenance and rely on extra activity for the whole deficit.</span></div>` : ''}
     <span class="t-sm semi" style="color:var(--teal)" data-act="go" data-arg="why" role="button" tabindex="0">Why these numbers?</span>
   </div>`; };
 
-SCREENS.why = () => `${statusBar()}${sNav('Back', 'Why these numbers?')}
-  <div class="content stack"><p class="lead">Three layers. Only the last is yours to approve.</p>
-  <div class="layer"><div class="row between"><span class="t-sm strong">Resting energy</span><span class="prov e">DEXA report estimate</span></div><p class="t-xs muted" style="margin-top:4px">Concept: updates as body composition changes; equation or measured values used when available.</p></div>
-  <div class="layer"><div class="row between"><span class="t-sm strong">Maintenance</span><span class="prov m">Learned from results</span></div><div class="t-body strong" style="margin-top:4px">≈ ${fmt(S.maintenanceEst)} kcal/day ${simTag}</div><p class="t-xs muted">From logged intake and weight/scan changes, usual activity included.</p></div>
-  <div class="layer" style="border-color:var(--teal)"><div class="row between"><span class="t-sm strong">Your targets</span><span class="prov">You approve</span></div><div class="t-body strong" style="margin-top:4px">Eat ${fmt((S.draft || S).plan.eat)} · activity goal ${fmt((S.draft || S).plan.goal)}</div></div></div>`;
+SCREENS.why = () => { const p = S.draft ? S.draft.plan : S.plan; const r = reconciliation(S.E, p); const E = S.E; const act = hasActivity(); const src = RMR_SOURCES[E.rmrSource].label;
+  return `${statusBar()}${sNav('Back', 'Why these numbers?')}
+  <div class="content stack">
+    <p class="lead">How eating ${fmt(p.eat)}${act ? ` and an activity goal of ${fmtG(p.goal)}` : ''} were worked out. All values are simulated. ${simTag}</p>
+    <div class="layer"><div class="row between"><span class="t-sm strong">1 · Resting energy (RMR)</span><span class="prov e">${src}</span></div><div class="t-body strong" style="margin-top:4px">≈ ${fmt(E.rmr)} kcal/day</div><p class="t-xs muted">An estimate unless measured. It changes as body composition changes.</p></div>
+    <div class="layer"><div class="row between"><span class="t-sm strong">2 · Usual activity</span><span class="prov">${act ? 'Apple Health, last 4 weeks' : 'No activity data'}</span></div><div class="t-body strong" style="margin-top:4px">${act ? `≈ ${fmt(E.usual)} kcal/day, workouts included` : `Assumed activity level × ${E.factor}`}</div></div>
+    <div class="layer"><div class="row between"><span class="t-sm strong">3 · Digestion</span><span class="prov">Assumption</span></div><div class="t-body strong" style="margin-top:4px">≈ ${E.tefPct}% of intake${act ? ` (≈ ${fmt(r.tef)})` : ' (inside the activity factor)'}</div></div>
+    <div class="layer"><div class="row between"><span class="t-sm strong">4 · Estimate from these parts</span><span class="prov">Bottom-up</span></div><div class="t-body strong" style="margin-top:4px">≈ ${fmt(r.bottomUp.value)} (${fmt(r.bottomUp.low)}–${fmt(r.bottomUp.high)}) at usual activity</div><p class="t-xs muted">${act ? `(${fmt(E.rmr)} + ${fmt(E.usual)}) ÷ (1 − ${E.tefPct}%)` : `${fmt(E.rmr)} × ${E.factor}`}</p></div>
+    <div class="layer" style="${r.planning.source === 'calibrated' ? 'border-color:var(--teal)' : ''}"><div class="row between"><span class="t-sm strong">5 · Maintenance from your results</span><span class="prov ${r.planning.source === 'calibrated' ? 'm' : ''}">${r.planning.source === 'calibrated' ? 'Calibrated' : 'Not available yet'}</span></div>
+      <div class="t-body strong" style="margin-top:4px">${r.planning.source === 'calibrated' ? `≈ ${fmt(r.planning.value)} (${fmt(r.planning.low)}–${fmt(r.planning.high)}) logged kcal/day` : '—'}</div><p class="t-xs muted">${r.planning.note || ''}</p></div>
+    <div class="card" style="border:1.5px solid var(--teal)"><span class="eyebrow">What the plan uses</span>
+      <div class="kv"><span class="k">Maintenance</span><span class="v">${maintLabel()}</span></div>
+      <div class="kv"><span class="k">Planned daily balance</span><span class="v">${sgn(r.balance)}</span></div>
+      <div class="kv"><span class="k">Eat</span><span class="v">${fmt(r.planning.value)} ${r.balance < 0 ? '−' : '+'} ${fmt(Math.abs(r.balance))}${act ? ` + ${fmt(p.added || 0)} extra` : ''} = ${fmt(p.eat)}</span></div>
+      ${act ? `<div class="kv"><span class="k">Activity goal</span><span class="v">${fmt(E.usual)} usual + ${fmt(p.added || 0)} extra = ${fmtG(p.goal)}</span></div>` : ''}</div>
+    ${act ? `<div class="card soft"><span class="eyebrow">Why it isn’t RMR + activity − food</span>
+      <div class="kv"><span class="k">RMR + activity goal − eat</span><span class="v">${fmt(E.rmr)} + ${fmtG(p.goal)} − ${fmt(p.eat)} = ${fmt(r.naive)}</span></div>
+      <div class="kv"><span class="k">With digestion added</span><span class="v">≈ ${fmt(-r.bottomUpDiff)}</span></div>
+      <p class="t-xs muted" style="margin-top:6px">That simple sum is not your deficit. ${r.planning.source === 'calibrated' ? `Your results behave like maintenance ≈ ${fmt(r.planning.value)}, about ${fmt(Math.abs(r.gap))} ${r.gap > 0 ? 'below' : 'above'} the bottom-up estimate. The gap usually comes from under-logged food, wearable over-estimates and RMR estimate error. The plan follows your results and still shows both.` : 'Until your results calibrate it, the plan starts from the bottom-up estimate with a wide range.'}</p></div>` : ''}
+  </div>`; };
 
 const hubRow = (ic, name, detail, act, changed) => `<div class="srow ${changed ? 'chg' : ''}" data-act="${act}" role="button" tabindex="0"><span class="ic ${changed ? 'amber' : ''}">${ic}</span><div class="grow"><div class="nm">${name}</div><div class="dt">${detail}</div></div><span class="edit">Edit</span></div>`;
 SCREENS.hub = () => { const d = S.draft; const p = d.plan; const base = S.plan;
   const changing = [];
   if (d.kind === 'lean') changing.push(hubRow(I.flag, 'Phase', `<span class="was">Lean Mass Build</span> → <b style="color:var(--ink)">Leaning (temporary)</b>`, d.kind === 'lean' ? 'openLeanSetup' : 'noop', true));
   if (d.kind === 'keepBuilding') changing.push(hubRow(I.shield, 'Body-fat range', `<span class="was">8–9%</span> → <b style="color:var(--ink)">${d.guardrail.min}–${d.guardrail.max}%</b>`, 'openKeepBuilding', true));
-  if (p.eat !== base.eat || p.goal !== base.goal) changing.push(hubRow(I.bolt, 'Daily energy', `<span class="was">eat ${fmt(base.eat)} · goal ${fmt(base.goal)}</span><br><b style="color:var(--ink)">${sgn(p.balance)} · eat ${fmt(p.eat)} · goal ${fmt(p.goal)}</b>`, 'openEnergy', true));
+  if (p.eat !== base.eat || p.goal !== base.goal) changing.push(hubRow(I.bolt, 'Daily energy', `<span class="was">eat ${fmt(base.eat)} · goal ${fmtG(base.goal)}</span><br><b style="color:var(--ink)">${sgn(p.balance)} · eat ${fmt(p.eat)} · goal ${fmtG(p.goal)}</b>`, 'openEnergy', true));
   const carried = [
     [I.lift, 'Training', `Learned: ≈ 4 workouts a week${p.trainingGoals ? ` · goal ${p.trainingGoals}` : ''} · ${p.progression}`, 'openTraining', p.progression !== base.progression || p.trainingGoals !== base.trainingGoals],
     [I.moon, 'Recovery', `${p.recovery.join(', ')}${p.sleepGoal ? ` · sleep ${p.sleepGoal}` : ' · no sleep goal'}`, 'openRecovery', p.recovery.length !== base.recovery.length || p.sleepGoal !== base.sleepGoal],
@@ -415,9 +442,9 @@ SCREENS.review = () => { const d = S.draft; const p = d.plan, b = S.plan; const 
   if (d.kind === 'lean') rows.push(['Phase', 'Lean Mass Build', 'Leaning (temporary)'], ['Ends', '', d.completion.mode === 'outcome' ? 'Back in 8–9%' : d.completion.mode === 'time' ? `After ${d.completion.weeks} weeks` : `Back in range or ${d.completion.weeks} weeks`], ['Goal date', 'Oct 31', 'Set when building resumes']);
   if (d.kind === 'keepBuilding') { rows.push(['Body-fat range', '8–9%', `${d.guardrail.min}–${d.guardrail.max}%`]); if (d.goalDate !== 'Oct 31') rows.push(['Goal date', 'Oct 31', d.goalDate]); }
   if (d.kind === 'next') rows.push(['Phase', 'Leaning (complete)', d.next === 'resume' ? 'Lean Mass Build' : d.next === 'maintain' ? 'Maintain' : 'Leaning (continued)']);
-  if (p.balance !== b.balance) rows.push(['Daily balance', sgn(b.balance), sgn(p.balance)]);
+  if (p.balance !== planBal(b)) rows.push(['Daily balance', sgn(planBal(b)), sgn(p.balance)]);
   if (p.eat !== b.eat) rows.push(['Eat', fmt(b.eat), `${fmt(p.eat)} kcal`]);
-  if (p.goal !== b.goal) rows.push(['Activity goal', fmt(b.goal), `${fmt(p.goal)} kcal`]);
+  if (p.goal !== b.goal) rows.push(['Activity goal', fmtG(b.goal), `${fmtG(p.goal)} kcal`]);
   if (p.progression !== b.progression) rows.push(['Training progression', b.progression, p.progression]);
   if (p.trainingGoals !== b.trainingGoals) rows.push(['Workouts a week', b.trainingGoals || 'not set', p.trainingGoals || 'not set']);
   if (p.recovery.join() !== b.recovery.join()) rows.push(['Recovery', b.recovery.join(', '), p.recovery.join(', ')]);
@@ -429,6 +456,8 @@ SCREENS.review = () => { const d = S.draft; const p = d.plan, b = S.plan; const 
   <div class="content stack"><div class="display h1">Review your new plan</div>
   <span class="pill teal" style="align-self:flex-start">${I.check} Checked against your latest evidence ${simTag}</span>
   <div class="card diff">${rows.length ? rows.map(([k, was, now]) => `<div class="kv"><span class="k">${k}</span><span class="delta">${was ? `<s>${was}</s>` : ''}<span class="v">${now}</span></span></div>`).join('') : '<p class="t-sm ink2">No changes yet.</p>'}</div>
+  <div class="card soft" style="padding:10px 14px"><div class="t-xs muted">Eat = maintenance ${maintLabel()} ${p.balance < 0 ? '−' : '+'} ${fmt(Math.abs(p.balance))}${hasActivity() ? ` + ${fmt(p.added || 0)} extra activity` : ''} = <b style="color:var(--ink)">${fmt(p.eat)}</b>${hasActivity() ? ` · activity goal = ${fmt(S.E.usual)} usual + ${fmt(p.added || 0)} = ${fmtG(p.goal)}` : ''}</div>
+    <div class="t-sm semi" style="color:var(--teal);margin-top:6px" data-act="go" data-arg="why" role="button" tabindex="0">Why these numbers?</div></div>
   <p class="t-xs muted">Only numbers that change are listed. Everything else carries forward.</p>
   ${btn('Approve', rows.length ? 'approve' : 'noop', rows.length ? 'primary' : 'disabled')}
   <p class="t-xs muted" style="text-align:center">One approval updates goal, phase and plan together. Version ${S.versions.length} is kept in Your Journey.</p></div>`; };
@@ -456,7 +485,7 @@ SCREENS.goals = () => { const leaning = S.phase === 'leaning'; const tempRows = 
       <div class="display h2" style="margin-top:6px">Leaning</div>
       <div class="kv"><span class="k">Ends</span><span class="v">${S.completion.mode === 'outcome' ? 'Back in 8–9%' : S.completion.mode === 'time' ? `After ${S.completion.weeks} weeks` : `In range or ${S.completion.weeks} weeks`}</span></div>
       <div class="kv"><span class="k">Body fat</span><span class="v">${f1(S.phaseStartBf)}% → ${f1(bf())}%</span></div>
-      <div class="kv"><span class="k">Plan</span><span class="v">${sgn(S.plan.balance)} · eat ${fmt(S.plan.eat)} · goal ${fmt(S.plan.goal)}</span></div></div>` : ''}
+      <div class="kv"><span class="k">Plan</span><span class="v">${sgn(planBal(S.plan))} · eat ${fmt(S.plan.eat)} · goal ${fmtG(S.plan.goal)}</span></div></div>` : ''}
     ${(S.decision.open) && (S.phase === 'building' || S.phase === 'leaningComplete') ? `<div class="card rail amber" data-act="${S.phase === 'building' ? 'openOptions' : 'openNext'}" role="button" tabindex="0"><div class="eyebrow amber">Open decision</div><div class="t-body strong" style="margin-top:4px">${S.phase === 'building' ? 'Review your goal options' : 'Choose your next phase'}</div></div>` : ''}
     <div class="card"><div class="row between"><span class="eyebrow">Body-fat limit</span>${tag('You approved')}</div><div class="t-body strong" style="margin-top:6px">${S.guardrail.min}–${S.guardrail.max}% · now ${f1(bf())}%</div></div>
     <div class="card"><span class="eyebrow">The path · Your Journey</span><div class="phases" style="margin-top:10px">${tempRows.map(([dot, t, s], i) => `<div class="ph"><div class="col"><div class="dot ${dot}"></div>${i < tempRows.length - 1 ? '<div class="line"></div>' : ''}</div><div class="txt"><div class="t-body strong">${t}</div><div class="t-sm ink2">${s}</div></div></div>`).join('')}</div></div>
@@ -468,12 +497,13 @@ SCREENS.placeholder = () => `${statusBar()}${sNav('Home', 'Not in this simulatio
 
 // ---------------- actions -----------------
 function startDraft(kind) {
-  const plan = JSON.parse(JSON.stringify(S.plan));
+  const plan = JSON.parse(JSON.stringify(S.plan)); plan.balance = planBal(S.plan);
   S.draft = { kind, plan, split: 'suggested', custom: 100, completion: { ...S.completion }, guardrail: { ...S.guardrail }, goalDate: S.goalDate, next: 'resume' };
   if (kind === 'lean') applyEnergy(-450);
   if (kind === 'keepBuilding') { S.draft.guardrail = { min: 8, max: 9 }; S.draft.goalDate = 'Oct 31'; applyEnergy(200); }
 }
 function applyEnergy(balance) { const d = S.draft; d.plan.balance = balance; const e = energyFrom(balance, d.split, d.custom); Object.assign(d.plan, { eat: e.eat, added: e.added, goal: e.goal, balance: e.balance }); }
+function recomputeDraft() { if (S.draft && S.draft.plan.balance != null && (S.draft.kind === 'lean' || S.draft.kind === 'keepBuilding' || S.draft.kind === 'next' || S.draft.touched)) applyEnergy(S.draft.plan.balance); }
 const ACT = {
   back, noop: () => {},
   tab: (a) => (a === 'home' ? home() : a === 'goals' ? (S.stack = [], S.screen = 'goals', render()) : go('placeholder')),
@@ -513,7 +543,7 @@ const ACT = {
     let label, detail;
     if (d.kind === 'lean') {
       S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = d.completion; S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; S.decision = { open: false };
-      label = 'Leaning phase approved'; detail = `${sgn(d.plan.balance)}/day · eat ${fmt(d.plan.eat)} · goal ${fmt(d.plan.goal)}`;
+      label = 'Leaning phase approved'; detail = `${sgn(d.plan.balance)}/day · eat ${fmt(d.plan.eat)} · goal ${fmtG(d.plan.goal)}`;
     } else if (d.kind === 'keepBuilding') {
       S.phase = 'keepBuilding'; S.guardrail = d.guardrail; S.goalDate = d.goalDate; S.decision = { open: false };
       label = 'Kept building with new limits'; detail = `range ${d.guardrail.min}–${d.guardrail.max}% · ${d.goalDate} · eat ${fmt(d.plan.eat)}`;
@@ -522,27 +552,29 @@ const ACT = {
       if (d.next === 'resume') { S.phase = 'resumed'; S.phaseStartDay = S.day; S.goalDate = 'Feb 20'; label = 'Building resumed'; }
       else if (d.next === 'maintain') { S.phase = 'maintaining'; S.phaseStartDay = S.day; label = 'Holding at maintenance'; }
       else { S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = { mode: 'hybrid', weeks: 4 }; S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; label = 'Leaning continued'; }
-      detail = `${sgn(d.plan.balance)}/day · eat ${fmt(d.plan.eat)} · goal ${fmt(d.plan.goal)}`;
-    } else { label = 'Plan customized'; detail = `eat ${fmt(d.plan.eat)} · goal ${fmt(d.plan.goal)}`; S.decision.open = false; }
+      detail = `${sgn(d.plan.balance)}/day · eat ${fmt(d.plan.eat)} · goal ${fmtG(d.plan.goal)}`;
+    } else { label = 'Plan customized'; detail = `eat ${fmt(d.plan.eat)} · goal ${fmtG(d.plan.goal)}`; S.decision.open = false; }
     const v = addVersion(label, detail);
     S.draft = null; S.log.unshift(`${dateLabel(S.day)} · v${v} approved: ${label}`);
     home(`Plan updated · version ${v}`);
   },
   undo: () => { if (!S.undo) return; Object.assign(S, S.undo.before); const v = addVersion('Undo', 'Back to the previous plan'); S.undo = null; S.log.unshift(`${dateLabel(S.day)} · undo → v${v}`); home(`Undone · version ${v} restores the previous plan`); },
-  openNext: () => { S.draft = { kind: 'next', next: bf() <= S.guardrail.max ? 'resume' : 'continue', plan: JSON.parse(JSON.stringify(S.plan)), split: 'suggested', custom: 100 }; go('next'); },
+  openNext: () => { const plan = JSON.parse(JSON.stringify(S.plan)); plan.balance = planBal(S.plan); S.draft = { kind: 'next', next: bf() <= S.guardrail.max ? 'resume' : 'continue', plan, split: 'suggested', custom: 100 }; go('next'); },
   pickNext: (a) => { S.draft.next = a; render(); },
   nextReview: () => { const d = S.draft; applyEnergy(d.next === 'resume' ? 200 : d.next === 'maintain' ? 0 : -450); go('review'); },
   qcOpt: (a) => { S.qc.opt = a; render(); },
   qcStep: (a) => { const [k, d] = a.split(':'); S.qc.custom[k] = Math.max(0, Math.min(400, S.qc.custom[k] + Number(d))); render(); },
   qcLater: () => { S.qc = null; S.observeUntil = S.day + 7; render(); toast('Hidden until next week’s check.'); },
   qcAccept: () => {
-    const q = S.qc; const o = q.opt; const eatD = o === 'eat' ? q.step : o === 'move' ? 0 : o === 'blend' ? Math.round(q.step / 2 / 25) * 25 : -q.custom.eatLess;
-    const moveD = o === 'eat' ? 0 : o === 'move' ? -q.step : o === 'blend' ? -Math.round(q.step / 2 / 25) * 25 : q.custom.moveMore;
+    const q = S.qc; const o = q.opt; const act = hasActivity(); const half = Math.round(q.step / 2 / 25) * 25;
+    const eatD = o === 'eat' ? q.step : o === 'move' ? 0 : o === 'blend' ? half : -q.custom.eatLess;
+    const moveD = !act ? 0 : o === 'eat' ? 0 : o === 'move' ? -q.step : o === 'blend' ? -(q.step - half) : q.custom.moveMore;
     S.undo = { day: S.day, before: snap() };
-    S.plan = { ...S.plan, eat: S.plan.eat + eatD, goal: S.plan.goal + moveD, added: S.plan.added + moveD, balance: S.plan.balance + eatD - moveD };
-    S.maintenanceEst = Math.round(S.maintenanceEst + q.step);
-    const v = addVersion('Quick calibration', `${sgn(eatD - moveD)}/day · eat ${fmt(S.plan.eat)} · goal ${fmt(S.plan.goal)}`);
-    S.qc = null; S.observeUntil = S.day + 21; S.log.unshift(`${dateLabel(S.day)} · Quick calibration applied (v${v})`);
+    S.plan = { ...S.plan, eat: S.plan.eat + eatD, goal: S.plan.goal == null ? null : S.plan.goal + moveD, added: (S.plan.added || 0) + moveD };
+    const newM = q.fromM + q.step;
+    S.E.calibrated = { value: newM, low: newM - 150, high: newM + 150, note: 'Updated from your logged intake and weight trend (simulated).' }; S.E.recalibrated = true;
+    const v = addVersion('Quick calibration', `${sgn(eatD - moveD)}/day · eat ${fmt(S.plan.eat)} · goal ${fmtG(S.plan.goal)} · maintenance ≈ ${fmt(newM)}`);
+    S.qc = null; S.observeUntil = S.day + 21; S.log.unshift(`${dateLabel(S.day)} · Quick calibration applied (v${v}); maintenance ${fmt(q.fromM)} → ${fmt(newM)}`);
     render(); toast(`Plan updated · version ${v} · watching for 3 weeks`);
   },
 };
@@ -553,19 +585,48 @@ const CONTROL = {
   advance: () => { if (S.phase === 'building' && S.decision.open && !S.decision.dismissed) { toast('Make or postpone the goal decision first, or use Reset.'); return; } simulateWeek(); S.stack = []; S.screen = S.phase === 'leaningComplete' ? 'briefing' : 'briefing'; render(); },
   midweek: () => go('midweek'),
   finish: () => { if (S.phase !== 'leaning') { toast('Start a leaning phase first.'); return; } let n = 0; while (S.phase === 'leaning' && n < 16) { simulateWeek(); n++; } S.stack = []; S.screen = 'briefing'; render(); },
-  response: (a) => { S.response = a; S.trueMaintenance = a === 'slower' ? S.maintenanceEst - 250 : S.maintenanceEst; render(); },
+  response: (a) => { S.response = a; render(); },
   theme: (a) => { S.theme = a; render(); },
-  reset: () => { S = initialState(); render(); },
+  reset: () => { S = initialState(S.E.key); render(); },
+  scenario: (k) => { S = initialState(k); render(); },
 };
+function energyLab() {
+  const E = S.E; const plan = S.draft ? S.draft.plan : S.plan; const r = reconciliation(E, plan); const pm = r.planning;
+  const num = (k, v, label, extra = '') => `<label class="lab-f"><span>${label}</span><input type="number" inputmode="numeric" data-lab="${k}" value="${v ?? ''}" ${extra} aria-label="${label}"></label>`;
+  return `<div class="pn-sec"><div class="pn-h">Energy assumptions (test)</div>
+    <div class="pn-btns" role="group" aria-label="Scenario">${Object.values(ENERGY_SCENARIOS).map((sc) => `<button data-ctl="scenario" data-arg="${sc.key}" aria-pressed="${E.key === sc.key}">${sc.label}</button>`).join('')}</div>
+    <p class="pn-note">Picking a scenario restarts the simulation. Editing a value below updates estimates live; approved targets never change, but unapproved drafts are recalculated.</p>
+    <div class="lab-grid">
+      ${num('rmr', E.rmr, 'RMR kcal/day')}
+      <label class="lab-f"><span>RMR source</span><select data-lab="rmrSource" aria-label="RMR source">${Object.entries(RMR_SOURCES).map(([k, v]) => `<option value="${k}" ${E.rmrSource === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></label>
+      ${num('usual', E.usual, 'Usual active kcal (blank = no wearable)')}
+      ${E.usual == null ? num('factor', E.factor, 'Activity factor (no wearable)', 'step="0.05" min="1.1" max="1.9"') : num('tef', E.tefPct, 'Digestion % of intake', 'min="0" max="20"')}
+      <label class="lab-f"><span>Outcome calibration</span><select data-lab="calOn" aria-label="Outcome calibration"><option value="on" ${E.calibrated ? 'selected' : ''}>Available</option><option value="off" ${E.calibrated ? '' : 'selected'}>Not available</option></select></label>
+      ${E.calibrated ? num('cal', E.calibrated.value, 'Calibrated maintenance') : ''}
+      <label class="lab-f"><span>Intake logging</span><select data-lab="logging" aria-label="Intake logging"><option value="complete" ${E.logging === 'complete' ? 'selected' : ''}>≥ 70% of days</option><option value="partial" ${E.logging === 'partial' ? 'selected' : ''}>Partial (9 of 28 days)</option></select></label>
+      ${S.draft && S.draft.plan.balance != null ? num('balance', S.draft.plan.balance, 'Draft balance kcal/day', 'step="25"') + (hasActivity() ? num('extra', S.draft.plan.added || 0, 'Draft extra activity', 'step="25" min="0" max="500"') : '') : ''}
+    </div>
+    <table class="lab-t">
+      <tr><td>Bottom-up estimate</td><td>${fmt(r.bottomUp.value)} <small>(${fmt(r.bottomUp.low)}–${fmt(r.bottomUp.high)})</small></td></tr>
+      <tr><td>Calibrated from results</td><td>${E.calibrated ? `${fmt(E.calibrated.value)}${E.logging === 'complete' ? '' : ' <small>(ignored: partial logging)</small>'}` : '—'}</td></tr>
+      <tr><td><b>Maintenance used</b></td><td><b>${maintLabel()}</b></td></tr>
+      <tr><td>${S.draft ? 'Draft' : 'Approved'} eat / activity goal</td><td>${fmt(plan.eat)} / ${fmtG(plan.goal)}</td></tr>
+      <tr><td><b>Planned balance</b></td><td><b>${sgn(r.balance)}</b> <small>= ${fmt(plan.eat)} − ${fmt(pm.value)} − ${fmt(plan.added || 0)}</small></td></tr>
+      <tr><td>RMR + activity goal − eat</td><td>${r.naive == null ? '—' : fmt(r.naive)} <small>not a deficit</small></td></tr>
+      <tr><td>Bottom-up − calibrated</td><td>${pm.source === 'calibrated' ? sgn(r.gap) : '—'}</td></tr>
+      <tr><td>Simulated true maintenance</td><td>${fmt(truth())} <small>hidden from the app</small></td></tr>
+    </table></div>`;
+}
 function panel() {
   const flow = [['home', 'Home'], ['goals', 'Goals'], ['briefing', 'Latest briefing'], ['midweek', 'Midweek'], ['monthly', 'Monthly'], ['photo', 'Photo event']];
   return `<div class="pn-sec"><div class="pn-h">Simulated state</div>
     <div class="kvs"><span>Date</span><b>${dateLabel(S.day)}</b><span>Phase</span><b>${{ building: 'Lean Mass Build', leaning: 'Leaning (temporary)', leaningComplete: 'Leaning complete', resumed: 'Lean Mass Build (resumed)', maintaining: 'Maintain', keepBuilding: 'Lean Mass Build (new limits)' }[S.phase]}</b>
-    <span>Body fat</span><b>${f1(bf())}%</b><span>Lean gained</span><b>${f1(S.gained)} of 10 lb</b><span>Plan</span><b>${sgn(S.plan.balance)} · eat ${fmt(S.plan.eat)} · goal ${fmt(S.plan.goal)}</b><span>Maintenance est.</span><b>${fmt(S.maintenanceEst)}</b><span>Version</span><b>v${S.versions[0].v}</b></div></div>
+    <span>Body fat</span><b>${f1(bf())}%</b><span>Lean gained</span><b>${f1(S.gained)} of 10 lb</b><span>Plan</span><b>${sgn(planBal(S.plan))} · eat ${fmt(S.plan.eat)} · goal ${fmtG(S.plan.goal)}</b><span>Maintenance used</span><b>${maintLabel()}</b><span>Version</span><b>v${S.versions[0].v}</b></div></div>
   <div class="pn-sec"><div class="pn-h">Jump to</div><div class="pn-btns">${flow.map(([k, l]) => `<button data-ctl="jump" data-arg="${k}">${l}</button>`).join('')}</div></div>
   <div class="pn-sec"><div class="pn-h">Simulate evidence</div><div class="pn-btns"><button data-ctl="advance" class="pri">Advance a week</button><button data-ctl="finish">Run to phase end</button></div>
     <div class="pn-h" style="margin-top:12px">Body response</div><div class="pn-btns"><button data-ctl="response" data-arg="asEstimated" aria-pressed="${S.response === 'asEstimated'}">As estimated</button><button data-ctl="response" data-arg="slower" aria-pressed="${S.response === 'slower'}">Slower than estimated</button></div>
     <p class="pn-note">“Slower” makes real maintenance about 250 lower than estimated, so a Quick Calibration appears in a Weekly after about 3 weeks.</p></div>
+  ${energyLab()}
   <div class="pn-sec"><div class="pn-h">Phone theme</div><div class="pn-btns"><button data-ctl="theme" data-arg="dark" aria-pressed="${S.theme === 'dark'}">Dark</button><button data-ctl="theme" data-arg="light" aria-pressed="${S.theme === 'light'}">Mineral Light</button></div></div>
   <div class="pn-sec"><div class="pn-btns"><button data-ctl="reset" class="warn">Reset simulation</button></div></div>
   <div class="pn-sec"><div class="pn-h">Event log</div><ol class="pn-log">${S.log.slice(0, 12).map((l) => `<li>${l}</li>`).join('')}</ol></div>`;
@@ -586,6 +647,23 @@ document.addEventListener('click', (e) => {
   const a = e.target.closest('#phone [data-act]');
   if (a && ACT[a.dataset.act]) { e.preventDefault(); ACT[a.dataset.act](a.dataset.arg); }
 });
+function labChange(k, v) {
+  const E = S.E; const n = Number(v);
+  if (k === 'rmr' && n > 500) E.rmr = Math.round(n);
+  if (k === 'rmrSource') E.rmrSource = v;
+  if (k === 'usual') { if (v === '') { E.usual = null; } else if (n >= 0) E.usual = Math.round(n); S.plan.goal = E.usual == null ? null : E.usual + (S.plan.added || 0); if (E.usual == null) S.plan.added = 0; }
+  if (k === 'tef' && n >= 0 && n <= 20) E.tefPct = n;
+  if (k === 'factor' && n >= 1.1 && n <= 1.9) E.factor = n;
+  if (k === 'calOn') E.calibrated = v === 'on' ? (E.calibrated || { value: bottomUp(E).value, low: bottomUp(E).value - 150, high: bottomUp(E).value + 150, note: 'Entered for testing.' }) : null;
+  if (k === 'cal' && E.calibrated && n > 500) { E.calibrated.value = Math.round(n); E.calibrated.low = E.calibrated.value - 150; E.calibrated.high = E.calibrated.value + 150; }
+  if (k === 'logging') E.logging = v;
+  if (k === 'balance' && S.draft) { S.draft.touched = true; applyEnergy(Math.max(-750, Math.min(500, Math.round(n)))); }
+  if (k === 'extra' && S.draft) { S.draft.touched = true; S.draft.split = 'custom'; S.draft.custom = Math.max(0, Math.min(500, Math.round(n))); applyEnergy(S.draft.plan.balance); }
+  if (!['balance', 'extra'].includes(k)) recomputeDraft();
+  S.qc = null;
+  render();
+}
+document.addEventListener('change', (e) => { const l = e.target.closest('[data-lab]'); if (l) labChange(l.dataset.lab, l.value); });
 document.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest?.('#phone [data-act]')) { e.preventDefault(); e.target.click(); } });
 document.addEventListener('input', (e) => { if (e.target.dataset.in === 'balance') { applyEnergy(Number(e.target.value)); const v = e.target.value; render(); const el = document.querySelector('[data-in="balance"]'); if (el) { el.value = v; el.focus(); } } });
 document.addEventListener('DOMContentLoaded', render);

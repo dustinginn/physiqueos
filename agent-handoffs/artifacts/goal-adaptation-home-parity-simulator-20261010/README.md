@@ -23,3 +23,18 @@
   - versions and undo.
 - **`simulator/test-sim.mjs`:** end-to-end click test; 37 checks in `test-results.json`, with screenshots in `simulator/screens/`.
 - **Rebuild:** `node simulator/build-sim.mjs`.
+
+## Energy model reconciliation (prompt `fcb9ad06`)
+
+- **`simulator/energy-model.js`:** pure, layered energy math. Each layer is kept separate:
+  1. RMR, with its source (measured, DEXA report or equation) and a range;
+  2. usual activity (Apple Health, or none);
+  3. digestion, assumed ≈ 10% of intake;
+  4. bottom-up estimate;
+  5. outcome-calibrated maintenance, used only with sufficient logging;
+  6. approved targets.
+
+  The derived balance is `eat − planning maintenance − extra activity`, with 1:1 activity accounting.
+- **`simulator/energy-model.test.mjs`:** 25 arithmetic regression checks, including the Founder case (1,850 + 900 − 1,700 = 1,050, which is not a deficit) and scenarios A (DEXA), B (equation RMR) and C (no wearable, partial logging). Results are in `energy-model.test-results.json`.
+- **Energy Lab** in the simulator side panel: switch scenarios, edit assumptions, and read the live reconciliation. Approved targets never change; drafts are recalculated.
+- **End-to-end:** `simulator/test-sim.mjs`, 57 checks.

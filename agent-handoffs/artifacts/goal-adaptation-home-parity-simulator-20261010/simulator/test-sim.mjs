@@ -13,7 +13,7 @@ await p.setContent(doc, { waitUntil: 'networkidle' }); await p.waitForTimeout(20
 const act = async (a, arg) => { const sel = arg !== undefined ? `#phone [data-act="${a}"][data-arg="${arg}"]` : `#phone [data-act="${a}"]`; await p.click(sel); await p.waitForTimeout(40); };
 const ctl = async (c, arg) => { await p.click(arg !== undefined ? `[data-ctl="${c}"][data-arg="${arg}"]` : `[data-ctl="${c}"]`); await p.waitForTimeout(40); };
 const text = () => p.evaluate(() => document.getElementById('phone').innerText);
-const st = () => p.evaluate(() => ({ screen: S.screen, phase: S.phase, eat: S.plan.eat, goal: S.plan.goal, balance: S.plan.balance, v: S.versions[0].v, bf: bf(), gained: S.gained, qc: !!S.qc, stack: S.stack.length }));
+const st = () => p.evaluate(() => ({ screen: S.screen, phase: S.phase, eat: S.plan.eat, goal: S.plan.goal, balance: planBal(S.plan), v: S.versions[0].v, bf: bf(), gained: S.gained, qc: !!S.qc, stack: S.stack.length }));
 const shot = async (n) => { await (await p.$('#phone')).screenshot({ path: path.join(shots, `${n}.png`) }); };
 
 ok('starts on Home building', (await text()).includes('Lean Mass Build') && (await text()).includes('CONFIDENCE'));
@@ -34,6 +34,16 @@ await act('balReset'); await act('split', 'suggested'); d = await p.evaluate(() 
 await shot('03-energy');
 await act('back'); ok('energy back → setup', (await st()).screen === 'leanSetup');
 await act('openEnergy'); ok('explainer not repeated', (await st()).screen === 'energy'); await act('back');
+// Founder case: −500 with +100 extra → 1,717 / 900, reconciled
+await act('openEnergy'); await act('bal', '-25'); await act('bal', '-25');
+d = await p.evaluate(() => S.draft.plan); ok('Founder case: −500 & +100 → eat 1,717, goal 900', d.eat === 1717 && d.goal === 900 && d.balance === -500, JSON.stringify(d));
+ok('energy screen shows maintenance source', /Maintenance used: 2,117 \(calibrated, illustrative\)/.test(await text()));
+await act('go', 'why'); const why = await text();
+ok('Why: RMR 1,850 DEXA report estimate', why.includes('1,850') && /DEXA REPORT ESTIMATE/i.test(why));
+ok('Why: naive 1,850 + 900 − 1,717 = 1,033 labelled not a deficit', why.includes('1,850 + 900 − 1,717 = 1,033') && why.includes('not your deficit'));
+ok('Why: bottom-up 2,944 vs calibrated 2,117, gap explained', why.includes('2,944') && why.includes('2,117') && why.includes('827'));
+ok('Why: plan arithmetic 2,117 − 500 + 100 = 1,717 and 800 + 100 = 900', why.includes('2,117 − 500 + 100 extra = 1,717') && why.includes('800 usual + 100 extra = 900'));
+await act('back'); await act('balReset'); await act('back');
 await act('openHub'); await shot('04-hub');
 await act('openTraining'); await act('prog', 'Conservative'); await act('back');
 await act('openRecovery'); await act('addRecovery', 'Stretching'); await act('sleep', '1'); await act('back');
@@ -51,8 +61,11 @@ await act('tab', 'home');
 await ctl('response', 'slower'); await ctl('advance'); await ctl('advance'); await ctl('advance');
 s = await st(); ok('Quick Calibration offered after 3 slower weeks', s.qc && (await text()).includes('Quick calibration'.toUpperCase()) || s.qc, JSON.stringify(s));
 await shot('08-weekly-qc');
+const q0 = await p.evaluate(() => ({ step: S.qc.step, fromM: S.qc.fromM, target: S.qc.target }));
 await act('qcOpt', 'blend'); const before = await st(); await act('qcAccept'); s = await st();
-ok('QC blend: eat −100, goal +100, balance −200 deeper', s.eat === before.eat - 100 && s.goal === before.goal + 100 && s.balance === before.balance - 200, `${JSON.stringify(before)} → ${JSON.stringify(s)}`);
+const half = Math.round(q0.step / 2 / 25) * 25; const mAfter = await p.evaluate(() => M());
+ok('QC blend: eat and goal change 1:1, maintenance recalibrated, planned balance restored', s.eat === before.eat + half && s.goal === before.goal - (q0.step - half) && mAfter === q0.fromM + q0.step && s.balance === q0.target, `${JSON.stringify(q0)} ${JSON.stringify(before)} → ${JSON.stringify(s)} M=${mAfter}`);
+ok('QC recalibrated maintenance below 2,117', mAfter < 2117 && mAfter >= 1817, String(mAfter));
 await ctl('jump', 'midweek'); ok('Midweek never proposes', !/Accept|Deepen/.test(await text()));
 await ctl('finish'); s = await st(); ok('phase completes → DEXA decision', s.phase === 'leaningComplete' && s.screen === 'briefing', JSON.stringify(s));
 await shot('09-dexa-complete');
@@ -74,6 +87,36 @@ await ctl('theme', 'light'); await shot('12-home-mineral');
 await ctl('jump', 'monthly'); ok('monthly briefing renders, no proposal', (await text()).includes('Month Ahead'.toUpperCase()) || (await text()).includes('Month Ahead'));
 await ctl('jump', 'photo'); ok('photo event never recommends', (await text()).includes('never trigger a recommendation'));
 ok('simulation label present', (await p.evaluate(() => document.body.innerText)).includes('Functional UX simulation, not the Native visual spec'));
+// Scenario B: no DEXA (equation RMR), provisional maintenance
+await ctl('scenario', 'B'); await act('openBriefing'); await act('openOptions'); await act('chooseLean');
+d = await p.evaluate(() => S.draft.plan); ok('B: provisional 2,926 → lean draft eat 2,576 / goal 900', d.eat === 2576 && d.goal === 900, JSON.stringify(d));
+await act('openEnergy'); await act('explainerDone'); ok('B: provisional warning shown', (await text()).includes('starting estimate, not calibrated'));
+await act('back'); await act('openReview'); await act('approve');
+await ctl('response', 'asEstimated'); await ctl('advance'); await ctl('advance'); await ctl('advance');
+s = await st(); ok('B: real maintenance lower than provisional → Quick Calibration offered', s.qc, JSON.stringify(s));
+const stepB = await p.evaluate(() => S.qc && S.qc.step); ok('B: step limited to −300', stepB === -300, String(stepB));
+// Lab edit: calibrated maintenance changes a draft but never an approved target
+await ctl('scenario', 'A'); const approvedEat = await p.evaluate(() => S.plan.eat);
+await act('openBriefing'); await act('openOptions'); await act('chooseLean');
+await p.selectOption('[data-lab="calOn"]', 'on'); await p.fill('[data-lab="cal"]', '1917'); await p.dispatchEvent('[data-lab="cal"]', 'change');
+d = await p.evaluate(() => S.draft.plan); ok('lab: calibrated 1,917 → draft −450/+100 eat 1,567', d.eat === 1567 && d.goal === 900, JSON.stringify(d));
+ok('lab: approved target unchanged (2,500)', (await p.evaluate(() => S.plan.eat)) === approvedEat && approvedEat === 2500);
+ok('lab: approved plan now shows derived balance +583', (await p.evaluate(() => planBal(S.plan))) === 583);
+// Scenario C: no wearable, partial logging
+await ctl('scenario', 'C'); await act('openBriefing'); await act('openOptions'); await act('chooseLean');
+d = await p.evaluate(() => S.draft.plan); ok('C: no activity goal, eat 2,566 − 450 = 2,116', d.goal === null && d.added === 0 && d.eat === 2116, JSON.stringify(d));
+await act('openEnergy'); await act('explainerDone'); const ct = await text(); ok('C: Move more / Blend hidden, activity explained', !ct.includes('Move more') && ct.includes('No activity data'));
+await act('back'); await act('openReview'); await act('approve');
+await ctl('response', 'slower'); for (let i = 0; i < 4; i++) await ctl('advance');
+s = await st(); ok('C: partial logging → no Quick Calibration', !s.qc, JSON.stringify(s));
+await p.selectOption('[data-lab="logging"]', 'complete'); await p.dispatchEvent('[data-lab="logging"]', 'change'); await ctl('advance');
+s = await st(); const cOpts = await p.evaluate(() => [...document.querySelectorAll('#phone [data-act="qcOpt"]')].map((e) => e.dataset.arg));
+ok('C: complete logging → Quick Calibration with eat-only options', s.qc && !cOpts.includes('move') && !cOpts.includes('blend'), JSON.stringify(cOpts));
+// No inert controls
+const inert = await p.evaluate(() => [...document.querySelectorAll('[data-act]')].map((e) => e.dataset.act).filter((a) => !(a in ACT)).concat([...document.querySelectorAll('[data-ctl]')].map((e) => e.dataset.ctl).filter((c) => c !== 'jump' && !(c in CONTROL))));
+ok('no inert controls on screen', inert.length === 0, inert.join(','));
+const codeActs = await p.evaluate(() => { const src = Object.values(SCREENS).map((f) => f.toString()).join(' ') + qcCard.toString() + homeParity.toString() + energyLab.toString() + panel.toString(); return [...new Set([...src.matchAll(/data-act=\"([a-zA-Z]+)\"/g)].map((m) => m[1]))].filter((a) => !(a in ACT) && !a.startsWith('$')); });
+ok('every data-act in source has a handler', codeActs.length === 0, codeActs.join(','));
 ok('no page errors', errors.length === 0, errors.join(' | '));
 await p.close();
 // mobile viewport
