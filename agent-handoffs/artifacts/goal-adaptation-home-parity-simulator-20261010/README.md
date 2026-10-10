@@ -54,3 +54,22 @@
   - one approval, with every change recorded in goal history and undoable;
   - on resume, the next phase (Phase 4, linked to Phase 2) shows which guardrail applies.
 - **End-to-end:** `simulator/test-sim.mjs`, 81 checks.
+
+## Guardrail ↔ phase-target sync (prompt `ce3b6ad1`)
+
+- The editor defaults to **Goal, going forward**. A goal-wide change (8–9% → 6.5–8.5%) is labelled "Changing your GOAL guardrail". The text explains that the leaning phase aims to bring you back into the new range and that Phase 4 keeps that range.
+- **The phase target is aligned automatically** to the lowest upper limit that will apply: the goal's, or a leaning-only override if it is lower (`grAlignedTarget`). It follows every guardrail edit until you set it yourself.
+  - If the new range already contains current body fat, the target goes just below current body fat.
+  - If the guardrail is removed, the previous target is kept.
+- **A target you set yourself is never overwritten.** If it no longer fits the range, one-tap fixes appear: "Use 8.5% (aligned)" or "Edit guardrail". When a set target differs from the aligned one, an "Align to X%" link appears.
+- **Steppers can't create an invalid range.** Pushing one limit past the other moves the other with it (`grStep`), and the range stays within 4–20%.
+- **Keep building and resume conflicts** offer "Raise upper limit to X%". Keep building also offers "Lean out first instead".
+- **Cancel / Done in the editor:** Cancel restores the guardrail and phase target exactly as they were.
+- **Review rows:**
+  - Goal guardrail (original → new · going forward)
+  - leaning-only guardrail, if any
+  - Phase ends (original → aligned target)
+  - When building resumes (Phase 4, linked, with its guardrail)
+- **Home:** text only, in the existing slots.
+- **Tests:** `guardrail-model.test.mjs` 32/32; `test-sim.mjs` 109/109; `energy-model.test.mjs` 25/25 (unchanged).
+- **Screenshots:** 16–22 in `simulator/screens/`.

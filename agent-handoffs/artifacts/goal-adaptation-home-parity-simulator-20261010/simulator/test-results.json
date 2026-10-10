@@ -180,17 +180,27 @@
     "info": ""
   },
   {
-    "name": "keep building: firm 8–9 while at 9.7% is blocked",
+    "name": "keep building: 8–9 while at 9.7% is blocked",
     "pass": true,
     "info": ""
   },
   {
-    "name": "editor: change 8–11.5 this phase only, no error",
+    "name": "keep building conflict offers fixes (raise to 11.5%, lean out first)",
     "pass": true,
     "info": ""
   },
   {
-    "name": "review shows original and proposed guardrail",
+    "name": "one tap: goal-wide 8–11.5, conflict cleared",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "switch to phase-only: 8–11.5 this phase only, goal 8–9 kept",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "review: goal 8–9% unchanged + this phase only 8–11.5%",
     "pass": true,
     "info": ""
   },
@@ -225,42 +235,182 @@
     "info": ""
   },
   {
-    "name": "lean setup shows phase target and guardrail separately",
+    "name": "lean setup: target ≤ 9% matches goal upper limit; guardrail 8–9% (goal)",
     "pass": true,
     "info": ""
   },
   {
-    "name": "target 9.5 above guardrail 9 → blocked",
+    "name": "editor defaults to Goal, going forward",
     "pass": true,
     "info": ""
   },
   {
-    "name": "phase-only 8–10 clears the target conflict",
+    "name": "repeated edits 8–9 → 6.5–8.5: target follows 9,9,9,8.5 and never blocks",
+    "pass": true,
+    "info": "9/auto/true 9/auto/true 9/auto/true 8.5/auto/true"
+  },
+  {
+    "name": "editor says GOAL guardrail changes, phase returns to it, Phase 4 keeps it",
     "pass": true,
     "info": ""
   },
   {
-    "name": "inverted range (10–10) blocked with message",
+    "name": "editor summary: goal 6.5–8.5 going forward, target ≤ 8.5 new goal limit, Phase 4 6.5–8.5",
     "pass": true,
     "info": ""
   },
   {
-    "name": "hub lists guardrail as changing",
+    "name": "upper 8.5 → 8 → 8.5: target 8 then 8.5, still auto",
+    "pass": true,
+    "info": "8,auto,true 8.5,auto,true"
+  },
+  {
+    "name": "scope switch: leaning-only 6.5–8.5 keeps goal 8–9, target 8.5 (leaning limit); back to goal → 8.5",
     "pass": true,
     "info": ""
   },
   {
-    "name": "review: guardrail 8–9% (goal) → 8–10% this phase only, phase ends ≤ 9.5%",
+    "name": "Cancel discards the edit: 8–9% (goal), target 9",
     "pass": true,
     "info": ""
   },
   {
-    "name": "one approval, one version",
+    "name": "lean setup after Done: target ≤ 8.5% set automatically + goal note 8–9% → 6.5–8.5%",
     "pass": true,
     "info": ""
   },
   {
-    "name": "state: goal 8–9, phase 8–10, target 9.5",
+    "name": "custom target 9% vs new 8.5% limit → blocked with one-tap fixes",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "raising the limit to 9 never rewrites the custom 9%; conflict clears",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "cancel → 6.5–8.5 again, custom 9 still conflicts (not silently changed)",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "tap \"Use 8.5% (aligned)\" → 8.5 auto, clear",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "compatible custom 8% stays put through edits (8 → 8)",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "custom differs from aligned → \"Align to 8.5%\" link",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "aligned again: 8.5 auto",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Review: goal 8–9% → 6.5–8.5% · goal, going forward",
+    "pass": true,
+    "info": "9:41\nBack\nReview\nReview your new plan\nChecked against your latest evidence\nSIMULATED\nPhase\nLean Mass Build\nLeaning (temporary)\nGoal guardrail\n8–9%\n6.5–8.5% · goal, going forward\nPhase ends\n≤ 9%\nBody fat ≤ 8.5% · aligned to the new goal upper limit\nWhen building resumes\nPhase 4 · Lean Mass Build (linked to Phase 2) · guardrail 6.5–8.5%\nGoal date\nOct 31\nSet when building resumes\nDaily balance\n+383\n−"
+  },
+  {
+    "name": "Review: phase ends ≤ 9% → ≤ 8.5% aligned to the new goal upper limit",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Review: when building resumes → Phase 4 linked, guardrail 6.5–8.5%",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "one approval → one version; goal 6.5–8.5, no override, target 8.5",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Home (same slots): 6.5–8.5% guardrail + \"Bring body fat to 8.5%\"",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Goals: goal 6.5–8.5, phase target 8.5, when building resumes 6.5–8.5, history",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "phase completes at the aligned 8.5% target",
+    "pass": true,
+    "info": "8.496774193548388"
+  },
+  {
+    "name": "What’s next: resume carries goal 6.5–8.5% into Phase 4, no conflict",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "resume review: Phase 4 linked; goal 6.5–8.5% unchanged",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "resumed Phase 4 with 6.5–8.5%; Home H4 shows it",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "undo resume → leaningComplete, goal still 6.5–8.5",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "goal 8–10 at 9.7% (already inside): target 9.5 just below now, no block",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "remove goal guardrail while leaning: target keeps 9%, warning, no block",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "keep → back to 8–9 / 9",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "custom 9.5 vs goal 8–9 → blocked with \"Use 9% (aligned)\"",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "leaning-only 8–10 clears it; warns the phase ends above the goal’s 9%",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "pushing lower past upper moves upper with it (10–10.5), never inverted",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "hub lists guardrail as changing with phase target",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "review: goal 8–9 unchanged, leaning-only 8–10, phase ends ≤ 9.5% custom",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "one approval, one version; state goal 8–9, phase 8–10, target 9.5",
     "pass": true,
     "info": ""
   },
@@ -270,32 +420,22 @@
     "info": "9.317079397498084"
   },
   {
-    "name": "next: leaning-only guardrail expires; resume shows goal 8–9%",
+    "name": "next: leaning-only guardrail expires; resume blocked above goal 9% with one-tap fix",
     "pass": true,
     "info": ""
   },
   {
-    "name": "resume blocked while above goal range 9% (at 9.x%)",
+    "name": "fix → goal-wide 8–9.5, clear",
     "pass": true,
     "info": ""
   },
   {
-    "name": "editor at resume: goal-wide 8–9.5 clears conflict",
+    "name": "resume review: Phase 4 linked; goal 8–9% → 8–9.5% going forward; leaning-only ends",
     "pass": true,
     "info": ""
   },
   {
-    "name": "resume review: Phase 4 linked to Phase 2; guardrail 8–9% (goal) → 8–9.5% (goal)",
-    "pass": true,
-    "info": ""
-  },
-  {
-    "name": "resumed with goal guardrail 8–9.5, no phase override",
-    "pass": true,
-    "info": ""
-  },
-  {
-    "name": "Home H4 shows goal guardrail 8–9.5%",
+    "name": "resumed with goal 8–9.5, no override; Home H4 8–9.5%",
     "pass": true,
     "info": ""
   },
@@ -310,12 +450,12 @@
     "info": ""
   },
   {
-    "name": "remove: warning shown",
+    "name": "remove: goal scope by default, warning shown",
     "pass": true,
     "info": ""
   },
   {
-    "name": "review: 8–9% (goal) → None (goal)",
+    "name": "review: 8–9% → None · goal, going forward",
     "pass": true,
     "info": ""
   },

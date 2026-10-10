@@ -64,10 +64,24 @@ function draftBase(d) { return { goal: S.guardrail, phase: d.kind === 'next' || 
 const draftProposed = (d) => grPropose(draftBase(d), d.gr);
 function draftContext(d) {
   const kind = d.kind === 'next' ? { resume: 'resume', maintain: 'maintain', continue: 'continueLean' }[d.next] : d.kind;
-  const target = (d.kind === 'lean' && d.completion.mode !== 'time') || (d.kind === 'next' && d.next === 'continue') ? d.target : null;
+  const target = tgtUsed(d) ? tgt(d) : null;
   return { kind, bodyFat: bf(), target };
 }
 const draftCheck = (d) => grValidate(draftContext(d), d.gr, draftProposed(d));
+// Phase target: aligned automatically to the lowest upper limit that will apply, until the user sets it by hand.
+const tgtUsed = (d) => (d.kind === 'lean' && d.completion.mode !== 'time') || (d.kind === 'next' && d.next === 'continue');
+const tgtFallback = () => (S.guardrail.enabled !== false ? S.guardrail.max : grStepBelow(bf()));
+const tgtInfo = (d) => grAlignedTarget(draftProposed(d), bf(), tgtFallback());
+const tgtStart = (d) => grAlignedTarget(draftBase(d), bf(), tgtFallback()).value;
+const tgt = (d) => (d.targetMode === 'custom' ? d.target : tgtInfo(d).value);
+const tgtWhy = (d) => { if (d.targetMode === 'custom') return 'custom'; const src = tgtInfo(d).source; return src === 'goal' ? `matches your ${grSame(draftBase(d).goal, draftProposed(d).goal) ? '' : 'new '}goal upper limit` : { phase: 'matches the leaning-only upper limit', previous: 'no guardrail · previous target kept', belowNow: 'already inside your range · just below now' }[src]; };
+// One-tap ways out of a conflict, so validation never dead-ends.
+function fixes(d, onEditor) {
+  const c = draftCheck(d).conflicts; const out = [];
+  if (c.includes('targetAboveRange') || c.includes('targetNotBelowNow')) { if (d.targetMode === 'custom') out.push([`Use ${grFmt(tgtInfo(d).value)}% (aligned)`, 'targetAuto', '']); if (!onEditor) out.push(['Edit guardrail', 'openGuardrail', '']); }
+  if (c.includes('aboveUpperWhileBuilding')) { const up = d.kind === 'keepBuilding' ? 11.5 : Math.ceil(bf() * 2) / 2; out.push([`Raise upper limit to ${grFmt(up)}%`, 'grFixUpper', up]); if (d.kind === 'keepBuilding') out.push(['Lean out first instead', 'chooseLean', '']); }
+  return out.length ? `<div class="chips" style="margin-top:8px">${out.map(([l, a, arg]) => `<span class="chip on" data-act="${a}" ${arg !== '' ? `data-arg="${arg}"` : ''} role="button" tabindex="0">${l}</span>`).join('')}</div>` : '';
+}
 const grLabel = (pr) => (pr.phase ? `${grText(pr.phase)} this phase only · goal ${grText(pr.goal)}` : `${grText(pr.goal)} (goal)`);
 const grChanged = (d) => { const b = draftBase(d), pr = draftProposed(d); return !grSame(b.goal, pr.goal) || !grSame(b.phase, pr.phase); };
 const checkMsgs = (chk) => chk.errors.map((m) => `<div class="ewarn red">${I.warn}<span>${m}</span></div>`).join('') + chk.warnings.map((m) => `<div class="ewarn amber">${I.info}<span>${m}</span></div>`).join('');
@@ -181,7 +195,7 @@ function homeState() {
 }
 
 // ---------------- shared UI bits -----------------
-const sNav = (back, title, action = '') => `<div class="nav"><span class="back" data-act="back" role="button" tabindex="0">${I.back}<span>${back}</span></span><span class="title">${title}</span><span class="action">${action}</span></div>`;
+const sNav = (back, title, action = '', backAct = 'back') => `<div class="nav"><span class="back" data-act="${backAct}" role="button" tabindex="0">${I.back}<span>${back}</span></span><span class="title">${title}</span><span class="action">${action}</span></div>`;
 const radio = (on) => `<div class="radio ${on ? 'on' : ''}"></div>`;
 const tag = (t, tone = 'line') => `<span class="pill ${tone}">${t}</span>`;
 const simTag = '<span class="pill amber" style="font-size:.625em">SIMULATED</span>';
@@ -328,19 +342,26 @@ SCREENS.notNow = () => `${statusBar()}${sNav('Back', 'Not now')}
     <div class="choice" data-act="notNowPick" data-arg="remove" role="button" tabindex="0"><div class="grow"><div class="t-body strong">Remove from Home</div><div class="t-sm ink2">Stays open in Goals.</div></div>${I.chev}</div>
   </div></div>`;
 
+function goalChangeNote(d) {
+  const base = draftBase(d), pr = draftProposed(d);
+  if (grSame(base.goal, pr.goal)) return '';
+  const t = tgtUsed(d) ? ` This leaning phase is meant to bring you back into it: phase target ${d.targetMode === 'custom' ? `stays at your custom ${grFmt(tgt(d))}%` : `≤ ${grFmt(tgt(d))}%, set automatically`}.` : '';
+  return `<div class="card soft" style="padding:10px 14px"><span class="eyebrow amber">Goal guardrail · going forward</span><div class="t-sm" style="margin-top:4px"><s class="muted">${grText(base.goal)}</s> → <b>${grText(pr.goal)}</b> for Build Lean Mass.${t}${d.kind === 'lean' ? ` Phase 4 keeps ${grText(pr.goal)} when building resumes.` : ''}</div></div>`;
+}
 SCREENS.leanSetup = () => { const d = S.draft; return `${statusBar()}${sNav('Options', 'Leaning Phase')}
   <div class="content stack">
     <div class="display h1">Set up your leaning phase</div>
     <p class="lead">Two decisions. Everything else carries forward.</p>
     <div class="card"><span class="eyebrow">Ends</span><div class="divider-list" style="margin-top:4px">
-      ${[['outcome', 'When I reach my phase target', `Body fat at or below ${grFmt(d.target)}%. A DEXA confirms it best; otherwise we estimate from trends.`], ['time', 'After a set time', 'Then we review together'], ['hybrid', 'Whichever comes first', 'Back in range, or the time limit']].map(([k, t, sub]) => `<div class="choice" data-act="setCompletion" data-arg="${k}" role="radio" aria-checked="${d.completion.mode === k}" tabindex="0">${radio(d.completion.mode === k)}<div class="grow"><div class="t-body strong">${t}</div><div class="t-sm ink2">${sub}</div></div></div>`).join('')}
+      ${[['outcome', 'When I reach my phase target', `Body fat at or below ${grFmt(tgt(d))}%. A DEXA confirms it best; otherwise we estimate from trends.`], ['time', 'After a set time', 'Then we review together'], ['hybrid', 'Whichever comes first', 'Back in range, or the time limit']].map(([k, t, sub]) => `<div class="choice" data-act="setCompletion" data-arg="${k}" role="radio" aria-checked="${d.completion.mode === k}" tabindex="0">${radio(d.completion.mode === k)}<div class="grow"><div class="t-body strong">${t}</div><div class="t-sm ink2">${sub}</div></div></div>`).join('')}
     </div>${d.completion.mode !== 'outcome' ? `<div class="row between" style="margin-top:6px"><span class="t-sm ink2">Time limit</span><div class="stepper"><span data-act="weeks" data-arg="-1" role="button" tabindex="0">−</span><b>${d.completion.weeks} weeks</b><span data-act="weeks" data-arg="1" role="button" tabindex="0">+</span></div></div>` : ''}
     <p class="t-xs muted" style="margin-top:6px">Nothing ends or restarts on its own; you choose what’s next.</p></div>
     <div class="card" style="padding:0 16px"><div class="divider-list">
-      ${d.completion.mode !== 'time' ? `<div class="srow"><span class="ic">${I.flag}</span><div class="grow"><div class="nm">Phase target</div><div class="dt">Ends at body fat ≤ ${grFmt(d.target)}% · now ${f1(bf())}%</div></div><div class="mini-step"><span data-act="target" data-arg="-0.5" role="button" tabindex="0" aria-label="Lower phase target">−</span><span data-act="target" data-arg="0.5" role="button" tabindex="0" aria-label="Raise phase target">+</span></div></div>` : ''}
+      ${d.completion.mode !== 'time' ? `<div class="srow"><span class="ic ${tgt(d) !== tgtStart(d) ? 'amber' : ''}">${I.flag}</span><div class="grow"><div class="nm">Phase target</div><div class="dt">Ends at body fat ≤ ${grFmt(tgt(d))}% · ${tgtWhy(d)} · now ${f1(bf())}%</div>${d.targetMode === 'custom' && tgt(d) !== tgtInfo(d).value ? `<div class="t-sm semi" style="color:var(--teal);margin-top:2px" data-act="targetAuto" role="button" tabindex="0">Align to ${grFmt(tgtInfo(d).value)}%</div>` : ''}</div><div class="mini-step"><span data-act="target" data-arg="-0.5" role="button" tabindex="0" aria-label="Lower phase target">−</span><span data-act="target" data-arg="0.5" role="button" tabindex="0" aria-label="Raise phase target">+</span></div></div>` : ''}
       <div class="srow" data-act="openGuardrail" role="button" tabindex="0"><span class="ic ${grChanged(d) ? 'amber' : ''}">${I.shield}</span><div class="grow"><div class="nm">Body-fat guardrail</div><div class="dt">${grLabel(draftProposed(d))}</div></div><span class="edit">Edit</span></div>
     </div><p class="t-xs muted" style="margin:6px 0 10px">The phase target is what ends this phase. The guardrail is the range your goal protects.</p></div>
-    ${checkMsgs({ errors: draftCheck(d).errors, warnings: [] })}
+    ${goalChangeNote(d)}
+    ${checkMsgs({ errors: draftCheck(d).errors, warnings: [] })}${fixes(d)}
     <div class="card" style="padding:0 16px"><div class="srow" data-act="openEnergy" role="button" tabindex="0"><span class="ic amber">${I.bolt}</span><div class="grow"><div class="nm">Daily energy</div><div class="dt"><b style="color:var(--ink)">${sgn(d.plan.balance)} a day</b> · eat ${fmt(d.plan.eat)} · activity goal ${fmtG(d.plan.goal)}</div></div><span class="edit">Edit</span></div></div>
     <div class="card" style="padding:12px 16px" data-act="openHub" role="button" tabindex="0"><div class="row between"><div><div class="t-body strong">Your plan</div><div class="t-sm ink2">Training, recovery, supplements and tracking carry forward</div></div>${I.chev}</div></div>
     ${btn('Review', draftCheck(d).ok ? 'openReview' : 'noop', draftCheck(d).ok ? 'primary' : 'disabled')}
@@ -349,7 +370,7 @@ SCREENS.leanSetup = () => { const d = S.draft; return `${statusBar()}${sNav('Opt
 SCREENS.keepBuilding = () => { const d = S.draft; const pr = draftProposed(d); const eff = grEffective(pr.goal, pr.phase); const chk = draftCheck(d); const fits = eff.enabled === false || eff.max >= 11.5; return `${statusBar()}${sNav('Options', 'Keep Building')}
   <div class="content stack"><div class="display h1">Keep building with limits that fit</div>
     <div class="card" style="padding:0 16px"><div class="srow" data-act="openGuardrail" role="button" tabindex="0"><span class="ic amber">${I.shield}</span><div class="grow"><div class="nm">Body-fat guardrail</div><div class="dt">${grLabel(pr)} · now ${f1(bf())}%</div></div><span class="edit">Edit</span></div></div>
-    ${checkMsgs(chk)}
+    ${checkMsgs(chk)}${fixes(d)}
     ${chk.ok ? `<div class="ewarn ${fits ? 'ok' : 'amber'}">${fits ? I.check : I.warn}<span>${fits ? 'At a small surplus, body fat likely stays inside this range.' : 'Body fat likely ends around 10.4–11.3%; an upper limit of at least 11.5% fits.'}</span></div>` : ''}
     <div class="card"><span class="eyebrow">Goal date</span>
       <div class="choice" data-act="date" data-arg="Oct 31" role="radio" tabindex="0">${radio(d.goalDate === 'Oct 31')}<div class="grow"><div class="t-body strong">Keep Oct 31</div>${d.goalDate === 'Oct 31' ? `<div class="ewarn amber">${I.warn}<span>Likely not achievable. It will show as at risk.</span></div>` : ''}</div></div>
@@ -360,18 +381,29 @@ SCREENS.keepBuilding = () => { const d = S.draft; const pr = draftProposed(d); c
 
 SCREENS.guardrail = () => { const d = S.draft; const base = draftBase(d); const pr = draftProposed(d); const chk = draftCheck(d); const g = d.gr;
   const scopeLabel = d.kind === 'next' ? 'Next phase only' : d.kind === 'lean' ? 'Leaning phase only' : 'This phase only';
-  return `${statusBar()}${sNav('Back', 'Body-Fat Guardrail', '<span data-act="back" role="button" tabindex="0" style="font-weight:700">Done</span>')}
+  const goalScope = g.scope === 'goal'; const phaseWord = d.kind === 'lean' ? 'leaning phase' : d.kind === 'next' ? 'next phase' : 'current phase';
+  const head = g.mode === 'keep' ? '' : goalScope ? 'Changing your GOAL guardrail' : `Changing the ${phaseWord} only`;
+  const note = g.mode === 'keep' ? '' : goalScope
+    ? `Build Lean Mass uses ${grText(pr.goal)} going forward${d.kind === 'next' ? ', starting with the next phase' : d.kind === 'lean' ? '' : ', in this and every later phase'}.${tgtUsed(d) ? ` This leaning phase aims to bring you back into it, so its phase target ${d.targetMode === 'custom' ? `stays at your custom ${grFmt(tgt(d))}%` : `moves to ${grFmt(tgt(d))}% automatically`}.` : ''}${d.kind === 'lean' ? ` Phase 4 keeps ${grText(pr.goal)} when building resumes.` : ''}`
+    : `Only during the ${phaseWord}. Your goal guardrail (${grText(pr.goal)}) returns when it ends${d.kind === 'lean' ? ' and carries into Phase 4' : ''}.`;
+  const after = [['Goal guardrail', `${grText(pr.goal)} · ${grSame(base.goal, pr.goal) ? 'unchanged' : 'going forward'}`]];
+  if (pr.phase) after.push([scopeLabel, grText(pr.phase)]);
+  if (tgtUsed(d)) after.push(['Phase target (separate)', `≤ ${grFmt(tgt(d))}% · ${tgtWhy(d)}`]);
+  if (d.kind === 'lean' || (d.kind === 'next' && d.next !== 'resume')) after.push(['When building resumes (Phase 4)', grText(pr.goal)]);
+  if (d.kind === 'next' && d.next === 'resume') after.push(['Phase 4 starts with', grText(grEffective(pr.goal, pr.phase))]);
+  return `${statusBar()}${sNav('Cancel', 'Body-Fat Guardrail', '<span data-act="grDone" role="button" tabindex="0" style="font-weight:700">Done</span>', 'grCancel')}
   <div class="content stack">
     <div class="card soft" style="padding:10px 14px"><div class="kv" style="padding:4px 0"><span class="k">Now applies</span><span class="v">${grLabel(base)}</span></div><div class="kv" style="padding:4px 0"><span class="k">Body fat now</span><span class="v">${f1(bf())}% ${simTag}</span></div></div>
     <div class="card"><div class="divider-list">
       ${[['keep', `Keep ${grText(grEffective(base.goal, base.phase))}`, 'No change'], ['change', 'Change the range', 'Raise or lower the limits'], ['remove', 'Remove the guardrail', 'Body fat is still shown; it just won’t trigger reviews']].map(([k, t, sub]) => `<div class="choice" data-act="grMode" data-arg="${k}" role="radio" aria-checked="${g.mode === k}" tabindex="0">${radio(g.mode === k)}<div class="grow"><div class="t-body strong">${t}</div><div class="t-sm ink2">${sub}</div></div></div>`).join('')}
     </div>
-    ${g.mode === 'change' ? `<div class="row between" style="margin-top:8px"><span class="t-body">Lower</span><div class="stepper"><span data-act="gr" data-arg="min:-0.5" role="button" tabindex="0" aria-label="Lower limit down">−</span><b>${grFmt(g.min)}%</b><span data-act="gr" data-arg="min:0.5" role="button" tabindex="0" aria-label="Lower limit up">+</span></div></div>
+    ${g.mode !== 'keep' ? `<div class="t-sm strong" style="margin-top:12px">Applies to</div><div class="seg" style="margin-top:8px"><div class="${goalScope ? 'on' : ''}" data-act="grScope" data-arg="goal" role="radio" aria-checked="${goalScope}" tabindex="0">Goal, going forward</div><div class="${!goalScope ? 'on' : ''}" data-act="grScope" data-arg="phase" role="radio" aria-checked="${!goalScope}" tabindex="0">${scopeLabel}</div></div>` : ''}
+    ${g.mode === 'change' ? `<div class="row between" style="margin-top:12px"><span class="t-body">Lower</span><div class="stepper"><span data-act="gr" data-arg="min:-0.5" role="button" tabindex="0" aria-label="Lower limit down">−</span><b>${grFmt(g.min)}%</b><span data-act="gr" data-arg="min:0.5" role="button" tabindex="0" aria-label="Lower limit up">+</span></div></div>
       <div class="row between" style="margin-top:8px"><span class="t-body">Upper</span><div class="stepper"><span data-act="gr" data-arg="max:-0.5" role="button" tabindex="0" aria-label="Upper limit down">−</span><b>${grFmt(g.max)}%</b><span data-act="gr" data-arg="max:0.5" role="button" tabindex="0" aria-label="Upper limit up">+</span></div></div>` : ''}
-    ${g.mode !== 'keep' ? `<div class="t-sm strong" style="margin-top:12px">Applies to</div><div class="seg" style="margin-top:8px"><div class="${g.scope === 'phase' ? 'on' : ''}" data-act="grScope" data-arg="phase" role="radio" aria-checked="${g.scope === 'phase'}" tabindex="0">${scopeLabel}</div><div class="${g.scope === 'goal' ? 'on' : ''}" data-act="grScope" data-arg="goal" role="radio" aria-checked="${g.scope === 'goal'}" tabindex="0">Goal, going forward</div></div>` : ''}
     </div>
-    ${checkMsgs(chk)}
-    <div class="card" style="padding:10px 14px"><div class="kv" style="padding:4px 0"><span class="k">After approval</span><span class="v">${grLabel(pr)}</span></div>${d.kind === 'lean' || (d.kind === 'next' && d.next === 'continue') ? `<div class="kv" style="padding:4px 0"><span class="k">Phase target (separate)</span><span class="v">≤ ${grFmt(d.target)}%</span></div>` : ''}</div>
+    ${head ? `<div class="card soft" style="padding:10px 14px"><span class="eyebrow ${goalScope ? 'amber' : ''}">${head}</span><div class="t-sm" style="margin-top:4px">${note}</div></div>` : ''}
+    ${checkMsgs(chk)}${fixes(d, true)}
+    <div class="card" style="padding:10px 14px">${after.map(([k, v]) => `<div class="kv" style="padding:4px 0"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')}</div>
     <p class="t-xs muted">Changes join the rest of this plan and apply with one approval. Earlier ranges stay in your goal history.</p>
   </div>`; };
 
@@ -433,7 +465,7 @@ const hubRow = (ic, name, detail, act, changed) => `<div class="srow ${changed ?
 SCREENS.hub = () => { const d = S.draft; const p = d.plan; const base = S.plan;
   const changing = [];
   if (d.kind === 'lean') changing.push(hubRow(I.flag, 'Phase', `<span class="was">Lean Mass Build</span> → <b style="color:var(--ink)">Leaning (temporary)</b>`, d.kind === 'lean' ? 'openLeanSetup' : 'noop', true));
-  if (grChanged(d)) changing.push(hubRow(I.shield, 'Body-fat guardrail', `<span class="was">${grLabel(draftBase(d))}</span><br><b style="color:var(--ink)">${grLabel(draftProposed(d))}</b>`, 'openGuardrail', true));
+  if (grChanged(d)) changing.push(hubRow(I.shield, 'Body-fat guardrail', `<span class="was">${grLabel(draftBase(d))}</span><br><b style="color:var(--ink)">${grLabel(draftProposed(d))}</b>${tgtUsed(d) ? `<br>Phase target ≤ ${grFmt(tgt(d))}% · ${tgtWhy(d)}` : ''}`, 'openGuardrail', true));
   if (p.eat !== base.eat || p.goal !== base.goal) changing.push(hubRow(I.bolt, 'Daily energy', `<span class="was">eat ${fmt(base.eat)} · goal ${fmtG(base.goal)}</span><br><b style="color:var(--ink)">${sgn(p.balance)} · eat ${fmt(p.eat)} · goal ${fmtG(p.goal)}</b>`, 'openEnergy', true));
   const carried = [
     [I.lift, 'Training', `Learned: ≈ 4 workouts a week${p.trainingGoals ? ` · goal ${p.trainingGoals}` : ''} · ${p.progression}`, 'openTraining', p.progression !== base.progression || p.trainingGoals !== base.trainingGoals],
@@ -477,10 +509,20 @@ SCREENS.tracking = () => { const p = S.draft.plan; return `${statusBar()}${sNav(
     <div class="lrow" data-act="toggle" data-arg="dexa" role="switch" aria-checked="${p.dexa}" tabindex="0"><div class="l">Schedule a DEXA<small>Optional</small></div><span class="sw ${p.dexa ? 'on' : ''}"></span></div></div></div>`; };
 
 SCREENS.review = () => { const d = S.draft; const p = d.plan, b = S.plan; const rows = [];
-  if (d.kind === 'lean') rows.push(['Phase', 'Lean Mass Build', 'Leaning (temporary)'], ['Phase ends', '', d.completion.mode === 'outcome' ? `Body fat ≤ ${grFmt(d.target)}%` : d.completion.mode === 'time' ? `After ${d.completion.weeks} weeks` : `Body fat ≤ ${grFmt(d.target)}% or ${d.completion.weeks} weeks`], ['Goal date', 'Oct 31', 'Set when building resumes']);
+  const gb = draftBase(d), gp = draftProposed(d); const goalCh = !grSame(gb.goal, gp.goal);
+  const tCell = () => `Body fat ≤ ${grFmt(tgt(d))}% · ${d.targetMode === 'custom' ? 'custom' : tgtInfo(d).source === 'goal' ? `aligned to the ${goalCh ? 'new ' : ''}goal upper limit` : tgtWhy(d)}`;
+  if (d.kind === 'lean') rows.push(['Phase', 'Lean Mass Build', 'Leaning (temporary)']);
+  if (d.kind === 'next') rows.push(['Phase', 'Leaning (complete)', d.next === 'resume' ? 'Phase 4 · Lean Mass Build (linked to Phase 2)' : d.next === 'maintain' ? 'Maintain' : 'Leaning (continued)']);
+  rows.push(['Goal guardrail', goalCh ? grText(gb.goal) : '', goalCh ? `${grText(gp.goal)} · goal, going forward` : `${grText(gp.goal)} · unchanged`]);
+  if (gp.phase || gb.phase) rows.push([d.kind === 'lean' ? 'Leaning-only guardrail' : 'This phase only', gb.phase && !grSame(gb.phase, gp.phase) ? grText(gb.phase) : '', gp.phase ? `${grText(gp.phase)} · ends with the phase` : 'None · goal guardrail applies']);
+  if (d.kind === 'next' && S.phaseGuardrail) rows.push(['Leaning-only guardrail', grText(S.phaseGuardrail), 'Ends with leaning']);
+  if (d.kind === 'lean') {
+    const t0 = tgtStart(d);
+    rows.push(['Phase ends', d.completion.mode !== 'time' && tgt(d) !== t0 ? `≤ ${grFmt(t0)}%` : '', d.completion.mode === 'outcome' ? tCell() : d.completion.mode === 'time' ? `After ${d.completion.weeks} weeks` : `${tCell()} or ${d.completion.weeks} weeks`]);
+    rows.push(['When building resumes', '', `Phase 4 · Lean Mass Build (linked to Phase 2) · guardrail ${grText(gp.goal)}`], ['Goal date', 'Oct 31', 'Set when building resumes']);
+  }
+  if (d.kind === 'next' && d.next === 'continue') rows.push(['Phase ends', '', tCell()], ['When building resumes', '', `Phase 4 · guardrail ${grText(gp.goal)}`]);
   if (d.kind === 'keepBuilding' && d.goalDate !== 'Oct 31') rows.push(['Goal date', 'Oct 31', d.goalDate]);
-  rows.push(['Body-fat guardrail', grChanged(d) ? grLabel(draftBase(d)) : '', grChanged(d) ? grLabel(draftProposed(d)) : `${grLabel(draftProposed(d))} · unchanged`]);
-  if (d.kind === 'next') { rows.push(['Phase', 'Leaning (complete)', d.next === 'resume' ? 'Phase 4 · Lean Mass Build (linked to Phase 2)' : d.next === 'maintain' ? 'Maintain' : 'Leaning (continued)']); if (d.next === 'continue') rows.push(['Phase ends', '', `Body fat ≤ ${grFmt(d.target)}%`]); }
   if (p.balance !== planBal(b)) rows.push(['Daily balance', sgn(planBal(b)), sgn(p.balance)]);
   if (p.eat !== b.eat) rows.push(['Eat', fmt(b.eat), `${fmt(p.eat)} kcal`]);
   if (p.goal !== b.goal) rows.push(['Activity goal', fmtG(b.goal), `${fmtG(p.goal)} kcal`]);
@@ -498,7 +540,7 @@ SCREENS.review = () => { const d = S.draft; const p = d.plan, b = S.plan; const 
   <div class="card soft" style="padding:10px 14px"><div class="t-xs muted">Eat = maintenance ${maintLabel()} ${p.balance < 0 ? '−' : '+'} ${fmt(Math.abs(p.balance))}${hasActivity() ? ` + ${fmt(p.added || 0)} extra activity` : ''} = <b style="color:var(--ink)">${fmt(p.eat)}</b>${hasActivity() ? ` · activity goal = ${fmt(S.E.usual)} usual + ${fmt(p.added || 0)} = ${fmtG(p.goal)}` : ''}</div>
     <div class="t-sm semi" style="color:var(--teal);margin-top:6px" data-act="go" data-arg="why" role="button" tabindex="0">Why these numbers?</div></div>
   <p class="t-xs muted">Only numbers that change are listed. Everything else carries forward.</p>
-  ${checkMsgs({ errors: draftCheck(d).errors, warnings: [] })}
+  ${checkMsgs({ errors: draftCheck(d).errors, warnings: [] })}${fixes(d)}
   ${btn('Approve', rows.length && draftCheck(d).ok ? 'approve' : 'noop', rows.length && draftCheck(d).ok ? 'primary' : 'disabled')}
   <p class="t-xs muted" style="text-align:center">One approval updates goal, phase and plan together. Version ${S.versions.length} is kept in Your Journey.</p></div>`; };
 
@@ -510,10 +552,11 @@ SCREENS.next = () => { const inRange = S.completionTarget != null && bf() <= S.c
   <p class="t-xs muted">Shown honestly, never reset. Some of a small lean drop is usually water. ${simTag}</p></div>
   <div class="card divider-list" style="padding:0 16px">${[['resume', 'Start building again', 'Slow, lean gain · +200 a day'], ['maintain', 'Hold at maintenance first', 'A few weeks before building'], ['continue', 'Keep leaning', inRange ? 'Set a lower phase target' : 'Continue toward your target']].map(([k, t, s]) => `<div class="choice" data-act="pickNext" data-arg="${k}" role="radio" aria-checked="${n === k}" tabindex="0">${radio(n === k)}<div class="grow"><div class="t-body strong">${t}${k === (inRange ? 'resume' : 'continue') ? ' <span class="pill teal">Suggested</span>' : ''}</div><div class="t-sm ink2">${s}</div></div></div>`).join('')}</div>
   ${S.draft ? `<div class="card" style="padding:0 16px"><div class="divider-list">
-    ${n === 'continue' ? `<div class="srow"><span class="ic">${I.flag}</span><div class="grow"><div class="nm">Phase target</div><div class="dt">Ends at body fat ≤ ${grFmt(S.draft.target)}%</div></div><div class="mini-step"><span data-act="target" data-arg="-0.5" role="button" tabindex="0">−</span><span data-act="target" data-arg="0.5" role="button" tabindex="0">+</span></div></div>` : ''}
+    ${n === 'continue' ? `<div class="srow"><span class="ic">${I.flag}</span><div class="grow"><div class="nm">Phase target</div><div class="dt">Ends at body fat ≤ ${grFmt(tgt(S.draft))}% · ${tgtWhy(S.draft)}</div>${S.draft.targetMode === 'custom' && tgt(S.draft) !== tgtInfo(S.draft).value ? `<div class="t-sm semi" style="color:var(--teal);margin-top:2px" data-act="targetAuto" role="button" tabindex="0">Align to ${grFmt(tgtInfo(S.draft).value)}%</div>` : ''}</div><div class="mini-step"><span data-act="target" data-arg="-0.5" role="button" tabindex="0">−</span><span data-act="target" data-arg="0.5" role="button" tabindex="0">+</span></div></div>` : ''}
     <div class="srow" data-act="openGuardrail" role="button" tabindex="0"><span class="ic ${grChanged(S.draft) ? 'amber' : ''}">${I.shield}</span><div class="grow"><div class="nm">${n === 'continue' ? 'Guardrail while leaning' : 'Guardrail when building resumes'}</div><div class="dt">${grLabel(draftProposed(S.draft))}</div></div><span class="edit">Edit</span></div></div></div>
     ${S.phaseGuardrail ? `<p class="t-xs muted">The leaning-only guardrail (${grText(S.phaseGuardrail)}) ends with this phase.</p>` : ''}
-    ${checkMsgs({ errors: draftCheck(S.draft).errors, warnings: [] })}` : ''}
+    ${n === 'resume' && !grChanged(S.draft) ? `<p class="t-xs muted">Phase 4 carries your approved goal guardrail forward (${grText(S.guardrail)}).</p>` : ''}
+    ${checkMsgs({ errors: draftCheck(S.draft).errors, warnings: [] })}${fixes(S.draft)}` : ''}
   ${btn('Review this change', S.draft && draftCheck(S.draft).ok ? 'nextReview' : 'noop', S.draft && draftCheck(S.draft).ok ? 'primary' : 'disabled')}<p class="t-xs muted" style="text-align:center">Nothing restarts on its own.</p></div>`; };
 
 SCREENS.goals = () => { const leaning = S.phase === 'leaning'; const tempRows = [['done', 'Phase 1 · Establish Maintenance', 'Complete']];
@@ -536,6 +579,7 @@ SCREENS.goals = () => { const leaning = S.phase === 'leaning'; const tempRows = 
       <div class="kv"><span class="k">Goal</span><span class="v">${grText(S.guardrail)}</span></div>
       ${S.phaseGuardrail ? `<div class="kv"><span class="k">This phase only</span><span class="v">${grText(S.phaseGuardrail)}</span></div>` : ''}
       ${leaning && S.completionTarget != null ? `<div class="kv"><span class="k">Phase target (separate)</span><span class="v">≤ ${grFmt(S.completionTarget)}%</span></div>` : ''}
+      ${leaning ? `<div class="kv"><span class="k">When building resumes</span><span class="v">${grText(S.guardrail)}</span></div>` : ''}
       <div class="kv"><span class="k">Body fat now</span><span class="v">${f1(bf())}%</span></div></div>
     <div class="card"><span class="eyebrow">The path · Your Journey</span><div class="phases" style="margin-top:10px">${tempRows.map(([dot, t, s], i) => `<div class="ph"><div class="col"><div class="dot ${dot}"></div>${i < tempRows.length - 1 ? '<div class="line"></div>' : ''}</div><div class="txt"><div class="t-body strong">${t}</div><div class="t-sm ink2">${s}</div></div></div>`).join('')}</div></div>
     <div class="card"><div class="row between"><span class="eyebrow">Changes you approved</span>${S.undo ? `<span class="t-sm semi" style="color:var(--teal)" data-act="undo" role="button" tabindex="0">Undo last</span>` : ''}</div>
@@ -548,10 +592,10 @@ SCREENS.placeholder = () => `${statusBar()}${sNav('Home', 'Not in this simulatio
 function startDraft(kind) {
   const plan = JSON.parse(JSON.stringify(S.plan)); plan.balance = planBal(S.plan);
   const eff = effGR();
-  S.draft = { kind, plan, split: 'suggested', custom: 100, completion: { ...S.completion }, goalDate: S.goalDate, next: 'resume', target: eff.enabled === false ? Math.max(6, Math.round((bf() - 1) * 2) / 2) : eff.max,
-    gr: { mode: 'keep', min: eff.enabled === false ? 8 : eff.min, max: eff.enabled === false ? 9 : eff.max, scope: 'phase' } };
+  S.draft = { kind, plan, split: 'suggested', custom: 100, completion: { ...S.completion }, goalDate: S.goalDate, next: 'resume', target: null, targetMode: 'auto',
+    gr: { mode: 'keep', min: eff.enabled === false ? 8 : eff.min, max: eff.enabled === false ? 9 : eff.max, scope: 'goal' } };
   if (kind === 'lean') applyEnergy(-450);
-  if (kind === 'keepBuilding') { S.draft.gr = { mode: 'change', min: 8, max: 9, scope: 'phase' }; S.draft.goalDate = 'Oct 31'; applyEnergy(200); }
+  if (kind === 'keepBuilding') { S.draft.gr = { mode: 'change', min: S.draft.gr.min, max: S.draft.gr.max, scope: 'goal' }; S.draft.goalDate = 'Oct 31'; applyEnergy(200); }
 }
 function applyEnergy(balance) { const d = S.draft; d.plan.balance = balance; const e = energyFrom(balance, d.split, d.custom); Object.assign(d.plan, { eat: e.eat, added: e.added, goal: e.goal, balance: e.balance }); }
 function recomputeDraft() { if (S.draft && S.draft.plan.balance != null && (S.draft.kind === 'lean' || S.draft.kind === 'keepBuilding' || S.draft.kind === 'next' || S.draft.touched)) applyEnergy(S.draft.plan.balance); }
@@ -585,21 +629,25 @@ const ACT = {
   sleep: (a) => { if (a === 'clear') S.draft.plan.sleepGoal = null; else { const cur = S.draft.plan.sleepGoal ? Number(S.draft.plan.sleepGoal.replace(/[^0-9.]/g, '')) : 7; const n = Math.max(6, Math.min(9, cur + Number(a) * 0.5)); S.draft.plan.sleepGoal = `${n} h`; } render(); },
   addSupp: (a) => { S.draft.plan.supplements.push(a); render(); }, rmSupp: (a) => { S.draft.plan.supplements = S.draft.plan.supplements.filter((x) => x !== a); render(); },
   toggle: (a) => { S.draft.plan[a] = !S.draft.plan[a]; render(); },
-  gr: (a) => { const [k, d] = a.split(':'); S.draft.gr.mode = 'change'; S.draft.gr[k] = Math.max(3, Math.min(21, S.draft.gr[k] + Number(d))); render(); },
-  grMode: (a) => { S.draft.gr.mode = a; render(); },
+  gr: (a) => { const [k, d] = a.split(':'); S.draft.gr = grStep(S.draft.gr, k, Number(d)); render(); },
+  grFixUpper: (a) => { const d = S.draft; const e = grEffective(draftProposed(d).goal, draftProposed(d).phase); d.gr = { ...d.gr, mode: 'change', min: e.enabled === false ? Math.min(8, Number(a) - 0.5) : Math.min(e.min, Number(a) - 0.5), max: Number(a) }; render(); },
+  grDone: () => { S.grSnap = null; back(); },
+  grCancel: () => { if (S.grSnap) Object.assign(S.draft, JSON.parse(S.grSnap)); S.grSnap = null; back(); },
+  targetAuto: () => { S.draft.targetMode = 'auto'; S.draft.target = null; render(); },
+  grMode: (a) => { const d = S.draft; d.gr.mode = a; if (a === 'keep') { const b = draftBase(d); const e = grEffective(b.goal, b.phase); if (e.enabled !== false) Object.assign(d.gr, { min: e.min, max: e.max }); } render(); },
   grScope: (a) => { S.draft.gr.scope = a; render(); },
-  openGuardrail: () => go('guardrail'),
-  target: (a) => { S.draft.target = Math.max(5, Math.min(15, S.draft.target + Number(a))); render(); },
+  openGuardrail: () => { const d = S.draft; S.grSnap = JSON.stringify({ gr: d.gr, targetMode: d.targetMode, target: d.target }); go('guardrail'); },
+  target: (a) => { const d = S.draft; d.target = Math.max(GR_LIMITS.min, Math.min(15, tgt(d) + Number(a))); d.targetMode = 'custom'; render(); },
   date: (a) => { S.draft.goalDate = a; render(); },
   openReview: () => go('review'),
   approve: () => {
     const d = S.draft; if (!draftCheck(d).ok) return; S.undo = { day: S.day, before: snap(), versionsLen: S.versions.length };
-    const pr = draftProposed(d); const grNote = grChanged(d) ? ` · guardrail ${grLabel(pr)}` : '';
+    const pr = draftProposed(d); const grNote = (grChanged(d) ? ` · guardrail ${grLabel(pr)}` : '') + (tgtUsed(d) ? ` · phase target ≤ ${grFmt(tgt(d))}%` : '');
     S.guardrail = pr.goal; S.phaseGuardrail = pr.phase;
     S.plan = d.plan;
     let label, detail;
     if (d.kind === 'lean') {
-      S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = d.completion; S.completionTarget = d.completion.mode === 'time' ? null : d.target; S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; S.decision = { open: false };
+      S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = d.completion; S.completionTarget = d.completion.mode === 'time' ? null : tgt(d); S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; S.decision = { open: false };
       label = 'Leaning phase approved'; detail = `${sgn(d.plan.balance)}/day · eat ${fmt(d.plan.eat)} · goal ${fmtG(d.plan.goal)}`;
     } else if (d.kind === 'keepBuilding') {
       S.phase = 'keepBuilding'; S.goalDate = d.goalDate; S.decision = { open: false };
@@ -608,7 +656,7 @@ const ACT = {
       S.completeBf = bf(); S.decision = { open: false }; S.qc = null; S.observeUntil = null;
       if (d.next === 'resume') { S.phase = 'resumed'; S.phaseStartDay = S.day; S.goalDate = 'Feb 20'; label = 'Building resumed'; }
       else if (d.next === 'maintain') { S.phase = 'maintaining'; S.phaseStartDay = S.day; label = 'Holding at maintenance'; }
-      else { S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = { mode: 'hybrid', weeks: 4 }; S.completionTarget = d.target; S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; label = 'Leaning continued'; }
+      else { S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = { mode: 'hybrid', weeks: 4 }; S.completionTarget = tgt(d); S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; label = 'Leaning continued'; }
       detail = `${sgn(d.plan.balance)}/day · eat ${fmt(d.plan.eat)} · goal ${fmtG(d.plan.goal)}`;
     } else { label = 'Plan customized'; detail = `eat ${fmt(d.plan.eat)} · goal ${fmtG(d.plan.goal)}`; S.decision.open = false; }
     const v = addVersion(label, detail + grNote);
@@ -616,7 +664,7 @@ const ACT = {
     home(`Plan updated · version ${v}`);
   },
   undo: () => { if (!S.undo) return; Object.assign(S, S.undo.before); const v = addVersion('Undo', 'Back to the previous plan'); S.undo = null; S.log.unshift(`${dateLabel(S.day)} · undo → v${v}`); home(`Undone · version ${v} restores the previous plan`); },
-  openNext: () => { const plan = JSON.parse(JSON.stringify(S.plan)); plan.balance = planBal(S.plan); const g = S.guardrail; S.draft = { kind: 'next', next: S.completionTarget != null && bf() <= S.completionTarget ? 'resume' : 'continue', plan, split: 'suggested', custom: 100, target: Math.max(6, Math.round((bf() - 0.5) * 2) / 2), gr: { mode: 'keep', min: g.enabled === false ? 8 : g.min, max: g.enabled === false ? 9 : g.max, scope: 'goal' } }; go('next'); },
+  openNext: () => { const plan = JSON.parse(JSON.stringify(S.plan)); plan.balance = planBal(S.plan); const g = S.guardrail; S.draft = { kind: 'next', next: S.completionTarget != null && bf() <= S.completionTarget ? 'resume' : 'continue', plan, split: 'suggested', custom: 100, target: null, targetMode: 'auto', gr: { mode: 'keep', min: g.enabled === false ? 8 : g.min, max: g.enabled === false ? 9 : g.max, scope: 'goal' } }; go('next'); },
   pickNext: (a) => { S.draft.next = a; render(); },
   nextReview: () => { const d = S.draft; applyEnergy(d.next === 'resume' ? 200 : d.next === 'maintain' ? 0 : -450); go('review'); },
   qcOpt: (a) => { S.qc.opt = a; render(); },

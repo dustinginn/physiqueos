@@ -172,5 +172,177 @@
     "pass": true,
     "got": false,
     "want": false
+  },
+  {
+    "name": "aligned target: keep 8–9 → 9 (goal)",
+    "pass": true,
+    "got": [
+      9,
+      "goal"
+    ],
+    "want": [
+      9,
+      "goal"
+    ]
+  },
+  {
+    "name": "aligned target: goal 6.5–8.5 → 8.5 (goal)",
+    "pass": true,
+    "got": [
+      8.5,
+      "goal"
+    ],
+    "want": [
+      8.5,
+      "goal"
+    ]
+  },
+  {
+    "name": "aligned target: phase-only 6.5–8.5 → 8.5 (phase, lower than goal 9)",
+    "pass": true,
+    "got": [
+      8.5,
+      "phase"
+    ],
+    "want": [
+      8.5,
+      "phase"
+    ]
+  },
+  {
+    "name": "aligned target: phase-only 8–10 → 9 (goal still lower)",
+    "pass": true,
+    "got": [
+      9,
+      "goal"
+    ],
+    "want": [
+      9,
+      "goal"
+    ]
+  },
+  {
+    "name": "aligned target: goal 8–10 at 9.7% → 9.5 (already inside, just below now)",
+    "pass": true,
+    "got": [
+      9.5,
+      "belowNow"
+    ],
+    "want": [
+      9.5,
+      "belowNow"
+    ]
+  },
+  {
+    "name": "aligned target: goal removed → previous 9 kept",
+    "pass": true,
+    "got": [
+      9,
+      "previous"
+    ],
+    "want": [
+      9,
+      "previous"
+    ]
+  },
+  {
+    "name": "aligned target never conflicts (goal 6.5–8.5)",
+    "pass": true,
+    "got": true,
+    "want": true
+  },
+  {
+    "name": "step below 9.7 → 9.5; 9.5 → 9",
+    "pass": true,
+    "got": [
+      9.5,
+      9
+    ],
+    "want": [
+      9.5,
+      9
+    ]
+  },
+  {
+    "name": "8–9 → lower ×3, upper ×1 → 6.5–8.5",
+    "pass": true,
+    "got": [
+      "change",
+      6.5,
+      8.5
+    ],
+    "want": [
+      "change",
+      6.5,
+      8.5
+    ]
+  },
+  {
+    "name": "upper pushed below lower moves lower with it",
+    "pass": true,
+    "got": [
+      7.5,
+      8
+    ],
+    "want": [
+      7.5,
+      8
+    ]
+  },
+  {
+    "name": "lower pushed above upper moves upper with it",
+    "pass": true,
+    "got": [
+      8.5,
+      9
+    ],
+    "want": [
+      8.5,
+      9
+    ]
+  },
+  {
+    "name": "bounds clamp at 4 and 20",
+    "pass": true,
+    "got": [
+      4,
+      20
+    ],
+    "want": [
+      4,
+      20
+    ]
+  },
+  {
+    "name": "custom target 9 vs new goal 6.5–8.5 → targetAboveRange",
+    "pass": true,
+    "got": [
+      "targetAboveRange"
+    ],
+    "want": [
+      "targetAboveRange"
+    ]
+  },
+  {
+    "name": "keep building 8–9 at 9.7% → aboveUpperWhileBuilding",
+    "pass": true,
+    "got": [
+      "aboveUpperWhileBuilding"
+    ],
+    "want": [
+      "aboveUpperWhileBuilding"
+    ]
+  },
+  {
+    "name": "custom target 9.5 inside leaning-only 8–10 but above goal 9 → allowed with warning",
+    "pass": true,
+    "got": [
+      true,
+      true
+    ],
+    "want": [
+      true,
+      true
+    ]
   }
 ]
