@@ -1284,6 +1284,86 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(homeReads, 1)
     }
 
+    /// Cold launch and foreground activation can legitimately overlap. The
+    /// older request must never paint an offline page while the newer healthy
+    /// startup is still pending.
+    @MainActor
+    func testHomeStartupIgnoresOlderNetworkFailureWhileNewerLoadSucceeds() async throws {
+        let home = try await FixtureHomeAPI().fetchHome()
+        let api = OverlappingStartupHomeAPI()
+        let viewModel = HomeViewModel(
+            api: api,
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+
+        let appearanceLoad = Task { await viewModel.load() }
+        await api.waitForReadCount(1)
+        let foregroundLoad = Task { await viewModel.load() }
+        await api.waitForReadCount(2)
+
+        await api.fail(read: 1, with: ProductionNativeError.networkFailure)
+        await Task.yield()
+        XCTAssertEqual(viewModel.state, .loading, "An obsolete failure must not flash over a newer startup load")
+
+        await api.succeed(read: 2, with: home)
+        await appearanceLoad.value
+        await foregroundLoad.value
+        XCTAssertEqual(viewModel.state, .loaded(home))
+    }
+
+    /// SwiftUI cancellation is collapsed to `.networkFailure` by the shared
+    /// transport. The task's cancellation bit still distinguishes that
+    /// lifecycle event from a truthful offline result.
+    @MainActor
+    func testCancelledHomeStartupDoesNotPresentOfflineState() async {
+        let api = CancellationMappedHomeAPI()
+        let viewModel = HomeViewModel(
+            api: api,
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+
+        let load = Task { await viewModel.load() }
+        await api.waitUntilStarted()
+        load.cancel()
+        await load.value
+
+        XCTAssertEqual(viewModel.state, .loading)
+    }
+
+    @MainActor
+    func testGenuineHomeNetworkFailureRemainsVisibleAndRetryRecovers() async throws {
+        let home = try await FixtureHomeAPI().fetchHome()
+        let api = FailThenSucceedHomeAPI(home: home)
+        let viewModel = HomeViewModel(
+            api: api,
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+
+        await viewModel.load()
+        XCTAssertEqual(viewModel.state, .failed("Temporarily offline. Reconnect and try again."))
+        XCTAssertEqual(
+            HomeView.failureDetail("Temporarily offline. Reconnect and try again."),
+            "Temporarily offline. Reconnect and try again. Pull to refresh."
+        )
+        XCTAssertEqual(
+            HomeView.failureDetail("Temporarily offline. Pull to refresh."),
+            "Temporarily offline. Pull to refresh.",
+            "The failure panel must never duplicate its refresh instruction"
+        )
+
+        await viewModel.load()
+        XCTAssertEqual(viewModel.state, .loaded(home))
+    }
+
     func testPriorityCompletionRetiresLastKnownHome() async throws {
         let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
         let transport = SequencedFounderTransport([
@@ -6960,6 +7040,59 @@ private actor FirstHomeThenFailureAPI: HomeAPI {
     func fetchHome() async throws -> HomeReadModel {
         reads += 1
         guard reads == 1 else { throw FocusedReadFailure.unavailable }
+        return home
+    }
+}
+
+private actor OverlappingStartupHomeAPI: HomeAPI {
+    private var nextRead = 0
+    private var continuations: [Int: CheckedContinuation<HomeReadModel, Error>] = [:]
+
+    func fetchHome() async throws -> HomeReadModel {
+        nextRead += 1
+        let read = nextRead
+        return try await withCheckedThrowingContinuation { continuation in
+            continuations[read] = continuation
+        }
+    }
+
+    func waitForReadCount(_ expected: Int) async {
+        while nextRead < expected { await Task.yield() }
+    }
+
+    func fail(read: Int, with error: ProductionNativeError) {
+        continuations.removeValue(forKey: read)?.resume(throwing: error)
+    }
+
+    func succeed(read: Int, with home: HomeReadModel) {
+        continuations.removeValue(forKey: read)?.resume(returning: home)
+    }
+}
+
+private actor CancellationMappedHomeAPI: HomeAPI {
+    private var started = false
+
+    func fetchHome() async throws -> HomeReadModel {
+        started = true
+        while !Task.isCancelled { await Task.yield() }
+        // Matches FounderServerAPI's deliberate transport-level collapse.
+        throw ProductionNativeError.networkFailure
+    }
+
+    func waitUntilStarted() async {
+        while !started { await Task.yield() }
+    }
+}
+
+private actor FailThenSucceedHomeAPI: HomeAPI {
+    let home: HomeReadModel
+    private var reads = 0
+
+    init(home: HomeReadModel) { self.home = home }
+
+    func fetchHome() async throws -> HomeReadModel {
+        reads += 1
+        if reads == 1 { throw ProductionNativeError.networkFailure }
         return home
     }
 }

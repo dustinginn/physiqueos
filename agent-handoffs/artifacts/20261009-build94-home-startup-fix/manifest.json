@@ -1,0 +1,32 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B84D6637-58FA-4671-BDB1-96D0EFFD6136",
+        "deviceName" : "B91 Evidence iPhone 17 Pro",
+        "exportedFileName" : "FD9C5C05-EFEA-40E9-AB0A-2DA29E97C5E8.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "home-physical-parity-dark_0_E5000E95-7F9D-4970-A992-8A0701F38392.png",
+        "timestamp" : 1791603253.708
+      }
+    ],
+    "testIdentifier" : "FoamRollingPriorityDetailUITests/testHomePhysicalParityDark()",
+    "testIdentifierURL" : "test://com.apple.xcode/PhysiqueOS/PhysiqueOSUITests/FoamRollingPriorityDetailUITests/testHomePhysicalParityDark"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B84D6637-58FA-4671-BDB1-96D0EFFD6136",
+        "deviceName" : "B91 Evidence iPhone 17 Pro",
+        "exportedFileName" : "9AA2A603-1D45-43D3-A877-C78E8DDEEF2B.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "home-physical-parity-light_0_220A7734-538B-4496-BB2C-DC3DF35D9340.png",
+        "timestamp" : 1791603263.71
+      }
+    ],
+    "testIdentifier" : "FoamRollingPriorityDetailUITests/testHomePhysicalParityMineralLight()",
+    "testIdentifierURL" : "test://com.apple.xcode/PhysiqueOS/PhysiqueOSUITests/FoamRollingPriorityDetailUITests/testHomePhysicalParityMineralLight"
+  }
+]

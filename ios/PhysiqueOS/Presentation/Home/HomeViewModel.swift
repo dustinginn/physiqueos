@@ -25,6 +25,12 @@ final class HomeViewModel {
     /// The authoritative refresh behind a last-known Home failed.
     private(set) var lastKnownRefreshFailed = false
     var isShowingLastKnown: Bool { lastKnownGeneratedAt != nil }
+    /// Home can be asked to load by both view appearance and foreground
+    /// activation during the same startup. Those requests are intentionally
+    /// allowed to overlap, but only the newest request may publish state: an
+    /// older cancellation/network result must not briefly replace a healthy
+    /// startup that is still in flight.
+    private var latestLoadRequestID = 0
     private let api: HomeAPI
     /// The shared Priority engine — `todaysFocus` is computed from here,
     /// not from the static Home fixture, so it can never drift from what
@@ -70,9 +76,13 @@ final class HomeViewModel {
     }
 
     func load(now: Date = Date()) async {
+        latestLoadRequestID &+= 1
+        let requestID = latestLoadRequestID
+
         // Cold launch only: paint the last authoritative Home immediately,
         // then replace it with this session's read below.
         if case .loading = state, !appliesSandboxProjections, let snapshot = await api.lastKnownHome() {
+            guard requestID == latestLoadRequestID, !Task.isCancelled else { return }
             var home = snapshot.home
             for index in home.todaysFocus.indices { home.todaysFocus[index].completable = false }
             state = .loaded(home)
@@ -88,11 +98,18 @@ final class HomeViewModel {
                 }
                 home.briefingCards = Self.projectBriefingCards(from: briefingStore.latestForHome(now: now))
             }
+            guard requestID == latestLoadRequestID, !Task.isCancelled else { return }
             state = .loaded(home)
             lastKnownGeneratedAt = nil
             lastKnownGeneratedDate = nil
             lastKnownRefreshFailed = false
         } catch {
+            // SwiftUI cancels view-bound work during ordinary lifecycle
+            // transitions. The transport deliberately collapses cancellation
+            // into `networkFailure`, so consult the task itself before showing
+            // a user-facing offline state. A newer overlapping load owns the
+            // screen and will publish its own result.
+            guard requestID == latestLoadRequestID, !Task.isCancelled else { return }
             if isShowingLastKnown {
                 lastKnownRefreshFailed = true
             } else if error as? ProductionNativeError == .reconnectRequired {
@@ -100,7 +117,7 @@ final class HomeViewModel {
             } else if error as? ProductionNativeError == .sessionRecoveryUnavailable {
                 state = .failed("Recovering the secure session. Try again when the connection is available.")
             } else if error as? ProductionNativeError == .networkFailure {
-                state = .failed("Temporarily offline. Reconnect and pull to refresh.")
+                state = .failed("Temporarily offline. Reconnect and try again.")
             } else {
                 state = .failed("Home could not be loaded.")
             }

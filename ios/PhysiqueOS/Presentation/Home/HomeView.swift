@@ -205,7 +205,7 @@ struct HomeView: View {
             HomeStatePanel(
                 icon: "exclamationmark.triangle.fill",
                 title: "Home couldn't refresh",
-                detail: message + " Pull to refresh."
+                detail: Self.failureDetail(message)
             )
         case .reconnectRequired:
             HomeStatePanel(
@@ -362,6 +362,13 @@ struct HomeView: View {
             }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: home.todaysFocus.count)
         }
+    }
+
+    /// The view owns the pull-to-refresh affordance copy. Keep it singular
+    /// even if a future domain error already includes the same instruction.
+    nonisolated static func failureDetail(_ message: String) -> String {
+        if message.localizedCaseInsensitiveContains("pull to refresh") { return message }
+        return message + " Pull to refresh."
     }
 
     /// Lets a just-completed priority's checkmark (already shown via
