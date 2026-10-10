@@ -44,7 +44,7 @@ struct HomeLoggedTodayWidget: Widget {
             HomeLoggedTodayWidgetView(snapshot: entry.snapshot, date: entry.date)
         }
         .configurationDisplayName("PhysiqueOS Logged Today")
-        .description("Training, nutrition, activity, weight, and Workout Logger access.")
+        .description("Training, nutrition, activity, and Workout Logger access.")
         .supportedFamilies([.systemSmall, .systemLarge])
     }
 }

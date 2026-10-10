@@ -22,12 +22,6 @@ enum HomeWidgetValueFormatter {
         wholeNumber(value, locale: locale)
     }
 
-    /// Weight keeps the canonical display string exactly as the app's Log
-    /// presents it (one decimal, e.g. "176.1 lb"); it is never re-rounded.
-    static func weight(_ weight: HomeWidgetWeightSummary?) -> String? {
-        weight?.displayValue
-    }
-
     /// Nearest whole (half away from zero), never truncation. Missing or
     /// non-finite stays missing, never "0"; a value that rounds to zero
     /// shows "0" without a sign.
@@ -139,16 +133,9 @@ struct HomeLoggedTodayWidgetView: View {
             if rendersToday, let snapshot {
                 VStack(alignment: .leading, spacing: 0) {
                     smallMetricColumns(nutrition: snapshot.nutrition, activity: snapshot.activity)
-                        .padding(.top, 8)
-                    // With today's weight the rhythm tightens by 3 pt so the
-                    // square still fits its 138 pt content area.
+                        .padding(.top, 7)
                     smallMacroChips(snapshot.nutrition)
-                        .padding(.top, snapshot.weight == nil ? 8 : 7)
-                    if let weight = HomeWidgetValueFormatter.weight(snapshot.weight) {
-                        smallLabel("WEIGHT  \(weight)")
-                            .padding(.top, 3)
-                            .accessibilityLabel("Weight \(weight)")
-                    }
+                        .padding(.top, 6)
                 }
                 .privacySensitive()
                 .redacted(reason: privacyRedactedForPreview ? .privacy : [])
@@ -321,10 +308,6 @@ struct HomeLoggedTodayWidgetView: View {
                 }
                 row(icon: "waveform.path.ecg", color: palette.activity, label: "Activity", destination: .activity(localDate: snapshot.localDate)) {
                     activityValue(snapshot.activity)
-                }
-                row(icon: "scalemass", color: palette.weight, label: "Weight", destination: .weight(localDate: snapshot.localDate)) {
-                    Text(HomeWidgetValueFormatter.weight(snapshot.weight) ?? "—  Not logged today")
-                        .valueStyle(present: snapshot.weight != nil, palette: palette)
                 }
             }
             .privacySensitive()
@@ -517,7 +500,7 @@ struct HomeLoggedTodayWidgetView: View {
 
     private var waitingDetail: String {
         presentationState == .waitingForToday
-            ? "Yesterday’s Nutrition, Activity, and Weight are intentionally hidden."
+            ? "Yesterday’s Nutrition and Activity are intentionally hidden."
             : "Today’s canonical Logged Today summary is not available yet."
     }
 
@@ -549,7 +532,6 @@ struct HomeWidgetPalette {
     let training: Color
     let nutrition: Color
     let activity: Color
-    let weight: Color
     let chip: Color
     /// Start Logger / Resume Workout: the iPhone Finish Workout amber
     /// (`WorkoutActivityPrimaryAction`, the same token the Watch and Live
@@ -575,7 +557,6 @@ struct HomeWidgetPalette {
             training = Color(hex: 0x9F7CFF)
             nutrition = Color(hex: 0x4EE09A)
             activity = Color(hex: 0xF3BA49)
-            weight = Color(hex: 0x40C7D7)
             chip = Color(hex: 0x203441, alpha: 0.55)
             workoutAction = Color(hex: WorkoutActivityPrimaryAction.darkHex)
         } else {
@@ -588,7 +569,6 @@ struct HomeWidgetPalette {
             training = Color(hex: 0x7255DC)
             nutrition = Color(hex: 0x0C9363)
             activity = Color(hex: 0xB47510)
-            weight = Color(hex: 0x0E8CA7)
             chip = Color(hex: 0xCAD4CF, alpha: 0.55)
             workoutAction = Color(hex: WorkoutActivityPrimaryAction.mineralLightHex)
         }

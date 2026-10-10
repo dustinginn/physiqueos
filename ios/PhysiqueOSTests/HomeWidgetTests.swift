@@ -49,7 +49,8 @@ final class HomeWidgetTests: XCTestCase {
     }
 
     /// Every square state fits the 170 pt systemSmall content area (16 pt
-    /// WidgetKit margins) in both appearances, with and without weight.
+    /// WidgetKit margins) in both appearances and at the largest accessibility
+    /// Dynamic Type size.
     @MainActor
     func testOptionBSquareFitsTheSystemSmallContentAreaInEveryState() {
 #if canImport(UIKit)
@@ -73,9 +74,51 @@ final class HomeWidgetTests: XCTestCase {
             for (name, snapshot) in states {
                 let host = UIHostingController(rootView: HomeLoggedTodayWidgetView(
                     snapshot: snapshot, date: HomeWidgetSamples.referenceDate, familyOverrideForPreview: .systemSmall
-                ).environment(\.colorScheme, scheme))
+                )
+                    .environment(\.colorScheme, scheme)
+                    .environment(\.dynamicTypeSize, .accessibility5))
                 let size = host.sizeThatFits(in: CGSize(width: 138, height: CGFloat.greatestFiniteMagnitude))
                 XCTAssertLessThanOrEqual(size.height, 138, "\(name) \(scheme) overflows the square")
+            }
+        }
+#endif
+    }
+
+    /// The widget may continue receiving the backward-compatible Weight field,
+    /// but neither supported family may render it. Pixel identity makes this a
+    /// presentation guarantee rather than a data-contract change.
+    @MainActor
+    func testWeightPayloadDoesNotAffectEitherWidgetFamilyInDarkOrMineralLight() throws {
+#if canImport(UIKit)
+        for scheme in [ColorScheme.dark, .light] {
+            for (family, size, padding) in [
+                (WidgetFamily.systemSmall, CGSize(width: 170, height: 170), CGFloat(16)),
+                (WidgetFamily.systemLarge, CGSize(width: 360, height: 376), CGFloat(16)),
+            ] {
+                func render(weight: Bool) throws -> Data {
+                    let tile = ZStack {
+                        HomeWidgetPalette(colorScheme: scheme).background
+                        HomeLoggedTodayWidgetView(
+                            snapshot: HomeWidgetSamples.snapshot(weight: weight),
+                            date: HomeWidgetSamples.referenceDate,
+                            familyOverrideForPreview: family
+                        )
+                        .padding(padding)
+                    }
+                    .frame(width: size.width, height: size.height)
+                    .environment(\.colorScheme, scheme)
+                    .environment(\.dynamicTypeSize, .accessibility5)
+                    let renderer = ImageRenderer(content: tile)
+                    renderer.proposedSize = ProposedViewSize(width: size.width, height: size.height)
+                    renderer.scale = 3
+                    return try XCTUnwrap(renderer.uiImage?.pngData())
+                }
+
+                XCTAssertEqual(
+                    try render(weight: true),
+                    try render(weight: false),
+                    "Weight payload changed \(family) in \(scheme)"
+                )
             }
         }
 #endif
@@ -339,7 +382,6 @@ final class HomeWidgetTests: XCTestCase {
         XCTAssertEqual(HomeWidgetValueFormatter.grams(166.7, locale: us), "167")
         XCTAssertEqual(HomeWidgetValueFormatter.grams(110.1, locale: us), "110")
         XCTAssertEqual(HomeWidgetValueFormatter.activeCalories(890.1, locale: us), "890")
-        XCTAssertEqual(HomeWidgetValueFormatter.weight(.init(displayValue: "176.1 lb")), "176.1 lb")
     }
 
     func testThousandsGroupingIsLocaleAware() {
@@ -355,13 +397,6 @@ final class HomeWidgetTests: XCTestCase {
         XCTAssertEqual(HomeWidgetValueFormatter.grams(-0.4, locale: us), "0", "Never a signed zero")
         XCTAssertEqual(HomeWidgetValueFormatter.calories(nil, locale: us), "—", "Missing never becomes 0")
         XCTAssertEqual(HomeWidgetValueFormatter.activeCalories(.nan, locale: us), "—")
-        XCTAssertNil(HomeWidgetValueFormatter.weight(nil))
-    }
-
-    func testWeightDisplayKeepsItsOneDecimalString() {
-        for value in ["176.1 lb", "176.0 lb", "79.9 kg"] {
-            XCTAssertEqual(HomeWidgetValueFormatter.weight(.init(displayValue: value)), value)
-        }
     }
 
     func testSnapshotKeepsCanonicalPrecisionAndFormattingIsDisplayOnly() throws {
@@ -381,7 +416,8 @@ final class HomeWidgetTests: XCTestCase {
         )
         // Every family/state renders numbers through the one formatter.
         XCTAssertFalse(source.contains("String(format:"), "No ad-hoc numeric formatting in the widget view")
-        XCTAssertFalse(source.contains(".displayValue ??"), "Weight renders through the formatter")
+        XCTAssertFalse(source.contains("smallLabel(\"WEIGHT"), "The compact widget must not render Weight")
+        XCTAssertFalse(source.contains("label: \"Weight\""), "The large widget must not render Weight")
     }
 
     // MARK: Build 79 integration review fixes
@@ -632,26 +668,24 @@ final class HomeWidgetOptionBAcceptanceRenderTests: XCTestCase {
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for scheme in [ColorScheme.dark, .light] {
-            for weight in [false, true] {
-                var snapshot = HomeWidgetSamples.snapshot(weight: weight)
-                snapshot.lastSuccessfulReadAt = HomeWidgetSnapshotClock.string(from: HomeWidgetSamples.referenceDate.addingTimeInterval(-12 * 60))
-                snapshot.nutrition = .init(calories: 1_139, proteinG: 96, carbsG: 104, fatG: 38)
-                snapshot.activity = .init(activeCalories: 649, isPartialDay: true)
-                let tile = ZStack {
-                    HomeWidgetPalette(colorScheme: scheme).background
-                    HomeLoggedTodayWidgetView(snapshot: snapshot, date: HomeWidgetSamples.referenceDate, familyOverrideForPreview: .systemSmall)
-                        .padding(16)
-                }
-                .frame(width: 170, height: 170)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .environment(\.colorScheme, scheme)
-                let renderer = ImageRenderer(content: tile)
-                renderer.proposedSize = ProposedViewSize(width: 170, height: 170)
-                renderer.scale = 3
-                let data = try XCTUnwrap(renderer.uiImage?.pngData())
-                let name = "shipping-option-b\(weight ? "-with-weight" : "")-\(scheme == .dark ? "dark" : "mineral-light").png"
-                try data.write(to: directory.appendingPathComponent(name), options: .atomic)
+            var snapshot = HomeWidgetSamples.snapshot()
+            snapshot.lastSuccessfulReadAt = HomeWidgetSnapshotClock.string(from: HomeWidgetSamples.referenceDate.addingTimeInterval(-12 * 60))
+            snapshot.nutrition = .init(calories: 1_139, proteinG: 96, carbsG: 104, fatG: 38)
+            snapshot.activity = .init(activeCalories: 649, isPartialDay: true)
+            let tile = ZStack {
+                HomeWidgetPalette(colorScheme: scheme).background
+                HomeLoggedTodayWidgetView(snapshot: snapshot, date: HomeWidgetSamples.referenceDate, familyOverrideForPreview: .systemSmall)
+                    .padding(16)
             }
+            .frame(width: 170, height: 170)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .environment(\.colorScheme, scheme)
+            let renderer = ImageRenderer(content: tile)
+            renderer.proposedSize = ProposedViewSize(width: 170, height: 170)
+            renderer.scale = 3
+            let data = try XCTUnwrap(renderer.uiImage?.pngData())
+            let name = "shipping-option-b-no-weight-\(scheme == .dark ? "dark" : "mineral-light").png"
+            try data.write(to: directory.appendingPathComponent(name), options: .atomic)
         }
 #endif
     }
