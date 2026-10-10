@@ -52,7 +52,7 @@ Design-only review artifacts for the Goal Adaptation journey. They use the Found
   - Dark: every pair is at least 6.19:1.
   - Mineral Light: every pair is at least 4.71:1 except two.
     - `green/paper` is **4.30:1**. It is the production `redesignGreen`, used here only for bold labels. This is flagged as a design-system observation and was not changed.
-    - `muted/canvas` is 4.23:1. It is used only for captions above the phones.
+    - `muted/canvas` is **4.23:1**. It is used for the small footnotes directly on the canvas (for example "Nothing restarts automatically"). Recommendation for implementation: use `redesignInkSecondary` for those footnotes.
 - The decorative Home hero arc clips intentionally.
 
 These are real browser renders of a design source. They are not SwiftUI simulator captures.
