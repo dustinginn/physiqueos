@@ -17,6 +17,9 @@ Before proposing or reconstructing the PhysiqueOS backlog:
 
 Agent handoff reports describe implementation state. This backlog describes what still needs product attention.
 
+BUILD 95 STARTUP — FOUNDER PROVISIONAL ACCEPTANCE (2026-10-09)
+- PhysiqueOS 1.0 (95) TestFlight VALID, Native release 59223a41, report agent-handoffs/reports/20261010T052621Z-build95-testflight-valid.md. Founder reports Home startup working so far and directs removal from active backlog. Treat as CLOSED / MONITOR ONLY; do not schedule further startup stabilization or prompt for repeated testing unless Founder reports recurrence. This supersedes the earlier Build94 startup failure as an active backlog item; preserve historical incident reports.
+
 FOUNDER BACKLOG DIRECTION — 2026-10-09
 - App-wide UI/design polish: CLOSED FOR NOW by Founder. Do not maintain a standing generic design-to-production parity or minor usability improvement project. Handle only newly observed, specific issues as Founder reports them. Historical design notes remain for reference, not automatic work authorization.
 - DEXA Evidence page cleanup (NEXT CONSOLIDATED NATIVE BUILD; NOT A STANDALONE RELEASE): remove the temporary DEXA → Apple Health writeback verification/debug card from the DEXA Evidence page, now that Founder confirms prospective writeback works. Preserve normal DEXA evidence, standard Apple Health controls/settings and actual writeback behavior; do not remove production synchronization or audit/receipt safeguards. First identify the exact card and its feature/debug gating in released Native source, then remove only that obsolete verification UI and related dead presentation code with focused Dark/Mineral/accessibility tests.
