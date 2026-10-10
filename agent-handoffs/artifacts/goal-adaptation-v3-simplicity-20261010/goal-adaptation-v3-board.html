@@ -1,0 +1,1308 @@
+<title>Goal Adaptation V3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
+<style>
+/* ---------- Accepted PhysiqueOS redesign tokens (ios/PhysiqueOS/SharedUI/PhysiqueOSTheme.swift @ 9d0a2069) ---------- */
+.phone {
+  --canvas: #061019; --paper: #0F1C2A; --soft: #132334;
+  --ink: #F3F8FA; --ink2: #C3D2D9; --muted: #92A5AF;
+  --teal: #3BD2CA; --green: #55E39A; --amber: #F4BC48; --amberInk: #EFB84F;
+  --purple: #AA98FF; --cyan: #3BC6DD; --red: #FF697A; --orangeInk: #FB923C;
+  --hairline: rgba(157,179,189,.184); --rule: rgba(167,188,197,.18);
+  --fieldStart: #087B70; --fieldEnd: #132751; --coach: #122A55;
+  --onAmber: #10202A; --onTeal: #03191E; --scrim: rgba(2,8,14,.62);
+  --tealWash: rgba(59,210,202,.10); --amberWash: rgba(244,188,72,.12); --redWash: rgba(255,105,122,.12);
+  --shadow: 0 30px 64px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.07);
+}
+.phone.light {
+  --canvas: #E8ECE5; --paper: #FBFAF4; --soft: #EEF2ED;
+  --ink: #102431; --ink2: #526970; --muted: #5D7279;
+  --teal: #087E78; --green: #16875F; --amber: #C98220; --amberInk: #925500;
+  --purple: #5C3FD2; --cyan: #107F99; --red: #B83D4B; --orangeInk: #9A4C10;
+  --hairline: rgba(25,56,66,.169); --rule: rgba(110,129,127,.22);
+  --fieldStart: #CBE6E2; --fieldEnd: #B9D5DD; --coach: #DDE8F1;
+  --onAmber: #102431; --onTeal: #FFFFFF; --scrim: rgba(16,36,49,.38);
+  --tealWash: rgba(8,126,120,.08); --amberWash: rgba(201,130,32,.10); --redWash: rgba(184,61,75,.08);
+  --shadow: 0 30px 64px rgba(16,36,49,.28), 0 0 0 1px rgba(16,36,49,.08);
+}
+
+.phone {
+  position: relative; width: 402px; min-height: 874px;
+  background: var(--canvas); color: var(--ink);
+  border-radius: 48px; overflow: hidden; box-shadow: var(--shadow);
+  font-size: 16px; padding-bottom: 40px; isolation: isolate;
+}
+.phone.xl { font-size: 21.6px; } /* 135% Dynamic Type stress */
+.t-xs { font-size: .75em; line-height: 1.3; }
+.t-sm { font-size: .8125em; line-height: 1.38; }
+.t-body { font-size: .9375em; line-height: 1.42; }
+.t-lg { font-size: 1.0625em; line-height: 1.35; }
+.display { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; font-weight: 800; letter-spacing: -.02em; }
+.h1 { font-size: 1.75em; line-height: 1.12; }
+.h2 { font-size: 1.3125em; line-height: 1.2; }
+.h3 { font-size: 1.0625em; line-height: 1.25; }
+.eyebrow { font-size: .75em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+.eyebrow.purple { color: var(--purple); }
+.eyebrow.amber { color: var(--amberInk); }
+.muted { color: var(--muted); }
+.ink2 { color: var(--ink2); }
+.strong { font-weight: 700; }
+.semi { font-weight: 600; }
+p { margin: 0; }
+
+/* chrome */
+.sb { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 6px 34px 0 42px; font-weight: 700; font-size: 17px; position: relative; z-index: 3; }
+.sb .icons { display: flex; gap: 7px; align-items: center; }
+.sb svg { display: block; }
+.nav { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; position: relative; z-index: 3; }
+.nav .back { display: flex; align-items: center; gap: 2px; color: var(--teal); font-size: 17px; }
+.nav .title { position: absolute; left: 0; right: 0; text-align: center; font-weight: 700; font-size: 17px; pointer-events: none; }
+.nav .action { color: var(--teal); font-size: 17px; }
+.content { padding: 4px 18px 0; }
+.stack > * + * { margin-top: 14px; }
+.stack-sm > * + * { margin-top: 8px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.between { justify-content: space-between; }
+.grow { flex: 1; min-width: 0; }
+
+/* surfaces */
+.card { background: var(--paper); border: 1px solid var(--hairline); border-radius: 18px; padding: 16px; position: relative; }
+.card.soft { background: var(--soft); }
+.card.rail { padding-left: 20px; overflow: hidden; }
+.card.rail::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--teal); }
+.card.rail.amber::before { background: var(--amber); }
+.card.rail.purple::before { background: var(--purple); }
+.card.selected { border: 2px solid var(--teal); padding: 15px; box-shadow: 0 0 0 4px var(--tealWash); }
+.card.selected.rail { padding-left: 19px; }
+.coach { background: linear-gradient(160deg, var(--coach), var(--soft)); border-radius: 22px; padding: 18px; border: 1px solid var(--hairline); }
+.rule { height: 1px; background: var(--rule); margin: 12px 0; }
+.divider-list > * + * { border-top: 1px solid var(--rule); }
+
+/* buttons */
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border-radius: 16px; font-weight: 700; font-size: 1.0625em; padding: 0 18px; text-align: center; }
+.btn.primary { background: var(--teal); color: var(--onTeal); }
+.btn.secondary { border: 1.5px solid var(--hairline); color: var(--ink); background: var(--paper); }
+.btn.ghost { color: var(--teal); min-height: 44px; }
+.btn.disabled { background: var(--soft); color: var(--muted); border: 1px dashed var(--hairline); }
+.btn.small { min-height: 44px; font-size: .9375em; border-radius: 14px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 10px; font-size: .75em; font-weight: 700; white-space: nowrap; }
+.pill.teal { background: var(--tealWash); color: var(--teal); }
+.pill.amber { background: var(--amberWash); color: var(--amberInk); }
+.pill.red { background: var(--redWash); color: var(--red); }
+.pill.line { border: 1px solid var(--hairline); color: var(--ink2); }
+
+/* controls */
+.radio { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--muted); flex: none; display: grid; place-items: center; }
+.radio.on { border-color: var(--teal); }
+.radio.on::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--teal); }
+.seg { display: flex; background: var(--soft); border-radius: 12px; padding: 3px; gap: 3px; border: 1px solid var(--hairline); }
+.seg > div { flex: 1; text-align: center; padding: 9px 4px; border-radius: 9px; font-size: .8125em; font-weight: 600; color: var(--ink2); min-height: 44px; display: grid; place-items: center; }
+.seg > .on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); border: 1px solid var(--hairline); }
+.choice { display: flex; gap: 12px; align-items: flex-start; padding: 13px 0; min-height: 48px; }
+.choice .radio { margin-top: 1px; }
+.stepper { display: flex; align-items: center; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }
+.stepper span { display: grid; place-items: center; width: 44px; height: 44px; color: var(--teal); font-size: 20px; font-weight: 600; }
+.stepper b { padding: 0 12px; font-size: .9375em; min-width: 78px; text-align: center; }
+.chev { color: var(--muted); flex: none; }
+.check { color: var(--green); flex: none; }
+
+/* data */
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.metric { background: var(--paper); border: 1px solid var(--hairline); border-radius: 16px; padding: 13px 14px; }
+.metric .v { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.375em; letter-spacing: -.02em; margin-top: 4px; }
+.metric .c { font-size: .75em; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+.bar { height: 8px; border-radius: 99px; background: var(--soft); overflow: hidden; border: 1px solid var(--hairline); }
+.bar > i { display: block; height: 100%; background: var(--teal); border-radius: 99px; }
+.kv { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; align-items: baseline; }
+.kv .k { color: var(--ink2); font-size: .875em; }
+.kv .v { font-weight: 700; text-align: right; font-size: .9375em; }
+.delta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.delta s { color: var(--muted); text-decoration-thickness: 1.5px; font-weight: 500; }
+
+/* illustrative stamp */
+.illus { border: 1.5px dashed var(--amber); border-radius: 16px; padding: 14px; position: relative; background: repeating-linear-gradient(135deg, transparent 0 10px, var(--amberWash) 10px 11px); }
+.illus-tag { display: inline-flex; align-items: center; gap: 6px; font-size: .6875em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--amberInk); background: var(--paper); border: 1px solid var(--amber); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.pending { display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--teal); color: var(--teal); border-radius: 10px; padding: 3px 9px; font-weight: 700; font-size: .875em; white-space: nowrap; }
+
+/* home */
+.hero { background: linear-gradient(165deg, var(--fieldStart) 0%, var(--fieldEnd) 92%); padding-bottom: 22px; position: relative; overflow: hidden; margin-top: -54px; padding-top: 54px; }
+.hero::after { content: ""; position: absolute; width: 520px; height: 520px; border-radius: 50%; right: -330px; top: 40px; border: 70px solid rgba(255,255,255,.05); }
+.phone.light .hero::after { border-color: rgba(255,255,255,.28); }
+.timeline-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 8px rgba(85,227,154,.22); flex: none; }
+.tabbar { margin: 18px 16px 0; height: 76px; border-radius: 38px; background: var(--paper); border: 1px solid var(--hairline); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; padding: 0 6px; }
+.tab { display: grid; justify-items: center; gap: 3px; font-size: 12px; color: var(--ink); }
+.tab.on { color: var(--purple); background: var(--soft); border-radius: 30px; padding: 8px 0; }
+.tile-amber { background: var(--amber); color: var(--onAmber); border-radius: 22px; padding: 16px; min-height: 104px; display: flex; align-items: flex-end; justify-content: space-between; }
+.prio { border: 1.5px solid var(--hairline); border-radius: 16px; padding: 13px 14px; background: var(--soft); }
+
+/* sheet / notification */
+.scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 5; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--paper); border-radius: 30px 30px 0 0; z-index: 6; padding: 10px 20px 40px; border-top: 1px solid var(--hairline); }
+.grabber { width: 40px; height: 5px; border-radius: 3px; background: var(--hairline); margin: 0 auto 16px; }
+.notif { border-radius: 22px; padding: 13px 14px; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(20px); border: 1px solid var(--hairline); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.appicon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(150deg, #0E8F86, #13305E); display: grid; place-items: center; flex: none; }
+.lock { background: linear-gradient(170deg, var(--fieldStart), var(--fieldEnd)); }
+
+/* phase strip */
+.phases { display: flex; flex-direction: column; gap: 0; }
+.ph { display: grid; grid-template-columns: 26px 1fr; gap: 12px; }
+.ph .dot { width: 14px; height: 14px; border-radius: 50%; margin: 4px auto 0; border: 2px solid var(--muted); background: var(--canvas); position: relative; z-index: 1; }
+.ph .dot.done { background: var(--amber); border-color: var(--amber); }
+.ph .dot.now { background: var(--green); border-color: var(--green); box-shadow: 0 0 0 6px rgba(85,227,154,.2); }
+.ph .dot.paused { background: var(--soft); border-color: var(--teal); }
+.ph .line { width: 2px; background: var(--rule); margin: 0 auto; flex: 1; min-height: 14px; }
+.ph .col { display: flex; flex-direction: column; align-items: center; }
+.ph .txt { padding-bottom: 14px; }
+
+/* compare table (option B) */
+.cmp { display: grid; grid-template-columns: 84px repeat(3, minmax(0, 1fr)); border: 1px solid var(--hairline); border-radius: 18px; overflow: hidden; background: var(--paper); }
+.cmp > div { overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; padding: 10px 8px; border-top: 1px solid var(--rule); font-size: .75em; line-height: 1.3; }
+.cmp > .hd { border-top: 0; font-weight: 800; font-size: .75em; padding-top: 12px; }
+.cmp > .lbl { color: var(--muted); font-weight: 700; }
+.cmp > .sel { background: var(--tealWash); }
+.cmp > .sel.hd { box-shadow: inset 0 3px 0 var(--teal); }
+
+
+/* ---------- New Operating Plan customization components (design proposal) ---------- */
+.phone { min-height: 874px; }
+.content { padding-bottom: 110px; }
+.phone .sec-label { font-size: .6875em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 18px 2px 8px; }
+.phone .lead { font-size: .9375em; line-height: 1.45; color: var(--ink2); }
+/* sticky change tray (Approach A) */
+.tray { position: absolute; left: 12px; right: 12px; bottom: 26px; z-index: 4; background: var(--paper); border: 1px solid var(--hairline); border-radius: 22px; padding: 10px 10px 10px 16px; display: flex; align-items: center; gap: 10px; box-shadow: 0 14px 34px rgba(0,0,0,.32); }
+.phone.light .tray { box-shadow: 0 14px 34px rgba(16,36,49,.18); }
+.tray .count { width: 30px; height: 30px; border-radius: 50%; background: var(--teal); color: var(--onTeal); display: grid; place-items: center; font-weight: 800; font-size: .875em; flex: none; }
+.tray .btn { min-height: 46px; padding: 0 16px; font-size: .9375em; }
+/* strategy rows */
+.srow { display: flex; gap: 12px; align-items: center; padding: 12px 0; min-height: 60px; }
+.srow .ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: var(--soft); color: var(--teal); border: 1px solid var(--hairline); }
+.srow .ic.amber { color: var(--amberInk); background: var(--amberWash); }
+.srow .ic.purple { color: var(--purple); }
+.srow .nm { font-weight: 700; font-size: .9375em; }
+.srow .dt { font-size: .8125em; color: var(--ink2); line-height: 1.35; margin-top: 2px; }
+.srow .edit { color: var(--teal); font-weight: 700; font-size: .875em; min-width: 44px; min-height: 44px; display: grid; place-items: center; }
+.chg { border-left: 3px solid var(--amber); padding-left: 12px; margin-left: -1px; }
+.was { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.now { font-weight: 800; color: var(--ink); }
+/* range slider */
+.rng { position: relative; height: 44px; display: flex; align-items: center; }
+.rng input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 44px; background: transparent; margin: 0; position: relative; z-index: 2; cursor: pointer; }
+.rng input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 99px; background: transparent; }
+.rng input[type=range]::-moz-range-track { height: 8px; border-radius: 99px; background: transparent; }
+.rng input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 3px solid var(--teal); margin-top: -11px; box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+.rng input[type=range]::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 3px solid var(--teal); box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+.rng input[type=range]:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 12px; }
+.rng .track { position: absolute; left: 0; right: 0; height: 8px; border-radius: 99px; background: var(--soft); border: 1px solid var(--hairline); z-index: 1; overflow: hidden; }
+.rng .track .z { position: absolute; top: 0; bottom: 0; }
+.rng .track .fill { position: absolute; top: 0; bottom: 0; background: var(--teal); opacity: .8; }
+.rng.amber input[type=range]::-webkit-slider-thumb { border-color: var(--amber); }
+.rng.purple input[type=range]::-webkit-slider-thumb { border-color: var(--purple); }
+.ticks { display: flex; justify-content: space-between; font-size: .6875em; color: var(--muted); margin-top: -2px; }
+.bigval { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 2em; letter-spacing: -.03em; line-height: 1; }
+.bigval small { font-size: .45em; letter-spacing: 0; color: var(--ink2); font-weight: 700; margin-left: 4px; }
+.band { display: flex; gap: 8px; flex-wrap: wrap; }
+.band > div { flex: 1; min-width: 130px; background: var(--soft); border: 1px solid var(--hairline); border-radius: 14px; padding: 10px 12px; }
+.band b { display: block; font-size: 1em; margin-top: 3px; }
+.band span { font-size: .6875em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { border: 1.5px solid var(--hairline); border-radius: 999px; padding: 0 14px; min-height: 40px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: .8125em; color: var(--ink2); background: var(--paper); cursor: pointer; user-select: none; }
+.chip.on { border-color: var(--teal); color: var(--teal); background: var(--tealWash); }
+.chip.dis { opacity: .45; border-style: dashed; cursor: default; }
+.alloc { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+.numbox { border: 1.5px solid var(--teal); border-radius: 12px; padding: 7px 10px; font-weight: 800; font-size: .9375em; background: var(--paper); min-width: 104px; text-align: right; display: inline-flex; justify-content: space-between; gap: 8px; }
+.numbox.err { border-color: var(--red); color: var(--red); }
+.numbox.ro { border-style: dashed; border-color: var(--hairline); color: var(--ink2); }
+.mini-step { display: inline-flex; border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; }
+.mini-step span { width: 40px; height: 40px; display: grid; place-items: center; color: var(--teal); font-weight: 700; cursor: pointer; user-select: none; }
+.ewarn { display: flex; gap: 8px; align-items: flex-start; border-radius: 12px; padding: 9px 11px; font-size: .78em; line-height: 1.4; margin-top: 8px; }
+.ewarn svg { flex: none; margin-top: 1px; }
+.ewarn.amber { background: var(--amberWash); color: var(--ink); border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); }
+.ewarn.amber svg { color: var(--amberInk); }
+.ewarn.red { background: var(--redWash); color: var(--ink); border: 1px solid color-mix(in srgb, var(--red) 55%, transparent); }
+.ewarn.red svg { color: var(--red); }
+.ewarn.info { background: var(--soft); color: var(--ink2); border: 1px solid var(--hairline); }
+.ewarn.info svg { color: var(--teal); }
+.ewarn.ok { background: var(--tealWash); color: var(--ink); border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent); }
+.ewarn.ok svg { color: var(--green); }
+/* stacked energy bar */
+.ebar { display: flex; height: 34px; border-radius: 10px; overflow: hidden; border: 1px solid var(--hairline); font-size: .6875em; font-weight: 800; }
+.ebar > div { display: grid; place-items: center; color: var(--onTeal); white-space: nowrap; overflow: hidden; }
+.ebar .base { background: color-mix(in srgb, var(--cyan) 70%, transparent); }
+.ebar .add { background: var(--purple); color: #fff; }
+.ebar .eat { background: var(--teal); }
+.ebar .gap { background: repeating-linear-gradient(135deg, var(--amberWash) 0 6px, transparent 6px 12px); color: var(--amberInk); border-left: 1.5px dashed var(--amber); }
+/* toggle */
+.sw { width: 51px; height: 31px; border-radius: 99px; background: var(--soft); border: 1px solid var(--hairline); position: relative; flex: none; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 25px; height: 25px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+.sw.on { background: var(--green); border-color: var(--green); }
+.sw.on::after { left: 22px; }
+.sw.dis { opacity: .4; }
+/* list rows */
+.lrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; padding: 8px 0; }
+.lrow .l { font-size: .9375em; }
+.lrow .l small { display: block; color: var(--ink2); font-size: .8125em; margin-top: 2px; line-height: 1.35; }
+.lrow .r { display: flex; align-items: center; gap: 8px; color: var(--ink2); font-size: .875em; text-align: right; }
+/* dialog */
+.alert { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 300px; background: var(--paper); border-radius: 22px; z-index: 7; overflow: hidden; border: 1px solid var(--hairline); text-align: center; }
+.alert .ab { padding: 20px 18px 16px; }
+.alert .ab .t { font-weight: 800; font-size: 1.0625em; }
+.alert .ab p { font-size: .8125em; color: var(--ink2); margin-top: 6px; line-height: 1.4; }
+.alert .act { border-top: 1px solid var(--rule); min-height: 46px; display: grid; place-items: center; color: var(--teal); font-weight: 600; font-size: 1em; }
+.alert .act.red { color: var(--red); }
+.alert .act.b { font-weight: 800; }
+/* steps header (Approach B) */
+.steps { display: flex; gap: 4px; margin: 2px 0 10px; }
+.steps i { flex: 1; height: 5px; border-radius: 9px; background: var(--soft); border: 1px solid var(--hairline); }
+.steps i.done { background: var(--teal); border-color: var(--teal); }
+.steps i.cur { background: color-mix(in srgb, var(--teal) 45%, var(--soft)); border-color: var(--teal); }
+/* week grid */
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.week > div { background: var(--soft); border: 1px solid var(--hairline); border-radius: 12px; padding: 7px 2px; text-align: center; font-size: .6875em; min-height: 74px; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.week > div b { font-size: 1.1em; }
+.week > div.on { border-color: var(--purple); background: color-mix(in srgb, var(--purple) 12%, var(--paper)); }
+.week > div.train { box-shadow: inset 0 3px 0 var(--teal); }
+.week .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); }
+.week .dot.t { background: var(--teal); }
+/* diff table */
+.diff .kv { padding: 10px 0; }
+.diff .grp { font-size: .6875em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 12px 0 2px; }
+/* concept stamp */
+.concept { border: 1.5px dashed var(--purple); border-radius: 16px; padding: 12px 14px; position: relative; background: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--purple) 7%, transparent) 10px 11px); }
+.ctag { display: inline-flex; align-items: center; gap: 5px; font-size: .625em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--purple); background: var(--paper); border: 1px solid var(--purple); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.ptag { display: inline-flex; align-items: center; font-size: .625em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--amberInk); background: var(--paper); border: 1px solid var(--amber); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.unav { opacity: .55; }
+.sheet.tall { top: 70px; overflow: hidden; }
+.field { border: 1.5px solid var(--hairline); border-radius: 12px; padding: 11px 12px; background: var(--paper); font-size: .9375em; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 46px; }
+.field.focus { border-color: var(--teal); box-shadow: 0 0 0 4px var(--tealWash); }
+.field.err { border-color: var(--red); box-shadow: 0 0 0 4px var(--redWash); }
+.errtxt { color: var(--red); font-size: .78em; font-weight: 600; margin-top: 6px; display: flex; gap: 6px; align-items: center; }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 112px; z-index: 6; background: var(--ink); color: var(--canvas); border-radius: 16px; padding: 12px 14px; font-size: .8125em; font-weight: 600; display: flex; gap: 10px; align-items: center; }
+.kbd { position: absolute; left: 0; right: 0; bottom: 0; height: 290px; background: color-mix(in srgb, var(--soft) 92%, #000 8%); z-index: 8; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; padding: 8px 6px 40px; border-top: 1px solid var(--hairline); }
+.kbd > div { background: var(--paper); border-radius: 8px; display: grid; place-items: center; font-size: 1.4em; font-weight: 500; box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.phone.xl .tray { flex-wrap: wrap; }
+.phone.xl .tray .btn { width: 100%; }
+.banner { border-radius: 16px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; font-size: .8125em; line-height: 1.4; }
+.banner.amber { background: var(--amberWash); border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); }
+.banner.teal { background: var(--tealWash); border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent); }
+.banner.red { background: var(--redWash); border: 1px solid color-mix(in srgb, var(--red) 50%, transparent); }
+.banner .bt { font-weight: 800; color: var(--ink); }
+.banner p { color: var(--ink2); margin-top: 2px; }
+.iconbtn { width: 44px; height: 44px; border-radius: 12px; border: 1.5px solid var(--hairline); display: grid; place-items: center; color: var(--teal); background: var(--paper); flex: none; cursor: pointer; }
+.numin input { width: 96px; min-height: 44px; border: 1.5px solid var(--teal); border-radius: 12px; background: var(--paper); color: var(--ink); font: inherit; font-weight: 800; font-size: .9375em; text-align: right; padding: 0 10px; }
+.numin input:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--tealWash); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mini-step span:focus-visible, .chip:focus-visible, [data-preset]:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.qgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.qtile { border: 1.5px solid var(--hairline); border-radius: 14px; padding: 10px 12px; background: var(--paper); cursor: pointer; min-height: 56px; display: flex; flex-direction: column; gap: 2px; }
+.qtile b { font-size: .9375em; }
+.qtile span { font-size: .75em; color: var(--ink2); }
+.qtile.on { border-color: var(--teal); background: var(--tealWash); box-shadow: 0 0 0 3px var(--tealWash); }
+.qtile:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.layer { border: 1px solid var(--hairline); border-radius: 16px; padding: 12px 14px; background: var(--paper); }
+.layer + .layer { margin-top: 8px; }
+.prov { display: inline-flex; font-size: .625em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--hairline); color: var(--ink2); white-space: nowrap; }
+.prov.m { color: var(--green); border-color: color-mix(in srgb, var(--green) 50%, transparent); }
+.prov.e { color: var(--amberInk); border-color: color-mix(in srgb, var(--amber) 55%, transparent); }
+.areas { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 12px; align-items: center; font-size: .875em; }
+.areas .bar { width: 90px; }
+
+/* ---------- Review board chrome (desktop first, responsive) ---------- */
+:root {
+  --b-bg: #050c14; --b-panel: #0b1622; --b-card: #0f1c2a; --b-line: rgba(157,179,189,.18);
+  --b-ink: #eef5f8; --b-ink2: #b6c6ce; --b-muted: #8399a3; --b-teal: #3bd2ca; --b-amber: #f4bc48;
+  --b-green: #55e39a; --b-red: #ff697a; --b-purple: #aa98ff;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --b-bg: #e3e8e1; --b-panel: #eef1ec; --b-card: #fbfaf4; --b-line: rgba(25,56,66,.16);
+    --b-ink: #102431; --b-ink2: #455d65; --b-muted: #5d7279; --b-teal: #087e78; --b-amber: #925500;
+    --b-green: #16875f; --b-red: #b83d4b; --b-purple: #5c3fd2;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --b-bg: #e3e8e1; --b-panel: #eef1ec; --b-card: #fbfaf4; --b-line: rgba(25,56,66,.16);
+  --b-ink: #102431; --b-ink2: #455d65; --b-muted: #5d7279; --b-teal: #087e78; --b-amber: #925500;
+  --b-green: #16875f; --b-red: #b83d4b; --b-purple: #5c3fd2;
+  color-scheme: light;
+}
+:root[data-theme="dark"] { color-scheme: dark; }
+body { background: var(--b-bg); color: var(--b-ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; margin: 0; }
+.main code, .note code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.sec > h2, .hero-b h1 { text-wrap: balance; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+html { scroll-behavior: smooth; }
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; background: color-mix(in srgb, var(--b-bg) 90%, transparent); backdrop-filter: blur(14px); border-bottom: 1px solid var(--b-line); }
+.topbar-in { max-width: 1920px; margin: 0 auto; padding: 10px 28px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.brand { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 17px; letter-spacing: -.01em; margin-right: 6px; white-space: nowrap; }
+.brand span { color: var(--b-teal); }
+.tog { display: inline-flex; background: var(--b-card); border: 1px solid var(--b-line); border-radius: 12px; padding: 3px; gap: 2px; }
+.tog button { all: unset; cursor: pointer; padding: 7px 12px; border-radius: 9px; font-size: 13px; font-weight: 700; color: var(--b-ink2); white-space: nowrap; }
+.tog button[aria-pressed="true"] { background: var(--b-teal); color: #03191e; }
+.tog button:focus-visible, .navlink:focus-visible, .shot:focus-visible { outline: 2px solid var(--b-teal); outline-offset: 2px; }
+.spacer { flex: 1; }
+.search { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 12px; color: var(--b-ink); padding: 8px 12px; font: inherit; font-size: 13px; width: 220px; }
+.layout { max-width: 1920px; margin: 0 auto; display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 0; }
+.side { position: sticky; top: 58px; align-self: start; height: calc(100vh - 58px); overflow: auto; padding: 18px 14px 40px 28px; border-right: 1px solid var(--b-line); }
+.side h4 { margin: 18px 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--b-muted); }
+.navlink { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 9px; color: var(--b-ink2); text-decoration: none; font-size: 13.5px; line-height: 1.3; }
+.navlink:hover, .navlink.on { background: var(--b-card); color: var(--b-ink); }
+.navlink small { color: var(--b-muted); font-variant-numeric: tabular-nums; }
+.main { padding: 26px 34px 120px; min-width: 0; }
+.hero-b h1 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 42px; letter-spacing: -.035em; line-height: 1.05; margin: 6px 0 10px; }
+.kick { color: var(--b-teal); font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.lead { color: var(--b-ink2); font-size: 16px; line-height: 1.6; max-width: 1120px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 20px 0 6px; }
+.stat { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 16px; padding: 14px 16px; }
+.stat b { display: block; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 26px; letter-spacing: -.02em; }
+.stat span { color: var(--b-ink2); font-size: 12.5px; line-height: 1.4; }
+.sec { border-top: 1px solid var(--b-line); padding: 30px 0 34px; scroll-margin-top: 70px; }
+.sec > h2 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; letter-spacing: -.02em; margin: 0 0 6px; }
+.sec > .note { color: var(--b-ink2); font-size: 14.5px; line-height: 1.6; max-width: 1180px; margin: 0 0 18px; }
+.flowline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 18px; font-size: 13px; }
+.flowline .n { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 10px; padding: 7px 10px; color: var(--b-ink); cursor: pointer; text-decoration: none; }
+.flowline .n b { color: var(--b-teal); margin-right: 5px; }
+.flowline .a { color: var(--b-muted); }
+.grid { display: flex; flex-wrap: wrap; gap: 30px 26px; align-items: flex-start; }
+.item { width: 686px; max-width: 100%; min-width: 0; }
+body[data-show="dark"] .item, body[data-show="light"] .item { width: 336px; }
+.item .meta { margin: 0 0 12px; max-width: 640px; }
+.item .id { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--b-teal); text-transform: uppercase; }
+.item .ttl { font-size: 15.5px; font-weight: 700; line-height: 1.3; margin-top: 3px; }
+.item .desc { font-size: 13px; color: var(--b-ink2); line-height: 1.5; margin-top: 4px; }
+.shot { width: 336px; cursor: zoom-in; border-radius: 14px; }
+.shot .cap { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--b-muted); }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.tag { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; border-radius: 999px; padding: 3px 8px; border: 1px solid var(--b-line); color: var(--b-ink2); }
+.tag.canon { color: var(--b-green); border-color: color-mix(in srgb, var(--b-green) 45%, transparent); }
+.tag.concept { color: var(--b-amber); border-color: color-mix(in srgb, var(--b-amber) 45%, transparent); }
+.tag.new { color: var(--b-purple); border-color: color-mix(in srgb, var(--b-purple) 45%, transparent); }
+.tag.newb { color: #fff; background: var(--b-purple); border-color: var(--b-purple); }
+.tag.upd { color: #03191e; background: var(--b-teal); border-color: var(--b-teal); }
+.sec > h2 .tag, .navlink .tag { vertical-align: middle; margin-left: 6px; font-size: 9.5px; }
+.tag.state { color: var(--b-teal); border-color: color-mix(in srgb, var(--b-teal) 40%, transparent); }
+.frame { width: 336px; position: relative; border-radius: 40px; }
+.frame > .phone { zoom: .8358; }
+.pair { display: flex; gap: 14px; }
+.pair .shot { width: 336px; }
+body[data-show="dark"] .phone-light-wrap, body[data-show="light"] .phone-dark-wrap { display: none; }
+.cmpwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+.panel { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 18px; padding: 18px 20px; }
+.panel h3 { margin: 0 0 8px; font-size: 17px; }
+.panel p, .panel li { color: var(--b-ink2); font-size: 14px; line-height: 1.55; }
+.panel ul { margin: 6px 0 0; padding-left: 18px; }
+.rec { border: 2px solid var(--b-teal); box-shadow: 0 0 0 4px color-mix(in srgb, var(--b-teal) 14%, transparent); }
+.score { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
+.score th, .score td { text-align: left; padding: 8px 10px 8px 0; border-top: 1px solid var(--b-line); vertical-align: top; }
+.score th { color: var(--b-muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; border-top: 0; }
+.tw { overflow-x: auto; border: 1px solid var(--b-line); border-radius: 16px; background: var(--b-card); }
+table.cov { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1180px; }
+.cov th, .cov td { text-align: left; padding: 9px 12px; border-top: 1px solid var(--b-line); vertical-align: top; line-height: 1.45; }
+.cov th { position: sticky; top: 0; background: var(--b-panel); color: var(--b-muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; border-top: 0; z-index: 1; }
+.cov td a { color: var(--b-teal); text-decoration: none; font-weight: 700; }
+.cov tr.grp td { background: var(--b-panel); font-weight: 800; color: var(--b-ink); }
+.st-canon { color: var(--b-green); font-weight: 700; }
+.st-partial { color: var(--b-teal); font-weight: 700; }
+.st-concept { color: var(--b-amber); font-weight: 700; }
+.st-read { color: var(--b-muted); font-weight: 700; }
+.idx { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.idx a { text-decoration: none; color: var(--b-ink2); font-size: 11.5px; line-height: 1.3; }
+.idx .mini { width: 100%; aspect-ratio: 402 / 600; overflow: hidden; border-radius: 16px; border: 1px solid var(--b-line); position: relative; margin-bottom: 6px; background: var(--b-card); }
+.idx .mini > .phone { zoom: .373; position: absolute; left: 0; top: 0; box-shadow: none; }
+.idx b { color: var(--b-teal); }
+.callouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.dec { counter-reset: d; display: grid; gap: 10px; }
+.dec > div { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 14px; padding: 12px 16px; font-size: 14px; line-height: 1.55; color: var(--b-ink2); }
+.dec > div b { color: var(--b-ink); }
+/* lightbox */
+.lb { position: fixed; inset: 0; z-index: 100; background: rgba(2,6,10,.86); display: none; align-items: center; justify-content: center; gap: 30px; padding: 30px; }
+.lb.open { display: flex; }
+.lb .stage { max-height: calc(100vh - 60px); overflow: auto; border-radius: 48px; }
+.lb .info { max-width: 420px; color: #e7eff3; }
+.lb .info h3 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; margin: 6px 0 8px; letter-spacing: -.01em; }
+.lb .info p { color: #b6c6ce; font-size: 14.5px; line-height: 1.6; }
+.lb .ctl { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.lb .ctl button { all: unset; cursor: pointer; border: 1px solid rgba(157,179,189,.3); border-radius: 12px; padding: 9px 14px; font-size: 13px; font-weight: 700; color: #e7eff3; }
+.lb .ctl button:focus-visible { outline: 2px solid #3bd2ca; }
+.hide { display: none !important; }
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: 1fr; }
+  .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--b-line); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .side h4 { width: 100%; margin: 8px 0 2px; }
+  .main { padding: 18px 16px 80px; }
+  .cmpwrap { grid-template-columns: 1fr; }
+  .topbar-in { padding: 10px 16px; }
+  .search { width: 100%; }
+  .hero-b h1 { font-size: 32px; }
+  .lb { flex-direction: column; overflow: auto; justify-content: flex-start; }
+}
+@media (max-width: 720px) {
+  .pair { flex-direction: column; }
+  .shot, .pair .shot, .frame, .item { width: 100%; max-width: 336px; }
+}
+
+</style>
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">PhysiqueOS <span>· Goal Adaptation V3 · simplicity</span></div>
+  <div class="tog" role="group" aria-label="Phone themes"><button data-show-btn="both" aria-pressed="true">Dark + Mineral</button><button data-show-btn="dark" aria-pressed="false">Dark</button><button data-show-btn="light" aria-pressed="false">Mineral Light</button></div>
+  <div class="tog" role="group" aria-label="Board theme"><button data-board-btn="auto" aria-pressed="true">Board: auto</button><button data-board-btn="dark" aria-pressed="false">Dark</button><button data-board-btn="light" aria-pressed="false">Light</button></div>
+  <div class="spacer"></div>
+  <input class="search" id="q" type="search" placeholder="Filter screens (e.g. energy, validation, concept)" aria-label="Filter screens">
+</div></div>
+<div class="layout"><nav class="side" id="side" aria-label="Board sections"></nav><main class="main" id="main"></main></div>
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Enlarged screen">
+  <div class="stage" id="lb-stage"></div>
+  <div class="info"><div id="lb-info"></div><div class="ctl"><button id="lb-prev">← Previous</button><button id="lb-next">Next →</button><button id="lb-theme">Switch theme (T)</button><button id="lb-close">Close (Esc)</button></div></div>
+</div>
+<script>
+const I = {
+  back: '<svg width="13" height="21" viewBox="0 0 13 21"><path d="M11 2 2.5 10.5 11 19" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chev: '<svg class="chev" width="8" height="14" viewBox="0 0 8 14"><path d="m1.5 1.5 5 5.5-5 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  arrow: '<svg width="20" height="16" viewBox="0 0 20 16"><path d="M2 8h15M11 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check: '<svg class="check" width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m6 10.3 2.7 2.7L14.3 7.4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  x: '<svg width="14" height="14" viewBox="0 0 14 14"><path d="m2 2 10 10M12 2 2 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  doc: '<svg width="18" height="22" viewBox="0 0 18 22"><path d="M3 1h8l6 6v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2Z" fill="currentColor"/><path d="M5 12h8M5 16h6" stroke="var(--paper)" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  warn: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.8 17 16H1L9 1.8Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9 7v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="13.4" r="1.1" fill="currentColor"/></svg>',
+  info: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7v4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="4.6" r="1" fill="currentColor"/></svg>',
+  plus: '<svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+  history: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M2.5 9a6.5 6.5 0 1 0 2-4.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2 2.5v3.3h3.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 5.5V9l2.5 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  sync: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M13.5 6A5.8 5.8 0 0 0 3 4.6M2.5 10A5.8 5.8 0 0 0 13 11.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M3 1.8v3h3M13 14.2v-3h-3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  home: '<svg width="30" height="26" viewBox="0 0 30 26"><path d="M15 2 2 13h4v11h7v-7h4v7h7V13h4L15 2Z" fill="currentColor"/></svg>',
+  goals: '<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="13" cy="13" r="6.3" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="13" cy="13" r="2" fill="currentColor"/></svg>',
+  log: '<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="12" fill="currentColor"/><path d="M13 7v12M7 13h12" stroke="var(--paper)" stroke-width="2.6" stroke-linecap="round"/></svg>',
+  evidence: '<svg width="28" height="24" viewBox="0 0 28 24"><rect x="1" y="9" width="7" height="14" rx="2" fill="currentColor"/><rect x="10.5" y="4" width="7" height="19" rx="2" fill="currentColor"/><rect x="20" y="1" width="7" height="22" rx="2" fill="currentColor"/></svg>',
+  you: '<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="12" fill="currentColor"/><circle cx="13" cy="10" r="4.2" fill="var(--paper)"/><path d="M5.5 20.5c1.8-3.2 4.5-4.6 7.5-4.6s5.7 1.4 7.5 4.6" fill="var(--paper)"/></svg>',
+  bolt: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M9 1 3 9h4l-1 6 6-8H8l1-6Z" fill="currentColor"/></svg>',
+};
+const statusBar = () => `<div class="sb"><span>9:41</span><span class="icons">
+  <svg width="19" height="12" viewBox="0 0 19 12"><rect x="0" y="8" width="3.2" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3.2" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3.2" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3.2" height="12" rx="1" fill="currentColor"/></svg>
+  <svg width="17" height="12" viewBox="0 0 17 12"><path d="M8.5 2.2c2.6 0 4.9 1 6.6 2.7l1.4-1.4A11.3 11.3 0 0 0 .5 3.5l1.4 1.4A9.3 9.3 0 0 1 8.5 2.2Zm0 4c1.5 0 2.8.6 3.8 1.5l1.4-1.4a7.3 7.3 0 0 0-10.4 0l1.4 1.4c1-.9 2.3-1.5 3.8-1.5Zm0 4 1.9-1.9a2.7 2.7 0 0 0-3.8 0l1.9 1.9Z" fill="currentColor"/></svg>
+  <svg width="27" height="13" viewBox="0 0 27 13"><rect x=".7" y=".7" width="22.6" height="11.6" rx="3.6" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-width="1.2"/><rect x="2.5" y="2.5" width="19" height="8" rx="2.2" fill="currentColor"/><rect x="24.6" y="4.3" width="1.8" height="4.4" rx=".9" fill="currentColor" fill-opacity=".5"/></svg>
+</span></div>`;
+const nav = (back, title, action = '') => `<div class="nav"><span class="back">${I.back}<span>${back}</span></span><span class="title">${title}</span><span class="action">${action}</span></div>`;
+const tabbar = (active = 'home') => `<div class="tabbar">${[
+  ['home', 'Home'], ['goals', 'Goals'], ['log', 'Log'], ['evidence', 'Evidence'], ['you', 'You']
+].map(([k, l]) => `<div class="tab ${k === active ? 'on' : ''}">${I[k]}<span>${l}</span></div>`).join('')}</div>`;
+const illusTag = (text = 'Illustrative') => `<span class="illus-tag">${text}</span>`;
+
+;
+// ---------------------------------------------------------------------------
+// v3 interactive models. 1:1 accounting everywhere:
+//   eat target        = estimated maintenance + planned balance + added activity
+//   activity goal     = usual active energy + added activity
+// Founder numbers: maintenance ≈ 2,117 (1,977–2,258) at usual ≈ 800 active kcal
+// (Phase B dormant candidate 99f11ae6). Plan: −450/day, eat 1,767, goal 900.
+// Quick Calibration scenario (illustrative): after 4 weeks with good evidence the
+// planned −450 behaved like ≈ −250; the maintenance estimate is refined
+// 2,117 → ≈ 1,917, and the briefing proposes deepening the balance by 200.
+// Floor (25% below maintenance, rounded up to 25), +500 added cap and step
+// sizes are PROVISIONAL.
+// ---------------------------------------------------------------------------
+const EM = { maintenance: 2117, low: 1977, high: 2258, usual: 800, maxAdded: 500, plan: { eat: 1767, goal: 900, balance: -450, added: 100 } };
+const fmt = (v) => Math.round(v).toLocaleString('en-US');
+const sgn = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(v));
+const floorFor = (m) => Math.ceil((m * (1 - 0.25)) / 25) * 25;
+const SPLITS = {
+  suggested: { label: 'Suggested', added: (b) => 100 },
+  eat: { label: 'Eat less', added: () => 0 },
+  move: { label: 'Move more', added: (b) => Math.min(EM.maxAdded, Math.max(0, -b)) },
+  blend: { label: 'Blend', added: (b) => Math.min(EM.maxAdded, Math.max(0, Math.round(-b / 2))) },
+};
+
+function energyState(root) {
+  const balance = Number(root.querySelector('[data-in="balance"]').value);
+  const split = root.dataset.split || 'suggested';
+  let added = split === 'custom' ? Number(root.querySelector('[data-in="added"]').value || 0) : SPLITS[split].added(balance);
+  added = Math.max(0, Math.min(EM.maxAdded, Math.round(added)));
+  const floor = floorFor(EM.maintenance);
+  let eat = EM.maintenance + balance + added;
+  const notes = [];
+  let limited = false;
+  if (eat < floor) { eat = floor; limited = true; notes.push(['red', `Eating is held at ${fmt(floor)} (provisional floor, 25% below maintenance). Add activity or choose a smaller deficit.`]); }
+  const eff = eat - EM.maintenance - added;
+  if (eat >= EM.maintenance && added > 0) notes.push(['amber', `You’d eat at or above maintenance and rely on +${fmt(added)} of extra activity every day for the whole deficit.`]);
+  const lo = eat - EM.high - added, hi = eat - EM.low - added;
+  const dens = eff < 0 ? 3300 : 2500;
+  const r1 = Math.abs(lo * 7 / dens), r2 = Math.abs(hi * 7 / dens);
+  let rate;
+  if (Math.abs(eff) < 60) rate = 'About steady';
+  else if (eff > 0) rate = `≈ ${(Math.min(r1, r2) * 4.33).toFixed(1)}–${(Math.max(r1, r2) * 4.33).toFixed(1)} lb/month gain`;
+  else rate = `≈ ${Math.min(r1, r2).toFixed(1)}–${Math.max(r1, r2).toFixed(1)} lb/week loss`;
+  return { balance, eff, added, eat, goal: EM.usual + added, limited, notes, rate, lo, hi };
+}
+function energyRefresh(root) {
+  const s = energyState(root);
+  const set = (k, v) => root.querySelectorAll(`[data-e="${k}"]`).forEach((el) => { el.innerHTML = v; });
+  set('balance', s.limited ? `${sgn(s.eff)} <span style="font-size:.5em;color:var(--red)">limited</span>` : sgn(s.balance));
+  set('rate', s.rate);
+  set('range', `${sgn(s.lo)} to ${sgn(s.hi)}`);
+  set('eat', fmt(s.eat));
+  set('goal', fmt(s.goal));
+  set('added', `+${fmt(s.added)}`);
+  set('formula', `${fmt(EM.maintenance)} ${s.eff < 0 ? '−' : '+'} ${fmt(Math.abs(s.eff))} + ${fmt(s.added)} = <b>${fmt(s.eat)}</b>`);
+  set('example', s.added ? `For example, ≈ ${fmt(Math.round(s.added * 22 / 100) * 100)} more steps a day. Any activity counts.` : 'No extra activity planned.');
+  set('notes', s.notes.map(([t, m]) => `<div class="ewarn ${t}">${I.warn}<span>${m}</span></div>`).join(''));
+  root.querySelectorAll('[data-split]').forEach((b) => { const on = b.dataset.split === (root.dataset.split || 'suggested'); b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+  const custom = root.querySelector('[data-e="custom"]'); if (custom) custom.hidden = (root.dataset.split || 'suggested') !== 'custom';
+  const a = root.querySelector('[data-in="added"]'); if (a && document.activeElement !== a) a.value = s.added;
+  const e = root.querySelector('[data-in="eatNum"]'); if (e && document.activeElement !== e) e.value = s.eat;
+}
+
+// ---------------- Quick Calibration v3 -----------------
+// Proposal: deepen the planned balance by 200. The user picks how.
+const QC = { eat: 1767, goal: 900, balance: -450, step: -200, refined: 1917 };
+const QCOPT = {
+  eat: { label: 'Eat less', eat: -200, move: 0 },
+  move: { label: 'Move more', eat: 0, move: 200 },
+  blend: { label: 'Blend', eat: -100, move: 100 },
+};
+function qcState(root) {
+  const opt = root.dataset.qopt || '';
+  let eat = 0, move = 0;
+  if (QCOPT[opt]) ({ eat, move } = QCOPT[opt]);
+  if (opt === 'custom') { eat = -Number(root.querySelector('[data-q="eatLess"]').value || 0); move = Number(root.querySelector('[data-q="moveMore"]').value || 0); }
+  const change = eat - move; // 1:1: each kcal eaten less or moved more deepens the balance by 1
+  const newEat = QC.eat + eat, newGoal = QC.goal + move;
+  return { opt, eat, move, change, newEat, newGoal, newBalance: QC.balance + change, floor: floorFor(QC.refined) };
+}
+function qcRefresh(root) {
+  const s = qcState(root);
+  const set = (k, v) => root.querySelectorAll(`[data-qe="${k}"]`).forEach((el) => { el.innerHTML = v; });
+  root.querySelectorAll('[data-qopt]').forEach((b) => { const on = b.dataset.qopt === s.opt; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+  set('eat', fmt(s.newEat)); set('goal', fmt(s.newGoal)); set('balance', sgn(s.opt ? s.newBalance : QC.balance + QC.step)); set('change', sgn(s.change));
+  set('eatDelta', s.eat ? sgn(s.eat) : 'same'); set('goalDelta', s.move ? sgn(s.move) : 'same');
+  const custom = root.querySelector('[data-qe="custom"]'); if (custom) custom.hidden = s.opt !== 'custom';
+  const btn = root.querySelector('[data-qe="accept"]');
+  const msgs = [];
+  if (s.newEat < s.floor) msgs.push(['red', `Eating can’t go below ${fmt(s.floor)} (provisional floor).`]);
+  if (s.opt === 'custom' && s.change > 0) msgs.push(['amber', 'This makes your deficit smaller, the opposite of the suggestion. You can still choose it.']);
+  if (s.opt === 'custom' && s.change < -300) msgs.push(['amber', 'Changes over 300 a day go to a full plan review.']);
+  set('msgs', msgs.map(([t, m]) => `<div class="ewarn ${t}">${I.warn}<span>${m}</span></div>`).join(''));
+  if (btn) {
+    const ok = s.opt && s.newEat >= s.floor && !(s.opt === 'custom' && (s.change === 0 || s.change < -300));
+    btn.className = `btn ${ok ? 'primary' : 'disabled'} grow`;
+    btn.textContent = !s.opt ? 'Choose how to add 200' : ok ? `Accept: eat ${fmt(s.newEat)} · goal ${fmt(s.newGoal)}` : s.change < -300 ? 'Review in your plan' : 'Adjust the amount';
+  }
+}
+
+// ---------------- event wiring (works inside the lightbox copy too) -----------------
+document.addEventListener('input', (ev) => {
+  const er = ev.target.closest('[data-energy]');
+  if (er) {
+    if (ev.target.dataset.in === 'eatNum' && ev.target.value !== '') { er.dataset.split = 'custom'; const a = er.querySelector('[data-in="added"]'); a.value = Math.max(0, Math.min(EM.maxAdded, Number(ev.target.value) - EM.maintenance - Number(er.querySelector('[data-in="balance"]').value))); }
+    if (ev.target.dataset.in === 'added') er.dataset.split = 'custom';
+    energyRefresh(er);
+  }
+  const qr = ev.target.closest('[data-qcv3]');
+  if (qr) qcRefresh(qr);
+});
+document.addEventListener('click', (ev) => {
+  const t = ev.target.closest('[data-split],[data-qopt],[data-step],[data-qstep]');
+  if (!t) return;
+  const er = t.closest('[data-energy]');
+  if (er) {
+    if (t.dataset.split) er.dataset.split = t.dataset.split;
+    if (t.dataset.step) { const [k, d] = t.dataset.step.split(':'); const el = er.querySelector(`[data-in="${k}"]`); el.value = Math.max(Number(el.min), Math.min(Number(el.max), Number(el.value) + Number(d))); if (k === 'added') er.dataset.split = 'custom'; }
+    energyRefresh(er);
+  }
+  const qr = t.closest('[data-qcv3]');
+  if (qr) {
+    if (t.dataset.qopt) qr.dataset.qopt = t.dataset.qopt;
+    if (t.dataset.qstep) { const [k, d] = t.dataset.qstep.split(':'); const el = qr.querySelector(`[data-q="${k}"]`); el.value = Math.max(0, Math.min(400, Number(el.value) + Number(d))); }
+    qcRefresh(qr);
+  }
+});
+
+;
+// ---------------------------------------------------------------------------
+// v3 screens, part A: Founder scenario (Option B → setup → Plan Hub → energy →
+// review), simplified editors, Quick Calibration v3.
+// ---------------------------------------------------------------------------
+const S = {};
+Object.assign(I, {
+  energy: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M10 1 3 10h5l-1 7 7-9H9l1-7Z" fill="currentColor"/></svg>',
+  walk: '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="10" cy="2.6" r="1.8" fill="currentColor"/><path d="m7 17 2-5 2 2v3M6 9l2-3.5 3 .5 2 3M9 12l-.5-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  lift: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M1 9h16M4 5v8M14 5v8M2 7v4M16 7v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  moon: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M15 11.5A7 7 0 0 1 6.5 3 7 7 0 1 0 15 11.5Z" fill="currentColor"/></svg>',
+  drop: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.5S3.5 7.6 3.5 11.2a5.5 5.5 0 0 0 11 0C14.5 7.6 9 1.5 9 1.5Z" fill="currentColor"/></svg>',
+  pill: '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="1.5" y="6" width="15" height="6.5" rx="3.25" fill="none" stroke="currentColor" stroke-width="1.8" transform="rotate(-35 9 9)"/><path d="m6.6 5.5 4.2 6" stroke="currentColor" stroke-width="1.8"/></svg>',
+  cam: '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="1.5" y="4.5" width="15" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
+  scan: '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="5" y="1.5" width="8" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2 6h14M2 12h14" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/></svg>',
+  food: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M5 1v6a2 2 0 0 0 4 0V1M7 7v10M13 1c-2 1.5-2.5 4-2.5 6.5h2.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  flag: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M3.5 17V2M3.5 3h10l-2 3.5 2 3.5h-10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  bell: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M4.5 12.5V8a4.5 4.5 0 0 1 9 0v4.5l1.5 1.5H3l1.5-1.5ZM7.5 16h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  reset: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2.5 8a5.5 5.5 0 1 0 1.8-4.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2 1.8v3h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chevDown: '<svg width="14" height="9" viewBox="0 0 14 9"><path d="m1.5 1.5 5.5 5.5 5.5-5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+});
+const radio = (on) => `<div class="radio ${on ? 'on' : ''}"></div>`;
+const sw = (on = true) => `<span class="sw ${on ? 'on' : ''}"></span>`;
+const ctag = (t = 'Concept') => `<span class="ctag">${t}</span>`;
+const navX = (title, action = 'Done', back = 'Cancel') => `<div class="nav"><span class="back" style="font-weight:500">${back}</span><span class="title">${title}</span><span class="action" style="font-weight:700">${action}</span></div>`;
+const srow = (ic, tone, name, detail, right = '<span class="edit">Edit</span>', cls = '') => `<div class="srow ${cls}"><span class="ic ${tone}">${I[ic]}</span><div class="grow"><div class="nm">${name}</div><div class="dt">${detail}</div></div>${right}</div>`;
+const bannerB = (tone, icon, title, body) => `<div class="banner ${tone}"><span style="color:var(--${tone === 'amber' ? 'amberInk' : tone === 'red' ? 'red' : 'teal'});margin-top:1px">${I[icon]}</span><div><div class="bt">${title}</div><p>${body}</p></div></div>`;
+const opt = (t) => `<span class="pill line" style="font-size:.6875em">${t || 'Optional'}</span>`;
+const editorHead = (eyebrow, title, lead) => `<div><span class="eyebrow">${eyebrow}</span><div class="display h2" style="margin-top:6px">${title}</div>${lead ? `<p class="lead" style="margin-top:6px">${lead}</p>` : ''}</div>`;
+
+// ---------------- Founder scenario -----------------
+S['F1-options'] = () => `
+${statusBar()}${nav('Briefing', 'Goal Options')}
+<div class="content stack">
+  <div class="display h1">Choose what to protect next</div>
+  <p class="t-body ink2">You’ve built about 7 of your 10 lb. Body fat is above your 8–9% range, and Oct 31 is unlikely at your recent pace.</p>
+  <div class="cmp">
+    <div class="hd lbl"></div><div class="hd sel"><span style="color:var(--teal)">★</span> Lean out first</div><div class="hd">Keep building</div><div class="hd">Keep plan</div>
+    <div class="lbl">Body fat</div><div class="sel">Back to 8.3–9%</div><div>Ends 10.4–11.3%</div><div>12.4–14%</div>
+    <div class="lbl">Timing</div><div class="sel">Lean 2–7 wks, then build</div><div>Goal ≈ Jan–Apr</div><div>Goal ≈ late Nov–Dec</div>
+    <div class="lbl">Fits limits?</div><div class="sel" style="color:var(--green);font-weight:700">Yes</div><div style="color:var(--amberInk);font-weight:700">Needs upper ≥ 11.5%</div><div style="color:var(--red);font-weight:700">No</div>
+  </div>
+  <p class="t-xs muted">★ Ranked first for you. Option B side-by-side, as approved. Numbers are rechecked before you approve.</p>
+  <div class="btn primary">Set up leaning phase ${I.arrow}</div>
+  <div class="btn ghost">Make my own changes instead</div>
+</div>`;
+
+S['F2-setup'] = () => `
+${statusBar()}${nav('Options', 'Leaning Phase')}
+<div class="content stack">
+  <div class="display h1">Set up your leaning phase</div>
+  <p class="lead">Two decisions. Everything else in your plan carries forward.</p>
+  <div class="card"><span class="eyebrow">Ends</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice">${radio(true)}<div class="grow"><div class="row between"><span class="t-body strong">When I’m back in range</span><span class="pill teal">Suggested</span></div><div class="t-sm ink2">8–9% body fat. A DEXA confirms it best; without one we estimate from your trends.</div></div></div>
+      <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">After a set time, or whichever comes first</div></div></div>
+    </div></div>
+  <div class="card" style="padding:0 16px">${srow('energy', 'amber', 'Daily energy', '<b style="color:var(--ink)">−450 a day</b> · eat 1,767 · activity goal 900')}</div>
+  <div class="card" style="padding:12px 16px"><div class="row between"><div><div class="t-body strong">Your plan</div><div class="t-sm ink2">Training, recovery, supplements and more carry forward</div></div>${I.chev}</div></div>
+  <div class="btn primary">Review ${I.arrow}</div>
+</div>`;
+
+const hubV3 = () => `
+${statusBar()}${nav('Leaning Phase', 'Your Plan')}
+<div class="content">
+  <div class="display h1">Your plan</div>
+  <p class="lead" style="margin-top:6px">2 changing. The rest carries forward; tap anything to adjust.</p>
+  <div class="sec-label">Changing</div>
+  <div class="card" style="padding:0 16px"><div class="divider-list">
+    ${srow('flag', 'amber', 'Phase', '<span class="was">Lean Mass Build</span> → <b style="color:var(--ink)">Leaning</b>', '<span class="edit">Edit</span>', 'chg')}
+    ${srow('energy', 'amber', 'Daily energy', '<span class="was">eat 2,500 · goal 800</span><br><b style="color:var(--ink)">−450 · eat 1,767 · goal 900</b>', '<span class="edit">Edit</span>', 'chg')}
+  </div></div>
+  <div class="sec-label">Carrying forward</div>
+  <div class="card" style="padding:0 16px"><div class="divider-list">
+    ${srow('food', '', 'Nutrition', 'Protein 1.0 g/lb*')}
+    ${srow('lift', '', 'Training', 'Learned: ≈ 4 workouts a week, upper/lower')}
+    ${srow('moon', '', 'Recovery', 'Foam Rolling · sleep goal not set')}
+    ${srow('pill', '', 'Supplements', '2 · reminders on')}
+    ${srow('cam', '', 'Progress photos & DEXA', 'Photos every 2 weeks · no scan planned')}
+  </div></div>
+  <p class="t-xs muted" style="margin-top:12px;text-align:center">Approach A plan hub. Nothing changes until you approve.</p>
+</div>
+<div class="tray"><span class="count">2</span><div class="grow"><div class="t-sm strong">2 changes</div><div class="t-xs muted">Draft · rechecked before approval</div></div><div class="btn primary">Review</div></div>`;
+S['F3-hub'] = () => hubV3();
+
+const energyEditor = (opts = {}) => `
+${statusBar()}${navX('Daily Energy')}
+<div class="content stack">
+  <div class="card">
+    <div class="row between"><span class="eyebrow amber">Daily balance</span><span class="t-xs muted">Suggested −450</span></div>
+    <div class="bigval" style="margin-top:10px"><span data-e="balance">−450</span><small>kcal/day</small></div>
+    <div class="t-xs muted" style="margin-top:4px"><span data-e="rate">≈ 0.7–1.3 lb/week loss</span> · likely <span data-e="range">−591 to −310</span></div>
+    <div class="rng"><div class="track"><div class="z" style="left:0;width:8%;background:var(--redWash)"></div><div class="z" style="left:8%;width:32%;background:var(--tealWash)"></div></div><input type="range" aria-label="Daily balance in kilocalories" data-in="balance" min="-750" max="500" step="25" value="${opts.balance ?? -450}"></div>
+    <div class="ticks"><span>−750</span><span>0</span><span>+500</span></div>
+  </div>
+  <div><div class="t-sm strong" style="margin-bottom:8px">How you get there</div>
+    <div class="chips" role="radiogroup" aria-label="How to reach the balance">${[['suggested', '★ Suggested'], ['eat', 'Eat less'], ['move', 'Move more'], ['blend', 'Blend'], ['custom', 'Custom']].map(([k, l]) => `<span class="chip" role="radio" tabindex="0" data-split="${k}">${l}</span>`).join('')}</div></div>
+  <div class="card soft">
+    <div class="kv"><span class="k">Eat each day</span><span class="v"><span data-e="eat">1,767</span> kcal</span></div>
+    <div class="kv"><span class="k">Activity goal</span><span class="v"><span data-e="goal">900</span> kcal/day <span class="t-xs muted">(usual 800 <span data-e="added">+100</span>)</span></span></div>
+    <div data-e="custom" hidden>
+      <div class="row between" style="margin-top:8px"><span class="t-sm ink2">Eat</span><label class="numin"><span class="sr">Daily intake</span><input type="number" inputmode="numeric" data-in="eatNum" value="1767" aria-label="Daily intake"></label></div>
+      <div class="row between" style="margin-top:8px"><span class="t-sm ink2">Extra activity</span><div class="row" style="gap:8px"><div class="mini-step"><span data-step="added:-25" role="button" tabindex="0" aria-label="25 less">−25</span><span data-step="added:25" role="button" tabindex="0" aria-label="25 more">+25</span></div><label class="numin"><span class="sr">Extra activity</span><input type="number" inputmode="numeric" data-in="added" min="0" max="500" value="100" aria-label="Extra activity"></label></div></div>
+    </div>
+    <p class="t-xs muted" style="margin-top:8px" data-e="formula">2,117 − 450 + 100 = <b>1,767</b></p>
+    <p class="t-xs muted" data-e="example">For example, ≈ 2,200 more steps a day. Any activity counts.</p>
+  </div>
+  <div data-e="notes"></div>
+  <span class="t-sm semi" style="color:var(--teal)">Why these numbers?</span>
+</div>`;
+S['F4-energy'] = () => energyEditor();
+
+S['F5-review'] = () => `
+${statusBar()}${nav('Your Plan', 'Review')}
+<div class="content stack">
+  <div class="display h1">Review your new plan</div>
+  <span class="pill teal" style="align-self:flex-start">${I.check} Checked against your latest evidence</span>
+  <div class="card diff">
+    <div class="kv"><span class="k">Phase</span><span class="delta"><s>Lean Mass Build</s><span class="v">Leaning</span></span></div>
+    <div class="kv"><span class="k">Ends</span><span class="v">Back in 8–9% · ≈ 2–5 weeks</span></div>
+    <div class="kv"><span class="k">Daily balance</span><span class="v">−450 kcal</span></div>
+    <div class="kv"><span class="k">Eat</span><span class="delta"><s>2,500</s><span class="v">1,767 kcal</span></span></div>
+    <div class="kv"><span class="k">Activity goal</span><span class="delta"><s>800</s><span class="v">900 kcal</span></span></div>
+    <div class="kv"><span class="k">Goal date</span><span class="delta"><s>Oct 31</s><span class="v">Re-estimated after leaning</span></span></div>
+  </div>
+  <div class="card" style="padding:12px 16px"><div class="row between"><div><div class="t-body strong">Carrying forward</div><div class="t-sm ink2">Body-fat range, nutrition, training, recovery, supplements, photos</div></div>${I.chev}</div></div>
+  <div class="btn primary">Approve plan</div>
+  <p class="t-xs muted" style="text-align:center">Only numbers that change are listed. One approval; version 1 is kept in Your Journey.</p>
+</div>`;
+
+S['F6-stale'] = () => `
+${statusBar()}${nav('Your Plan', 'Review')}
+<div class="content stack">
+  <div class="display h2">Your plan was updated</div>
+  ${bannerB('amber', 'sync', 'Something changed since you started this draft', 'A new weigh-in trend refined your maintenance estimate. To keep −450 a day, eating is now 1,800 instead of 1,767. Your other choices are unchanged.')}
+  <div class="card diff"><div class="kv"><span class="k">Eat</span><span class="delta"><s>1,767</s><span class="v">1,800 kcal</span></span></div><div class="kv"><span class="k">Activity goal</span><span class="v">900 kcal (same)</span></div></div>
+  <div class="btn primary">Continue to review</div>
+</div>`;
+
+// ---------------- Simplified editors -----------------
+S['A1-activity'] = () => `
+${statusBar()}${navX('Activity')}
+<div class="content stack">
+  ${editorHead('Activity', 'Your activity goal')}
+  <div class="card"><div class="row between"><span class="t-body">Daily active energy</span><div class="stepper"><span>−</span><b>900</b><span>+</span></div></div>
+    <p class="t-xs muted" style="margin-top:8px">Usual ≈ 800 (last 4 weeks, Apple Health) + 100 extra. Changing it here changes what you eat 1:1 at the same balance.</p></div>
+  <div class="ewarn info">${I.info}<span>For example, ≈ 2,200 more steps a day, or a short walk most days. Any activity counts; you don’t need a schedule.</span></div>
+  <div class="card divider-list" style="padding:0 16px">
+    <div class="lrow"><div class="l">Activity data<small>Apple Health · active energy, workouts included</small></div>${I.chev}</div>
+  </div>
+</div>`;
+
+S['A2-no-wearable'] = () => `
+${statusBar()}${navX('Activity')}
+<div class="content stack">
+  ${editorHead('Activity', 'No activity data yet')}
+  ${bannerB('amber', 'info', 'We don’t see any activity data', 'Your plan still works. Your deficit comes from what you eat, and your weigh-ins show the result.')}
+  <div class="card"><div class="divider-list">
+    <div class="choice">${radio(true)}<div class="grow"><div class="t-body strong">Plan without activity data</div><div class="t-sm ink2">No activity goal. Eating carries the whole balance.</div></div></div>
+    <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Connect Apple Health</div><div class="t-sm ink2">Any device that writes active energy to Apple Health works.</div></div></div>
+  </div></div>
+  <p class="t-xs muted">Other sources can plug in later through the same activity-data layer.</p>
+</div>`;
+
+S['R1-recovery'] = () => `
+${statusBar()}${navX('Recovery')}
+<div class="content stack">
+  ${editorHead('Recovery', 'Recovery priorities')}
+  <div class="card divider-list" style="padding:0 16px">
+    ${srow('moon', '', 'Foam Rolling', 'Daily · evening · reminder on')}
+    <div class="srow"><span class="ic" style="color:var(--teal)">${I.plus}</span><div class="grow"><div class="nm" style="color:var(--teal)">Add a priority</div><div class="dt">Stretching, mobility or your own</div></div></div>
+  </div>
+  <div class="card"><div class="row between"><div><div class="t-body strong">Sleep goal ${opt()}</div><div class="t-sm ink2">Your sleep data averages 7 h 05 m</div></div><span class="t-sm semi" style="color:var(--teal)">Set</span></div></div>
+</div>`;
+
+S['R2-add-priority'] = () => `<div style="height:874px;overflow:hidden;position:relative">${S['R1-recovery']()}</div><div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="row between"><span class="t-body muted">Cancel</span><span class="t-body strong">Add a priority</span><span class="t-body strong" style="color:var(--teal)">Add</span></div>
+  <div class="chips" style="margin-top:16px"><span class="chip on">Stretching</span><span class="chip">Mobility</span><span class="chip">Walk after meals</span><span class="chip">Breathing</span><span class="chip">Custom…</span></div>
+  <div class="card divider-list" style="margin-top:14px;padding:0 16px">
+    <div class="lrow"><div class="l">How often ${opt()}</div><div class="r">3× a week ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Remind me</div>${sw(false)}</div>
+  </div>
+  <p class="t-xs muted" style="margin-top:10px">Shows in Today’s Priorities when it’s due. Skip any day without penalty.</p>
+</div>`;
+
+S['R3-sleep-goal'] = () => `<div style="height:874px;overflow:hidden;position:relative">${S['R1-recovery']()}</div><div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="row between"><span class="t-body muted">Cancel</span><span class="t-body strong">Sleep goal</span><span class="t-body strong" style="color:var(--teal)">Save</span></div>
+  <div class="row between" style="margin-top:18px"><span class="t-body">Time asleep</span><div class="stepper"><span>−</span><b>7 h 30 m</b><span>+</span></div></div>
+  <p class="t-xs muted" style="margin-top:10px">Recent average 7 h 05 m. Briefings mention sleep when it affects recovery. No reminders unless you ask.</p>
+  <div class="btn ghost" style="margin-top:6px">Don’t set a goal</div>
+</div>`;
+
+S['S1-supplements'] = () => `
+${statusBar()}${navX('Supplements')}
+<div class="content stack">
+  ${editorHead('Supplements', 'Supplements')}
+  <div class="card divider-list" style="padding:0 16px">
+    ${srow('pill', '', 'Tongkat Ali', '2 capsules · daily · reminder on')}
+    ${srow('pill', '', 'Electrolytes', 'Training days · no reminder')}
+    <div class="srow"><span class="ic" style="color:var(--teal)">${I.plus}</span><div class="grow"><div class="nm" style="color:var(--teal)">Add a supplement</div></div></div>
+  </div>
+  <p class="t-xs muted">PhysiqueOS tracks what you take; it doesn’t recommend supplements or doses.</p>
+</div>`;
+
+S['S2-add-supplement'] = () => `<div style="height:874px;overflow:hidden;position:relative">${S['S1-supplements']()}</div><div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="row between"><span class="t-body muted">Cancel</span><span class="t-body strong">Add supplement</span><span class="t-body strong" style="color:var(--teal)">Add</span></div>
+  <div class="field focus" style="margin-top:16px"><span class="strong">Creatine</span></div>
+  <div class="card divider-list" style="margin-top:12px;padding:0 16px">
+    <div class="lrow"><div class="l">Amount ${opt()}</div><div class="r">5 g ${I.chev}</div></div>
+    <div class="lrow"><div class="l">How often</div><div class="r">Daily ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Remind me</div>${sw(false)}</div>
+  </div>
+</div>`;
+
+S['P1-photos-dexa'] = () => `
+${statusBar()}${navX('Photos & DEXA')}
+<div class="content stack">
+  ${editorHead('Evidence', 'Progress photos & DEXA', 'Both optional. Your plan works without them; they make estimates sharper.')}
+  <div class="card divider-list" style="padding:0 16px">
+    <div class="lrow"><div class="l">Progress photos<small>Every 2 weeks · Saturday morning</small></div>${sw(true)}</div>
+    <div class="lrow"><div class="l">Remind me</div>${sw(true)}</div>
+  </div>
+  <div class="card divider-list" style="padding:0 16px">
+    <div class="lrow"><div class="l">Next DEXA scan<small>Not planned · optional</small></div><span class="t-sm semi" style="color:var(--teal)">Schedule</span></div>
+  </div>
+</div>`;
+
+// ---------------- Quick Calibration v3 -----------------
+const take = `<div class="coach"><span class="eyebrow purple">Coach’s Take</span>
+  <div style="margin-top:10px"><div class="t-sm strong">Biggest Takeaway</div><p class="t-sm ink2" style="margin-top:3px">Four weeks of steady logging and activity, but weight has moved about −0.2 lb a week, less than planned.</p></div>
+  <div style="margin-top:10px"><div class="t-sm strong">Into Next Week</div><p class="t-sm ink2" style="margin-top:3px">Keep training as you are; strength is holding.</p></div></div>`;
+const qcCardV3 = (sel = '') => `
+  <div class="card selected" data-qcv3 data-qopt="${sel}">
+    <div class="row between"><span class="eyebrow amber">Quick calibration</span><span class="pill teal">${I.check} Checked</span></div>
+    <div class="display h3" style="margin-top:8px">Deepen your daily deficit by 200</div>
+    <p class="t-sm ink2" style="margin-top:6px">Your −450 plan has behaved like about −250. Adding 200 brings you back on pace.</p>
+    <div class="row" style="gap:10px;margin-top:10px;align-items:baseline"><span class="was t-lg">−450</span><span class="t-lg">→</span><span class="bigval" style="font-size:1.6em"><span data-qe="balance">−650</span></span><span class="t-sm ink2">planned a day</span></div>
+    <div class="t-sm strong" style="margin-top:12px">How?</div>
+    <div class="qgrid" role="radiogroup" aria-label="How to add 200">
+      ${[['eat', 'Eat less', '1,567 · goal 900'], ['move', 'Move more', '1,767 · goal 1,100'], ['blend', 'Blend', '1,667 · goal 1,000'], ['custom', 'Custom', 'Set your own']].map(([k, l, d]) => `<div class="qtile" role="radio" tabindex="0" data-qopt="${k}"><b>${l}</b><span>${d}</span></div>`).join('')}
+    </div>
+    <div data-qe="custom" hidden>
+      <div class="row between" style="margin-top:10px"><span class="t-sm ink2">Eat less by</span><div class="row" style="gap:8px"><div class="mini-step"><span data-qstep="eatLess:-25" role="button" tabindex="0" aria-label="25 less">−25</span><span data-qstep="eatLess:25" role="button" tabindex="0" aria-label="25 more">+25</span></div><label class="numin"><span class="sr">Eat less by</span><input type="number" inputmode="numeric" data-q="eatLess" value="150" aria-label="Eat less by kilocalories"></label></div></div>
+      <div class="row between" style="margin-top:8px"><span class="t-sm ink2">Move more by</span><div class="row" style="gap:8px"><div class="mini-step"><span data-qstep="moveMore:-25" role="button" tabindex="0" aria-label="25 less">−25</span><span data-qstep="moveMore:25" role="button" tabindex="0" aria-label="25 more">+25</span></div><label class="numin"><span class="sr">Move more by</span><input type="number" inputmode="numeric" data-q="moveMore" value="50" aria-label="Move more by kilocalories"></label></div></div>
+    </div>
+    <div class="card soft" style="margin-top:10px;padding:8px 12px">
+      <div class="kv" style="padding:6px 0"><span class="k">Eat</span><span class="v"><span data-qe="eat">1,767</span> <span class="t-xs muted">(<span data-qe="eatDelta">same</span>)</span></span></div>
+      <div class="kv" style="padding:6px 0"><span class="k">Activity goal</span><span class="v"><span data-qe="goal">900</span> <span class="t-xs muted">(<span data-qe="goalDelta">same</span>)</span></span></div>
+    </div>
+    <div data-qe="msgs"></div>
+    <div class="row" style="margin-top:12px"><div class="btn disabled grow" data-qe="accept">Choose how to add 200</div></div>
+    <div class="row between" style="margin-top:6px"><span class="t-sm semi" style="color:var(--teal)">Why?</span><span class="t-sm semi muted">Not now</span></div>
+  </div>`;
+S['Q1-proposal'] = () => `
+${statusBar()}${nav('Home', 'Weekly Briefing')}
+<div class="content stack">
+  <div class="row between"><span class="eyebrow">Weekly · Nov 1–7</span><span class="t-xs muted">End of briefing</span></div>
+  ${take}
+  ${qcCardV3('')}
+</div>`;
+S['Q2-blend'] = () => S['Q1-proposal']().replace('data-qopt=""', 'data-qopt="blend"');
+S['Q3-custom'] = () => S['Q1-proposal']().replace('data-qopt=""', 'data-qopt="custom"');
+S['Q4-applied'] = () => `
+${statusBar()}${nav('Home', 'Weekly Briefing')}
+<div class="content stack">
+  <div class="row between"><span class="eyebrow">Weekly · Nov 1–7</span><span class="t-xs muted">End of briefing</span></div>
+  ${take}
+  <div class="card" style="border:1.5px solid var(--green)">
+    <div class="row between"><span class="eyebrow" style="color:var(--green)">Plan updated</span><span class="t-xs muted">Nov 8 · 9:43 AM</span></div>
+    <div class="kv"><span class="k">Daily balance</span><span class="delta"><s>−450</s><span class="v">−650 planned</span></span></div>
+    <div class="kv"><span class="k">Eat</span><span class="delta"><s>1,767</s><span class="v">1,667</span></span></div>
+    <div class="kv"><span class="k">Activity goal</span><span class="delta"><s>900</s><span class="v">1,000</span></span></div>
+    <p class="t-sm ink2" style="margin-top:6px">Everything else is unchanged. We’ll watch for 3 weeks before suggesting anything else.</p>
+    <div class="row between" style="margin-top:10px"><span class="t-sm semi" style="color:var(--teal)">View change</span><span class="t-sm semi" style="color:var(--teal)">Undo</span></div>
+  </div>
+</div>`;
+S['Q5-why'] = () => `<div style="height:874px;overflow:hidden;position:relative">${S['Q1-proposal']()}</div><div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="display h2">Why 200?</div>
+  <div class="divider-list" style="margin-top:10px">
+    <div class="kv"><span class="k">You followed the plan</span><span class="v">27/28 days logged · activity on goal</span></div>
+    <div class="kv"><span class="k">Weight trend</span><span class="v">−0.2 lb/week (planned −0.7 to −1.3)</span></div>
+    <div class="kv"><span class="k">What that means</span><span class="v">Real deficit ≈ −250, not −450</span></div>
+    <div class="kv"><span class="k">Maintenance estimate</span><span class="delta"><s>2,117</s><span class="v">≈ 1,917</span></span></div>
+  </div>
+  <p class="t-sm ink2" style="margin-top:10px">Logs and wearables have margins of error; your results show the real balance. We suggest a modest step and recheck after 3 weeks.</p>
+</div>`;
+S['Q6-escalate'] = () => `
+${statusBar()}${nav('Home', 'Monthly Briefing')}
+<div class="content stack">
+  <div class="row between"><span class="eyebrow">Monthly · October</span><span class="t-xs muted">End of briefing</span></div>
+  <div class="coach"><span class="eyebrow purple">Coach’s Take · Month Ahead</span><p class="t-sm ink2" style="margin-top:8px">Fat is coming down slower than planned, and the leaning phase will likely pass its 6-week limit.</p></div>
+  <div class="card selected"><div class="row between"><span class="eyebrow amber">Needs a plan review</span></div>
+    <div class="display h3" style="margin-top:8px">Adjust energy and the phase end together</div>
+    <p class="t-sm ink2" style="margin-top:6px">This affects your phase limit, so it opens Your Plan with both changes ready. Small changes like last month’s stay in the briefing.</p>
+    <div class="btn primary" style="margin-top:12px">Review my plan ${I.arrow}</div></div>
+</div>`;
+
+;
+// ---------------------------------------------------------------------------
+// v3 screens, part B: evolving RMR / maintenance transparency, learned
+// training. Real today: DEXA-report RMR, RMR + active energy math, Training
+// Logger evidence. Concept: equation/lean-mass RMR between scans, outcome-
+// calibrated maintenance in production, learned weekly pattern.
+// ---------------------------------------------------------------------------
+const prov = (t, cls = '') => `<span class="prov ${cls}">${t}</span>`;
+
+S['M1-why-numbers'] = () => `<div style="height:874px;overflow:hidden;position:relative">${S['F4-energy']()}</div><div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="display h2">Why these numbers?</div>
+  <p class="t-sm ink2" style="margin-top:6px">Three layers. Only the last one is yours to approve.</p>
+  <div style="margin-top:12px">
+    <div class="layer"><div class="row between"><span class="t-sm strong">Resting energy</span>${prov('DEXA report · Oct 9', 'e')}</div><div class="row between" style="margin-top:4px"><span class="bigval" style="font-size:1.3em">≈ 1,790<small>kcal/day*</small></span></div><p class="t-xs muted" style="margin-top:4px">What your body uses at rest. Updates with body composition.</p></div>
+    <div class="layer"><div class="row between"><span class="t-sm strong">Maintenance</span>${prov('Learned from your results', 'm')}</div><div class="row between" style="margin-top:4px"><span class="bigval" style="font-size:1.3em">≈ 2,117<small>1,977–2,258</small></span></div><p class="t-xs muted" style="margin-top:4px">From what you logged and how your weight and scans changed, with your usual ≈ 800 activity included.</p></div>
+    <div class="layer" style="border-color:var(--teal)"><div class="row between"><span class="t-sm strong">Your targets</span>${prov('You approved')}</div><div class="t-body strong" style="margin-top:4px">Eat 1,767 · activity goal 900</div><p class="t-xs muted" style="margin-top:4px">Change only when you approve, here or in a briefing.</p></div>
+  </div>
+</div>`;
+
+S['M2-new-user'] = () => `
+${statusBar()}${navX('Daily Energy', 'Done')}
+<div class="content stack">
+  ${editorHead('Energy', 'How we start without a scan')}
+  <div class="layer"><div class="row between"><span class="t-sm strong">Resting energy</span>${prov('Estimate from your profile')}</div>
+    <div class="bigval" style="font-size:1.3em;margin-top:4px">≈ 1,850<small>1,700–2,000</small></div>
+    <p class="t-xs muted" style="margin-top:4px">From sex, age, height and weight. Read from Apple Health when available, so there’s nothing to fill in.</p></div>
+  <div class="layer"><div class="row between"><span class="t-sm strong">Maintenance</span>${prov('Provisional')}</div>
+    <div class="bigval" style="font-size:1.3em;margin-top:4px">≈ 2,750<small>2,450–3,050</small></div>
+    <p class="t-xs muted" style="margin-top:4px">Resting energy plus your usual activity and digestion. Narrows after about 3 weeks of logging and weigh-ins.</p></div>
+  <div class="card"><span class="eyebrow">Missing from Apple Health</span>
+    <div class="row between" style="margin-top:10px"><span class="t-body">Birth year</span><span class="numbox">1988 ✎</span></div>
+    <p class="t-xs muted" style="margin-top:8px">Only what’s missing is asked, once.</p></div>
+  <p class="t-xs muted">A DEXA or measured resting energy makes this sharper. Neither is required.</p>
+</div>`;
+
+S['M3-composition-changed'] = () => `
+${statusBar()}${nav('Your Plan', 'Daily Energy')}
+<div class="content stack">
+  ${bannerB('teal', 'info', 'Your estimates updated after the Nov 13 scan', 'Lean mass +1.3 lb, fat −2.4 lb. Your targets did not change.')}
+  <div class="card diff">
+    <div class="kv"><span class="k">Resting energy</span><span class="delta"><s>1,790</s><span class="v">1,812*</span></span></div>
+    <div class="kv"><span class="k">Maintenance</span><span class="delta"><s>1,917</s><span class="v">≈ 1,940 (1,860–2,020)</span></span></div>
+    <div class="kv"><span class="k">Your targets</span><span class="v">Eat 1,667 · goal 1,000 (unchanged)</span></div>
+  </div>
+  <p class="t-sm ink2">If the new estimates change what you should do, your next briefing will suggest it. Nothing changes without you.</p>
+  <span class="t-sm semi" style="color:var(--teal)">Why these numbers?</span>
+</div>`;
+
+// ---------------- Learned training -----------------
+const areaRows = (rows) => `<div class="areas">${rows.map(([a, f, w]) => `<span>${a}</span><div class="bar"><i style="width:${w}%"></i></div><b style="text-align:right">${f}</b>`).join('')}</div>`;
+S['T1-learned'] = () => `
+${statusBar()}${navX('Training')}
+<div class="content stack">
+  ${editorHead('Training', 'Learned from your recent workouts')}
+  <div class="card"><div class="row between"><span class="eyebrow">Your pattern</span>${prov('Observed · 6 weeks, 22 workouts', 'm')}</div>
+    <div class="t-body strong" style="margin-top:8px">≈ 4 workouts a week · usually Mon, Tue, Thu, Sat</div>
+    <div style="margin-top:12px">${areaRows([['Lower body', '2.0×/wk', 100], ['Arms', '1.5×/wk', 75], ['Back', '1.2×/wk', 60], ['Chest', '1.0×/wk', 50], ['Shoulders', '1.0×/wk', 50], ['Core', '0.7×/wk', 35]])}</div>
+    <p class="t-xs muted" style="margin-top:8px">Supersets count once per session. Weeks with no tracking are left out.</p></div>
+  <div class="card"><div class="row between"><span class="eyebrow">How it’s going</span>${prov('Comparable sessions', 'm')}</div>
+    <div class="kv"><span class="k">Improving</span><span class="v">9 lifts</span></div>
+    <div class="kv"><span class="k">Holding</span><span class="v">6 lifts</span></div>
+    <div class="kv"><span class="k">Slipping</span><span class="v">1 lift (incline press)</span></div></div>
+  <div class="card soft"><div class="row between"><span class="eyebrow purple">Coach suggestion · leaning phase</span></div>
+    <p class="t-sm ink2" style="margin-top:6px">Keep this pattern and hold your loads. Training hard is what protects lean mass while you eat less.</p></div>
+  <div class="card" style="padding:12px 16px"><div class="row between"><div><div class="t-body strong">Training goals ${opt()}</div><div class="t-sm ink2">None set. We follow what you do.</div></div><span class="t-sm semi" style="color:var(--teal)">Add</span></div></div>
+</div>`;
+
+S['T2-learning'] = () => `
+${statusBar()}${navX('Training')}
+<div class="content stack">
+  ${editorHead('Training', 'Learning your routine')}
+  <div class="card"><div class="row between"><span class="eyebrow">So far</span>${prov('3 workouts · 9 days')}</div>
+    <p class="t-body" style="margin-top:8px">Lower body, back and arms so far.</p>
+    <div class="bar" style="margin-top:12px"><i style="width:40%"></i></div>
+    <p class="t-xs muted" style="margin-top:8px">We’ll describe your weekly pattern after about 3 weeks and 6 workouts. Until then, nothing here affects your plan.</p></div>
+  <div class="card" style="padding:12px 16px"><div class="row between"><div><div class="t-body strong">Training goals ${opt()}</div><div class="t-sm ink2">Set a few now if you like.</div></div><span class="t-sm semi" style="color:var(--teal)">Add</span></div></div>
+</div>`;
+
+S['T3-travel-week'] = () => `
+${statusBar()}${navX('Training')}
+<div class="content stack">
+  ${editorHead('Training', 'Learned from your recent workouts')}
+  ${bannerB('teal', 'info', 'Last week: 1 workout', 'That looks like a break, not a new routine. Your usual pattern stays the same. If it continues for 3 weeks, we’ll update it.')}
+  <div class="card"><div class="row between"><span class="eyebrow">Your usual pattern</span>${prov('Observed · 6 weeks', 'm')}</div>
+    <div class="t-body strong" style="margin-top:8px">≈ 4 workouts a week</div>
+    <p class="t-xs muted" style="margin-top:6px">Days with no tracking at all are left out of the pattern.</p></div>
+</div>`;
+
+S['T4-goals'] = () => `<div style="height:874px;overflow:hidden;position:relative">${S['T1-learned']()}</div><div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="row between"><span class="t-body muted">Cancel</span><span class="t-body strong">Training goals</span><span class="t-body strong" style="color:var(--teal)">Save</span></div>
+  <p class="t-sm ink2" style="margin-top:12px">All optional. Leave blank and we’ll simply follow your workouts.</p>
+  <div class="card divider-list" style="margin-top:12px;padding:0 16px">
+    <div class="lrow"><div class="l">Focus areas</div><div class="r">Chest, Back ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Workouts a week</div><div class="r">4 ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Progression</div><div class="r">Conservative ${I.chev}</div></div>
+  </div>
+  <p class="t-xs muted" style="margin-top:10px">No split or day-by-day schedule needed.</p>
+</div>`;
+
+;
+// ---------------------------------------------------------------------------
+// v3 registry: focused board. Tags: NEW, UPDATED, Canonical today, New contract
+// (Phase C), Concept only.
+// ---------------------------------------------------------------------------
+const T = { canon: 'Canonical today', newc: 'New contract (Phase C)', concept: 'Concept only' };
+const SCREENS = {
+  'F1-options': { short: 'Options', title: 'Option B comparison (preserved)', desc: 'Accepted side-by-side choices. The recommended option is ranked first; every valid option stays choosable.', tags: ['Preserved'] },
+  'F2-setup': { short: 'Setup', title: 'Leaning setup: two decisions', desc: 'How the phase ends, and daily energy. Everything else carries forward; “Your plan” is one tap away for anyone who wants to customize early.', tags: ['UPDATED', T.newc] },
+  'F3-hub': { short: 'Plan hub', title: 'Approach A plan hub, simplified', desc: 'Two changing rows, then carried-forward strategies in one short list. Training shows what was learned; recovery, supplements, photos and DEXA read as optional.', tags: ['Preserved', 'UPDATED'] },
+  'F4-energy': { short: 'Energy', title: 'Daily energy on one screen (interactive)', desc: 'Pick the balance, then how: Suggested, Eat less, Move more, Blend or Custom. 1:1: eat = 2,117 + balance + extra activity. No weekly day-by-day split.', tags: ['UPDATED', 'Interactive', T.newc], energy: {} },
+  'F5-review': { short: 'Review', title: 'Review: only numbers that change', desc: 'Phase, end condition, balance, eat, activity goal and goal date. No prescribed walks or schedules.', tags: ['UPDATED'] },
+  'F6-stale': { short: 'Stale draft', title: 'Stale draft revalidated (generic)', desc: 'Any newer evidence or plan change refreshes derived numbers and shows the difference. Replaces the web-specific “edited elsewhere” screen.', tags: ['UPDATED', 'Revalidation'] },
+  'Q1-proposal': { short: 'Suggestion', title: 'Quick Calibration: balance first (interactive)', desc: 'At the end of the Weekly, after Coach’s Take: “Deepen your daily deficit by 200”. Then four equal choices: Eat less, Move more, Blend, Custom. Accept stays disabled until you choose how.', tags: ['NEW', 'Interactive', T.newc] },
+  'Q2-blend': { short: 'Blend', title: 'Quick Calibration: Blend selected (interactive)', desc: 'Eat 1,767 → 1,667 and activity goal 900 → 1,000: 100 + 100 = 200 deeper, 1:1. One tap to accept.', tags: ['NEW', 'Interactive'] },
+  'Q3-custom': { short: 'Custom', title: 'Quick Calibration: Custom (interactive)', desc: 'Two small inputs: eat less by and move more by. Starts at 150 + 50; any mix, checked against the floor and the quick-step limit.', tags: ['NEW', 'Interactive', 'Editable numbers'] },
+  'Q4-applied': { short: 'Applied', title: 'Plan updated inline', desc: 'Only the balance and its dependent targets change, in one approved write. View change and Undo. Three-week observation window before another suggestion.', tags: ['NEW'] },
+  'Q5-why': { short: 'Why', title: 'Why 200?', desc: 'You followed the plan; the result shows a real deficit near −250. Maintenance estimate refined 2,117 → ≈ 1,917.', tags: ['NEW', 'Explainability'] },
+  'Q6-escalate': { short: 'Escalate', title: 'When it needs the plan hub', desc: 'If the phase limit, goal date or guardrail is affected, the briefing opens Your Plan instead. Small compatible changes never do.', tags: ['NEW', 'Escalation'] },
+  'M1-why-numbers': { short: 'Why numbers', title: 'Three layers: resting energy → maintenance → your targets', desc: 'Resting energy (DEXA report estimate), maintenance learned from results, and the targets you approved. Only targets need approval.', tags: ['NEW', 'Explainability'] },
+  'M2-new-user': { short: 'No scan', title: 'Starting without a scan', desc: 'Provisional resting energy from sex, age, height and weight, read from Apple Health where possible; only missing fields are asked once. Wide range until results narrow it.', tags: ['NEW', T.concept] },
+  'M3-composition-changed': { short: 'Estimates updated', title: 'Body composition changed: estimates move, targets don’t', desc: 'A new scan updates resting energy and maintenance. Approved targets stay put; a briefing suggests a change only if it matters.', tags: ['NEW', T.concept] },
+  'T1-learned': { short: 'Learned', title: 'Learned from your recent workouts', desc: 'Observed pattern (frequency and usual days), how lifts are trending, a coach suggestion, and optional training goals. Clearly separated.', tags: ['NEW', T.concept] },
+  'T2-learning': { short: 'Learning', title: 'Still learning (few workouts)', desc: 'No pattern claimed until about 3 weeks and 6 workouts.', tags: ['NEW', 'Empty / missing evidence'] },
+  'T3-travel-week': { short: 'Break week', title: 'A light week isn’t a new routine', desc: 'One-off breaks don’t change the learned pattern; untracked days are left out.', tags: ['NEW'] },
+  'T4-goals': { short: 'Goals', title: 'Optional training goals', desc: 'Focus areas, workouts a week and progression, all optional. No split or day-by-day schedule.', tags: ['NEW', T.canon] },
+  'A1-activity': { short: 'Activity', title: 'Activity: one number', desc: 'Daily active-energy goal with a short, non-prescriptive example. Source shown as “Activity data · Apple Health”.', tags: ['UPDATED'] },
+  'A2-no-wearable': { short: 'No data', title: 'No activity data', desc: 'Plan without activity data (eating carries the balance), or connect Apple Health. No unsupported device claims.', tags: ['NEW', 'Empty / missing evidence'] },
+  'R1-recovery': { short: 'Recovery', title: 'Recovery priorities + optional sleep goal', desc: 'Existing priorities, add your own, and an optional sleep goal.', tags: ['UPDATED'] },
+  'R2-add-priority': { short: 'Add priority', title: 'Add a recovery priority', desc: 'Pick stretching, mobility or your own; frequency and reminder optional.', tags: ['NEW', T.concept] },
+  'R3-sleep-goal': { short: 'Sleep goal', title: 'Optional sleep goal', desc: 'One number, with your recent average for reference.', tags: ['NEW', T.concept] },
+  'S1-supplements': { short: 'Supplements', title: 'Supplements', desc: 'List with add and edit. No recommendations or dose advice.', tags: ['UPDATED', T.canon] },
+  'S2-add-supplement': { short: 'Add', title: 'Add a supplement', desc: 'Name, optional amount, how often and reminder.', tags: ['NEW', T.canon] },
+  'P1-photos-dexa': { short: 'Photos & DEXA', title: 'Progress photos and DEXA, both optional', desc: 'Toggle photos and reminders; schedule a scan only if you want one.', tags: ['UPDATED', T.canon] },
+};
+
+const SECTIONS = [
+  { group: 'Start here', items: [
+    { key: 'principle', badge: 'NEW', title: 'Simplicity with sophistication: what changed', render: () => principleView() },
+    { key: 'audit', badge: 'NEW', title: 'Source audit: what exists, what’s missing', render: () => auditView() },
+  ] },
+  { group: 'Founder scenario', items: [
+    { key: 'scenario', title: 'Option B → leaning setup → plan hub → energy → review', note: 'The shortest path for the Founder’s Oct 9 situation. Two decisions, one review, one approval.', flow: ['#F1-options', '→', '#F2-setup', '→', '#F4-energy', '→', '#F5-review', '·', 'optional', '→', '#F3-hub'], screens: ['F1-options', 'F2-setup', 'F3-hub', 'F4-energy', 'F5-review', 'F6-stale'] },
+  ] },
+  { group: 'Quick Calibration', items: [
+    { key: 'qc', badge: 'UPDATED', title: 'Quick Calibration: balance first, then how', note: 'Four weeks into leaning, logging and activity on plan, weight trend −0.2 lb/week. The Weekly ends with one suggestion. Try the tiles on Q1–Q3.', flow: ['Weekly (end)', '→', '#Q1-proposal', '→', '#Q2-blend', '→', '#Q4-applied', '·', '#Q5-why', '·', '#Q6-escalate'], screens: ['Q1-proposal', 'Q2-blend', 'Q3-custom', 'Q4-applied', 'Q5-why', 'Q6-escalate'] },
+  ] },
+  { group: 'Intelligence behind the scenes', items: [
+    { key: 'rmr', badge: 'NEW', title: 'Evolving resting energy and maintenance', note: 'Estimates evolve on their own; your targets never change without you.', screens: ['M1-why-numbers', 'M2-new-user', 'M3-composition-changed'] },
+    { key: 'training', badge: 'NEW', title: 'Training learned from the Logger', note: 'Observed pattern, user goals and coach suggestions are kept separate. No mandatory split.', screens: ['T1-learned', 'T2-learning', 'T3-travel-week', 'T4-goals'] },
+  ] },
+  { group: 'Simplified plan', items: [
+    { key: 'editors', badge: 'UPDATED', title: 'Optional, easy-to-customize strategies', note: 'Activity is one number; recovery, sleep, supplements, photos and DEXA are optional and quick to adjust.', screens: ['A1-activity', 'A2-no-wearable', 'R1-recovery', 'R2-add-priority', 'R3-sleep-goal', 'S1-supplements', 'S2-add-supplement', 'P1-photos-dexa'] },
+  ] },
+  { group: 'For the Founder', items: [
+    { key: 'decisions', badge: 'NEW', title: 'Decisions still open', render: () => decisionsView() },
+    { key: 'index', title: 'Visual index', render: () => indexView() },
+  ] },
+];
+
+function linkScreens(text) {
+  return text.replace(/\b(F[1-6]|Q[1-6]|M[1-3]|T[1-4]|A[12]|R[1-3]|S[12]|P1)\b/g, (m) => {
+    const id = Object.keys(SCREENS).find((k) => k.split('-')[0] === m);
+    return id ? `<a href="#p-${id}">${m}</a>` : m;
+  });
+}
+
+function principleView() {
+  const rows = [
+    ['Quick Calibration', '“Eat 150 less” (intake only)', 'Balance first (“deepen by 200”), then Eat less · Move more · Blend · Custom, equal weight, 1:1 (Q1–Q3)'],
+    ['Energy editor', 'Two steps plus a weekly day-by-day split', 'One screen: balance + how; daily targets are averages, the week’s outcome matters (F4)'],
+    ['Activity', 'Session type, length, count and days', 'One number plus an optional example; any activity counts (A1)'],
+    ['Wearables', 'Apple Watch wording', '“Activity data · Apple Health”; no-data route; no device claims (A1, A2)'],
+    ['Resting energy and maintenance', 'Fixed maintenance from one calibration', 'Evolving estimates with sources; targets change only with approval (M1–M3)'],
+    ['Training', 'Configure frequency per area, split optional concept', 'Learned from the Logger; goals optional (T1–T4)'],
+    ['Recovery, sleep, supplements', 'Fixed lists; sleep concept-only', 'Add your own priority, optional sleep goal, add supplements (R1–R3, S1, S2)'],
+    ['Photos and DEXA', 'Inside a large Coaching Updates editor', 'Both optional on one small screen (P1)'],
+    ['Conflicts', '“Edited on the web” merge screen', 'Generic stale-draft revalidation (F6)'],
+    ['Review', 'Included prescribed walks', 'Only numbers that change (F5)'],
+    ['Kept', 'Option B comparison · Approach A plan hub · 1:1 arithmetic · recommendation last in briefings · no automatic resumption · guardrail/phase/deadline behaviour', 'Unchanged'],
+  ];
+  return `<p class="note">The engine does the work; you see only the decisions that matter. Everything below the line of “what you approve” (resting energy, maintenance, learned training) updates on its own and explains itself in one tap. What you approve (targets, phase, limits) never changes without you.</p>
+  <div class="tw"><table class="cov" style="min-width:860px"><tr><th>Area</th><th>Before (prior boards)</th><th>Now (V3)</th></tr>${rows.map((r) => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${linkScreens(r[2])}</td></tr>`).join('')}</table></div>`;
+}
+
+function auditView() {
+  const rmr = [
+    ['DEXA-report resting energy, stored per scan, editable', 'Exists', 'PdfInterpreter.js:191-223 · dexaScan.js:39'],
+    ['Expenditure = DEXA resting energy + Apple Health active energy', 'Exists (all briefings, Energy Evidence)', 'EnergyDailyReconciliationService.js:119-152'],
+    ['Source type for resting energy (measured / DEXA report / equation)', 'Missing (labelled “dexa”)', 'CadenceEnergyAssessmentService.js:238-257'],
+    ['Equation or lean-mass resting energy; updates between scans', 'Missing', 'no Mifflin / Katch / Cunningham code'],
+    ['Apple Health basal energy', 'Missing (Watch live display only)', 'WatchWorkoutHealthController.swift'],
+    ['Maintenance learned from outcomes', 'Dormant only (Phase B 99f11ae6)', 'EnergyCalibrationV1.js'],
+    ['Estimate vs weight-outcome check', 'Exists, narrative only', 'CadenceEnergyObservationsV3.js:378-401'],
+    ['Sex and age for a provisional estimate', 'Missing (fields null, not collected)', 'models/user.js:16-21'],
+    ['Fitbit or other connectors', 'Missing (Apple Health only; manual entry exists)', 'HealthKitTypeRegistry.swift'],
+    ['Approved intake and activity targets', 'Exists (user_required, no auto-adjust)', 'PhaseEstablishmentService.js:5-17'],
+  ];
+  const tr = [
+    ['Usual training days (any workout)', 'Exists in briefings', 'BriefingIntelligence.js:140-160'],
+    ['Missed-run and frequency-change detection', 'Exists (not per area)', 'BriefingIntelligence.js:274-321'],
+    ['Per-lift trends, PRs, best set, volume; variant + superset aware', 'Exists', 'TrainingPerformanceIntelligenceService.js'],
+    ['Supersets not double-counted', 'Exists', 'trainingExerciseRelationship.js'],
+    ['Exercise → 11 muscle groups', 'Exists', 'trainingNavigationMapping.js:144-264'],
+    ['11 muscle groups → 6 plan areas', 'Missing', '—'],
+    ['Learned weekly frequency per area', 'Missing', '—'],
+    ['Planned vs observed comparator', 'Dormant (production passes null; week-start and vocabulary bugs)', 'MonthlyEvidenceIntelligenceV3.js:393-440'],
+    ['Travel or deload marker', 'Missing (untracked days excluded)', 'BriefingIntelligence.js:548-553'],
+  ];
+  const gaps = [
+    ['Quick Calibration write', 'Single-target, dependent-target atomic update with recommendation id (idempotent), revalidation fingerprint and version provenance', 'Phase C coordinator'],
+    ['Maintenance estimate in production', 'Promote Phase B EnergyCalibrationV1 (dormant) with ranges; reconcile with RMR + active', 'Phase B → C'],
+    ['Resting-energy source and between-scan estimate', 'Source type enum; lean-mass equation from last scan + weight trend; ± range', 'New'],
+    ['Profile for provisional estimate', 'Read Apple Health sex, birth date, height, body mass (new permissions); store; ask only what’s missing', 'New (Native + Server)'],
+    ['Learned training per area', '11→6 mapping; per-area weekly learner (Monday weeks, 4–8 week window, ≥3 weeks and ≥6 workouts); wire planned vs observed', 'New'],
+    ['Recovery priorities and sleep goal', 'Custom recovery items through existing recurring support; sleep goal field', 'Partial (support exists) + new field'],
+    ['Activity data abstraction', 'Source-neutral activity_day already exists; connector interface for other sources later', 'Later'],
+  ];
+  const table = (rows, h) => `<div class="tw"><table class="cov" style="min-width:760px"><tr>${h.map((x) => `<th>${x}</th>`).join('')}</tr>${rows.map((r) => `<tr>${r.map((c, i) => `<td${i === 1 ? ` class="${/^Exists/.test(c) ? 'st-canon' : /Dormant|Partial|narrative/.test(c) ? 'st-partial' : 'st-concept'}"` : ''}>${i === 2 ? `<code style="font-size:12px">${c}</code>` : c}</td>`).join('')}</tr>`).join('')}</table></div>`;
+  return `<p class="note">Read from the release commits: Server production <code>85a98025</code>, Native Build 94 <code>49829781</code>, and the dormant Phase B candidate <code>99f11ae6</code>. The design reuses what exists and names every gap.</p>
+  <h3 style="margin:0 0 10px">Resting energy, maintenance and activity data</h3>${table(rmr, ['Capability', 'Status', 'Source'])}
+  <h3 style="margin:22px 0 10px">Training intelligence</h3>${table(tr, ['Capability', 'Status', 'Source'])}
+  <h3 style="margin:22px 0 10px">Backend contract gaps for this design</h3><div class="tw"><table class="cov" style="min-width:760px"><tr><th>Gap</th><th>What’s needed</th><th>Where</th></tr>${gaps.map((g) => `<tr><td><b>${g[0]}</b></td><td>${g[1]}</td><td>${g[2]}</td></tr>`).join('')}</table></div>`;
+}
+
+function decisionsView() {
+  const d = [
+    ['Provisional resting energy without a scan', 'Needs sex and age, which the app doesn’t have. OK to read them (plus height and weight) from Apple Health with a new permission, and ask only for what’s missing (M2)?'],
+    ['Resting energy between scans', 'Estimate it from your last scan’s lean mass and your weight trend (smooth, with a range), or keep the last DEXA value until the next scan (M3)?'],
+    ['Quick Calibration choice', 'Four equal options with none preselected (as drawn), or preselect the option you chose last time (Q1)?'],
+    ['Learned training areas', 'When a lift works more than one area (for example, pull-ups), count it for the main area only, or for both (T1)?'],
+  ];
+  return `<div class="dec">${d.map(([t, b], i) => `<div><b>${i + 1}. ${t}.</b> ${linkScreens(b)}</div>`).join('')}</div>
+  <p class="note" style="margin-top:14px">Provisional values that stay as they are unless you say otherwise: intake floor 25% below maintenance, +500 extra-activity cap, ±300 quick-step limit, 3-week observation window.</p>`;
+}
+
+function indexView() {
+  return `<p class="note">Every screen on this board. Click to jump; click a phone to enlarge (← → to step, T switches theme, Esc closes).</p>
+  <div class="idx">${Object.keys(SCREENS).map((id) => `<a href="#p-${id}"><div class="mini">${phoneHtml(id, 'dark')}</div><b>${id.split('-')[0]}</b> ${SCREENS[id].short}</a>`).join('')}</div>`;
+}
+
+function boardIntro() {
+  return `<div class="hero-b"><div class="kick">Goal Adaptation · V3 · design only</div>
+  <h1>Simple on the surface, smart underneath</h1>
+  <p class="lead">A focused revision. Quick Calibration now suggests a change to your daily balance and lets you choose how: eat less, move more, blend or custom, all 1:1. Resting energy and maintenance evolve as your body changes, and your training pattern is learned from the Logger, so the plan needs fewer settings. Option B and the Approach A plan hub are unchanged.</p>
+  <div class="stats">
+    <div class="stat"><b>${Object.keys(SCREENS).length}</b><span>focused screens, Dark and Mineral Light</span></div>
+    <div class="stat"><b>2</b><span>decisions in the default leaning setup</span></div>
+    <div class="stat"><b>4</b><span>equal ways to apply a calibration</span></div>
+    <div class="stat"><b>1:1</b><span>activity accounting everywhere</span></div>
+    <div class="stat"><b>4</b><span>decisions still open</span></div>
+  </div>
+  <p class="lead" style="font-size:13.5px">Markers: <span class="tag newb">NEW</span> · <span class="tag upd">UPDATED</span> · <span class="tag state">Preserved</span> · <span class="tag canon">Canonical today</span> · <span class="tag new">New contract (Phase C)</span> · <span class="tag concept">Concept only</span>. Founder maintenance ≈ 2,117 is from the Phase B candidate; values marked * are illustrative.</p></div>`;
+}
+
+;
+// ---------------------------------------------------------------------------
+// Board renderer: sections, theme filter, search, click-to-enlarge, index.
+// Depends on: S (screen templates), SCREENS (registry), SECTIONS, COVERAGE,
+// boardIntro(), comparisonView(), decisionsView(), contractView().
+// ---------------------------------------------------------------------------
+const tagHtml = (t) => {
+  const cls = t === 'NEW' ? 'newb' : /^UPDATED/.test(t) ? 'upd' : t === 'Canonical today' ? 'canon' : /^New contract/.test(t) ? 'new' : /concept/i.test(t) ? 'concept' : 'state';
+  return `<span class="tag ${cls}">${t}</span>`;
+};
+const phoneHtml = (id, theme, extra = '') => {
+  const sc = SCREENS[id];
+  const energy = sc.energy ? ` data-energy data-split="${sc.energy.split || 'suggested'}"` : '';
+  return `<div class="phone ${theme} ${sc.xl ? 'xl' : ''}"${energy} data-capture="${id}-${theme}" ${extra}>${S[id]()}</div>`;
+};
+function shotHtml(id) {
+  const sc = SCREENS[id];
+  const search = (id + ' ' + sc.title + ' ' + sc.desc + ' ' + (sc.tags || []).join(' ')).toLowerCase().replace(/"/g, '');
+  return `<div class="item" id="p-${id}" data-id="${id}" data-search="${search}">
+    <div class="meta"><div class="id">${id.split('-')[0]} · ${sc.short}</div><div class="ttl">${sc.title}</div><div class="desc">${sc.desc}</div><div class="tags">${(sc.tags || []).map(tagHtml).join('')}</div></div>
+    <div class="pair">
+      <div class="shot phone-dark-wrap" tabindex="0" role="button" aria-label="Enlarge ${id} in Dark" data-open="${id}" data-theme="dark"><p class="cap">Dark</p><div class="frame">${phoneHtml(id, 'dark')}</div></div>
+      <div class="shot phone-light-wrap" tabindex="0" role="button" aria-label="Enlarge ${id} in Mineral Light" data-open="${id}" data-theme="light"><p class="cap">Mineral Light</p><div class="frame">${phoneHtml(id, 'light')}</div></div>
+    </div></div>`;
+}
+function flowHtml(flow) {
+  if (!flow) return '';
+  return `<div class="flowline">${flow.map((step, i) => (step === '→' || step === '·' ? `<span class="a">${step === '·' ? '|' : '→'}</span>` : step.startsWith('#') ? `<a class="n" href="#p-${step.slice(1)}"><b>${step.slice(1).split('-')[0]}</b>${SCREENS[step.slice(1)]?.short ?? ''}</a>` : `<span class="n">${step}</span>`)).join('')}</div>`;
+}
+function render() {
+  const nav = [];
+  const body = [];
+  body.push(boardIntro());
+  for (const group of SECTIONS) {
+    nav.push(`<h4>${group.group}</h4>`);
+    for (const sec of group.items) {
+      const count = sec.screens ? sec.screens.length : '';
+      const badge = sec.badge ? ` <span class="tag ${sec.badge === 'NEW' ? 'newb' : 'upd'}">${sec.badge}</span>` : '';
+      nav.push(`<a class="navlink" href="#${sec.key}" data-nav="${sec.key}"><span>${sec.title}${badge}</span><small>${count}</small></a>`);
+      const inner = sec.render ? sec.render() : `${flowHtml(sec.flow)}<div class="grid">${sec.screens.map((id) => shotHtml(id)).join('')}</div>`;
+      body.push(`<section class="sec" id="${sec.key}" data-sec><h2>${sec.title}${badge}</h2>${sec.note ? `<p class="note">${sec.note}</p>` : ''}${inner}</section>`);
+    }
+  }
+  document.getElementById('side').innerHTML = nav.join('');
+  document.getElementById('main').innerHTML = body.join('');
+  document.querySelectorAll('[data-energy]').forEach(energyRefresh);
+  document.querySelectorAll('[data-qcv3]').forEach(qcRefresh);
+}
+
+// theme filter
+function setShow(mode) {
+  document.body.dataset.show = mode;
+  document.querySelectorAll('[data-show-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.showBtn === mode)));
+  try { localStorage.setItem('opd-show', mode); } catch (e) { /* storage unavailable */ }
+}
+function setBoardTheme(mode) {
+  if (mode === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = mode;
+  document.querySelectorAll('[data-board-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.boardBtn === mode)));
+}
+// search
+function applySearch(q) {
+  q = q.trim().toLowerCase();
+  document.querySelectorAll('.item[data-search]').forEach((el) => el.classList.toggle('hide', !!q && !el.dataset.search.includes(q)));
+  document.querySelectorAll('[data-sec]').forEach((sec) => {
+    const items = sec.querySelectorAll('.item[data-search]');
+    if (!items.length) { sec.classList.toggle('hide', !!q); return; }
+    sec.classList.toggle('hide', !!q && [...items].every((p) => p.classList.contains('hide')));
+  });
+}
+// lightbox
+let lbList = [], lbPos = 0, lbTheme = 'dark';
+function openLb(id, theme) {
+  lbList = [...document.querySelectorAll('.item[data-id]')].filter((p) => !p.classList.contains('hide')).map((p) => p.dataset.id);
+  lbPos = Math.max(0, lbList.indexOf(id));
+  lbTheme = theme;
+  drawLb();
+  document.getElementById('lb').classList.add('open');
+  document.getElementById('lb-close').focus();
+}
+function drawLb() {
+  const id = lbList[lbPos];
+  const sc = SCREENS[id];
+  document.getElementById('lb-stage').innerHTML = phoneHtml(id, lbTheme);
+  document.getElementById('lb-info').innerHTML = `<div class="kick">${id} · ${lbTheme === 'light' ? 'Mineral Light' : 'Dark'} · ${lbPos + 1} / ${lbList.length}</div><h3>${sc.title}</h3><p>${sc.desc}</p><div class="tags">${(sc.tags || []).map(tagHtml).join('')}</div>${sc.notes ? `<p style="margin-top:12px">${sc.notes}</p>` : ''}`;
+  const st = document.getElementById('lb-stage').querySelector('[data-energy]');
+  if (st) energyRefresh(st);
+  const qs = document.getElementById('lb-stage').querySelector('[data-qcv3]');
+  if (qs) qcRefresh(qs);
+}
+function closeLb() { document.getElementById('lb').classList.remove('open'); }
+document.addEventListener('click', (ev) => {
+  if (ev.target.closest('input, label, button, [data-split], [data-step], [data-qopt], [data-qstep]')) return;
+  const open = ev.target.closest('[data-open]');
+  if (open) { openLb(open.dataset.open, open.dataset.theme); return; }
+  if (ev.target.id === 'lb') closeLb();
+});
+document.addEventListener('keydown', (ev) => {
+  const lb = document.getElementById('lb');
+  if (lb.classList.contains('open')) {
+    if (ev.key === 'Escape') closeLb();
+    if (ev.key === 'ArrowRight') { lbPos = (lbPos + 1) % lbList.length; drawLb(); }
+    if (ev.key === 'ArrowLeft') { lbPos = (lbPos - 1 + lbList.length) % lbList.length; drawLb(); }
+    if (ev.key.toLowerCase() === 't') { lbTheme = lbTheme === 'dark' ? 'light' : 'dark'; drawLb(); }
+    return;
+  }
+  if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.closest?.('[data-open]')) { ev.preventDefault(); const o = ev.target.closest('[data-open]'); openLb(o.dataset.open, o.dataset.theme); }
+});
+// active section highlight
+const io = new IntersectionObserver((entries) => {
+  entries.forEach((e) => { if (e.isIntersecting) document.querySelectorAll('.navlink').forEach((a) => a.classList.toggle('on', a.dataset.nav === e.target.id)); });
+}, { rootMargin: '-30% 0px -60% 0px' });
+
+document.addEventListener('DOMContentLoaded', () => {
+  render();
+  document.querySelectorAll('[data-sec]').forEach((s) => io.observe(s));
+  let saved = 'both';
+  try { saved = localStorage.getItem('opd-show') || 'both'; } catch (e) { /* storage unavailable */ }
+  setShow(saved);
+  document.querySelectorAll('[data-show-btn]').forEach((b) => b.addEventListener('click', () => setShow(b.dataset.showBtn)));
+  document.querySelectorAll('[data-board-btn]').forEach((b) => b.addEventListener('click', () => setBoardTheme(b.dataset.boardBtn)));
+  document.getElementById('q').addEventListener('input', (e) => applySearch(e.target.value));
+  document.getElementById('lb-close').addEventListener('click', closeLb);
+  document.getElementById('lb-prev').addEventListener('click', () => { lbPos = (lbPos - 1 + lbList.length) % lbList.length; drawLb(); });
+  document.getElementById('lb-next').addEventListener('click', () => { lbPos = (lbPos + 1) % lbList.length; drawLb(); });
+  document.getElementById('lb-theme').addEventListener('click', () => { lbTheme = lbTheme === 'dark' ? 'light' : 'dark'; drawLb(); });
+});
+
+</script>

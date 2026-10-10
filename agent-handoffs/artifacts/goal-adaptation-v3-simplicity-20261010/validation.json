@@ -1,0 +1,168 @@
+{
+  "views": {
+    "desktop-1600-dark": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 1,
+      "lightboxOpens": true
+    },
+    "desktop-1600-light": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 1,
+      "lightboxOpens": true
+    },
+    "laptop-1280-dark": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 1,
+      "lightboxOpens": null
+    },
+    "mobile-390-light": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 1,
+      "lightboxOpens": null
+    }
+  },
+  "energy": {
+    "energyDefault": {
+      "balance": "−450",
+      "eat": "1,767",
+      "goal": "900",
+      "added": "+100",
+      "formula": "2,117 − 450 + 100 = 1,767",
+      "rate": "≈ 0.7–1.3 lb/week loss",
+      "range": "−591 to −310",
+      "notes": ""
+    },
+    "split_eat": {
+      "balance": "−450",
+      "eat": "1,667",
+      "goal": "800",
+      "added": "+0",
+      "formula": "2,117 − 450 + 0 = 1,667",
+      "rate": "≈ 0.7–1.3 lb/week loss",
+      "range": "−591 to −310",
+      "notes": ""
+    },
+    "split_move": {
+      "balance": "−450",
+      "eat": "2,117",
+      "goal": "1,250",
+      "added": "+450",
+      "formula": "2,117 − 450 + 450 = 2,117",
+      "rate": "≈ 0.7–1.3 lb/week loss",
+      "range": "−591 to −310",
+      "notes": "You’d eat at or above maintenance and rely on +450 of extra activity every day for the whole deficit."
+    },
+    "split_blend": {
+      "balance": "−450",
+      "eat": "1,892",
+      "goal": "1,025",
+      "added": "+225",
+      "formula": "2,117 − 450 + 225 = 1,892",
+      "rate": "≈ 0.7–1.3 lb/week loss",
+      "range": "−591 to −310",
+      "notes": ""
+    },
+    "split_suggested": {
+      "balance": "−450",
+      "eat": "1,767",
+      "goal": "900",
+      "added": "+100",
+      "formula": "2,117 − 450 + 100 = 1,767",
+      "rate": "≈ 0.7–1.3 lb/week loss",
+      "range": "−591 to −310",
+      "notes": ""
+    },
+    "customEat1800": {
+      "balance": "−450",
+      "eat": "1,800",
+      "goal": "933",
+      "added": "+133",
+      "formula": "2,117 − 450 + 133 = 1,800",
+      "rate": "≈ 0.7–1.3 lb/week loss",
+      "range": "−591 to −310",
+      "notes": ""
+    },
+    "floorAt750": {
+      "balance": "−517 limited",
+      "eat": "1,600",
+      "goal": "800",
+      "added": "+0",
+      "formula": "2,117 − 517 + 0 = 1,600",
+      "rate": "≈ 0.8–1.4 lb/week loss",
+      "range": "−658 to −377",
+      "notes": "Eating is held at 1,600 (provisional floor, 25% below maintenance). Add activity or choose a smaller deficit."
+    },
+    "qcNone": {
+      "opt": "",
+      "eat": "1,767",
+      "goal": "900",
+      "balance": "−650",
+      "accept": "Choose how to add 200",
+      "msgs": ""
+    },
+    "qc_eat": {
+      "opt": "eat",
+      "eat": "1,567",
+      "goal": "900",
+      "balance": "−650",
+      "accept": "Accept: eat 1,567 · goal 900",
+      "msgs": ""
+    },
+    "qc_move": {
+      "opt": "move",
+      "eat": "1,767",
+      "goal": "1,100",
+      "balance": "−650",
+      "accept": "Accept: eat 1,767 · goal 1,100",
+      "msgs": ""
+    },
+    "qc_blend": {
+      "opt": "blend",
+      "eat": "1,667",
+      "goal": "1,000",
+      "balance": "−650",
+      "accept": "Accept: eat 1,667 · goal 1,000",
+      "msgs": ""
+    },
+    "qcBlendScreen": {
+      "opt": "blend",
+      "eat": "1,667",
+      "goal": "1,000",
+      "balance": "−650",
+      "accept": "Accept: eat 1,667 · goal 1,000",
+      "msgs": ""
+    },
+    "qcCustomDefault": {
+      "opt": "custom",
+      "eat": "1,617",
+      "goal": "950",
+      "balance": "−650",
+      "accept": "Accept: eat 1,617 · goal 950",
+      "msgs": ""
+    },
+    "qcCustomTooBig": {
+      "opt": "custom",
+      "eat": "1,367",
+      "goal": "950",
+      "balance": "−900",
+      "accept": "Review in your plan",
+      "msgs": "Eating can’t go below 1,450 (provisional floor).\nChanges over 300 a day go to a full plan review."
+    },
+    "remnants": {
+      "visible75pct": 0,
+      "source75pct": 0,
+      "credit": 0,
+      "weeklySplitEditor": 0,
+      "prescribedWalks": 0,
+      "fitbitClaims": 1,
+      "editedElsewhere": 2
+    },
+    "errors": []
+  },
+  "screens": 54,
+  "screenErrors": []
+}
