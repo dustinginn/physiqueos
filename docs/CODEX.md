@@ -4,6 +4,8 @@
 
 PhysiqueOS agent tasks and completion handoffs may be transported through `agent-handoffs/`. Read `agent-handoffs/README.md` (on `origin/main`) for the protocol. When explicitly told to read the latest GitHub task, consume `agent-handoffs/inbox/latest.json` and its prompt before acting. At completion, publish the sanitized handoff according to the protocol. `agent-handoffs/latest.json` / `latest.md` are the accepted Native release authority: non-release tasks publish only a timestamped report and leave them unchanged (`agent-handoffs/RELEASE_AUTHORITY.md`).
 
+**Standing rule for every new coder chat:** read the `Standing completion rule — every coder session` section of `agent-handoffs/README.md` on `origin/main` before starting. A task is not complete until its sanitized report is published under `agent-handoffs/reports/` on `origin/main` and the agent returns the main publication SHA and direct report URL. A report on a work branch alone does not count. Preserve accepted Native release pointers as defined in `agent-handoffs/RELEASE_AUTHORITY.md`.
+
 ## Purpose
 
 You are contributing to PhysiqueOS.
