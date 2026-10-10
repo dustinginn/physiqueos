@@ -1,0 +1,28 @@
+// Unit tests for guardrail-model.js. Usage: node guardrail-model.test.mjs
+import fs from 'node:fs'; import vm from 'node:vm'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
+const dir = path.dirname(fileURLToPath(import.meta.url));
+const ctx = { module: { exports: {} } }; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(dir, 'guardrail-model.js'), 'utf8'), ctx);
+const G = ctx.module.exports; const r = []; const eq = (n, got, want) => r.push({ name: n, pass: JSON.stringify(got) === JSON.stringify(want), got, want });
+const goal = { enabled: true, min: 8, max: 9 }; const base = { goal, phase: null };
+eq('keep → unchanged', G.grPropose(base, { mode: 'keep' }), { goal, phase: null });
+eq('change phase-only → goal kept, phase override', G.grPropose(base, { mode: 'change', min: 8, max: 10, scope: 'phase' }), { goal, phase: { enabled: true, min: 8, max: 10, scope: 'phase' } });
+eq('change goal → goal replaced, no override', G.grPropose(base, { mode: 'change', min: 8, max: 10, scope: 'goal' }), { goal: { enabled: true, min: 8, max: 10 }, phase: null });
+eq('remove goal → disabled', G.grPropose(base, { mode: 'remove', scope: 'goal' }).goal.enabled, false);
+eq('remove phase → goal kept, phase disabled', [G.grPropose(base, { mode: 'remove', scope: 'phase' }).goal.max, G.grPropose(base, { mode: 'remove', scope: 'phase' }).phase.enabled], [9, false]);
+eq('text', [G.grText(goal), G.grText({ enabled: false }), G.grText({ enabled: true, min: 8, max: 11.5 })].map((x) => x.replace(/\u2060/g, '')), ['8–9%', 'None', '8–11.5%']);
+const v = (ctx2, e) => G.grValidate(ctx2, e, G.grPropose(base, e));
+eq('inverted range error', v({ kind: 'lean', bodyFat: 9.7, target: 9 }, { mode: 'change', min: 10, max: 9.5, scope: 'phase' }).ok, false);
+eq('lean target above guardrail max → error', v({ kind: 'lean', bodyFat: 9.7, target: 9.5 }, { mode: 'keep' }).ok, false);
+eq('lean target 9.0 within 8–9 → ok', v({ kind: 'lean', bodyFat: 9.7, target: 9 }, { mode: 'keep' }).ok, true);
+eq('lean target ≥ current body fat → error', v({ kind: 'lean', bodyFat: 9.7, target: 9.7 }, { mode: 'change', min: 8, max: 10, scope: 'phase' }).ok, false);
+eq('lean target 9.5 with phase guardrail 8–10 → ok', v({ kind: 'lean', bodyFat: 9.7, target: 9.5 }, { mode: 'change', min: 8, max: 10, scope: 'phase' }).ok, true);
+eq('keep building at 9.7% with firm 8–9 → incompatible', v({ kind: 'keepBuilding', bodyFat: 9.7 }, { mode: 'keep' }).ok, false);
+eq('keep building with 8–11.5 → ok', v({ kind: 'keepBuilding', bodyFat: 9.7 }, { mode: 'change', min: 8, max: 11.5, scope: 'phase' }).ok, true);
+eq('keep building with guardrail removed for phase → ok + warning', [v({ kind: 'keepBuilding', bodyFat: 9.7 }, { mode: 'remove', scope: 'phase' }).ok, v({ kind: 'keepBuilding', bodyFat: 9.7 }, { mode: 'remove', scope: 'phase' }).warnings.length > 0], [true, true]);
+eq('resume at 8.9% with goal 8–9 → ok', v({ kind: 'resume', bodyFat: 8.9 }, { mode: 'keep' }).ok, true);
+eq('resume at 8.9% with new goal 7–8.5 → incompatible', v({ kind: 'resume', bodyFat: 8.9 }, { mode: 'change', min: 7, max: 8.5, scope: 'goal' }).ok, false);
+eq('out of bounds 3–9 → error', v({ kind: 'lean', bodyFat: 9.7, target: 9 }, { mode: 'change', min: 3, max: 9, scope: 'goal' }).ok, false);
+const failed = r.filter((x) => !x.pass);
+fs.writeFileSync(path.join(dir, 'guardrail-model.test-results.json'), JSON.stringify(r, null, 2));
+console.log(`${r.length - failed.length}/${r.length} guardrail checks passed`); failed.forEach((f) => console.log('FAIL', f.name, JSON.stringify(f.got), JSON.stringify(f.want)));
+process.exitCode = failed.length ? 1 : 0;

@@ -464,6 +464,54 @@ if (typeof module !== 'undefined') module.exports = { ENERGY_SCENARIOS, RMR_SOUR
 
 ;
 // ---------------------------------------------------------------------------
+// Body-fat guardrail model for the Goal Adaptation simulator (simulation only).
+// Two scopes, kept separate:
+//   goal  — the overarching goal's guardrail (applies across phases, goes forward)
+//   phase — a temporary override for the current/next phase only; it expires
+//           when that phase ends and the goal guardrail applies again.
+// A leaning phase's completion target ("phase ends at ≤ X%") is a different
+// thing again: it is the phase objective, not a guardrail.
+// ---------------------------------------------------------------------------
+const GR_LIMITS = { min: 4, max: 20, gap: 0.5, step: 0.5 };
+const grFmt = (v) => (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, '');
+const WJ = '\u2060'; // word joiner: keeps a range like 8–9% on one line
+function grText(g) { return g && g.enabled !== false ? `${grFmt(g.min)}${WJ}–${WJ}${grFmt(g.max)}%` : 'None'; }
+function grEffective(goal, phase) { return phase || goal; }
+function grSame(a, b) { if (!a || !b) return a === b; if ((a.enabled === false) || (b.enabled === false)) return (a.enabled === false) === (b.enabled === false); return a.min === b.min && a.max === b.max; }
+
+// edit: { mode: 'keep' | 'change' | 'remove', min, max, scope: 'phase' | 'goal' }
+// base: { goal, phase } guardrails that would apply to the phase being set up if nothing changed
+function grPropose(base, edit) {
+  const goal = { ...base.goal }; let phase = base.phase ? { ...base.phase } : null;
+  if (!edit || edit.mode === 'keep') return { goal, phase };
+  const next = edit.mode === 'remove' ? { enabled: false } : { enabled: true, min: edit.min, max: edit.max };
+  if (edit.scope === 'goal') return { goal: next, phase: null };
+  return { goal, phase: { ...next, scope: 'phase' } };
+}
+// context: { kind: 'lean' | 'keepBuilding' | 'resume' | 'maintain' | 'continueLean' | 'custom', bodyFat, target }
+function grValidate(context, edit, proposed) {
+  const errors = [], warnings = [];
+  const bf = context.bodyFat;
+  if (edit && edit.mode === 'change') {
+    if (edit.max - edit.min < GR_LIMITS.gap) errors.push('Upper limit must be at least 0.5% above the lower limit.');
+    if (edit.min < GR_LIMITS.min || edit.max > GR_LIMITS.max) errors.push(`Choose a range between ${GR_LIMITS.min}% and ${GR_LIMITS.max}%.`);
+  }
+  const eff = grEffective(proposed.goal, proposed.phase);
+  const building = ['keepBuilding', 'resume', 'custom'].includes(context.kind);
+  if (building && eff.enabled !== false && bf > eff.max) errors.push(`You’re at ${grFmt(bf)}%, above the ${grFmt(eff.max)}% upper limit. Building would move further away: raise the upper limit, remove the guardrail for this phase, or lean out first.`);
+  if (['lean', 'continueLean'].includes(context.kind) && context.target != null) {
+    if (context.target >= bf) errors.push(`The phase target (${grFmt(context.target)}%) is at or above your current ${grFmt(bf)}%, so the phase would end immediately.`);
+    if (eff.enabled !== false && context.target > eff.max) errors.push(`The phase target (${grFmt(context.target)}%) is above the guardrail’s ${grFmt(eff.max)}% upper limit, so the phase would end outside your range.`);
+    if (eff.enabled !== false && context.target < eff.min) warnings.push(`The phase target is below the guardrail’s ${grFmt(eff.min)}% lower limit.`);
+  }
+  if (edit && edit.mode === 'remove') warnings.push(edit.scope === 'goal' ? 'Without a guardrail, body fat is still shown but no longer triggers reviews, for this goal going forward.' : 'No guardrail during this phase. The goal guardrail returns when the phase ends.');
+  if (proposed.phase && proposed.phase.enabled !== false && edit && edit.mode === 'change' && edit.scope === 'phase') warnings.push(`Applies to this phase only. The goal guardrail (${grText(proposed.goal)}) returns afterwards.`);
+  return { errors, warnings, ok: errors.length === 0 };
+}
+if (typeof module !== 'undefined') module.exports = { GR_LIMITS, grFmt, grText, grEffective, grSame, grPropose, grValidate };
+
+;
+// ---------------------------------------------------------------------------
 // Production-parity Home renderer (design replica, not production code).
 // Authority: Native Build 94 (498297815a) sources:
 //   Presentation/Home/HomeView.swift            stack spacing 12, padding 18/10, canvas bg
@@ -644,7 +692,7 @@ function initialState(scenario = 'A') {
     phaseStartDay: null, completion: { mode: 'outcome', weeks: 6 },
     body: { weight: 179.0, fat: 17.4, lean: 154.6, other: 7.0 },
     gained: 7.1, response: 'asEstimated',
-    guardrail: { min: 8, max: 9 }, goalDate: 'Oct 31',
+    guardrail: { enabled: true, min: 8, max: 9 }, phaseGuardrail: null, completionTarget: 9, goalDate: 'Oct 31',
     plan: { ...BASE_PLAN, goal: E.usual == null ? null : E.usual },
     draft: null, explainerSeen: false,
     decision: { open: true, source: 'Oct 9 DEXA', dismissed: false, kind: 'adapt' },
@@ -654,7 +702,7 @@ function initialState(scenario = 'A') {
   };
 }
 let S = initialState();
-const snap = () => JSON.parse(JSON.stringify({ E: S.E, phase: S.phase, phaseStartDay: S.phaseStartDay, completion: S.completion, guardrail: S.guardrail, goalDate: S.goalDate, plan: S.plan, decision: S.decision, qc: S.qc, observeUntil: S.observeUntil }));
+const snap = () => JSON.parse(JSON.stringify({ E: S.E, phase: S.phase, phaseStartDay: S.phaseStartDay, completion: S.completion, guardrail: S.guardrail, phaseGuardrail: S.phaseGuardrail, completionTarget: S.completionTarget, goalDate: S.goalDate, plan: S.plan, decision: S.decision, qc: S.qc, observeUntil: S.observeUntil }));
 const bf = (b = S.body) => (b.fat / b.weight) * 100;
 const inPhaseWeeks = () => (S.phaseStartDay == null ? 0 : Math.floor((S.day - S.phaseStartDay) / 7));
 
@@ -678,6 +726,24 @@ function rateRange(balance) {
   const a = Math.abs(lo / d), b = Math.abs(hi / d);
   return balance < 0 ? `≈ ${f1(Math.min(a, b))}–${f1(Math.max(a, b))} lb/week loss` : `≈ ${f1(Math.min(a, b) * 4.33)}–${f1(Math.max(a, b) * 4.33)} lb/month gain`;
 }
+const effGR = () => grEffective(S.guardrail, S.phaseGuardrail);
+const effMax = () => (effGR().enabled === false ? Infinity : effGR().max);
+function draftBase(d) { return { goal: S.guardrail, phase: d.kind === 'next' || d.kind === 'lean' ? null : S.phaseGuardrail }; }
+const draftProposed = (d) => grPropose(draftBase(d), d.gr);
+function draftContext(d) {
+  const kind = d.kind === 'next' ? { resume: 'resume', maintain: 'maintain', continue: 'continueLean' }[d.next] : d.kind;
+  const target = (d.kind === 'lean' && d.completion.mode !== 'time') || (d.kind === 'next' && d.next === 'continue') ? d.target : null;
+  return { kind, bodyFat: bf(), target };
+}
+const draftCheck = (d) => grValidate(draftContext(d), d.gr, draftProposed(d));
+const grLabel = (pr) => (pr.phase ? `${grText(pr.phase)} this phase only · goal ${grText(pr.goal)}` : `${grText(pr.goal)} (goal)`);
+const grChanged = (d) => { const b = draftBase(d), pr = draftProposed(d); return !grSame(b.goal, pr.goal) || !grSame(b.phase, pr.phase); };
+const checkMsgs = (chk) => chk.errors.map((m) => `<div class="ewarn red">${I.warn}<span>${m}</span></div>`).join('') + chk.warnings.map((m) => `<div class="ewarn amber">${I.info}<span>${m}</span></div>`).join('');
+function homeGR(detail) {
+  const g = effGR();
+  if (g.enabled === false) return { title: 'No body-fat guardrail', detail: S.phaseGuardrail ? `This phase only · goal ${grText(S.guardrail)}` : 'Removed from this goal' };
+  return { title: `Maintain approximately ${grFmt(g.min)}–${grFmt(g.max)}% body fat`, detail: S.phaseGuardrail ? `This phase only · goal ${grText(S.guardrail)}` : detail };
+}
 const maintLabel = () => { const pm = planningMaintenance(S.E); return pm.source === 'calibrated' ? `${fmt(pm.value)} (calibrated${S.E.key === 'A' && !S.E.recalibrated ? ', illustrative' : ''})` : `${fmt(pm.value)} (provisional estimate)`; };
 
 // ---------------- simulated evidence -----------------
@@ -699,7 +765,7 @@ function simulateWeek() {
 function evaluateAfterWeek() {
   if (S.phase === 'leaning') {
     const weeks = inPhaseWeeks();
-    const backInRange = bf() <= S.guardrail.max;
+    const backInRange = S.completionTarget != null && bf() <= S.completionTarget;
     const timeUp = S.completion.mode !== 'outcome' && weeks >= S.completion.weeks;
     if ((S.completion.mode !== 'time' && backInRange) || timeUp) {
       S.phase = 'leaningComplete';
@@ -748,38 +814,38 @@ function homeState() {
     return { ...base, headline: 'Lean Mass Build', timeline: S.phase === 'keepBuilding' ? `New date ${S.goalDate}` : '3 weeks remaining', support: 'Add lean mass gradually while keeping body fat in range.',
       metrics: { targetDate: S.goalDate, remaining: S.phase === 'keepBuilding' ? 'Revised' : '3 weeks', progress: pct, destination: '10 lb' }, range: `Jul 18 – ${S.goalDate}`,
       rows: [{ order: 1, status: 'completed', name: 'Establish Maintenance', detail: 'Completed' }, { order: 2, status: 'active', name: 'Lean Mass Build', detail: `Aug 15 – ${S.goalDate}`, label: `${f1(S.gained)} of 10 lb gained` }],
-      guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: bf() > S.guardrail.max ? 'Latest: above range' : 'Within range' },
+      guardrail: homeGR(bf() > effMax() ? 'Latest: above range' : 'Within range'),
       priorities: [...decisionItem, ...base.priorities] };
   }
   if (S.phase === 'leaning') {
     const wk = inPhaseWeeks();
     const left = S.completion.mode === 'outcome' ? 'until back in range' : `${Math.max(0, S.completion.weeks - wk)} weeks left`;
-    return { ...base, headline: 'Leaning', timeline: `Temporary · ${left}`, support: 'Bring body fat back to 8–9% while keeping lean mass.',
+    return { ...base, headline: 'Leaning', timeline: `Temporary · ${left}`, support: S.completionTarget != null ? `Bring body fat to ${grFmt(S.completionTarget)}% while keeping lean mass.` : 'Lean out for a set time while keeping lean mass.',
       metrics: { targetDate: 'Paused', remaining: S.completion.mode === 'outcome' ? '—' : `${Math.max(0, S.completion.weeks - wk)} weeks`, progress: pct, destination: '10 lb' }, range: 'Jul 18 – date set after leaning',
-      rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: `${f1(S.gained)} of 10 lb kept` }, { order: 3, status: 'active', name: 'Leaning (temporary)', detail: `Since ${dateLabel(S.phaseStartDay)} · week ${wk + 1}`, label: `Body fat ${f1(bf())}% → ${S.guardrail.min}–${S.guardrail.max}%` }],
-      guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: 'Applies across every phase' },
+      rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: `${f1(S.gained)} of 10 lb kept` }, { order: 3, status: 'active', name: 'Leaning (temporary)', detail: `Since ${dateLabel(S.phaseStartDay)} · week ${wk + 1}`, label: `Body fat ${f1(bf())}% → ${S.completionTarget != null ? `${grFmt(S.completionTarget)}%` : 'time limit'}` }],
+      guardrail: homeGR('Applies across every phase'),
       briefing: { title: 'Weekly Briefing', date: S.day === S.phaseStartDay ? 'Today' : dateLabel(S.day) } };
   }
   if (S.phase === 'leaningComplete') {
-    const inRange = bf() <= S.guardrail.max;
+    const inRange = S.completionTarget != null && bf() <= S.completionTarget;
     return { ...base, headline: inRange ? 'Leaning complete' : 'Leaning time limit', timeline: inRange ? 'Back in range' : 'Review needed', support: inRange ? 'Choose when to resume building.' : 'Choose what happens next.',
       metrics: { targetDate: '—', remaining: '—', progress: pct, destination: '10 lb' }, range: 'Jul 18 – date set on resume',
-      rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: 'Ready to resume' }, { order: 3, status: 'completed', name: 'Leaning (temporary)', detail: inRange ? 'Back in 8–9%' : `${dateLabel(S.phaseStartDay)} – ${dateLabel(S.day)}` }],
-      guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: inRange ? 'Within range' : 'Above range' },
+      rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: 'Ready to resume' }, { order: 3, status: 'completed', name: 'Leaning (temporary)', detail: inRange ? `Target ${grFmt(S.completionTarget)}% met` : `${dateLabel(S.phaseStartDay)} – ${dateLabel(S.day)}` }],
+      guardrail: homeGR(bf() > effMax() ? 'Above range' : 'Within range'),
       briefing: { title: 'DEXA Analysis', date: dateLabel(S.day) },
       priorities: [...(S.decision.dismissed ? [] : [{ title: 'Choose your next phase', sub: inRange ? 'Leaning complete' : 'Time limit reached', kind: 'decision', action: 'openNext' }]), ...base.priorities] };
   }
   if (S.phase === 'maintaining') {
     return { ...base, headline: 'Maintain', timeline: 'Holding before building', support: 'Keep weight steady for a few weeks, then resume building.',
       metrics: { targetDate: '—', remaining: '—', progress: pct, destination: '10 lb' }, range: 'Jul 18 – date set on resume',
-      rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Back in 8–9%' }, { order: 4, status: 'active', name: 'Maintain', detail: `Since ${dateLabel(S.phaseStartDay)}`, label: 'Building resumes when you choose' }],
-      guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: 'Within range' } };
+      rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Target met' }, { order: 4, status: 'active', name: 'Maintain', detail: `Since ${dateLabel(S.phaseStartDay)}`, label: 'Building resumes when you choose' }],
+      guardrail: homeGR('Within range') };
   }
   // resumed
   return { ...base, headline: 'Lean Mass Build', timeline: '14 weeks remaining', support: 'Add lean mass gradually while keeping body fat in range.',
     metrics: { targetDate: S.goalDate, remaining: '14 weeks', progress: pct, destination: '10 lb' }, range: `Jul 18 – ${S.goalDate}`,
-    rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Back in 8–9%' }, { order: 4, status: 'active', name: 'Lean Mass Build', detail: `${dateLabel(S.phaseStartDay)} – ${S.goalDate}`, label: `${f1(S.gained)} of 10 lb gained` }],
-    guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: bf() > S.guardrail.max ? 'Above range' : 'Within range' } };
+    rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Target met' }, { order: 4, status: 'active', name: 'Lean Mass Build', detail: `${dateLabel(S.phaseStartDay)} – ${S.goalDate}`, label: `${f1(S.gained)} of 10 lb gained` }],
+    guardrail: homeGR(bf() > effMax() ? 'Above range' : 'Within range') };
 }
 
 // ---------------- shared UI bits -----------------
@@ -814,13 +880,13 @@ SCREENS.briefing = () => {
       ${S.decision.dismissed ? '<p class="t-xs muted" style="text-align:center">You chose “Not now”. The decision stays available in Goals.</p>' : `
       <div class="card rail amber" style="padding-top:16px;padding-bottom:16px"><div class="eyebrow amber">Goal decision</div>
         <div class="display h3" style="margin-top:6px">Review your goal options</div>
-        <p class="t-sm ink2" style="margin-top:6px">Body fat ${f1(bf())}% is above your 8–9% range, and Oct 31 is unlikely at your recent pace.</p>
+        <p class="t-sm ink2" style="margin-top:6px">Body fat ${f1(bf())}% is above your ${grText(S.guardrail)} range, and Oct 31 is unlikely at your recent pace.</p>
         <div class="row" style="gap:10px;margin-top:12px">${btn('Review options', 'openOptions', 'primary small grow')}${btn('Not now', 'notNow', 'secondary small')}</div>
         <p class="t-xs muted" style="margin-top:8px">Nothing changes until you approve.</p></div>`}
     </div>`;
   }
   if (S.phase === 'leaningComplete') {
-    const inRange = bf() <= S.guardrail.max;
+    const inRange = S.completionTarget != null && bf() <= S.completionTarget;
     const d = S.phaseSnapshot || S.body;
     return `${statusBar()}${sNav('Home', 'DEXA Analysis')}
     <div class="content stack">
@@ -907,7 +973,7 @@ SCREENS.midweek = () => `${statusBar()}${sNav('Home', 'Midweek Briefing')}
 SCREENS.options = () => `${statusBar()}${sNav('Back', 'Goal Options')}
   <div class="content stack">
     <div class="display h1">Choose what to protect next</div>
-    <p class="t-body ink2">You’ve built about ${f1(S.gained)} of your 10 lb. Body fat (${f1(bf())}%) is above your 8–9% range, and Oct 31 is unlikely at your recent pace. ${simTag}</p>
+    <p class="t-body ink2">You’ve built about ${f1(S.gained)} of your 10 lb. Body fat (${f1(bf())}%) is above your ${grText(S.guardrail)} range, and Oct 31 is unlikely at your recent pace. ${simTag}</p>
     <div class="cmp">
       <div class="hd lbl"></div><div class="hd sel"><span style="color:var(--teal)">★</span> Lean out first</div><div class="hd">Keep building</div><div class="hd">Keep plan</div>
       <div class="lbl">Body fat</div><div class="sel">Back to 8–9%</div><div>Higher; new range needed</div><div>Likely keeps rising</div>
@@ -935,27 +1001,46 @@ SCREENS.leanSetup = () => { const d = S.draft; return `${statusBar()}${sNav('Opt
     <div class="display h1">Set up your leaning phase</div>
     <p class="lead">Two decisions. Everything else carries forward.</p>
     <div class="card"><span class="eyebrow">Ends</span><div class="divider-list" style="margin-top:4px">
-      ${[['outcome', 'When I’m back in range', '8–9% body fat. A DEXA confirms it best; otherwise we estimate from trends.'], ['time', 'After a set time', 'Then we review together'], ['hybrid', 'Whichever comes first', 'Back in range, or the time limit']].map(([k, t, sub]) => `<div class="choice" data-act="setCompletion" data-arg="${k}" role="radio" aria-checked="${d.completion.mode === k}" tabindex="0">${radio(d.completion.mode === k)}<div class="grow"><div class="t-body strong">${t}</div><div class="t-sm ink2">${sub}</div></div></div>`).join('')}
+      ${[['outcome', 'When I reach my phase target', `Body fat at or below ${grFmt(d.target)}%. A DEXA confirms it best; otherwise we estimate from trends.`], ['time', 'After a set time', 'Then we review together'], ['hybrid', 'Whichever comes first', 'Back in range, or the time limit']].map(([k, t, sub]) => `<div class="choice" data-act="setCompletion" data-arg="${k}" role="radio" aria-checked="${d.completion.mode === k}" tabindex="0">${radio(d.completion.mode === k)}<div class="grow"><div class="t-body strong">${t}</div><div class="t-sm ink2">${sub}</div></div></div>`).join('')}
     </div>${d.completion.mode !== 'outcome' ? `<div class="row between" style="margin-top:6px"><span class="t-sm ink2">Time limit</span><div class="stepper"><span data-act="weeks" data-arg="-1" role="button" tabindex="0">−</span><b>${d.completion.weeks} weeks</b><span data-act="weeks" data-arg="1" role="button" tabindex="0">+</span></div></div>` : ''}
     <p class="t-xs muted" style="margin-top:6px">Nothing ends or restarts on its own; you choose what’s next.</p></div>
+    <div class="card" style="padding:0 16px"><div class="divider-list">
+      ${d.completion.mode !== 'time' ? `<div class="srow"><span class="ic">${I.flag}</span><div class="grow"><div class="nm">Phase target</div><div class="dt">Ends at body fat ≤ ${grFmt(d.target)}% · now ${f1(bf())}%</div></div><div class="mini-step"><span data-act="target" data-arg="-0.5" role="button" tabindex="0" aria-label="Lower phase target">−</span><span data-act="target" data-arg="0.5" role="button" tabindex="0" aria-label="Raise phase target">+</span></div></div>` : ''}
+      <div class="srow" data-act="openGuardrail" role="button" tabindex="0"><span class="ic ${grChanged(d) ? 'amber' : ''}">${I.shield}</span><div class="grow"><div class="nm">Body-fat guardrail</div><div class="dt">${grLabel(draftProposed(d))}</div></div><span class="edit">Edit</span></div>
+    </div><p class="t-xs muted" style="margin:6px 0 10px">The phase target is what ends this phase. The guardrail is the range your goal protects.</p></div>
+    ${checkMsgs({ errors: draftCheck(d).errors, warnings: [] })}
     <div class="card" style="padding:0 16px"><div class="srow" data-act="openEnergy" role="button" tabindex="0"><span class="ic amber">${I.bolt}</span><div class="grow"><div class="nm">Daily energy</div><div class="dt"><b style="color:var(--ink)">${sgn(d.plan.balance)} a day</b> · eat ${fmt(d.plan.eat)} · activity goal ${fmtG(d.plan.goal)}</div></div><span class="edit">Edit</span></div></div>
     <div class="card" style="padding:12px 16px" data-act="openHub" role="button" tabindex="0"><div class="row between"><div><div class="t-body strong">Your plan</div><div class="t-sm ink2">Training, recovery, supplements and tracking carry forward</div></div>${I.chev}</div></div>
-    ${btn('Review', 'openReview')}
+    ${btn('Review', draftCheck(d).ok ? 'openReview' : 'noop', draftCheck(d).ok ? 'primary' : 'disabled')}
   </div>`; };
 
-SCREENS.keepBuilding = () => { const d = S.draft; const fits = d.guardrail.max >= 11.5; return `${statusBar()}${sNav('Options', 'Keep Building')}
+SCREENS.keepBuilding = () => { const d = S.draft; const pr = draftProposed(d); const eff = grEffective(pr.goal, pr.phase); const chk = draftCheck(d); const fits = eff.enabled === false || eff.max >= 11.5; return `${statusBar()}${sNav('Options', 'Keep Building')}
   <div class="content stack"><div class="display h1">Keep building with limits that fit</div>
-    <div class="card"><span class="eyebrow">Body-fat range</span>
-      <div class="choice" style="opacity:.55"><span style="color:var(--muted)">${I.shield}</span><div class="grow"><div class="t-body strong">Keep 8–9% firm</div><div class="t-sm ink2">Not available: you’re above 9%, and building moves further from it.</div></div></div>
-      <div class="row between" style="margin-top:8px"><span class="t-body">Lower</span><div class="stepper"><span data-act="gr" data-arg="min:-0.5" role="button" tabindex="0">−</span><b>${d.guardrail.min}%</b><span data-act="gr" data-arg="min:0.5" role="button" tabindex="0">+</span></div></div>
-      <div class="row between" style="margin-top:8px"><span class="t-body">Upper</span><div class="stepper"><span data-act="gr" data-arg="max:-0.5" role="button" tabindex="0">−</span><b>${d.guardrail.max}%</b><span data-act="gr" data-arg="max:0.5" role="button" tabindex="0">+</span></div></div>
-      ${d.guardrail.max <= d.guardrail.min ? `<div class="errtxt">${I.warn} Upper must be above lower.</div>` : ''}
-      <div class="ewarn ${fits ? 'ok' : 'amber'}">${fits ? I.check : I.warn}<span>${fits ? 'At a small surplus, body fat likely stays inside this range.' : 'Body fat likely ends around 10.4–11.3%; an upper limit of at least 11.5% fits.'}</span></div></div>
+    <div class="card" style="padding:0 16px"><div class="srow" data-act="openGuardrail" role="button" tabindex="0"><span class="ic amber">${I.shield}</span><div class="grow"><div class="nm">Body-fat guardrail</div><div class="dt">${grLabel(pr)} · now ${f1(bf())}%</div></div><span class="edit">Edit</span></div></div>
+    ${checkMsgs(chk)}
+    ${chk.ok ? `<div class="ewarn ${fits ? 'ok' : 'amber'}">${fits ? I.check : I.warn}<span>${fits ? 'At a small surplus, body fat likely stays inside this range.' : 'Body fat likely ends around 10.4–11.3%; an upper limit of at least 11.5% fits.'}</span></div>` : ''}
     <div class="card"><span class="eyebrow">Goal date</span>
       <div class="choice" data-act="date" data-arg="Oct 31" role="radio" tabindex="0">${radio(d.goalDate === 'Oct 31')}<div class="grow"><div class="t-body strong">Keep Oct 31</div>${d.goalDate === 'Oct 31' ? `<div class="ewarn amber">${I.warn}<span>Likely not achievable. It will show as at risk.</span></div>` : ''}</div></div>
       <div class="choice" data-act="date" data-arg="Feb 15" role="radio" tabindex="0">${radio(d.goalDate === 'Feb 15')}<div class="grow"><div class="t-body strong">Move to Feb 15</div><div class="t-sm ink2">Likely at a slow, lean gain</div></div></div></div>
     <div class="card" style="padding:0 16px"><div class="srow" data-act="openEnergy" role="button" tabindex="0"><span class="ic amber">${I.bolt}</span><div class="grow"><div class="nm">Daily energy</div><div class="dt"><b style="color:var(--ink)">${sgn(d.plan.balance)} a day</b> · eat ${fmt(d.plan.eat)}</div></div><span class="edit">Edit</span></div></div>
-    ${btn('Your plan', 'openHub', 'secondary')}${btn('Review', 'openReview', d.guardrail.max > d.guardrail.min ? 'primary' : 'disabled')}
+    ${btn('Your plan', 'openHub', 'secondary')}${btn('Review', chk.ok ? 'openReview' : 'noop', chk.ok ? 'primary' : 'disabled')}
+  </div>`; };
+
+SCREENS.guardrail = () => { const d = S.draft; const base = draftBase(d); const pr = draftProposed(d); const chk = draftCheck(d); const g = d.gr;
+  const scopeLabel = d.kind === 'next' ? 'Next phase only' : d.kind === 'lean' ? 'Leaning phase only' : 'This phase only';
+  return `${statusBar()}${sNav('Back', 'Body-Fat Guardrail', '<span data-act="back" role="button" tabindex="0" style="font-weight:700">Done</span>')}
+  <div class="content stack">
+    <div class="card soft" style="padding:10px 14px"><div class="kv" style="padding:4px 0"><span class="k">Now applies</span><span class="v">${grLabel(base)}</span></div><div class="kv" style="padding:4px 0"><span class="k">Body fat now</span><span class="v">${f1(bf())}% ${simTag}</span></div></div>
+    <div class="card"><div class="divider-list">
+      ${[['keep', `Keep ${grText(grEffective(base.goal, base.phase))}`, 'No change'], ['change', 'Change the range', 'Raise or lower the limits'], ['remove', 'Remove the guardrail', 'Body fat is still shown; it just won’t trigger reviews']].map(([k, t, sub]) => `<div class="choice" data-act="grMode" data-arg="${k}" role="radio" aria-checked="${g.mode === k}" tabindex="0">${radio(g.mode === k)}<div class="grow"><div class="t-body strong">${t}</div><div class="t-sm ink2">${sub}</div></div></div>`).join('')}
+    </div>
+    ${g.mode === 'change' ? `<div class="row between" style="margin-top:8px"><span class="t-body">Lower</span><div class="stepper"><span data-act="gr" data-arg="min:-0.5" role="button" tabindex="0" aria-label="Lower limit down">−</span><b>${grFmt(g.min)}%</b><span data-act="gr" data-arg="min:0.5" role="button" tabindex="0" aria-label="Lower limit up">+</span></div></div>
+      <div class="row between" style="margin-top:8px"><span class="t-body">Upper</span><div class="stepper"><span data-act="gr" data-arg="max:-0.5" role="button" tabindex="0" aria-label="Upper limit down">−</span><b>${grFmt(g.max)}%</b><span data-act="gr" data-arg="max:0.5" role="button" tabindex="0" aria-label="Upper limit up">+</span></div></div>` : ''}
+    ${g.mode !== 'keep' ? `<div class="t-sm strong" style="margin-top:12px">Applies to</div><div class="seg" style="margin-top:8px"><div class="${g.scope === 'phase' ? 'on' : ''}" data-act="grScope" data-arg="phase" role="radio" aria-checked="${g.scope === 'phase'}" tabindex="0">${scopeLabel}</div><div class="${g.scope === 'goal' ? 'on' : ''}" data-act="grScope" data-arg="goal" role="radio" aria-checked="${g.scope === 'goal'}" tabindex="0">Goal, going forward</div></div>` : ''}
+    </div>
+    ${checkMsgs(chk)}
+    <div class="card" style="padding:10px 14px"><div class="kv" style="padding:4px 0"><span class="k">After approval</span><span class="v">${grLabel(pr)}</span></div>${d.kind === 'lean' || (d.kind === 'next' && d.next === 'continue') ? `<div class="kv" style="padding:4px 0"><span class="k">Phase target (separate)</span><span class="v">≤ ${grFmt(d.target)}%</span></div>` : ''}</div>
+    <p class="t-xs muted">Changes join the rest of this plan and apply with one approval. Earlier ranges stay in your goal history.</p>
   </div>`; };
 
 SCREENS.explainer = () => `${statusBar()}${sNav('Back', 'Daily Energy')}
@@ -1016,12 +1101,13 @@ const hubRow = (ic, name, detail, act, changed) => `<div class="srow ${changed ?
 SCREENS.hub = () => { const d = S.draft; const p = d.plan; const base = S.plan;
   const changing = [];
   if (d.kind === 'lean') changing.push(hubRow(I.flag, 'Phase', `<span class="was">Lean Mass Build</span> → <b style="color:var(--ink)">Leaning (temporary)</b>`, d.kind === 'lean' ? 'openLeanSetup' : 'noop', true));
-  if (d.kind === 'keepBuilding') changing.push(hubRow(I.shield, 'Body-fat range', `<span class="was">8–9%</span> → <b style="color:var(--ink)">${d.guardrail.min}–${d.guardrail.max}%</b>`, 'openKeepBuilding', true));
+  if (grChanged(d)) changing.push(hubRow(I.shield, 'Body-fat guardrail', `<span class="was">${grLabel(draftBase(d))}</span><br><b style="color:var(--ink)">${grLabel(draftProposed(d))}</b>`, 'openGuardrail', true));
   if (p.eat !== base.eat || p.goal !== base.goal) changing.push(hubRow(I.bolt, 'Daily energy', `<span class="was">eat ${fmt(base.eat)} · goal ${fmtG(base.goal)}</span><br><b style="color:var(--ink)">${sgn(p.balance)} · eat ${fmt(p.eat)} · goal ${fmtG(p.goal)}</b>`, 'openEnergy', true));
   const carried = [
     [I.lift, 'Training', `Learned: ≈ 4 workouts a week${p.trainingGoals ? ` · goal ${p.trainingGoals}` : ''} · ${p.progression}`, 'openTraining', p.progression !== base.progression || p.trainingGoals !== base.trainingGoals],
     [I.moon, 'Recovery', `${p.recovery.join(', ')}${p.sleepGoal ? ` · sleep ${p.sleepGoal}` : ' · no sleep goal'}`, 'openRecovery', p.recovery.length !== base.recovery.length || p.sleepGoal !== base.sleepGoal],
     [I.pill, 'Supplements', p.supplements.join(', ') || 'None', 'openSupplements', p.supplements.length !== base.supplements.length],
+    ...(grChanged(d) ? [] : [[I.shield, 'Body-fat guardrail', grLabel(draftProposed(d)), 'openGuardrail', false]]),
     [I.cam, 'Photos & DEXA', `Photos ${p.photos ? 'every 2 weeks' : 'off'} · DEXA ${p.dexa ? 'scheduled' : 'optional, not planned'}`, 'openTracking', p.photos !== base.photos || p.dexa !== base.dexa],
   ];
   const ch = changing.length + carried.filter((c) => c[4]).length;
@@ -1059,9 +1145,10 @@ SCREENS.tracking = () => { const p = S.draft.plan; return `${statusBar()}${sNav(
     <div class="lrow" data-act="toggle" data-arg="dexa" role="switch" aria-checked="${p.dexa}" tabindex="0"><div class="l">Schedule a DEXA<small>Optional</small></div><span class="sw ${p.dexa ? 'on' : ''}"></span></div></div></div>`; };
 
 SCREENS.review = () => { const d = S.draft; const p = d.plan, b = S.plan; const rows = [];
-  if (d.kind === 'lean') rows.push(['Phase', 'Lean Mass Build', 'Leaning (temporary)'], ['Ends', '', d.completion.mode === 'outcome' ? 'Back in 8–9%' : d.completion.mode === 'time' ? `After ${d.completion.weeks} weeks` : `Back in range or ${d.completion.weeks} weeks`], ['Goal date', 'Oct 31', 'Set when building resumes']);
-  if (d.kind === 'keepBuilding') { rows.push(['Body-fat range', '8–9%', `${d.guardrail.min}–${d.guardrail.max}%`]); if (d.goalDate !== 'Oct 31') rows.push(['Goal date', 'Oct 31', d.goalDate]); }
-  if (d.kind === 'next') rows.push(['Phase', 'Leaning (complete)', d.next === 'resume' ? 'Lean Mass Build' : d.next === 'maintain' ? 'Maintain' : 'Leaning (continued)']);
+  if (d.kind === 'lean') rows.push(['Phase', 'Lean Mass Build', 'Leaning (temporary)'], ['Phase ends', '', d.completion.mode === 'outcome' ? `Body fat ≤ ${grFmt(d.target)}%` : d.completion.mode === 'time' ? `After ${d.completion.weeks} weeks` : `Body fat ≤ ${grFmt(d.target)}% or ${d.completion.weeks} weeks`], ['Goal date', 'Oct 31', 'Set when building resumes']);
+  if (d.kind === 'keepBuilding' && d.goalDate !== 'Oct 31') rows.push(['Goal date', 'Oct 31', d.goalDate]);
+  rows.push(['Body-fat guardrail', grChanged(d) ? grLabel(draftBase(d)) : '', grChanged(d) ? grLabel(draftProposed(d)) : `${grLabel(draftProposed(d))} · unchanged`]);
+  if (d.kind === 'next') { rows.push(['Phase', 'Leaning (complete)', d.next === 'resume' ? 'Phase 4 · Lean Mass Build (linked to Phase 2)' : d.next === 'maintain' ? 'Maintain' : 'Leaning (continued)']); if (d.next === 'continue') rows.push(['Phase ends', '', `Body fat ≤ ${grFmt(d.target)}%`]); }
   if (p.balance !== planBal(b)) rows.push(['Daily balance', sgn(planBal(b)), sgn(p.balance)]);
   if (p.eat !== b.eat) rows.push(['Eat', fmt(b.eat), `${fmt(p.eat)} kcal`]);
   if (p.goal !== b.goal) rows.push(['Activity goal', fmtG(b.goal), `${fmtG(p.goal)} kcal`]);
@@ -1079,17 +1166,23 @@ SCREENS.review = () => { const d = S.draft; const p = d.plan, b = S.plan; const 
   <div class="card soft" style="padding:10px 14px"><div class="t-xs muted">Eat = maintenance ${maintLabel()} ${p.balance < 0 ? '−' : '+'} ${fmt(Math.abs(p.balance))}${hasActivity() ? ` + ${fmt(p.added || 0)} extra activity` : ''} = <b style="color:var(--ink)">${fmt(p.eat)}</b>${hasActivity() ? ` · activity goal = ${fmt(S.E.usual)} usual + ${fmt(p.added || 0)} = ${fmtG(p.goal)}` : ''}</div>
     <div class="t-sm semi" style="color:var(--teal);margin-top:6px" data-act="go" data-arg="why" role="button" tabindex="0">Why these numbers?</div></div>
   <p class="t-xs muted">Only numbers that change are listed. Everything else carries forward.</p>
-  ${btn('Approve', rows.length ? 'approve' : 'noop', rows.length ? 'primary' : 'disabled')}
+  ${checkMsgs({ errors: draftCheck(d).errors, warnings: [] })}
+  ${btn('Approve', rows.length && draftCheck(d).ok ? 'approve' : 'noop', rows.length && draftCheck(d).ok ? 'primary' : 'disabled')}
   <p class="t-xs muted" style="text-align:center">One approval updates goal, phase and plan together. Version ${S.versions.length} is kept in Your Journey.</p></div>`; };
 
-SCREENS.next = () => { const inRange = bf() <= S.guardrail.max; const n = S.draft?.next || 'resume'; return `${statusBar()}${sNav('Back', 'What’s next')}
+SCREENS.next = () => { const inRange = S.completionTarget != null && bf() <= S.completionTarget; const n = S.draft?.next || 'resume'; return `${statusBar()}${sNav('Back', 'What’s next')}
   <div class="content stack"><div class="display h1">${inRange ? 'Leaning complete' : 'Time limit reached'}</div>
   <div class="card"><div class="kv"><span class="k">Body fat</span><span class="delta"><s>${f1(S.phaseStartBf)}%</s><span class="v">${f1(bf())}%</span></span></div>
   <div class="kv"><span class="k">Lean mass (DEXA)</span><span class="v">${f1(S.body.lean - S.phaseStartBody.lean)} lb</span></div>
   <div class="kv"><span class="k">Goal progress</span><span class="delta"><s>${f1(S.phaseStartGained)}</s><span class="v">${f1(S.gained)} of 10 lb</span></span></div>
   <p class="t-xs muted">Shown honestly, never reset. Some of a small lean drop is usually water. ${simTag}</p></div>
-  <div class="card divider-list" style="padding:0 16px">${[['resume', 'Start building again', 'Slow, lean gain · +200 a day'], ['maintain', 'Hold at maintenance first', 'A few weeks before building'], ['continue', 'Keep leaning', inRange ? 'Aim for the lower end of 8–9%' : 'Continue toward the range']].map(([k, t, s]) => `<div class="choice" data-act="pickNext" data-arg="${k}" role="radio" aria-checked="${n === k}" tabindex="0">${radio(n === k)}<div class="grow"><div class="t-body strong">${t}${k === (inRange ? 'resume' : 'continue') ? ' <span class="pill teal">Suggested</span>' : ''}</div><div class="t-sm ink2">${s}</div></div></div>`).join('')}</div>
-  ${btn('Review this change', 'nextReview')}<p class="t-xs muted" style="text-align:center">Nothing restarts on its own.</p></div>`; };
+  <div class="card divider-list" style="padding:0 16px">${[['resume', 'Start building again', 'Slow, lean gain · +200 a day'], ['maintain', 'Hold at maintenance first', 'A few weeks before building'], ['continue', 'Keep leaning', inRange ? 'Set a lower phase target' : 'Continue toward your target']].map(([k, t, s]) => `<div class="choice" data-act="pickNext" data-arg="${k}" role="radio" aria-checked="${n === k}" tabindex="0">${radio(n === k)}<div class="grow"><div class="t-body strong">${t}${k === (inRange ? 'resume' : 'continue') ? ' <span class="pill teal">Suggested</span>' : ''}</div><div class="t-sm ink2">${s}</div></div></div>`).join('')}</div>
+  ${S.draft ? `<div class="card" style="padding:0 16px"><div class="divider-list">
+    ${n === 'continue' ? `<div class="srow"><span class="ic">${I.flag}</span><div class="grow"><div class="nm">Phase target</div><div class="dt">Ends at body fat ≤ ${grFmt(S.draft.target)}%</div></div><div class="mini-step"><span data-act="target" data-arg="-0.5" role="button" tabindex="0">−</span><span data-act="target" data-arg="0.5" role="button" tabindex="0">+</span></div></div>` : ''}
+    <div class="srow" data-act="openGuardrail" role="button" tabindex="0"><span class="ic ${grChanged(S.draft) ? 'amber' : ''}">${I.shield}</span><div class="grow"><div class="nm">${n === 'continue' ? 'Guardrail while leaning' : 'Guardrail when building resumes'}</div><div class="dt">${grLabel(draftProposed(S.draft))}</div></div><span class="edit">Edit</span></div></div></div>
+    ${S.phaseGuardrail ? `<p class="t-xs muted">The leaning-only guardrail (${grText(S.phaseGuardrail)}) ends with this phase.</p>` : ''}
+    ${checkMsgs({ errors: draftCheck(S.draft).errors, warnings: [] })}` : ''}
+  ${btn('Review this change', S.draft && draftCheck(S.draft).ok ? 'nextReview' : 'noop', S.draft && draftCheck(S.draft).ok ? 'primary' : 'disabled')}<p class="t-xs muted" style="text-align:center">Nothing restarts on its own.</p></div>`; };
 
 SCREENS.goals = () => { const leaning = S.phase === 'leaning'; const tempRows = [['done', 'Phase 1 · Establish Maintenance', 'Complete']];
   if (S.phase === 'building' || S.phase === 'keepBuilding') tempRows.push(['now', 'Phase 2 · Lean Mass Build', `Since Aug 15 · ${f1(S.gained)} of 10 lb`]);
@@ -1103,11 +1196,15 @@ SCREENS.goals = () => { const leaning = S.phase === 'leaning'; const tempRows = 
       <div class="kv"><span class="k" style="color:var(--ink)">Goal date</span><span class="v">${S.phase === 'building' ? 'Oct 31 (at risk)' : S.phase === 'resumed' || S.phase === 'keepBuilding' ? S.goalDate : 'Set when building resumes'}</span></div></div>
     ${leaning ? `<div class="card" style="border:1.5px solid var(--green)"><div class="row between"><span class="eyebrow" style="color:var(--green)">Now · temporary phase</span>${tag(`Week ${inPhaseWeeks() + 1}`)}</div>
       <div class="display h2" style="margin-top:6px">Leaning</div>
-      <div class="kv"><span class="k">Ends</span><span class="v">${S.completion.mode === 'outcome' ? 'Back in 8–9%' : S.completion.mode === 'time' ? `After ${S.completion.weeks} weeks` : `In range or ${S.completion.weeks} weeks`}</span></div>
+      <div class="kv"><span class="k">Ends</span><span class="v">${S.completion.mode === 'outcome' ? `Body fat ≤ ${grFmt(S.completionTarget)}%` : S.completion.mode === 'time' ? `After ${S.completion.weeks} weeks` : `Body fat ≤ ${grFmt(S.completionTarget)}% or ${S.completion.weeks} weeks`}</span></div>
       <div class="kv"><span class="k">Body fat</span><span class="v">${f1(S.phaseStartBf)}% → ${f1(bf())}%</span></div>
       <div class="kv"><span class="k">Plan</span><span class="v">${sgn(planBal(S.plan))} · eat ${fmt(S.plan.eat)} · goal ${fmtG(S.plan.goal)}</span></div></div>` : ''}
     ${(S.decision.open) && (S.phase === 'building' || S.phase === 'leaningComplete') ? `<div class="card rail amber" data-act="${S.phase === 'building' ? 'openOptions' : 'openNext'}" role="button" tabindex="0"><div class="eyebrow amber">Open decision</div><div class="t-body strong" style="margin-top:4px">${S.phase === 'building' ? 'Review your goal options' : 'Choose your next phase'}</div></div>` : ''}
-    <div class="card"><div class="row between"><span class="eyebrow">Body-fat limit</span>${tag('You approved')}</div><div class="t-body strong" style="margin-top:6px">${S.guardrail.min}–${S.guardrail.max}% · now ${f1(bf())}%</div></div>
+    <div class="card"><div class="row between"><span class="eyebrow">Body-fat guardrail</span>${tag('You approved')}</div>
+      <div class="kv"><span class="k">Goal</span><span class="v">${grText(S.guardrail)}</span></div>
+      ${S.phaseGuardrail ? `<div class="kv"><span class="k">This phase only</span><span class="v">${grText(S.phaseGuardrail)}</span></div>` : ''}
+      ${leaning && S.completionTarget != null ? `<div class="kv"><span class="k">Phase target (separate)</span><span class="v">≤ ${grFmt(S.completionTarget)}%</span></div>` : ''}
+      <div class="kv"><span class="k">Body fat now</span><span class="v">${f1(bf())}%</span></div></div>
     <div class="card"><span class="eyebrow">The path · Your Journey</span><div class="phases" style="margin-top:10px">${tempRows.map(([dot, t, s], i) => `<div class="ph"><div class="col"><div class="dot ${dot}"></div>${i < tempRows.length - 1 ? '<div class="line"></div>' : ''}</div><div class="txt"><div class="t-body strong">${t}</div><div class="t-sm ink2">${s}</div></div></div>`).join('')}</div></div>
     <div class="card"><div class="row between"><span class="eyebrow">Changes you approved</span>${S.undo ? `<span class="t-sm semi" style="color:var(--teal)" data-act="undo" role="button" tabindex="0">Undo last</span>` : ''}</div>
       <div class="divider-list" style="margin-top:6px">${S.versions.map((v) => `<div class="lrow"><div class="l"><b>v${v.v} · ${v.day < 0 ? 'Aug 15' : dateLabel(v.day)}</b><small>${v.label} · ${v.detail}</small></div></div>`).join('')}</div></div>
@@ -1118,9 +1215,11 @@ SCREENS.placeholder = () => `${statusBar()}${sNav('Home', 'Not in this simulatio
 // ---------------- actions -----------------
 function startDraft(kind) {
   const plan = JSON.parse(JSON.stringify(S.plan)); plan.balance = planBal(S.plan);
-  S.draft = { kind, plan, split: 'suggested', custom: 100, completion: { ...S.completion }, guardrail: { ...S.guardrail }, goalDate: S.goalDate, next: 'resume' };
+  const eff = effGR();
+  S.draft = { kind, plan, split: 'suggested', custom: 100, completion: { ...S.completion }, goalDate: S.goalDate, next: 'resume', target: eff.enabled === false ? Math.max(6, Math.round((bf() - 1) * 2) / 2) : eff.max,
+    gr: { mode: 'keep', min: eff.enabled === false ? 8 : eff.min, max: eff.enabled === false ? 9 : eff.max, scope: 'phase' } };
   if (kind === 'lean') applyEnergy(-450);
-  if (kind === 'keepBuilding') { S.draft.guardrail = { min: 8, max: 9 }; S.draft.goalDate = 'Oct 31'; applyEnergy(200); }
+  if (kind === 'keepBuilding') { S.draft.gr = { mode: 'change', min: 8, max: 9, scope: 'phase' }; S.draft.goalDate = 'Oct 31'; applyEnergy(200); }
 }
 function applyEnergy(balance) { const d = S.draft; d.plan.balance = balance; const e = energyFrom(balance, d.split, d.custom); Object.assign(d.plan, { eat: e.eat, added: e.added, goal: e.goal, balance: e.balance }); }
 function recomputeDraft() { if (S.draft && S.draft.plan.balance != null && (S.draft.kind === 'lean' || S.draft.kind === 'keepBuilding' || S.draft.kind === 'next' || S.draft.touched)) applyEnergy(S.draft.plan.balance); }
@@ -1154,32 +1253,38 @@ const ACT = {
   sleep: (a) => { if (a === 'clear') S.draft.plan.sleepGoal = null; else { const cur = S.draft.plan.sleepGoal ? Number(S.draft.plan.sleepGoal.replace(/[^0-9.]/g, '')) : 7; const n = Math.max(6, Math.min(9, cur + Number(a) * 0.5)); S.draft.plan.sleepGoal = `${n} h`; } render(); },
   addSupp: (a) => { S.draft.plan.supplements.push(a); render(); }, rmSupp: (a) => { S.draft.plan.supplements = S.draft.plan.supplements.filter((x) => x !== a); render(); },
   toggle: (a) => { S.draft.plan[a] = !S.draft.plan[a]; render(); },
-  gr: (a) => { const [k, d] = a.split(':'); S.draft.guardrail[k] = Math.max(6, Math.min(14, S.draft.guardrail[k] + Number(d))); render(); },
+  gr: (a) => { const [k, d] = a.split(':'); S.draft.gr.mode = 'change'; S.draft.gr[k] = Math.max(3, Math.min(21, S.draft.gr[k] + Number(d))); render(); },
+  grMode: (a) => { S.draft.gr.mode = a; render(); },
+  grScope: (a) => { S.draft.gr.scope = a; render(); },
+  openGuardrail: () => go('guardrail'),
+  target: (a) => { S.draft.target = Math.max(5, Math.min(15, S.draft.target + Number(a))); render(); },
   date: (a) => { S.draft.goalDate = a; render(); },
   openReview: () => go('review'),
   approve: () => {
-    const d = S.draft; S.undo = { day: S.day, before: snap(), versionsLen: S.versions.length };
+    const d = S.draft; if (!draftCheck(d).ok) return; S.undo = { day: S.day, before: snap(), versionsLen: S.versions.length };
+    const pr = draftProposed(d); const grNote = grChanged(d) ? ` · guardrail ${grLabel(pr)}` : '';
+    S.guardrail = pr.goal; S.phaseGuardrail = pr.phase;
     S.plan = d.plan;
     let label, detail;
     if (d.kind === 'lean') {
-      S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = d.completion; S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; S.decision = { open: false };
+      S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = d.completion; S.completionTarget = d.completion.mode === 'time' ? null : d.target; S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; S.decision = { open: false };
       label = 'Leaning phase approved'; detail = `${sgn(d.plan.balance)}/day · eat ${fmt(d.plan.eat)} · goal ${fmtG(d.plan.goal)}`;
     } else if (d.kind === 'keepBuilding') {
-      S.phase = 'keepBuilding'; S.guardrail = d.guardrail; S.goalDate = d.goalDate; S.decision = { open: false };
-      label = 'Kept building with new limits'; detail = `range ${d.guardrail.min}–${d.guardrail.max}% · ${d.goalDate} · eat ${fmt(d.plan.eat)}`;
+      S.phase = 'keepBuilding'; S.goalDate = d.goalDate; S.decision = { open: false };
+      label = 'Kept building with new limits'; detail = `${d.goalDate} · eat ${fmt(d.plan.eat)}`;
     } else if (d.kind === 'next') {
       S.completeBf = bf(); S.decision = { open: false }; S.qc = null; S.observeUntil = null;
       if (d.next === 'resume') { S.phase = 'resumed'; S.phaseStartDay = S.day; S.goalDate = 'Feb 20'; label = 'Building resumed'; }
       else if (d.next === 'maintain') { S.phase = 'maintaining'; S.phaseStartDay = S.day; label = 'Holding at maintenance'; }
-      else { S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = { mode: 'hybrid', weeks: 4 }; S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; label = 'Leaning continued'; }
+      else { S.phase = 'leaning'; S.phaseStartDay = S.day; S.completion = { mode: 'hybrid', weeks: 4 }; S.completionTarget = d.target; S.phaseStartBf = bf(); S.phaseStartBody = { ...S.body }; S.phaseStartGained = S.gained; label = 'Leaning continued'; }
       detail = `${sgn(d.plan.balance)}/day · eat ${fmt(d.plan.eat)} · goal ${fmtG(d.plan.goal)}`;
     } else { label = 'Plan customized'; detail = `eat ${fmt(d.plan.eat)} · goal ${fmtG(d.plan.goal)}`; S.decision.open = false; }
-    const v = addVersion(label, detail);
-    S.draft = null; S.log.unshift(`${dateLabel(S.day)} · v${v} approved: ${label}`);
+    const v = addVersion(label, detail + grNote);
+    S.draft = null; S.log.unshift(`${dateLabel(S.day)} · v${v} approved: ${label}${grNote}`);
     home(`Plan updated · version ${v}`);
   },
   undo: () => { if (!S.undo) return; Object.assign(S, S.undo.before); const v = addVersion('Undo', 'Back to the previous plan'); S.undo = null; S.log.unshift(`${dateLabel(S.day)} · undo → v${v}`); home(`Undone · version ${v} restores the previous plan`); },
-  openNext: () => { const plan = JSON.parse(JSON.stringify(S.plan)); plan.balance = planBal(S.plan); S.draft = { kind: 'next', next: bf() <= S.guardrail.max ? 'resume' : 'continue', plan, split: 'suggested', custom: 100 }; go('next'); },
+  openNext: () => { const plan = JSON.parse(JSON.stringify(S.plan)); plan.balance = planBal(S.plan); const g = S.guardrail; S.draft = { kind: 'next', next: S.completionTarget != null && bf() <= S.completionTarget ? 'resume' : 'continue', plan, split: 'suggested', custom: 100, target: Math.max(6, Math.round((bf() - 0.5) * 2) / 2), gr: { mode: 'keep', min: g.enabled === false ? 8 : g.min, max: g.enabled === false ? 9 : g.max, scope: 'goal' } }; go('next'); },
   pickNext: (a) => { S.draft.next = a; render(); },
   nextReview: () => { const d = S.draft; applyEnergy(d.next === 'resume' ? 200 : d.next === 'maintain' ? 0 : -450); go('review'); },
   qcOpt: (a) => { S.qc.opt = a; render(); },
@@ -1241,7 +1346,7 @@ function panel() {
   const flow = [['home', 'Home'], ['goals', 'Goals'], ['briefing', 'Latest briefing'], ['midweek', 'Midweek'], ['monthly', 'Monthly'], ['photo', 'Photo event']];
   return `<div class="pn-sec"><div class="pn-h">Simulated state</div>
     <div class="kvs"><span>Date</span><b>${dateLabel(S.day)}</b><span>Phase</span><b>${{ building: 'Lean Mass Build', leaning: 'Leaning (temporary)', leaningComplete: 'Leaning complete', resumed: 'Lean Mass Build (resumed)', maintaining: 'Maintain', keepBuilding: 'Lean Mass Build (new limits)' }[S.phase]}</b>
-    <span>Body fat</span><b>${f1(bf())}%</b><span>Lean gained</span><b>${f1(S.gained)} of 10 lb</b><span>Plan</span><b>${sgn(planBal(S.plan))} · eat ${fmt(S.plan.eat)} · goal ${fmtG(S.plan.goal)}</b><span>Maintenance used</span><b>${maintLabel()}</b><span>Version</span><b>v${S.versions[0].v}</b></div></div>
+    <span>Body fat</span><b>${f1(bf())}%</b><span>Lean gained</span><b>${f1(S.gained)} of 10 lb</b><span>Plan</span><b>${sgn(planBal(S.plan))} · eat ${fmt(S.plan.eat)} · goal ${fmtG(S.plan.goal)}</b><span>Maintenance used</span><b>${maintLabel()}</b><span>Guardrail</span><b>${S.phaseGuardrail ? `${grText(S.phaseGuardrail)} this phase · goal ${grText(S.guardrail)}` : `${grText(S.guardrail)} (goal)`}</b><span>Version</span><b>v${S.versions[0].v}</b></div></div>
   <div class="pn-sec"><div class="pn-h">Jump to</div><div class="pn-btns">${flow.map(([k, l]) => `<button data-ctl="jump" data-arg="${k}">${l}</button>`).join('')}</div></div>
   <div class="pn-sec"><div class="pn-h">Simulate evidence</div><div class="pn-btns"><button data-ctl="advance" class="pri">Advance a week</button><button data-ctl="finish">Run to phase end</button></div>
     <div class="pn-h" style="margin-top:12px">Body response</div><div class="pn-btns"><button data-ctl="response" data-arg="asEstimated" aria-pressed="${S.response === 'asEstimated'}">As estimated</button><button data-ctl="response" data-arg="slower" aria-pressed="${S.response === 'slower'}">Slower than estimated</button></div>

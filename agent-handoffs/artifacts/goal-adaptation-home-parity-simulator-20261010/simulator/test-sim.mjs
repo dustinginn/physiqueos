@@ -12,7 +12,7 @@ const errors = []; p.on('pageerror', (e) => errors.push(e.message));
 await p.setContent(doc, { waitUntil: 'networkidle' }); await p.waitForTimeout(200);
 const act = async (a, arg) => { const sel = arg !== undefined ? `#phone [data-act="${a}"][data-arg="${arg}"]` : `#phone [data-act="${a}"]`; await p.click(sel); await p.waitForTimeout(40); };
 const ctl = async (c, arg) => { await p.click(arg !== undefined ? `[data-ctl="${c}"][data-arg="${arg}"]` : `[data-ctl="${c}"]`); await p.waitForTimeout(40); };
-const text = () => p.evaluate(() => document.getElementById('phone').innerText);
+const text = () => p.evaluate(() => document.getElementById('phone').innerText.replace(/\u2060/g, ''));
 const st = () => p.evaluate(() => ({ screen: S.screen, phase: S.phase, eat: S.plan.eat, goal: S.plan.goal, balance: planBal(S.plan), v: S.versions[0].v, bf: bf(), gained: S.gained, qc: !!S.qc, stack: S.stack.length }));
 const shot = async (n) => { await (await p.$('#phone')).screenshot({ path: path.join(shots, `${n}.png`) }); };
 
@@ -77,16 +77,55 @@ ok('resume → building again, new version', s.phase === 'resumed' && (await tex
 await shot('11-home-resumed');
 await act('openGoals'); ok('undo available', (await text()).includes('Undo last')); await act('undo'); s = await st(); ok('undo restores leaningComplete', s.phase === 'leaningComplete');
 await ctl('reset'); s = await st(); ok('reset → initial', s.phase === 'building' && s.v === 1 && s.eat === 2500);
-// alternative path: keep building
+// alternative path: keep building (guardrail incompatible until raised)
 await act('openBriefing'); await act('openOptions'); await act('chooseKeepBuilding');
-await act('gr', 'max:0.5'); await act('gr', 'max:0.5'); await act('gr', 'max:0.5'); await act('gr', 'max:0.5'); await act('gr', 'max:0.5');
-await act('date', 'Feb 15'); await act('openReview'); await act('approve'); s = await st();
-ok('keep-building path approves new range', s.phase === 'keepBuilding' && (await p.evaluate(() => S.guardrail.max)) === 11.5);
+ok('keep building: firm 8–9 while at 9.7% is blocked', (await text()).includes('above the 9% upper limit') && (await p.evaluate(() => !draftCheck(S.draft).ok)));
+await act('openGuardrail'); for (let i = 0; i < 5; i++) await act('gr', 'max:0.5');
+ok('editor: change 8–11.5 this phase only, no error', (await p.evaluate(() => draftCheck(S.draft).ok)) && (await text()).includes('8–11.5% this phase only'));
+await act('back'); await act('date', 'Feb 15'); await act('openReview');
+ok('review shows original and proposed guardrail', /8–9% \(goal\)[\s\S]*8–11\.5% this phase only · goal 8–9%/.test(await text()));
+const vBefore = await p.evaluate(() => S.versions.length); await act('approve'); s = await st();
+ok('keep-building approves phase-only 8–11.5, goal stays 8–9, one version', s.phase === 'keepBuilding' && (await p.evaluate(() => [S.phaseGuardrail.max, S.guardrail.max, S.versions.length])).join() === `11.5,9,${vBefore + 1}`);
+ok('Home guardrail box shows effective range with phase scope', (await text()).includes('Maintain approximately 8–11.5% body fat') && (await text()).includes('This phase only · goal 8–9%'));
 await ctl('reset'); await act('openBriefing'); await act('notNow'); await act('notNowPick', 'remove'); ok('not now removes Home item', !(await text()).includes('Review goal options'));
 await ctl('theme', 'light'); await shot('12-home-mineral');
 await ctl('jump', 'monthly'); ok('monthly briefing renders, no proposal', (await text()).includes('Month Ahead'.toUpperCase()) || (await text()).includes('Month Ahead'));
 await ctl('jump', 'photo'); ok('photo event never recommends', (await text()).includes('never trigger a recommendation'));
 ok('simulation label present', (await p.evaluate(() => document.body.innerText)).includes('Functional UX simulation, not the Native visual spec'));
+// Guardrail during leaning: phase-only change, target distinct, resume uses goal guardrail
+await ctl('reset'); await act('openBriefing'); await act('openOptions'); await act('chooseLean');
+ok('lean setup shows phase target and guardrail separately', /Phase target[\s\S]*≤ 9%[\s\S]*Body-fat guardrail[\s\S]*8–9% \(goal\)/.test(await text()));
+await act('target', '0.5'); ok('target 9.5 above guardrail 9 → blocked', (await text()).includes('above the guardrail') && !(await p.evaluate(() => draftCheck(S.draft).ok)));
+await act('openGuardrail'); await act('grMode', 'change'); await act('gr', 'max:0.5'); await act('gr', 'max:0.5');
+ok('phase-only 8–10 clears the target conflict', await p.evaluate(() => draftCheck(S.draft).ok));
+await act('gr', 'min:0.5'); await act('gr', 'min:0.5'); await act('gr', 'min:0.5'); await act('gr', 'min:0.5');
+ok('inverted range (10–10) blocked with message', (await text()).includes('at least 0.5% above') && !(await p.evaluate(() => draftCheck(S.draft).ok)));
+for (let i = 0; i < 4; i++) await act('gr', 'min:-0.5');
+await act('back'); await act('openHub'); ok('hub lists guardrail as changing', /CHANGING[\s\S]*Body-fat guardrail/i.test(await text()));
+await act('openReview'); const rv2 = await text();
+ok('review: guardrail 8–9% (goal) → 8–10% this phase only, phase ends ≤ 9.5%', rv2.includes('8–10% this phase only · goal 8–9%') && rv2.includes('Body fat ≤ 9.5%'));
+const vb = await p.evaluate(() => S.versions.length); await act('approve');
+ok('one approval, one version', (await p.evaluate(() => S.versions.length)) === vb + 1);
+ok('state: goal 8–9, phase 8–10, target 9.5', (await p.evaluate(() => [S.guardrail.max, S.phaseGuardrail.max, S.completionTarget])).join() === '9,10,9.5');
+await ctl('response', 'asEstimated'); await ctl('finish');
+s = await st(); ok('phase completes on its own target (≤ 9.5%), not the guardrail', s.phase === 'leaningComplete' && s.bf <= 9.5 && s.bf > 9.0, String(s.bf));
+await act('back'); await act('openNext');
+ok('next: leaning-only guardrail expires; resume shows goal 8–9%', (await text()).includes('Guardrail when building resumes') && (await text()).includes('8–9% (goal)') && (await text()).includes('ends with this phase'));
+ok('resume blocked while above goal range 9% (at 9.x%)', !(await p.evaluate(() => draftCheck(S.draft).ok)) && (await text()).includes('above the 9% upper limit'));
+await act('openGuardrail'); await act('grMode', 'change'); await act('gr', 'max:0.5'); await act('grScope', 'goal');
+ok('editor at resume: goal-wide 8–9.5 clears conflict', await p.evaluate(() => draftCheck(S.draft).ok));
+await act('back'); await act('nextReview'); const rv3 = await text();
+ok('resume review: Phase 4 linked to Phase 2; guardrail 8–9% (goal) → 8–9.5% (goal)', rv3.includes('Phase 4 · Lean Mass Build (linked to Phase 2)') && rv3.includes('8–9.5% (goal)'));
+await act('approve'); s = await st();
+ok('resumed with goal guardrail 8–9.5, no phase override', s.phase === 'resumed' && (await p.evaluate(() => [S.guardrail.max, S.phaseGuardrail])).join() === '9.5,');
+ok('Home H4 shows goal guardrail 8–9.5%', (await text()).includes('Maintain approximately 8–9.5% body fat'));
+await act('openGoals'); ok('Goals history keeps every guardrail change', /guardrail 8–10% this phase only[\s\S]*/.test(await text()) && (await text()).includes('guardrail 8–9.5% (goal)'));
+await act('undo'); ok('undo restores pre-resume guardrails', (await p.evaluate(() => [S.phase, S.guardrail.max, S.phaseGuardrail && S.phaseGuardrail.max])).join() === 'leaningComplete,9,10');
+// Remove guardrail for the goal (from the plan hub)
+await ctl('reset'); await act('openBriefing'); await act('openOptions'); await act('chooseCustom'); await act('openGuardrail'); await act('grMode', 'remove'); await act('grScope', 'goal');
+ok('remove: warning shown', (await text()).includes('no longer triggers reviews'));
+await act('back'); await act('openReview'); ok('review: 8–9% (goal) → None (goal)', (await text()).includes('None (goal)')); await act('approve');
+ok('Home guardrail box: No body-fat guardrail (same slot)', (await text()).includes('No body-fat guardrail') && (await p.evaluate(() => S.guardrail.enabled)) === false);
 // Scenario B: no DEXA (equation RMR), provisional maintenance
 await ctl('scenario', 'B'); await act('openBriefing'); await act('openOptions'); await act('chooseLean');
 d = await p.evaluate(() => S.draft.plan); ok('B: provisional 2,926 → lean draft eat 2,576 / goal 900', d.eat === 2576 && d.goal === 900, JSON.stringify(d));

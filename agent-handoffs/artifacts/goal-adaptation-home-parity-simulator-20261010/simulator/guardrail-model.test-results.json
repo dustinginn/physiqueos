@@ -1,0 +1,176 @@
+[
+  {
+    "name": "keep → unchanged",
+    "pass": true,
+    "got": {
+      "goal": {
+        "enabled": true,
+        "min": 8,
+        "max": 9
+      },
+      "phase": null
+    },
+    "want": {
+      "goal": {
+        "enabled": true,
+        "min": 8,
+        "max": 9
+      },
+      "phase": null
+    }
+  },
+  {
+    "name": "change phase-only → goal kept, phase override",
+    "pass": true,
+    "got": {
+      "goal": {
+        "enabled": true,
+        "min": 8,
+        "max": 9
+      },
+      "phase": {
+        "enabled": true,
+        "min": 8,
+        "max": 10,
+        "scope": "phase"
+      }
+    },
+    "want": {
+      "goal": {
+        "enabled": true,
+        "min": 8,
+        "max": 9
+      },
+      "phase": {
+        "enabled": true,
+        "min": 8,
+        "max": 10,
+        "scope": "phase"
+      }
+    }
+  },
+  {
+    "name": "change goal → goal replaced, no override",
+    "pass": true,
+    "got": {
+      "goal": {
+        "enabled": true,
+        "min": 8,
+        "max": 10
+      },
+      "phase": null
+    },
+    "want": {
+      "goal": {
+        "enabled": true,
+        "min": 8,
+        "max": 10
+      },
+      "phase": null
+    }
+  },
+  {
+    "name": "remove goal → disabled",
+    "pass": true,
+    "got": false,
+    "want": false
+  },
+  {
+    "name": "remove phase → goal kept, phase disabled",
+    "pass": true,
+    "got": [
+      9,
+      false
+    ],
+    "want": [
+      9,
+      false
+    ]
+  },
+  {
+    "name": "text",
+    "pass": true,
+    "got": [
+      "8–9%",
+      "None",
+      "8–11.5%"
+    ],
+    "want": [
+      "8–9%",
+      "None",
+      "8–11.5%"
+    ]
+  },
+  {
+    "name": "inverted range error",
+    "pass": true,
+    "got": false,
+    "want": false
+  },
+  {
+    "name": "lean target above guardrail max → error",
+    "pass": true,
+    "got": false,
+    "want": false
+  },
+  {
+    "name": "lean target 9.0 within 8–9 → ok",
+    "pass": true,
+    "got": true,
+    "want": true
+  },
+  {
+    "name": "lean target ≥ current body fat → error",
+    "pass": true,
+    "got": false,
+    "want": false
+  },
+  {
+    "name": "lean target 9.5 with phase guardrail 8–10 → ok",
+    "pass": true,
+    "got": true,
+    "want": true
+  },
+  {
+    "name": "keep building at 9.7% with firm 8–9 → incompatible",
+    "pass": true,
+    "got": false,
+    "want": false
+  },
+  {
+    "name": "keep building with 8–11.5 → ok",
+    "pass": true,
+    "got": true,
+    "want": true
+  },
+  {
+    "name": "keep building with guardrail removed for phase → ok + warning",
+    "pass": true,
+    "got": [
+      true,
+      true
+    ],
+    "want": [
+      true,
+      true
+    ]
+  },
+  {
+    "name": "resume at 8.9% with goal 8–9 → ok",
+    "pass": true,
+    "got": true,
+    "want": true
+  },
+  {
+    "name": "resume at 8.9% with new goal 7–8.5 → incompatible",
+    "pass": true,
+    "got": false,
+    "want": false
+  },
+  {
+    "name": "out of bounds 3–9 → error",
+    "pass": true,
+    "got": false,
+    "want": false
+  }
+]

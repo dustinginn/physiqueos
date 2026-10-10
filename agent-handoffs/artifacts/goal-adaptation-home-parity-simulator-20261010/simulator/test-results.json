@@ -180,7 +180,27 @@
     "info": ""
   },
   {
-    "name": "keep-building path approves new range",
+    "name": "keep building: firm 8–9 while at 9.7% is blocked",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "editor: change 8–11.5 this phase only, no error",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "review shows original and proposed guardrail",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "keep-building approves phase-only 8–11.5, goal stays 8–9, one version",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Home guardrail box shows effective range with phase scope",
     "pass": true,
     "info": ""
   },
@@ -201,6 +221,106 @@
   },
   {
     "name": "simulation label present",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "lean setup shows phase target and guardrail separately",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "target 9.5 above guardrail 9 → blocked",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "phase-only 8–10 clears the target conflict",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "inverted range (10–10) blocked with message",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "hub lists guardrail as changing",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "review: guardrail 8–9% (goal) → 8–10% this phase only, phase ends ≤ 9.5%",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "one approval, one version",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "state: goal 8–9, phase 8–10, target 9.5",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "phase completes on its own target (≤ 9.5%), not the guardrail",
+    "pass": true,
+    "info": "9.317079397498084"
+  },
+  {
+    "name": "next: leaning-only guardrail expires; resume shows goal 8–9%",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "resume blocked while above goal range 9% (at 9.x%)",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "editor at resume: goal-wide 8–9.5 clears conflict",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "resume review: Phase 4 linked to Phase 2; guardrail 8–9% (goal) → 8–9.5% (goal)",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "resumed with goal guardrail 8–9.5, no phase override",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Home H4 shows goal guardrail 8–9.5%",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Goals history keeps every guardrail change",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "undo restores pre-resume guardrails",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "remove: warning shown",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "review: 8–9% (goal) → None (goal)",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Home guardrail box: No body-fat guardrail (same slot)",
     "pass": true,
     "info": ""
   },
