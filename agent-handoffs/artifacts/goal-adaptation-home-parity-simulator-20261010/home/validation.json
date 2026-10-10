@@ -1,0 +1,134 @@
+{
+  "desktop-1600": {
+    "overflowX": 0,
+    "errors": [],
+    "checks": [
+      {
+        "h": 1002,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1002,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1002,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1002,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1002,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1002,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1052,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1052,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1002,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1002,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      }
+    ]
+  },
+  "mobile-390": {
+    "overflowX": 0,
+    "errors": [],
+    "checks": [
+      {
+        "h": 1006,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1006,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1006,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1006,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1006,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1006,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1055,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1055,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1006,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      },
+      {
+        "h": 1006,
+        "rows": 2,
+        "ring": true,
+        "guardrail": true
+      }
+    ]
+  }
+}
