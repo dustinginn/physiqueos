@@ -25,7 +25,7 @@ for (const [name, w, h, scheme] of [['desktop-1600-dark', 1600, 1000, 'dark'], [
   const { p, errors } = await page(w, h, scheme);
   const overflowX = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   await p.screenshot({ path: path.join(root, 'review-board', `${name}-top.png`) });
-  for (const sec of ['principle', 'audit', 'scenario', 'qc', 'rmr', 'training', 'editors', 'decisions']) {
+  for (const sec of ['principle', 'home', 'goals', 'briefings', 'qc', 'decisions']) {
     await p.evaluate((id) => { document.getElementById(id).scrollIntoView(); window.scrollBy(0, -60); }, sec);
     await p.waitForTimeout(150);
     if (name.startsWith('desktop') || sec === 'energy') await p.screenshot({ path: path.join(root, 'review-board', `${name}-${sec}.png`) });
@@ -68,6 +68,7 @@ for (const [name, w, h, scheme] of [['desktop-1600-dark', 1600, 1000, 'dark'], [
   R.qcCustomTooBig = await readQ('Q3-custom');
   const text = await p.evaluate(() => document.body.innerText);
   R.remnants = { visible75pct: (text.match(/75\s?%/g) || []).length, source75pct: (html.match(/75\s?%/g) || []).length, credit: (html.match(/credit/gi) || []).length, weeklySplitEditor: (text.match(/Same intake every day|More on training days/g) || []).length, prescribedWalks: (text.match(/brisk 45-min/g) || []).length, fitbitClaims: (text.match(/Fitbit/g) || []).length, editedElsewhere: (text.match(/edited on the web|edited elsewhere/gi) || []).length };
+  R.phase = await p.evaluate(() => { const t = (id) => document.querySelector(`#p-${id} .phone.dark`).innerText; return { homeLeaningShowsGoal: /BUILD LEAN MASS/.test(t('H2-home-leaning')) && /\+7 of 10 lb kept/.test(t('H2-home-leaning')), homeLeaningPhaseRows: (t('H2-home-leaning').match(/PHASE 2|NOW · TEMPORARY/g) || []).length, weeklyLeaningNoWrongDirection: !/wrong/i.test(t('B1-weekly-leaning')), midweekNoProposal: !/Accept|Choose what/.test(t('B4-midweek-leaning')), dexaDecisionLast: /Phase decision[\s\S]*Not now\s*$/i.test(t('B3-dexa-phase-complete').trim()), goalProgressNotReset: /\+6\.6 of 10/.test(t('G2-goal-phase-complete')) }; });
   report.energy = { ...R, errors };
   await p.close();
 }

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const read = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
 const css = ['phone.css', 'components.css', 'board.css'].map(read).join('\n').replace(/font-family: Jakarta,/g, "font-family: 'Plus Jakarta Sans',");
-const js = ['chrome.js', 'model.js', 'screens-v3a.js', 'screens-v3b.js', 'registry.js', 'board.js'].map(read).join('\n;\n').replace(/font-family:Jakarta/g, "font-family:'Plus Jakarta Sans'");
+const js = ['chrome.js', 'model.js', 'screens-v3a.js', 'screens-v3b.js', 'screens-v3c.js', 'screens-v3d.js', 'registry.js', 'board.js'].map(read).join('\n;\n').replace(/font-family:Jakarta/g, "font-family:'Plus Jakarta Sans'");
 const html = `<title>Goal Adaptation V3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

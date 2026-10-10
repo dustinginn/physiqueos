@@ -161,8 +161,16 @@
       "fitbitClaims": 1,
       "editedElsewhere": 2
     },
+    "phase": {
+      "homeLeaningShowsGoal": true,
+      "homeLeaningPhaseRows": 2,
+      "weeklyLeaningNoWrongDirection": true,
+      "midweekNoProposal": true,
+      "dexaDecisionLast": true,
+      "goalProgressNotReset": true
+    },
     "errors": []
   },
-  "screens": 54,
+  "screens": 80,
   "screenErrors": []
 }

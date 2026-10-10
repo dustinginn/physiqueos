@@ -1025,6 +1025,210 @@ S['T4-goals'] = () => `<div style="height:874px;overflow:hidden;position:relativ
 
 ;
 // ---------------------------------------------------------------------------
+// v3 addendum (9e1d6207): Home, Goals and briefings across the temporary
+// leaning phase. Home reuses the existing HomeJourneyFieldView slots only
+// (headline, timeline line, support line, confidence ring, 4 metrics, phase
+// rows, guardrail box). Values marked * are illustrative.
+// ---------------------------------------------------------------------------
+const ring = (pct, label = 'Goal') => `<svg width="96" height="96" viewBox="0 0 96 96" aria-label="${label} confidence ${pct} percent"><circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="9"/><circle cx="48" cy="48" r="40" fill="none" stroke="var(--green)" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(pct / 100) * 251} 251" transform="rotate(-90 48 48)"/><text x="48" y="50" text-anchor="middle" font-size="20" font-weight="800" fill="currentColor">${pct}%</text><text x="48" y="66" text-anchor="middle" font-size="8.5" font-weight="700" fill="currentColor" opacity=".75">${label.toUpperCase()}</text></svg>`;
+const metric = (k, v) => `<div style="border-top:1px solid rgba(255,255,255,.22);padding-top:6px"><div style="font-size:.5625em;font-weight:800;letter-spacing:.1em;opacity:.8">${k}</div><div style="font-size:.875em;font-weight:800;margin-top:3px;line-height:1.2">${v}</div></div>`;
+const phaseRow = (tone, label, name, detail, extra = '') => `<div class="row" style="align-items:flex-start;gap:12px;position:relative;z-index:1"><span style="width:24px;height:24px;border-radius:50%;background:${tone === 'green' ? 'rgba(85,227,154,.25)' : tone === 'amber' ? 'rgba(244,188,72,.25)' : 'rgba(255,255,255,.14)'};display:grid;place-items:center;flex:none"><i style="width:12px;height:12px;border-radius:50%;background:${tone === 'green' ? 'var(--green)' : tone === 'amber' ? 'var(--amber)' : 'transparent'};border:${tone === 'hollow' ? '2px solid currentColor' : '0'}"></i></span><div><div style="font-size:.6875em;font-weight:800;letter-spacing:.1em;opacity:.85">${label}</div><div style="font-weight:800;font-size:.9375em;margin-top:2px">${name}</div><div style="font-size:.75em;font-weight:600;opacity:.85;margin-top:2px">${detail}</div>${extra ? `<div style="font-size:.75em;font-weight:800;margin-top:2px">${extra}</div>` : ''}</div></div>`;
+const homeField = (o) => `
+<div style="margin:6px 0 0;padding:18px;background:linear-gradient(165deg,var(--fieldStart),var(--fieldEnd));position:relative;overflow:hidden;color:var(--ink)">
+  <div style="position:absolute;width:265px;height:265px;border-radius:50%;border:48px solid rgba(255,255,255,.05);right:-130px;top:40px"></div>
+  <div class="row" style="align-items:flex-start;gap:14px;position:relative">
+    <div class="grow"><div style="font-size:.6875em;font-weight:800;letter-spacing:.1em;opacity:.85">TRAJECTORY</div>
+      <div class="display" style="font-size:1.5em;margin-top:4px;line-height:1.1">${o.headline}</div>
+      <div class="row" style="gap:6px;margin-top:6px"><i style="width:7px;height:7px;border-radius:50%;background:var(--green);flex:none"></i><span style="font-size:.8125em;font-weight:800;color:var(--green)">${o.timeline}</span></div>
+      <p style="font-size:.875em;font-weight:500;margin-top:6px;line-height:1.35;opacity:.9">${o.support}</p></div>
+    <div style="flex:none">${ring(o.conf)}</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 16px;position:relative">${o.metrics.map(([k, v]) => metric(k, v)).join('')}</div>
+  <div style="position:relative"><div style="font-size:.6875em;font-weight:800;letter-spacing:.1em;color:var(--purple)">PRIMARY GOAL · BUILD LEAN MASS</div><div style="font-size:.75em;opacity:.85;margin-top:2px">${o.range}</div>
+    <div class="stack-sm" style="margin-top:12px">${o.rows.map((r) => phaseRow(...r)).join('')}</div></div>
+  <div style="width:304px;max-width:100%;margin-top:14px;border-radius:12px;background:color-mix(in srgb,var(--paper) 80%,transparent);border-left:4px solid var(--cyan);padding:10px 12px;position:relative"><div style="font-size:.625em;font-weight:800;letter-spacing:.1em;color:var(--cyan)">${o.boxLabel}</div><div style="font-weight:800;font-size:.875em;margin-top:2px">${o.boxTitle}</div><div style="font-size:.75em;color:var(--ink2);margin-top:2px">${o.boxDetail}</div></div>
+</div>`;
+const homeStrip = (brief) => `<div class="row" style="gap:10px;height:104px;align-items:stretch">
+  <div class="tile-amber" style="flex:58;min-height:0"><span class="display h3">Log Morning Weight</span><span style="background:rgba(255,255,255,.28);border-radius:14px;width:44px;height:44px;display:grid;place-items:center">${I.plus}</span></div>
+  <div class="card" style="flex:42;border:1.5px solid var(--teal);padding:12px;display:flex;flex-direction:column;justify-content:space-between"><span class="eyebrow">Briefing</span><div class="t-sm strong">${brief}</div></div></div>`;
+const homePriorities = (decision) => `<div class="card" style="padding:16px"><div class="row between"><span class="eyebrow purple">Today's priorities</span><span class="eyebrow purple">${decision ? 3 : 2} open</span></div>
+  ${decision ? `<div class="card rail amber" style="margin-top:12px;background:var(--soft)"><div class="row between" style="align-items:flex-start"><div class="grow"><div class="eyebrow amber">Phase decision</div><div class="t-lg strong" style="margin-top:4px">${decision}</div><div class="t-sm ink2" style="margin-top:4px">Leaning phase complete · your choice</div></div><span style="color:var(--muted);width:44px;height:44px;display:grid;place-items:center;margin:-10px -10px 0 0">${I.x}</span></div></div>` : ''}
+  <div class="row" style="gap:10px;margin-top:10px"><div class="prio grow"><div class="t-body semi">Morning Weigh-In</div><div class="t-sm ink2">Before food or fluids</div></div><div class="prio grow"><div class="t-body semi">Foam Rolling</div><div class="t-sm ink2">Evening</div></div></div></div>`;
+const homeScreen = (o, brief, decision) => `
+${statusBar()}
+<div style="padding:4px 18px 0"><div class="t-body ink2">Good morning</div><div class="display" style="font-size:1.875em">Dustin<span style="color:var(--purple)">.</span></div></div>
+${homeField(o)}
+<div class="content stack" style="padding-top:12px">${homeStrip(brief)}${homePriorities(decision)}</div>
+${tabbar('home')}`;
+
+S['H1-home-building'] = () => homeScreen({ headline: 'Lean Mass Build', timeline: 'About 3 weeks remaining', support: 'Add lean mass gradually while keeping body fat in range.', conf: 70, metrics: [['TARGET DATE', 'Oct 31'], ['REMAINING', '3 weeks'], ['PROGRESS', '+7 of 10 lb'], ['DESTINATION', '+10 lb']], range: 'Jul 18 – Oct 31', rows: [['amber', 'PHASE 1 · COMPLETE', 'Maintenance Calibration', 'Jul 18 – Aug 15'], ['green', 'PHASE 2 · ACTIVE', 'Lean Mass Build', 'Aug 15 – Oct 31', '+7 of 10 lb gained']], boxLabel: 'GUARDRAIL', boxTitle: 'Keep body fat at 8–9%', boxDetail: 'Latest DEXA: above range' }, 'DEXA Analysis ready · Oct 9');
+
+S['H2-home-leaning'] = () => homeScreen({ headline: 'Leaning phase', timeline: 'Temporary · week 2 · ≈ 2–4 weeks left*', support: 'Bring body fat back to 8–9% while keeping the lean mass you built. Building resumes when you choose.', conf: 70, metrics: [['GOAL', '+7 of 10 lb kept'], ['BODY FAT · 8–9%', '9.4%*'], ['PHASE', 'Week 2'], ['GOAL DATE', 'After leaning']], range: 'Jul 18 – re-estimated after leaning', rows: [['amber', 'PHASE 2 · PAUSED', 'Lean Mass Build', 'Paused at +7 lb · resumes when you choose'], ['green', 'NOW · TEMPORARY', 'Leaning phase', 'Started Oct 9 · ends when back in range', 'Week 2 · on track']], boxLabel: 'PHASE GOAL', boxTitle: 'Body fat back to 8–9%', boxDetail: 'Latest estimate 9.4%* · a DEXA confirms best' }, 'Weekly ready · Oct 18–24');
+
+S['H3-home-phase-done'] = () => homeScreen({ headline: 'Leaning complete', timeline: 'Back in range · your next step', support: 'Body fat 8.7%* on your Nov 20 scan. Choose when to start building again.', conf: 72, metrics: [['GOAL', '+6.6 of 10 lb*'], ['BODY FAT · 8–9%', '8.7%* ✓'], ['PHASE', 'Complete'], ['GOAL DATE', 'Set on resume']], range: 'Jul 18 – re-estimated on resume', rows: [['amber', 'PHASE 2 · PAUSED', 'Lean Mass Build', 'Ready to resume'], ['green', 'LEANING · COMPLETE', 'Leaning phase', 'Oct 9 – Nov 20 · fat −3.1 lb*']], boxLabel: 'GUARDRAIL', boxTitle: 'Keep body fat at 8–9%', boxDetail: 'Latest DEXA: within range' }, 'DEXA Analysis ready · Nov 20', 'Start building again?');
+
+S['H4-home-resumed'] = () => homeScreen({ headline: 'Lean Mass Build', timeline: 'Building again · ≈ 3.4 lb to go', support: 'Slow, lean gain from here, keeping body fat inside 8–9%.', conf: 64, metrics: [['TARGET DATE', 'Feb–Apr*'], ['REMAINING', '≈ 3.4 lb'], ['PROGRESS', '+6.6 of 10 lb'], ['DESTINATION', '+10 lb']], range: 'Jul 18 – Feb–Apr* (revised)', rows: [['amber', 'LEANING · COMPLETE', 'Leaning phase', 'Oct 9 – Nov 20'], ['green', 'PHASE 2 · RESUMED', 'Lean Mass Build', 'Resumed Nov 22', '+6.6 of 10 lb']], boxLabel: 'GUARDRAIL', boxTitle: 'Keep body fat at 8–9%', boxDetail: 'Latest DEXA: within range' }, 'Weekly ready · Nov 22–28');
+
+// ---------------- Goals -----------------
+const lab = (t, cls) => `<span class="prov ${cls || ''}">${t}</span>`;
+const journeyCard = (rows) => `<div class="card"><span class="eyebrow">The path · Your Journey</span><div class="phases" style="margin-top:10px">${rows.map(([dot, title, sub], i) => `<div class="ph"><div class="col"><div class="dot ${dot}"></div>${i < rows.length - 1 ? '<div class="line"></div>' : ''}</div><div class="txt"><div class="t-body strong">${title}</div><div class="t-sm ink2">${sub}</div></div></div>`).join('')}</div></div>`;
+const historyCard = (rows) => `<div class="card"><div class="row between"><span class="eyebrow">Changes you approved</span><span class="t-sm semi" style="color:var(--teal)">Original plan</span></div><div class="divider-list" style="margin-top:6px">${rows.map(([d, t]) => `<div class="lrow"><div class="l"><b>${d}</b><small>${t}</small></div></div>`).join('')}</div></div>`;
+
+S['G1-goal-leaning'] = () => `
+${statusBar()}${nav('Goals', 'Build Lean Mass')}
+<div class="content stack">
+  <div class="card" style="background:linear-gradient(160deg,var(--fieldStart),var(--fieldEnd));border:0">
+    <div class="row between"><span class="eyebrow" style="color:var(--ink)">Active goal</span>${lab('Goal confidence 70%')}</div>
+    <div class="display h1" style="margin-top:6px">Build Lean Mass</div>
+    <div class="t-sm" style="margin-top:4px">+10 lb lean mass</div>
+    <div class="kv"><span class="k" style="color:var(--ink)">Progress</span><span class="v">+7 of 10 lb · kept ${lab('Measured Oct 9', 'm')}</span></div>
+    <div class="bar"><i style="width:70%"></i></div>
+    <div class="kv"><span class="k" style="color:var(--ink)">Goal date</span><span class="delta"><s>Oct 31</s><span class="v">Re-estimated after leaning</span></span></div>
+  </div>
+  <div class="card" style="border:1.5px solid var(--green)">
+    <div class="row between"><span class="eyebrow" style="color:var(--green)">Now · temporary phase</span>${lab('Week 2')}</div>
+    <div class="display h2" style="margin-top:6px">Leaning phase</div>
+    <p class="t-sm ink2" style="margin-top:4px">Back to 8–9% body fat while keeping lean mass. Then building resumes when you choose.</p>
+    <div class="kv"><span class="k">Ends</span><span class="v">Back in 8–9% · review at 6 weeks if not</span></div>
+    <div class="kv"><span class="k">Body fat</span><span class="v">9.7% → 9.4%* ${lab('Estimate')}</span></div>
+    <div class="bar"><i style="width:43%"></i></div>
+    <div class="kv"><span class="k">Phase forecast</span><span class="v">Likely 2–4 more weeks ${lab('Forecast', 'e')}</span></div>
+    <p class="t-xs muted" style="margin-top:4px">Phase forecast is separate from goal confidence.</p>
+  </div>
+  <div class="card"><div class="row between"><span class="eyebrow">Body-fat limit</span>${lab('You approved')}</div>
+    <div class="t-body strong" style="margin-top:6px">8–9% · firm · always</div><p class="t-sm ink2" style="margin-top:2px">Currently above; this phase is bringing it back.</p></div>
+  <div class="card"><div class="row between"><span class="eyebrow">Plan for this phase</span><span class="t-sm semi" style="color:var(--teal)">Open plan</span></div>
+    <div class="kv"><span class="k">Daily balance</span><span class="v">−450 · eat 1,767 · goal 900</span></div>
+    <div class="kv"><span class="k">Carried forward</span><span class="v">Training, recovery, supplements, photos</span></div></div>
+  ${journeyCard([['done', 'Phase 1 · Maintenance Calibration', 'Jul 18 – Aug 15 · complete'], ['paused', 'Phase 2 · Lean Mass Build', 'Paused at +7 lb on Oct 9 · progress kept'], ['now', 'Leaning phase · temporary', 'Since Oct 9 · week 2'], ['', 'Lean Mass Build resumes', 'When you choose, after leaning']])}
+  ${historyCard([['Oct 9 · plan v2', 'Leaning phase approved · eat 2,500 → 1,767, activity goal 800 → 900'], ['Aug 15 · plan v1', 'Lean Mass Build started · original goal date Oct 31']])}
+</div>`;
+
+S['G2-goal-phase-complete'] = () => `
+${statusBar()}${nav('Goals', 'Build Lean Mass')}
+<div class="content stack">
+  <div class="card" style="border:1.5px solid var(--green)">
+    <div class="row between"><span class="eyebrow" style="color:var(--green)">Leaning phase complete</span>${lab('Nov 20 DEXA*', 'm')}</div>
+    <div class="display h2" style="margin-top:6px">Back in your 8–9% range</div>
+    <div class="kv"><span class="k">Body fat</span><span class="delta"><s>9.7%</s><span class="v">8.7%*</span></span></div>
+    <div class="kv"><span class="k">Fat mass</span><span class="v">−3.1 lb*</span></div>
+    <div class="kv"><span class="k">Lean mass (DEXA)</span><span class="v">−0.4 lb*</span></div>
+    <p class="t-xs muted" style="margin-top:4px">DEXA lean mass is everything that isn’t fat, including water and stored carbs. Some of a small drop after a cut is usually water, not muscle.</p>
+  </div>
+  <div class="card"><div class="row between"><span class="eyebrow">Build Lean Mass</span>${lab('Goal')}</div>
+    <div class="kv"><span class="k">Progress</span><span class="delta"><s>+7.0</s><span class="v">+6.6 of 10 lb*</span></span></div>
+    <p class="t-xs muted">Shown honestly: progress isn’t reset, and the next scans will show how much returns.</p></div>
+  <div class="card selected"><span class="eyebrow amber">What’s next?</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice">${radio(true)}<div class="grow"><div class="row between"><span class="t-body strong">Start building again</span><span class="pill teal">Suggested</span></div><div class="t-sm ink2">Slow, lean gain · goal ≈ Feb–Apr*</div></div></div>
+      <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Hold at maintenance first</div><div class="t-sm ink2">2–4 weeks before building</div></div></div>
+      <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Keep leaning</div><div class="t-sm ink2">Aim for the lower end of 8–9%</div></div></div>
+    </div>
+    <div class="btn primary" style="margin-top:10px">Review this change</div>
+    <p class="t-xs muted" style="margin-top:8px;text-align:center">Nothing restarts on its own.</p></div>
+</div>`;
+
+S['G3-goal-resumed'] = () => `
+${statusBar()}${nav('Goals', 'Build Lean Mass')}
+<div class="content stack">
+  <div class="card" style="background:linear-gradient(160deg,var(--fieldStart),var(--fieldEnd));border:0">
+    <div class="row between"><span class="eyebrow" style="color:var(--ink)">Active goal</span>${lab('Goal confidence 64%')}</div>
+    <div class="display h1" style="margin-top:6px">Build Lean Mass</div>
+    <div class="kv"><span class="k" style="color:var(--ink)">Progress</span><span class="v">+6.6 of 10 lb ${lab('Measured Nov 20', 'm')}</span></div>
+    <div class="bar"><i style="width:66%"></i></div>
+    <div class="kv"><span class="k" style="color:var(--ink)">Goal date</span><span class="delta"><s>Oct 31</s><span class="v">Feb–Apr* ${lab('Forecast', 'e')}</span></span></div>
+  </div>
+  ${journeyCard([['done', 'Phase 1 · Maintenance Calibration', 'Jul 18 – Aug 15'], ['done', 'Phase 2 · Lean Mass Build', 'Aug 15 – Oct 9 · +7 lb'], ['done', 'Leaning phase · temporary', 'Oct 9 – Nov 20 · fat −3.1 lb*, back in range'], ['now', 'Phase 2 · Lean Mass Build (resumed)', 'Since Nov 22 · +200 a day · eat 2,117 · goal 800*']])}
+  ${historyCard([['Nov 22 · plan v4', 'Resumed building · balance +200'], ['Nov 8 · plan v3', 'Quick calibration · deficit −450 → −650'], ['Oct 9 · plan v2', 'Leaning phase approved'], ['Aug 15 · plan v1', 'Lean Mass Build · original date Oct 31']])}
+</div>`;
+
+;
+// ---------------------------------------------------------------------------
+// v3 addendum: phase-aware briefings. Approved section order is kept; only the
+// narrative inside existing sections changes. Middle modules are shown as a
+// compact "unchanged" stub so each phone shows the hero and the ending.
+// ---------------------------------------------------------------------------
+const stub = (names) => `<div class="card soft" style="padding:10px 14px"><div class="t-xs muted">${names} · layout unchanged</div></div>`;
+const weeklyHero = (o) => `<div class="card" style="background:linear-gradient(160deg,var(--fieldStart),var(--fieldEnd));border:0">
+  <div class="row between"><div><div class="eyebrow" style="color:var(--ink)">Weekly briefing</div><div class="t-xs" style="margin-top:2px">${o.dates}</div></div>${ring(o.conf)}</div>
+  <div class="display h2" style="margin-top:6px">${o.headline}</div>
+  <p class="t-sm" style="margin-top:6px;opacity:.9">${o.meaning}</p>
+  <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">${o.chips.map(([k, v]) => `<span class="pill line" style="background:color-mix(in srgb,var(--paper) 70%,transparent)">${k}: ${v}</span>`).join('')}</div></div>`;
+const coachTake = (rows, title = 'Coach’s Take') => `<div class="coach"><div class="eyebrow purple">${title}</div><div class="divider-list" style="margin-top:6px">${rows.map(([h, b, mark]) => `<div style="padding:10px 0"><div class="t-sm strong">${h}</div><p class="t-sm ${mark ? '' : 'ink2'}" style="margin-top:3px${mark ? ';background:var(--tealWash);border-radius:8px;padding:4px 6px' : ''}">${b}</p></div>`).join('')}</div></div>`;
+
+S['B0-weekly-before'] = () => `
+${statusBar()}${nav('Briefings', 'Weekly Briefing')}
+<div class="content stack">
+  ${weeklyHero({ dates: 'Oct 18–24', conf: 66, headline: 'Weight moved the wrong way for building', meaning: 'Scale weight fell 0.9 lb, which works against your lean-mass goal.', chips: [['Strategy', 'Leaning phase'], ['Week', '2']] })}
+  ${stub('Energy · Weight · Body Composition · Training · Recovery')}
+  ${coachTake([['Biggest Takeaway', 'Weight dropped while you’re building muscle. That’s not the direction you want.'], ['What To Do', 'Pause the push to gain more weight until intake is back on plan.']])}
+  <div class="ewarn red">${I.warn}<span>Today’s engine judges the week by the goal (build = weight up), so a planned cut reads as a setback.</span></div>
+</div>`;
+
+S['B1-weekly-leaning'] = () => `
+${statusBar()}${nav('Briefings', 'Weekly Briefing')}
+<div class="content stack">
+  ${weeklyHero({ dates: 'Oct 18–24', conf: 70, headline: 'Leaning is on track', meaning: 'Weight down 0.9 lb, strength held on 8 of 9 lifts. Exactly what this temporary phase is for.', chips: [['Strategy', 'Leaning (temporary)'], ['Week', '2'], ['Next', 'Calibration check Nov 6']] })}
+  ${stub('Energy · Weight · Body Composition · Training · Recovery')}
+  ${coachTake([['Biggest Takeaway', 'Fat is coming down and your lifts are holding, so the +7 lb you built is being protected.', 1], ['What To Do', 'Keep training heavy; it’s the signal that keeps lean mass while you eat less.'], ['What To Watch', 'If strength drops on 2+ lifts, we’ll look at the deficit size.'], ['Into Next Week', 'Same plan: −450 a day, 1,767 kcal, activity goal 900.']])}
+  <p class="t-xs muted" style="text-align:center">No recommendation this week, so nothing appears below Coach’s Take.</p>
+</div>`;
+
+S['B2-monthly-leaning'] = () => `
+${statusBar()}${nav('Briefings', 'Monthly Briefing')}
+<div class="content stack">
+  <div class="row between"><span class="eyebrow">Monthly · October</span><span class="t-xs muted">End of briefing</span></div>
+  ${stub('Hero · Goal Milestone · Training · Energy · Recovery · New Baseline · What Changed · Defining Moments')}
+  ${coachTake([['Coach’s Take', 'October split in two: three weeks of building that added lean mass, then a deliberate leaning phase to bring body fat back into range. Both moved you toward the same goal.', 1]])}
+  <div class="card"><span class="eyebrow">Month Ahead</span>
+    <div class="t-body strong" style="margin-top:6px">Finish leaning, then decide how to resume building.</div>
+    <p class="t-sm ink2" style="margin-top:4px">Phase forecast: likely 2–4 more weeks. Goal: +7 of 10 lb kept; the new goal date is set when you resume.</p>
+    <div class="divider-list" style="margin-top:8px">${[['Energy', 'Hold −450 a day; a calibration check comes on Nov 6.'], ['Training', 'Keep loads; protect strength.'], ['Recovery', 'Sleep 7 h+ helps you hold strength in a deficit.']].map(([k, v]) => `<div class="lrow"><div class="l">${k}<small>${v}</small></div></div>`).join('')}</div></div>
+</div>`;
+
+S['B3-dexa-phase-complete'] = () => `
+${statusBar()}${nav('Briefings', 'DEXA Analysis')}
+<div class="content stack">
+  <div class="card" style="background:linear-gradient(160deg,var(--fieldStart),var(--fieldEnd));border:0">
+    <div class="eyebrow" style="color:var(--ink)">DEXA event briefing · Nov 20*</div>
+    <div class="display h2" style="margin-top:6px">Back in your 8–9% range</div>
+    <p class="t-sm" style="margin-top:6px;opacity:.9">Your leaning phase did its job: fat down, lean mass close to where it was.</p></div>
+  <div class="card"><span class="eyebrow">Since starting the leaning phase</span>
+    <div class="kv"><span class="k">Body fat</span><span class="delta"><s>9.7%</s><span class="v">8.7%*</span></span></div>
+    <div class="kv"><span class="k">Fat mass</span><span class="v" style="color:var(--green)">−3.1 lb*</span></div>
+    <div class="kv"><span class="k">Lean mass</span><span class="v">−0.4 lb*</span></div>
+    <p class="t-xs muted">Lean mass is muscle plus water and other non-fat tissue. A small drop after a cut is often water and stored carbs.</p></div>
+  ${coachTake([['Biggest Win', 'Body fat is back in range, and the lean mass you built is largely intact.', 1], ['Protect', 'Your strength held through the cut, which is the best sign the muscle is still there.'], ['Next', 'Start building again slowly so body fat stays in range.']], 'Coach’s Insight')}
+  <div class="card rail amber" style="padding-top:16px;padding-bottom:16px">
+    <div class="eyebrow amber">Phase decision</div>
+    <div class="display h3" style="margin-top:6px">Your leaning phase is complete</div>
+    <p class="t-sm ink2" style="margin-top:6px">Choose when and how to start building again. Nothing restarts on its own.</p>
+    <div class="row" style="margin-top:12px;gap:10px"><div class="btn primary small grow">Choose what’s next</div><div class="btn secondary small" style="width:104px">Not now</div></div></div>
+</div>`;
+
+S['B4-midweek-leaning'] = () => `
+${statusBar()}${nav('Briefings', 'Midweek Briefing')}
+<div class="content stack">
+  <div class="card" style="background:linear-gradient(160deg,var(--fieldStart),var(--fieldEnd));border:0">
+    <div class="eyebrow" style="color:var(--ink)">Midweek briefing · Oct 25–27</div>
+    <div class="display h3" style="margin-top:6px">Leaning is moving as planned so far</div>
+    <span class="pill line" style="margin-top:10px;display:inline-flex;background:color-mix(in srgb,var(--paper) 70%,transparent)">Goal & Phase: Build Lean Mass · Leaning (temporary)</span></div>
+  ${stub('Energy · Weight · Body Composition · Training')}
+  ${coachTake([['Biggest Takeaway', 'Intake and activity are on plan through Tuesday.'], ['What To Do', 'Keep the same plan through Sunday.']])}
+  <p class="t-xs muted" style="text-align:center">Midweek never suggests changes. If a decision is already open, it links to it.</p>
+</div>`;
+
+S['B5-photo-leaning'] = () => `
+${statusBar()}${nav('Briefings', 'Photo Event')}
+<div class="content stack">
+  <div class="row between"><span class="eyebrow">Photo event · Oct 31</span><span class="t-xs muted">End of briefing</span></div>
+  ${stub('Hero · This Photo Session · What Visibly Changed · Interpretation')}
+  ${coachTake([['Coach’s Insight', 'Your waist looks a little leaner than two weeks ago, consistent with the leaning phase. Photos support the trend but don’t measure body fat, so your next scan or weigh-in trend decides when the phase is done.', 1]], 'Coach’s Insight')}
+  <p class="t-xs muted" style="text-align:center">Photos alone never trigger a recommendation.</p>
+</div>`;
+
+;
+// ---------------------------------------------------------------------------
 // v3 registry: focused board. Tags: NEW, UPDATED, Canonical today, New contract
 // (Phase C), Concept only.
 // ---------------------------------------------------------------------------
@@ -1056,6 +1260,19 @@ const SCREENS = {
   'R3-sleep-goal': { short: 'Sleep goal', title: 'Optional sleep goal', desc: 'One number, with your recent average for reference.', tags: ['NEW', T.concept] },
   'S1-supplements': { short: 'Supplements', title: 'Supplements', desc: 'List with add and edit. No recommendations or dose advice.', tags: ['UPDATED', T.canon] },
   'S2-add-supplement': { short: 'Add', title: 'Add a supplement', desc: 'Name, optional amount, how often and reminder.', tags: ['NEW', T.canon] },
+  'H1-home-building': { short: 'Home · building', title: 'Home today: building (before)', desc: 'The current Home goal card: phase headline, countdown, goal confidence ring, four metrics, phase rows and guardrail box. Kept as the baseline.', tags: ['Preserved'] },
+  'H2-home-leaning': { short: 'Home · leaning', title: 'Home during the temporary leaning phase', desc: 'Same card, same slots and the same two phase rows. Headline “Leaning phase · Temporary”; the primary goal stays visible (“PRIMARY GOAL · BUILD LEAN MASS”, “+7 of 10 lb kept”, Lean Mass Build paused, not abandoned). Metrics switch to Goal · Body fat · Phase · Goal date; the guardrail box shows the phase goal.', tags: ['NEW', T.newc] },
+  'H3-home-phase-done': { short: 'Home · decision', title: 'Home: phase complete, your next step', desc: 'Headline “Leaning complete”. The decision is a dismissible item in Today’s Priorities (existing pattern), not a new card.', tags: ['NEW', T.newc] },
+  'H4-home-resumed': { short: 'Home · resumed', title: 'Home: building again', desc: 'Lean Mass Build resumed with honest progress (+6.6 of 10 lb measured) and a revised goal date range. The leaning row shows complete.', tags: ['NEW', T.newc] },
+  'G1-goal-leaning': { short: 'Goal · leaning', title: 'Goals: overarching goal, temporary phase and history', desc: 'Goal progress and goal confidence on top; then the temporary phase with its end condition, body-fat progress and a separate phase forecast; the body-fat limit; the phase plan and what carries forward; Your Journey with Lean Mass Build paused; and the approved-changes history with the original plan one tap away. Labels separate measured, estimate, forecast and approved.', tags: ['NEW', T.newc] },
+  'G2-goal-phase-complete': { short: 'Goal · complete', title: 'Goals: phase complete, choose what’s next', desc: 'Measured result, including a small DEXA lean drop explained as lean mass rather than muscle. Goal progress shown honestly (+7.0 → +6.6), never reset. Three next steps; nothing restarts on its own.', tags: ['NEW', T.newc] },
+  'G3-goal-resumed': { short: 'Goal · resumed', title: 'Goals: building resumed', desc: 'Journey shows the temporary phase complete and Lean Mass Build resumed; original Oct 31 date crossed out with a forecast range; full approved-change history.', tags: ['NEW', T.newc] },
+  'B0-weekly-before': { short: 'Weekly before', title: 'Weekly today during a cut (before)', desc: 'Today’s engine judges weight against the goal (build = up), so a planned cut reads as “the wrong way”. This is what phase-awareness fixes.', tags: ['Before'] },
+  'B1-weekly-leaning': { short: 'Weekly', title: 'Weekly: phase-aware, same sections', desc: 'Same hero, chips and Coach’s Take order. The narrative judges the week against the leaning phase while keeping the long-term goal in view. No recommendation, so nothing below Coach’s Take.', tags: ['NEW', T.newc] },
+  'B2-monthly-leaning': { short: 'Monthly', title: 'Monthly: Coach’s Take and Month Ahead', desc: 'A month that held building and leaning, told as one story toward the same goal. Month Ahead gives the phase forecast separately from the goal.', tags: ['NEW', T.newc] },
+  'B3-dexa-phase-complete': { short: 'DEXA', title: 'DEXA: phase complete, decision last', desc: 'Measured changes since starting the phase; lean mass explained as non-fat tissue; Coach’s Insight; then the phase decision card at the very end.', tags: ['NEW', T.newc] },
+  'B4-midweek-leaning': { short: 'Midweek', title: 'Midweek stays short and never proposes', desc: 'Goal & Phase chip names the temporary phase. It can describe progress and link to an open decision, never create one.', tags: ['NEW'] },
+  'B5-photo-leaning': { short: 'Photo', title: 'Photo Event: supportive, never decisive', desc: 'Phase-aware Coach’s Insight; photos support the trend but don’t set body fat or trigger recommendations.', tags: ['NEW'] },
   'P1-photos-dexa': { short: 'Photos & DEXA', title: 'Progress photos and DEXA, both optional', desc: 'Toggle photos and reminders; schedule a scan only if you want one.', tags: ['UPDATED', T.canon] },
 };
 
@@ -1077,6 +1294,11 @@ const SECTIONS = [
   { group: 'Simplified plan', items: [
     { key: 'editors', badge: 'UPDATED', title: 'Optional, easy-to-customize strategies', note: 'Activity is one number; recovery, sleep, supplements, photos and DEXA are optional and quick to adjust.', screens: ['A1-activity', 'A2-no-wearable', 'R1-recovery', 'R2-add-priority', 'R3-sleep-goal', 'S1-supplements', 'S2-add-supplement', 'P1-photos-dexa'] },
   ] },
+  { group: 'Across the app (addendum)', items: [
+    { key: 'home', badge: 'NEW', title: 'Home: compact phase states, same real estate', note: 'The existing Home goal card, reused slot for slot. The temporary phase never hides the primary goal. Left to right: today, leaning, phase complete, building again.', flow: ['#H1-home-building', '→', '#H2-home-leaning', '→', '#H3-home-phase-done', '→', '#H4-home-resumed'], screens: ['H1-home-building', 'H2-home-leaning', 'H3-home-phase-done', 'H4-home-resumed'] },
+    { key: 'goals', badge: 'NEW', title: 'Goals: the full story', note: 'Goals carries the richer view: overarching goal, temporary phase, original and revised timeline, phase forecast vs goal confidence, constraint, plan summary, journey and approved history.', screens: ['G1-goal-leaning', 'G2-goal-phase-complete', 'G3-goal-resumed'] },
+    { key: 'briefings', badge: 'NEW', title: 'Briefings: phase-aware, layouts unchanged', note: 'Only the narrative inside existing sections changes. Decision cards stay last; Midweek never proposes; photos never decide.', flow: ['#B0-weekly-before', '→', '#B1-weekly-leaning', '·', '#B2-monthly-leaning', '·', '#B3-dexa-phase-complete', '·', '#B4-midweek-leaning', '·', '#B5-photo-leaning'], screens: ['B0-weekly-before', 'B1-weekly-leaning', 'B2-monthly-leaning', 'B3-dexa-phase-complete', 'B4-midweek-leaning', 'B5-photo-leaning'] },
+  ] },
   { group: 'For the Founder', items: [
     { key: 'decisions', badge: 'NEW', title: 'Decisions still open', render: () => decisionsView() },
     { key: 'index', title: 'Visual index', render: () => indexView() },
@@ -1084,7 +1306,7 @@ const SECTIONS = [
 ];
 
 function linkScreens(text) {
-  return text.replace(/\b(F[1-6]|Q[1-6]|M[1-3]|T[1-4]|A[12]|R[1-3]|S[12]|P1)\b/g, (m) => {
+  return text.replace(/\b(F[1-6]|Q[1-6]|M[1-3]|T[1-4]|A[12]|R[1-3]|S[12]|P1|H[1-4]|G[1-3]|B[0-5])\b/g, (m) => {
     const id = Object.keys(SCREENS).find((k) => k.split('-')[0] === m);
     return id ? `<a href="#p-${id}">${m}</a>` : m;
   });
@@ -1102,6 +1324,9 @@ function principleView() {
     ['Photos and DEXA', 'Inside a large Coaching Updates editor', 'Both optional on one small screen (P1)'],
     ['Conflicts', '“Edited on the web” merge screen', 'Generic stale-draft revalidation (F6)'],
     ['Review', 'Included prescribed walks', 'Only numbers that change (F5)'],
+    ['Home', 'Phase headline only; PROGRESS shows the active phase’s time', 'Temporary phase in the same slots, primary goal always visible, goal progress kept (H1–H4)'],
+    ['Goals', 'Phases as completed / active / planned only', 'Goal → temporary phase → journey → approved history, with forecast vs measured labels (G1–G3)'],
+    ['Briefings', 'Judged by the goal: a planned cut reads as “wrong direction”', 'Judged by the active phase, goal kept in view, sections unchanged (B0 → B1–B5)'],
     ['Kept', 'Option B comparison · Approach A plan hub · 1:1 arithmetic · recommendation last in briefings · no automatic resumption · guardrail/phase/deadline behaviour', 'Unchanged'],
   ];
   return `<p class="note">The engine does the work; you see only the decisions that matter. Everything below the line of “what you approve” (resting energy, maintenance, learned training) updates on its own and explains itself in one tap. What you approve (targets, phase, limits) never changes without you.</p>
@@ -1139,12 +1364,27 @@ function auditView() {
     ['Profile for provisional estimate', 'Read Apple Health sex, birth date, height, body mass (new permissions); store; ask only what’s missing', 'New (Native + Server)'],
     ['Learned training per area', '11→6 mapping; per-area weekly learner (Monday weeks, 4–8 week window, ≥3 weeks and ≥6 workouts); wire planned vs observed', 'New'],
     ['Recovery priorities and sleep goal', 'Custom recovery items through existing recurring support; sleep goal field', 'Partial (support exists) + new field'],
+    ['Temporary phase contract', 'Phase kind “temporary” + resumesPhaseId; paused build keeps outcome ownership; review_due/pending_decision rendered; resume as a decision outcome', 'Phase C + Native'],
+    ['Phase-aware narrative inputs', 'Pass phase objective, weight direction, accepted body-fat range and energy intent into V3; phase forecast separate from goal confidence; Midweek recommendation guard; DEXA/Photo copy by structured phase intent', 'Phase C'],
     ['Activity data abstraction', 'Source-neutral activity_day already exists; connector interface for other sources later', 'Later'],
   ];
   const table = (rows, h) => `<div class="tw"><table class="cov" style="min-width:760px"><tr>${h.map((x) => `<th>${x}</th>`).join('')}</tr>${rows.map((r) => `<tr>${r.map((c, i) => `<td${i === 1 ? ` class="${/^Exists/.test(c) ? 'st-canon' : /Dormant|Partial|narrative/.test(c) ? 'st-partial' : 'st-concept'}"` : ''}>${i === 2 ? `<code style="font-size:12px">${c}</code>` : c}</td>`).join('')}</tr>`).join('')}</table></div>`;
+  const ph = [
+    ['Temporary phase kind, link to the paused phase, resume', 'Missing', 'canonicalGoalPhase.js'],
+    ['Paused / review_due / pending_decision shown in Native', 'Missing (shown as Planned or raw label)', 'GoalsReadModel.swift:134-146'],
+    ['Goal progress independent of the active phase', 'Missing (Home PROGRESS = active phase)', 'HomeGoalTrajectoryService.js:124-133'],
+    ['Phase forecast separate from goal confidence', 'Missing (goal confidence re-keyed per phase)', 'CanonicalBriefingConfidencePublicationService.js:493'],
+    ['Phase objective and weight direction in the narrative', 'Missing (weight expectation from goal type)', 'GoalEvidencePolicies.js:57-87'],
+    ['Phase body-fat range in the narrative', 'Computed then dropped', 'CurrentStrategyAuthority.js:230-255'],
+    ['Lean mass explained as non-fat tissue in DEXA copy', 'Exists', 'DEXAEventPlainLanguage.js:39-43'],
+    ['Photo confidence gating', 'Exists (never moves confidence)', 'ProductionConfidenceNarrativeV3Adapter.js:1411'],
+    ['Midweek never recommends', 'Documented; no V3 guard', 'MidweekBriefingPreviewService.js:103'],
+    ['Phase decision card in Native production', 'Missing (DEXA phaseReview hard-coded nil)', 'ProductionBriefingMapper.swift:867'],
+  ];
   return `<p class="note">Read from the release commits: Server production <code>85a98025</code>, Native Build 94 <code>49829781</code>, and the dormant Phase B candidate <code>99f11ae6</code>. The design reuses what exists and names every gap.</p>
   <h3 style="margin:0 0 10px">Resting energy, maintenance and activity data</h3>${table(rmr, ['Capability', 'Status', 'Source'])}
   <h3 style="margin:22px 0 10px">Training intelligence</h3>${table(tr, ['Capability', 'Status', 'Source'])}
+  <h3 style="margin:22px 0 10px">Home, Goals and briefings across phases</h3>${table(ph, ['Capability', 'Status', 'Source'])}
   <h3 style="margin:22px 0 10px">Backend contract gaps for this design</h3><div class="tw"><table class="cov" style="min-width:760px"><tr><th>Gap</th><th>What’s needed</th><th>Where</th></tr>${gaps.map((g) => `<tr><td><b>${g[0]}</b></td><td>${g[1]}</td><td>${g[2]}</td></tr>`).join('')}</table></div>`;
 }
 
@@ -1154,6 +1394,7 @@ function decisionsView() {
     ['Resting energy between scans', 'Estimate it from your last scan’s lean mass and your weight trend (smooth, with a range), or keep the last DEXA value until the next scan (M3)?'],
     ['Quick Calibration choice', 'Four equal options with none preselected (as drawn), or preselect the option you chose last time (Q1)?'],
     ['Learned training areas', 'When a lift works more than one area (for example, pull-ups), count it for the main area only, or for both (T1)?'],
+    ['Home metrics during a temporary phase', 'Swap the four metrics to Goal · Body fat · Phase · Goal date while leaning (H2), or keep today’s Target date · Remaining · Progress · Destination?'],
   ];
   return `<div class="dec">${d.map(([t, b], i) => `<div><b>${i + 1}. ${t}.</b> ${linkScreens(b)}</div>`).join('')}</div>
   <p class="note" style="margin-top:14px">Provisional values that stay as they are unless you say otherwise: intake floor 25% below maintenance, +500 extra-activity cap, ±300 quick-step limit, 3-week observation window.</p>`;
@@ -1167,13 +1408,13 @@ function indexView() {
 function boardIntro() {
   return `<div class="hero-b"><div class="kick">Goal Adaptation · V3 · design only</div>
   <h1>Simple on the surface, smart underneath</h1>
-  <p class="lead">A focused revision. Quick Calibration now suggests a change to your daily balance and lets you choose how: eat less, move more, blend or custom, all 1:1. Resting energy and maintenance evolve as your body changes, and your training pattern is learned from the Logger, so the plan needs fewer settings. Option B and the Approach A plan hub are unchanged.</p>
+  <p class="lead">A focused revision. The temporary leaning phase now shows across Home, Goals and briefings without hiding the Build Lean Mass goal. Quick Calibration now suggests a change to your daily balance and lets you choose how: eat less, move more, blend or custom, all 1:1. Resting energy and maintenance evolve as your body changes, and your training pattern is learned from the Logger, so the plan needs fewer settings. Option B and the Approach A plan hub are unchanged.</p>
   <div class="stats">
     <div class="stat"><b>${Object.keys(SCREENS).length}</b><span>focused screens, Dark and Mineral Light</span></div>
     <div class="stat"><b>2</b><span>decisions in the default leaning setup</span></div>
     <div class="stat"><b>4</b><span>equal ways to apply a calibration</span></div>
     <div class="stat"><b>1:1</b><span>activity accounting everywhere</span></div>
-    <div class="stat"><b>4</b><span>decisions still open</span></div>
+    <div class="stat"><b>5</b><span>decisions still open</span></div>
   </div>
   <p class="lead" style="font-size:13.5px">Markers: <span class="tag newb">NEW</span> · <span class="tag upd">UPDATED</span> · <span class="tag state">Preserved</span> · <span class="tag canon">Canonical today</span> · <span class="tag new">New contract (Phase C)</span> · <span class="tag concept">Concept only</span>. Founder maintenance ≈ 2,117 is from the Phase B candidate; values marked * are illustrative.</p></div>`;
 }
