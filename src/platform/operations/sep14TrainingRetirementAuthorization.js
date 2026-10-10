@@ -1,0 +1,32 @@
+export const SEP14_TRAINING_RETIREMENT_AUTHORIZATION = Object.freeze({
+  authorizationReference: "Founder prompt 02f129f6 / 2026-10-10 Sep14 Training safe retirement",
+  ownerUserId: "user_founder_001",
+  targetReviewMd5: "a413c0b4c9a5fb1338fc30e175dc2d7b",
+  expectedVersion: 19,
+  expectedUpdatedAt: "2026-09-14T17:01:32.232Z",
+  expectedPayloadUpdatedAt: "2026-09-14T17:01:29.457Z",
+  expectedPayloadSha256: "38b3e48780970b0375ac95d5ac18fccd8e5690bd6b58c43f4966ef4e65786cd1",
+  expectedCompletedSteps: Object.freeze([
+    "analysis",
+    "canonical_commit",
+    "compatibility_writes",
+    "scheduled_completion",
+  ]),
+  expectedCanonicalWorkoutSha256: "2e00e2fa962888c8f4a65fe8005f1be436ba97585220b50a24291a0b1dfb80ba",
+  expectedExerciseCount: 4,
+  expectedSetCount: 16,
+  expectedPerformanceEventCount: 5,
+  expectedPerformanceEventPayloadSha256: Object.freeze([
+    "ef9485b15ac330f0e86893bfbba22b3f6a8e32ba9e2bfa4555755ebc8cd8438a",
+    "5921dc83855c4b2a1893d8192eade7d5b6a4c72d16070c3b5ba50146181d0c37",
+    "3a17d52ffd52cb9fce24d5dcf62e9d74d00877cb080ae495452bcb2543dd6bdb",
+    "79ea29cb96fa7825659d748d2350c8c5865942bc77872635f6561d82a04d56b0",
+    "fefa141e1bedb3b3eeb4b5f5030ba3194f5071540d0856beb2ab83dab187bc91",
+  ].sort()),
+  expectedSessionHistorySha256: "cb60ee631078b776b790babdb1daa97f8a63026e1d3c6a14eca2078db8e71a1a",
+  expectedAggregateSeals: Object.freeze({
+    goals: Object.freeze({ count: 13, digest: "254b12f7bf836699b1b49f4712856214" }),
+    briefings: Object.freeze({ count: 61, digest: "4c2454439ac9ce48a59a7601f59fb3d7" }),
+    training: Object.freeze({ count: 14807, digest: "cbfcaa75599401452c2d7ad414693709" }),
+  }),
+});

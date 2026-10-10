@@ -34,6 +34,12 @@ The watchdog selects at most one stranded review per tick. A review is stranded 
 
 Recovery releases the stale claim and inserts or revives the idempotent continuation. Completed checkpoints are never replayed. At most two automatic resumes are allowed. A third detection changes the durable review to `commit_failed` or `partially_committed`, marks operator attention, and leaves it actionable. A renewed live lease fails the recovery atomically with `COMMIT_NOT_STRANDED`.
 
+### Deployment adoption boundary
+
+Automatic recovery applies only to reviews whose latest durable transition is at or after the current Server build's first persisted worker heartbeat. Stranded work inherited from an older build remains included in metrics and alerts, but the worker does not release its claim, revive its dead outbox message, or replay any continuation step. Historical work requires an explicit, separately authorized operator disposition.
+
+The first process of a build uses the earlier of its own start time and its first visible heartbeat; subsequent ticks and restarts use the earliest heartbeat retained for the same immutable build identity. Using the process start closes the short gap before the first heartbeat is persisted. The boundary therefore survives worker restarts without converting post-deployment failures into historical work. It is also fail-closed: a missing or invalid review `updatedAt` is historical/alert-only.
+
 ## Memory admission
 
 DEXA confirmation steps and scheduled briefing cadence share one FIFO admission gate per process. Work is serialized and is rejected retryably before execution when current RSS plus the operation estimate would exceed 70% of the configured service limit; 85% is the hard ceiling. Rejected durable continuation work is retried by the outbox. Measurements are emitted as `evidence.processing.memory`.

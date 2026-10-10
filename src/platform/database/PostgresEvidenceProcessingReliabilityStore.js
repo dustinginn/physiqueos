@@ -7,17 +7,18 @@ const MAX_INSPECTION_ROWS = 64;
 export function createPostgresEvidenceProcessingReliabilityStore({
   pool,
   ownerUserId,
+  buildId,
   authorityStore,
   migrationOperationId = null,
   now = () => new Date(),
   createRecoveryId = () => randomUUID(),
 } = {}) {
-  if (!pool?.query || !pool?.connect || !ownerUserId || !authorityStore) {
+  if (!pool?.query || !pool?.connect || !ownerUserId || !buildId || !authorityStore) {
     throw new Error("Evidence processing reliability storage requires PostgreSQL, owner, and authority.");
   }
   return Object.freeze({
     async inspect({ observedAt = now() } = {}) {
-      const [reviewsResult, messagesResult, heartbeatResult] = await Promise.all([
+      const [reviewsResult, messagesResult, heartbeatResult, adoptionResult] = await Promise.all([
         pool.query(
           `SELECT record_id,payload,updated_at FROM physiqueos.canonical_evidence_records
             WHERE owner_user_id=$1 AND collection_name='evidenceReviews'
@@ -37,6 +38,11 @@ export function createPostgresEvidenceProcessingReliabilityStore({
         pool.query(
           `SELECT worker_id,build_id,status,observed_at,details
              FROM physiqueos.worker_heartbeats ORDER BY observed_at DESC LIMIT 1`,
+        ),
+        pool.query(
+          `SELECT min(observed_at) AS adopted_at
+             FROM physiqueos.worker_heartbeats WHERE build_id=$1`,
+          [buildId],
         ),
       ]);
       const messagesByReview = groupBy(messagesResult.rows, (row) => String(row.review_id ?? ""));
@@ -66,6 +72,7 @@ export function createPostgresEvidenceProcessingReliabilityStore({
       const heartbeat = heartbeatResult.rows[0] ?? null;
       return Object.freeze({
         observedAt: observedAt.toISOString(),
+        adoptionBoundary: adoptionResult.rows[0]?.adopted_at ?? null,
         reviews: Object.freeze(reviews),
         heartbeat: heartbeat ? Object.freeze({
           workerId: heartbeat.worker_id,

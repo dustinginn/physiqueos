@@ -308,6 +308,7 @@ if (workerBootProbe) {
         store: createPostgresEvidenceProcessingReliabilityStore({
           pool,
           ownerUserId,
+          buildId: buildIdentity.buildId,
           authorityStore: runtimeAuthorityStore,
           migrationOperationId: process.env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
         }),

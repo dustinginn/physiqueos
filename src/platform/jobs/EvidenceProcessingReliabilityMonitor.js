@@ -28,6 +28,12 @@ export function createEvidenceProcessingReliabilityMonitor({
       ]);
       const memory = sampleMemory();
       const stale = inspection.reviews.filter((review) => isStranded(review, observedAt, reviewAgeThresholdMs));
+      const adoptionBoundary = resolveAdoptionBoundary({
+        persistedBuildBoundary: inspection.adoptionBoundary,
+        processStartedAt,
+      });
+      const adoptedStale = stale.filter((review) => isAdoptedForAutomaticRecovery(review, adoptionBoundary));
+      const historicalStale = stale.filter((review) => !isAdoptedForAutomaticRecovery(review, adoptionBoundary));
       const queuedTooLong = inspection.reviews.filter(
         (review) => review.queueAgeMs != null && review.queueAgeMs > queueAgeThresholdMs
       );
@@ -36,10 +42,13 @@ export function createEvidenceProcessingReliabilityMonitor({
       const metrics = Object.freeze({
         workerId,
         buildId,
+        adoptionBoundary: adoptionBoundary.toISOString(),
         processStartedAt: processStartedAt.toISOString(),
         processUptimeSeconds: Math.max(0, Math.round((observedAt - processStartedAt) / 1000)),
         activeReviewCount: inspection.reviews.filter((review) => review.status === "committing").length,
         staleReviewCount: stale.length,
+        adoptedStaleReviewCount: adoptedStale.length,
+        historicalStaleReviewCount: historicalStale.length,
         queuedTooLongCount: queuedTooLong.length,
         deadContinuationCount: deadCount,
         maximumReviewAgeMs: maximum(inspection.reviews.map((review) => review.reviewAgeMs)),
@@ -55,7 +64,15 @@ export function createEvidenceProcessingReliabilityMonitor({
       if (alerts.length) logger?.error?.("evidence.processing.alert", { codes: alerts, ...metrics });
 
       let recovery = null;
-      const candidate = stale[0];
+      // Deployment adoption boundary: a newly installed watchdog may observe
+      // abandoned work from an older runtime. Those reviews must remain
+      // visible and alerting, but automatic recovery is authorized only for
+      // work that transitioned at or after this build was first observed. The
+      // current process start protects the first-heartbeat gap; the earliest
+      // persisted heartbeat for the immutable build protects later restarts.
+      // An operator can disposition older work explicitly without a deployment
+      // silently replaying historical Goal/Event/Briefing effects.
+      const candidate = adoptedStale[0];
       if (candidate) {
         try {
           const recovered = await store.recover(candidate.reviewId, { observedAt, maximumAutoResumes });
@@ -99,6 +116,24 @@ export function isStranded(review, observedAt, thresholdMs = DEFAULT_REVIEW_AGE_
   if (review.claimStatus !== "in_progress") return false;
   const expiry = Date.parse(review.claimLeaseExpiresAt ?? "");
   return Number.isFinite(expiry) && expiry <= observedAt.getTime();
+}
+
+export function isAdoptedForAutomaticRecovery(review, adoptionBoundary) {
+  const updatedAt = Date.parse(review?.updatedAt ?? "");
+  const boundary = adoptionBoundary instanceof Date
+    ? adoptionBoundary.getTime()
+    : Date.parse(String(adoptionBoundary ?? ""));
+  return Number.isFinite(updatedAt) && Number.isFinite(boundary) && updatedAt >= boundary;
+}
+
+export function resolveAdoptionBoundary({ persistedBuildBoundary, processStartedAt } = {}) {
+  const processTime = processStartedAt instanceof Date
+    ? processStartedAt.getTime()
+    : Date.parse(String(processStartedAt ?? ""));
+  const persistedTime = Date.parse(String(persistedBuildBoundary ?? ""));
+  const candidates = [processTime, persistedTime].filter(Number.isFinite);
+  // An invalid boundary must never make all historical work eligible.
+  return new Date(candidates.length ? Math.min(...candidates) : 8_640_000_000_000_000);
 }
 
 function alertCodes({ metrics, inspection, reviewAgeThresholdMs, queueAgeThresholdMs, heartbeatAgeThresholdMs }) {

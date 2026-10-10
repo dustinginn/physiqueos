@@ -20,11 +20,13 @@ describe("PostgreSQL evidence processing reliability inspection", () => {
       .mockResolvedValueOnce({ rows: [{
         worker_id: "worker", build_id: "build", status: "healthy",
         observed_at: "2026-10-10T11:59:30.000Z",
-      }] });
+      }] })
+      .mockResolvedValueOnce({ rows: [{ adopted_at: "2026-10-10T10:00:00.000Z" }] });
     const pool = { query, connect: vi.fn() };
     const store = createPostgresEvidenceProcessingReliabilityStore({
       pool,
       ownerUserId: "owner",
+      buildId: "build",
       authorityStore: {},
     });
     const inspection = await store.inspect({ observedAt: new Date("2026-10-10T12:00:00.000Z") });
@@ -36,7 +38,9 @@ describe("PostgreSQL evidence processing reliability inspection", () => {
       maximumAttemptCount: 8,
     });
     expect(inspection.heartbeat).toMatchObject({ workerId: "worker", ageMs: 30_000 });
+    expect(inspection.adoptionBoundary).toBe("2026-10-10T10:00:00.000Z");
     expect(query.mock.calls[0][1]).toEqual(["owner", 64]);
     expect(query.mock.calls[1][1][0]).toBe("owner");
+    expect(query.mock.calls[3][1]).toEqual(["build"]);
   });
 });
