@@ -1,0 +1,172 @@
+[
+  {
+    "name": "starts on Home building",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "DEXA briefing has decision last",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Option B comparison",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "back returns to briefing",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "lean draft default −450 → eat 1,767",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "hybrid with 7 weeks",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "one-time explainer first",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "energy screen after explainer",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "blend −450 → eat 1,892 goal 1,025 (1:1)",
+    "pass": true,
+    "info": "{\"mode\":\"build\",\"balance\":-450,\"eat\":1892,\"added\":225,\"goal\":1025,\"trainingGoals\":null,\"progression\":\"Moderate\",\"recovery\":[\"Foam Rolling\"],\"sleepGoal\":null,\"supplements\":[\"Tongkat Ali\",\"Electrolytes\"],\"photos\":true,\"dexa\":false}"
+  },
+  {
+    "name": "eat less → 1,667 / 800",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "step −25 → −475, eat 1,642",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "reset to suggested 1,767/900",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "energy back → setup",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "explainer not repeated",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "hub shows changes",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "review lists numeric changes only",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "approved → Home leaning v2",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Home leaning keeps primary goal and paused build",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Goals shows temporary phase + history",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "Quick Calibration offered after 3 slower weeks",
+    "pass": true,
+    "info": "{\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1767,\"goal\":900,\"balance\":-450,\"v\":2,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":true,\"stack\":0}"
+  },
+  {
+    "name": "QC blend: eat −100, goal +100, balance −200 deeper",
+    "pass": true,
+    "info": "{\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1767,\"goal\":900,\"balance\":-450,\"v\":2,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":true,\"stack\":0} → {\"screen\":\"briefing\",\"phase\":\"leaning\",\"eat\":1667,\"goal\":1000,\"balance\":-650,\"v\":3,\"bf\":9.181585677749364,\"gained\":6.947272727272727,\"qc\":false,\"stack\":0}"
+  },
+  {
+    "name": "Midweek never proposes",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "phase completes → DEXA decision",
+    "pass": true,
+    "info": "{\"screen\":\"briefing\",\"phase\":\"leaningComplete\",\"eat\":1667,\"goal\":1000,\"balance\":-650,\"v\":3,\"bf\":8.817885900291248,\"gained\":6.845454545454546,\"qc\":false,\"stack\":0}"
+  },
+  {
+    "name": "Home phase complete concise + priority",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "next step shows honest lean change",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "resume → building again, new version",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "undo available",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "undo restores leaningComplete",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "reset → initial",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "keep-building path approves new range",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "not now removes Home item",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "no page errors",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "mobile 390 no horizontal overflow",
+    "pass": true,
+    "info": "0"
+  },
+  {
+    "name": "mobile no errors",
+    "pass": true,
+    "info": ""
+  }
+]
