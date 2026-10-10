@@ -88,9 +88,6 @@ struct DEXAHistoryView: View {
                 Task { await viewModel?.selectScope(pillID: pillID) }
             }
             latestScanCard(report.latestScan)
-            if let writeback = writebackDisplay {
-                writebackCard(writeback)
-            }
             summaryGrid(report.summary)
             if let delta = report.delta { sincePriorScanCard(delta) }
             coreTrendsCard(report)
@@ -182,72 +179,6 @@ struct DEXAHistoryView: View {
         .buttonStyle(.plain)
         .disabled(loadingSourceMediaID != nil)
         .accessibilityIdentifier("dexa.latestScan.viewPDF")
-    }
-
-    // MARK: - DEXA → Apple Health
-
-    private struct WritebackDisplay {
-        let completed: Bool
-        let attention: Bool
-        let label: String
-        let showsRetry: Bool
-    }
-
-    /// Founder Production's real writeback coordinator. The Debug review
-    /// seam renders the same card in Sandbox for parity capture only.
-    private var writebackDisplay: WritebackDisplay? {
-        #if DEBUG
-        if let label = Self.reviewWritebackLabel {
-            return WritebackDisplay(completed: true, attention: false, label: label, showsRetry: false)
-        }
-        #endif
-        guard environment.nativeAuthority == .founderProduction else { return nil }
-        let coordinator = environment.dexaHealthKitWritebackCoordinator
-        let attention: Bool
-        switch coordinator.state {
-        case .failed, .permissionNeeded: attention = true
-        default: attention = false
-        }
-        return WritebackDisplay(
-            completed: coordinator.state == .current || coordinator.state == .deleted,
-            attention: attention,
-            label: coordinator.state.label,
-            showsRetry: coordinator.isEnabled && coordinator.state != .reconciling
-        )
-    }
-
-    private func writebackCard(_ display: WritebackDisplay) -> some View {
-        RecordCard {
-            HStack(alignment: .center, spacing: m.pt(9)) {
-                Text(display.completed ? "✓" : (display.attention ? "!" : "○"))
-                    .evidenceText(.normal(18, 400, jakarta: false))
-                    .foregroundStyle(display.completed ? m.c.green : (display.attention ? m.c.amber : m.c.quiet))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("DEXA → Apple Health")
-                        .evidenceText(RecordText.rowLabel)
-                        .foregroundStyle(m.c.ink)
-                    Text(display.label)
-                        .evidenceText(RecordText.rowCopy)
-                        .foregroundStyle(m.c.quiet)
-                        .padding(.top, m.pt(3))
-                }
-                Spacer(minLength: 0)
-                if display.showsRetry {
-                    Button("Retry") {
-                        Task { await environment.dexaHealthKitWritebackCoordinator.reconcilePermanent() }
-                    }
-                    .buttonStyle(.plain)
-                    .evidenceText(RecordText.action)
-                    .foregroundStyle(m.c.accent)
-                    .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
-                    .accessibilityIdentifier("dexa.writeback.retry")
-                }
-            }
-            .accessibilityElement(children: .combine)
-        }
-        .padding(.bottom, m.pt(17))
-        .accessibilityIdentifier("dexa.writeback")
     }
 
     // MARK: - Headline metrics
@@ -548,16 +479,6 @@ private extension DEXAHistoryView {
         #endif
     }
 
-    #if DEBUG
-    /// `-physiqueos.evidence-review.dexa-writeback <label>` shows the
-    /// Production writeback card in Sandbox for parity capture only.
-    static var reviewWritebackLabel: String? {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let flag = arguments.firstIndex(of: "-physiqueos.evidence-review.dexa-writeback"),
-              arguments.indices.contains(flag + 1) else { return nil }
-        return arguments[flag + 1]
-    }
-    #endif
 }
 
 /// `.scan`: date and source, Body Fat in green, the fat · lean · RMR line

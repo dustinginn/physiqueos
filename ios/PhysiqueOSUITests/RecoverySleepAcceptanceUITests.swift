@@ -709,6 +709,9 @@ final class EvidencePhotosDEXAUITests: XCTestCase {
         app.launchArguments += [
             "-physiqueos.native.authority-selection.v1", "sandbox",
             "-physiqueos.evidence-review.synthetic-photos",
+            // This former review seam must stay ignored: the temporary
+            // DEXA → Apple Health status card no longer belongs on Evidence.
+            "-physiqueos.evidence-review.dexa-writeback", "Saved",
         ]
         app.launch()
         app.buttons["Evidence"].tap()
@@ -802,6 +805,7 @@ final class EvidencePhotosDEXAUITests: XCTestCase {
     func testDEXAOrderAndEveryIndependentDisclosure() {
         open(stream: "dexa")
         XCTAssertTrue(app.staticTexts["DEXA"].waitForExistence(timeout: 10))
+        XCTAssertFalse(element("dexa.writeback").exists)
         let order = ["dexa.latestScan", "dexa.summary", "dexa.sincePriorScan", "dexa.coreTrends", "dexa.supplemental", "dexa.regionalLean", "dexa.regionalFat", "dexa.history"]
         // Every locked section exists, and adjacent sections keep the locked
         // order (compared while both are on screen).
