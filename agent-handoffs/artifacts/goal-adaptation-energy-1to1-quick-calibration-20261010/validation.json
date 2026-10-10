@@ -1,0 +1,210 @@
+{
+  "views": {
+    "desktop-1600-dark": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 13,
+      "lightboxOpens": true
+    },
+    "desktop-1600-light": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 13,
+      "lightboxOpens": true
+    },
+    "laptop-1280-dark": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 13,
+      "lightboxOpens": null
+    },
+    "mobile-390-light": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 13,
+      "lightboxOpens": null
+    }
+  },
+  "energy": {
+    "e2Default": {
+      "intake": "1,767",
+      "added": "+100",
+      "net": "−450 kcal/day",
+      "goal": "900",
+      "week": "12,369",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 100 = 1,767",
+      "warnings": "Added activity counts 1:1. If your Watch reads high or low, your weigh-in trend shows it and we recalibrate."
+    },
+    "preset_balanced": {
+      "intake": "1,892",
+      "added": "+225",
+      "net": "−450 kcal/day",
+      "goal": "1,025",
+      "week": "13,244",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 225 = 1,892",
+      "warnings": "Added activity counts 1:1. If your Watch reads high or low, your weigh-in trend shows it and we recalibrate."
+    },
+    "preset_intake": {
+      "intake": "1,667",
+      "added": "+0",
+      "net": "−450 kcal/day",
+      "goal": "800",
+      "week": "11,669",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 0 = 1,667",
+      "warnings": ""
+    },
+    "preset_activity": {
+      "intake": "2,017",
+      "added": "+350",
+      "net": "−450 kcal/day",
+      "goal": "1,150",
+      "week": "14,119",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 350 = 2,017",
+      "warnings": "+350 kcal a day is a big jump from your usual 800. Make sure it’s sustainable."
+    },
+    "preset_suggested": {
+      "intake": "1,767",
+      "added": "+100",
+      "net": "−450 kcal/day",
+      "goal": "900",
+      "week": "12,369",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 100 = 1,767",
+      "warnings": "Added activity counts 1:1. If your Watch reads high or low, your weigh-in trend shows it and we recalibrate."
+    },
+    "added300": {
+      "intake": "1,967",
+      "added": "+300",
+      "net": "−450 kcal/day",
+      "goal": "1,100",
+      "week": "13,769",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 300 = 1,967",
+      "warnings": "Added activity counts 1:1. If your Watch reads high or low, your weigh-in trend shows it and we recalibrate."
+    },
+    "typedIntake1800": {
+      "intake": "1,800",
+      "added": "+133",
+      "net": "−450 kcal/day",
+      "goal": "933",
+      "week": "12,600",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 133 = 1,800",
+      "warnings": "Added activity counts 1:1. If your Watch reads high or low, your weigh-in trend shows it and we recalibrate."
+    },
+    "dragIntake1700": {
+      "intake": "1,700",
+      "added": "+33",
+      "net": "−450 kcal/day",
+      "goal": "833",
+      "week": "11,900",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 33 = 1,700",
+      "warnings": "Added activity counts 1:1. If your Watch reads high or low, your weigh-in trend shows it and we recalibrate."
+    },
+    "typedAdded133": {
+      "intake": "1,800",
+      "added": "+133",
+      "net": "−450 kcal/day",
+      "goal": "933",
+      "week": "12,600",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 133 = 1,800",
+      "warnings": "Added activity counts 1:1. If your Watch reads high or low, your weigh-in trend shows it and we recalibrate."
+    },
+    "e4Floor": {
+      "intake": "1,600",
+      "added": "+0",
+      "net": "−517 kcal/day limited",
+      "goal": "800",
+      "week": "11,200",
+      "weekNet": "−3,619",
+      "formula": "2,117 − 517 + 0 = 1,600",
+      "warnings": "Eating can’t go below 1,600 kcal (provisional floor, 25% under your maintenance). Add activity or choose a smaller deficit."
+    },
+    "e5Heavy": {
+      "intake": "2,167",
+      "added": "+500",
+      "net": "−450 kcal/day",
+      "goal": "1,300",
+      "week": "15,169",
+      "weekNet": "−3,150",
+      "formula": "2,117 − 450 + 500 = 2,167",
+      "warnings": "You’d eat above your maintenance and rely on +500 kcal of extra activity every day for the whole deficit. If activity falls short, so does the deficit."
+    },
+    "e1Default": {
+      "net": "−450 kcal/day",
+      "rate": "≈ 0.7–1.3 lb/week loss",
+      "weeks": "2–5 weeks",
+      "range": "−591 to −310",
+      "warnings": ""
+    },
+    "e1At250": {
+      "net": "−250 kcal/day",
+      "rate": "≈ 0.2–0.8 lb/week loss",
+      "weeks": "3–14 weeks",
+      "range": "−391 to −110",
+      "warnings": ""
+    },
+    "e7Surplus": {
+      "net": "+200 kcal/day",
+      "rate": "≈ 0.7–4.1 lb/month gain",
+      "weeks": "Building continues",
+      "range": "+59 to +340",
+      "warnings": ""
+    },
+    "qcDefault": {
+      "delta": "−150 kcal/day",
+      "intake": "1617",
+      "week": "11,319",
+      "net": "−450",
+      "apply": "Apply 1,617 kcal",
+      "msgs": "Recommended amount. Restores your −450 target with the updated maintenance estimate."
+    },
+    "qcChip200": {
+      "delta": "−200 kcal/day",
+      "intake": "1567",
+      "week": "10,969",
+      "net": "−500",
+      "apply": "Apply 1,567 kcal",
+      "msgs": ""
+    },
+    "qcTyped1700": {
+      "delta": "−67 kcal/day",
+      "intake": "1700",
+      "week": "11,900",
+      "net": "−367",
+      "apply": "Apply 1,700 kcal",
+      "msgs": ""
+    },
+    "qcNoChange": {
+      "delta": "No change",
+      "intake": "1767",
+      "week": "12,369",
+      "net": "−300",
+      "apply": "Keep current plan",
+      "msgs": "No change. Your plan stays at 1,767 and we keep observing."
+    },
+    "qcInvalid": {
+      "delta": "−350 kcal/day",
+      "intake": "1417",
+      "week": "9,919",
+      "net": "−650",
+      "apply": "Below the floor",
+      "msgs": "Changes over 300 kcal at once need a full plan review, so the rest of your plan can be checked too.\nEating can’t go below 1,500 kcal (provisional floor, 25% under your updated maintenance)."
+    },
+    "remnants": {
+      "visible75pct": 0,
+      "source75pct": 0,
+      "sourceCredit": 0,
+      "source1750": 2
+    },
+    "errors": []
+  },
+  "screens": 154,
+  "screenErrors": []
+}
