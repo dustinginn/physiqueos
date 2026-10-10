@@ -4,6 +4,32 @@ import XCTest
 
 @MainActor
 final class DEXAHealthKitWritebackTests: XCTestCase {
+    func testEvidencePageRemovesTemporaryWritebackCardWithoutRemovingSynchronizationOrSettings() throws {
+        let testFile = URL(fileURLWithPath: #filePath)
+        let iosRoot = testFile.deletingLastPathComponent().deletingLastPathComponent()
+        let evidence = try String(
+            contentsOf: iosRoot.appendingPathComponent("PhysiqueOS/Presentation/Evidence/DEXAHistoryView.swift"),
+            encoding: .utf8
+        )
+        let settings = try String(
+            contentsOf: iosRoot.appendingPathComponent("PhysiqueOS/Presentation/You/YouPlaceholderView.swift"),
+            encoding: .utf8
+        )
+        let synchronization = try String(
+            contentsOf: iosRoot.appendingPathComponent("PhysiqueOS/Networking/DEXAHealthKitWriteback.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(evidence.contains("dexa.writeback"))
+        XCTAssertFalse(evidence.contains("evidence-review.dexa-writeback"))
+        XCTAssertFalse(evidence.contains("DEXA → Apple Health"))
+        XCTAssertTrue(settings.contains("DEXA → Apple Health"))
+        XCTAssertTrue(settings.contains("reconcilePermanent()"))
+        XCTAssertTrue(synchronization.contains("final class DEXAHealthKitWritebackCoordinator"))
+        XCTAssertTrue(synchronization.contains("dexa-healthkit-writeback"))
+        XCTAssertTrue(synchronization.contains("recordDexaHealthKitWritebackReceipt"))
+    }
+
     func testProductionTimestampParserAcceptsServerFractionalAndPlainISOInstants() {
         XCTAssertNotNil(SystemDEXAHealthKitSampleStore.parseSampleInstant("2026-09-12T19:00:00.000Z"))
         XCTAssertNotNil(SystemDEXAHealthKitSampleStore.parseSampleInstant("2026-09-12T19:00:00Z"))
