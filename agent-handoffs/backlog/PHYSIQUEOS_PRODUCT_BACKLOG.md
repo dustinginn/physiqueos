@@ -18,6 +18,7 @@ Agent handoff reports describe implementation state. This backlog describes what
 
 
 BUILD 94 — FOUNDER-LOCKED NATIVE SCOPE (2026-10-09)
+- Founder accepted Option B Editorial Rail physical-design simulator screenshots (Dark and Mineral Light) on 2026-10-09. Tested isolated Native candidate b1535c7d558a7e16a4098110c575de26734840bb, report agent-handoffs/reports/20261010T002659Z-build93-home-secondary-briefing-option-b-implementation.md (main 75432a73). This is the accepted starting candidate for Build94 integration; do not redesign or duplicate it. Release still gated.
 Owner: existing Mac Codex A conversation. Base: accepted Build93 Native 9d0a2069. This is scope authorization for isolated implementation, integration candidates and tests, NOT TestFlight/deployment authority.
 1. Home secondary briefing card: Founder-selected Option B Editorial Rail (design artifact 30803809; handoff 3bd19757), preserve placement, exact Server order/copy/navigation; Dark/Mineral and accessibility.
 2. DEXA appointment priority: scheduled-time direct Upload DEXA Results PDF action; evidence-confirmed appointment completion, failure/retry, no manual Complete/Skip for informational DEXA; investigate prior Mark Complete refusal and ensure normal priority actions unaffected.
