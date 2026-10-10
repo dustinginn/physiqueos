@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhysiqueOS — Goal Adaptation design mockups</title>
+<style>
+@font-face {
+  font-family: Jakarta;
+  src: url('../../home-design-exploration-20261003/fonts/PlusJakartaSans.ttf') format('truetype');
+  font-weight: 200 800;
+  font-display: block;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: #050c14;
+  color: #f3f8fa;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Accepted PhysiqueOS redesign tokens (ios/PhysiqueOS/SharedUI/PhysiqueOSTheme.swift @ 9d0a2069) ---------- */
+.phone {
+  --canvas: #061019; --paper: #0F1C2A; --soft: #132334;
+  --ink: #F3F8FA; --ink2: #C3D2D9; --muted: #92A5AF;
+  --teal: #3BD2CA; --green: #55E39A; --amber: #F4BC48; --amberInk: #EFB84F;
+  --purple: #AA98FF; --cyan: #3BC6DD; --red: #FF697A; --orangeInk: #FB923C;
+  --hairline: rgba(157,179,189,.184); --rule: rgba(167,188,197,.18);
+  --fieldStart: #087B70; --fieldEnd: #132751; --coach: #122A55;
+  --onAmber: #10202A; --onTeal: #03191E; --scrim: rgba(2,8,14,.62);
+  --tealWash: rgba(59,210,202,.10); --amberWash: rgba(244,188,72,.12); --redWash: rgba(255,105,122,.12);
+  --shadow: 0 30px 64px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.07);
+}
+.phone.light {
+  --canvas: #E8ECE5; --paper: #FBFAF4; --soft: #EEF2ED;
+  --ink: #102431; --ink2: #526970; --muted: #5D7279;
+  --teal: #087E78; --green: #16875F; --amber: #C98220; --amberInk: #925500;
+  --purple: #5C3FD2; --cyan: #107F99; --red: #B83D4B; --orangeInk: #9A4C10;
+  --hairline: rgba(25,56,66,.169); --rule: rgba(110,129,127,.22);
+  --fieldStart: #CBE6E2; --fieldEnd: #B9D5DD; --coach: #DDE8F1;
+  --onAmber: #102431; --onTeal: #FFFFFF; --scrim: rgba(16,36,49,.38);
+  --tealWash: rgba(8,126,120,.08); --amberWash: rgba(201,130,32,.10); --redWash: rgba(184,61,75,.08);
+  --shadow: 0 30px 64px rgba(16,36,49,.28), 0 0 0 1px rgba(16,36,49,.08);
+}
+
+.phone {
+  position: relative; width: 402px; min-height: 874px;
+  background: var(--canvas); color: var(--ink);
+  border-radius: 48px; overflow: hidden; box-shadow: var(--shadow);
+  font-size: 16px; padding-bottom: 40px; isolation: isolate;
+}
+.phone.xl { font-size: 21.6px; } /* 135% Dynamic Type stress */
+.t-xs { font-size: .75em; line-height: 1.3; }
+.t-sm { font-size: .8125em; line-height: 1.38; }
+.t-body { font-size: .9375em; line-height: 1.42; }
+.t-lg { font-size: 1.0625em; line-height: 1.35; }
+.display { font-family: Jakarta, -apple-system, sans-serif; font-weight: 800; letter-spacing: -.02em; }
+.h1 { font-size: 1.75em; line-height: 1.12; }
+.h2 { font-size: 1.3125em; line-height: 1.2; }
+.h3 { font-size: 1.0625em; line-height: 1.25; }
+.eyebrow { font-size: .75em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+.eyebrow.purple { color: var(--purple); }
+.eyebrow.amber { color: var(--amberInk); }
+.muted { color: var(--muted); }
+.ink2 { color: var(--ink2); }
+.strong { font-weight: 700; }
+.semi { font-weight: 600; }
+p { margin: 0; }
+
+/* chrome */
+.sb { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 6px 34px 0 42px; font-weight: 700; font-size: 17px; position: relative; z-index: 3; }
+.sb .icons { display: flex; gap: 7px; align-items: center; }
+.sb svg { display: block; }
+.nav { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; position: relative; z-index: 3; }
+.nav .back { display: flex; align-items: center; gap: 2px; color: var(--teal); font-size: 17px; }
+.nav .title { position: absolute; left: 0; right: 0; text-align: center; font-weight: 700; font-size: 17px; pointer-events: none; }
+.nav .action { color: var(--teal); font-size: 17px; }
+.content { padding: 4px 18px 0; }
+.stack > * + * { margin-top: 14px; }
+.stack-sm > * + * { margin-top: 8px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.between { justify-content: space-between; }
+.grow { flex: 1; min-width: 0; }
+
+/* surfaces */
+.card { background: var(--paper); border: 1px solid var(--hairline); border-radius: 18px; padding: 16px; position: relative; }
+.card.soft { background: var(--soft); }
+.card.rail { padding-left: 20px; overflow: hidden; }
+.card.rail::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--teal); }
+.card.rail.amber::before { background: var(--amber); }
+.card.rail.purple::before { background: var(--purple); }
+.card.selected { border: 2px solid var(--teal); padding: 15px; box-shadow: 0 0 0 4px var(--tealWash); }
+.card.selected.rail { padding-left: 19px; }
+.coach { background: linear-gradient(160deg, var(--coach), var(--soft)); border-radius: 22px; padding: 18px; border: 1px solid var(--hairline); }
+.rule { height: 1px; background: var(--rule); margin: 12px 0; }
+.divider-list > * + * { border-top: 1px solid var(--rule); }
+
+/* buttons */
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border-radius: 16px; font-weight: 700; font-size: 1.0625em; padding: 0 18px; text-align: center; }
+.btn.primary { background: var(--teal); color: var(--onTeal); }
+.btn.secondary { border: 1.5px solid var(--hairline); color: var(--ink); background: var(--paper); }
+.btn.ghost { color: var(--teal); min-height: 44px; }
+.btn.disabled { background: var(--soft); color: var(--muted); border: 1px dashed var(--hairline); }
+.btn.small { min-height: 44px; font-size: .9375em; border-radius: 14px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 10px; font-size: .75em; font-weight: 700; white-space: nowrap; }
+.pill.teal { background: var(--tealWash); color: var(--teal); }
+.pill.amber { background: var(--amberWash); color: var(--amberInk); }
+.pill.red { background: var(--redWash); color: var(--red); }
+.pill.line { border: 1px solid var(--hairline); color: var(--ink2); }
+
+/* controls */
+.radio { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--muted); flex: none; display: grid; place-items: center; }
+.radio.on { border-color: var(--teal); }
+.radio.on::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--teal); }
+.seg { display: flex; background: var(--soft); border-radius: 12px; padding: 3px; gap: 3px; border: 1px solid var(--hairline); }
+.seg > div { flex: 1; text-align: center; padding: 9px 4px; border-radius: 9px; font-size: .8125em; font-weight: 600; color: var(--ink2); min-height: 44px; display: grid; place-items: center; }
+.seg > .on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); border: 1px solid var(--hairline); }
+.choice { display: flex; gap: 12px; align-items: flex-start; padding: 13px 0; min-height: 48px; }
+.choice .radio { margin-top: 1px; }
+.stepper { display: flex; align-items: center; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }
+.stepper span { display: grid; place-items: center; width: 44px; height: 44px; color: var(--teal); font-size: 20px; font-weight: 600; }
+.stepper b { padding: 0 12px; font-size: .9375em; min-width: 78px; text-align: center; }
+.chev { color: var(--muted); flex: none; }
+.check { color: var(--green); flex: none; }
+
+/* data */
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.metric { background: var(--paper); border: 1px solid var(--hairline); border-radius: 16px; padding: 13px 14px; }
+.metric .v { font-family: Jakarta, sans-serif; font-weight: 800; font-size: 1.375em; letter-spacing: -.02em; margin-top: 4px; }
+.metric .c { font-size: .75em; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+.bar { height: 8px; border-radius: 99px; background: var(--soft); overflow: hidden; border: 1px solid var(--hairline); }
+.bar > i { display: block; height: 100%; background: var(--teal); border-radius: 99px; }
+.kv { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; align-items: baseline; }
+.kv .k { color: var(--ink2); font-size: .875em; }
+.kv .v { font-weight: 700; text-align: right; font-size: .9375em; }
+.delta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.delta s { color: var(--muted); text-decoration-thickness: 1.5px; font-weight: 500; }
+
+/* illustrative stamp */
+.illus { border: 1.5px dashed var(--amber); border-radius: 16px; padding: 14px; position: relative; background: repeating-linear-gradient(135deg, transparent 0 10px, var(--amberWash) 10px 11px); }
+.illus-tag { display: inline-flex; align-items: center; gap: 6px; font-size: .6875em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--amberInk); background: var(--paper); border: 1px solid var(--amber); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.pending { display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--teal); color: var(--teal); border-radius: 10px; padding: 3px 9px; font-weight: 700; font-size: .875em; white-space: nowrap; }
+
+/* home */
+.hero { background: linear-gradient(165deg, var(--fieldStart) 0%, var(--fieldEnd) 92%); padding-bottom: 22px; position: relative; overflow: hidden; margin-top: -54px; padding-top: 54px; }
+.hero::after { content: ""; position: absolute; width: 520px; height: 520px; border-radius: 50%; right: -330px; top: 40px; border: 70px solid rgba(255,255,255,.05); }
+.phone.light .hero::after { border-color: rgba(255,255,255,.28); }
+.timeline-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 8px rgba(85,227,154,.22); flex: none; }
+.tabbar { margin: 18px 16px 0; height: 76px; border-radius: 38px; background: var(--paper); border: 1px solid var(--hairline); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; padding: 0 6px; }
+.tab { display: grid; justify-items: center; gap: 3px; font-size: 12px; color: var(--ink); }
+.tab.on { color: var(--purple); background: var(--soft); border-radius: 30px; padding: 8px 0; }
+.tile-amber { background: var(--amber); color: var(--onAmber); border-radius: 22px; padding: 16px; min-height: 104px; display: flex; align-items: flex-end; justify-content: space-between; }
+.prio { border: 1.5px solid var(--hairline); border-radius: 16px; padding: 13px 14px; background: var(--soft); }
+
+/* sheet / notification */
+.scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 5; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--paper); border-radius: 30px 30px 0 0; z-index: 6; padding: 10px 20px 40px; border-top: 1px solid var(--hairline); }
+.grabber { width: 40px; height: 5px; border-radius: 3px; background: var(--hairline); margin: 0 auto 16px; }
+.notif { border-radius: 22px; padding: 13px 14px; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(20px); border: 1px solid var(--hairline); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.appicon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(150deg, #0E8F86, #13305E); display: grid; place-items: center; flex: none; }
+.lock { background: linear-gradient(170deg, var(--fieldStart), var(--fieldEnd)); }
+
+/* phase strip */
+.phases { display: flex; flex-direction: column; gap: 0; }
+.ph { display: grid; grid-template-columns: 26px 1fr; gap: 12px; }
+.ph .dot { width: 14px; height: 14px; border-radius: 50%; margin: 4px auto 0; border: 2px solid var(--muted); background: var(--canvas); position: relative; z-index: 1; }
+.ph .dot.done { background: var(--amber); border-color: var(--amber); }
+.ph .dot.now { background: var(--green); border-color: var(--green); box-shadow: 0 0 0 6px rgba(85,227,154,.2); }
+.ph .dot.paused { background: var(--soft); border-color: var(--teal); }
+.ph .line { width: 2px; background: var(--rule); margin: 0 auto; flex: 1; min-height: 14px; }
+.ph .col { display: flex; flex-direction: column; align-items: center; }
+.ph .txt { padding-bottom: 14px; }
+
+/* compare table (option B) */
+.cmp { display: grid; grid-template-columns: 92px repeat(3, 1fr); border: 1px solid var(--hairline); border-radius: 18px; overflow: hidden; background: var(--paper); }
+.cmp > div { padding: 10px 8px; border-top: 1px solid var(--rule); font-size: .75em; line-height: 1.3; }
+.cmp > .hd { border-top: 0; font-weight: 800; font-size: .75em; padding-top: 12px; }
+.cmp > .lbl { color: var(--muted); font-weight: 700; }
+.cmp > .sel { background: var(--tealWash); }
+.cmp > .sel.hd { box-shadow: inset 0 3px 0 var(--teal); }
+
+/* board */
+.board { max-width: 1900px; margin: 0 auto; padding: 48px 40px 80px; }
+.board h1 { font-family: Jakarta, sans-serif; font-size: 44px; letter-spacing: -.035em; margin: 8px 0 6px; line-height: 1.05; }
+.board .lead { color: #aebfc8; font-size: 16px; line-height: 1.55; max-width: 1100px; }
+.board .kick { color: #3bd2ca; font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.section { border-top: 1px solid #9db3bd2f; padding: 34px 0 44px; }
+.section h2 { font-family: Jakarta, sans-serif; font-size: 28px; letter-spacing: -.02em; margin: 0 0 6px; }
+.section .note { color: #b6c6ce; font-size: 14px; line-height: 1.55; max-width: 1180px; margin: 0 0 22px; }
+.pairs { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+.cap { margin: 0 0 9px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #a9bbc4; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.facts table { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.45; }
+.facts td, .facts th { border-top: 1px solid #9db3bd2f; padding: 8px 10px 8px 0; vertical-align: top; text-align: left; color: #dce7ec; }
+.facts th { color: #92a5af; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.facts td.tag-exact { color: #55e39a; font-weight: 700; }
+[data-board] { padding: 24px 36px 12px; background: #050c14; }
+.facts td.tag-ill { color: #f4bc48; font-weight: 700; }
+.flow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13.5px; }
+.flow .n { background: #0f1c2a; border: 1px solid #9db3bd2f; border-radius: 12px; padding: 10px 12px; color: #e7eff3; }
+.flow .n b { color: #3bd2ca; margin-right: 6px; }
+.flow .a { color: #5d7279; }
+.callouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.callout { background: #0f1c2a; border: 1px solid #9db3bd2f; border-radius: 16px; padding: 16px 18px; color: #c3d2d9; font-size: 13.5px; line-height: 1.55; }
+.callout h3 { margin: 0 0 6px; color: #f3f8fa; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="board" id="board"></div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Icons
+// ---------------------------------------------------------------------------
+const I = {
+  back: '<svg width="13" height="21" viewBox="0 0 13 21"><path d="M11 2 2.5 10.5 11 19" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chev: '<svg class="chev" width="8" height="14" viewBox="0 0 8 14"><path d="m1.5 1.5 5 5.5-5 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  arrow: '<svg width="20" height="16" viewBox="0 0 20 16"><path d="M2 8h15M11 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check: '<svg class="check" width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m6 10.3 2.7 2.7L14.3 7.4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  x: '<svg width="14" height="14" viewBox="0 0 14 14"><path d="m2 2 10 10M12 2 2 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  doc: '<svg width="18" height="22" viewBox="0 0 18 22"><path d="M3 1h8l6 6v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2Z" fill="currentColor"/><path d="M5 12h8M5 16h6" stroke="var(--paper)" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  warn: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.8 17 16H1L9 1.8Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9 7v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="13.4" r="1.1" fill="currentColor"/></svg>',
+  info: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7v4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="4.6" r="1" fill="currentColor"/></svg>',
+  plus: '<svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+  history: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M2.5 9a6.5 6.5 0 1 0 2-4.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2 2.5v3.3h3.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 5.5V9l2.5 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  sync: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M13.5 6A5.8 5.8 0 0 0 3 4.6M2.5 10A5.8 5.8 0 0 0 13 11.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M3 1.8v3h3M13 14.2v-3h-3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  home: '<svg width="30" height="26" viewBox="0 0 30 26"><path d="M15 2 2 13h4v11h7v-7h4v7h7V13h4L15 2Z" fill="currentColor"/></svg>',
+  goals: '<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="13" cy="13" r="6.3" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="13" cy="13" r="2" fill="currentColor"/></svg>',
+  log: '<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="12" fill="currentColor"/><path d="M13 7v12M7 13h12" stroke="var(--paper)" stroke-width="2.6" stroke-linecap="round"/></svg>',
+  evidence: '<svg width="28" height="24" viewBox="0 0 28 24"><rect x="1" y="9" width="7" height="14" rx="2" fill="currentColor"/><rect x="10.5" y="4" width="7" height="19" rx="2" fill="currentColor"/><rect x="20" y="1" width="7" height="22" rx="2" fill="currentColor"/></svg>',
+  you: '<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="12" fill="currentColor"/><circle cx="13" cy="10" r="4.2" fill="var(--paper)"/><path d="M5.5 20.5c1.8-3.2 4.5-4.6 7.5-4.6s5.7 1.4 7.5 4.6" fill="var(--paper)"/></svg>',
+  bolt: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M9 1 3 9h4l-1 6 6-8H8l1-6Z" fill="currentColor"/></svg>',
+};
+const statusBar = () => `<div class="sb"><span>9:41</span><span class="icons">
+  <svg width="19" height="12" viewBox="0 0 19 12"><rect x="0" y="8" width="3.2" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3.2" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3.2" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3.2" height="12" rx="1" fill="currentColor"/></svg>
+  <svg width="17" height="12" viewBox="0 0 17 12"><path d="M8.5 2.2c2.6 0 4.9 1 6.6 2.7l1.4-1.4A11.3 11.3 0 0 0 .5 3.5l1.4 1.4A9.3 9.3 0 0 1 8.5 2.2Zm0 4c1.5 0 2.8.6 3.8 1.5l1.4-1.4a7.3 7.3 0 0 0-10.4 0l1.4 1.4c1-.9 2.3-1.5 3.8-1.5Zm0 4 1.9-1.9a2.7 2.7 0 0 0-3.8 0l1.9 1.9Z" fill="currentColor"/></svg>
+  <svg width="27" height="13" viewBox="0 0 27 13"><rect x=".7" y=".7" width="22.6" height="11.6" rx="3.6" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-width="1.2"/><rect x="2.5" y="2.5" width="19" height="8" rx="2.2" fill="currentColor"/><rect x="24.6" y="4.3" width="1.8" height="4.4" rx=".9" fill="currentColor" fill-opacity=".5"/></svg>
+</span></div>`;
+const nav = (back, title, action = '') => `<div class="nav"><span class="back">${I.back}<span>${back}</span></span><span class="title">${title}</span><span class="action">${action}</span></div>`;
+const tabbar = (active = 'home') => `<div class="tabbar">${[
+  ['home', 'Home'], ['goals', 'Goals'], ['log', 'Log'], ['evidence', 'Evidence'], ['you', 'You']
+].map(([k, l]) => `<div class="tab ${k === active ? 'on' : ''}">${I[k]}<span>${l}</span></div>`).join('')}</div>`;
+const illusTag = (text = 'Illustrative') => `<span class="illus-tag">${text}</span>`;
+
+// ---------------------------------------------------------------------------
+// Shared fact strip: every value here is source-derived (see README facts table)
+// ---------------------------------------------------------------------------
+const factStrip = () => `
+<div class="metrics">
+  <div class="metric"><div class="eyebrow">Lean mass goal</div><div class="v">71%</div><div class="c">About 7 of 10 lb since Jul 18</div></div>
+  <div class="metric"><div class="eyebrow">Time left</div><div class="v">22 days</div><div class="c">Target date Oct 31</div></div>
+  <div class="metric"><div class="eyebrow amber">Body fat</div><div class="v" style="color:var(--amberInk)">Above</div><div class="c">Your 8–9% range · Oct 9 DEXA</div></div>
+  <div class="metric"><div class="eyebrow">Goal confidence</div><div class="v">70%</div><div class="c">Down from 80% after Oct 9</div></div>
+</div>`;
+
+// ---------------------------------------------------------------------------
+// Screens
+// ---------------------------------------------------------------------------
+const S = {};
+
+S['01-dexa-recommendation'] = () => `
+${statusBar()}${nav('Briefings', 'DEXA Analysis')}
+<div class="content stack">
+  <div class="row between"><span class="eyebrow">DEXA Event · Oct 9</span><span class="pill line">Scan 6 since May</span></div>
+  <div class="display h1">You're making progress toward your muscle-building goal, but body fat needs attention.</div>
+  <p class="t-body ink2">Since your September 12 scan, your lean mass (muscle plus water and other non-fat tissue) went up about 1.3 lb. Body fat rose above your 8–9% range.</p>
+  <div class="metrics">
+    <div class="metric"><div class="eyebrow">Lean mass</div><div class="v">≈ +1.3 lb</div><div class="c">Your main goal measure</div></div>
+    <div class="metric"><div class="eyebrow amber">Body fat</div><div class="v" style="color:var(--amberInk)">Above</div><div class="c">Your 8–9% range</div></div>
+  </div>
+  <div class="card">
+    <div class="row between"><span class="eyebrow">Your goal timeline</span><span class="pill amber">Behind schedule</span></div>
+    <div class="row between" style="margin-top:12px"><span class="t-body semi">About 7 of 10 lb</span><span class="t-sm muted">22 days to Oct 31</span></div>
+    <div class="bar" style="margin-top:8px"><i style="width:71%"></i></div>
+    <p class="t-sm ink2" style="margin-top:10px">At your recent pace, the last 3 lb would take until around early January. That's a rough estimate, not a promise.</p>
+  </div>
+  <div class="card rail amber" style="padding-top:18px;padding-bottom:18px">
+    <div class="eyebrow amber">Recommended next step</div>
+    <div class="display h2" style="margin-top:8px">Review your goal options</div>
+    <p class="t-body ink2" style="margin-top:8px">Your Oct 31 date and your body-fat range now pull in different directions. Let's decide together which one to protect.</p>
+    <div class="row" style="margin-top:14px;gap:10px">
+      <div class="btn primary small grow">Review options</div>
+      <div class="btn secondary small" style="width:112px">Not now</div>
+    </div>
+    <p class="t-xs muted" style="margin-top:10px">Nothing changes until you approve it.</p>
+  </div>
+  <div class="coach">
+    <div class="eyebrow purple">Coach's insight</div>
+    <div class="divider-list" style="margin-top:8px">
+      <div class="row" style="padding:10px 0;align-items:flex-start"><span class="eyebrow" style="width:92px;flex:none;color:var(--green)">Biggest win</span><span class="t-sm semi">You're more than halfway to your lean-mass goal. That progress is real.</span></div>
+      <div class="row" style="padding:10px 0;align-items:flex-start"><span class="eyebrow" style="width:92px;flex:none">Next</span><span class="t-sm semi">Look closely at calorie intake before trying to gain more weight.</span></div>
+    </div>
+  </div>
+</div>`;
+
+S['02-weekly-plan-check'] = () => `
+${statusBar()}${nav('Briefings', 'Weekly Briefing')}
+<div class="content stack">
+  <span class="eyebrow">Weekly Briefing · Oct 4 – 10</span>
+  <div class="display h1">A strong training week while your goal decision is open.</div>
+  <p class="t-body ink2">Training and food logging were steady. The decision from your October 9 scan is still waiting for you.</p>
+  <div class="card rail amber">
+    <div class="row between"><span class="eyebrow amber">Plan check · open</span><span class="t-xs muted">Since Oct 9</span></div>
+    <div class="display h3" style="margin-top:8px">Choose how to handle body fat and your Oct 31 date</div>
+    <p class="t-sm ink2" style="margin-top:6px">Same decision as your DEXA briefing — no new information this week changes it.</p>
+    <div class="row between" style="margin-top:12px"><span class="t-body semi" style="color:var(--teal)">Review options</span>${I.chev}</div>
+  </div>
+  <div class="card">
+    <span class="eyebrow">This week</span>
+    <div class="divider-list" style="margin-top:6px">
+      <div class="kv"><span class="k">Training sessions</span><span class="v">Logged</span></div>
+      <div class="kv"><span class="k">Nutrition</span><span class="v">Synced from Apple Health</span></div>
+      <div class="kv"><span class="k">Morning weight</span><span class="v">Trend available</span></div>
+    </div>
+  </div>
+  <div class="card soft">
+    <div class="row" style="align-items:flex-start;gap:10px"><span style="color:var(--muted);margin-top:2px">${I.info}</span>
+    <p class="t-sm ink2">Weekly and Monthly briefings are where goal decisions normally start. Midweek briefings only link to an open decision; they never start a new one.</p></div>
+  </div>
+</div>`;
+
+S['03-home-priority'] = () => `
+<div class="hero">
+  ${statusBar()}
+  <div style="padding:6px 22px 0;position:relative;z-index:2">
+    <div class="row" style="align-items:flex-start;gap:16px">
+      <div style="display:flex;flex-direction:column;align-items:center;padding-top:6px"><div class="timeline-dot"></div><div style="width:3px;height:70px;background:var(--green);opacity:.8"></div></div>
+      <div>
+        <div class="eyebrow" style="color:var(--green)">Phase 2 · Active</div>
+        <div class="display h2" style="margin-top:4px">Lean Mass Build</div>
+        <div class="t-body ink2" style="margin-top:4px">Aug 15 – Oct 31 · about 3 weeks remaining</div>
+        <div class="t-body strong" style="margin-top:6px">About +7 of 10 lb</div>
+      </div>
+    </div>
+    <div class="card rail amber" style="margin-top:16px;max-width:300px;background:color-mix(in srgb,var(--paper) 88%,transparent)">
+      <div class="eyebrow">Guardrail</div>
+      <div class="display h3" style="margin-top:4px">Keep body fat at 8–9%</div>
+      <div class="t-sm ink2" style="margin-top:4px">Latest DEXA: above range</div>
+    </div>
+  </div>
+</div>
+<div class="content stack" style="padding-top:16px">
+  <div class="row" style="gap:12px;align-items:stretch">
+    <div class="tile-amber" style="flex:1.35"><span class="display h3">Log Morning Weight</span><span style="background:rgba(255,255,255,.28);border-radius:14px;width:44px;height:44px;display:grid;place-items:center">${I.plus}</span></div>
+    <div class="card" style="flex:1;border:1.5px solid var(--teal);display:flex;gap:8px;align-items:center;padding:12px">
+      <span style="color:var(--teal)">${I.doc}</span><div><div class="display" style="font-size:.95em;line-height:1.15">DEXA Analysis Ready</div><div class="t-xs muted">Oct 9</div></div>
+    </div>
+  </div>
+  <div class="card" style="padding:16px">
+    <div class="row between"><span class="eyebrow purple">Today's priorities</span><span class="eyebrow purple">3 open</span></div>
+    <div class="card rail amber" style="margin-top:12px;background:var(--soft)">
+      <div class="row between" style="align-items:flex-start">
+        <div class="grow">
+          <div class="eyebrow amber">Goal decision</div>
+          <div class="t-lg strong" style="margin-top:4px">Choose how to handle body fat and your Oct 31 date</div>
+          <div class="t-sm ink2" style="margin-top:4px">From your Oct 9 scan · 3 options</div>
+        </div>
+        <span style="color:var(--muted);width:44px;height:44px;display:grid;place-items:center;margin:-10px -10px 0 0">${I.x}</span>
+      </div>
+      <div class="row between" style="margin-top:10px"><span class="t-body semi" style="color:var(--teal)">Review options</span>${I.chev}</div>
+    </div>
+    <div class="row" style="gap:10px;margin-top:10px">
+      <div class="prio grow"><div class="t-body semi">Morning Weigh-In</div><div class="t-sm ink2">Before food or fluids</div></div>
+      <div class="prio grow"><div class="t-body semi">Foam Rolling</div><div class="t-sm ink2">7:15 PM</div></div>
+    </div>
+  </div>
+</div>
+${tabbar('home')}`;
+
+S['04-notification'] = () => `
+<div class="lock" style="position:absolute;inset:0"></div>
+<div style="position:relative;z-index:1">
+${statusBar()}
+<div style="text-align:center;margin-top:18px"><div class="t-lg semi ink2">Friday, October 10</div><div class="display" style="font-size:5.4em;line-height:1;font-weight:700;letter-spacing:-.04em">9:41</div></div>
+<div class="content" style="margin-top:28px">
+  <div class="notif">
+    <div class="row" style="align-items:flex-start;gap:11px">
+      <div class="appicon"><svg width="22" height="22" viewBox="0 0 26 26"><circle cx="13" cy="13" r="10" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="13" cy="13" r="4" fill="#3BD2CA"/></svg></div>
+      <div class="grow"><div class="row between"><span class="t-sm strong">PhysiqueOS</span><span class="t-xs muted">now</span></div>
+      <div class="t-body semi" style="margin-top:2px">Your goal needs a decision</div>
+      <div class="t-sm ink2" style="margin-top:2px">Body fat is above your range and Oct 31 looks tight. Review three options when you have a few minutes.</div></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:22px;background:color-mix(in srgb,var(--paper) 80%,transparent)">
+    <span class="eyebrow">One decision, one alert</span>
+    <div class="divider-list" style="margin-top:6px">
+      <div class="kv"><span class="k">DEXA briefing card</span><span class="v t-sm">Same decision</span></div>
+      <div class="kv"><span class="k">Home priority</span><span class="v t-sm">Same decision</span></div>
+      <div class="kv"><span class="k">This notification</span><span class="v t-sm">Sent once</span></div>
+      <div class="kv"><span class="k">Next Weekly</span><span class="v t-sm">Reminds only if still open</span></div>
+    </div>
+  </div>
+</div>
+</div>`;
+
+S['04b-not-now-sheet'] = () => `
+<div style="height:874px;overflow:hidden;position:relative">${S['01-dexa-recommendation']()}</div>
+<div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="display h2">Not ready to decide?</div>
+  <p class="t-sm ink2" style="margin-top:6px">Each choice does something different. You can always find this decision in Goals.</p>
+  <div class="divider-list" style="margin-top:12px">
+    <div class="choice"><div class="grow"><div class="t-body strong">Remind me with Sunday's Weekly</div><div class="t-sm ink2" style="margin-top:2px">Hides it until then. It comes back once, inside your Weekly Briefing.</div></div>${I.chev}</div>
+    <div class="choice"><div class="grow"><div class="t-body strong">Keep my current plan</div><div class="t-sm ink2" style="margin-top:2px">Records your decision. We won't ask again unless a new scan or a clear change in your trend gives a new reason.</div></div>${I.chev}</div>
+    <div class="choice"><div class="grow"><div class="t-body strong">Remove from Home</div><div class="t-sm ink2" style="margin-top:2px">Clears the Home card only. The decision stays open in Goals and in your next Weekly.</div></div>${I.chev}</div>
+  </div>
+</div>`;
+
+const optionsHeader = () => `
+${statusBar()}${nav('Briefing', 'Goal Options')}
+<div class="content stack">
+  <div class="display h1">Choose what to protect next</div>
+  <p class="t-body ink2">You've built about 7 of your 10 lb. Body fat is now above your 8–9% range, and reaching 10 lb by Oct 31 would mean pushing it higher.</p>`;
+
+S['05-options-alt-a-ranked'] = () => `
+${optionsHeader()}
+  <div class="card selected rail">
+    <div class="row between" style="align-items:flex-start"><span class="pill teal">Recommended</span><div class="radio on"></div></div>
+    <div class="display h3" style="margin-top:10px">Lean out first, then keep building</div>
+    <p class="t-sm ink2" style="margin-top:6px">A short leaning phase brings body fat back into 8–9% while protecting the lean mass you've gained. Your goal date moves later.</p>
+    <div class="rule"></div>
+    <div class="t-sm"><span style="color:var(--green)" class="strong">Protects</span> your range and your progress</div>
+    <div class="t-sm" style="margin-top:4px"><span style="color:var(--amberInk)" class="strong">Costs</span> a few weeks of building</div>
+  </div>
+  <div class="card">
+    <div class="row between" style="align-items:flex-start"><span class="pill line">Option 2</span><div class="radio"></div></div>
+    <div class="display h3" style="margin-top:10px">Keep building, adjust the limits</div>
+    <p class="t-sm ink2" style="margin-top:6px">Continue the build with a higher or paused body-fat limit, a later date, or both.</p>
+    <div class="rule"></div>
+    <div class="t-sm"><span style="color:var(--green)" class="strong">Protects</span> building momentum</div>
+    <div class="t-sm" style="margin-top:4px"><span style="color:var(--amberInk)" class="strong">Costs</span> more fat to remove later</div>
+  </div>
+  <div class="card">
+    <div class="row between" style="align-items:flex-start"><span class="pill line">Option 3</span><div class="radio"></div></div>
+    <div class="display h3" style="margin-top:10px">Make my own changes</div>
+    <p class="t-sm ink2" style="margin-top:6px">Pick exactly what to change: date, target, body-fat range or calories.</p>
+  </div>
+  <div class="card soft" style="padding:13px 16px">
+    <div class="t-sm ink2"><span class="strong" style="color:var(--ink)">One goal stays primary.</span> Build Lean Mass remains your goal; a leaning phase becomes a step inside it, and staying lean is a supporting objective.</div>
+  </div>
+  <div class="btn primary">Set up leaning phase ${I.arrow}</div>
+  <div class="row between"><div class="btn ghost" style="padding:0">Compare side by side</div><div class="btn ghost" style="padding:0;color:var(--ink2)">Keep current plan</div></div>
+</div>`;
+
+S['06-options-alt-b-compare'] = () => `
+${optionsHeader()}
+  <div class="seg"><div class="on">Lean out first</div><div>Keep building</div><div>Keep plan</div></div>
+  <div class="cmp">
+    <div class="hd lbl"></div><div class="hd sel">Lean out first</div><div class="hd">Keep building</div><div class="hd">Keep plan</div>
+    <div class="lbl">Body fat</div><div class="sel">Back to 8–9%</div><div>Higher, with a revised limit</div><div>Likely keeps rising</div>
+    <div class="lbl">Lean mass</div><div class="sel">Held, building pauses</div><div>Keeps building</div><div>Keeps building</div>
+    <div class="lbl">Goal date</div><div class="sel">Moves later</div><div>Oct 31 or later</div><div>Oct 31 unlikely</div>
+    <div class="lbl">Food</div><div class="sel">Fewer calories for a while</div><div>About the same</div><div>Unchanged</div>
+    <div class="lbl">Fits your limits?</div><div class="sel" style="color:var(--green);font-weight:700">Yes</div><div style="color:var(--amberInk);font-weight:700">Needs a new limit</div><div style="color:var(--red);font-weight:700">No</div>
+  </div>
+  <div class="card selected rail">
+    <div class="row between"><span class="pill teal">Recommended</span><span class="t-xs muted">Selected</span></div>
+    <div class="display h3" style="margin-top:8px">Lean out first, then keep building</div>
+    <p class="t-sm ink2" style="margin-top:6px">Protects your range and your progress. Costs a few weeks of building.</p>
+  </div>
+  <div class="btn primary">Set up leaning phase ${I.arrow}</div>
+  <div class="btn ghost">Make my own changes instead</div>
+</div>`;
+
+S['07-conflict-validation'] = () => `
+${statusBar()}${nav('Briefing', 'Goal Options')}
+<div class="content stack">
+  <div class="display h1">Keep building, adjust the limits</div>
+  <p class="t-body ink2">Choose how your body-fat limit and goal date should change. You can change one or both.</p>
+  <div class="card">
+    <span class="eyebrow">Body-fat limit</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice"><div class="radio on"></div><div class="grow"><div class="t-body strong">Keep 8–9% as a firm limit</div></div></div>
+      <div class="choice"><div class="radio"></div><div class="grow"><div class="t-body strong">Raise the upper limit</div><div class="t-sm ink2">You choose the new limit and how long it applies</div></div></div>
+      <div class="choice"><div class="radio"></div><div class="grow"><div class="t-body strong">Pause the limit for now</div><div class="t-sm ink2">Watched, but not used to judge progress</div></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <span class="eyebrow">Goal date</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice"><div class="radio on"></div><div class="grow"><div class="t-body strong">Keep Oct 31</div></div></div>
+      <div class="choice"><div class="radio"></div><div class="grow"><div class="t-body strong">Move it later</div><div class="t-sm ink2">Recent pace points to around early January</div></div></div>
+    </div>
+  </div>
+  <div class="card" style="border:1.5px solid var(--red);background:var(--redWash)">
+    <div class="row" style="gap:10px;align-items:flex-start"><span style="color:var(--red);margin-top:1px">${I.warn}</span>
+      <div><div class="t-body strong">These choices can't all work together</div>
+      <p class="t-sm ink2" style="margin-top:4px">Gaining the last 3 lb by Oct 31 would very likely push body fat further above 9%, while 8–9% is still a firm limit. Change one of them:</p></div></div>
+    <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+      <span class="pill teal" style="padding:9px 12px;font-size:.8125em">Raise the limit</span>
+      <span class="pill teal" style="padding:9px 12px;font-size:.8125em">Pause the limit</span>
+      <span class="pill teal" style="padding:9px 12px;font-size:.8125em">Move the date</span>
+    </div>
+  </div>
+  <div class="btn disabled">Resolve the conflict to continue</div>
+  <p class="t-xs muted" style="text-align:center">Or go back and choose “Lean out first”, which fits both.</p>
+</div>`;
+
+S['08-leaning-phase-setup'] = () => `
+${statusBar()}${nav('Options', 'Leaning Phase')}
+<div class="content stack">
+  <div class="display h1">Set up your leaning phase</div>
+  <p class="t-body ink2">A short step inside Build Lean Mass. Your lean-mass progress is kept; building resumes only when you choose.</p>
+  <div class="card">
+    <span class="eyebrow">How should it end?</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice"><div class="radio on"></div><div class="grow"><div class="row between"><span class="t-body strong">When I'm back in range</span><span class="pill teal">Suggested</span></div><div class="t-sm ink2">A DEXA shows body fat back in 8–9% with lean mass held. Weekly check-ins show how close you are.</div></div></div>
+      <div class="choice"><div class="radio"></div><div class="grow"><div class="t-body strong">After a set time</div><div class="row between" style="margin-top:8px"><span class="t-sm ink2">Length</span><div class="stepper"><span>−</span><b>4 weeks</b><span>+</span></div></div></div></div>
+      <div class="choice"><div class="radio"></div><div class="grow"><div class="t-body strong">Whichever comes first</div><div class="t-sm ink2">Back in range, or a time limit you set</div></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <span class="eyebrow">Check-ins</span>
+    <div class="seg" style="margin-top:10px"><div class="on">Weekly</div><div>Every 2 weeks</div></div>
+    <p class="t-sm ink2" style="margin-top:8px">Your Weekly Briefing will show how the phase is going.</p>
+  </div>
+  <div class="card">
+    <span class="eyebrow">When it ends</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice"><div class="radio on"></div><div class="grow"><div class="t-body strong">Ask me what's next</div><div class="t-sm ink2">Suggested. We'll recommend resuming the build, but you decide.</div></div></div>
+      <div class="choice"><div class="radio"></div><div class="grow"><div class="t-body strong">Plan to resume building</div><div class="t-sm ink2">You'll still confirm before anything changes.</div></div></div>
+    </div>
+  </div>
+  <div class="illus">
+    <div class="row between"><span class="eyebrow">Energy plan</span>${illusTag()}</div>
+    <p class="t-xs ink2" style="margin-top:6px">Example values only. Your real numbers will be calculated by the engine from your history before you approve.</p>
+    <div class="divider-list" style="margin-top:6px">
+      <div class="kv"><span class="k">Daily intake</span><span class="delta"><s>2,500</s><span class="pending">≈ 2,100–2,250 kcal</span></span></div>
+      <div class="kv"><span class="k">Daily activity</span><span class="delta"><s>800</s><span class="pending">≈ 850–950 kcal</span></span></div>
+      <div class="kv"><span class="k">Training</span><span class="v">Unchanged</span></div>
+      <div class="kv"><span class="k">Protein</span><span class="v">Unchanged</span></div>
+      <div class="kv"><span class="k">Expected body fat</span><span class="v">Back in range in ≈ 3–6 weeks</span></div>
+    </div>
+    <div class="rule"></div>
+    <div class="t-xs ink2"><span class="strong" style="color:var(--ink)">Calibrated from your own history, not a generic deficit:</span> your May–July cut (body fat 13.6% → 7.7% in 8 weeks, lean mass within 2 lb), this build at 2,500 kcal, six DEXA scans, daily weight, and Apple Health nutrition and activity.</div>
+  </div>
+  <div class="btn primary">Review changes ${I.arrow}</div>
+</div>`;
+
+S['09-keep-building-revision'] = () => `
+${statusBar()}${nav('Options', 'Adjust Your Goal')}
+<div class="content stack">
+  <div class="display h1">Keep building with new limits</div>
+  <p class="t-body ink2">You're choosing to keep gaining. Set a body-fat limit and date that fit that choice.</p>
+  <div class="card">
+    <span class="eyebrow">Body-fat limit</span>
+    <div class="row between" style="margin-top:12px"><span class="t-body semi">Upper limit</span><div class="stepper"><span>−</span><b>10%</b><span>+</span></div></div>
+    <p class="t-xs muted" style="margin-top:6px">You choose the number. Lower limit stays 8%.</p>
+    <div class="rule"></div>
+    <span class="t-sm semi">Applies</span>
+    <div class="seg" style="margin-top:8px"><div>Until Oct 31</div><div class="on">Until next DEXA</div><div>From now on</div></div>
+    <div class="choice" style="padding-bottom:0"><div class="radio"></div><div class="grow"><div class="t-sm strong">Until body fat reaches a level I set</div></div></div>
+  </div>
+  <div class="card">
+    <span class="eyebrow">Goal date</span>
+    <div class="kv"><span class="k">Target</span><span class="delta"><s>Oct 31</s><span class="t-body strong">Dec 31</span></span></div>
+    <p class="t-sm ink2">At your recent pace, the last 3 lb would take until around early January. A later date leaves room for a slower, leaner gain.</p>
+  </div>
+  <div class="card soft">
+    <span class="eyebrow">Tradeoffs</span>
+    <div class="t-sm" style="margin-top:8px"><span style="color:var(--green)" class="strong">Keeps</span> building momentum and your training plan</div>
+    <div class="t-sm" style="margin-top:4px"><span style="color:var(--amberInk)" class="strong">Means</span> more body fat to lose later, and a scan reading that isn't all muscle</div>
+  </div>
+  <div class="card">
+    <div class="row" style="gap:10px;align-items:flex-start"><span style="color:var(--teal);margin-top:1px">${I.history}</span>
+      <div><div class="t-body strong">Your original goal is kept</div>
+      <p class="t-sm ink2" style="margin-top:3px">+10 lb lean mass by Oct 31 with 8–9% body fat, set in July, stays in your goal history. This becomes version 2.</p></div></div>
+  </div>
+  <div class="btn primary">Review changes ${I.arrow}</div>
+</div>`;
+
+S['10-review-approve'] = () => `
+${statusBar()}${nav('Leaning Phase', 'Review')}
+<div class="content stack">
+  <div class="display h1">Review your new plan</div>
+  <p class="t-body ink2">Only what changes is shown. One approval updates your goal, phase and Operating Plan together.</p>
+  <div class="card">
+    <span class="eyebrow">What changes</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="kv"><span class="k">Current phase</span><span class="delta"><s>Lean Mass Build</s><span class="v">Leaning phase</span></span></div>
+      <div class="kv"><span class="k">Ends</span><span class="v">Back in 8–9% on a DEXA</span></div>
+      <div class="kv"><span class="k">Daily intake</span><span class="delta"><s>2,500</s><span class="pending">Calculated</span></span></div>
+      <div class="kv"><span class="k">Daily activity</span><span class="delta"><s>800</s><span class="pending">Calculated</span></span></div>
+      <div class="kv"><span class="k">Check-ins</span><span class="v">Weekly</span></div>
+      <div class="kv"><span class="k">Goal date</span><span class="delta"><s>Oct 31</s><span class="v">Set when building resumes</span></span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row between"><div><span class="eyebrow">Continuing unchanged</span><div class="t-sm ink2" style="margin-top:4px">Body-fat range 8–9%, training schedule, protein, Foam Rolling, morning weigh-in, supplements and reminders</div></div>${I.chev}</div>
+  </div>
+  <div class="card soft" style="padding:13px 16px">
+    <div class="row" style="gap:10px;align-items:flex-start"><span style="color:var(--teal);margin-top:2px">${I.history}</span><p class="t-sm ink2">Lean Mass Build is paused at about +7 lb, not erased. Your original goal is saved in its history.</p></div>
+  </div>
+  <div class="btn primary">Approve changes</div>
+  <div class="btn ghost">Edit a detail</div>
+  <p class="t-xs muted" style="text-align:center">Calorie numbers appear here once the engine has calculated them from your history.</p>
+</div>`;
+
+S['11-phase-started'] = () => `
+${statusBar()}${nav('Goals', 'Build Lean Mass')}
+<div class="content stack">
+  <div class="row" style="gap:10px"><span style="color:var(--green)">${I.check}</span><span class="eyebrow" style="color:var(--green)">Approved · Oct 10</span></div>
+  <div class="display h1">Your leaning phase has started</div>
+  <p class="t-body ink2">Your Operating Plan is updated. The first check-in is in your next Weekly Briefing.</p>
+  <div class="card">
+    <span class="eyebrow">Your journey</span>
+    <div class="phases" style="margin-top:14px">
+      <div class="ph"><div class="col"><div class="dot done"></div><div class="line"></div></div><div class="txt"><div class="t-body strong">Establish Maintenance</div><div class="t-sm muted">Jul 19 – Aug 15 · completed</div></div></div>
+      <div class="ph"><div class="col"><div class="dot paused"></div><div class="line"></div></div><div class="txt"><div class="t-body strong">Lean Mass Build</div><div class="t-sm muted">Aug 15 – Oct 10 · paused at about +7 lb</div></div></div>
+      <div class="ph"><div class="col"><div class="dot now"></div><div class="line"></div></div><div class="txt"><div class="t-body strong">Leaning phase</div><div class="t-sm muted">Now · ends when you're back in 8–9%</div></div></div>
+      <div class="ph"><div class="col"><div class="dot"></div></div><div class="txt" style="padding-bottom:0"><div class="t-body strong">What's next</div><div class="t-sm muted">You'll choose when this phase ends</div></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row between"><div class="row" style="gap:10px"><span style="color:var(--teal)">${I.history}</span><div><div class="t-body strong">Goal history</div><div class="t-sm muted">Version 2 saved · original kept</div></div></div>${I.chev}</div>
+  </div>
+  <div class="btn primary">Done</div>
+</div>`;
+
+S['12-phase-complete-next'] = () => `
+${statusBar()}${nav('Briefings', 'DEXA Analysis')}
+<div class="content stack">
+  <div class="row between"><span class="eyebrow">DEXA Event · future scan</span>${illusTag('Future example')}</div>
+  <div class="display h1">You're back in your 8–9% range</div>
+  <p class="t-body ink2">Your leaning phase did its job, and lean mass held steady. What should come next?</p>
+  <div class="card selected rail">
+    <div class="row between" style="align-items:flex-start"><span class="pill teal">Recommended</span><div class="radio on"></div></div>
+    <div class="display h3" style="margin-top:8px">Resume building</div>
+    <p class="t-sm ink2" style="margin-top:4px">Pick up from about +7 lb with a new date and a slower, leaner gain.</p>
+  </div>
+  <div class="card"><div class="row between"><div><div class="display h3">Maintain for a while</div><p class="t-sm ink2" style="margin-top:4px">Hold where you are before deciding.</p></div><div class="radio"></div></div></div>
+  <div class="card"><div class="row between"><div><div class="display h3">Keep leaning</div><p class="t-sm ink2" style="margin-top:4px">Go toward the lower end of your range.</p></div><div class="radio"></div></div></div>
+  <div class="card"><div class="row between"><div><div class="display h3">Customize</div><p class="t-sm ink2" style="margin-top:4px">Change the goal, date or range yourself.</p></div><div class="radio"></div></div></div>
+  <div class="btn primary">Continue ${I.arrow}</div>
+  <p class="t-xs muted" style="text-align:center">Nothing restarts automatically. Your leaning plan continues until you choose.</p>
+</div>`;
+
+S['13-evidence-insufficient'] = () => `
+${statusBar()}${nav('Briefings', 'Weekly Briefing')}
+<div class="content stack">
+  <div class="row between"><span class="eyebrow">Weekly Briefing · Oct 21</span>${illusTag('Example')}</div>
+  <div class="display h1">Too early to judge the new plan</div>
+  <p class="t-body ink2">Your leaning phase is 9 days old. We'll suggest goal changes only after it has had a fair test.</p>
+  <div class="card">
+    <div class="row between"><span class="eyebrow">Ready to evaluate</span><span class="t-sm strong">9 of 21 days</span></div>
+    <div class="bar" style="margin-top:10px"><i style="width:43%"></i></div>
+    <p class="t-sm ink2" style="margin-top:10px">Goal options open after 3 weeks and your next DEXA, unless something urgent changes.</p>
+  </div>
+  <div class="card">
+    <span class="eyebrow">What we're seeing</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="kv"><span class="k row" style="gap:8px">${I.check}Nutrition</span><span class="v t-sm" style="color:var(--ink2)">Synced from Apple Health</span></div>
+      <div class="kv"><span class="k row" style="gap:8px">${I.check}Activity</span><span class="v t-sm" style="color:var(--ink2)">Synced from Apple Health</span></div>
+      <div class="kv"><span class="k row" style="gap:8px">${I.check}Training</span><span class="v t-sm" style="color:var(--ink2)">On schedule</span></div>
+      <div class="kv"><span class="k row" style="gap:8px"><span style="color:var(--amberInk)">${I.info}</span>Morning weight</span><span class="v t-sm" style="color:var(--amberInk)">3 of 7 mornings</span></div>
+    </div>
+  </div>
+  <div class="card rail">
+    <div class="eyebrow">One thing that would help</div>
+    <p class="t-body semi" style="margin-top:6px">Two more morning weigh-ins this week would make your trend reliable enough to read.</p>
+    <p class="t-sm ink2" style="margin-top:4px">Nothing else is needed. Food and activity already sync on their own.</p>
+  </div>
+</div>`;
+
+// ---------------------------------------------------------------------------
+// Board
+// ---------------------------------------------------------------------------
+const phone = (key, theme, extra = '') => `<div><p class="cap">${theme === 'light' ? 'Mineral Light' : 'Dark'}${extra.includes('xl') ? ' · 135% type' : ''}</p>
+  <div class="phone ${theme} ${extra}" data-capture="${key}-${theme}${extra.includes('xl') ? '-xl' : ''}">${S[key]()}</div></div>`;
+
+const SECTIONS = [
+  ['01-dexa-recommendation', '1 · DEXA Event briefing: a contextual “Review goal options” recommendation',
+   'One compact card inside the October 9 briefing, after the goal timeline. It names the conflict in one sentence and opens the options. The briefing stays a briefing, not a wall of choices. DEXA Events may raise this; Weekly and Monthly are the main triggers.'],
+  ['02-weekly-plan-check', '1b · Weekly briefing: the same open decision, not a new one',
+   'The Weekly references the stable recommendation from Oct 9 (“Plan check · open”). Midweek only links to an open decision and never starts one.'],
+  ['03-home-priority', '2 · Home priority: dismissible, inside Today’s Priorities',
+   'The decision appears as the first priority in the accepted Build 94 Home grammar (amber rail = needs attention). The × removes it from Home only. The hero guardrail card states the range plainly.'],
+  ['04-notification', '2b · One coordinated notification for the same recommendation',
+   'A single push for the same recommendation id as the briefing card and Home priority. It is not repeated; the next Weekly mentions the decision only if it is still open.'],
+  ['04b-not-now-sheet', '2c · “Not now”: three distinct outcomes',
+   'Opened from “Not now” on the briefing or the Home card’s ×. “Remind me”, “Keep my current plan” and “Remove from Home” each mean something different, and each is explained in place.'],
+  ['05-options-alt-a-ranked', '3 · Decision screen — ALTERNATIVE A: ranked choice cards (recommended)',
+   'Vertical, readable cards with one recommended choice preselected and genuine alternatives, each with “Protects / Costs”. Keeping the current plan is available but quiet. One primary goal is stated explicitly.'],
+  ['06-options-alt-b-compare', '3 · Decision screen — ALTERNATIVE B: side-by-side outcome comparison',
+   'A compact outcome matrix across three paths (body fat, lean mass, date, food, fits your limits), with a segmented selector. Strongest for comparison; tighter at large text sizes.'],
+  ['07-conflict-validation', '3b · Option within an option, with constraint-conflict validation',
+   '“Keep building” opens its own choices. Keeping 8–9% as a firm limit and Oct 31 together is blocked with a plain explanation and three one-tap resolutions.'],
+  ['08-leaning-phase-setup', '4 · Temporary leaning (cut) phase configuration',
+   'End by outcome (suggested), by time, or whichever comes first; check-in frequency; what happens at the end (recommend, but ask). The energy plan is drawn as a dashed ILLUSTRATIVE block: the real values will be calculated from the Founder’s own history.'],
+  ['09-keep-building-revision', '5 · Keep building: guardrail and timeline revision with history preserved',
+   'The user sets the new limit and how long it applies (until a date, next DEXA, permanently, or until a condition). The date estimate comes from the engine. The original July goal is kept as version 1.'],
+  ['10-review-approve', '6 · One compact review of material changes and a single atomic approval',
+   'Only changed items are listed. Everything continuing unchanged is collapsed into one row and can be opened on demand. Calories appear only because they materially change, and they show as “Calculated” until the engine runs.'],
+  ['11-phase-started', '7 · Confirmation: phase transition recorded in the goal journey',
+   'Lean Mass Build is paused, not erased. Goal history shows version 2 with the original kept.'],
+  ['12-phase-complete-next', '7b · Later: phase complete and next-step choice (no automatic resumption)',
+   'A future DEXA confirms the outcome. The engine recommends resuming; the Founder chooses between resume, maintain, keep leaning or customize.'],
+  ['13-evidence-insufficient', '8 · Evidence-insufficient state: too early to recommend a change',
+   'After a new phase, goal options stay closed during an observation window. Evidence quality is shown per source. Synced Apple Health data is respected, and the one ask is specific and achievable.'],
+];
+
+const factsTable = `
+<div class="facts">
+  <table><tr><th>Shown in mockups</th><th>Source</th><th>Type</th></tr>
+  <tr><td>Goal: Build Lean Mass, +10 lb lean mass by Oct 31; started Jul 19; baseline Jul 18 DEXA</td><td>prod goal record (audit ba50a591)</td><td class="tag-exact">Exact</td></tr>
+  <tr><td>Body-fat guardrail “Maintain approximately 8–9% body fat”</td><td>prod goal guardrails</td><td class="tag-exact">Exact</td></tr>
+  <tr><td>Phase 1 Establish Maintenance Jul 19 – Aug 15; Phase 2 Lean Mass Build active since Aug 15</td><td>prod phases</td><td class="tag-exact">Exact</td></tr>
+  <tr><td>71% progress (“about 7 of 10 lb”), 22 days left, body fat above 8–9%, Goal Confidence 70% down from 80</td><td>Oct 9 V3 assessment + published DEXA briefing</td><td class="tag-exact">Exact (rounded)</td></tr>
+  <tr><td>Lean mass ≈ +1.3 lb since Sep 12; fat gain larger than lean gain</td><td>71% − 58% of 10 lb; Oct 9 plain-language briefing</td><td class="tag-exact">Derived (≈)</td></tr>
+  <tr><td>“Last 3 lb would take until around early January”</td><td>V3 projectedDaysToCompletion 86 from Oct 9</td><td class="tag-exact">Engine estimate</td></tr>
+  <tr><td>Current plan 2,500 kcal intake, 800 kcal activity</td><td>prod Phase Review decision (Aug 16)</td><td class="tag-exact">Exact</td></tr>
+  <tr><td>May–Jul cut: body fat 13.6% → 7.7% in 8 weeks; lean mass 149.1 → 147.5 lb (within 2 lb)</td><td>founder seed + Jul 18 DEXA fixture</td><td class="tag-exact">Exact</td></tr>
+  </table>
+  <table><tr><th>Shown in mockups</th><th>Why</th><th>Type</th></tr>
+  <tr><td>Leaning-phase intake ≈ 2,100–2,250 kcal, activity ≈ 850–950 kcal</td><td>Placeholder layout only; no engine was run</td><td class="tag-ill">Illustrative</td></tr>
+  <tr><td>“Back in range in ≈ 3–6 weeks”</td><td>Placeholder outcome range</td><td class="tag-ill">Illustrative</td></tr>
+  <tr><td>Keep-building limit 10%, new date Dec 31</td><td>Example user choices, not recommendations</td><td class="tag-ill">Illustrative</td></tr>
+  <tr><td>Approval date Oct 10; Weekly Oct 4–10 wording; 9 of 21 days; 3 of 7 weigh-ins</td><td>Scenario dates and evidence counts</td><td class="tag-ill">Illustrative</td></tr>
+  <tr><td>Future DEXA “back in range”</td><td>Hypothetical future state</td><td class="tag-ill">Illustrative</td></tr>
+  <tr><td>Exact body-fat percentage</td><td>Deliberately not shown; only “above 8–9%”</td><td class="tag-ill">Withheld</td></tr>
+  </table>
+</div>`;
+
+const flow = `<div class="flow">
+  <span class="n"><b>Trigger</b>Weekly / Monthly (primary) · DEXA (eligible) · Photo (only if corroborated) · Midweek never</span><span class="a">→</span>
+  <span class="n"><b>1</b>Briefing card “Review goal options”</span><span class="a">→</span>
+  <span class="n"><b>2</b>Same id on Home + one push</span><span class="a">→</span>
+  <span class="n"><b>3</b>Options (A or B)</span><span class="a">→</span>
+  <span class="n"><b>4/5</b>Configure the chosen path</span><span class="a">→</span>
+  <span class="n"><b>6</b>Review + one approval</span><span class="a">→</span>
+  <span class="n"><b>7</b>Phase started → later: complete + choose next</span>
+  <span class="n" style="border-style:dashed"><b>Alt</b>Not now: remind with Weekly · keep plan (closed until new evidence) · remove from Home</span>
+  <span class="n" style="border-style:dashed"><b>Alt</b>Evidence insufficient: options stay closed during the observation window</span>
+</div>
+<p class="note" style="margin-top:14px">Minimum path: briefing → Review options → Set up leaning phase → Review changes → Approve = <b>4 taps</b> when accepting the recommendation and its suggested settings.</p>`;
+
+function buildBoard() {
+  const b = document.getElementById('board');
+  const section = ([key, title, note]) => `<div class="section"><h2>${title}</h2><p class="note">${note}</p><div class="pairs">${phone(key, 'dark')}${phone(key, 'light')}${
+      key.startsWith('05') || key.startsWith('06') ? phone(key, 'dark', 'xl') + phone(key, 'light', 'xl') : ''}</div></div>`;
+  const groups = [
+    ['1', 'Triggers, Home and notification', ['01', '02', '03', '04', '04b']],
+    ['2', 'The decision screen: two alternatives', ['05', '06', '07']],
+    ['3', 'Configure, approve, transition, and evidence gating', ['08', '09', '10', '11', '12', '13']],
+  ];
+  let html = `<div data-board="0"><div class="kick">PhysiqueOS · Goal Adaptation · design only · not implemented</div>
+  <h1>Goal Adaptation — Founder scenario mockups</h1>
+  <p class="lead">The Founder's real Build Lean Mass situation after the October 9 DEXA: about 71% of +10 lb, 22 days to Oct 31, body fat above the chosen 8–9% range, Goal Confidence 70% (from 80). Built on the existing engine (V3 schedule state + Phase Review approval) per audit ba50a591. Accepted PhysiqueOS redesign tokens, Plus Jakarta Sans display type, 402 pt iPhone width. Dark and Mineral Light.</p>
+  <div class="section"><h2>Facts vs illustrative values</h2>${factsTable}</div>
+  <div class="section"><h2>Journey</h2>${flow}</div></div>`;
+  for (const [id, label, keys] of groups) {
+    html += `<div data-board="${id}"><div class="kick" style="margin-top:30px">Board ${id} · ${label}</div>`;
+    html += SECTIONS.filter(([k]) => keys.includes(k.split('-')[0])).map(section).join('');
+    if (id === '2') html += `<div class="section"><h2>Decision screen: A vs B</h2><div class="callouts">
+    <div class="callout"><h3>Alternative A — ranked choice cards</h3>Best for a single decisive moment on a phone: one recommendation preselected, each option explains what it protects and what it costs, and options can open their own sub-choices (option within option). Reflows cleanly at 135% type. <b>Recommended.</b></div>
+    <div class="callout"><h3>Alternative B — side-by-side comparison</h3>Best for seeing all tradeoffs at once. The matrix compresses to ~95 pt columns at 402 pt; at 135% type cells wrap to four lines and the screen grows ~30%. Sub-choices need a second screen.</div>
+    <div class="callout"><h3>Hybrid</h3>Ship A as the decision screen with “Compare side by side” opening B as a read-only sheet. Keeps the decision simple without hiding the comparison.</div>
+  </div></div>`;
+    html += `</div>`;
+  }
+  b.innerHTML = html;
+}
+buildBoard();
+</script>
+</body>
+</html>
