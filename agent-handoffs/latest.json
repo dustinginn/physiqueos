@@ -1,58 +1,54 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-10-10T04:12:14Z",
+  "generated_at_utc": "2026-10-10T05:26:21Z",
   "task": {
-    "id": "build94-founder-authorized-gated-release-20261009",
-    "title": "Build 94 VALID in TestFlight with guarded Server 85a98025 deployment",
+    "id": "build95-founder-authorized-stabilization-release-20261009",
+    "title": "Build 95 Home startup stabilization VALID in TestFlight",
     "agent": "codex",
     "status": "completed"
   },
   "repository": "dustinginn/physiqueos",
   "authority": {
-    "base_sha": "f643d8456f8b493d6461a6d2c9078184e5c88b1c",
-    "final_sha": "498297815a3e20b1038fac9260d9f6649cad044a",
-    "native_sha": "498297815a3e20b1038fac9260d9f6649cad044a",
+    "base_sha": "cb3d520d6bcd4253c9ff542987997e43b4ce4d3c",
+    "final_sha": "59223a41052201121ca1ade24aaf3a4ad0db637e",
+    "native_sha": "59223a41052201121ca1ade24aaf3a4ad0db637e",
     "production_server_sha": "85a9802587de0ef23ff2021e803258dea825254d",
     "production_deployment": "40122906-34f0-4d0a-91cf-8c943a15e603",
-    "native_build": 94,
-    "testflight_delivery": "811cb356-9924-4f53-8ce3-15847c8dd849"
+    "native_build": 95
   },
   "result": {
-    "summary": "Build 94 (com.physiqueos.native.dev 1.0 (94)) from Founder-approved Native f643d845 plus the deterministic build-number-only commit 49829781 uploaded once; delivery 811cb356-9924-4f53-8ce3-15847c8dd849 is build VALID, import VALID and present on App Store Connect. Exact Server 85a98025 deployed as 40122906-34f0-4d0a-91cf-8c943a15e603 and is ACTIVE 9/9 with Web and Worker exact, health/readiness green. Postdeploy read-only audit confirms Morning Check-In recognizes canonical HealthKit Activity/Nutrition without duplicate evidence or review creation. Recovery remains OFF.",
+    "summary": "Build 95 (com.physiqueos.native.dev 1.0 (95)) from Founder-approved Home-startup candidate cb3d520d plus deterministic build-number-only commit 59223a41 uploaded exactly once; delivery 06b8bf23-a439-4edb-9d01-50ad25721fe1 is build VALID, import VALID and present on App Store Connect. Production Server remained exact 85a98025 on deployment 40122906-34f0-4d0a-91cf-8c943a15e603, ACTIVE 9/9, and Recovery remains OFF.",
     "success": true,
-    "production_mutated": true,
-    "deployed": true,
+    "production_mutated": false,
+    "deployed": false,
     "testflight_uploaded": true
   },
   "validation": {
     "tests": {
       "status": "passed",
-      "summary": "Credited accepted Native evidence: iPhone units 2,287 executed / 2,285 passed / 0 failed / 2 intentional skips; integrated iPhone UI 8/8; Watch units 76/76. Final startup delta: 350/350 affected units, 3/3 focused UI, generic Release pass. Exact Server 85a98025: fresh 42/42 focused tests plus unchanged accepted 96/96 matrix and production build. Deterministic generation, release verification, signed archive, embedded version/entitlement/signature checks, matching dSYM and guarded upload dry run all passed."
+      "summary": "Credited exact-candidate evidence: 352/352 affected units, delayed cold-launch UI 1/1, Release compile. Fresh final-SHA evidence: 20/20 focused units, 4/4 focused Home UI tests, deterministic generation, release configuration, generic Release build including Watch/extension, signed archive, embedded identity/version/entitlement/signature checks, matching dSYM, upload dry run and independent VALID readback all passed."
     },
     "review": {
       "status": "not_run",
-      "summary": "Founder physical acceptance of Build 94 on iPhone and Watch is pending."
+      "summary": "Founder physical acceptance of Build 95 startup behavior on iPhone and Watch remains pending."
     },
-    "postdeploy_audit": {
+    "zero_write_audit": {
       "status": "passed",
-      "summary": "REPEATABLE READ READ ONLY postdeploy audit rolled back: canonical HealthKit Activity/Nutrition days recognized, ordinary duplicate evidence 0, pending reviews 0, Recovery authority rows 0/effective OFF, DEXA briefing and Confidence preserved."
+      "summary": "Server branch/runtime/deployment remained exact 85a98025 / 40122906; health and readiness were green 9/9. A bounded REPEATABLE READ READ ONLY audit rolled back and confirmed zero Recovery publication-authority rows and effective Recovery OFF. No Server deploy, policy change or production data write occurred."
     }
   },
   "decisions_required": [
-    "Founder: install Build 94 from TestFlight and complete physical acceptance",
-    "Founder: Recovery real-data calibration and any Weekly/Monthly activation remain separate future authorization gates"
+    "Founder: install Build 95 from TestFlight and complete physical Home-startup and Watch acceptance"
   ],
   "blockers": [],
-  "unexpected_findings": [
-    "The prior DEXA APPLY's two HealthKit receipt reporting records advanced through later idempotent already-present reports; their canonical/materialized revision remains 1 and no duplicate measurement or DEXA briefing mutation occurred."
-  ],
+  "unexpected_findings": [],
   "backlog": [
-    "Build 94 Founder physical acceptance",
-    "Recovery calibration and separately authorized Weekly/Monthly-only activation; keep Recovery OFF",
-    "Deferred pre-beta reliability/performance audit and unrelated Goal Intelligence work"
+    "Build 95 Founder physical acceptance",
+    "Separate evidence-backed Server Home performance work, if still desired; no Server change was part of Build 95",
+    "Recovery calibration and any future activation remain separately authorized; keep Recovery OFF"
   ],
-  "recommended_next_step": "Founder installs Build 94 via TestFlight and verifies the accepted Build 94 flows on physical iPhone and Watch; keep Recovery OFF pending separate calibration and activation authority.",
-  "full_report_path": "agent-handoffs/reports/20261010T041214Z-build94-testflight-valid.md",
+  "recommended_next_step": "Founder installs Build 95 from TestFlight and verifies terminated cold launch, warm launch, background/foreground, genuine offline/retry, accepted Home layout and Watch presence on physical devices.",
+  "full_report_path": "agent-handoffs/reports/20261010T052621Z-build95-testflight-valid.md",
   "safety": {
     "contains_secrets": false,
     "contains_credentials": false,
