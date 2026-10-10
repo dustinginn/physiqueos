@@ -580,6 +580,73 @@ final class HomeReadModelTests: XCTestCase {
         XCTAssertNil(PriorityExecutionContextPresentation.primaryLine(for: item))
     }
 
+    func testPrioritySchedulePresentationDeduplicatesCadenceAndClockAcrossPriorityTypes() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        var daily = Self.executionContextItem(title: "Foam Rolling", time: "17:00", dose: nil)
+        daily.subtitle = "5:00 PM"
+        daily.metadata = "Daily · 5:00 PM"
+        XCTAssertEqual(
+            PriorityExecutionContextPresentation.lines(for: daily, calendar: calendar),
+            .init(primary: "Daily · 5:00 PM", secondary: nil)
+        )
+
+        var weekly = Self.executionContextItem(title: "Retatrutide", time: "21:45", dose: "1.5 mg")
+        weekly.subtitle = "Thursday · 9:45 PM"
+        weekly.metadata = "Weekly · Thursday · 9:45 PM"
+        XCTAssertEqual(
+            PriorityExecutionContextPresentation.lines(for: weekly, calendar: calendar),
+            .init(primary: "Weekly · Thursday · 9:45 PM · 1.5 mg", secondary: nil)
+        )
+
+        var oneOff = Self.executionContextItem(title: "DEXA appointment", time: "07:30", dose: nil)
+        oneOff.subtitle = "Tomorrow at 7:30 AM"
+        oneOff.metadata = "Saturday, October 10 · 7:30 AM"
+        XCTAssertEqual(
+            PriorityExecutionContextPresentation.lines(for: oneOff, calendar: calendar),
+            .init(primary: "Saturday, October 10 · 7:30 AM", secondary: nil)
+        )
+
+        var workout = Self.executionContextItem(title: "Upper Body", time: "18:00", dose: nil)
+        workout.subtitle = "Today · 6:00 PM"
+        workout.metadata = "Strength workout"
+        XCTAssertEqual(
+            PriorityExecutionContextPresentation.lines(for: workout, calendar: calendar),
+            .init(primary: "Today · 6:00 PM", secondary: "Strength workout")
+        )
+
+        var custom = Self.executionContextItem(title: "Mobility", time: nil, dose: nil)
+        custom.subtitle = "Every other day"
+        custom.metadata = "After training"
+        XCTAssertEqual(
+            PriorityExecutionContextPresentation.lines(for: custom, calendar: calendar),
+            .init(primary: "Every other day", secondary: "After training")
+        )
+
+        var overdue = daily
+        overdue.subtitle = "Overdue"
+        XCTAssertEqual(
+            PriorityExecutionContextPresentation.lines(for: overdue, calendar: calendar),
+            .init(primary: "Daily · 5:00 PM", secondary: "Overdue")
+        )
+    }
+
+    func testPrioritySchedulePresentationPreservesDistinctDueAndScheduledTimes() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        var item = Self.executionContextItem(title: "Custom deadline", time: "17:00", dose: nil)
+        item.subtitle = "Due at 5:00 PM"
+        item.metadata = "Scheduled at 5:00 PM"
+
+        XCTAssertEqual(
+            PriorityExecutionContextPresentation.lines(for: item, calendar: calendar),
+            .init(primary: "Scheduled at 5:00 PM", secondary: "Due at 5:00 PM")
+        )
+    }
+
     // MARK: - Natural prose capitalization
 
     /// Mirrors the product rule in

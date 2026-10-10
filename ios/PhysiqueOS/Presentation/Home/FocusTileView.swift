@@ -4,6 +4,11 @@ import SwiftUI
 /// This never derives a schedule or dose: it merely localizes the canonical
 /// `HH:mm` and displays the canonical completion payload's dose.
 enum PriorityExecutionContextPresentation {
+    struct Lines: Equatable {
+        let primary: String?
+        let secondary: String?
+    }
+
     static func context(for item: PriorityOccurrence, calendar: Calendar = .current) -> String? {
         let time = item.notificationAction?.scheduledTime.flatMap {
             localizedTime($0, calendar: calendar)
@@ -15,7 +20,81 @@ enum PriorityExecutionContextPresentation {
     }
 
     static func primaryLine(for item: PriorityOccurrence, calendar: Calendar = .current) -> String? {
-        context(for: item, calendar: calendar) ?? item.subtitle
+        lines(for: item, calendar: calendar).primary
+    }
+
+    /// Produces one schedule line even when the Server projects the same
+    /// clock time in both `scheduledTime` and a cadence-rich subtitle or
+    /// metadata value. Distinct state/date/instruction copy remains a
+    /// secondary line; canonical schedule and action fields are untouched.
+    static func lines(for item: PriorityOccurrence, calendar: Calendar = .current) -> Lines {
+        let time = item.notificationAction?.scheduledTime.flatMap {
+            localizedTime($0, calendar: calendar)
+        }
+        let dose = item.notificationAction?.completionCommand?.payload.dose?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let meaningfulDose = dose?.isEmpty == false ? dose : nil
+        let candidates = [item.subtitle, item.metadata]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        var primary: String?
+        if let time {
+            let timeKey = comparisonKey(time)
+            primary = candidates
+                .filter { comparisonKey($0).contains(timeKey) }
+                .max { lhs, rhs in lhs.count < rhs.count } ?? time
+        } else if let meaningfulDose {
+            primary = meaningfulDose
+        } else {
+            primary = item.subtitle
+        }
+
+        if let meaningfulDose,
+           let current = primary,
+           !comparisonKey(current).contains(comparisonKey(meaningfulDose)) {
+            primary = "\(current) · \(meaningfulDose)"
+        }
+
+        let secondary = candidates.first { candidate in
+            guard !isRedundant(candidate, with: primary) else { return false }
+            if let time,
+               comparisonKey(candidate).contains(comparisonKey(time)),
+               primary.map({ comparisonKey($0).contains(comparisonKey(time)) }) == true,
+               !hasDistinctDueAndScheduleSemantics(candidate, primary ?? "") {
+                return false
+            }
+            if time != nil, isGenericRelativeTime(candidate) { return false }
+            return true
+        }
+        return Lines(primary: primary, secondary: secondary)
+    }
+
+    private static func isRedundant(_ candidate: String, with primary: String?) -> Bool {
+        guard let primary else { return false }
+        let candidateKey = comparisonKey(candidate)
+        let primaryKey = comparisonKey(primary)
+        return candidateKey == primaryKey
+            || primaryKey.contains(candidateKey)
+            || candidateKey.contains(primaryKey)
+    }
+
+    private static func isGenericRelativeTime(_ value: String) -> Bool {
+        ["today", "tonight", "thismorning", "thisafternoon", "thisevening"]
+            .contains(comparisonKey(value))
+    }
+
+    private static func hasDistinctDueAndScheduleSemantics(_ lhs: String, _ rhs: String) -> Bool {
+        let dueWords = ["due", "deadline"]
+        let scheduleWords = ["scheduled", "starts", "begins"]
+        let left = lhs.lowercased()
+        let right = rhs.lowercased()
+        return (dueWords.contains { left.contains($0) } && scheduleWords.contains { right.contains($0) })
+            || (scheduleWords.contains { left.contains($0) } && dueWords.contains { right.contains($0) })
+    }
+
+    private static func comparisonKey(_ value: String) -> String {
+        String(value.lowercased().unicodeScalars.filter(CharacterSet.alphanumerics.contains))
     }
 
     private static func localizedTime(_ value: String, calendar: Calendar) -> String? {
@@ -33,7 +112,13 @@ enum PriorityExecutionContextPresentation {
         date.hour = components[0]
         date.minute = components[1]
         guard let resolved = calendar.date(from: date) else { return nil }
-        return resolved.formatted(date: .omitted, time: .shortened)
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = calendar.locale ?? .current
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter.string(from: resolved)
     }
 }
 
@@ -119,22 +204,23 @@ struct FocusTileView: View {
     }
 
     private var rowBody: some View {
-        HStack(spacing: 8) {
+        let presentation = PriorityExecutionContextPresentation.lines(for: item)
+        return HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .physiqueOSFont(PhysiqueOSTypography.focusLabel)
                     .foregroundStyle(PhysiqueOSTheme.redesignInk)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
-                if let executionContext = PriorityExecutionContextPresentation.primaryLine(for: item) {
+                if let executionContext = presentation.primary {
                     Text(executionContext)
                         .physiqueOSFont(PhysiqueOSTypography.focusSubtitle)
                         .foregroundStyle(PhysiqueOSTheme.redesignInkSecondary)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if (density == .expanded || item.changeLabel != nil), let metadata = item.metadata {
-                    Text(metadata)
+                if (density == .expanded || item.changeLabel != nil), let secondary = presentation.secondary {
+                    Text(secondary)
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(PhysiqueOSTheme.redesignInk)
                 }
@@ -160,9 +246,10 @@ struct FocusTileView: View {
     }
 
     private var accessibilityLabel: String {
+        let presentation = PriorityExecutionContextPresentation.lines(for: item)
         var parts = [item.title]
-        if let context = PriorityExecutionContextPresentation.primaryLine(for: item) { parts.append(context) }
-        if let metadata = item.metadata { parts.append(metadata) }
+        if let context = presentation.primary { parts.append(context) }
+        if let secondary = presentation.secondary { parts.append(secondary) }
         if let actionLabel = item.actionLabel {
             parts.append(actionLabel)
         } else if item.completed {
