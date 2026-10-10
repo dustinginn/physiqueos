@@ -76,6 +76,8 @@ describe("Recovery eligibility checkpoint (zero-write)", () => {
     expect(result.baselineFinal).toBe(false);
     expect(result.liveAuthority).toEqual({ enabled: false, invalidReason: "recovery_publication_authority_absent" });
     expect(result.simulatedAuthority.written).toBe(false);
+    expect(result.period).toEqual({ startDate: "2026-10-18", endDate: "2026-10-24", timeZone: "America/Los_Angeles" });
+    expect(result.periodAccounting).toMatchObject({ expectedNights: 7, reliableNights: 0, missingNights: 7 });
   });
 
   it("after the Oct 17 sleep-day cutoff with one more failure: exactly 14 → eligible and final", async () => {

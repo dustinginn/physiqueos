@@ -256,7 +256,7 @@ function checkpointDecision({ projection, cadence, lastClosedSleepDay }) {
     additionalFailuresTolerated: Math.max(0, maximumBaseline - required),
     baselineFinal: lastClosedSleepDay >= baselineEnd,
     periodRequiredNights: periodRequired,
-    period,
+    periodAccounting: period,
     note: "Period coverage is required separately: fewer reliable period nights than required publishes a Not enough data card, not a status.",
   };
 }
