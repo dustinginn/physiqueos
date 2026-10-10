@@ -120,6 +120,36 @@ describe("Native HealthKit V1 ingestion contract", () => {
     });
   });
 
+  it("bounds canonical Evidence hydration to incoming and active-workout dates", async () => {
+    const relevant = detailedSession("training-relevant");
+    const historical = detailedSession("training-historical");
+    historical.payload.observed_at = "2026-05-24";
+    historical.payload.metadata.start_time = "2026-05-24T17:00:00.000Z";
+    historical.payload.metadata.end_time = "2026-05-24T18:00:00.000Z";
+    const backing = recordStore([historical, relevant]);
+    const calls = [];
+    const records = {
+      ...backing,
+      async listEvidenceWithStorageMetadataByDateRange(args) {
+        calls.push(args);
+        return backing.listEvidenceWithStorageMetadataByDateRange(args);
+      },
+    };
+    const diagnostics = { stages: {} };
+    const ports = createCanonicalPersistenceCommandPorts({ records });
+
+    await ports.ingestHealthKitObservations({
+      ...context("delivery-evidence-bounded", {
+        batchId: "healthkit-evidence-bounded",
+        observations: [activitySummary()],
+      }),
+      transaction: { diagnostics },
+    });
+
+    expect(calls).toEqual([{ ownerUserId: OWNER, startDate: "2026-09-12", endDate: "2026-09-12" }]);
+    expect(diagnostics.stages.healthKitIngest.canonicalEvidenceCount).toBe(1);
+  });
+
   it("stores source observations separately and never adds workout calories to the daily total", async () => {
     const records = recordStore();
     const ports = createCanonicalPersistenceCommandPorts({

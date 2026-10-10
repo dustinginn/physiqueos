@@ -113,6 +113,30 @@ export function createPhase4CanonicalRecordStore({ query }) {
       );
       return result.rows.map(mapStorageMetadata);
     },
+    // HealthKit reconciliation compares canonical Evidence only on the local
+    // dates represented by the incoming batch or an active canonical workout.
+    // Return the immutable storage timestamps with those records so the
+    // matcher does not need a second, lifetime-wide metadata scan.
+    async listEvidenceWithStorageMetadataByDateRange({ ownerUserId, startDate, endDate }) {
+      const start = calendarDate(startDate);
+      const end = calendarDate(endDate);
+      if (!start || !end || end < start) throw new Error("A scoped Evidence read requires an inclusive YYYY-MM-DD range.");
+      const result = await query(
+        `SELECT record_id,payload,version,created_at,updated_at
+           FROM physiqueos.canonical_evidence_records
+          WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
+            AND LEFT(COALESCE(
+              payload#>>'{payload,observed_at}',payload#>>'{payload,date}',
+              payload->>'observed_at',payload->>'date',''
+            ),10) BETWEEN $2 AND $3
+          ORDER BY record_id`,
+        [ownerUserId, start, end]
+      );
+      return Object.freeze({
+        records: Object.freeze(result.rows.map(mapRecord)),
+        storageMetadata: Object.freeze(result.rows.map(mapStorageMetadata)),
+      });
+    },
     async putIfAbsent({ ownerUserId, collection, recordId, payload, sourceIdentity = null }) {
       const table = assertKnownPhase4Collection(collection);
       const version = normalizeVersion(payload.version);
@@ -251,6 +275,25 @@ export function createInMemoryCanonicalRecordStore(collections, {
     },
     async listStorageMetadata({ collection }) {
       return (storageMetadataByCollection.get(collection) ?? []).map(clone);
+    },
+    async listEvidenceWithStorageMetadataByDateRange({ startDate, endDate }) {
+      const start = calendarDate(startDate);
+      const end = calendarDate(endDate);
+      if (!start || !end || end < start) throw new Error("A scoped Evidence read requires an inclusive YYYY-MM-DD range.");
+      const entries = [...(maps.get("canonicalEvidenceObjects")?.entries() ?? [])]
+        .filter(([, record]) => {
+          const payload = record?.payload ?? record;
+          const date = calendarDate(String(payload?.observed_at ?? payload?.date ?? "").slice(0, 10));
+          return date !== null && date >= start && date <= end;
+        })
+        .sort(([left], [right]) => left.localeCompare(right));
+      const ids = new Set(entries.map(([recordId]) => recordId));
+      return Object.freeze({
+        records: Object.freeze(entries.map(([, record]) => clone(record))),
+        storageMetadata: Object.freeze((storageMetadataByCollection.get("canonicalEvidenceObjects") ?? [])
+          .filter((row) => ids.has(row.recordId))
+          .map(clone)),
+      });
     },
     async putIfAbsent({ collection, recordId, payload }) {
       const collectionMap = maps.get(collection) ?? new Map();

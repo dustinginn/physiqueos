@@ -39,6 +39,10 @@ describe("PostgreSQL core navigation read store", () => {
     expect(query.mock.calls[0][0]).toContain("ORDER BY collection_name,source_ordinal,record_id");
     expect(query.mock.calls[0][0]).toContain("jsonb_strip_nulls");
     expect(query.mock.calls[0][0]).toContain("jsonb_array_elements");
+    expect(query.mock.calls[0][0]).toContain("collection_name<>'analyses' OR jsonb_array_length");
+    expect(query.mock.calls[0][0]).toContain("collection_name<>'dailyBriefings' OR");
+    expect(query.mock.calls[0][0]).toContain("photoEventNarrative,eventDate}'='2026-07-18'");
+    expect(query.mock.calls[0][0]).toContain("goalCompletionHandoff,goalId}'='goal_visible_abs_at_rest'");
     expect(query.mock.calls[0][0]).toContain("'supportsGoal',observation->'supportsGoal'");
     expect(query.mock.calls[0][0]).toContain("publication_rank<=2");
     expect(query.mock.calls[0][0]).toContain("collection_name='goalConfidenceSnapshots'");

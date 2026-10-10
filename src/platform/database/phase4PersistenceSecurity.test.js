@@ -78,6 +78,32 @@ describe("Phase 4 persistence ownership boundary", () => {
     expect(query.mock.calls[0][1]).toEqual(["owner-a", "canonicalEvidenceObjects"]);
   });
 
+  it("loads date-scoped canonical Evidence and immutable storage metadata together", async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{
+      record_id: "training-one",
+      payload: { canonicalId: "training-one", payload: { evidence_type: "training", observed_at: "2026-10-10" } },
+      version: "4",
+      created_at: "2026-10-10T17:00:00Z",
+      updated_at: "2026-10-10T18:00:00Z",
+    }] });
+    const records = createPhase4CanonicalRecordStore({ query });
+
+    await expect(records.listEvidenceWithStorageMetadataByDateRange({
+      ownerUserId: "owner-a", startDate: "2026-10-01", endDate: "2026-10-10",
+    })).resolves.toEqual({
+      records: [{ canonicalId: "training-one", payload: { evidence_type: "training", observed_at: "2026-10-10" }, version: 4 }],
+      storageMetadata: [{
+        recordId: "training-one",
+        createdAt: "2026-10-10T17:00:00.000Z",
+        updatedAt: "2026-10-10T18:00:00.000Z",
+      }],
+    });
+    expect(query.mock.calls[0][0]).toContain("collection_name='canonicalEvidenceObjects'");
+    expect(query.mock.calls[0][0]).toContain("payload#>>'{payload,observed_at}'");
+    expect(query.mock.calls[0][0]).toContain("BETWEEN $2 AND $3");
+    expect(query.mock.calls[0][1]).toEqual(["owner-a", "2026-10-01", "2026-10-10"]);
+  });
+
   it("creates source observations without overwriting a concurrent immutable identity", async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [] })

@@ -68,19 +68,19 @@ try {
   if (readOnly.rows[0]?.transaction_read_only !== "on") stop("NOT_READ_ONLY");
 
   const recentObservations = await select(
-    `SELECT record_id FROM physiqueos.canonical_training_records
+    `SELECT record_id,payload#>>'{occurrence,localDate}' AS local_date FROM physiqueos.canonical_training_records
       WHERE owner_user_id=$1 AND collection_name='healthKitObservations'
       ORDER BY updated_at DESC,record_id DESC LIMIT 2`, [OWNER]
   );
   const workoutSources = await select(
-    `SELECT payload#>>'{current,sourceObservationId}' AS source_id
+    `SELECT payload#>>'{current,sourceObservationId}' AS source_id,payload->>'localDate' AS local_date
        FROM physiqueos.canonical_training_records
       WHERE owner_user_id=$1 AND collection_name='healthKitCanonicalWorkouts'
         AND NULLIF(payload#>>'{current,sourceObservationId}','') IS NOT NULL
       ORDER BY record_id`, [OWNER]
   );
   const recentDays = await select(
-    `SELECT record_id FROM physiqueos.canonical_training_records
+    `SELECT record_id,payload->>'localDate' AS local_date FROM physiqueos.canonical_training_records
       WHERE owner_user_id=$1 AND collection_name='healthKitCanonicalDays'
       ORDER BY updated_at DESC,record_id DESC LIMIT 2`, [OWNER]
   );
@@ -95,6 +95,20 @@ try {
     "healthkit_trusted_watch_workout_correlation_policy",
   ];
   const relationshipCollections = ["healthKitCanonicalWorkouts", "healthKitWorkoutLinks", "healthKitWorkoutLinkClaims"];
+  const scopeDates = [...new Set([
+    ...recentObservations.rows.map((row) => row.local_date),
+    ...workoutSources.rows.map((row) => row.local_date),
+    ...recentDays.rows.map((row) => row.local_date),
+  ].filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ""))))].sort();
+  if (scopeDates.length === 0) stop("EVIDENCE_SCOPE_UNAVAILABLE");
+  const scopedEvidence = [`SELECT record_id,payload,version,created_at,updated_at
+      FROM physiqueos.canonical_evidence_records
+      WHERE owner_user_id=$1 AND collection_name='canonicalEvidenceObjects'
+        AND LEFT(COALESCE(
+          payload#>>'{payload,observed_at}',payload#>>'{payload,date}',
+          payload->>'observed_at',payload->>'date',''
+        ),10) BETWEEN $2 AND $3
+      ORDER BY record_id`, [OWNER, scopeDates[0], scopeDates.at(-1)]];
 
   const baseline = [
     [`SELECT payload,version FROM physiqueos.canonical_training_records WHERE owner_user_id=$1 AND collection_name='healthKitObservations' ORDER BY record_id`, [OWNER]],
@@ -116,13 +130,22 @@ try {
     [`SELECT payload,version FROM physiqueos.canonical_training_records WHERE owner_user_id=$1 AND collection_name='healthKitObservations' AND record_id=ANY($2::text[]) ORDER BY record_id`, [OWNER, observationIds]],
     [`SELECT payload,version FROM physiqueos.canonical_training_records WHERE owner_user_id=$1 AND collection_name='healthKitCanonicalDays' AND record_id=ANY($2::text[]) ORDER BY record_id`, [OWNER, canonicalDayIds]],
   ];
+  const dateScopedCandidate = [
+    [`SELECT payload,version FROM physiqueos.canonical_training_records WHERE owner_user_id=$1 AND collection_name='healthKitConfiguration' AND record_id=ANY($2::text[]) ORDER BY record_id`, [OWNER, configIds]],
+    [`SELECT collection_name,payload,version FROM physiqueos.canonical_training_records WHERE owner_user_id=$1 AND collection_name=ANY($2::text[]) ORDER BY collection_name,record_id`, [OWNER, relationshipCollections]],
+    scopedEvidence,
+    [`SELECT payload,version FROM physiqueos.canonical_training_records WHERE owner_user_id=$1 AND collection_name='healthKitObservations' AND record_id=ANY($2::text[]) ORDER BY record_id`, [OWNER, observationIds]],
+    [`SELECT payload,version FROM physiqueos.canonical_training_records WHERE owner_user_id=$1 AND collection_name='healthKitCanonicalDays' AND record_id=ANY($2::text[]) ORDER BY record_id`, [OWNER, canonicalDayIds]],
+  ];
 
-  const samples = { baseline: [], candidate: [] };
+  const samples = { baseline: [], candidate: [], dateScopedCandidate: [] };
   for (let index = 0; index < REPETITIONS; index += 1) {
-    const order = index % 2 === 0 ? [["baseline", baseline], ["candidate", candidate]] : [["candidate", candidate], ["baseline", baseline]];
+    const order = index % 2 === 0
+      ? [["baseline", baseline], ["candidate", candidate], ["dateScopedCandidate", dateScopedCandidate]]
+      : [["dateScopedCandidate", dateScopedCandidate], ["candidate", candidate], ["baseline", baseline]];
     for (const [label, statements] of order) samples[label].push(await measure(statements));
   }
-  const results = ["baseline", "candidate"].map((label) => ({
+  const results = ["baseline", "candidate", "dateScopedCandidate"].map((label) => ({
     label,
     failure: null,
     warmMedianMs: round(median(samples[label].map((sample) => sample.elapsedMs))),
@@ -142,7 +165,11 @@ try {
     codeLabel: "baseline-vs-bounded-candidate",
     commandGate: "COMMANDS_DISABLED",
     repetitions: REPETITIONS,
-    selectionCounts: { observationIds: observationIds.length, canonicalDayIds: canonicalDayIds.length },
+    selectionCounts: {
+      observationIds: observationIds.length,
+      canonicalDayIds: canonicalDayIds.length,
+      evidenceScopeDaySpan: Math.round((Date.parse(`${scopeDates.at(-1)}T00:00:00Z`) - Date.parse(`${scopeDates[0]}T00:00:00Z`)) / 86_400_000) + 1,
+    },
     results,
   })}\n`);
 } catch (error) {

@@ -177,7 +177,32 @@ function normalizeCollection(value) {
 }
 
 function canonicalEvidencePredicate(readModel, { hasLogDate = false } = {}) {
-  return `${graduationPolicyPredicate(readModel)}${evidenceTypePredicate(readModel)}${evidenceReviewStatusPredicate(readModel)}${logEvidenceDatePredicate(readModel, hasLogDate)}${confidenceHistoryPredicate(readModel)}`;
+  return `${graduationPolicyPredicate(readModel)}${evidenceTypePredicate(readModel)}${evidenceReviewStatusPredicate(readModel)}${logEvidenceDatePredicate(readModel, hasLogDate)}${goalsAnalysisPredicate(readModel)}${goalsCompletionBriefingPredicate(readModel)}${confidenceHistoryPredicate(readModel)}`;
+}
+
+function goalsAnalysisPredicate(readModel) {
+  if (readModel !== "core.navigation.goals") return "";
+  // Goals passes analyses only to BodyCompositionEstimateService, which reads
+  // structured photo observations. Records without a non-empty observation
+  // array project to [] and cannot affect the response, so do not hydrate them.
+  return `AND (collection_name<>'analyses' OR jsonb_array_length(CASE
+    WHEN jsonb_typeof(payload#>'{metadata,structuredObservations}')='array'
+      THEN payload#>'{metadata,structuredObservations}'
+    WHEN jsonb_typeof(payload->'structuredObservations')='array'
+      THEN payload->'structuredObservations'
+    ELSE '[]'::jsonb END)>0)`;
+}
+
+function goalsCompletionBriefingPredicate(readModel) {
+  if (readModel !== "core.navigation.goals") return "";
+  // Goals uses Briefings only to resolve the completed Visible Abs photo. The
+  // domain service has the same canonical Goal/date constants and falls back
+  // to canonical photos when this event is absent; every other briefing is
+  // observationally irrelevant to the Goals response.
+  return `AND (collection_name<>'dailyBriefings' OR (
+    payload#>>'{briefing,photoEventNarrative,eventDate}'='2026-07-18' AND
+    payload#>>'{briefing,photoEventNarrative,goalCompletionHandoff,goalId}'='goal_visible_abs_at_rest'
+  ))`;
 }
 
 function logEvidenceDatePredicate(readModel, hasLogDate) {

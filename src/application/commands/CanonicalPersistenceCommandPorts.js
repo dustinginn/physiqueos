@@ -490,9 +490,7 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
     }
     const stageDurations = { normalizationMs: roundedDuration(normalizationStartedAt) };
     const initialLoadStartedAt = performance.now();
-    const [canonicalObjects, canonicalObjectStorageMetadata, configurationRows, relationshipRows] = await Promise.all([
-      records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
-      records.listStorageMetadata({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
+    const [configurationRows, relationshipRows] = await Promise.all([
       records.getMany({
         ownerUserId: context.ownerUserId,
         collection: "healthKitConfiguration",
@@ -526,7 +524,27 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       const domain = healthKitDailySnapshotDomain(observation.observationType);
       return domain ? getHealthKitCanonicalDayRecordId(domain, observation.occurrence.localDate) : null;
     }).filter(Boolean);
-    const [existingObservations, existingCanonicalDays] = await Promise.all([
+    const workoutPolicy = resolveHealthKitWorkoutActivationPolicy(workoutPolicyRecord);
+    const relevantEvidenceDates = [
+      ...batch.observations.map((observation) => observation.occurrence?.localDate),
+      ...(workoutPolicy.enabled ? existingCanonicalWorkouts
+        .filter((workout) => workout.localDate >= workoutPolicy.effectiveLocalDate &&
+          (workoutPolicy.endLocalDate === null || workout.localDate <= workoutPolicy.endLocalDate))
+        .map((workout) => workout.localDate) : []),
+    ].filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ""))).sort();
+    const evidenceScope = relevantEvidenceDates.length > 0 &&
+      typeof records.listEvidenceWithStorageMetadataByDateRange === "function"
+      ? records.listEvidenceWithStorageMetadataByDateRange({
+          ownerUserId: context.ownerUserId,
+          startDate: relevantEvidenceDates[0],
+          endDate: relevantEvidenceDates.at(-1),
+        })
+      : Promise.all([
+          records.list({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
+          records.listStorageMetadata({ ownerUserId: context.ownerUserId, collection: "canonicalEvidenceObjects" }),
+        ]).then(([records, storageMetadata]) => ({ records, storageMetadata }));
+    const [scopedEvidence, existingObservations, existingCanonicalDays] = await Promise.all([
+      evidenceScope,
       records.getMany({
         ownerUserId: context.ownerUserId,
         collection: "healthKitObservations",
@@ -538,6 +556,8 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
         recordIds: canonicalDayIds,
       }),
     ]);
+    const canonicalObjects = scopedEvidence.records;
+    const canonicalObjectStorageMetadata = scopedEvidence.storageMetadata;
     stageDurations.initialLoadMs = roundedDuration(initialLoadStartedAt);
     let collisionObservations = null;
     const loadCollisionObservations = async () => {
@@ -548,7 +568,6 @@ export function createCanonicalPersistenceCommandPorts({ records, now = () => ne
       return collisionObservations;
     };
     const trustedWatchCorrelationPolicy = resolveHealthKitTrustedWatchWorkoutCorrelationPolicy(trustedWatchCorrelationPolicyRecord);
-    const workoutPolicy = resolveHealthKitWorkoutActivationPolicy(workoutPolicyRecord);
     const workoutActivationSnapshot = workoutPolicy.enabled
       ? {
         policyRecordId: HEALTHKIT_WORKOUT_ACTIVATION_POLICY_RECORD_ID,
