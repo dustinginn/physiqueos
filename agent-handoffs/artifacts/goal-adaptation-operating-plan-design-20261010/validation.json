@@ -1,0 +1,64 @@
+{
+  "views": {
+    "desktop-1600-dark": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 11,
+      "lightboxOpens": true
+    },
+    "desktop-1600-light": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 11,
+      "lightboxOpens": true
+    },
+    "laptop-1280-dark": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 11,
+      "lightboxOpens": null
+    },
+    "mobile-390-light": {
+      "overflowX": 0,
+      "errors": [],
+      "validationFilterMatches": 11,
+      "lightboxOpens": null
+    }
+  },
+  "energy": {
+    "initial": {
+      "intake": "1,750",
+      "added": "+100",
+      "net": "−450 kcal/day",
+      "warnings": "Added activity counted at 75%. Watch estimates for extra exercise tend to run high."
+    },
+    "afterAdded": {
+      "intake": "1,900",
+      "added": "+300",
+      "net": "−450 kcal/day",
+      "warnings": "Added activity counted at 75%. Watch estimates for extra exercise tend to run high."
+    },
+    "afterPreset": {
+      "intake": "1,675",
+      "added": "+0",
+      "net": "−450 kcal/day",
+      "warnings": ""
+    },
+    "floor": {
+      "intake": "1,600",
+      "warnings": "Intake can’t go below 1,600 kcal (25% under your maintenance). Add activity or choose a smaller deficit."
+    },
+    "e1At250": {
+      "rate": "≈ 0.2–0.8 lb/week loss",
+      "weeks": "3–17 weeks",
+      "zone": "Gentle deficit"
+    },
+    "surplus": {
+      "rate": "≈ 0.8–4.2 lb/month gain",
+      "weeks": "Building continues"
+    },
+    "errors": []
+  },
+  "screens": 120,
+  "screenErrors": []
+}

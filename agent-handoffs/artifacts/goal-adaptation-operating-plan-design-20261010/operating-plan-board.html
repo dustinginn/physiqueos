@@ -1,0 +1,1841 @@
+<title>Operating Plan Customization</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
+<style>
+/* ---------- Accepted PhysiqueOS redesign tokens (ios/PhysiqueOS/SharedUI/PhysiqueOSTheme.swift @ 9d0a2069) ---------- */
+.phone {
+  --canvas: #061019; --paper: #0F1C2A; --soft: #132334;
+  --ink: #F3F8FA; --ink2: #C3D2D9; --muted: #92A5AF;
+  --teal: #3BD2CA; --green: #55E39A; --amber: #F4BC48; --amberInk: #EFB84F;
+  --purple: #AA98FF; --cyan: #3BC6DD; --red: #FF697A; --orangeInk: #FB923C;
+  --hairline: rgba(157,179,189,.184); --rule: rgba(167,188,197,.18);
+  --fieldStart: #087B70; --fieldEnd: #132751; --coach: #122A55;
+  --onAmber: #10202A; --onTeal: #03191E; --scrim: rgba(2,8,14,.62);
+  --tealWash: rgba(59,210,202,.10); --amberWash: rgba(244,188,72,.12); --redWash: rgba(255,105,122,.12);
+  --shadow: 0 30px 64px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.07);
+}
+.phone.light {
+  --canvas: #E8ECE5; --paper: #FBFAF4; --soft: #EEF2ED;
+  --ink: #102431; --ink2: #526970; --muted: #5D7279;
+  --teal: #087E78; --green: #16875F; --amber: #C98220; --amberInk: #925500;
+  --purple: #5C3FD2; --cyan: #107F99; --red: #B83D4B; --orangeInk: #9A4C10;
+  --hairline: rgba(25,56,66,.169); --rule: rgba(110,129,127,.22);
+  --fieldStart: #CBE6E2; --fieldEnd: #B9D5DD; --coach: #DDE8F1;
+  --onAmber: #102431; --onTeal: #FFFFFF; --scrim: rgba(16,36,49,.38);
+  --tealWash: rgba(8,126,120,.08); --amberWash: rgba(201,130,32,.10); --redWash: rgba(184,61,75,.08);
+  --shadow: 0 30px 64px rgba(16,36,49,.28), 0 0 0 1px rgba(16,36,49,.08);
+}
+
+.phone {
+  position: relative; width: 402px; min-height: 874px;
+  background: var(--canvas); color: var(--ink);
+  border-radius: 48px; overflow: hidden; box-shadow: var(--shadow);
+  font-size: 16px; padding-bottom: 40px; isolation: isolate;
+}
+.phone.xl { font-size: 21.6px; } /* 135% Dynamic Type stress */
+.t-xs { font-size: .75em; line-height: 1.3; }
+.t-sm { font-size: .8125em; line-height: 1.38; }
+.t-body { font-size: .9375em; line-height: 1.42; }
+.t-lg { font-size: 1.0625em; line-height: 1.35; }
+.display { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; font-weight: 800; letter-spacing: -.02em; }
+.h1 { font-size: 1.75em; line-height: 1.12; }
+.h2 { font-size: 1.3125em; line-height: 1.2; }
+.h3 { font-size: 1.0625em; line-height: 1.25; }
+.eyebrow { font-size: .75em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+.eyebrow.purple { color: var(--purple); }
+.eyebrow.amber { color: var(--amberInk); }
+.muted { color: var(--muted); }
+.ink2 { color: var(--ink2); }
+.strong { font-weight: 700; }
+.semi { font-weight: 600; }
+p { margin: 0; }
+
+/* chrome */
+.sb { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 6px 34px 0 42px; font-weight: 700; font-size: 17px; position: relative; z-index: 3; }
+.sb .icons { display: flex; gap: 7px; align-items: center; }
+.sb svg { display: block; }
+.nav { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; position: relative; z-index: 3; }
+.nav .back { display: flex; align-items: center; gap: 2px; color: var(--teal); font-size: 17px; }
+.nav .title { position: absolute; left: 0; right: 0; text-align: center; font-weight: 700; font-size: 17px; pointer-events: none; }
+.nav .action { color: var(--teal); font-size: 17px; }
+.content { padding: 4px 18px 0; }
+.stack > * + * { margin-top: 14px; }
+.stack-sm > * + * { margin-top: 8px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.between { justify-content: space-between; }
+.grow { flex: 1; min-width: 0; }
+
+/* surfaces */
+.card { background: var(--paper); border: 1px solid var(--hairline); border-radius: 18px; padding: 16px; position: relative; }
+.card.soft { background: var(--soft); }
+.card.rail { padding-left: 20px; overflow: hidden; }
+.card.rail::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--teal); }
+.card.rail.amber::before { background: var(--amber); }
+.card.rail.purple::before { background: var(--purple); }
+.card.selected { border: 2px solid var(--teal); padding: 15px; box-shadow: 0 0 0 4px var(--tealWash); }
+.card.selected.rail { padding-left: 19px; }
+.coach { background: linear-gradient(160deg, var(--coach), var(--soft)); border-radius: 22px; padding: 18px; border: 1px solid var(--hairline); }
+.rule { height: 1px; background: var(--rule); margin: 12px 0; }
+.divider-list > * + * { border-top: 1px solid var(--rule); }
+
+/* buttons */
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border-radius: 16px; font-weight: 700; font-size: 1.0625em; padding: 0 18px; text-align: center; }
+.btn.primary { background: var(--teal); color: var(--onTeal); }
+.btn.secondary { border: 1.5px solid var(--hairline); color: var(--ink); background: var(--paper); }
+.btn.ghost { color: var(--teal); min-height: 44px; }
+.btn.disabled { background: var(--soft); color: var(--muted); border: 1px dashed var(--hairline); }
+.btn.small { min-height: 44px; font-size: .9375em; border-radius: 14px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 10px; font-size: .75em; font-weight: 700; white-space: nowrap; }
+.pill.teal { background: var(--tealWash); color: var(--teal); }
+.pill.amber { background: var(--amberWash); color: var(--amberInk); }
+.pill.red { background: var(--redWash); color: var(--red); }
+.pill.line { border: 1px solid var(--hairline); color: var(--ink2); }
+
+/* controls */
+.radio { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--muted); flex: none; display: grid; place-items: center; }
+.radio.on { border-color: var(--teal); }
+.radio.on::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--teal); }
+.seg { display: flex; background: var(--soft); border-radius: 12px; padding: 3px; gap: 3px; border: 1px solid var(--hairline); }
+.seg > div { flex: 1; text-align: center; padding: 9px 4px; border-radius: 9px; font-size: .8125em; font-weight: 600; color: var(--ink2); min-height: 44px; display: grid; place-items: center; }
+.seg > .on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.18); border: 1px solid var(--hairline); }
+.choice { display: flex; gap: 12px; align-items: flex-start; padding: 13px 0; min-height: 48px; }
+.choice .radio { margin-top: 1px; }
+.stepper { display: flex; align-items: center; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }
+.stepper span { display: grid; place-items: center; width: 44px; height: 44px; color: var(--teal); font-size: 20px; font-weight: 600; }
+.stepper b { padding: 0 12px; font-size: .9375em; min-width: 78px; text-align: center; }
+.chev { color: var(--muted); flex: none; }
+.check { color: var(--green); flex: none; }
+
+/* data */
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.metric { background: var(--paper); border: 1px solid var(--hairline); border-radius: 16px; padding: 13px 14px; }
+.metric .v { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.375em; letter-spacing: -.02em; margin-top: 4px; }
+.metric .c { font-size: .75em; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+.bar { height: 8px; border-radius: 99px; background: var(--soft); overflow: hidden; border: 1px solid var(--hairline); }
+.bar > i { display: block; height: 100%; background: var(--teal); border-radius: 99px; }
+.kv { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; align-items: baseline; }
+.kv .k { color: var(--ink2); font-size: .875em; }
+.kv .v { font-weight: 700; text-align: right; font-size: .9375em; }
+.delta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.delta s { color: var(--muted); text-decoration-thickness: 1.5px; font-weight: 500; }
+
+/* illustrative stamp */
+.illus { border: 1.5px dashed var(--amber); border-radius: 16px; padding: 14px; position: relative; background: repeating-linear-gradient(135deg, transparent 0 10px, var(--amberWash) 10px 11px); }
+.illus-tag { display: inline-flex; align-items: center; gap: 6px; font-size: .6875em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--amberInk); background: var(--paper); border: 1px solid var(--amber); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.pending { display: inline-flex; align-items: center; gap: 6px; border: 1.5px dashed var(--teal); color: var(--teal); border-radius: 10px; padding: 3px 9px; font-weight: 700; font-size: .875em; white-space: nowrap; }
+
+/* home */
+.hero { background: linear-gradient(165deg, var(--fieldStart) 0%, var(--fieldEnd) 92%); padding-bottom: 22px; position: relative; overflow: hidden; margin-top: -54px; padding-top: 54px; }
+.hero::after { content: ""; position: absolute; width: 520px; height: 520px; border-radius: 50%; right: -330px; top: 40px; border: 70px solid rgba(255,255,255,.05); }
+.phone.light .hero::after { border-color: rgba(255,255,255,.28); }
+.timeline-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 8px rgba(85,227,154,.22); flex: none; }
+.tabbar { margin: 18px 16px 0; height: 76px; border-radius: 38px; background: var(--paper); border: 1px solid var(--hairline); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; padding: 0 6px; }
+.tab { display: grid; justify-items: center; gap: 3px; font-size: 12px; color: var(--ink); }
+.tab.on { color: var(--purple); background: var(--soft); border-radius: 30px; padding: 8px 0; }
+.tile-amber { background: var(--amber); color: var(--onAmber); border-radius: 22px; padding: 16px; min-height: 104px; display: flex; align-items: flex-end; justify-content: space-between; }
+.prio { border: 1.5px solid var(--hairline); border-radius: 16px; padding: 13px 14px; background: var(--soft); }
+
+/* sheet / notification */
+.scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 5; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--paper); border-radius: 30px 30px 0 0; z-index: 6; padding: 10px 20px 40px; border-top: 1px solid var(--hairline); }
+.grabber { width: 40px; height: 5px; border-radius: 3px; background: var(--hairline); margin: 0 auto 16px; }
+.notif { border-radius: 22px; padding: 13px 14px; background: color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter: blur(20px); border: 1px solid var(--hairline); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.appicon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(150deg, #0E8F86, #13305E); display: grid; place-items: center; flex: none; }
+.lock { background: linear-gradient(170deg, var(--fieldStart), var(--fieldEnd)); }
+
+/* phase strip */
+.phases { display: flex; flex-direction: column; gap: 0; }
+.ph { display: grid; grid-template-columns: 26px 1fr; gap: 12px; }
+.ph .dot { width: 14px; height: 14px; border-radius: 50%; margin: 4px auto 0; border: 2px solid var(--muted); background: var(--canvas); position: relative; z-index: 1; }
+.ph .dot.done { background: var(--amber); border-color: var(--amber); }
+.ph .dot.now { background: var(--green); border-color: var(--green); box-shadow: 0 0 0 6px rgba(85,227,154,.2); }
+.ph .dot.paused { background: var(--soft); border-color: var(--teal); }
+.ph .line { width: 2px; background: var(--rule); margin: 0 auto; flex: 1; min-height: 14px; }
+.ph .col { display: flex; flex-direction: column; align-items: center; }
+.ph .txt { padding-bottom: 14px; }
+
+/* compare table (option B) */
+.cmp { display: grid; grid-template-columns: 84px repeat(3, minmax(0, 1fr)); border: 1px solid var(--hairline); border-radius: 18px; overflow: hidden; background: var(--paper); }
+.cmp > div { overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; padding: 10px 8px; border-top: 1px solid var(--rule); font-size: .75em; line-height: 1.3; }
+.cmp > .hd { border-top: 0; font-weight: 800; font-size: .75em; padding-top: 12px; }
+.cmp > .lbl { color: var(--muted); font-weight: 700; }
+.cmp > .sel { background: var(--tealWash); }
+.cmp > .sel.hd { box-shadow: inset 0 3px 0 var(--teal); }
+
+
+/* ---------- New Operating Plan customization components (design proposal) ---------- */
+.phone { min-height: 874px; }
+.content { padding-bottom: 110px; }
+.phone .sec-label { font-size: .6875em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 18px 2px 8px; }
+.phone .lead { font-size: .9375em; line-height: 1.45; color: var(--ink2); }
+/* sticky change tray (Approach A) */
+.tray { position: absolute; left: 12px; right: 12px; bottom: 26px; z-index: 4; background: var(--paper); border: 1px solid var(--hairline); border-radius: 22px; padding: 10px 10px 10px 16px; display: flex; align-items: center; gap: 10px; box-shadow: 0 14px 34px rgba(0,0,0,.32); }
+.phone.light .tray { box-shadow: 0 14px 34px rgba(16,36,49,.18); }
+.tray .count { width: 30px; height: 30px; border-radius: 50%; background: var(--teal); color: var(--onTeal); display: grid; place-items: center; font-weight: 800; font-size: .875em; flex: none; }
+.tray .btn { min-height: 46px; padding: 0 16px; font-size: .9375em; }
+/* strategy rows */
+.srow { display: flex; gap: 12px; align-items: center; padding: 12px 0; min-height: 60px; }
+.srow .ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: var(--soft); color: var(--teal); border: 1px solid var(--hairline); }
+.srow .ic.amber { color: var(--amberInk); background: var(--amberWash); }
+.srow .ic.purple { color: var(--purple); }
+.srow .nm { font-weight: 700; font-size: .9375em; }
+.srow .dt { font-size: .8125em; color: var(--ink2); line-height: 1.35; margin-top: 2px; }
+.srow .edit { color: var(--teal); font-weight: 700; font-size: .875em; min-width: 44px; min-height: 44px; display: grid; place-items: center; }
+.chg { border-left: 3px solid var(--amber); padding-left: 12px; margin-left: -1px; }
+.was { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.now { font-weight: 800; color: var(--ink); }
+/* range slider */
+.rng { position: relative; height: 44px; display: flex; align-items: center; }
+.rng input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 44px; background: transparent; margin: 0; position: relative; z-index: 2; cursor: pointer; }
+.rng input[type=range]::-webkit-slider-runnable-track { height: 8px; border-radius: 99px; background: transparent; }
+.rng input[type=range]::-moz-range-track { height: 8px; border-radius: 99px; background: transparent; }
+.rng input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 3px solid var(--teal); margin-top: -11px; box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+.rng input[type=range]::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 3px solid var(--teal); box-shadow: 0 3px 10px rgba(0,0,0,.35); }
+.rng input[type=range]:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 12px; }
+.rng .track { position: absolute; left: 0; right: 0; height: 8px; border-radius: 99px; background: var(--soft); border: 1px solid var(--hairline); z-index: 1; overflow: hidden; }
+.rng .track .z { position: absolute; top: 0; bottom: 0; }
+.rng .track .fill { position: absolute; top: 0; bottom: 0; background: var(--teal); opacity: .8; }
+.rng.amber input[type=range]::-webkit-slider-thumb { border-color: var(--amber); }
+.rng.purple input[type=range]::-webkit-slider-thumb { border-color: var(--purple); }
+.ticks { display: flex; justify-content: space-between; font-size: .6875em; color: var(--muted); margin-top: -2px; }
+.bigval { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 2em; letter-spacing: -.03em; line-height: 1; }
+.bigval small { font-size: .45em; letter-spacing: 0; color: var(--ink2); font-weight: 700; margin-left: 4px; }
+.band { display: flex; gap: 8px; flex-wrap: wrap; }
+.band > div { flex: 1; min-width: 130px; background: var(--soft); border: 1px solid var(--hairline); border-radius: 14px; padding: 10px 12px; }
+.band b { display: block; font-size: 1em; margin-top: 3px; }
+.band span { font-size: .6875em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { border: 1.5px solid var(--hairline); border-radius: 999px; padding: 0 14px; min-height: 40px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: .8125em; color: var(--ink2); background: var(--paper); cursor: pointer; user-select: none; }
+.chip.on { border-color: var(--teal); color: var(--teal); background: var(--tealWash); }
+.chip.dis { opacity: .45; border-style: dashed; cursor: default; }
+.alloc { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+.numbox { border: 1.5px solid var(--teal); border-radius: 12px; padding: 7px 10px; font-weight: 800; font-size: .9375em; background: var(--paper); min-width: 104px; text-align: right; display: inline-flex; justify-content: space-between; gap: 8px; }
+.numbox.err { border-color: var(--red); color: var(--red); }
+.numbox.ro { border-style: dashed; border-color: var(--hairline); color: var(--ink2); }
+.mini-step { display: inline-flex; border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; }
+.mini-step span { width: 40px; height: 40px; display: grid; place-items: center; color: var(--teal); font-weight: 700; cursor: pointer; user-select: none; }
+.ewarn { display: flex; gap: 8px; align-items: flex-start; border-radius: 12px; padding: 9px 11px; font-size: .78em; line-height: 1.4; margin-top: 8px; }
+.ewarn svg { flex: none; margin-top: 1px; }
+.ewarn.amber { background: var(--amberWash); color: var(--ink); border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); }
+.ewarn.amber svg { color: var(--amberInk); }
+.ewarn.red { background: var(--redWash); color: var(--ink); border: 1px solid color-mix(in srgb, var(--red) 55%, transparent); }
+.ewarn.red svg { color: var(--red); }
+.ewarn.info { background: var(--soft); color: var(--ink2); border: 1px solid var(--hairline); }
+.ewarn.info svg { color: var(--teal); }
+.ewarn.ok { background: var(--tealWash); color: var(--ink); border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent); }
+.ewarn.ok svg { color: var(--green); }
+/* stacked energy bar */
+.ebar { display: flex; height: 34px; border-radius: 10px; overflow: hidden; border: 1px solid var(--hairline); font-size: .6875em; font-weight: 800; }
+.ebar > div { display: grid; place-items: center; color: var(--onTeal); white-space: nowrap; overflow: hidden; }
+.ebar .base { background: color-mix(in srgb, var(--cyan) 70%, transparent); }
+.ebar .add { background: var(--purple); color: #fff; }
+.ebar .eat { background: var(--teal); }
+.ebar .gap { background: repeating-linear-gradient(135deg, var(--amberWash) 0 6px, transparent 6px 12px); color: var(--amberInk); border-left: 1.5px dashed var(--amber); }
+/* toggle */
+.sw { width: 51px; height: 31px; border-radius: 99px; background: var(--soft); border: 1px solid var(--hairline); position: relative; flex: none; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 25px; height: 25px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+.sw.on { background: var(--green); border-color: var(--green); }
+.sw.on::after { left: 22px; }
+.sw.dis { opacity: .4; }
+/* list rows */
+.lrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; padding: 8px 0; }
+.lrow .l { font-size: .9375em; }
+.lrow .l small { display: block; color: var(--ink2); font-size: .8125em; margin-top: 2px; line-height: 1.35; }
+.lrow .r { display: flex; align-items: center; gap: 8px; color: var(--ink2); font-size: .875em; text-align: right; }
+/* dialog */
+.alert { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 300px; background: var(--paper); border-radius: 22px; z-index: 7; overflow: hidden; border: 1px solid var(--hairline); text-align: center; }
+.alert .ab { padding: 20px 18px 16px; }
+.alert .ab .t { font-weight: 800; font-size: 1.0625em; }
+.alert .ab p { font-size: .8125em; color: var(--ink2); margin-top: 6px; line-height: 1.4; }
+.alert .act { border-top: 1px solid var(--rule); min-height: 46px; display: grid; place-items: center; color: var(--teal); font-weight: 600; font-size: 1em; }
+.alert .act.red { color: var(--red); }
+.alert .act.b { font-weight: 800; }
+/* steps header (Approach B) */
+.steps { display: flex; gap: 4px; margin: 2px 0 10px; }
+.steps i { flex: 1; height: 5px; border-radius: 9px; background: var(--soft); border: 1px solid var(--hairline); }
+.steps i.done { background: var(--teal); border-color: var(--teal); }
+.steps i.cur { background: color-mix(in srgb, var(--teal) 45%, var(--soft)); border-color: var(--teal); }
+/* week grid */
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.week > div { background: var(--soft); border: 1px solid var(--hairline); border-radius: 12px; padding: 7px 2px; text-align: center; font-size: .6875em; min-height: 74px; display: flex; flex-direction: column; gap: 3px; align-items: center; }
+.week > div b { font-size: 1.1em; }
+.week > div.on { border-color: var(--purple); background: color-mix(in srgb, var(--purple) 12%, var(--paper)); }
+.week > div.train { box-shadow: inset 0 3px 0 var(--teal); }
+.week .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--purple); }
+.week .dot.t { background: var(--teal); }
+/* diff table */
+.diff .kv { padding: 10px 0; }
+.diff .grp { font-size: .6875em; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 12px 0 2px; }
+/* concept stamp */
+.concept { border: 1.5px dashed var(--purple); border-radius: 16px; padding: 12px 14px; position: relative; background: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--purple) 7%, transparent) 10px 11px); }
+.ctag { display: inline-flex; align-items: center; gap: 5px; font-size: .625em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--purple); background: var(--paper); border: 1px solid var(--purple); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.ptag { display: inline-flex; align-items: center; font-size: .625em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--amberInk); background: var(--paper); border: 1px solid var(--amber); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.unav { opacity: .55; }
+.sheet.tall { top: 70px; overflow: hidden; }
+.field { border: 1.5px solid var(--hairline); border-radius: 12px; padding: 11px 12px; background: var(--paper); font-size: .9375em; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 46px; }
+.field.focus { border-color: var(--teal); box-shadow: 0 0 0 4px var(--tealWash); }
+.field.err { border-color: var(--red); box-shadow: 0 0 0 4px var(--redWash); }
+.errtxt { color: var(--red); font-size: .78em; font-weight: 600; margin-top: 6px; display: flex; gap: 6px; align-items: center; }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 112px; z-index: 6; background: var(--ink); color: var(--canvas); border-radius: 16px; padding: 12px 14px; font-size: .8125em; font-weight: 600; display: flex; gap: 10px; align-items: center; }
+.kbd { position: absolute; left: 0; right: 0; bottom: 0; height: 290px; background: color-mix(in srgb, var(--soft) 92%, #000 8%); z-index: 8; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; padding: 8px 6px 40px; border-top: 1px solid var(--hairline); }
+.kbd > div { background: var(--paper); border-radius: 8px; display: grid; place-items: center; font-size: 1.4em; font-weight: 500; box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.phone.xl .tray { flex-wrap: wrap; }
+.phone.xl .tray .btn { width: 100%; }
+.banner { border-radius: 16px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; font-size: .8125em; line-height: 1.4; }
+.banner.amber { background: var(--amberWash); border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); }
+.banner.teal { background: var(--tealWash); border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent); }
+.banner.red { background: var(--redWash); border: 1px solid color-mix(in srgb, var(--red) 50%, transparent); }
+.banner .bt { font-weight: 800; color: var(--ink); }
+.banner p { color: var(--ink2); margin-top: 2px; }
+.iconbtn { width: 44px; height: 44px; border-radius: 12px; border: 1.5px solid var(--hairline); display: grid; place-items: center; color: var(--teal); background: var(--paper); flex: none; cursor: pointer; }
+
+/* ---------- Review board chrome (desktop first, responsive) ---------- */
+:root {
+  --b-bg: #050c14; --b-panel: #0b1622; --b-card: #0f1c2a; --b-line: rgba(157,179,189,.18);
+  --b-ink: #eef5f8; --b-ink2: #b6c6ce; --b-muted: #8399a3; --b-teal: #3bd2ca; --b-amber: #f4bc48;
+  --b-green: #55e39a; --b-red: #ff697a; --b-purple: #aa98ff;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --b-bg: #e3e8e1; --b-panel: #eef1ec; --b-card: #fbfaf4; --b-line: rgba(25,56,66,.16);
+    --b-ink: #102431; --b-ink2: #455d65; --b-muted: #5d7279; --b-teal: #087e78; --b-amber: #925500;
+    --b-green: #16875f; --b-red: #b83d4b; --b-purple: #5c3fd2;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --b-bg: #e3e8e1; --b-panel: #eef1ec; --b-card: #fbfaf4; --b-line: rgba(25,56,66,.16);
+  --b-ink: #102431; --b-ink2: #455d65; --b-muted: #5d7279; --b-teal: #087e78; --b-amber: #925500;
+  --b-green: #16875f; --b-red: #b83d4b; --b-purple: #5c3fd2;
+  color-scheme: light;
+}
+:root[data-theme="dark"] { color-scheme: dark; }
+body { background: var(--b-bg); color: var(--b-ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; margin: 0; }
+.main code, .note code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+.sec > h2, .hero-b h1 { text-wrap: balance; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+html { scroll-behavior: smooth; }
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; background: color-mix(in srgb, var(--b-bg) 90%, transparent); backdrop-filter: blur(14px); border-bottom: 1px solid var(--b-line); }
+.topbar-in { max-width: 1920px; margin: 0 auto; padding: 10px 28px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.brand { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 17px; letter-spacing: -.01em; margin-right: 6px; white-space: nowrap; }
+.brand span { color: var(--b-teal); }
+.tog { display: inline-flex; background: var(--b-card); border: 1px solid var(--b-line); border-radius: 12px; padding: 3px; gap: 2px; }
+.tog button { all: unset; cursor: pointer; padding: 7px 12px; border-radius: 9px; font-size: 13px; font-weight: 700; color: var(--b-ink2); white-space: nowrap; }
+.tog button[aria-pressed="true"] { background: var(--b-teal); color: #03191e; }
+.tog button:focus-visible, .navlink:focus-visible, .shot:focus-visible { outline: 2px solid var(--b-teal); outline-offset: 2px; }
+.spacer { flex: 1; }
+.search { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 12px; color: var(--b-ink); padding: 8px 12px; font: inherit; font-size: 13px; width: 220px; }
+.layout { max-width: 1920px; margin: 0 auto; display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 0; }
+.side { position: sticky; top: 58px; align-self: start; height: calc(100vh - 58px); overflow: auto; padding: 18px 14px 40px 28px; border-right: 1px solid var(--b-line); }
+.side h4 { margin: 18px 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--b-muted); }
+.navlink { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 9px; color: var(--b-ink2); text-decoration: none; font-size: 13.5px; line-height: 1.3; }
+.navlink:hover, .navlink.on { background: var(--b-card); color: var(--b-ink); }
+.navlink small { color: var(--b-muted); font-variant-numeric: tabular-nums; }
+.main { padding: 26px 34px 120px; min-width: 0; }
+.hero-b h1 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 42px; letter-spacing: -.035em; line-height: 1.05; margin: 6px 0 10px; }
+.kick { color: var(--b-teal); font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.lead { color: var(--b-ink2); font-size: 16px; line-height: 1.6; max-width: 1120px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 20px 0 6px; }
+.stat { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 16px; padding: 14px 16px; }
+.stat b { display: block; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 26px; letter-spacing: -.02em; }
+.stat span { color: var(--b-ink2); font-size: 12.5px; line-height: 1.4; }
+.sec { border-top: 1px solid var(--b-line); padding: 30px 0 34px; scroll-margin-top: 70px; }
+.sec > h2 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 28px; letter-spacing: -.02em; margin: 0 0 6px; }
+.sec > .note { color: var(--b-ink2); font-size: 14.5px; line-height: 1.6; max-width: 1180px; margin: 0 0 18px; }
+.flowline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 18px; font-size: 13px; }
+.flowline .n { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 10px; padding: 7px 10px; color: var(--b-ink); cursor: pointer; text-decoration: none; }
+.flowline .n b { color: var(--b-teal); margin-right: 5px; }
+.flowline .a { color: var(--b-muted); }
+.grid { display: flex; flex-wrap: wrap; gap: 30px 26px; align-items: flex-start; }
+.item { width: 686px; max-width: 100%; min-width: 0; }
+body[data-show="dark"] .item, body[data-show="light"] .item { width: 336px; }
+.item .meta { margin: 0 0 12px; max-width: 640px; }
+.item .id { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--b-teal); text-transform: uppercase; }
+.item .ttl { font-size: 15.5px; font-weight: 700; line-height: 1.3; margin-top: 3px; }
+.item .desc { font-size: 13px; color: var(--b-ink2); line-height: 1.5; margin-top: 4px; }
+.shot { width: 336px; cursor: zoom-in; border-radius: 14px; }
+.shot .cap { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--b-muted); }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.tag { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; border-radius: 999px; padding: 3px 8px; border: 1px solid var(--b-line); color: var(--b-ink2); }
+.tag.canon { color: var(--b-green); border-color: color-mix(in srgb, var(--b-green) 45%, transparent); }
+.tag.concept { color: var(--b-amber); border-color: color-mix(in srgb, var(--b-amber) 45%, transparent); }
+.tag.new { color: var(--b-purple); border-color: color-mix(in srgb, var(--b-purple) 45%, transparent); }
+.tag.state { color: var(--b-teal); border-color: color-mix(in srgb, var(--b-teal) 40%, transparent); }
+.frame { width: 336px; position: relative; border-radius: 40px; }
+.frame > .phone { zoom: .8358; }
+.pair { display: flex; gap: 14px; }
+.pair .shot { width: 336px; }
+body[data-show="dark"] .phone-light-wrap, body[data-show="light"] .phone-dark-wrap { display: none; }
+.cmpwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+.panel { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 18px; padding: 18px 20px; }
+.panel h3 { margin: 0 0 8px; font-size: 17px; }
+.panel p, .panel li { color: var(--b-ink2); font-size: 14px; line-height: 1.55; }
+.panel ul { margin: 6px 0 0; padding-left: 18px; }
+.rec { border: 2px solid var(--b-teal); box-shadow: 0 0 0 4px color-mix(in srgb, var(--b-teal) 14%, transparent); }
+.score { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
+.score th, .score td { text-align: left; padding: 8px 10px 8px 0; border-top: 1px solid var(--b-line); vertical-align: top; }
+.score th { color: var(--b-muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; border-top: 0; }
+.tw { overflow-x: auto; border: 1px solid var(--b-line); border-radius: 16px; background: var(--b-card); }
+table.cov { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1180px; }
+.cov th, .cov td { text-align: left; padding: 9px 12px; border-top: 1px solid var(--b-line); vertical-align: top; line-height: 1.45; }
+.cov th { position: sticky; top: 0; background: var(--b-panel); color: var(--b-muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; border-top: 0; z-index: 1; }
+.cov td a { color: var(--b-teal); text-decoration: none; font-weight: 700; }
+.cov tr.grp td { background: var(--b-panel); font-weight: 800; color: var(--b-ink); }
+.st-canon { color: var(--b-green); font-weight: 700; }
+.st-partial { color: var(--b-teal); font-weight: 700; }
+.st-concept { color: var(--b-amber); font-weight: 700; }
+.st-read { color: var(--b-muted); font-weight: 700; }
+.idx { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.idx a { text-decoration: none; color: var(--b-ink2); font-size: 11.5px; line-height: 1.3; }
+.idx .mini { width: 100%; aspect-ratio: 402 / 600; overflow: hidden; border-radius: 16px; border: 1px solid var(--b-line); position: relative; margin-bottom: 6px; background: var(--b-card); }
+.idx .mini > .phone { zoom: .373; position: absolute; left: 0; top: 0; box-shadow: none; }
+.idx b { color: var(--b-teal); }
+.callouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.dec { counter-reset: d; display: grid; gap: 10px; }
+.dec > div { background: var(--b-card); border: 1px solid var(--b-line); border-radius: 14px; padding: 12px 16px; font-size: 14px; line-height: 1.55; color: var(--b-ink2); }
+.dec > div b { color: var(--b-ink); }
+/* lightbox */
+.lb { position: fixed; inset: 0; z-index: 100; background: rgba(2,6,10,.86); display: none; align-items: center; justify-content: center; gap: 30px; padding: 30px; }
+.lb.open { display: flex; }
+.lb .stage { max-height: calc(100vh - 60px); overflow: auto; border-radius: 48px; }
+.lb .info { max-width: 420px; color: #e7eff3; }
+.lb .info h3 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; margin: 6px 0 8px; letter-spacing: -.01em; }
+.lb .info p { color: #b6c6ce; font-size: 14.5px; line-height: 1.6; }
+.lb .ctl { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.lb .ctl button { all: unset; cursor: pointer; border: 1px solid rgba(157,179,189,.3); border-radius: 12px; padding: 9px 14px; font-size: 13px; font-weight: 700; color: #e7eff3; }
+.lb .ctl button:focus-visible { outline: 2px solid #3bd2ca; }
+.hide { display: none !important; }
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: 1fr; }
+  .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--b-line); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .side h4 { width: 100%; margin: 8px 0 2px; }
+  .main { padding: 18px 16px 80px; }
+  .cmpwrap { grid-template-columns: 1fr; }
+  .topbar-in { padding: 10px 16px; }
+  .search { width: 100%; }
+  .hero-b h1 { font-size: 32px; }
+  .lb { flex-direction: column; overflow: auto; justify-content: flex-start; }
+}
+@media (max-width: 720px) {
+  .pair { flex-direction: column; }
+  .shot, .pair .shot, .frame, .item { width: 100%; max-width: 336px; }
+}
+
+</style>
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">PhysiqueOS <span>· Operating Plan design</span></div>
+  <div class="tog" role="group" aria-label="Phone themes"><button data-show-btn="both" aria-pressed="true">Dark + Mineral</button><button data-show-btn="dark" aria-pressed="false">Dark</button><button data-show-btn="light" aria-pressed="false">Mineral Light</button></div>
+  <div class="tog" role="group" aria-label="Board theme"><button data-board-btn="auto" aria-pressed="true">Board: auto</button><button data-board-btn="dark" aria-pressed="false">Dark</button><button data-board-btn="light" aria-pressed="false">Light</button></div>
+  <div class="spacer"></div>
+  <input class="search" id="q" type="search" placeholder="Filter screens (e.g. energy, validation, concept)" aria-label="Filter screens">
+</div></div>
+<div class="layout"><nav class="side" id="side" aria-label="Board sections"></nav><main class="main" id="main"></main></div>
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Enlarged screen">
+  <div class="stage" id="lb-stage"></div>
+  <div class="info"><div id="lb-info"></div><div class="ctl"><button id="lb-prev">← Previous</button><button id="lb-next">Next →</button><button id="lb-theme">Switch theme (T)</button><button id="lb-close">Close (Esc)</button></div></div>
+</div>
+<script>
+const I = {
+  back: '<svg width="13" height="21" viewBox="0 0 13 21"><path d="M11 2 2.5 10.5 11 19" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  chev: '<svg class="chev" width="8" height="14" viewBox="0 0 8 14"><path d="m1.5 1.5 5 5.5-5 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  arrow: '<svg width="20" height="16" viewBox="0 0 20 16"><path d="M2 8h15M11 2l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check: '<svg class="check" width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="m6 10.3 2.7 2.7L14.3 7.4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  x: '<svg width="14" height="14" viewBox="0 0 14 14"><path d="m2 2 10 10M12 2 2 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  doc: '<svg width="18" height="22" viewBox="0 0 18 22"><path d="M3 1h8l6 6v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2Z" fill="currentColor"/><path d="M5 12h8M5 16h6" stroke="var(--paper)" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  warn: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.8 17 16H1L9 1.8Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9 7v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="13.4" r="1.1" fill="currentColor"/></svg>',
+  info: '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7v4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="4.6" r="1" fill="currentColor"/></svg>',
+  plus: '<svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+  history: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M2.5 9a6.5 6.5 0 1 0 2-4.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2 2.5v3.3h3.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 5.5V9l2.5 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  sync: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M13.5 6A5.8 5.8 0 0 0 3 4.6M2.5 10A5.8 5.8 0 0 0 13 11.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M3 1.8v3h3M13 14.2v-3h-3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  home: '<svg width="30" height="26" viewBox="0 0 30 26"><path d="M15 2 2 13h4v11h7v-7h4v7h7V13h4L15 2Z" fill="currentColor"/></svg>',
+  goals: '<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="13" cy="13" r="6.3" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="13" cy="13" r="2" fill="currentColor"/></svg>',
+  log: '<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="12" fill="currentColor"/><path d="M13 7v12M7 13h12" stroke="var(--paper)" stroke-width="2.6" stroke-linecap="round"/></svg>',
+  evidence: '<svg width="28" height="24" viewBox="0 0 28 24"><rect x="1" y="9" width="7" height="14" rx="2" fill="currentColor"/><rect x="10.5" y="4" width="7" height="19" rx="2" fill="currentColor"/><rect x="20" y="1" width="7" height="22" rx="2" fill="currentColor"/></svg>',
+  you: '<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="12" fill="currentColor"/><circle cx="13" cy="10" r="4.2" fill="var(--paper)"/><path d="M5.5 20.5c1.8-3.2 4.5-4.6 7.5-4.6s5.7 1.4 7.5 4.6" fill="var(--paper)"/></svg>',
+  bolt: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M9 1 3 9h4l-1 6 6-8H8l1-6Z" fill="currentColor"/></svg>',
+};
+const statusBar = () => `<div class="sb"><span>9:41</span><span class="icons">
+  <svg width="19" height="12" viewBox="0 0 19 12"><rect x="0" y="8" width="3.2" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3.2" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3.2" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3.2" height="12" rx="1" fill="currentColor"/></svg>
+  <svg width="17" height="12" viewBox="0 0 17 12"><path d="M8.5 2.2c2.6 0 4.9 1 6.6 2.7l1.4-1.4A11.3 11.3 0 0 0 .5 3.5l1.4 1.4A9.3 9.3 0 0 1 8.5 2.2Zm0 4c1.5 0 2.8.6 3.8 1.5l1.4-1.4a7.3 7.3 0 0 0-10.4 0l1.4 1.4c1-.9 2.3-1.5 3.8-1.5Zm0 4 1.9-1.9a2.7 2.7 0 0 0-3.8 0l1.9 1.9Z" fill="currentColor"/></svg>
+  <svg width="27" height="13" viewBox="0 0 27 13"><rect x=".7" y=".7" width="22.6" height="11.6" rx="3.6" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-width="1.2"/><rect x="2.5" y="2.5" width="19" height="8" rx="2.2" fill="currentColor"/><rect x="24.6" y="4.3" width="1.8" height="4.4" rx=".9" fill="currentColor" fill-opacity=".5"/></svg>
+</span></div>`;
+const nav = (back, title, action = '') => `<div class="nav"><span class="back">${I.back}<span>${back}</span></span><span class="title">${title}</span><span class="action">${action}</span></div>`;
+const tabbar = (active = 'home') => `<div class="tabbar">${[
+  ['home', 'Home'], ['goals', 'Goals'], ['log', 'Log'], ['evidence', 'Evidence'], ['you', 'You']
+].map(([k, l]) => `<div class="tab ${k === active ? 'on' : ''}">${I[k]}<span>${l}</span></div>`).join('')}</div>`;
+const illusTag = (text = 'Illustrative') => `<span class="illus-tag">${text}</span>`;
+
+;
+// ---------------------------------------------------------------------------
+// Energy balance model used by the interactive prototype screens.
+// Founder Oct 9 numbers come from the Phase B dormant candidate (99f11ae6):
+// maintenance ≈ 2,117 logged kcal/day (1,977–2,258) at ~800 kcal usual activity.
+// Everything else here (credit factor, caps, presets) is a PROVISIONAL design
+// proposal for Founder review, not engine policy.
+// ---------------------------------------------------------------------------
+const EM = {
+  maintenance: 2117, low: 1977, high: 2258,      // logged kcal/day at usual activity
+  baseline: 800,                                  // usual Apple Watch active energy (already inside maintenance)
+  credit: 0.75,                                   // share of ADDED activity counted toward the balance
+  densityLoss: 3300, densityGain: 2500,           // kcal per lb of mixed weight change
+  fatToLose: 2.6, fatShare: [0.8, 0.95],          // Phase B lean-out projection
+  leanToGain: 2.9,                                // remaining lean mass to the +10 lb goal
+  floorFraction: 0.75, maxAdded: 500, maxSurplus: 500, round: 25,
+  plan: { intake: 2500, activity: 800 },
+};
+const r25 = (v) => Math.round(v / EM.round) * EM.round;
+const fmt = (v) => Math.round(v).toLocaleString('en-US');
+const sgn = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + fmt(Math.abs(v));
+
+function energyCalc(net, added) {
+  const floor = Math.ceil((EM.maintenance * EM.floorFraction) / EM.round) * EM.round;
+  let intake = r25(EM.maintenance + net + EM.credit * added);
+  const warnings = [];
+  let clamped = false;
+  if (intake < floor) { intake = floor; clamped = true; warnings.push(['red', `Intake can’t go below ${fmt(floor)} kcal (25% under your maintenance). Add activity or choose a smaller deficit.`]); }
+  if (intake > EM.maintenance + EM.maxSurplus) { intake = r25(EM.maintenance + EM.maxSurplus); clamped = true; warnings.push(['amber', 'Surplus capped at +500 kcal over maintenance.']); }
+  const effNet = intake - EM.maintenance - EM.credit * added;
+  // uncertainty from the maintenance range plus the uncounted share of added activity
+  const netLo = intake - EM.high - EM.credit * added - 0.25 * added * 0.5;
+  const netHi = intake - EM.low - EM.credit * added + 0.25 * added * 0.5;
+  const density = effNet < 0 ? EM.densityLoss : EM.densityGain;
+  const rate = (n) => (n * 7) / density; // lb/week, signed
+  const rLo = rate(Math.min(netLo, netHi)), rHi = rate(Math.max(netLo, netHi));
+  const bw = 179;
+  let weeks = null;
+  if (effNet < -60) {
+    const lossLo = EM.fatToLose / EM.fatShare[1], lossHi = EM.fatToLose / EM.fatShare[0];
+    const fast = Math.abs(Math.min(rLo, rHi)), slow = Math.max(0.15, Math.abs(Math.max(rLo, rHi)));
+    weeks = [Math.max(1, Math.round(lossLo / fast)), Math.max(2, Math.round(lossHi / slow))];
+    const pct = (Math.abs(effNet) * 7 / EM.densityLoss) / bw * 100;
+    if (pct > 0.85) warnings.push(['amber', `About ${(pct).toFixed(1)}% of body weight a week is faster than the 0.4–0.7% that best protects lean mass.`]);
+  } else if (effNet > 60) {
+    weeks = null;
+  }
+  if (added > 300) warnings.push(['amber', `+${added} kcal a day is a big jump from your usual ${EM.baseline}. Watch estimates for added exercise run high, so only ${Math.round(EM.credit * 100)}% is counted.`]);
+  if (added > 0 && added <= 300) warnings.push(['info', `Added activity counted at ${Math.round(EM.credit * 100)}%. Watch estimates for extra exercise tend to run high.`]);
+  return { intake, added, net: Math.round(effNet), netLo: Math.round(Math.min(netLo, netHi)), netHi: Math.round(Math.max(netLo, netHi)), rLo, rHi, weeks, warnings, clamped, floor, activityGoal: EM.baseline + added };
+}
+
+const PRESETS = {
+  suggested: { label: 'Suggested', net: -450, added: 100 },
+  balanced: { label: 'Balanced', net: -450, added: 300 },
+  intake: { label: 'Intake-focused', net: -450, added: 0 },
+  activity: { label: 'Activity-focused', net: -450, added: 500 },
+};
+
+function rateText(c) {
+  const a = Math.abs(c.rLo), b = Math.abs(c.rHi);
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  if (c.net > -60 && c.net < 60) return 'About steady weight';
+  if (c.net > 0) return `≈ ${(lo * 4.33).toFixed(1)}–${(hi * 4.33).toFixed(1)} lb/month gain`;
+  return `≈ ${lo.toFixed(1)}–${hi.toFixed(1)} lb/week loss`;
+}
+
+// live wiring for interactive phones (event delegation; works in the lightbox copy too)
+function energyRefresh(root) {
+  const net = Number(root.querySelector('[data-in="net"]')?.value ?? root.dataset.net ?? -450);
+  const added = Number(root.querySelector('[data-in="added"]')?.value ?? root.dataset.added ?? 100);
+  const c = energyCalc(net, added);
+  const set = (k, v) => root.querySelectorAll(`[data-e="${k}"]`).forEach((el) => { el.innerHTML = v; });
+  set('net', c.clamped ? `${sgn(c.net)} kcal/day <span style="font-size:.6em;color:var(--red)">limited</span>` : `${sgn(net)} kcal/day`);
+  set('netrange', `${sgn(c.netLo)} to ${sgn(c.netHi)}`);
+  set('rate', rateText({ ...c, net }));
+  set('weeks', c.weeks ? `${c.weeks[0]}–${c.weeks[1]} weeks` : net > 60 ? 'Building continues' : 'No fixed length');
+  set('intake', fmt(c.intake));
+  set('intakeDelta', `${sgn(c.intake - EM.plan.intake)} vs today’s plan`);
+  set('added', `+${fmt(added)}`);
+  set('activityGoal', fmt(c.activityGoal));
+  set('weekIntake', fmt(c.intake * 7));
+  set('weekAdded', fmt(added * 7));
+  set('steps', added ? `≈ ${fmt(Math.round(added * 22 / 100) * 100)} extra steps a day, or ${Math.max(1, Math.round(added * 7 / 350))} brisk 45-min walks a week` : 'No added activity');
+  const zone = net < -650 ? 'Aggressive' : net < -250 ? 'Moderate deficit' : net < -60 ? 'Gentle deficit' : net <= 60 ? 'Maintenance' : net <= 250 ? 'Lean surplus' : 'Surplus';
+  set('zone', zone);
+  root.querySelectorAll('[data-e="zone"]').forEach((el) => { el.className = `pill ${net < -650 ? 'red' : net < -60 ? 'amber' : net <= 60 ? 'line' : 'teal'}`; });
+  const intakeSlider = root.querySelector('[data-in="intake"]');
+  if (intakeSlider && document.activeElement !== intakeSlider) intakeSlider.value = c.intake;
+  const w = root.querySelector('[data-e="warnings"]');
+  if (w) w.innerHTML = c.warnings.map(([tone, t]) => `<div class="ewarn ${tone}">${tone === 'info' ? I.info : I.warn}<span>${t}</span></div>`).join('');
+  root.querySelectorAll('[data-preset]').forEach((b) => {
+    const p = b.dataset.preset === 'suggested' ? { net: Number(root.dataset.sugNet ?? -450), added: Number(root.dataset.sugAdded ?? 100) } : PRESETS[b.dataset.preset];
+    b.classList.toggle('on', p.net === net && p.added === added);
+  });
+  const fill = root.querySelector('[data-e="netfill"]');
+  if (fill) { const pct = ((net + 750) / 1250) * 100; fill.style.left = `${Math.min(pct, 60)}%`; fill.style.width = `${Math.abs(pct - 60)}%`; }
+}
+document.addEventListener('input', (ev) => {
+  const root = ev.target.closest('[data-energy]');
+  if (!root) return;
+  if (ev.target.dataset.in === 'intake') {
+    // dragging intake keeps the selected net balance: activity moves the other way
+    const net = Number(root.querySelector('[data-in="net"]')?.value ?? root.dataset.net);
+    const wantIntake = Number(ev.target.value);
+    const added = Math.max(0, Math.min(EM.maxAdded, Math.round(((wantIntake - EM.maintenance - net) / EM.credit) / 25) * 25));
+    const a = root.querySelector('[data-in="added"]'); if (a) a.value = added;
+  }
+  energyRefresh(root);
+});
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-preset],[data-step]');
+  if (!b) return;
+  const root = b.closest('[data-energy]');
+  if (!root) return;
+  const netEl = root.querySelector('[data-in="net"]'), addEl = root.querySelector('[data-in="added"]');
+  if (b.dataset.preset) { const p = b.dataset.preset === 'suggested' ? { net: Number(root.dataset.sugNet ?? -450), added: Number(root.dataset.sugAdded ?? 100) } : PRESETS[b.dataset.preset]; if (netEl) netEl.value = p.net; if (addEl) addEl.value = p.added; }
+  if (b.dataset.step) { const [k, d] = b.dataset.step.split(':'); const el = root.querySelector(`[data-in="${k}"]`); if (el) el.value = Number(el.value) + Number(d); }
+  energyRefresh(root);
+});
+
+;
+// ---------------------------------------------------------------------------
+// Screens part A: icons, shared fragments, journey entry, phase & goal setup,
+// Approach A plan hub. Values: Founder Oct 9 (Phase B candidate 99f11ae6) where
+// stated; everything marked * is illustrative.
+// ---------------------------------------------------------------------------
+const S = {};
+Object.assign(I, {
+  energy: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M10 1 3 10h5l-1 7 7-9H9l1-7Z" fill="currentColor"/></svg>',
+  food: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M5 1v6a2 2 0 0 0 4 0V1M7 7v10M13 1c-2 1.5-2.5 4-2.5 6.5h2.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  walk: '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="10" cy="2.6" r="1.8" fill="currentColor"/><path d="m7 17 2-5 2 2v3M6 9l2-3.5 3 .5 2 3M9 12l-.5-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  lift: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M1 9h16M4 5v8M14 5v8M2 7v4M16 7v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  moon: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M15 11.5A7 7 0 0 1 6.5 3 7 7 0 1 0 15 11.5Z" fill="currentColor"/></svg>',
+  drop: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.5S3.5 7.6 3.5 11.2a5.5 5.5 0 0 0 11 0C14.5 7.6 9 1.5 9 1.5Z" fill="currentColor"/></svg>',
+  pill: '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="1.5" y="6" width="15" height="6.5" rx="3.25" fill="none" stroke="currentColor" stroke-width="1.8" transform="rotate(-35 9 9)"/><path d="m6.6 5.5 4.2 6" stroke="currentColor" stroke-width="1.8"/></svg>',
+  cam: '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="1.5" y="4.5" width="15" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 4.5 7 2.5h4l1 2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
+  scale: '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="1.5" y="1.5" width="15" height="15" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 6.5a4 4 0 0 1 6 0L10 8.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  bell: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M4.5 12.5V8a4.5 4.5 0 0 1 9 0v4.5l1.5 1.5H3l1.5-1.5ZM7.5 16h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  target: '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="9" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/></svg>',
+  flag: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M3.5 17V2M3.5 3h10l-2 3.5 2 3.5h-10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  shield: '<svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 1.5 15 4v4.5c0 3.8-2.6 6.7-6 8-3.4-1.3-6-4.2-6-8V4l6-2.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  cal: '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="1.5" y="3" width="15" height="13.5" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M1.5 7.5h15M5.5 1v3.5M12.5 1v3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  lock: '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="3" y="8" width="12" height="9" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 8V5.5a3.5 3.5 0 0 1 7 0V8" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>',
+  reset: '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2.5 8a5.5 5.5 0 1 0 1.8-4.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2 1.8v3h3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pencil: '<svg width="14" height="14" viewBox="0 0 14 14"><path d="M9.5 1.5 12.5 4.5 4.5 12.5H1.5v-3l8-8Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
+  watch: '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="4" y="4" width="10" height="10" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 4 6.6 1h4.8L12 4M6 14l.6 3h4.8l.6-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  chevDown: '<svg width="14" height="9" viewBox="0 0 14 9"><path d="m1.5 1.5 5.5 5.5 5.5-5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  dots: '<svg width="20" height="6" viewBox="0 0 20 6"><circle cx="3" cy="3" r="2.2" fill="currentColor"/><circle cx="10" cy="3" r="2.2" fill="currentColor"/><circle cx="17" cy="3" r="2.2" fill="currentColor"/></svg>',
+});
+const IL = '<span style="color:var(--amberInk);font-weight:800">*</span>';
+const ctag = (t = 'Concept') => `<span class="ctag">${t}</span>`;
+const ptag = (t = 'Provisional') => `<span class="ptag">${t}</span>`;
+const sw = (on = true, dis = false) => `<span class="sw ${on ? 'on' : ''} ${dis ? 'dis' : ''}"></span>`;
+const radio = (on) => `<div class="radio ${on ? 'on' : ''}"></div>`;
+const tray = (n, label = 'Review changes', sub = '') => `<div class="tray"><span class="count">${n}</span><div class="grow"><div class="t-sm strong">${n} change${n === 1 ? '' : 's'} in your draft</div><div class="t-xs muted">${sub || 'Nothing changes until you approve'}</div></div><div class="btn primary">${label}</div></div>`;
+const navX = (title, action = 'Done', back = 'Cancel') => `<div class="nav"><span class="back" style="font-weight:500">${back}</span><span class="title">${title}</span><span class="action" style="font-weight:700">${action}</span></div>`;
+const srow = (ic, tone, name, detail, right = `<span class="edit">Edit</span>`, cls = '') => `<div class="srow ${cls}"><span class="ic ${tone}">${I[ic]}</span><div class="grow"><div class="nm">${name}</div><div class="dt">${detail}</div></div>${right}</div>`;
+const pillTone = (t, label) => `<span class="pill ${t}">${label}</span>`;
+const bannerB = (tone, icon, title, body) => `<div class="banner ${tone}"><span style="color:var(--${tone === 'amber' ? 'amberInk' : tone === 'red' ? 'red' : 'teal'});margin-top:1px">${I[icon]}</span><div><div class="bt">${title}</div><p>${body}</p></div></div>`;
+
+// ---------------- Journey entry -----------------
+S['J1-options'] = () => `
+${statusBar()}${nav('Briefing', 'Goal Options')}
+<div class="content stack">
+  <div class="display h1">Choose what to protect next</div>
+  <p class="t-body ink2">You've built about 7 of your 10 lb. Body fat is above your 8–9% range, and Oct 31 is unlikely at your recent pace.</p>
+  <div class="cmp">
+    <div class="hd lbl"></div><div class="hd sel"><span style="color:var(--teal)">★</span> Lean out first</div><div class="hd">Keep building</div><div class="hd">Keep plan</div>
+    <div class="lbl">Daily intake</div><div class="sel">1,600–1,775</div><div>2,275–2,375</div><div>2,500</div>
+    <div class="lbl">Body fat</div><div class="sel">Back to 8.3–9%</div><div>Ends 10.4–11.3%</div><div>12.4–14%</div>
+    <div class="lbl">Timing</div><div class="sel">Lean 2–7 wks, goal ≈ Jan–May</div><div>Goal ≈ Jan–Apr</div><div>Goal ≈ late Nov–Dec</div>
+    <div class="lbl">Fits limits?</div><div class="sel" style="color:var(--green);font-weight:700">Yes</div><div style="color:var(--amberInk);font-weight:700">Needs upper ≥ 11.5%</div><div style="color:var(--red);font-weight:700">No</div>
+  </div>
+  <p class="t-xs muted">★ Ranked first for you. Calories are calibrated from your own logging and scans (maintenance ≈ 2,117, moderate confidence). Every number is provisional and rechecked before you approve.</p>
+  <div class="card selected rail"><div class="row between"><span class="pill teal">Recommended</span><span class="t-xs muted">Selected</span></div>
+    <div class="display h3" style="margin-top:8px">Lean out first, then keep building</div>
+    <p class="t-sm ink2" style="margin-top:6px">The only option that fits your body-fat range while protecting the lean mass you've built.</p></div>
+  <div class="btn primary">Set up leaning phase ${I.arrow}</div>
+  <div class="btn ghost">Make my own changes instead</div>
+</div>`;
+
+S['J2-option-detail'] = () => `
+${statusBar()}${nav('Options', 'Keep my current plan')}
+<div class="content stack">
+  <span class="pill red" style="align-self:flex-start">${I.warn} Doesn't fit your limits</span>
+  <div class="display h1">Keep my current plan</div>
+  <p class="t-body ink2">You can choose this. Here's what the evidence says it likely means.</p>
+  <div class="card"><span class="eyebrow">Tradeoffs</span>
+    <div class="divider-list" style="margin-top:6px">
+      <div class="lrow"><div class="l"><span style="color:var(--green);font-weight:800">+</span> No changes to your routine</div></div>
+      <div class="lrow"><div class="l"><span style="color:var(--amberInk);font-weight:800">−</span> Body fat likely 12.4–14% by the goal<small>Your firm limit is 8–9%</small></div></div>
+      <div class="lrow"><div class="l"><span style="color:var(--amberInk);font-weight:800">−</span> Goal ≈ Nov 26 – Dec 28<small>Oct 31 is unlikely at your measured pace</small></div></div>
+    </div></div>
+  <div class="card soft"><div class="row between"><span class="eyebrow">How sure is this?</span><span class="pill line">Moderate</span></div>
+    <p class="t-sm ink2" style="margin-top:6px">Based on 3 calibrated months of logging and 4 scans. Ranges narrow with each scan.</p></div>
+  ${bannerB('amber', 'warn', 'Your firm limit would need to change', 'To keep this plan you’ll set a new body-fat range, or keep 8–9% and accept it will show as exceeded.')}
+  <div class="btn secondary">Choose this anyway</div>
+  <div class="btn ghost">Back to options</div>
+</div>`;
+
+// ---------------- Phase & goal setup -----------------
+const completionCard = (mode) => `
+  <div class="card"><span class="eyebrow">How should the leaning phase end?</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice">${radio(mode === 'outcome')}<div class="grow"><div class="row between"><span class="t-body strong">When I'm back in range</span>${mode === 'outcome' ? '<span class="pill teal">Suggested</span>' : ''}</div><div class="t-sm ink2">Body fat back in 8–9%. A DEXA confirms it best; without one, we estimate from your weight trend and photos.</div></div></div>
+      <div class="choice">${radio(mode === 'time')}<div class="grow"><div class="t-body strong">After a set time</div>${mode === 'time' ? `<div class="row between" style="margin-top:8px"><span class="t-sm ink2">Length</span><div class="stepper"><span>−</span><b>4 weeks</b><span>+</span></div></div><div class="t-xs muted" style="margin-top:6px">Ends Nov 6 · then we review together</div>` : '<div class="t-sm ink2">A fixed number of weeks</div>'}</div></div>
+      <div class="choice">${radio(mode === 'hybrid')}<div class="grow"><div class="t-body strong">Whichever comes first</div>${mode === 'hybrid' ? `<div class="row between" style="margin-top:8px"><span class="t-sm ink2">Time limit</span><div class="stepper"><span>−</span><b>6 weeks</b><span>+</span></div></div>` : '<div class="t-sm ink2">Back in range, or a time limit you set</div>'}</div></div>
+    </div>
+    <p class="t-xs muted" style="margin-top:6px">${mode === 'outcome' ? 'Estimated 2–5 weeks at your chosen deficit.' : 'If time runs out before you’re back in range, we’ll ask what you want to do. Nothing ends or restarts on its own.'}</p>
+  </div>`;
+
+S['P1-leaning-setup'] = () => `
+${statusBar()}${nav('Options', 'Leaning Phase')}
+<div class="content stack">
+  <div class="display h1">Set up your leaning phase</div>
+  <p class="lead">Three things define this phase. Everything else in your plan carries forward unless you change it.</p>
+  ${completionCard('outcome')}
+  <div class="card" style="padding:0 16px">
+    <div class="srow"><span class="ic amber">${I.energy}</span><div class="grow"><div class="nm">Daily energy</div><div class="dt"><b style="color:var(--ink)">−450 kcal/day</b> · 1,750 eaten · +100 activity</div></div><span class="edit">Edit</span></div>
+    <div class="rule" style="margin:0"></div>
+    <div class="srow"><span class="ic">${I.cal}</span><div class="grow"><div class="nm">Check-ins</div><div class="dt">Weekly, in your Sunday briefing</div></div><span class="edit">Edit</span></div>
+  </div>
+  <div class="card" style="padding:12px 16px"><div class="row between"><div><div class="t-body strong">Your plan for this phase</div><div class="t-sm ink2">Nutrition, training, recovery and 6 more carry forward</div></div>${I.chev}</div></div>
+  <div class="btn primary">Continue to your plan ${I.arrow}</div>
+</div>`;
+
+S['P2-completion-time'] = () => `
+${statusBar()}${nav('Options', 'Leaning Phase')}
+<div class="content stack">
+  <div class="display h2">How should the leaning phase end?</div>
+  ${completionCard('time')}
+  ${bannerB('teal', 'info', 'Time-only phases are reviewed, never auto-completed', 'At 4 weeks we’ll show your measured change and ask whether to keep leaning, resume building or maintain.')}
+</div>`;
+
+S['P3-completion-hybrid'] = () => `
+${statusBar()}${nav('Options', 'Leaning Phase')}
+<div class="content stack">
+  <div class="display h2">How should the leaning phase end?</div>
+  ${completionCard('hybrid')}
+  <div class="card soft"><div class="kv"><span class="k">Likely end</span><span class="v">Nov 1 – Nov 20</span></div><div class="kv"><span class="k">Latest end</span><span class="v">Nov 20 (6-week limit)</span></div></div>
+</div>`;
+
+S['P4-keep-building'] = () => `
+${statusBar()}${nav('Options', 'Keep Building')}
+<div class="content stack">
+  <div class="display h1">Keep building with limits that fit</div>
+  <div class="card" style="padding:0 16px">
+    <div class="srow"><span class="ic amber">${I.shield}</span><div class="grow"><div class="nm">Body-fat range</div><div class="dt"><span class="was">8–9% firm</span> → <b style="color:var(--ink)">8–11.5% this phase</b></div></div><span class="edit">Edit</span></div>
+    <div class="rule" style="margin:0"></div>
+    <div class="srow"><span class="ic amber">${I.flag}</span><div class="grow"><div class="nm">Goal date</div><div class="dt"><span class="was">Oct 31</span> → <b style="color:var(--ink)">Feb 15</b> · likely</div></div><span class="edit">Edit</span></div>
+    <div class="rule" style="margin:0"></div>
+    <div class="srow"><span class="ic amber">${I.energy}</span><div class="grow"><div class="nm">Daily energy</div><div class="dt"><b style="color:var(--ink)">+200 kcal/day</b> · 2,325 eaten · no added activity</div></div><span class="edit">Edit</span></div>
+  </div>
+  ${bannerB('teal', 'check', 'These fit together', 'At +200 kcal, body fat likely ends 10.4–11.3%, inside the new 11.5% upper limit.')}
+  <div class="card" style="padding:12px 16px"><div class="row between"><div><div class="t-body strong">Your plan for this phase</div><div class="t-sm ink2">Everything else carries forward</div></div>${I.chev}</div></div>
+  <div class="btn primary">Continue to your plan ${I.arrow}</div>
+</div>`;
+
+S['P5-guardrail-editor'] = () => `
+${statusBar()}${navX('Body-Fat Range')}
+<div class="content stack">
+  <p class="lead">Your range protects what matters while you work toward the goal.</p>
+  <div class="card"><span class="eyebrow">Range</span>
+    <div class="row between" style="margin-top:10px"><span class="t-body">Lower</span><div class="stepper"><span>−</span><b>8.0%</b><span>+</span></div></div>
+    <div class="row between" style="margin-top:8px"><span class="t-body">Upper</span><div class="stepper"><span>−</span><b>11.5%</b><span>+</span></div></div>
+    <div style="margin-top:14px;position:relative;height:38px">
+      <div style="position:absolute;left:0;right:0;top:14px;height:10px;border-radius:9px;background:var(--soft);border:1px solid var(--hairline)"></div>
+      <div style="position:absolute;left:25%;right:31.25%;top:14px;height:10px;border-radius:9px;background:var(--tealWash);border:1.5px solid var(--teal)"></div>
+      <div style="position:absolute;left:46%;top:6px;width:3px;height:26px;background:var(--amber);border-radius:2px"></div>
+      <div class="t-xs" style="position:absolute;left:39%;top:-10px;color:var(--amberInk);font-weight:800">You 9.7%</div>
+    </div>
+    <div class="ticks"><span>6%</span><span>8%</span><span>10%</span><span>12%</span><span>14%</span></div>
+  </div>
+  <div class="card"><span class="eyebrow">How strict?</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice">${radio(true)}<div class="grow"><div class="t-body strong">Firm limit</div><div class="t-sm ink2">Going past it opens a review of your plan</div></div></div>
+      <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Target range</div><div class="t-sm ink2">Watched and coached; doesn’t trigger reviews on its own</div></div></div>
+    </div></div>
+  <div class="card"><span class="eyebrow">Applies</span><div class="seg" style="margin-top:10px"><div class="on">This phase</div><div>Until a date</div><div>Always</div></div>
+    <p class="t-xs muted" style="margin-top:8px">After this phase, your original 8–9% returns. Version 1 is kept in Your Journey.</p></div>
+</div>`;
+
+S['P5b-guardrail-invalid'] = () => `
+${statusBar()}${navX('Body-Fat Range', '<span style="color:var(--muted)">Done</span>')}
+<div class="content stack">
+  <div class="card"><span class="eyebrow">Range</span>
+    <div class="row between" style="margin-top:10px"><span class="t-body">Lower</span><div class="stepper" style="border-color:var(--red)"><span>−</span><b style="color:var(--red)">10.0%</b><span>+</span></div></div>
+    <div class="row between" style="margin-top:8px"><span class="t-body">Upper</span><div class="stepper" style="border-color:var(--red)"><span>−</span><b style="color:var(--red)">9.5%</b><span>+</span></div></div>
+    <div class="errtxt">${I.warn} Upper must be at least 0.5% above lower.</div>
+  </div>
+  <div class="card" style="opacity:.6"><div class="row" style="gap:10px;align-items:flex-start">${I.lock}<div><div class="t-body strong">Keep 8–9% firm while building</div><div class="t-sm ink2">Not available: you’re at 9.7%, and building would move further from it. Choose leaning, or set a new range.</div></div></div></div>
+  ${bannerB('amber', 'warn', 'Upper below your current level', 'You’re at 9.7%. An upper limit under that is allowed while leaning, but will show as exceeded right away while building.')}
+</div>`;
+
+S['P6-deadline-editor'] = () => `
+${statusBar()}${navX('Goal Date')}
+<div class="content stack">
+  <p class="lead">How likely each date is at your measured pace (≈ 0.6–1.0 lb lean per month after leaning).</p>
+  <div class="card">
+    <div class="row between"><span class="t-sm ink2">Remaining</span><span class="t-body strong">≈ 2.9 lb lean mass</span></div>
+    <div style="margin-top:14px">
+      ${[['Oct 31', 'Unlikely', 'red', 4], ['Dec 31', 'Possible', 'amber', 46], ['Feb 15', 'Likely', 'green', 82], ['Apr 30', 'Very likely', 'green', 96]].map(([d, l, t, p]) => `
+      <div class="lrow" style="min-height:48px"><div class="l strong" style="width:72px">${d}</div><div class="grow"><div class="bar"><i style="width:${p}%;background:var(--${t === 'amber' ? 'amber' : t})"></i></div></div><span class="pill ${t === 'green' ? 'teal' : t}" style="min-width:86px;justify-content:center">${l}</span></div>`).join('')}
+    </div></div>
+  <div class="field focus"><span>Goal date</span><span class="strong">Feb 15, 2027 ${I.cal}</span></div>
+  <p class="t-xs muted">Probabilities are rough and widen with time. They update with every scan. You can keep any future date; unlikely dates show as at risk.</p>
+  <div class="btn ghost">Keep Oct 31 anyway</div>
+</div>`;
+
+S['P6b-deadline-past'] = () => `
+${statusBar()}${navX('Goal Date', '<span style="color:var(--muted)">Done</span>')}
+<div class="content stack">
+  <div class="field err"><span>Goal date</span><span class="strong" style="color:var(--red)">Oct 1, 2026 ${I.cal}</span></div>
+  <div class="errtxt">${I.warn} Choose a date after today (Oct 9).</div>
+  <div class="field"><span>Phase must end by</span><span class="ink2">Before the goal date</span></div>
+  ${bannerB('amber', 'warn', 'Leaning phase ends after this date', 'Your leaning phase could run to Nov 20. A goal date before then leaves no time to build. Move the goal date or shorten the phase.')}
+</div>`;
+
+S['P7-checkins'] = () => `
+${statusBar()}${navX('Check-ins')}
+<div class="content stack">
+  <p class="lead">When we look at your evidence together and decide whether anything should change.</p>
+  <div class="card"><span class="eyebrow">Regular check-in</span>
+    <div class="seg" style="margin-top:10px"><div class="on">Weekly</div><div>Every 2 weeks</div></div>
+    <p class="t-xs muted" style="margin-top:8px">Delivered in your Sunday Weekly briefing. Change the day in Coaching updates.</p></div>
+  <div class="card"><div class="row between"><span class="eyebrow">Calibration checkpoint</span>${pillTone('line', 'Fixed by policy')}</div>
+    <div class="t-body strong" style="margin-top:8px">4 weeks after the phase starts · Nov 6</div>
+    <p class="t-sm ink2" style="margin-top:4px">We only judge the new energy plan after 4 weeks of enough evidence. If logging or adherence fall short, we’ll help with that first.</p></div>
+  <div class="card"><div class="row between"><div><div class="t-body strong">Safety checks</div><div class="t-sm ink2">Always on. Losing more than 1.5% of body weight in a week opens a review right away.</div></div>${I.lock}</div></div>
+</div>`;
+
+// ---------------- Approach A: plan hub -----------------
+const hubRows = (opts = {}) => {
+  const changing = [
+    ['flag', 'amber', 'Phase', '<span class="was">Lean Mass Build</span> → <b style="color:var(--ink)">Leaning phase</b> · ends when back in range'],
+    ['energy', 'amber', 'Energy', '<span class="was">2,500 eaten · 800 activity</span><br><b style="color:var(--ink)">−450/day · 1,750 eaten · 900 activity</b>'],
+    ...(opts.more ? [['lift', 'amber', 'Training', 'Progression <span class="was">Moderate</span> → <b style="color:var(--ink)">Conservative</b>'], ['walk', 'amber', 'Activity', '3 brisk walks a week · Mon, Wed, Sat']] : []),
+  ];
+  const carried = [
+    ['food', '', 'Nutrition', 'Protein 1.0 g/lb · balanced carbs and fat' + IL, opts.conflict ? 'amber' : ''],
+    ...(opts.more ? [] : [['walk', '', 'Activity', 'Usual ≈ 800 kcal/day from Apple Watch']]),
+    ...(opts.more ? [] : [['lift', '', 'Training', '9 sessions/week · Chest, Back · Moderate']]),
+    ['moon', '', 'Recovery', 'Foam Rolling · daily 7:15 PM'],
+    ['drop', '', 'Peptides', '2 protocols · unchanged'],
+    ['pill', '', 'Supplements', 'Tongkat Ali, Electrolytes'],
+    ['cam', '', 'Coaching updates', 'Weekly Sun · Photos every 2 weeks'],
+    ['scale', '', 'Tracking & reminders', 'Morning weigh-in · 4 reminders'],
+  ];
+  return { changing, carried };
+};
+const hub = (opts = {}) => {
+  const { changing, carried } = hubRows(opts);
+  const shown = opts.expanded ? carried : carried.slice(0, opts.more ? 2 : 3);
+  return `
+${statusBar()}${nav('Leaning Phase', 'Your Plan')}
+<div class="content">
+  <div class="display h1">Your plan for the leaning phase</div>
+  <p class="lead" style="margin-top:6px">${changing.length} changing. Everything else carries forward — tap any strategy to change it.</p>
+  ${opts.superseded ? `<div style="margin-top:12px">${bannerB('amber', 'sync', 'New scan arrived — energy numbers refreshed', 'Your edits are kept. Maintenance moved 2,117 → 2,180, so intake is now 1,800 for the same −450/day. Review the change below.')}</div>` : ''}
+  ${opts.conflict ? `<div style="margin-top:12px">${bannerB('amber', 'warn', '1 thing to check', 'Protein at 1.0 g/lb is 41% of 1,750 kcal. That works, but leaves less room for carbs on training days. <span style="color:var(--teal);font-weight:700">Review Nutrition</span>')}</div>` : ''}
+  <div class="sec-label">Changing</div>
+  <div class="card" style="padding:0 16px"><div class="divider-list">${changing.map(([ic, t, n, d]) => srow(ic, t, n, d, '<span class="edit">Edit</span>', 'chg')).join('')}</div></div>
+  <div class="sec-label row between" style="display:flex"><span>Carrying forward</span><span style="color:var(--teal);letter-spacing:0;text-transform:none;font-size:1.2em">${opts.expanded ? 'Show less' : `Show all ${carried.length}`}</span></div>
+  <div class="card" style="padding:0 16px"><div class="divider-list">${shown.map(([ic, t, n, d, warn]) => srow(ic, t, n, d, warn ? `<span class="pill amber">Check</span>` : '<span class="edit">Edit</span>')).join('')}
+    ${opts.expanded ? '' : `<div class="srow" style="min-height:48px"><div class="grow t-sm ink2">${carried.slice(shown.length).map((c) => c[2]).join(' · ')}</div>${I.chevDown}</div>`}</div></div>
+  <p class="t-xs muted" style="margin-top:12px;text-align:center">Edits are saved to this draft as you go. One approval applies everything together.</p>
+</div>
+${tray(changing.length + (opts.more ? 0 : 0), 'Review')}`;
+};
+S['A1-hub'] = () => hub();
+S['A2-hub-expanded'] = () => hub({ expanded: true });
+S['A3-hub-more-edits'] = () => hub({ more: true, conflict: true });
+S['A4-hub-superseded'] = () => hub({ superseded: true });
+S['A5-unsaved'] = () => `<div style="height:874px;overflow:hidden;position:relative">${hub({ more: true })}</div><div class="scrim"></div>
+<div class="alert"><div class="ab"><div class="t">Leave without approving?</div><p>Your 4 changes stay in this draft until Oct 23 or until new evidence arrives. Nothing in your plan has changed yet.</p></div>
+<div class="act b">Keep editing</div><div class="act">Leave and keep draft</div><div class="act red">Discard changes</div></div>`;
+S['A6-hub-xl'] = () => hub();
+
+;
+// ---------------------------------------------------------------------------
+// Screens part B: the energy balance experience (interactive).
+// Step 1 picks the daily balance; step 2 splits it between eating and moving.
+// ---------------------------------------------------------------------------
+const zoneTrack = () => `<div class="track">
+  <div class="z" style="left:0;width:8%;background:var(--redWash)"></div>
+  <div class="z" style="left:8%;width:32%;background:var(--tealWash)"></div>
+  <div class="z" style="left:56%;width:4%;background:color-mix(in srgb,var(--ink) 8%,transparent)"></div>
+  <div class="z" style="left:60%;width:20%;background:color-mix(in srgb,var(--purple) 12%,transparent)"></div>
+  <div class="fill" data-e="netfill" style="left:24%;width:36%"></div>
+</div>`;
+
+const energyStep1 = (opts = {}) => `
+${statusBar()}${navX('Daily Energy', 'Next', opts.back || 'Cancel')}
+<div class="content stack">
+  <div><span class="eyebrow amber">Step 1 of 2 · Daily balance</span>
+  <div class="display h2" style="margin-top:6px">How big a daily ${opts.surplus ? 'surplus' : 'deficit'}?</div></div>
+  <div class="card">
+    <div class="row between"><span class="pill amber" data-e="zone">Moderate deficit</span><span class="t-xs muted">${opts.surplus ? 'Suggested +200' : 'Suggested −450'}</span></div>
+    <div class="bigval" style="margin-top:12px"><span data-e="net">−450 kcal/day</span></div>
+    <div class="t-xs muted" style="margin-top:4px">Likely real balance <span data-e="netrange">−595 to −290</span></div>
+    <div class="rng" style="margin-top:6px">${zoneTrack()}<input type="range" aria-label="Daily energy balance in kilocalories" data-in="net" min="-750" max="500" step="25" value="${opts.net ?? -450}"></div>
+    <div class="ticks"><span>−750</span><span>−450</span><span>0</span><span>+250</span><span>+500</span></div>
+    <input type="hidden" data-in="added" value="${opts.added ?? 100}">
+    <div class="row" style="justify-content:center;gap:10px;margin-top:10px"><div class="mini-step"><span data-step="net:-25" role="button" aria-label="Decrease 25">−25</span><span data-step="net:25" role="button" aria-label="Increase 25">+25</span></div><span class="t-sm semi" data-preset="${opts.surplus ? 'suggested' : 'suggested'}" style="color:var(--teal);display:inline-flex;gap:6px;align-items:center;cursor:pointer">${I.reset} Reset</span></div>
+  </div>
+  <div class="band">
+    <div><span>Expected change</span><b data-e="rate">≈ 0.6–1.3 lb/week loss</b></div>
+    <div><span>${opts.surplus ? 'Phase' : 'Leaning phase'}</span><b data-e="weeks">2–5 weeks</b></div>
+  </div>
+  <div class="ewarn info">${I.info}<span>Ranges come from your own logged intake and scans: maintenance ≈ <b>2,117 kcal</b> (1,977–2,258) with your usual activity. They narrow after each check-in.</span></div>
+  ${opts.surplus ? '<div class="ewarn amber">' + I.warn + '<span>Because maintenance is only known to about ±140 kcal, a small surplus can mean anything from barely gaining to about 1 lb a week. The 4-week checkpoint tightens this.</span></div>' : ''}
+  <div class="btn primary">Next: how you’ll get there ${I.arrow}</div>
+</div>`;
+S['E1-balance'] = () => energyStep1();
+S['E7-surplus'] = () => energyStep1({ surplus: true, net: 200, added: 0, back: 'Keep Building' });
+
+const allocation = (opts = {}) => `
+${statusBar()}${navX('Daily Energy', 'Done', '‹ Balance')}
+<div class="content stack">
+  <div><span class="eyebrow amber">Step 2 of 2 · Eat and move</span>
+  <div class="display h2" style="margin-top:6px">Split your <span data-e="net">−450 kcal/day</span></div></div>
+  <input type="hidden" data-in="net" value="${opts.net ?? -450}">
+  <div class="chips" role="radiogroup" aria-label="Allocation">
+    ${Object.entries(PRESETS).map(([k, p]) => `<span class="chip" role="radio" data-preset="${k}">${k === 'suggested' ? '★ ' : ''}${p.label}</span>`).join('')}
+  </div>
+  <div class="card">
+    <div class="alloc"><div><div class="t-sm ink2">Eat</div><div class="bigval" style="font-size:1.6em"><span data-e="intake">1,750</span><small>kcal/day</small></div></div><span class="iconbtn" role="button" aria-label="Type an exact intake">${I.pencil}</span></div>
+    <div class="t-xs muted" data-e="intakeDelta">−750 vs today’s plan</div>
+    <div class="rng"><div class="track"><div class="z" style="left:0;width:2%;background:var(--redWash)"></div></div><input type="range" aria-label="Daily intake in kilocalories" data-in="intake" min="1600" max="2625" step="25" value="1750"></div>
+    <div class="ticks"><span>1,600 floor</span><span>2,117 maintenance</span><span>2,625</span></div>
+    <div class="rule"></div>
+    <div class="alloc"><div><div class="t-sm ink2">Move more than usual</div><div class="bigval" style="font-size:1.6em;color:var(--purple)"><span data-e="added">+100</span><small>kcal/day</small></div></div><span class="iconbtn" role="button" aria-label="Type exact added activity">${I.pencil}</span></div>
+    <div class="t-xs muted" data-e="steps">≈ 2,200 extra steps a day</div>
+    <div class="rng purple"><div class="track"></div><input type="range" aria-label="Added activity above your usual in kilocalories" data-in="added" min="0" max="500" step="25" value="${opts.added ?? 100}"></div>
+    <div class="ticks"><span>0 · usual only</span><span>+250</span><span>+500</span></div>
+  </div>
+  <div data-e="warnings"></div>
+  <div class="card soft">
+    <div class="row between"><span class="eyebrow">Your targets</span><span class="t-xs muted">Balance stays <span data-e="net">−450</span></span></div>
+    <div class="kv"><span class="k">Eat each day</span><span class="v"><span data-e="intake">1,750</span> kcal</span></div>
+    <div class="kv"><span class="k">Apple Watch active energy</span><span class="v"><span data-e="activityGoal">900</span> kcal/day</span></div>
+    <div class="kv"><span class="k">Per week</span><span class="v"><span data-e="weekIntake">12,250</span> eaten · +<span data-e="weekAdded">700</span> moved</span></div>
+    <p class="t-xs muted" style="margin-top:6px">Your usual ≈ 800 kcal of activity is already inside maintenance, so it’s never counted twice.</p>
+  </div>
+  <div class="row between"><span class="t-sm semi" data-preset="suggested" style="color:var(--teal);display:inline-flex;gap:6px;align-items:center;cursor:pointer">${I.reset} Reset to suggested</span><span class="t-sm semi" style="color:var(--teal)">Why these numbers?</span></div>
+</div>`;
+S['E2-allocation'] = () => allocation();
+S['E4-floor'] = () => allocation({ net: -750, added: 0 });
+S['E5-activity-heavy'] = () => allocation({ added: 500 });
+S['E10-allocation-xl'] = () => allocation();
+
+S['E3-numeric'] = () => `<div style="height:874px;overflow:hidden;position:relative">${allocation()}</div><div class="scrim"></div>
+<div class="sheet" style="padding-bottom:300px">
+  <div class="grabber"></div>
+  <div class="row between"><span class="t-body muted">Cancel</span><span class="t-body strong">Daily intake</span><span class="t-body strong" style="color:var(--teal)">Set</span></div>
+  <div class="field focus" style="margin-top:16px;font-size:1.3em"><span class="strong">1,800</span><span class="t-sm muted">kcal/day</span></div>
+  <div class="divider-list" style="margin-top:10px">
+    <div class="choice">${radio(true)}<div class="grow"><div class="t-body strong">Keep the −450 balance</div><div class="t-sm ink2">Added activity becomes +175 kcal/day</div></div></div>
+    <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Change the balance instead</div><div class="t-sm ink2">Balance becomes −392; leaning takes 2–6 weeks</div></div></div>
+  </div>
+  <p class="t-xs muted">Rounded to the nearest 25 kcal.</p>
+</div>
+<div class="kbd">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((k) => `<div>${k}</div>`).join('')}</div>`;
+
+S['E6-weekly'] = () => `
+${statusBar()}${navX('This Week', 'Done', '‹ Energy')}
+<div class="content stack">
+  <div class="display h2">Your week at −450 a day</div>
+  <div class="week">
+    ${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => { const walk = [0, 2, 5].includes(i); const train = [0, 1, 3, 4, 5].includes(i); return `<div class="${walk ? 'on' : ''} ${train ? 'train' : ''}"><span class="muted">${d}</span><b>1,750</b><span class="muted">eat</span>${walk ? '<span class="dot"></span><span style="color:var(--purple);font-weight:700">+233</span>' : '<span class="muted">—</span>'}</div>`; }).join('')}
+  </div>
+  <div class="row" style="gap:14px;flex-wrap:wrap"><span class="t-xs row" style="gap:6px"><span class="week" style="display:inline"><span class="dot" style="display:inline-block"></span></span>Added walk</span><span class="t-xs row" style="gap:6px"><span style="width:14px;height:3px;background:var(--teal);display:inline-block;border-radius:2px"></span>Training day</span></div>
+  <div class="card">
+    <div class="kv"><span class="k">Eat this week</span><span class="v">12,250 kcal</span></div>
+    <div class="kv"><span class="k">Added activity</span><span class="v">≈ 700 kcal · 3 brisk 45-min walks</span></div>
+    <div class="kv"><span class="k">Weekly balance</span><span class="v">≈ −3,150 kcal</span></div>
+  </div>
+  <div class="card"><span class="eyebrow">Spread</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice">${radio(true)}<div class="grow"><div class="t-body strong">Same intake every day</div><div class="t-sm ink2">Simplest to follow and to judge</div></div></div>
+      <div class="choice unav">${radio(false)}<div class="grow"><div class="row between"><span class="t-body strong">More on training days</span>${ctag()}</div><div class="t-sm ink2">e.g. 1,900 on training days, 1,375 on rest days. Same weekly total.</div></div></div>
+    </div></div>
+  <p class="t-xs muted">Missed a walk? Your weekly balance matters more than any single day. Briefings judge the week, not the day.</p>
+</div>`;
+
+S['E8-no-calibration'] = () => `
+${statusBar()}${navX('Daily Energy', 'Done')}
+<div class="content stack">
+  <div class="display h2">We can’t size this yet</div>
+  ${bannerB('amber', 'info', 'Not enough logged intake between measurements', 'Calibration needs about 3 weeks with 70% of days logged between two weigh-in trends or scans. You have 9 of 28 days logged.')}
+  <div class="card"><span class="eyebrow">Choose for now</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice">${radio(true)}<div class="grow"><div class="t-body strong">Keep 2,500 kcal and 800 activity</div><div class="t-sm ink2">Log for 3 weeks; we’ll suggest a calibrated plan at the checkpoint</div></div></div>
+      <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Set my own numbers</div><div class="t-sm ink2">Shown as “not calibrated” until evidence supports them</div>
+        <div class="row between" style="margin-top:10px"><span class="t-sm ink2">Eat</span><span class="numbox">2,200 ${I.pencil}</span></div>
+        <div class="row between" style="margin-top:8px"><span class="t-sm ink2">Activity goal</span><span class="numbox">850 ${I.pencil}</span></div></div></div>
+    </div></div>
+  <p class="t-xs muted">No deficit size, weekly rate or phase length is shown until calibration — we won’t guess.</p>
+</div>`;
+
+S['E9-baseline-explainer'] = () => `<div style="height:874px;overflow:hidden;position:relative">${allocation()}</div><div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <div class="display h2">How your energy adds up</div>
+  <p class="t-sm ink2" style="margin-top:6px">Measured from what you logged and how your body changed — not from a formula.</p>
+  <div class="sec-label">What you burn (≈ 2,117 + extra)</div>
+  <div class="ebar"><div class="base" style="flex:1317">Body at rest ≈ 1,317</div><div class="base" style="flex:800;filter:saturate(.6)">Usual 800</div><div class="add" style="flex:100">+100</div></div>
+  <div class="sec-label">What you eat</div>
+  <div class="ebar"><div class="eat" style="flex:1750">1,750</div><div class="gap" style="flex:467">≈ −450</div></div>
+  <div class="divider-list" style="margin-top:12px">
+    <div class="lrow"><div class="l">Usual activity<small>Your Apple Watch average (~800, workouts included) is already part of maintenance. We don’t add it again.</small></div></div>
+    <div class="lrow"><div class="l">Added activity<small>Only movement above your usual counts, at 75%. Watch estimates for extra exercise tend to run high.</small></div></div>
+    <div class="lrow"><div class="l">Logged calories<small>Everything is in the calories you log, so a steady logging habit cancels out.</small></div></div>
+  </div>
+</div>`;
+
+;
+// ---------------------------------------------------------------------------
+// Screens part C: focused strategy editors opened from the plan.
+// Every editor uses the same frame: Cancel · title · Done (Done keeps the edit
+// in the draft; nothing is saved until the single approval).
+// ---------------------------------------------------------------------------
+const owned = (label, value, owner) => `<div class="lrow"><div class="l">${label}<small>Set in ${owner}</small></div><div class="r"><b style="color:var(--ink)">${value}</b>${I.chev}</div></div>`;
+const editorHead = (eyebrow, title, lead) => `<div><span class="eyebrow">${eyebrow}</span><div class="display h2" style="margin-top:6px">${title}</div>${lead ? `<p class="lead" style="margin-top:6px">${lead}</p>` : ''}</div>`;
+
+// ---------------- Nutrition -----------------
+const nutrition = (opts = {}) => `
+${statusBar()}${navX('Nutrition', opts.err ? '<span style="color:var(--muted)">Done</span>' : 'Done')}
+<div class="content stack">
+  ${editorHead('Nutrition', 'Turn your energy plan into meals')}
+  <div class="card" style="padding:4px 16px">${owned('Calories', '1,750 kcal/day', 'Daily energy')}</div>
+  <div class="card"><div class="row between"><span class="eyebrow">Protein</span><span class="t-xs muted">≈ ${opts.err ? '—' : '179 g/day'}</span></div>
+    <div class="seg" style="margin-top:10px"><div class="on">Per body weight</div><div>Fixed grams</div></div>
+    <div class="row between" style="margin-top:12px"><span class="t-body">${opts.err ? 'Grams per lb' : 'Grams per lb'}</span>${opts.err ? '<div class="stepper" style="border-color:var(--red)"><span>−</span><b style="color:var(--red)">2.4 g</b><span>+</span></div>' : '<div class="stepper"><span>−</span><b>1.0 g</b><span>+</span></div>'}</div>
+    ${opts.err ? `<div class="errtxt">${I.warn} Choose 0.5–2.0 g per lb (or switch to fixed grams, 50–400 g).</div>` : `<p class="t-xs muted" style="margin-top:8px">At 179 lb. Updates as your weight changes.</p>`}
+  </div>
+  <div class="card"><span class="eyebrow">Carbohydrates</span>
+    <div class="chips" style="margin-top:10px"><span class="chip on">Performance</span><span class="chip">Balanced</span><span class="chip">Lower carbohydrate</span></div>
+    <span class="eyebrow" style="display:block;margin-top:16px">Fat</span>
+    <div class="chips" style="margin-top:10px"><span class="chip">Sustainable minimum</span><span class="chip on">Balanced</span><span class="chip">Higher fat</span></div>
+  </div>
+  ${opts.warn ? bannerB('amber', 'warn', 'Protein is a big share at 1,750', '179 g is 41% of your calories, leaving ≈ 150 g carbs for training. That works for a short leaning phase. Want to keep it?') : ''}
+  <div class="concept"><div class="row between"><span class="eyebrow purple">Daily macro preview</span>${ctag('Concept')}</div>
+    <div class="ebar" style="margin-top:10px"><div style="flex:41;background:#FB7185">P 179 g</div><div style="flex:34;background:#FBBF24;color:#10202A">C ≈150 g</div><div style="flex:25;background:#38BDF8;color:#10202A">F ≈ 49 g</div></div>
+    <p class="t-xs muted" style="margin-top:8px">Derived guidance, not a target. Today only protein is a stored number; carbs and fat are approaches.</p></div>
+  <div class="concept"><div class="row between"><span class="eyebrow purple">Consistency</span>${ctag('Concept')}</div>
+    <div class="lrow"><div class="l">Log intake<small>So calibration stays reliable</small></div><div class="r"><b style="color:var(--ink)">6 of 7 days</b></div></div>
+    <div class="lrow"><div class="l">Counts as on plan<small>Matches how briefings judge adherence</small></div><div class="r"><b style="color:var(--ink)">within ±10%</b></div></div></div>
+</div>`;
+S['N1-nutrition'] = () => nutrition();
+S['N2-nutrition-tradeoff'] = () => nutrition({ warn: true });
+S['N3-nutrition-invalid'] = () => nutrition({ err: true });
+
+// ---------------- Activity -----------------
+S['AC1-activity'] = () => `
+${statusBar()}${navX('Activity')}
+<div class="content stack">
+  ${editorHead('Activity', 'How much you move')}
+  <div class="card"><div class="row between"><span class="eyebrow">Your usual</span>${I.lock}</div>
+    <div class="bigval" style="margin-top:8px">≈ 800<small>kcal/day</small></div>
+    <p class="t-sm ink2" style="margin-top:6px">Apple Watch active energy, last 4 weeks (720–880), workouts included. Already part of your maintenance.</p></div>
+  <div class="card"><div class="row between"><span class="eyebrow" style="color:var(--purple)">Added this phase</span><span class="t-xs muted">From Daily energy</span></div>
+    <div class="row between" style="margin-top:8px"><div class="bigval" style="color:var(--purple)">+100<small>kcal/day</small></div><span class="t-sm semi" style="color:var(--teal)">Change</span></div>
+    <div class="kv" style="margin-top:6px"><span class="k">Apple Watch goal</span><span class="v">900 kcal/day</span></div>
+    <div class="kv"><span class="k">Per week</span><span class="v">+700 kcal</span></div></div>
+  <div class="concept"><div class="row between"><span class="eyebrow purple">How you’ll add it</span>${ctag()}</div>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="lrow"><div class="l">Brisk walks<small>3 × 45 min · Mon, Wed, Sat</small></div><div class="r">${I.chev}</div></div>
+      <div class="lrow"><div class="l">Daily steps<small>≈ 2,200 more than your usual 9,400</small></div><div class="r">${I.chev}</div></div>
+    </div></div>
+  <p class="t-xs muted">Activity estimates are approximate. We judge the weekly total, not each walk.</p>
+</div>`;
+
+S['AC2-distribution'] = () => `
+${statusBar()}${navX('Added Activity', 'Done', '‹ Activity')}
+<div class="content stack">
+  <div class="row between">${editorHead('Weekly plan', 'Spread +700 kcal a week', '')}</div>
+  <div>${ctag('Concept · no backend yet')}</div>
+  <div class="card"><span class="eyebrow">Session</span>
+    <div class="chips" style="margin-top:10px"><span class="chip on">Brisk walk</span><span class="chip">Incline walk</span><span class="chip">Bike</span><span class="chip">Steps only</span></div>
+    <div class="row between" style="margin-top:12px"><span class="t-body">Length</span><div class="stepper"><span>−</span><b>45 min</b><span>+</span></div></div>
+    <div class="row between" style="margin-top:8px"><span class="t-body">Per week</span><div class="stepper"><span>−</span><b>3</b><span>+</span></div></div>
+    <p class="t-xs muted" style="margin-top:8px">≈ 233 kcal each by your Watch’s estimate · ≈ 700 a week</p></div>
+  <div class="card"><span class="eyebrow">Days</span>
+    <div class="week" style="margin-top:10px">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => `<div class="${[0, 2, 5].includes(i) ? 'on' : ''} ${[0, 1, 3, 4, 5].includes(i) ? 'train' : ''}" style="min-height:58px"><b>${d}</b>${[0, 2, 5].includes(i) ? '<span class="dot"></span>' : ''}</div>`).join('')}</div>
+    ${bannerB('amber', 'warn', 'Saturday is also a Lower Body day', 'A 45-minute walk is fine for most people; move it to Sunday if your legs need the rest.')}</div>
+</div>`;
+
+S['AC3-no-watch'] = () => `
+${statusBar()}${navX('Activity')}
+<div class="content stack">
+  ${editorHead('Activity', 'We can’t see your usual activity')}
+  ${bannerB('amber', 'watch', 'No Apple Watch activity for 9 days', 'Without your usual activity we can’t separate “added” movement. We’ll keep your current 800 kcal activity goal.')}
+  <div class="card"><div class="kv"><span class="k">Usual activity</span><span class="v muted">Unknown</span></div><div class="kv"><span class="k">Activity goal</span><span class="v">800 kcal/day (kept)</span></div></div>
+  <div class="card unav"><div class="row between"><span class="eyebrow">Added this phase</span>${I.lock}</div><p class="t-sm ink2" style="margin-top:6px">Available once 2 weeks of activity are in Health. Your deficit comes from intake until then.</p></div>
+  <div class="btn secondary">Check Apple Health access</div>
+</div>`;
+
+// ---------------- Training -----------------
+const training = (opts = {}) => `
+${statusBar()}${navX('Training', opts.err ? '<span style="color:var(--muted)">Done</span>' : 'Done')}
+<div class="content stack">
+  ${editorHead('Training', 'Keep the muscle you built')}
+  ${opts.err ? '' : bannerB('teal', 'info', 'Suggested while leaning: keep your sessions, hold progression', 'Training hard is what tells your body to keep lean mass in a deficit. Conservative progression avoids chasing new records on less food.')}
+  <div class="card"><div class="row between"><span class="eyebrow">Sessions per week</span><span class="t-sm strong">${opts.err ? '<span style="color:var(--red)">0 total</span>' : '9 total'}</span></div>
+    <div class="divider-list" style="margin-top:4px">${[['Chest', 1], ['Back', 1], ['Shoulders', 1], ['Arms', 2], ['Lower body', 2], ['Core', 2]].map(([a, n]) => `<div class="lrow"><div class="l">${a}</div><div class="stepper"><span>−</span><b>${opts.err ? 0 : n}×</b><span>+</span></div></div>`).join('')}</div>
+    ${opts.err ? `<div class="errtxt">${I.warn} Choose at least one session a week.</div>` : ''}</div>
+  <div class="card"><span class="eyebrow">Focus</span>
+    <div class="chips" style="margin-top:10px">${['Chest', 'Back', 'Shoulders', 'Arms', 'Lower body', 'Core'].map((a) => `<span class="chip ${!opts.err && ['Chest', 'Back'].includes(a) ? 'on' : ''}">${a}</span>`).join('')}</div>
+    ${opts.err ? `<div class="errtxt">${I.warn} Choose at least one focus area.</div>` : ''}</div>
+  <div class="card"><span class="eyebrow">Progression</span>
+    <div class="seg" style="margin-top:10px"><div class="on">Conservative</div><div>Moderate</div><div>Aggressive</div></div>
+    <p class="t-xs muted" style="margin-top:8px"><span class="was">Moderate</span> → Conservative · two good sessions before adding load</p></div>
+  <div class="concept"><div class="row between"><span class="eyebrow purple">Not editable here yet</span>${ctag()}</div>
+    ${['Weekly schedule and split', 'Volume and intensity', 'Exercise variants (in the workout logger)'].map((t) => `<div class="lrow unav"><div class="l">${t}</div>${I.lock}</div>`).join('')}</div>
+</div>`;
+S['T1-training'] = () => training();
+S['T2-training-invalid'] = () => training({ err: true });
+
+S['T3-training-schedule-concept'] = () => `
+${statusBar()}${navX('Weekly Schedule', 'Done', '‹ Training')}
+<div class="content stack">
+  <div class="row between"><div class="display h2">Your training week</div>${ctag()}</div>
+  <p class="lead">A future editor: assign the 9 sessions to days. Today the schedule isn’t stored; Training saves frequency, focus and progression only.</p>
+  <div class="card divider-list" style="padding:0 16px">${[['Mon', 'Chest · Shoulders'], ['Tue', 'Lower body'], ['Wed', 'Arms · Core'], ['Thu', 'Back'], ['Fri', 'Lower body'], ['Sat', 'Arms · Core'], ['Sun', 'Rest']].map(([d, s]) => `<div class="lrow"><div class="l strong" style="width:48px">${d}</div><div class="grow t-sm ${s === 'Rest' ? 'muted' : ''}">${s}</div>${I.dots}</div>`).join('')}</div>
+  <div class="card soft"><div class="kv"><span class="k">Volume</span><span class="v muted">Hold current sets</span></div><div class="kv"><span class="k">Intensity</span><span class="v muted">Keep 1–3 reps in reserve</span></div></div>
+</div>`;
+
+// ---------------- Recovery -----------------
+S['R1-recovery'] = () => `
+${statusBar()}${navX('Recovery')}
+<div class="content stack">
+  ${editorHead('Recovery', 'What helps you recover')}
+  <div class="card" style="padding:0 16px">${srow('moon', '', 'Foam Rolling', 'Daily · 7:15 PM · reminder on')}</div>
+  <div class="concept"><div class="row between"><span class="eyebrow purple">Recovery targets</span>${ctag()}</div>
+    <div class="lrow"><div class="l">Sleep<small>Your Sleep evidence averages 7 h 05 m. A target isn’t stored yet.</small></div><div class="r unav">7 h 30 m ${I.lock}</div></div>
+    <div class="lrow"><div class="l">Rest days<small>Derived from your training week once a schedule exists</small></div><div class="r unav">1 / week ${I.lock}</div></div></div>
+  <p class="t-xs muted">Recovery methods come from your plan. New methods are added outside Goal Adaptation.</p>
+</div>`;
+
+const scheduleEditor = (opts = {}) => `
+${statusBar()}${navX(opts.title || 'Foam Rolling', opts.err ? '<span style="color:var(--muted)">Done</span>' : 'Done', '‹ ' + (opts.back || 'Recovery'))}
+<div class="content stack">
+  ${editorHead(opts.eyebrow || 'Recovery support', opts.title || 'Foam Rolling')}
+  <div class="card"><span class="eyebrow">How often</span>
+    <div class="chips" style="margin-top:10px">${['Daily', 'Weekly', 'Specific days', 'Every few days'].map((c) => `<span class="chip ${c === (opts.freq || 'Daily') ? 'on' : ''}">${c}</span>`).join('')}</div>
+    ${opts.freq === 'Specific days' ? `<div class="chips" style="margin-top:12px">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => `<span class="chip" style="min-width:40px;justify-content:center">${d}</span>`).join('')}</div>${opts.err ? `<div class="errtxt">${I.warn} Choose at least one day.</div>` : ''}` : ''}
+    <span class="eyebrow" style="display:block;margin-top:16px">When</span>
+    <div class="chips" style="margin-top:10px">${['Morning', 'Afternoon', 'Evening', 'Exact time'].map((c) => `<span class="chip ${c === 'Exact time' ? 'on' : ''}">${c}</span>`).join('')}</div>
+    <div class="field" style="margin-top:10px"><span>Time</span><b>${opts.time || '7:15 PM'}</b></div></div>
+  <div class="card divider-list" style="padding:0 16px">
+    <div class="lrow"><div class="l">Remind me</div>${sw(true)}</div>
+    <div class="lrow"><div class="l">Starts</div><div class="r">Today ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Ends</div><div class="r">Until changed ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Notes<small>${opts.note || 'Shown when the priority opens'}</small></div>${I.chev}</div></div>
+  <div class="ewarn info">${I.cal}<span><b>Preview:</b> ${opts.preview || 'Every day at 7:15 PM, starting today'}</span></div>
+</div>`;
+S['R2-schedule'] = () => scheduleEditor();
+S['R3-schedule-invalid'] = () => scheduleEditor({ freq: 'Specific days', err: true, preview: 'Choose days to see the preview' });
+
+// ---------------- Peptides -----------------
+S['PE1-peptides'] = () => `
+${statusBar()}${navX('Peptides')}
+<div class="content stack">
+  ${editorHead('Peptides', 'Your current protocols')}
+  <div class="ewarn info">${I.info}<span>PhysiqueOS doesn’t recommend peptides or doses. Changes here only update the schedule and reminders you follow.</span></div>
+  ${[['Retatrutide', 'Active · Thursdays 9:45 PM', 'teal'], ['Tesamorelin', 'Active · Daily evening', 'teal']].map(([n, d]) => `
+  <div class="card"><div class="row between"><div><div class="t-body strong">${n}</div><div class="t-sm ink2">${d}</div></div><span class="pill teal">Carry forward</span></div>
+    <div class="row" style="gap:8px;margin-top:12px"><div class="btn secondary small grow">Manage</div><div class="btn secondary small grow" style="color:var(--red)">Pause</div></div></div>`).join('')}
+  <p class="t-xs muted">Dose history is always kept. Pauses and changes join this plan and take effect when you approve.</p>
+</div>`;
+
+S['PE2-peptide-manage'] = () => `
+${statusBar()}${navX('Tesamorelin', 'Done', '‹ Peptides')}
+<div class="content stack">
+  ${editorHead('Peptide', 'Tesamorelin')}
+  <div class="card divider-list" style="padding:0 16px">
+    ${[['Dose', 'Unchanged'], ['Days', 'Every day'], ['Time', '9:45 PM'], ['Next dose', 'Today · 9:45 PM']].map(([k, v], i) => `<div class="lrow"><div class="l">${k}</div><div class="r">${v}${i < 3 ? I.chev : ''}</div></div>`).join('')}
+    <div class="lrow"><div class="l">Reminder</div>${sw(true)}</div>
+    <div class="lrow"><div class="l">Notes</div><div class="r">Add notes ${I.chev}</div></div></div>
+  <div class="card"><span class="eyebrow">Pause with this plan</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice">${radio(true)}<div class="grow"><div class="t-body strong">Keep taking it</div></div></div>
+      <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Pause from the day I approve</div><div class="t-sm ink2">Doses and reminders stop. History is kept.</div></div></div>
+    </div></div>
+  <p class="t-xs muted">Dose and dose-plan changes keep their own safeguards (for example, rewriting past doses needs confirmation).</p>
+</div>`;
+
+S['PE3-peptide-pause-confirm'] = () => `<div style="height:874px;overflow:hidden;position:relative">${S['PE2-peptide-manage']()}</div><div class="scrim"></div>
+<div class="alert"><div class="ab"><div class="t">Pause Tesamorelin?</div><p>It pauses on the day you approve this plan. Upcoming doses and reminders stop until you resume. Your dose history is kept.</p></div>
+<div class="act red b">Pause with this plan</div><div class="act">Cancel</div></div>`;
+
+// ---------------- Supplements -----------------
+S['SU1-supplements'] = () => `
+${statusBar()}${navX('Supplements')}
+<div class="content stack">
+  ${editorHead('Supplements', 'Supplements in your plan')}
+  ${[['Tongkat Ali', '2 capsules · daily morning', 'Active'], ['Electrolytes', '1 serving · training days', 'Active']].map(([n, d]) => `
+  <div class="card"><div class="row between"><div><div class="t-body strong">${n}</div><div class="t-sm ink2">${d}</div></div><span class="pill teal">Carry forward</span></div>
+    <div class="row" style="gap:8px;margin-top:12px"><div class="btn secondary small grow">Edit</div><div class="btn secondary small grow">Pause</div></div></div>`).join('')}
+  <div class="card unav"><div class="row between"><div class="t-body strong">${I.plus} Add a supplement</div>${ctag('Native hidden today')}</div></div>
+</div>`;
+
+S['SU2-supplement-edit'] = () => `
+${statusBar()}${navX('Tongkat Ali', '<span style="color:var(--muted)">Done</span>', '‹ Supplements')}
+<div class="content stack">
+  ${editorHead('Supplement', 'Tongkat Ali')}
+  <div class="card"><span class="eyebrow">Amount</span>
+    <div class="row" style="gap:10px;margin-top:10px"><div class="field err grow"><span class="strong" style="color:var(--red)">two</span></div><div class="field" style="width:130px"><span>capsules</span></div></div>
+    <div class="errtxt">${I.warn} Enter a number, like 2 or 0.5.</div></div>
+  <div class="card divider-list" style="padding:0 16px">
+    <div class="lrow"><div class="l">Schedule</div><div class="r">Daily · Morning ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Remind me</div>${sw(true)}</div>
+    <div class="lrow"><div class="l">Purpose and role</div><div class="r">Edit ${I.chev}</div></div></div>
+</div>`;
+
+// ---------------- Coaching updates -----------------
+S['CU1-coaching'] = () => `
+${statusBar()}${navX('Coaching Updates')}
+<div class="content stack">
+  ${editorHead('Coaching updates', 'When you hear from us')}
+  <div class="card divider-list" style="padding:0 16px">
+    ${[['Midweek check-in', 'Wednesday · 9:00 AM', true], ['Weekly briefing', 'Sunday · 8:00 AM · your check-in', true], ['Monthly review', '1st of the month · 9:00 AM', true]].map(([n, d, on]) => `<div class="lrow"><div class="l">${n}<small>${d}</small></div>${sw(on)}</div>`).join('')}</div>
+  <div class="card divider-list" style="padding:0 16px">
+    <div class="lrow"><div class="l">Progress photos<small>Every 2 weeks on Saturday · reminder on</small></div>${I.chev}</div>
+    <div class="lrow"><div class="l">Next DEXA scan <span class="pill line" style="margin-left:6px">Optional</span><small>Not scheduled</small></div>${I.chev}</div></div>
+  <div class="card divider-list" style="padding:0 16px">
+    <div class="lrow"><div class="l">Photo Event briefing</div>${sw(true)}</div>
+    <div class="lrow"><div class="l">DEXA Event briefing</div>${sw(true)}</div></div>
+  <p class="t-xs muted">Briefings notify you when they’re ready. The Monthly day is fixed to the 1st. Daily briefings aren’t available.</p>
+</div>`;
+
+S['CU2-photos'] = () => `
+${statusBar()}${navX('Progress Photos', 'Done', '‹ Coaching')}
+<div class="content stack">
+  ${editorHead('Progress photos', 'Photo check-ins')}
+  ${bannerB('teal', 'info', 'Suggested while leaning: every 2 weeks', 'Photos help confirm you’re back in range when there’s no DEXA.')}
+  <div class="card"><div class="row between"><span class="t-body">Every</span><div class="stepper"><span>−</span><b>2</b><span>+</span></div></div>
+    <div class="seg" style="margin-top:12px"><div class="on">Weeks</div><div>Months</div></div>
+    <div class="lrow" style="margin-top:6px"><div class="l">Day</div><div class="r">Saturday ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Time</div><div class="r">Morning ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Remind me</div>${sw(true)}</div></div>
+  <div class="ewarn info">${I.cal}<span><b>Next:</b> Sat Oct 17 · Oct 31 · Nov 14</span></div>
+</div>`;
+
+S['CU3-dexa'] = () => `
+${statusBar()}${navX('Next DEXA Scan', 'Done', '‹ Coaching')}
+<div class="content stack">
+  ${editorHead('DEXA', 'Schedule a scan (optional)', 'A DEXA gives the most precise answer, but your plan never depends on one.')}
+  <div class="card divider-list" style="padding:0 16px">
+    <div class="lrow"><div class="l">Date</div><div class="r">Fri, Nov 13 ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Time</div><div class="r">7:30 AM ${I.chev}</div></div>
+    <div class="lrow"><div class="l">Prep note</div><div class="r">Add ${I.chev}</div></div></div>
+  <div class="card divider-list" style="padding:0 16px">
+    ${[['1 week before', true], ['1 day before', true], ['Morning of', false], ['Upload results after', true]].map(([n, on]) => `<div class="lrow"><div class="l">${n}</div>${sw(on)}</div>`).join('')}</div>
+  <div class="concept"><div class="row between"><span class="t-body strong" style="color:var(--red)">Remove this scan</span>${ctag('Concept · no unschedule today')}</div></div>
+</div>`;
+
+// ---------------- Tracking & reminders -----------------
+const tracking = (off) => `
+${statusBar()}${navX('Tracking & Reminders')}
+<div class="content stack">
+  ${editorHead('Tracking', 'What keeps your evidence current')}
+  ${off ? bannerB('red', 'bell', 'Notifications are off for PhysiqueOS', 'Reminders won’t arrive. Your plan still works; turn them on in iOS Settings.') : ''}
+  <div class="card divider-list" style="padding:0 16px">
+    <div class="lrow"><div class="l">Morning weigh-in<small>Daily · Morning · completes automatically from weight</small></div>${I.chev}</div></div>
+  <div class="sec-label">All reminders in this plan</div>
+  <div class="card divider-list" style="padding:0 16px">
+    ${[['Morning weigh-in', 'Daily morning', true], ['Foam Rolling', 'Daily 7:15 PM', true], ['Tesamorelin', 'Daily 9:45 PM', true], ['Progress photos', 'Every 2 weeks · Sat', true], ['Tongkat Ali', 'Daily morning', false]].map(([n, d, on]) => `<div class="lrow"><div class="l">${n}<small>${d}</small></div>${sw(on, off)}</div>`).join('')}</div>
+  <p class="t-xs muted">Each reminder still belongs to its strategy. This list just puts them in one place.</p>
+  ${off ? '<div class="btn secondary">Open iOS Settings</div>' : ''}
+</div>`;
+S['TR1-tracking'] = () => tracking(false);
+S['TR2-notifications-off'] = () => tracking(true);
+
+;
+// ---------------------------------------------------------------------------
+// Screens part D: cross-strategy states, review & approve, Approach B guided
+// path, Approach C (considered), and standalone Operating Plan reuse.
+// ---------------------------------------------------------------------------
+S['X1-conflict'] = () => `<div style="height:874px;overflow:hidden;position:relative">${hub({ more: true, conflict: true })}</div><div class="scrim"></div>
+<div class="sheet">
+  <div class="grabber"></div>
+  <span class="eyebrow amber">Check before you approve</span>
+  <div class="display h2" style="margin-top:6px">Lots of new activity on top of full training</div>
+  <p class="t-sm ink2" style="margin-top:6px">You raised added activity to +500 a day and kept 9 training sessions. Together that’s a big jump in total work while eating 2,050.</p>
+  <div class="divider-list" style="margin-top:10px">
+    <div class="choice">${radio(true)}<div class="grow"><div class="t-body strong">Use the suggested split</div><div class="t-sm ink2">+100 activity, 1,750 eaten — same −450 balance</div></div></div>
+    <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Keep +500 and drop to 7 sessions</div><div class="t-sm ink2">Opens Training</div></div></div>
+    <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Keep everything as I set it</div><div class="t-sm ink2">Noted in your plan; we’ll watch recovery</div></div></div>
+  </div>
+  <div class="btn primary" style="margin-top:10px">Apply</div>
+</div>`;
+
+S['X2-approve-failed'] = () => `
+${statusBar()}${nav('Your Plan', 'Review')}
+<div class="content stack">
+  <div class="display h1">Review your new plan</div>
+  ${bannerB('red', 'warn', 'Nothing was changed', 'We couldn’t reach PhysiqueOS, so none of your 5 changes were applied. Your draft is safe. Try again when you’re online.')}
+  <div class="card" style="opacity:.6"><div class="kv"><span class="k">Phase</span><span class="v">Leaning phase</span></div><div class="kv"><span class="k">Daily energy</span><span class="v">−450 · 1,750 eaten</span></div></div>
+  <div class="btn primary">Try again</div>
+  <p class="t-xs muted" style="text-align:center">Changes apply together or not at all — never half a plan.</p>
+</div>`;
+
+S['X3-stale-merge'] = () => `
+${statusBar()}${nav('Your Plan', 'Review')}
+<div class="content stack">
+  <div class="display h2">Something changed elsewhere</div>
+  ${bannerB('amber', 'sync', 'Coaching updates were edited on the web', 'Your Weekly briefing moved to Saturday 7:00 AM while this draft was open. Your other changes are unaffected.')}
+  <div class="card"><span class="eyebrow">Coaching updates</span>
+    <div class="divider-list" style="margin-top:4px">
+      <div class="choice">${radio(true)}<div class="grow"><div class="t-body strong">Use the newer setting</div><div class="t-sm ink2">Weekly on Saturday · 7:00 AM</div></div></div>
+      <div class="choice">${radio(false)}<div class="grow"><div class="t-body strong">Keep my draft</div><div class="t-sm ink2">Weekly on Sunday · 8:00 AM</div></div></div>
+    </div></div>
+  <div class="btn primary">Continue to review</div>
+</div>`;
+
+const reviewScreen = (opts = {}) => `
+${statusBar()}${nav('Your Plan', 'Review')}
+<div class="content stack">
+  <div class="display h1">Review your new plan</div>
+  ${opts.superseded ? bannerB('amber', 'sync', 'Updated with your Oct 23 weigh-in trend', 'Maintenance moved 2,117 → 2,180. To keep −450/day, intake is now 1,800 (was 1,750). Approve again to continue.') : `<span class="pill teal" style="align-self:flex-start">${I.check} Checked against your latest evidence · 9:41 AM</span>`}
+  <div class="card diff">
+    <div class="grp" style="padding-top:0">Goal and phase</div>
+    <div class="kv"><span class="k">Phase</span><span class="delta"><s>Lean Mass Build</s><span class="v">Leaning phase</span></span></div>
+    <div class="kv"><span class="k">Ends</span><span class="v">Back in 8–9% · ≈ 2–5 weeks</span></div>
+    <div class="kv"><span class="k">Goal date</span><span class="delta"><s>Oct 31</s><span class="v">Re-estimated after leaning</span></span></div>
+    <div class="grp">Energy</div>
+    <div class="kv"><span class="k">Daily balance</span><span class="v">−450 kcal (≈ −290 to −595)</span></div>
+    <div class="kv"><span class="k">Eat</span><span class="delta"><s>2,500</s><span class="v" ${opts.superseded ? 'style="color:var(--amberInk)"' : ''}>${opts.superseded ? '1,800' : '1,750'} kcal</span></span></div>
+    <div class="kv"><span class="k">Activity goal</span><span class="delta"><s>800</s><span class="v">900 kcal (+100 added)</span></span></div>
+    <div class="grp">Other strategies</div>
+    <div class="kv"><span class="k">Training progression</span><span class="delta"><s>Moderate</s><span class="v">Conservative</span></span></div>
+    <div class="kv"><span class="k">Added activity</span><span class="v">3 walks · Mon, Wed, Sat${IL}</span></div>
+  </div>
+  <div class="card" style="padding:12px 16px"><div class="row between"><div><div class="t-body strong">Carrying forward (6)</div><div class="t-sm ink2">Body-fat range 8–9%, nutrition, recovery, peptides, supplements, coaching, tracking</div></div>${I.chev}</div></div>
+  <div class="btn primary">${opts.superseded ? 'Approve updated plan' : 'Approve plan'}</div>
+  <p class="t-xs muted" style="text-align:center">One approval updates your goal, phase and every strategy together. Your current plan is saved as version 1 in Your Journey.</p>
+</div>`;
+S['RV1-review'] = () => reviewScreen();
+S['RV3-review-superseded'] = () => reviewScreen({ superseded: true });
+
+S['RV2-approved'] = () => `
+${statusBar()}${nav('Goals', 'Build Lean Mass')}
+<div class="content stack">
+  <div class="row" style="gap:10px"><span style="color:var(--green)">${I.check}</span><span class="eyebrow" style="color:var(--green)">Approved · Oct 9</span></div>
+  <div class="display h1">Your leaning phase has started</div>
+  <p class="lead">Starting today: 1,750 kcal, a 900 kcal activity goal and conservative progression. Your first check-in is Sunday.</p>
+  <div class="card"><span class="eyebrow">Your journey</span>
+    <div class="phases" style="margin-top:10px">
+      <div class="ph"><div class="col"><div class="dot done"></div><div class="line"></div></div><div class="txt"><div class="t-body strong">Lean Mass Build · paused at +7 lb</div><div class="t-sm ink2">Plan version 1 kept</div></div></div>
+      <div class="ph"><div class="col"><div class="dot now"></div><div class="line"></div></div><div class="txt"><div class="t-body strong">Leaning phase</div><div class="t-sm ink2">Started Oct 9 · plan version 2</div></div></div>
+      <div class="ph"><div class="col"><div class="dot"></div></div><div class="txt"><div class="t-body strong muted">Building resumes when you choose</div></div></div>
+    </div></div>
+  <div class="btn secondary">See what changed</div>
+</div>`;
+
+// ---------------- Approach B: guided path -----------------
+const guided = (step, title, body, opts = {}) => `
+${statusBar()}${navX('Your Plan', 'Skip to review', '‹ Back')}
+<div class="content stack">
+  <div><div class="steps">${Array.from({ length: 7 }, (_, i) => `<i class="${i < step - 1 ? 'done' : i === step - 1 ? 'cur' : ''}"></i>`).join('')}</div>
+  <div class="row between"><span class="eyebrow">Step ${step} of 7 · ${opts.domain}</span><span class="t-xs muted">${opts.changes ?? 1} change${(opts.changes ?? 1) === 1 ? '' : 's'} so far</span></div>
+  <div class="display h2" style="margin-top:6px">${title}</div></div>
+  ${body}
+</div>
+<div class="tray" style="padding-left:12px"><div class="btn secondary grow" style="min-height:46px">${opts.keep ? 'Keep as is' : 'Back'}</div><div class="btn primary grow">${opts.next || 'Next'}</div></div>`;
+S['B1-guided-energy'] = () => guided(1, 'Daily energy', `
+  <div class="card"><div class="row between"><span class="pill amber">Moderate deficit</span><span class="t-xs muted">Suggested</span></div><div class="bigval" style="margin-top:10px">−450<small>kcal/day</small></div>
+  <div class="band" style="margin-top:12px"><div><span>Eat</span><b>1,750</b></div><div><span>Added activity</span><b>+100</b></div></div></div>
+  <div class="btn ghost">Adjust balance and split</div>`, { domain: 'Energy', changes: 2, next: 'Next: Nutrition' });
+S['B2-guided-training'] = () => guided(4, 'Training', `
+  <p class="lead">Nothing has to change here. Keep it, or adjust for the leaning phase.</p>
+  <div class="card soft"><div class="kv"><span class="k">Sessions</span><span class="v">9 a week</span></div><div class="kv"><span class="k">Focus</span><span class="v">Chest, Back</span></div><div class="kv"><span class="k">Progression</span><span class="v">Moderate</span></div></div>
+  ${bannerB('teal', 'info', 'Suggested: conservative progression while leaning', 'Hold loads; don’t chase records on less food.')}
+  <div class="btn secondary">Edit training</div>`, { domain: 'Training', changes: 2, keep: true, next: 'Use suggestion' });
+S['B3-guided-overview'] = () => `
+${statusBar()}${navX('Your Plan', 'Close', '‹ Back')}
+<div class="content stack">
+  <div class="display h2">Jump to a step</div>
+  <div class="card divider-list" style="padding:0 16px">
+    ${[['Energy', 'Changed', 'amber'], ['Nutrition', 'Kept', 'line'], ['Activity', 'Changed', 'amber'], ['Training', 'Current step', 'teal'], ['Recovery', '—', 'line'], ['Peptides & supplements', '—', 'line'], ['Coaching & tracking', '—', 'line']].map(([n, s, t], i) => `<div class="lrow"><div class="l"><span class="muted" style="margin-right:8px">${i + 1}</span>${n}</div><span class="pill ${t}">${s}</span></div>`).join('')}
+  </div>
+  <p class="t-xs muted">Each step defaults to “Keep as is”. Review appears after step 7, or any time with “Skip to review”.</p>
+</div>`;
+
+// ---------------- Approach C (considered, not recommended) -----------------
+S['C1-accordion'] = () => `
+${statusBar()}${nav('Leaning Phase', 'Your Plan')}
+<div class="content stack">
+  <div class="display h2">Your plan · all on one page</div>
+  <div class="card"><div class="row between"><span class="t-body strong">Energy</span>${I.chevDown}</div>
+    <div class="rng" style="margin-top:6px"><div class="track"><div class="fill" style="left:24%;width:36%"></div></div><input type="range" min="-750" max="500" value="-450" aria-label="Balance" disabled></div>
+    <div class="row between t-sm"><span>Eat 1,750</span><span>Added +100</span></div></div>
+  <div class="card"><div class="row between"><span class="t-body strong">Nutrition</span>${I.chevDown}</div>
+    <div class="seg" style="margin-top:8px"><div class="on">Per body weight</div><div>Fixed</div></div>
+    <div class="chips" style="margin-top:8px"><span class="chip on">Performance</span><span class="chip">Balanced</span><span class="chip">Lower</span></div></div>
+  <div class="card"><div class="row between"><span class="t-body strong">Training</span>${I.chevDown}</div>
+    ${[['Chest', 1], ['Back', 1], ['Arms', 2]].map(([a, n]) => `<div class="lrow"><div class="l">${a}</div><div class="stepper"><span>−</span><b>${n}×</b><span>+</span></div></div>`).join('')}</div>
+  <div class="card"><div class="row between"><span class="t-body strong">Recovery · Peptides · Supplements · …</span>${I.chev}</div></div>
+</div>`;
+
+// ---------------- Same editors outside Goal Adaptation -----------------
+S['O1-operating-plan'] = () => `
+${statusBar()}${nav('You', 'Operating Plan')}
+<div class="content">
+  <div class="display h1">Your Operating Plan</div>
+  <p class="lead" style="margin-top:6px">Leaning phase · version 2 since Oct 9</p>
+  <div class="card" style="margin-top:14px;background:linear-gradient(160deg,var(--fieldStart),var(--fieldEnd));border:0">
+    <span class="eyebrow" style="color:var(--ink)">Daily energy</span>
+    <div class="bigval" style="margin-top:8px">−450<small>kcal/day</small></div>
+    <div class="t-sm" style="margin-top:6px">1,750 eaten · 900 activity goal · weekly check-in</div></div>
+  <div class="card" style="padding:0 16px;margin-top:12px"><div class="divider-list">
+    ${[['food', 'Nutrition', 'Protein 1.0 g/lb · performance carbs'], ['walk', 'Activity', '+100 above usual · 3 walks'], ['lift', 'Training', '9 sessions · conservative'], ['moon', 'Recovery', 'Foam Rolling daily'], ['drop', 'Peptides', '2 active'], ['pill', 'Supplements', '2 active'], ['cam', 'Coaching updates', 'Weekly Sun · photos 2 wks'], ['scale', 'Tracking & reminders', '5 reminders']].map(([ic, n, d]) => srow(ic, '', n, d, I.chev)).join('')}</div></div>
+  <p class="t-xs muted" style="margin-top:12px;text-align:center">Same editors as in Goal Adaptation. Outside a phase change, Energy opens a review because it’s tied to your phase.</p>
+</div>
+${tabbar('you')}`;
+
+;
+// ---------------------------------------------------------------------------
+// Registry: screen metadata, board sections, coverage matrix, contract map,
+// approach comparison and Founder decisions.
+// Tag vocabulary:
+//   "Canonical today"        existing production Native command
+//   "Canonical · Web only"   production Web action, no Native command
+//   "New contract (Phase C)" needs the GoalAdaptationCommitCoordinator / new writer
+//   "Concept only"           no backend; future
+//   other tags               interaction state
+// ---------------------------------------------------------------------------
+const T = { canon: 'Canonical today', web: 'Canonical · Web only', newc: 'New contract (Phase C)', concept: 'Concept only' };
+const SCREENS = {
+  'J1-options': { short: 'Options', title: 'Ranked options (Phase B numbers)', desc: 'Accepted Option B layout, now with Phase B calibrated ranges. Recommended option is preselected; “Make my own changes” opens the plan directly.', tags: ['Accepted V2', T.newc] },
+  'J2-option-detail': { short: 'Option detail', title: 'Option detail: tradeoffs and feasibility', desc: 'Every valid option stays choosable. A non-fitting option shows why, with honest timing and confidence, and what limit would need to change.', tags: ['Feasibility warning', T.newc] },
+  'P1-leaning-setup': { short: 'Leaning setup', title: 'Leaning phase setup: three decisions', desc: 'How the phase ends, daily energy and check-ins. Everything else is one tap away in “Your plan for this phase”. DEXA is never required: “back in range” can be estimated from weight trend and photos.', tags: [T.newc, 'Default path'] },
+  'P2-completion-time': { short: 'Time-based', title: 'Completion: after a set time', desc: 'A time-limited phase triggers a review at the limit. It never auto-completes or resumes building.', tags: [T.newc] },
+  'P3-completion-hybrid': { short: 'Hybrid', title: 'Completion: whichever comes first', desc: 'Outcome with a time limit. Shows likely and latest end. Hybrid does not exist as a stored mode today; proposed as completion criteria + time-limit review milestone.', tags: [T.newc] },
+  'P4-keep-building': { short: 'Keep building', title: 'Keep building: limits, date and energy that fit', desc: 'Guardrail, goal date and surplus side by side, with a live “these fit together” validation.', tags: [T.newc, 'Cross-dependency'] },
+  'P5-guardrail-editor': { short: 'Guardrail', title: 'Body-fat range editor', desc: 'Structured range with your current value on the scale, strictness (firm limit vs target range) and effective period. Replaces today’s free-text guardrail.', tags: [T.newc, 'Replaces free text'] },
+  'P5b-guardrail-invalid': { short: 'Guardrail errors', title: 'Guardrail validation states', desc: 'Inverted range error; firm 8–9% disabled while building with a reason; upper-below-current warning.', tags: ['Validation', 'Disabled state'] },
+  'P6-deadline-editor': { short: 'Goal date', title: 'Goal date with feasibility bands', desc: 'Each date shows rough likelihood at measured pace. Any future date is allowed; unlikely dates are kept with an at-risk label.', tags: [T.web, 'Uncertainty'] },
+  'P6b-deadline-past': { short: 'Date errors', title: 'Goal date validation and phase conflict', desc: 'Past date error, and a cross-dependency warning when the goal date falls before the phase could end.', tags: ['Validation', 'Cross-dependency'] },
+  'P7-checkins': { short: 'Check-ins', title: 'Review checkpoints', desc: 'Weekly or every 2 weeks; the accepted 4-week calibration checkpoint and the safety check are shown but locked.', tags: [T.newc, 'Locked by policy'] },
+  'A1-hub': { short: 'Plan hub', title: 'Approach A · Your plan for this phase', desc: 'Recommended. One page: what’s changing, then carried-forward strategies collapsed but listed by name. Change tray keeps the draft visible. Tap any row for a focused editor.', tags: ['Recommended', 'Default path'] },
+  'A2-hub-expanded': { short: 'All strategies', title: 'Hub with every strategy expanded', desc: 'All nine strategies visible with current values; “Show less” collapses back.', tags: ['Discoverability'] },
+  'A3-hub-more-edits': { short: 'Dirty draft', title: 'Hub with several edits and a check', desc: 'Four changes in the draft; Nutrition flagged by a cross-strategy check rather than an error.', tags: ['Dirty state', 'Cross-dependency'] },
+  'A4-hub-superseded': { short: 'Superseded', title: 'New evidence while editing', desc: 'A new scan refreshes calibrated numbers. User edits are kept; the derived intake moves to keep the chosen balance.', tags: ['Revalidation'] },
+  'A5-unsaved': { short: 'Unsaved', title: 'Leaving with an open draft', desc: 'Keep editing, leave and keep draft (until expiry or new evidence), or discard. Replaces today’s silent discard.', tags: ['Unsaved changes', 'Back navigation'] },
+  'A6-hub-xl': { short: 'Hub 135%', title: 'Plan hub at 135% Dynamic Type', desc: 'Rows wrap, the tray stacks its button, nothing truncates.', tags: ['Accessibility'], xl: true },
+  'E1-balance': { short: 'Balance', title: 'Energy step 1: choose the daily balance (interactive)', desc: 'Drag or step the deficit/surplus. Expected weekly change and phase length update as ranges from calibration uncertainty. Zones: gentle, moderate, aggressive (red below −650).', tags: [T.newc, 'Interactive', 'Uncertainty'], energy: { net: -450, added: 100 } },
+  'E2-allocation': { short: 'Eat & move', title: 'Energy step 2: linked intake and added activity (interactive)', desc: 'Presets: Suggested, Balanced, Intake-focused, Activity-focused. Dragging either slider moves the other so the chosen balance holds. Added activity is counted at 75%. Weekly targets and the Apple Watch goal update live.', tags: [T.newc, 'Interactive', 'Cross-dependency'], energy: { net: -450, added: 100 } },
+  'E3-numeric': { short: 'Exact number', title: 'Exact numeric entry', desc: 'Type an exact intake; choose whether activity or the balance absorbs the difference.', tags: ['Accessibility', 'Fine adjust'] },
+  'E4-floor': { short: 'Floor', title: 'Out of range: below the intake floor (interactive)', desc: 'Starts at −750 with no added activity: intake is held at the 25% floor (1,600) with a red explanation. Add activity or reduce the deficit to clear it.', tags: ['Validation', 'Interactive'], energy: { net: -750, added: 0 } },
+  'E5-activity-heavy': { short: 'Activity-heavy', title: 'Activity-focused allocation warnings (interactive)', desc: '+500 a day is flagged as a large jump from usual, with the 75% credit explained.', tags: ['Validation', 'Interactive'], energy: { net: -450, added: 500 } },
+  'E6-weekly': { short: 'Week', title: '7-day targets', desc: 'Daily intake, added walks and training days on one week strip, with weekly totals. Uneven training-day intake is concept-only.', tags: [T.newc, T.concept] },
+  'E7-surplus': { short: 'Surplus', title: 'Keep building: lean surplus (interactive)', desc: 'Same control in surplus mode, shown per month, with an honest note that a small surplus is within maintenance uncertainty.', tags: [T.newc, 'Interactive', 'Uncertainty'], energy: { net: 200, added: 0, sug: [200, 0] } },
+  'E8-no-calibration': { short: 'No calibration', title: 'Missing evidence: no calibration yet', desc: 'No deficit size, rate or length is shown. Keep the current plan, or set numbers that are labelled “not calibrated”.', tags: ['Empty / missing evidence'] },
+  'E9-baseline-explainer': { short: 'Why', title: '“Why these numbers?” explainer', desc: 'Shows usual activity is already inside maintenance (no double counting) and why added activity is discounted.', tags: ['Explainability'] },
+  'E10-allocation-xl': { short: 'Energy 135%', title: 'Energy split at 135% Dynamic Type (interactive)', desc: 'Large type stress test of the linked sliders.', tags: ['Accessibility', 'Interactive'], energy: { net: -450, added: 100 }, xl: true },
+  'N1-nutrition': { short: 'Nutrition', title: 'Nutrition editor', desc: 'Calories are read-through from Energy (one owner). Protein basis, carbs and fat are today’s canonical fields; macro preview and consistency are concepts.', tags: [T.canon, T.concept] },
+  'N2-nutrition-tradeoff': { short: 'Protein share', title: 'Cross-dependency: protein share at lower intake', desc: 'Lower calories raise protein’s share; shown as a check, not an error.', tags: ['Cross-dependency'] },
+  'N3-nutrition-invalid': { short: 'Out of range', title: 'Protein out of range', desc: '2.4 g/lb exceeds the canonical 0.5–2.0 range; Done is disabled with a fix-it message.', tags: ['Validation'] },
+  'AC1-activity': { short: 'Activity', title: 'Activity: usual vs added', desc: 'Usual activity is read-only from Apple Watch (workouts included). Added activity comes from Energy and becomes the Apple Watch goal. How you add it is concept-only.', tags: [T.newc, T.concept] },
+  'AC2-distribution': { short: 'Weekly spread', title: 'Weekly activity distribution', desc: 'Session type, length, count and days, with a training-day conflict check.', tags: [T.concept, 'Cross-dependency'] },
+  'AC3-no-watch': { short: 'No Watch data', title: 'Missing Apple Watch data', desc: 'Usual activity unknown: added activity is unavailable and the current activity goal is kept.', tags: ['Empty / missing evidence', 'Disabled state'] },
+  'T1-training': { short: 'Training', title: 'Training editor with leaning guidance', desc: 'Frequency per area, focus and progression are canonical today. Schedule, volume, intensity and variants are shown locked.', tags: [T.canon, 'Recommendation'] },
+  'T2-training-invalid': { short: 'Training errors', title: 'Training validation', desc: 'Zero sessions and no focus area, matching Server rules.', tags: ['Validation'] },
+  'T3-training-schedule-concept': { short: 'Schedule', title: 'Weekly schedule (concept)', desc: 'Future day assignment, volume and intensity. Not stored today.', tags: [T.concept] },
+  'R1-recovery': { short: 'Recovery', title: 'Recovery', desc: 'Foam Rolling support is canonical. Sleep and rest-day targets are concepts.', tags: [T.canon, T.concept] },
+  'R2-schedule': { short: 'Schedule', title: 'Shared schedule editor', desc: 'One schedule component for Recovery, Supplements and Tracking: frequency, time, reminder, start/end, notes and a live preview.', tags: [T.canon] },
+  'R3-schedule-invalid': { short: 'Schedule error', title: 'Schedule validation', desc: 'Specific days with none selected.', tags: ['Validation'] },
+  'PE1-peptides': { short: 'Peptides', title: 'Peptides: carry forward, manage or pause', desc: 'No medical advice: changes only update the user’s own schedule.', tags: [T.canon, 'Safety copy'] },
+  'PE2-peptide-manage': { short: 'Manage', title: 'Peptide within the plan', desc: 'Dose, days, time, reminder and notes are canonical. Pause joins the plan and takes effect on approval.', tags: [T.canon, T.newc] },
+  'PE3-peptide-pause-confirm': { short: 'Pause', title: 'Pause confirmation', desc: 'States exactly what stops and that history is kept.', tags: ['Confirmation'] },
+  'SU1-supplements': { short: 'Supplements', title: 'Supplements', desc: 'Edit, pause and restore are canonical. Native create is hidden in production today.', tags: [T.canon, 'Disabled state'] },
+  'SU2-supplement-edit': { short: 'Amount error', title: 'Supplement amount validation', desc: 'Adds numeric validation that today’s free-text amount lacks.', tags: ['Validation'] },
+  'CU1-coaching': { short: 'Coaching', title: 'Coaching updates', desc: 'Briefing cadence, photos, optional DEXA and event briefings. Fixed items are stated, not hidden.', tags: [T.canon] },
+  'CU2-photos': { short: 'Photos', title: 'Progress photo cadence', desc: 'Every N weeks or months, day, time, reminder, next three dates; leaning suggestion.', tags: [T.canon, 'Recommendation'] },
+  'CU3-dexa': { short: 'DEXA', title: 'DEXA scheduling (optional)', desc: 'Never required. Removing a scheduled scan is concept-only today.', tags: [T.canon, T.concept] },
+  'TR1-tracking': { short: 'Tracking', title: 'Tracking & reminders', desc: 'Morning weigh-in plus every reminder in the plan in one list. Each still belongs to its strategy.', tags: [T.canon, 'New view'] },
+  'TR2-notifications-off': { short: 'Notifications off', title: 'iOS notifications off', desc: 'Plan still works; reminders disabled with a path to Settings.', tags: ['System state'] },
+  'X1-conflict': { short: 'Conflict', title: 'Cross-strategy conflict resolution', desc: 'High added activity plus full training volume in a deficit. Three choices, including keeping it as set.', tags: ['Cross-dependency', 'Conflict'] },
+  'X2-approve-failed': { short: 'Failed', title: 'Approval failed: nothing changed', desc: 'Atomic: all or nothing. Draft kept, retry offered.', tags: ['Error', 'Offline'] },
+  'X3-stale-merge': { short: 'Edited elsewhere', title: 'Edited elsewhere while drafting', desc: 'Per-strategy conflict choice when a strategy changed on another device.', tags: ['Conflict', 'Stale version'] },
+  'RV1-review': { short: 'Review', title: 'One review, before/after diff', desc: 'Grouped diff, carried-forward collapsed, revalidated stamp, one approval for goal, phase and every strategy.', tags: [T.newc, 'Default path'] },
+  'RV3-review-superseded': { short: 'Superseded', title: 'Superseded at approval', desc: 'New evidence changed a derived number: highlighted, approve again.', tags: ['Revalidation'] },
+  'RV2-approved': { short: 'Approved', title: 'Approved: phase started, versions kept', desc: 'Your Journey shows plan versions 1 and 2.', tags: ['Success'] },
+  'B1-guided-energy': { short: 'Guided: energy', title: 'Approach B · guided path, step 1', desc: 'Linear 7 steps, each defaulting to keep. Skip to review anytime.', tags: ['Alternative'] },
+  'B2-guided-training': { short: 'Guided: training', title: 'Approach B · step 4 with a suggestion', desc: 'Keep as is, or use the suggestion.', tags: ['Alternative'] },
+  'B3-guided-overview': { short: 'Guided: jump', title: 'Approach B · jump list', desc: 'Step status overview.', tags: ['Alternative'] },
+  'C1-accordion': { short: 'One page', title: 'Approach C · everything inline (considered)', desc: 'All controls on one long page. Fast for experts, overwhelming by default; not recommended.', tags: ['Considered'] },
+  'O1-operating-plan': { short: 'Operating Plan', title: 'Same editors outside Goal Adaptation', desc: 'The redesigned Operating Plan landing reuses the same rows and editors. Energy edits outside a phase change route to a review.', tags: ['Architecture', 'Reuse'] },
+};
+
+const SECTIONS = [
+  { group: 'Start here', items: [
+    { key: 'approaches', title: 'Navigation approaches and recommendation', render: () => comparisonView() },
+    { key: 'index', title: 'Visual index', render: () => indexView() },
+  ] },
+  { group: 'Journey · Approach A (recommended)', items: [
+    { key: 'entry', title: 'Choosing an adaptation', note: 'The accepted V2 Option B layout, now driven by Phase B ranges. The selected option seeds the draft plan.', flow: ['Briefing (last element)', '→', '#J1-options', '→', '#J2-option-detail', '→', '#P1-leaning-setup'], screens: ['J1-options', 'J2-option-detail'] },
+    { key: 'phase', title: 'Phase, goal date, guardrail and check-ins', note: 'Leaning vs continued building, completion by outcome/time/hybrid, structured body-fat range, feasibility-aware goal date and checkpoints.', flow: ['#P1-leaning-setup', '→', '#P2-completion-time', '→', '#P3-completion-hybrid', '·', '#P4-keep-building', '→', '#P5-guardrail-editor', '→', '#P6-deadline-editor', '→', '#P7-checkins'], screens: ['P1-leaning-setup', 'P2-completion-time', 'P3-completion-hybrid', 'P4-keep-building', 'P5-guardrail-editor', 'P5b-guardrail-invalid', 'P6-deadline-editor', 'P6b-deadline-past', 'P7-checkins'] },
+    { key: 'hub', title: 'Your plan for this phase (hub)', note: 'One coordinated draft. Changing strategies first, carried-forward ones collapsed but named so editing is discoverable. Focused editors return here with Done; nothing saves until the single approval.', flow: ['#P1-leaning-setup', '→', '#A1-hub', '→', 'any editor', '→', '#A3-hub-more-edits', '→', '#RV1-review'], screens: ['A1-hub', 'A2-hub-expanded', 'A3-hub-more-edits', 'A4-hub-superseded', 'A5-unsaved', 'A6-hub-xl'] },
+    { key: 'energy', title: 'Energy balance (interactive)', note: 'Step 1 chooses the daily balance with uncertainty-aware rate and phase length. Step 2 splits it between eating and moving with linked sliders that hold the balance. Drag the sliders, tap presets, step ±25 and reset. Numbers: Founder maintenance ≈ 2,117 (1,977–2,258) from the Phase B candidate; the 75% activity credit, caps and presets are provisional design proposals.', flow: ['#A1-hub', '→', '#E1-balance', '→', '#E2-allocation', '→', '#E3-numeric', '·', '#E6-weekly', '·', '#E9-baseline-explainer'], screens: ['E1-balance', 'E2-allocation', 'E3-numeric', 'E4-floor', 'E5-activity-heavy', 'E6-weekly', 'E7-surplus', 'E8-no-calibration', 'E9-baseline-explainer', 'E10-allocation-xl'] },
+  ] },
+  { group: 'Strategies', items: [
+    { key: 'nutrition', title: 'Nutrition', screens: ['N1-nutrition', 'N2-nutrition-tradeoff', 'N3-nutrition-invalid'] },
+    { key: 'activity', title: 'Activity and cardio', screens: ['AC1-activity', 'AC2-distribution', 'AC3-no-watch'] },
+    { key: 'training', title: 'Training', screens: ['T1-training', 'T2-training-invalid', 'T3-training-schedule-concept'] },
+    { key: 'recovery', title: 'Recovery and the shared schedule editor', screens: ['R1-recovery', 'R2-schedule', 'R3-schedule-invalid'] },
+    { key: 'peptides', title: 'Peptides', screens: ['PE1-peptides', 'PE2-peptide-manage', 'PE3-peptide-pause-confirm'] },
+    { key: 'supplements', title: 'Supplements', screens: ['SU1-supplements', 'SU2-supplement-edit'] },
+    { key: 'coaching', title: 'Coaching updates, photos and DEXA', screens: ['CU1-coaching', 'CU2-photos', 'CU3-dexa'] },
+    { key: 'tracking', title: 'Tracking and reminders', screens: ['TR1-tracking', 'TR2-notifications-off'] },
+  ] },
+  { group: 'Conflicts and approval', items: [
+    { key: 'cross', title: 'Cross-strategy conflicts and failures', screens: ['X1-conflict', 'X2-approve-failed', 'X3-stale-merge'] },
+    { key: 'review', title: 'Review and approve once', flow: ['#A3-hub-more-edits', '→', '#RV1-review', '→', '#RV2-approved', '·', 'new evidence', '→', '#RV3-review-superseded'], screens: ['RV1-review', 'RV3-review-superseded', 'RV2-approved'] },
+  ] },
+  { group: 'Alternatives and reuse', items: [
+    { key: 'approach-b', title: 'Approach B · Guided path', note: 'Same editors in a linear 7-step shell. Strong for first-time setup; slower for an adaptation where only 1–2 things change.', screens: ['B1-guided-energy', 'B2-guided-training', 'B3-guided-overview'] },
+    { key: 'approach-c', title: 'Approach C · Everything on one page (considered)', screens: ['C1-accordion'] },
+    { key: 'reuse', title: 'Reuse outside Goal Adaptation', note: 'Architecture only: the same strategy editor modules power the standalone Operating Plan. (Onboarding is out of scope; the editors are self-contained modules with a draft-in/draft-out contract, which is what any future shell would need.)', screens: ['O1-operating-plan'] },
+  ] },
+  { group: 'For the Founder', items: [
+    { key: 'coverage', title: 'Coverage matrix: every editable field and concept', render: () => coverageView() },
+    { key: 'contracts', title: 'Feasibility and contract mapping', render: () => contractView() },
+    { key: 'decisions', title: 'Design decisions for the Founder', render: () => decisionsView() },
+    { key: 'gaps', title: 'Known gaps and recommended Phase B refinements', render: () => gapsView() },
+  ] },
+];
+
+// ---------------- Coverage matrix -----------------
+// [field, today (control · where), contract, redesign status key, screens]
+const COVERAGE = [
+  ['Goal and phase', [
+    ['Adaptation choice (lean out / keep building / keep plan / custom)', 'V2 accepted design', 'Phase B options (dormant); commit needs coordinator', 'newc', 'J1, J2'],
+    ['Phase type: leaning vs building', 'Not editable (Phase Review begin/extend only, Web)', 'phase review / new temporary_leaning contract', 'newc', 'P1, P4'],
+    ['Phase completion: outcome / time / whichever first', 'Not exposed (timingMode in model only)', 'timingMode fixed_duration | completion_criteria; hybrid = new', 'newc', 'P1, P2, P3'],
+    ['Phase length / extension', 'Phase Review stepper 1–8 weeks (sandbox) · Web 1/2/3 weeks/custom', 'phase review extend', 'web', 'P2, P3'],
+    ['Goal name, purpose, outcome', 'Goal Edit Wizard text fields (sandbox) · Web', 'goal_plan_update_v1', 'web', 'O1 (unchanged; outside adaptation)'],
+    ['Goal target amount / unit / type', 'Not exposed in Native', 'goal.target', 'web', 'J2, P6 (read-through)'],
+    ['Goal date', 'DateField (sandbox) · Web', 'goal.timeline.targetDate', 'web', 'P4, P6, P6b'],
+    ['Journey start date', 'DateField (sandbox)', 'goal.timeline.startDate', 'web', 'Not in adaptation (carried)'],
+    ['Success criteria (free text list)', 'List editor (sandbox) · Web', 'goal.successCriteria', 'web', 'Carried forward; RV1'],
+    ['Body-fat guardrail range', 'Free-text guardrail list', 'goal.guardrails[].text (+ frozen phaseStrategies copy)', 'newc', 'P4, P5, P5b'],
+    ['Guardrail strictness (firm / target)', 'Not present', 'none (timeline.flexibility exists, unused)', 'newc', 'P5'],
+    ['Guardrail effective period', 'Not present', 'Phase 0 structured guardrail contract (draft)', 'newc', 'P5'],
+    ['Review checkpoints / check-in cadence', 'Fixed (weekly monitoring, monthly DEXA-anchored)', 'phaseStrategies cadence; milestones', 'newc', 'P7'],
+    ['Calibration checkpoint (4 weeks)', 'n/a', 'accepted policy', 'read', 'P7'],
+    ['Coaching preferences (goal)', 'Static text, inert', 'goal.coachingPreferences', 'read', 'CU1'],
+  ]],
+  ['Energy', [
+    ['Daily balance (deficit/surplus)', 'Not present', 'derived input → intake & activity targets', 'newc', 'E1, E7, E4'],
+    ['Daily intake target', 'Read-only (Phase Review range in sandbox)', 'energy protocolVersions.caloricIntakeTarget', 'newc', 'E2, E3, E4'],
+    ['Added activity above usual', 'Not present', 'derived → activityExpenditureTarget = usual + added', 'newc', 'E2, E5, AC1'],
+    ['Activity target (kcal/day)', 'Read-only “N active kcal/day”', 'energy protocolVersions.activityExpenditureTarget', 'newc', 'E2, AC1, AC3'],
+    ['Allocation presets', 'Not present', 'UI only', 'newc', 'E2'],
+    ['Weekly targets', 'Not present (weekly = daily×7 derived)', 'derived', 'newc', 'E2, E6'],
+    ['Uneven daily intake', 'Not present', 'none', 'concept', 'E6'],
+    ['Calibration approach / review cadence', 'Read-only line', 'energy cadence fields', 'read', 'P7'],
+    ['Energy phase history', 'Sandbox only', 'protocolVersions', 'read', 'RV2'],
+  ]],
+  ['Nutrition', [
+    ['Calories', 'Not in Nutrition (owned by Energy)', 'energy protocol', 'read', 'N1 (read-through)'],
+    ['Protein basis (per lb / fixed)', 'Two pills', 'nutrition-strategy.save.v1', 'canon', 'N1'],
+    ['Protein ratio 0.5–2.0 g/lb', 'Stepper', 'nutrition-strategy.save.v1', 'canon', 'N1, N3'],
+    ['Fixed protein 50–400 g', 'Stepper', 'nutrition-strategy.save.v1', 'canon', 'N1, N3'],
+    ['Carbohydrate approach', 'Flow pills', 'nutrition-strategy.save.v1', 'canon', 'N1'],
+    ['Fat approach', 'Flow pills', 'nutrition-strategy.save.v1', 'canon', 'N1'],
+    ['Macro gram preview', 'Not present', 'none', 'concept', 'N1, N2'],
+    ['Consistency (logging days, ±10%)', 'Not present', 'none (policy uses ±10%)', 'concept', 'N1'],
+  ]],
+  ['Activity and cardio', [
+    ['Usual activity baseline', 'Not present', 'evidence (Apple Watch move kcal)', 'read', 'AC1, AC3, E9'],
+    ['Session type / length / count', 'Not present', 'none', 'concept', 'AC2'],
+    ['Weekly distribution (days)', 'Not present', 'none', 'concept', 'AC2, E6'],
+    ['Steps target', 'Not present', 'none (steps are evidence only)', 'concept', 'AC1'],
+    ['Activity protocol daily target', 'Web create-only (100–5000)', 'activateActivityProtocol', 'web', 'Folded into Energy (AC1)'],
+  ]],
+  ['Training', [
+    ['Weekly frequency per area (0–7)', 'Steppers', 'training-strategy.save.v1', 'canon', 'T1, T2'],
+    ['Focus areas (≥1)', 'Multi-select pills', 'training-strategy.save.v1', 'canon', 'T1, T2'],
+    ['Progression pace', '3 pills', 'training-strategy.save.v1', 'canon', 'T1'],
+    ['Objective, rhythm, nutrition phase, safeguards', 'Sandbox builder (discarded on save)', 'none', 'concept', 'T3'],
+    ['Weekly schedule / split', 'Not present', 'none', 'concept', 'T3'],
+    ['Volume / intensity', 'Not present', 'none', 'concept', 'T1, T3'],
+    ['Exercise variants', 'Workout logger (Build 92)', 'variant registry (separate)', 'read', 'T1 (link)'],
+  ]],
+  ['Recovery', [
+    ['Foam Rolling schedule (frequency, days, interval, time, start, end)', 'Shared schedule editor', 'recurring-support.save.v1', 'canon', 'R1, R2, R3'],
+    ['Reminder', 'Pills', 'recurring-support.save.v1', 'canon', 'R2, TR1'],
+    ['Execution notes', 'Multi-line', 'recurring-support.save.v1', 'canon', 'R2'],
+    ['Sleep target', 'Not present', 'none (sleep evidence exists)', 'concept', 'R1'],
+    ['Rest days', 'Not present', 'none', 'concept', 'R1'],
+  ]],
+  ['Peptides', [
+    ['Dose (from date / next dose only)', 'Change dose sheet', 'peptide-support.save.v1', 'canon', 'PE2'],
+    ['Days / interval', 'Days sheet', 'peptide-support.save.v1', 'canon', 'PE2'],
+    ['Time', 'Time sheet', 'peptide-support.save.v1', 'canon', 'PE2'],
+    ['Reminder (saves immediately today)', 'Toggle', 'peptide-support.save.v1', 'canon', 'PE2, TR1'],
+    ['Notes', 'Notes sheet', 'peptide-support.save.v1', 'canon', 'PE2'],
+    ['Dose plan (titration, hold, end, rewrite history)', 'Advanced editor', 'peptide-support.save.v1', 'canon', 'PE2 (kept as-is, linked)'],
+    ['Pause / resume (today / tomorrow)', 'Buttons + confirm', 'peptide-lifecycle.change.v1', 'canon', 'PE1, PE2, PE3'],
+    ['Pause effective on approval', 'Not present', 'coordinator', 'newc', 'PE2, PE3'],
+  ]],
+  ['Supplements', [
+    ['Name, purpose, role, goal', 'Strategy editor', 'supplement-strategy.save.v1', 'canon', 'SU2 (link)'],
+    ['Add supplement', 'Hidden in production', 'supplement-strategy.save.v1 (create)', 'canon', 'SU1 (disabled)'],
+    ['Amount and unit', 'Free text', 'supplement-support.save.v1', 'canon', 'SU2'],
+    ['Schedule / reminder / notes', 'Shared schedule editor', 'supplement-support.save.v1', 'canon', 'SU2, R2'],
+    ['Pause / restore', 'Buttons, no confirm', 'supplement-lifecycle.change.v1', 'canon', 'SU1'],
+  ]],
+  ['Coaching updates', [
+    ['Midweek: enabled, day, time', 'Toggle, menu, time', 'coaching-updates.save.v1', 'canon', 'CU1'],
+    ['Weekly: enabled, day, time', 'Toggle, menu, time', 'coaching-updates.save.v1', 'canon', 'CU1, P7'],
+    ['Monthly: enabled, time (day fixed)', 'Toggle, time', 'coaching-updates.save.v1', 'canon', 'CU1'],
+    ['Photos: interval, unit, week-of-month, day, time, reminder', 'Stepper, segmented, menus', 'coaching-updates.save.v1', 'canon', 'CU2'],
+    ['Photo / DEXA Event briefings', 'Toggles', 'coaching-updates.save.v1', 'canon', 'CU1'],
+    ['DEXA: date, time, prep, reminders, upload reminder', 'Date, time, toggles', 'coaching-updates.save.v1', 'canon', 'CU3'],
+    ['Unschedule DEXA', 'Not present', 'model supports empty date; no UI', 'concept', 'CU3'],
+    ['Notification preference / daily briefings', 'Fixed', 'fixed server-side', 'read', 'CU1 (stated)'],
+  ]],
+  ['Tracking and notifications', [
+    ['Morning weigh-in schedule / reminder / notes', 'Tracking support editor', 'recurring-support.save.v1', 'canon', 'TR1, R2'],
+    ['All reminders in one place', 'Scattered across editors', 'existing per-strategy fields', 'newc', 'TR1'],
+    ['iOS permission state', 'Not surfaced', 'system', 'read', 'TR2'],
+  ]],
+];
+
+const STATES = [
+  ['Default fast path', 'P1 → A1 → RV1 → RV2'], ['Save / cancel / done', 'Every editor: Cancel · Done (draft), single Approve'], ['Reset', 'E1, E2 (reset to suggested)'],
+  ['Optional change', 'A1, B2 (keep as is)'], ['Unavailable / disabled', 'P5b, AC3, SU1, T1, R1, CU3'], ['Conflict resolution', 'X1, X3, P6b, AC2'],
+  ['Dirty state', 'A3, tray on every hub view'], ['Validation', 'P5b, P6b, E4, N3, T2, R3, SU2'], ['Back navigation / unsaved', 'A5'],
+  ['Preview changes / diff', 'RV1, RV3, R2 preview, CU2 next dates'], ['Accessibility / Dynamic Type', 'A6, E10, E3 (numeric entry), slider ARIA labels'],
+  ['Dark / Mineral Light', 'Every screen in both themes'], ['Empty / missing evidence', 'E8, AC3'], ['Out-of-range custom values', 'E4, N3, P5b, SU2'],
+  ['Cross-strategy consequences', 'E2, N2, P4, P6b, X1, AC2'], ['Revalidation / superseded', 'A4, RV3'], ['Failure / offline / stale', 'X2, X3'],
+];
+
+const statusLabel = { canon: ['Canonical today', 'st-canon'], web: ['Canonical · Web only', 'st-partial'], newc: ['New contract (Phase C)', 'st-partial'], concept: ['Concept only', 'st-concept'], read: ['Read-only / fixed', 'st-read'] };
+function linkScreens(text) {
+  return text.replace(/\b(J1|J2|P1|P2|P3|P4|P5b|P5|P6b|P6|P7|A1|A2|A3|A4|A5|A6|E10|E1|E2|E3|E4|E5|E6|E7|E8|E9|N1|N2|N3|AC1|AC2|AC3|T1|T2|T3|R1|R2|R3|PE1|PE2|PE3|SU1|SU2|CU1|CU2|CU3|TR1|TR2|X1|X2|X3|RV1|RV2|RV3|B1|B2|B3|C1|O1)\b/g, (m) => {
+    const id = Object.keys(SCREENS).find((k) => k.split('-')[0] === m);
+    return id ? `<a href="#p-${id}">${m}</a>` : m;
+  });
+}
+function coverageView() {
+  const counts = { canon: 0, web: 0, newc: 0, concept: 0, read: 0 };
+  COVERAGE.forEach(([, rows]) => rows.forEach((r) => counts[r[3]]++));
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return `<p class="note">${total} fields and concepts across 10 areas, each mapped to at least one reviewed screen. Source: Native Build 94 (<code>49829781</code>) and Server production (<code>85a98025</code>) read-only audits on the design branch.</p>
+  <div class="stats" style="margin-top:0">${Object.entries(counts).map(([k, n]) => `<div class="stat"><b class="${statusLabel[k][1]}">${n}</b><span>${statusLabel[k][0]}</span></div>`).join('')}</div>
+  <div class="tw" style="max-height:760px;margin-top:14px"><table class="cov"><tr><th>Field or setting</th><th>Today (control · where)</th><th>Contract</th><th>Redesign status</th><th>Reviewed in</th></tr>
+  ${COVERAGE.map(([g, rows]) => `<tr class="grp"><td colspan="5">${g}</td></tr>${rows.map(([f, today, c, st, sc]) => `<tr><td>${f}</td><td>${today}</td><td><code style="font-size:12px">${c}</code></td><td class="${statusLabel[st][1]}">${statusLabel[st][0]}</td><td>${linkScreens(sc)}</td></tr>`).join('')}`).join('')}
+  </table></div>
+  <h3 style="margin:26px 0 10px">Interaction states</h3>
+  <div class="tw"><table class="cov" style="min-width:700px"><tr><th>State</th><th>Where it is reviewed</th></tr>${STATES.map(([s, w]) => `<tr><td>${s}</td><td>${linkScreens(w)}</td></tr>`).join('')}</table></div>`;
+}
+
+function comparisonView() {
+  const rows = [
+    ['Default adaptation (1–2 changes)', '3 screens: setup → plan → review', '8+ screens unless skipping', '2 screens but very long'],
+    ['Discover unaffected settings', 'Named, collapsed rows on one page', 'Only by stepping through', 'Everything visible at once'],
+    ['Edit any strategy out of order', 'Yes, tap any row', 'Via jump list', 'Yes, scroll'],
+    ['One coordinated approval + diff', 'Yes', 'Yes', 'Yes'],
+    ['Cognitive load', 'Low', 'Low per step, long overall', 'High'],
+    ['Dynamic Type at 135%', 'Good (rows wrap)', 'Good', 'Poor (dense controls)'],
+    ['Reuse in standalone Operating Plan', 'Same rows and editors', 'Shell is adaptation-specific', 'Hard to reuse'],
+  ];
+  return `<p class="note">All three use the same focused strategy editors and the same single approval; they differ in how you move between them.</p>
+  <div class="callouts">
+    <div class="panel rec"><div class="kick">Recommended</div><h3>A · Plan hub with a draft tray</h3><p>One page lists what’s changing, then every other strategy collapsed but named. Tap a row for a focused editor; Done returns to the hub. A persistent tray shows the draft and leads to one review.</p><ul><li>Fastest when only Energy and the phase change.</li><li>Unaffected settings are discoverable up front.</li><li>Same rows power the standalone Operating Plan.</li></ul><p><a href="#p-A1-hub" style="color:var(--b-teal);font-weight:700">See A1 →</a></p></div>
+    <div class="panel"><div class="kick">Alternative</div><h3>B · Guided path</h3><p>Seven steps in a fixed order, each defaulting to “Keep as is”, with skip to review. Clear for people who want to be walked through.</p><ul><li>Slow when little changes.</li><li>Hides later settings until reached.</li></ul><p><a href="#p-B1-guided-energy" style="color:var(--b-teal);font-weight:700">See B1 →</a></p></div>
+    <div class="panel"><div class="kick">Considered</div><h3>C · Everything on one page</h3><p>Every control inline in an accordion. No navigation, but dense and overwhelming by default.</p><p><a href="#p-C1-accordion" style="color:var(--b-teal);font-weight:700">See C1 →</a></p></div>
+  </div>
+  <div class="tw" style="margin-top:18px"><table class="cov" style="min-width:820px"><tr><th>Criterion</th><th>A · Plan hub</th><th>B · Guided path</th><th>C · One page</th></tr>${rows.map((r) => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</table></div>`;
+}
+
+function indexView() {
+  return `<p class="note">Every screen on this board. Click to jump; click a phone anywhere to enlarge (← → to step, T to switch theme, Esc to close).</p>
+  <div class="idx">${Object.keys(SCREENS).map((id) => `<a href="#p-${id}"><div class="mini">${phoneHtml(id, 'dark')}</div><b>${id.split('-')[0]}</b> ${SCREENS[id].short}</a>`).join('')}</div>`;
+}
+
+function contractView() {
+  const rows = [
+    ['One approval for goal + phase + strategies', 'Each strategy commits alone; goal/phase edits are Web-only; Phase Review is the only energy writer', 'New Server GoalAdaptationCommitCoordinator (roadmap Phase C): one transaction writing goal revision, phase change, energy successor and any strategy successors; review token + revalidation fingerprint', 'Phase C'],
+    ['Energy balance, intake and added activity', 'Energy is intentionallyReadOnly; intake 500–10000 and activity 0–10000 stored as two targets', 'Keep the two stored targets. Balance and added activity are UI inputs: intake = maintenance + balance + 0.75 × added; activity target = usual + added. Store the calibration snapshot used, for revalidation.', 'Phase C (+ Phase B policy)'],
+    ['Structured body-fat guardrail', 'Free text, regex-parsed; second frozen copy in phaseStrategies diverges after edits', 'Phase 0 structured guardrail {min, max, strictness, effectivePeriod} as the single source; V3 and DEXA narratives read it', 'Phase C'],
+    ['Hybrid completion', 'timingMode fixed_duration | target_date | completion_criteria', 'completion_criteria + time-limit review milestone (no new enum needed)', 'Phase C'],
+    ['Check-in cadence', 'Fixed phase cadence', 'Weekly / every 2 weeks monitoring cadence on the phase strategy', 'Phase C'],
+    ['Nutrition, training, recovery, tracking, peptides, supplements, coaching edits', 'Canonical Native commands, each with its own version fence', 'Reuse unchanged payloads as coordinator participants; preserve 412 stale handling per strategy (X3)', 'Phase C reuses existing'],
+    ['Peptide pause on approval', 'pause today/tomorrow', 'effectiveDate = approval date via coordinator', 'Phase C'],
+    ['Steps, cardio sessions, weekly distribution, sleep/rest targets, macro grams, consistency, training schedule/volume/intensity, DEXA unschedule', 'None', 'Concept only — design reserved, no backend proposed in this round', 'Later'],
+  ];
+  return `<p class="note">Nothing on this board claims a working backend that doesn’t exist. Green tags are production commands today; “New contract” needs Phase C; “Concept only” is future.</p>
+  <div class="tw"><table class="cov"><tr><th>Capability</th><th>Today</th><th>Proposed contract</th><th>When</th></tr>${rows.map((r) => `<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}</table></div>`;
+}
+
+function decisionsView() {
+  const d = [
+    ['Navigation', 'Approve Approach A (plan hub + draft tray) as the customization model, with B kept as a possible shell for future guided flows.'],
+    ['Energy order', 'Confirm balance first, then the eat/move split, with linked sliders that hold the balance.'],
+    ['Activity credit', 'Count added activity at 75% of the Watch estimate (provisional). Alternatives: 100%, or 50% for very large additions.'],
+    ['Safety bounds', 'Intake floor 25% below maintenance (1,600 for you); added activity cap +500/day; aggressive zone below −650. All provisional, matching Phase B policy.'],
+    ['DEXA never required', '“Back in range” is confirmed by DEXA when available, otherwise estimated from weight trend and photos (P1). Confirm this wording.'],
+    ['Guardrail strictness', 'Introduce “firm limit” vs “target range” as a structured field (P5). Today it doesn’t exist.'],
+    ['Peptides', 'Show pause/resume and existing schedule edits only; no suggestions and explicit no-advice copy (PE1).'],
+    ['Draft lifetime', 'Keep an unapproved draft until the recommendation expires (14 days) or new evidence supersedes it (A5).'],
+    ['Concepts to pursue', 'Which concept-only items matter next: activity distribution, steps target, macro preview, consistency targets, training schedule, sleep target.'],
+    ['Reminders view', 'Approve a consolidated “Tracking & reminders” list that edits each strategy’s existing reminder (TR1).'],
+  ];
+  return `<div class="dec">${d.map(([t, b], i) => `<div><b>${i + 1}. ${t}.</b> ${linkScreens(b)}</div>`).join('')}</div>`;
+}
+
+function gapsView() {
+  return `<div class="callouts">
+  <div class="panel"><h3>Known gaps on this board</h3><ul>
+    <li>Peptide advanced dose-plan editing is linked, not redesigned; its safeguards stay as built.</li>
+    <li>Supplement create and the strategy (name/purpose/role) editor are summarized, not fully drawn.</li>
+    <li>VoiceOver is specified by ARIA labels on interactive controls; no screen-reader walkthrough was recorded.</li>
+    <li>Step counts and kcal-per-walk conversions are rough illustrations.</li>
+    <li>Nutrition values (1.0 g/lb, performance carbs) and supplement doses are illustrative; Native fixtures, not production reads.</li></ul></div>
+  <div class="panel"><h3>Recommended Phase B refinements</h3><ul>
+    <li>Return a <b>net balance</b> with each option (today: intake ranges only) plus the uncertainty band used for E1.</li>
+    <li>Add <b>usual activity</b> (28-day Watch mean and range) to calibration output so “added” is explicit.</li>
+    <li>Make the <b>activity credit</b> (75%) and <b>added-activity cap</b> policy values, provisional for review.</li>
+    <li>Provide <b>phase length</b> for any chosen balance (E1 is interactive; the engine should expose the function, not just option ranges).</li>
+    <li>Return <b>surplus rate per month</b> with an explicit “within maintenance uncertainty” flag (E7).</li>
+    <li>Snapshot the calibration in the recommendation so revalidation can move derived intake while keeping user choices (A4, RV3).</li></ul></div>
+  </div>`;
+}
+
+function boardIntro() {
+  const n = Object.keys(SCREENS).length;
+  const interactive = Object.values(SCREENS).filter((s) => s.energy).length;
+  return `<div class="hero-b"><div class="kick">Goal Adaptation · Operating Plan customization · design only</div>
+  <h1>Customize your plan, approve once</h1>
+  <p class="lead">A redesign of every Operating Plan customization inside Goal Adaptation. The recommended model is a single plan hub: what’s changing first, everything else carried forward and one tap away, focused editors, and one approval with a before/after diff. The new energy experience picks a daily balance first, then splits it between eating and moving with linked sliders.</p>
+  <div class="stats">
+    <div class="stat"><b>${n}</b><span>screens and states, each in Dark and Mineral Light</span></div>
+    <div class="stat"><b>${interactive}</b><span>interactive energy prototypes (drag the sliders)</span></div>
+    <div class="stat"><b>${COVERAGE.reduce((a, [, r]) => a + r.length, 0)}</b><span>fields and concepts in the coverage matrix</span></div>
+    <div class="stat"><b>3</b><span>navigation approaches; A recommended</span></div>
+    <div class="stat"><b>0</b><span>backend features invented: every concept is tagged</span></div>
+  </div>
+  <p class="lead" style="font-size:13.5px">Tags: <span class="tag canon">Canonical today</span> production command exists · <span class="tag state">Canonical · Web only</span> · <span class="tag new">New contract (Phase C)</span> · <span class="tag concept">Concept only</span>. Founder numbers come from the Phase B candidate (<code>99f11ae6</code>); activity credit, caps and presets are provisional. Values marked * are illustrative.</p></div>`;
+}
+
+;
+// ---------------------------------------------------------------------------
+// Board renderer: sections, theme filter, search, click-to-enlarge, index.
+// Depends on: S (screen templates), SCREENS (registry), SECTIONS, COVERAGE,
+// boardIntro(), comparisonView(), decisionsView(), contractView().
+// ---------------------------------------------------------------------------
+const tagHtml = (t) => {
+  const cls = t === 'Canonical today' ? 'canon' : /^New contract/.test(t) ? 'new' : /concept/i.test(t) ? 'concept' : 'state';
+  return `<span class="tag ${cls}">${t}</span>`;
+};
+const phoneHtml = (id, theme, extra = '') => {
+  const sc = SCREENS[id];
+  const energy = sc.energy ? ` data-energy data-net="${sc.energy.net}" data-added="${sc.energy.added}" data-sug-net="${sc.energy.sug?.[0] ?? -450}" data-sug-added="${sc.energy.sug?.[1] ?? 100}"` : '';
+  return `<div class="phone ${theme} ${sc.xl ? 'xl' : ''}"${energy} data-capture="${id}-${theme}" ${extra}>${S[id]()}</div>`;
+};
+function shotHtml(id) {
+  const sc = SCREENS[id];
+  const search = (id + ' ' + sc.title + ' ' + sc.desc + ' ' + (sc.tags || []).join(' ')).toLowerCase().replace(/"/g, '');
+  return `<div class="item" id="p-${id}" data-id="${id}" data-search="${search}">
+    <div class="meta"><div class="id">${id.split('-')[0]} · ${sc.short}</div><div class="ttl">${sc.title}</div><div class="desc">${sc.desc}</div><div class="tags">${(sc.tags || []).map(tagHtml).join('')}</div></div>
+    <div class="pair">
+      <div class="shot phone-dark-wrap" tabindex="0" role="button" aria-label="Enlarge ${id} in Dark" data-open="${id}" data-theme="dark"><p class="cap">Dark</p><div class="frame">${phoneHtml(id, 'dark')}</div></div>
+      <div class="shot phone-light-wrap" tabindex="0" role="button" aria-label="Enlarge ${id} in Mineral Light" data-open="${id}" data-theme="light"><p class="cap">Mineral Light</p><div class="frame">${phoneHtml(id, 'light')}</div></div>
+    </div></div>`;
+}
+function flowHtml(flow) {
+  if (!flow) return '';
+  return `<div class="flowline">${flow.map((step, i) => (step === '→' || step === '·' ? `<span class="a">${step === '·' ? '|' : '→'}</span>` : step.startsWith('#') ? `<a class="n" href="#p-${step.slice(1)}"><b>${step.slice(1).split('-')[0]}</b>${SCREENS[step.slice(1)]?.short ?? ''}</a>` : `<span class="n">${step}</span>`)).join('')}</div>`;
+}
+function render() {
+  const nav = [];
+  const body = [];
+  body.push(boardIntro());
+  for (const group of SECTIONS) {
+    nav.push(`<h4>${group.group}</h4>`);
+    for (const sec of group.items) {
+      const count = sec.screens ? sec.screens.length : '';
+      nav.push(`<a class="navlink" href="#${sec.key}" data-nav="${sec.key}"><span>${sec.title}</span><small>${count}</small></a>`);
+      const inner = sec.render ? sec.render() : `${flowHtml(sec.flow)}<div class="grid">${sec.screens.map((id) => shotHtml(id)).join('')}</div>`;
+      body.push(`<section class="sec" id="${sec.key}" data-sec><h2>${sec.title}</h2>${sec.note ? `<p class="note">${sec.note}</p>` : ''}${inner}</section>`);
+    }
+  }
+  document.getElementById('side').innerHTML = nav.join('');
+  document.getElementById('main').innerHTML = body.join('');
+  document.querySelectorAll('[data-energy]').forEach(energyRefresh);
+}
+
+// theme filter
+function setShow(mode) {
+  document.body.dataset.show = mode;
+  document.querySelectorAll('[data-show-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.showBtn === mode)));
+  try { localStorage.setItem('opd-show', mode); } catch (e) { /* storage unavailable */ }
+}
+function setBoardTheme(mode) {
+  if (mode === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.dataset.theme = mode;
+  document.querySelectorAll('[data-board-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.boardBtn === mode)));
+}
+// search
+function applySearch(q) {
+  q = q.trim().toLowerCase();
+  document.querySelectorAll('.item[data-search]').forEach((el) => el.classList.toggle('hide', !!q && !el.dataset.search.includes(q)));
+  document.querySelectorAll('[data-sec]').forEach((sec) => {
+    const items = sec.querySelectorAll('.item[data-search]');
+    if (!items.length) { sec.classList.toggle('hide', !!q); return; }
+    sec.classList.toggle('hide', !!q && [...items].every((p) => p.classList.contains('hide')));
+  });
+}
+// lightbox
+let lbList = [], lbPos = 0, lbTheme = 'dark';
+function openLb(id, theme) {
+  lbList = [...document.querySelectorAll('.item[data-id]')].filter((p) => !p.classList.contains('hide')).map((p) => p.dataset.id);
+  lbPos = Math.max(0, lbList.indexOf(id));
+  lbTheme = theme;
+  drawLb();
+  document.getElementById('lb').classList.add('open');
+  document.getElementById('lb-close').focus();
+}
+function drawLb() {
+  const id = lbList[lbPos];
+  const sc = SCREENS[id];
+  document.getElementById('lb-stage').innerHTML = phoneHtml(id, lbTheme);
+  document.getElementById('lb-info').innerHTML = `<div class="kick">${id} · ${lbTheme === 'light' ? 'Mineral Light' : 'Dark'} · ${lbPos + 1} / ${lbList.length}</div><h3>${sc.title}</h3><p>${sc.desc}</p><div class="tags">${(sc.tags || []).map(tagHtml).join('')}</div>${sc.notes ? `<p style="margin-top:12px">${sc.notes}</p>` : ''}`;
+  const st = document.getElementById('lb-stage').querySelector('[data-energy]');
+  if (st) energyRefresh(st);
+}
+function closeLb() { document.getElementById('lb').classList.remove('open'); }
+document.addEventListener('click', (ev) => {
+  if (ev.target.closest('input, button, [data-preset], [data-step]')) return;
+  const open = ev.target.closest('[data-open]');
+  if (open) { openLb(open.dataset.open, open.dataset.theme); return; }
+  if (ev.target.id === 'lb') closeLb();
+});
+document.addEventListener('keydown', (ev) => {
+  const lb = document.getElementById('lb');
+  if (lb.classList.contains('open')) {
+    if (ev.key === 'Escape') closeLb();
+    if (ev.key === 'ArrowRight') { lbPos = (lbPos + 1) % lbList.length; drawLb(); }
+    if (ev.key === 'ArrowLeft') { lbPos = (lbPos - 1 + lbList.length) % lbList.length; drawLb(); }
+    if (ev.key.toLowerCase() === 't') { lbTheme = lbTheme === 'dark' ? 'light' : 'dark'; drawLb(); }
+    return;
+  }
+  if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.closest?.('[data-open]')) { ev.preventDefault(); const o = ev.target.closest('[data-open]'); openLb(o.dataset.open, o.dataset.theme); }
+});
+// active section highlight
+const io = new IntersectionObserver((entries) => {
+  entries.forEach((e) => { if (e.isIntersecting) document.querySelectorAll('.navlink').forEach((a) => a.classList.toggle('on', a.dataset.nav === e.target.id)); });
+}, { rootMargin: '-30% 0px -60% 0px' });
+
+document.addEventListener('DOMContentLoaded', () => {
+  render();
+  document.querySelectorAll('[data-sec]').forEach((s) => io.observe(s));
+  let saved = 'both';
+  try { saved = localStorage.getItem('opd-show') || 'both'; } catch (e) { /* storage unavailable */ }
+  setShow(saved);
+  document.querySelectorAll('[data-show-btn]').forEach((b) => b.addEventListener('click', () => setShow(b.dataset.showBtn)));
+  document.querySelectorAll('[data-board-btn]').forEach((b) => b.addEventListener('click', () => setBoardTheme(b.dataset.boardBtn)));
+  document.getElementById('q').addEventListener('input', (e) => applySearch(e.target.value));
+  document.getElementById('lb-close').addEventListener('click', closeLb);
+  document.getElementById('lb-prev').addEventListener('click', () => { lbPos = (lbPos - 1 + lbList.length) % lbList.length; drawLb(); });
+  document.getElementById('lb-next').addEventListener('click', () => { lbPos = (lbPos + 1) % lbList.length; drawLb(); });
+  document.getElementById('lb-theme').addEventListener('click', () => { lbTheme = lbTheme === 'dark' ? 'light' : 'dark'; drawLb(); });
+});
+
+</script>
