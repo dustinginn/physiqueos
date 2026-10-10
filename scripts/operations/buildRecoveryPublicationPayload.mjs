@@ -5,7 +5,8 @@
 //     [--cadences weekly,monthly --effective-from YYYY-MM-DD --recovery-effective YYYY-MM-DD] \
 //     [--authorization-ref <text>] [--expected-seal <seal from the preview>] [--expected-record-digest <32-hex>] --out <file>
 //   node scripts/operations/buildRecoveryPublicationPayload.mjs --operation preview --sha <40-hex deployed SHA> \
-//     --kind checkpoint|preview --cadence weekly|monthly --start YYYY-MM-DD --end YYYY-MM-DD --out <file>
+//     --kind checkpoint|preview --cadence weekly|monthly --start YYYY-MM-DD --end YYYY-MM-DD \
+//     [--simulated-effective-from YYYY-MM-DD (diagnostic: simulated authority only)] --out <file>
 // Building a payload executes nothing. Running apply or disable in production is a separate,
 // explicitly Founder-authorized act through the accepted console runner.
 import fs from "node:fs";
@@ -21,7 +22,7 @@ const ACTIONS = Object.freeze(["preview", "apply", "postverify", "disable-previe
 export async function buildRecoveryPublicationPayload({
   operation, sha, action = "preview", cadences = "weekly,monthly", effectiveFrom = "", recoveryEffective = "",
   authorizationReference = "", expectedSeal = "", expectedRecordDigest = "",
-  kind = "checkpoint", cadence = "", start = "", end = "", marker,
+  kind = "checkpoint", cadence = "", start = "", end = "", simulatedEffectiveFrom = "", marker,
 } = {}) {
   if (!/^[0-9a-f]{40}$/.test(String(sha ?? ""))) throw new Error("--sha must be the 40-hex production commit the payload is authorized for.");
   let define;
@@ -51,10 +52,12 @@ export async function buildRecoveryPublicationPayload({
     if (!["checkpoint", "preview"].includes(kind)) throw new Error("--kind must be checkpoint or preview.");
     if (!["weekly", "monthly"].includes(cadence)) throw new Error("--cadence must be weekly or monthly.");
     if (!DATE.test(start) || !DATE.test(end)) throw new Error("--start and --end must be YYYY-MM-DD.");
+    if (simulatedEffectiveFrom && !DATE.test(simulatedEffectiveFrom)) throw new Error("--simulated-effective-from must be YYYY-MM-DD.");
     label = `PREVIEW_${kind.toUpperCase()}`;
     define = { __OPERATION__: "preview", __ACTION__: "", __DESIRED_JSON__: "", __AUTHORIZATION_REFERENCE__: "",
       __EXPECTED_SEAL__: "", __EXPECTED_RECORD_DIGEST__: "",
-      __PREVIEW_JSON__: JSON.stringify({ kind, cadence, startDate: start, endDate: end }) };
+      __PREVIEW_JSON__: JSON.stringify({ kind, cadence, startDate: start, endDate: end,
+        ...(simulatedEffectiveFrom ? { simulatedEffectiveFrom } : {}) }) };
   } else {
     throw new Error("--operation must be authority or preview.");
   }
@@ -79,6 +82,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     authorizationReference: args["authorization-ref"] ?? "", expectedSeal: args["expected-seal"] ?? "",
     expectedRecordDigest: args["expected-record-digest"] ?? "",
     kind: args.kind, cadence: args.cadence, start: args.start, end: args.end,
+    simulatedEffectiveFrom: args["simulated-effective-from"] ?? "",
   });
   if (!args.out) throw new Error("--out is required.");
   fs.writeFileSync(args.out, code, { mode: 0o600 });

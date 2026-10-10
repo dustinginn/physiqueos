@@ -212,6 +212,19 @@ describe("Recovery publication preview (zero-write, deployed composition)", () =
     expect((await preview(records, AT_SUNDAY, { startDate: "2026-10-32" })).reasons).toEqual(["period_dates_invalid"]);
   });
 
+  it("before the proposed effective period the deployed gate refuses; a diagnostic simulated start runs the full path", async () => {
+    const { records } = storeWith({ sleepDays: sleepRows({ through: "2026-10-09" }) });
+    const at = new Date("2026-10-10T05:30:00.000Z");
+    const request = { startDate: "2026-09-27", endDate: "2026-10-03" };
+    expect((await preview(records, at, request)).reasons).toEqual(["period_before_publication_effective"]);
+    const diagnostic = await preview(records, at, { ...request, simulatedEffectiveFrom: "2026-09-27" });
+    expect(diagnostic.outcome).toBe("no_card");
+    expect(diagnostic.reason).toBe("baseline_not_yet_eligible");
+    expect(diagnostic.simulatedAuthority).toMatchObject({ written: false, diagnosticEffectiveFrom: true, effectiveFromPeriodStart: "2026-09-27" });
+    expect(diagnostic.eligibility.baseline.reliableNights).toBe(0);
+    expect(diagnostic.eligibility.period.reliableNights).toBe(2);
+  });
+
   it("uses the simulated authority even when a live one exists, and reports the live one", async () => {
     const { records } = storeWith({ authority: recoveryAuthorityRecord({ status: "disabled" }) });
     const result = await preview(records, AT_SUNDAY);

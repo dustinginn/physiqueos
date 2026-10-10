@@ -46,6 +46,10 @@ export async function runRecoveryPublicationPreview({
   endDate,
   timeZone = "America/Los_Angeles",
   proposal = RECOVERY_PUBLICATION_AUTHORITY_PROPOSAL_V1,
+  // Diagnostic only: moves the SIMULATED authority's first covered period so
+  // an already-closed period can exercise the full real-data path. It never
+  // reaches the authority runner and is reported in the output.
+  simulatedEffectiveFrom = null,
   now = () => new Date(),
 } = {}) {
   if (!ownerUserId) throw previewError("An owner is required.", "OWNER_REQUIRED");
@@ -60,7 +64,7 @@ export async function runRecoveryPublicationPreview({
     schemaVersion: "recovery_briefing_publication_authority_v1",
     status: "enabled",
     cadences: [...proposal.cadences],
-    effectiveFromPeriodStart: proposal.effectiveFromPeriodStart,
+    effectiveFromPeriodStart: simulatedEffectiveFrom ?? proposal.effectiveFromPeriodStart,
     recoveryEffectiveSleepDay: proposal.recoveryEffectiveSleepDay,
     strategicEvidenceEligibility: "excluded",
     historicalBackfill: false,
@@ -74,7 +78,8 @@ export async function runRecoveryPublicationPreview({
     period: { startDate: window.value.startDate, endDate: window.value.endDate, timeZone },
     evaluatedAt: at.toISOString(),
     liveAuthority: { enabled: liveAuthority.enabled, invalidReason: liveAuthority.invalidReason },
-    simulatedAuthority: { written: false, enabled: authority.enabled, cadences: authority.cadences,
+    simulatedAuthority: { written: false, diagnosticEffectiveFrom: simulatedEffectiveFrom !== null,
+      enabled: authority.enabled, cadences: authority.cadences,
       effectiveFromPeriodStart: authority.effectiveFromPeriodStart, recoveryEffectiveSleepDay: authority.recoveryEffectiveSleepDay },
   };
 
