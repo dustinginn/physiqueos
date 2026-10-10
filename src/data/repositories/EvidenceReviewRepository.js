@@ -101,6 +101,63 @@ export function createEvidenceReviewRepository(reviews = [], options = {}) {
       options.onChange?.("evidenceReviews");
       return structuredClone(review);
     },
+    async recoverStrandedEvidenceReviewCommit(id, {
+      observedAt,
+      recoveryId,
+      maximumAutoResumes = 2,
+    }) {
+      const review = reviews.find((item) => item.id === id);
+      if (!review || review.status !== "committing") {
+        throw repositoryError("REVIEW_NOT_COMMITTING", "Evidence processing is no longer active.");
+      }
+      const observedMs = Date.parse(observedAt ?? "");
+      const leaseMs = Date.parse(review.commitClaim?.leaseExpiresAt ?? "");
+      if (!Number.isFinite(observedMs)) {
+        throw repositoryError("RECOVERY_TIME_INVALID", "Evidence recovery requires a valid observation time.");
+      }
+      if (review.commitClaim?.status === "in_progress" && Number.isFinite(leaseMs) && leaseMs > observedMs) {
+        throw repositoryError("COMMIT_NOT_STRANDED", "Evidence processing still has a live lease.");
+      }
+      if (!["available", "in_progress"].includes(review.commitClaim?.status)) {
+        throw repositoryError("COMMIT_NOT_STRANDED", "Evidence processing is not eligible for automatic recovery.");
+      }
+      const attempts = Number(review.processingReliability?.autoResumeCount ?? 0);
+      if (attempts >= maximumAutoResumes) {
+        const completed = Object.values(review.commitProgress ?? {})
+          .some((item) => item?.status === "completed");
+        review.status = completed ? "partially_committed" : "commit_failed";
+        review.commitError = "Automatic processing recovery was exhausted.";
+        review.commitClaim = {
+          ...review.commitClaim,
+          status: "failed",
+          failedAt: observedAt,
+          leaseExpiresAt: observedAt,
+        };
+        review.processingReliability = {
+          ...(review.processingReliability ?? {}),
+          state: "operator_attention",
+          exhaustedAt: observedAt,
+          lastRecoveryId: recoveryId,
+        };
+      } else {
+        review.commitClaim = {
+          ...review.commitClaim,
+          status: "available",
+          releasedAt: observedAt,
+          leaseExpiresAt: observedAt,
+        };
+        review.processingReliability = {
+          ...(review.processingReliability ?? {}),
+          state: "auto_resumed",
+          autoResumeCount: attempts + 1,
+          lastAutoResumeAt: observedAt,
+          lastRecoveryId: recoveryId,
+        };
+      }
+      review.updatedAt = observedAt;
+      options.onChange?.("evidenceReviews");
+      return structuredClone(review);
+    },
     async completeEvidenceReviewCommit(id, { operationId, confirmation, interpretedEvidence }) {
       const review = reviews.find((item) => item.id === id);
       assertActiveCommit(review, operationId);

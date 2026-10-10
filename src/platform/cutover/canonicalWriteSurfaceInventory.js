@@ -37,7 +37,8 @@ const repositoryMethods = Object.freeze({
     "createReview", "updateReview", "updateReviewIfCurrent", "claimPendingReviewReprocess",
     "completePendingReviewReprocess", "failPendingReviewReprocess",
     "claimEvidenceReviewCommit", "recordEvidenceReviewCommitProgress",
-    "releaseEvidenceReviewCommit", "completeEvidenceReviewCommit", "failEvidenceReviewCommit",
+    "releaseEvidenceReviewCommit", "recoverStrandedEvidenceReviewCommit",
+    "completeEvidenceReviewCommit", "failEvidenceReviewCommit",
   ]),
   trainingPerformanceEvents: classify(["listTrainingPerformanceEvents", "getTrainingPerformanceEventById", "listTrainingPerformanceEventsBySession"], []),
   goalConfidence: classify([

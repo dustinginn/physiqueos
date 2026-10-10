@@ -10,6 +10,7 @@ import {
   isHealthKitWorkoutReconciliationReview,
   projectHealthKitWorkoutReconciliationPresentation,
 } from "../../domain/services/HealthKitWorkoutReconciliationService.js";
+import { projectEvidenceProcessingState } from "../../domain/services/EvidenceProcessingState.js";
 
 export function createLogReadService({ repositories, now = () => new Date() } = {}) {
   return scopeRepositoryReadService({ repositories, namespace: "log", service: Object.freeze({
@@ -95,21 +96,23 @@ export function projectProcessingReviews(reviews = [], timeZone) {
         resolveLocalTimeZone(timeZone),
       );
       const domain = processingDomain(objects);
+      const processing = projectEvidenceProcessingState(review);
       return Object.freeze({
         id: review.id,
         localDate: date,
         domain,
         label: processingLabel(domain),
-        status: "accepted_processing",
+        status: processing.state,
+        processing,
       });
     })
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 
 export function overlayAcceptedProcessing(loggedToday, processingReviews, localDate) {
-  const processingDomains = new Set(processingReviews
+  const processingByDomain = new Map(processingReviews
     .filter((review) => review.localDate === localDate)
-    .map((review) => review.domain));
+    .map((review) => [review.domain, review.processing]));
   return Object.freeze({
     ...loggedToday,
     rows: Object.freeze(loggedToday.rows.map((row) => {
@@ -117,13 +120,14 @@ export function overlayAcceptedProcessing(loggedToday, processingReviews, localD
       // but it is still populated canonical history. Processing may only
       // replace the genuinely empty placeholder, never real combined data.
       const genuinelyEmpty = row.recordId == null && row.href == null && row.summary === "Nothing logged yet";
-      if (!processingDomains.has(row.id) || !genuinelyEmpty) return row;
+      const processing = processingByDomain.get(row.id);
+      if (!processing || !genuinelyEmpty) return row;
       return Object.freeze({
         ...row,
         summary: `${processingLabel(row.id)} processing`,
-        context: "Confirmation accepted · No action required",
+        context: processing.message,
         // Typed-provenance rows mirror the status line in `contextDetail`.
-        ...("contextDetail" in row ? { contextDetail: "Confirmation accepted · No action required" } : {}),
+        ...("contextDetail" in row ? { contextDetail: processing.message } : {}),
         processing: true,
       });
     })),

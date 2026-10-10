@@ -126,6 +126,42 @@ describe("PostgreSQL Founder repository facade", () => {
     }));
   });
 
+  it("atomically releases an expired evidence claim and bounds automatic recovery", async () => {
+    const database = fakeDatabase();
+    const review = database.runtime.evidenceReviews[0];
+    Object.assign(review, {
+      status: "committing",
+      interpretedEvidence: { package_id: "package-one", evidence_objects: [] },
+      commitProgress: { canonical_commit: { status: "completed", attempts: 1 } },
+      commitClaim: {
+        operationId: "crashed-operation",
+        status: "in_progress",
+        leaseExpiresAt: "2026-10-10T11:01:00.000Z",
+      },
+    });
+    const repositories = createPostgresFounderRepositoryFacade({
+      pool: database.pool,
+      ownerUserId: PHASE5_SYNTHETIC_OWNER_ID,
+      compatibilityMode: true,
+      requireCompatibilityAuthority: true,
+      authorityStore: { assertCompatibilityAccess: vi.fn(async () => ({ authority: "provider-compatibility-nonauthoritative" })) },
+      createCommandId: () => "watchdog-recovery",
+    });
+
+    await repositories.evidenceReviews.recoverStrandedEvidenceReviewCommit(review.id, {
+      observedAt: "2026-10-10T12:00:00.000Z",
+      recoveryId: "recovery-1",
+      maximumAutoResumes: 2,
+    });
+
+    expect(database.runtime.evidenceReviews[0]).toMatchObject({
+      status: "committing",
+      commitClaim: { status: "available" },
+      processingReliability: { autoResumeCount: 1 },
+    });
+    expect(database.outbox).toContainEqual(expect.objectContaining({ reviewId: review.id }));
+  });
+
   it("updates one current Evidence Review row and rejects a stale concurrent edit before loading the runtime", async () => {
     const database = fakeDatabase();
     const review = database.runtime.evidenceReviews[0];

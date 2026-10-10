@@ -50,6 +50,7 @@ const logger = createStructuredLogger({ buildIdentity });
 const adapters = createFoundationPostgresAdapters({ query: (text, values) => pool.query(text, values) });
 const controller = new AbortController();
 const providerWorkerId = process.env.PHYSIQUEOS_WORKER_ID || createUuidV7();
+const processStartedAt = new Date();
 const workerBootProbe = process.env.PHYSIQUEOS_PROVIDER_WORKER_BOOT_PROBE === "1";
 const nativeSandboxEnabled = process.env.PHYSIQUEOS_NATIVE_SANDBOX_ENABLED === "1";
 const compatibilityMode = process.env.PHYSIQUEOS_PROVIDER_COMPATIBILITY_MODE === "1";
@@ -250,6 +251,11 @@ if (workerBootProbe) {
   await nativeSandboxComposition?.pool?.end?.();
   await pool.end();
 } else {
+  logger.info("worker.started", {
+    workerId: providerWorkerId,
+    buildId: buildIdentity.buildId,
+    processStartedAt: processStartedAt.toISOString(),
+  });
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => controller.abort());
   try {
     const loops = [
@@ -265,10 +271,17 @@ if (workerBootProbe) {
       const [{ createProviderBriefingCadenceRunner }, {
         loadApplicationCanonicalCommitBindings,
         loadApplicationCanonicalRuntimeSnapshot,
+      }, {
+        createEvidenceProcessingReliabilityMonitor,
+        runEvidenceProcessingReliabilityLoop,
+      }, {
+        createPostgresEvidenceProcessingReliabilityStore,
       }] =
         await Promise.all([
           import("../src/application/composition/providerBriefingCadenceComposition.js"),
           import("../src/application/runtime/ApplicationCanonicalRuntime.js"),
+          import("../src/platform/jobs/EvidenceProcessingReliabilityMonitor.js"),
+          import("../src/platform/database/PostgresEvidenceProcessingReliabilityStore.js"),
         ]);
       const cadenceRunner = createProviderBriefingCadenceRunner({
         pool,
@@ -290,6 +303,22 @@ if (workerBootProbe) {
         execute: cadenceRunner.execute,
         signal: controller.signal,
         logger,
+      }));
+      const reliabilityMonitor = createEvidenceProcessingReliabilityMonitor({
+        store: createPostgresEvidenceProcessingReliabilityStore({
+          pool,
+          ownerUserId,
+          authorityStore: runtimeAuthorityStore,
+          migrationOperationId: process.env.PHYSIQUEOS_MIGRATION_OPERATION_ID ?? null,
+        }),
+        logger,
+        workerId: providerWorkerId,
+        buildId: buildIdentity.buildId,
+        processStartedAt,
+      });
+      loops.push(runEvidenceProcessingReliabilityLoop({
+        monitor: reliabilityMonitor,
+        signal: controller.signal,
       }));
     }
     await Promise.all(loops);

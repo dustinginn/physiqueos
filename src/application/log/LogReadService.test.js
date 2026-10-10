@@ -81,7 +81,7 @@ describe("Log accepted-processing evidence semantics", () => {
     expect(result.rows[1]).toEqual({
       id: "nutrition",
       summary: "Nutrition processing",
-      context: "Confirmation accepted · No action required",
+      context: "Confirmation saved · Waiting for secure processing",
       recordId: null,
       processing: true,
     });
@@ -106,8 +106,8 @@ describe("Log accepted-processing evidence semantics", () => {
     ];
     expect(projectPendingReviews(reviews)).toEqual([]);
     expect(projectProcessingReviews(reviews)).toMatchObject([
-      { id: "review-activity", domain: "activity", status: "accepted_processing" },
-      { id: "review-generic", domain: "evidence", status: "accepted_processing" },
+      { id: "review-activity", domain: "activity", status: "accepted" },
+      { id: "review-generic", domain: "evidence", status: "accepted" },
     ]);
   });
 

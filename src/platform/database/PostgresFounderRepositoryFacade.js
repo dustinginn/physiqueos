@@ -24,6 +24,7 @@ const TARGETED_EVIDENCE_REVIEW_METHODS = new Set([
   "claimEvidenceReviewCommit",
   "recordEvidenceReviewCommitProgress",
   "releaseEvidenceReviewCommit",
+  "recoverStrandedEvidenceReviewCommit",
   "completeEvidenceReviewCommit",
   "failEvidenceReviewCommit",
 ]);
@@ -165,7 +166,7 @@ export async function executePostgresEvidenceReviewMutation({
         code: "EVIDENCE_REVIEW_CONCURRENCY_CONFLICT",
       });
     }
-    if (methodName === "releaseEvidenceReviewCommit") {
+    if (["releaseEvidenceReviewCommit", "recoverStrandedEvidenceReviewCommit"].includes(methodName) && review.status === "committing") {
       await enqueueEvidenceReviewContinuation(client, review);
     }
     await bumpRuntimeMetadata(client, { ownerUserId, commandId, now });
@@ -596,7 +597,10 @@ async function enqueueEvidenceReviewContinuation(client, review) {
     `INSERT INTO physiqueos.outbox_messages
       (id,user_id,operation_id,topic,dedupe_key,payload_version,payload,due_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,now())
-     ON CONFLICT (topic,dedupe_key) DO NOTHING`,
+     ON CONFLICT (topic,dedupe_key) DO UPDATE SET
+       status='pending',due_at=now(),claimed_by=NULL,claim_expires_at=NULL,
+       dead_at=NULL,last_error_code=NULL,last_error_detail=NULL,updated_at=now()
+       WHERE outbox_messages.status='dead'`,
     [message.id, message.userId, message.operationId, message.topic,
       message.dedupeKey, message.payloadVersion, JSON.stringify(message.payload)],
   );
