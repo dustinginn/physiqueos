@@ -28,7 +28,7 @@ export async function runGroup({ bench }) {
     index += 1;
     await bench(`priority#${index}`, "priority", occurrenceDate ? { priorityId, occurrenceDate } : { priorityId });
   }
-  await bench("log.queue", "evidence-review-queue", {});
+  await bench("log.queue", "evidence-review-queue", { timeZone: "America/Los_Angeles" });
   await bench("goals", "goals", {});
   await bench("goal.active", "active-goal", {});
   await bench("goal.completed-visible-abs", "completed-goal", {});

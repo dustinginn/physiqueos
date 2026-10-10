@@ -107,11 +107,13 @@ describe("HealthKit production payload builder", () => {
 
   it("the activation entry prints its success marker only for the requested clean outcome", () => {
     const entry = fs.readFileSync(new URL("../../../scripts/operations/healthKitActivationPolicy.entry.mjs", import.meta.url), "utf8");
-    const guard = entry.indexOf('const expectedOutcome = MODE === "apply" ? "applied" : "dry_run"');
+    const guard = entry.indexOf('const acceptable = ACTION === "replace-families"');
     const marker = entry.lastIndexOf("process.stdout.write(`${MARKER}");
     expect(guard).toBeGreaterThan(0);
     expect(marker).toBeGreaterThan(guard);
-    expect(entry).toContain("if (result.outcome !== expectedOutcome) stop(");
+    expect(entry).toContain("if (!acceptable.includes(result.outcome)) stop(");
+    expect(entry).toContain('["applied", "already_replaced"]');
+    expect(entry).toContain('["dry_run", "already_replaced"]');
   });
 
   it("refuses apply without an authorization reference and expected facts", async () => {

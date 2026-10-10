@@ -124,11 +124,15 @@ export function createCoreNavigationReadService({
     // user's current local day. It never changes the stored user zone or any
     // record's canonical localDate.
     getLog({ timeZone = null } = {}) {
+      const requestedTimeZone = timeZone ? resolveLocalTimeZone(timeZone) : null;
+      const readContext = requestedTimeZone
+        ? { localDate: getLocalDateKey(now(), requestedTimeZone) }
+        : null;
       return withContext("core.navigation.log", "log", async ({ ownerUserId, principal, repositories, runtime }) => {
         const user = runtime.user?.id === ownerUserId ? runtime.user : null;
         const log = await createLogReadService({ repositories, now }).getLog({
           principal,
-          timeZone: timeZone ?? user?.timeZone ?? user?.timezone,
+          timeZone: requestedTimeZone ?? user?.timeZone ?? user?.timezone,
           healthKitRelationshipState: {
             canonicalWorkouts: runtime.healthKitCanonicalWorkouts ?? [],
             workoutLinks: runtime.healthKitWorkoutLinks ?? [],
@@ -136,7 +140,7 @@ export function createCoreNavigationReadService({
           },
         });
         return projectConfirmedHealthKitLogProvenance(log, runtime);
-      });
+      }, readContext);
     },
     async getGoals() {
       await ensureCanonicalExerciseRegistry();
@@ -741,7 +745,7 @@ export function createCoreNavigationReadService({
       : listCanonicalTrainingExerciseIdentities();
   }
 
-  function withContext(readModel, surface, callback) {
+  function withContext(readModel, surface, callback, readContext = null) {
     return store.run(readModel, async ({ readCollections, readRuntimeMetadata }) => {
       const ownerUserId = store.getOwnerUserId();
       if (!ownerUserId) throw new Error("Core navigation owner is unavailable.");
@@ -758,7 +762,7 @@ export function createCoreNavigationReadService({
         repositories,
         runtime,
       });
-    });
+    }, readContext);
   }
 }
 

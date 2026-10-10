@@ -86,6 +86,30 @@ describe("provider-native core navigation reads", () => {
     expect((await narrow.getLog({ timeZone: null })).localDate).toBe("2026-08-29");
   });
 
+  it("passes the resolved local date to provider storage only for an explicit device zone", async () => {
+    const runtime = createPhase5SyntheticRuntime();
+    const delegate = createRepositoryCoreNavigationReadStore({ readRuntimeStore: () => runtime });
+    const contexts = [];
+    const narrow = createCoreNavigationReadService({
+      store: {
+        getOwnerUserId: delegate.getOwnerUserId,
+        run(readModel, callback, readContext) {
+          contexts.push({ readModel, readContext });
+          return delegate.run(readModel, callback, readContext);
+        },
+      },
+      now: () => NOW,
+    });
+
+    await narrow.getLog({ timeZone: "Asia/Tokyo" });
+    await narrow.getLog();
+
+    expect(contexts).toEqual([
+      { readModel: "core.navigation.log", readContext: { localDate: "2026-08-30" } },
+      { readModel: "core.navigation.log", readContext: null },
+    ]);
+  });
+
   it("keeps Goals output equivalent, including Confidence and transition state", async () => {
     const { legacyRepositories, narrow, principal, runtime } = services();
     expect(await narrow.getGoals()).toEqual(

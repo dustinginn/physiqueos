@@ -80,6 +80,25 @@ describe("PostgreSQL core navigation read store", () => {
     expect(sql).toContain("collection_name<>'evidenceReviews'");
   });
 
+  it("bounds Log canonical evidence to the explicitly requested local date", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    const store = createPostgresCoreNavigationReadStore({ pool: { query }, ownerUserId: "owner-one" });
+
+    await store.run(
+      "core.navigation.log",
+      ({ readCollections }) => readCollections(["user", "evidenceReviews", "canonicalEvidenceObjects"]),
+      { localDate: "2026-10-10" }
+    );
+
+    const [sql, values] = query.mock.calls[0];
+    expect(sql).toContain("LEFT(COALESCE(payload#>>'{payload,observed_at}'");
+    expect(sql).toContain("payload->>'date',''),10)=$2");
+    expect(values.slice(0, 2)).toEqual(["owner-one", "2026-10-10"]);
+    expect(values.slice(2).flat()).toEqual(expect.arrayContaining([
+      "user", "evidenceReviews", "canonicalEvidenceObjects",
+    ]));
+  });
+
   it.each([
     ["core.navigation.home", ["user", "dailyBriefings", "analyses", "canonicalEvidenceObjects"]],
     ["core.navigation.log", ["user", "evidenceReviews", "canonicalEvidenceObjects"]],

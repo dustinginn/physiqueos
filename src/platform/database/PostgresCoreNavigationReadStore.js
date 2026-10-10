@@ -30,7 +30,7 @@ export function createPostgresCoreNavigationReadStore({
   });
   return Object.freeze({
     getOwnerUserId: () => ownerUserId,
-    async run(readModel, callback) {
+    async run(readModel, callback, readContext = null) {
       let queryCount = 0;
       let rowCount = 0;
       let payloadBytes = 0;
@@ -45,7 +45,9 @@ export function createPostgresCoreNavigationReadStore({
         const graduated = requested.includes("canonicalEvidenceObjects") && HEALTHKIT_GRADUATED_READ_MODELS.has(readModel);
         if (graduated) requested.push(HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION);
         const grouped = groupCollectionsByTable(requested);
-        const values = [ownerUserId];
+        const hasLogDate = readModel === "core.navigation.log" && /^\d{4}-\d{2}-\d{2}$/.test(readContext?.localDate ?? "");
+        const values = hasLogDate ? [ownerUserId, readContext.localDate] : [ownerUserId];
+        const collectionParameterOffset = hasLogDate ? 3 : 2;
         const selections = [...grouped].map(([table, names], index) => {
           values.push(names);
           return `SELECT collection_name,source_ordinal,record_id,
@@ -53,13 +55,12 @@ export function createPostgresCoreNavigationReadStore({
               (SELECT json_build_object('revision',revision,'lastCommitId',last_command_id,'updatedAt',updated_at)
                  FROM physiqueos.canonical_runtime_metadata WHERE owner_user_id=$1) AS runtime_metadata` : ""}
             FROM physiqueos.${table}
-            WHERE owner_user_id=$1 AND collection_name=ANY($${index + 2}::text[])
-              ${canonicalEvidencePredicate(readModel)}`;
+            WHERE owner_user_id=$1 AND collection_name=ANY($${index + collectionParameterOffset}::text[])
+              ${canonicalEvidencePredicate(readModel, { hasLogDate })}`;
         });
         queryCount += 1;
         const result = await pool.query(
-          `${selections.join(" UNION ALL ")}
-           ORDER BY collection_name,source_ordinal,record_id`,
+          `${selections.join(" UNION ALL ")} ORDER BY collection_name,source_ordinal,record_id`,
           values
         );
         rowCount += result.rows.length;
@@ -175,8 +176,14 @@ function normalizeCollection(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-function canonicalEvidencePredicate(readModel) {
-  return `${graduationPolicyPredicate(readModel)}${evidenceTypePredicate(readModel)}${evidenceReviewStatusPredicate(readModel)}${confidenceHistoryPredicate(readModel)}`;
+function canonicalEvidencePredicate(readModel, { hasLogDate = false } = {}) {
+  return `${graduationPolicyPredicate(readModel)}${evidenceTypePredicate(readModel)}${evidenceReviewStatusPredicate(readModel)}${logEvidenceDatePredicate(readModel, hasLogDate)}${confidenceHistoryPredicate(readModel)}`;
+}
+
+function logEvidenceDatePredicate(readModel, hasLogDate) {
+  if (readModel !== "core.navigation.log" || !hasLogDate) return "";
+  return `AND (collection_name<>'canonicalEvidenceObjects' OR
+    LEFT(COALESCE(payload#>>'{payload,observed_at}',payload#>>'{payload,date}',payload->>'observed_at',payload->>'date',''),10)=$2)`;
 }
 
 function graduationPolicyPredicate(readModel) {
