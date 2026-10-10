@@ -17,6 +17,16 @@ Agent handoff reports describe implementation state. This backlog describes what
 
 
 
+BUILD 94 — FOUNDER-LOCKED NATIVE SCOPE (2026-10-09)
+Owner: existing Mac Codex A conversation. Base: accepted Build93 Native 9d0a2069. This is scope authorization for isolated implementation, integration candidates and tests, NOT TestFlight/deployment authority.
+1. Home secondary briefing card: Founder-selected Option B Editorial Rail (design artifact 30803809; handoff 3bd19757), preserve placement, exact Server order/copy/navigation; Dark/Mineral and accessibility.
+2. DEXA appointment priority: scheduled-time direct Upload DEXA Results PDF action; evidence-confirmed appointment completion, failure/retry, no manual Complete/Skip for informational DEXA; investigate prior Mark Complete refusal and ensure normal priority actions unaffected.
+3. Today's Priorities adaptive layout: long content full-width, lone last card full-width, 3+ rows as needed, no clipping, Dynamic Type/Dark/Mineral. Audit Build93 odd-tail behavior before changes.
+4. Morning Check-In: don't prompt to Add Activity or Add Nutrition if accepted canonical date-scoped evidence already exists; handle partial/pending sync, source provenance, timezone, failure states, and avoid duplicates; preserve manual weight entry.
+5. HealthKit iPhone/Watch authorization reprompt: audit prior vs newly requested types and lifecycle; fix only verified issue, do not reset permissions or block release without a real recurring defect.
+6. Associated focused UI/accessibility/regression coverage and Founder physical acceptance for the above.
+Explicit exclusions: pre-beta P1 uptime/performance audit deferred until later; Goal Intelligence/Adaptation discovery in new Claude chat; October9 DEXA Event presentation-only republication in existing Claude B chat; Recovery activation/Sleep backfill; unrelated historical changes. No release, production write or build-number bump until separately gated/authorized. Preserve Build93 physical acceptance findings and current Server 5e91aa5d authority (reverify).
+
 BUILD 93 — RELEASED TO TESTFLIGHT, PHYSICAL ACCEPTANCE PENDING (2026-10-09)
 - Accepted Native release authority: `9d0a206908fc3c4a64976e9cc3840e23cab0ba55`, PhysiqueOS 1.0 (93), delivery `15ae3b39-2594-47a7-a686-7920b3a7faf0`, build VALID / import VALID / present on App Store Connect. Detailed evidence: `agent-handoffs/reports/20261009T171605Z-build93-testflight-valid.md`.
 - Production Server authority at release: `e03f6768627f49175c476208eca79c99ae3d5ee9`, deployment `69a8dc14-461f-4680-91a3-14e42522494f`, ACTIVE 9/9; web and worker exact, live/ready green, schema remains migration 000014.
