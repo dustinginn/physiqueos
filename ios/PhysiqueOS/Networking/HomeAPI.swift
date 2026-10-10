@@ -35,6 +35,14 @@ struct FixtureHomeAPI: HomeAPI {
     }
 
     func fetchHome() async throws -> HomeReadModel {
+#if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let marker = arguments.firstIndex(of: "-physiqueos.home-startup-delay-ms"),
+           arguments.indices.contains(marker + 1),
+           let milliseconds = Int(arguments[marker + 1]), milliseconds > 0 {
+            try await Task.sleep(for: .milliseconds(milliseconds))
+        }
+#endif
         let resourceName: String
 #if DEBUG
         resourceName = ProcessInfo.processInfo.arguments.contains("-physiqueos.redesign-review")

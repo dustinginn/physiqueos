@@ -1,13 +1,17 @@
 import Foundation
+import os
 
-/// Loads the Home read model through the injected `HomeAPI` seam and holds
-/// it for `HomeView`. No caching, retry, or offline behavior is
-/// implemented here — Stage 1 is online-authoritative and this is a
-/// fixture load, not production networking (see
-/// docs/PHYSIQUEOS_NATIVE_V1.md, section 25).
+/// Loads the Home read model through the injected `HomeAPI` seam and owns its
+/// presentation state. The production transport owns authentication, request
+/// coalescing and persistence; this model only arbitrates lifecycle results
+/// and labels a persisted snapshot as last-known rather than authoritative.
 @Observable
 @MainActor
 final class HomeViewModel {
+    enum LoadTrigger: String, Sendable {
+        case automatic
+        case manualRefresh = "manual-refresh"
+    }
     enum LoadState: Equatable {
         case loading
         case loaded(HomeReadModel)
@@ -67,17 +71,20 @@ final class HomeViewModel {
     /// Hand canonical reminders to iOS before unrelated speculative reads.
     /// Prefetch may take longer than a nearby reminder's remaining lead time.
     func loadAndReconcileBeforePrefetch(
+        trigger: LoadTrigger = .automatic,
         reconcileNotifications: () async -> Void,
         prefetch: () async -> Void
     ) async {
-        await load()
+        await load(trigger: trigger)
         await reconcileNotifications()
         await prefetch()
     }
 
-    func load(now: Date = Date()) async {
+    func load(now: Date = Date(), trigger: LoadTrigger = .automatic) async {
         latestLoadRequestID &+= 1
         let requestID = latestLoadRequestID
+        let priorState = HomeLoadDiagnostics.describe(state)
+        let startedAt = ContinuousClock.now
 
         // Cold launch only: paint the last authoritative Home immediately,
         // then replace it with this session's read below.
@@ -88,6 +95,10 @@ final class HomeViewModel {
             state = .loaded(home)
             lastKnownGeneratedAt = snapshot.generatedAt
             lastKnownGeneratedDate = snapshot.generatedDate
+            HomeLoadDiagnostics.record(
+                id: requestID, trigger: trigger, outcome: "last-known", category: nil,
+                prior: priorState, startedAt: startedAt
+            )
         }
         do {
             var home = try await api.fetchHome()
@@ -98,18 +109,34 @@ final class HomeViewModel {
                 }
                 home.briefingCards = Self.projectBriefingCards(from: briefingStore.latestForHome(now: now))
             }
-            guard requestID == latestLoadRequestID, !Task.isCancelled else { return }
+            guard requestID == latestLoadRequestID, !Task.isCancelled else {
+                HomeLoadDiagnostics.record(
+                    id: requestID, trigger: trigger, outcome: "discarded", category: "superseded-or-cancelled",
+                    prior: priorState, startedAt: startedAt
+                )
+                return
+            }
             state = .loaded(home)
             lastKnownGeneratedAt = nil
             lastKnownGeneratedDate = nil
             lastKnownRefreshFailed = false
+            HomeLoadDiagnostics.record(
+                id: requestID, trigger: trigger, outcome: "authoritative", category: nil,
+                prior: priorState, startedAt: startedAt
+            )
         } catch {
             // SwiftUI cancels view-bound work during ordinary lifecycle
             // transitions. The transport deliberately collapses cancellation
             // into `networkFailure`, so consult the task itself before showing
             // a user-facing offline state. A newer overlapping load owns the
             // screen and will publish its own result.
-            guard requestID == latestLoadRequestID, !Task.isCancelled else { return }
+            guard requestID == latestLoadRequestID, !Task.isCancelled else {
+                HomeLoadDiagnostics.record(
+                    id: requestID, trigger: trigger, outcome: "discarded", category: HomeLoadDiagnostics.category(error),
+                    prior: priorState, startedAt: startedAt
+                )
+                return
+            }
             if isShowingLastKnown {
                 lastKnownRefreshFailed = true
             } else if error as? ProductionNativeError == .reconnectRequired {
@@ -118,9 +145,20 @@ final class HomeViewModel {
                 state = .failed("Recovering the secure session. Try again when the connection is available.")
             } else if error as? ProductionNativeError == .networkFailure {
                 state = .failed("Temporarily offline. Reconnect and try again.")
+            } else if case .temporaryServer = error as? ProductionNativeError {
+                state = .failed("PhysiqueOS is temporarily unavailable. Try again.")
+            } else if case .notPaired = error as? ProductionNativeError {
+                state = .reconnectRequired
+            } else if case .unauthenticated = error as? ProductionNativeError {
+                state = .reconnectRequired
             } else {
                 state = .failed("Home could not be loaded.")
             }
+            HomeLoadDiagnostics.record(
+                id: requestID, trigger: trigger,
+                outcome: isShowingLastKnown ? "last-known-refresh-failed" : "failed",
+                category: HomeLoadDiagnostics.category(error), prior: priorState, startedAt: startedAt
+            )
         }
     }
 
@@ -217,5 +255,48 @@ final class HomeViewModel {
                 destination: .briefingDetail(briefingId: briefing.id)
             )
         ]
+    }
+}
+
+/// Release-visible, privacy-safe Home lifecycle evidence. This deliberately
+/// records only a local load number, trigger, state/category and duration —
+/// never dates, payloads, identifiers, URLs, credentials or Server text.
+enum HomeLoadDiagnostics {
+    private static let logger = Logger(subsystem: "com.physiqueos.native", category: "HomeLoad")
+
+    static func category(_ error: Error) -> String {
+        if error is CancellationError || (error as? URLError)?.code == .cancelled { return "cancelled" }
+        switch error as? ProductionNativeError {
+        case .networkFailure: return "network"
+        case .temporaryServer, .server: return "server"
+        case .sessionRecoveryUnavailable: return "session-recovering"
+        case .reconnectRequired, .notPaired, .unauthenticated, .secureInstallationKeyUnavailable: return "session"
+        case .invalidResponse, .incompatibleContractVersion, .resourceMismatch, .authorityMismatch: return "contract"
+        case .none: return "other"
+        default: return "request"
+        }
+    }
+
+    @MainActor
+    static func describe(_ state: HomeViewModel.LoadState) -> String {
+        switch state {
+        case .loading: "loading"
+        case .loaded: "loaded"
+        case .failed: "failed"
+        case .reconnectRequired: "reconnect"
+        }
+    }
+
+    static func record(
+        id: Int,
+        trigger: HomeViewModel.LoadTrigger,
+        outcome: String,
+        category: String?,
+        prior: String,
+        startedAt: ContinuousClock.Instant
+    ) {
+        let components = startedAt.duration(to: .now).components
+        let milliseconds = max(0, Int(components.seconds * 1_000 + components.attoseconds / 1_000_000_000_000_000))
+        logger.info("home_load id=\(id) trigger=\(trigger.rawValue, privacy: .public) outcome=\(outcome, privacy: .public) category=\(category ?? "none", privacy: .public) prior=\(prior, privacy: .public) duration_ms=\(milliseconds)")
     }
 }

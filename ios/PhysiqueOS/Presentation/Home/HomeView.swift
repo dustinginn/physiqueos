@@ -1,6 +1,19 @@
 import SwiftUI
 import UserNotifications
 
+/// One identity for every automatic Home refresh source. SwiftUI cancels the
+/// prior task when any input changes, so appearance, foreground activation,
+/// day rollover and a canonical Priority mutation cannot start independent
+/// competing loads during the same lifecycle transition.
+struct HomeAutomaticLoadPlan: Hashable {
+    let authority: NativeAPIEnvironment
+    let isActive: Bool
+    let day: DailyDriverLocalDay
+    let canonicalPriorityRefreshGeneration: Int
+
+    var shouldLoad: Bool { isActive }
+}
+
 /// The real Stage 1 Home screen: the daily cockpit answering "Am I on
 /// track?" and "What matters most today?" (docs/INFORMATION_ARCHITECTURE.md).
 /// Composition and hierarchy mirror `HomeScreen.jsx` exactly: header, hero
@@ -38,7 +51,8 @@ struct HomeView: View {
         .physiqueOSScrollBottomClearance()
         .background(PhysiqueOSTheme.redesignCanvas)
         .toolbar(.hidden, for: .navigationBar)
-        .task(id: environment.nativeAuthority) {
+        .task(id: automaticLoadPlan) {
+            let plan = automaticLoadPlan
             if viewModelAuthority != environment.nativeAuthority {
                 viewModel = HomeViewModel(
                     api: environment.homeAPI,
@@ -49,7 +63,9 @@ struct HomeView: View {
                 )
                 viewModelAuthority = environment.nativeAuthority
             }
+            guard plan.shouldLoad else { return }
             await viewModel?.loadAndReconcileBeforePrefetch(
+                trigger: .automatic,
                 reconcileNotifications: { await syncPriorityNotifications() },
                 prefetch: { await prefetchLikelyDestinations() }
             )
@@ -59,34 +75,10 @@ struct HomeView: View {
                 await environment.productionNativeAPI.invalidateReadResources(["home"], retainingLastKnown: true)
             }
             await viewModel?.loadAndReconcileBeforePrefetch(
+                trigger: .manualRefresh,
                 reconcileNotifications: { await syncPriorityNotifications() },
                 prefetch: { await prefetchLikelyDestinations() }
             )
-        }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active || phase == .inactive else { return }
-            Task {
-                // Re-evaluate first so a resume across midnight / a zone change
-                // has invalidated the day-scoped caches before Home reads; Home
-                // always loads here (visible or not) so the notification sync
-                // below never runs on the previous day's model. On a crossing
-                // resume a visible Home may also reload once via the day-change
-                // path (at most one extra read, first resume of a day).
-                if phase == .active {
-                    await environment.reevaluateDailyDriverDay()
-                    await viewModel?.load()
-                }
-                await syncPriorityNotifications()
-            }
-        }
-        .onChange(of: environment.canonicalPriorityRefreshGeneration) { _, _ in
-            Task { await viewModel?.load() }
-        }
-        // A foregrounded Home crossing local midnight or a zone change reloads
-        // from a fresh read (the day-scoped cache was invalidated first).
-        .reloadsOnDailyDriverDayChangeWhenVisible(environment.dailyDriverDay) {
-            await viewModel?.load()
-            await syncPriorityNotifications()
         }
         .alert("Priority action could not be saved", isPresented: Binding(
             get: { priorityActionError != nil },
@@ -108,6 +100,15 @@ struct HomeView: View {
             if let review = ConfidenceReviewFixture.requested { confidenceDetailPresentation = review }
         }
 #endif
+    }
+
+    private var automaticLoadPlan: HomeAutomaticLoadPlan {
+        HomeAutomaticLoadPlan(
+            authority: environment.nativeAuthority,
+            isActive: scenePhase == .active,
+            day: environment.dailyDriverDay,
+            canonicalPriorityRefreshGeneration: environment.canonicalPriorityRefreshGeneration
+        )
     }
 
     /// The review fixture is a source-shaped snapshot of the accepted Home

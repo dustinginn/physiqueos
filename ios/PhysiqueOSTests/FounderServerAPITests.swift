@@ -1364,6 +1364,62 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(viewModel.state, .loaded(home))
     }
 
+    func testHomeAutomaticLoadPlanStartsOnceAcrossColdLaunchActivation() {
+        let day = DailyDriverLocalDay(dateKey: "2026-10-09", timeZoneIdentifier: "America/Los_Angeles")
+        let inactive = HomeAutomaticLoadPlan(
+            authority: .founderProduction,
+            isActive: false,
+            day: day,
+            canonicalPriorityRefreshGeneration: 0
+        )
+        let active = HomeAutomaticLoadPlan(
+            authority: .founderProduction,
+            isActive: true,
+            day: day,
+            canonicalPriorityRefreshGeneration: 0
+        )
+
+        XCTAssertFalse(inactive.shouldLoad, "The pre-activation task must initialize Home without starting a request.")
+        XCTAssertTrue(active.shouldLoad, "Activation owns the one cold-launch request.")
+        XCTAssertEqual(active, HomeAutomaticLoadPlan(
+            authority: .founderProduction,
+            isActive: true,
+            day: day,
+            canonicalPriorityRefreshGeneration: 0
+        ), "Duplicate active notifications do not create a second task identity.")
+        XCTAssertNotEqual(active, HomeAutomaticLoadPlan(
+            authority: .founderProduction,
+            isActive: true,
+            day: day,
+            canonicalPriorityRefreshGeneration: 1
+        ), "A canonical Priority mutation still requests one fresh Home read.")
+    }
+
+    @MainActor
+    func testHomeClassifiesTemporaryServerAndEndedSessionWithoutGenericFailure() async {
+        let server = HomeViewModel(
+            api: FailingHomeAPI(error: .temporaryServer(nil)),
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+        await server.load()
+        XCTAssertEqual(server.state, .failed("PhysiqueOS is temporarily unavailable. Try again."))
+        XCTAssertEqual(HomeLoadDiagnostics.category(ProductionNativeError.temporaryServer(nil)), "server")
+
+        let session = HomeViewModel(
+            api: FailingHomeAPI(error: .unauthenticated(nil)),
+            priorityStore: LoggingSandboxStore(),
+            goalsSandboxStore: GoalsSandboxStore(),
+            briefingStore: BriefingSandboxStore(),
+            appliesSandboxProjections: false
+        )
+        await session.load()
+        XCTAssertEqual(session.state, .reconnectRequired)
+        XCTAssertEqual(HomeLoadDiagnostics.category(ProductionNativeError.unauthenticated(nil)), "session")
+    }
+
     func testPriorityCompletionRetiresLastKnownHome() async throws {
         let (store, credentials) = try await Self.persistAuthoritativeHome(confidence: 71)
         let transport = SequencedFounderTransport([

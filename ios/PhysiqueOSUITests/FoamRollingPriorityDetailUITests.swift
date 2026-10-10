@@ -264,6 +264,28 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         XCTAssertEqual(tiles[1].frame.width, tiles[2].frame.width, accuracy: 2)
     }
 
+    func testHomeDelayedColdLaunchTransitionsFromLoadingStraightToContent() {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance-review.value", "dark",
+            "-physiqueos.appearance-review.route", "home",
+            "-physiqueos.redesign-review",
+            // XCUITest waits several seconds for launch idleness before the
+            // first AX query. Keep the deterministic response pending long
+            // enough to observe the real loading panel after that handshake.
+            "-physiqueos.home-startup-delay-ms", "8000",
+        ]
+        app.launch()
+
+        let loading = app.descendants(matching: .any)["home.state.loading"]
+        XCTAssertTrue(loading.waitForExistence(timeout: 1), "Delayed cold launch must expose its truthful loading state.")
+        XCTAssertFalse(app.descendants(matching: .any)["home.state.message"].exists)
+        XCTAssertTrue(app.staticTexts["4 weeks"].waitForExistence(timeout: 12))
+        XCTAssertFalse(app.descendants(matching: .any)["home.state.message"].exists, "Delayed success must never pass through an error page.")
+        capture("build95-home-delayed-cold-launch-dark")
+    }
+
     func testHomeSecondaryBriefingEditorialRailDarkAndMineralLightNavigates() {
         for appearance in ["dark", "light"] {
             launchHomeParity(appearance: appearance)
