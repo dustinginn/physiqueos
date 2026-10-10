@@ -66,6 +66,20 @@ describe("HealthKit canonical acceptance audit", () => {
     // Handoff-safe mode carries no health values.
     expect(JSON.stringify(summary)).not.toMatch(/2400|700\.4/);
     expect(summary.policy).toMatchObject({ enabled: true, strategicEvidenceEligibility: "quarantined", historicalBackfill: false });
+    expect(summary.observationCoverage).toEqual([
+      { type: "activity_summary", source: "com.apple.Health|Apple Health", records: 1, distinctDays: 1, firstLocalDate: "2026-09-23", lastLocalDate: "2026-09-23" },
+      { type: "nutrition_daily_total", source: "com.apple.Health|Apple Health", records: 1, distinctDays: 1, firstLocalDate: "2026-09-23", lastLocalDate: "2026-09-23" },
+    ]);
+    expect(summary.observationCoverageTotals).toEqual([
+      { type: "activity_summary", source: "all_sources", records: 1, distinctDays: 1, firstLocalDate: "2026-09-23", lastLocalDate: "2026-09-23" },
+      { type: "nutrition_daily_total", source: "all_sources", records: 1, distinctDays: 1, firstLocalDate: "2026-09-23", lastLocalDate: "2026-09-23" },
+    ]);
+    expect(summary.canonicalEvidenceCoverage).toEqual([
+      { type: "activity_day", source: "no_integration|Apple Fitness|screenshot", records: 1, distinctDays: 1, firstLocalDate: "2026-09-23", lastLocalDate: "2026-09-23" },
+    ]);
+    expect(summary.canonicalEvidenceCoverageTotals).toEqual([
+      { type: "activity_day", source: "all_sources", records: 1, distinctDays: 1, firstLocalDate: "2026-09-23", lastLocalDate: "2026-09-23" },
+    ]);
   });
 
   it("reports a HealthKit-derived record inside strategic Evidence as a violation", () => {

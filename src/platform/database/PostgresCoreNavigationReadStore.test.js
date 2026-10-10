@@ -38,6 +38,12 @@ describe("PostgreSQL core navigation read store", () => {
     expect(query.mock.calls[0][0]).toContain("UNION ALL");
     expect(query.mock.calls[0][0]).toContain("ORDER BY collection_name,source_ordinal,record_id");
     expect(query.mock.calls[0][0]).toContain("jsonb_strip_nulls");
+    expect(query.mock.calls[0][0]).toContain("jsonb_array_elements");
+    expect(query.mock.calls[0][0]).toContain("'supportsGoal',observation->'supportsGoal'");
+    expect(query.mock.calls[0][0]).toContain("publication_rank<=2");
+    expect(query.mock.calls[0][0]).toContain("collection_name='goalConfidenceSnapshots'");
+    expect(query.mock.calls[0][0]).toContain("canonical_confidence_assessment_v3");
+    expect(query.mock.calls[0][0]).toContain("'strategicInterpretation','coachingState','confidenceProjection'");
     expect(query.mock.calls[0][0]).toContain("='training'");
     expect(query.mock.calls[0][1][0]).toBe("owner-one");
     expect(query.mock.calls[0][1].flat()).toEqual(expect.arrayContaining([
@@ -52,9 +58,26 @@ describe("PostgreSQL core navigation read store", () => {
       readModel: "core.navigation.goals",
       queryCount: 1,
       rowCount: 2,
+      collections: expect.arrayContaining([
+        { collection: "goals", rows: 1, payloadBytes: expect.any(Number) },
+        { collection: "user", rows: 1, payloadBytes: expect.any(Number) },
+      ]),
       compatibilityRuntimeLoadCount: 0,
       pool: { totalCount: 1, idleCount: 1, waitingCount: 0 },
     }));
+  });
+
+  it("bounds Log to actionable processing reviews and user-visible evidence domains", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    const store = createPostgresCoreNavigationReadStore({ pool: { query }, ownerUserId: "owner-one" });
+
+    await store.run("core.navigation.log", ({ readCollections }) =>
+      readCollections(["user", "evidenceReviews", "canonicalEvidenceObjects"]));
+
+    const sql = query.mock.calls[0][0];
+    expect(sql).toContain("ARRAY['nutrition','activity_day','training']");
+    expect(sql).toContain("ARRAY['pending','committing','commit_failed','partially_committed']");
+    expect(sql).toContain("collection_name<>'evidenceReviews'");
   });
 
   it.each([

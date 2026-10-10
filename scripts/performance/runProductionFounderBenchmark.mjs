@@ -17,7 +17,14 @@ const benchmark = fs.readFileSync(path.join(root, "scripts/performance/productio
   .replace("__BENCHMARK_BATCH__", batch)
   .replace("__COMPATIBILITY_RUNTIME_QUERY_COUNT__", compatibilityRuntimeQueryCount);
 const encodedSource = gzipSync(Buffer.from(benchmark)).toString("base64");
-const config = load(fs.readFileSync(path.join(os.homedir(), "AppData", "Roaming", "doctl", "config.yaml"), "utf8"));
+const configPaths = [
+  path.join(os.homedir(), "Library", "Application Support", "doctl", "config.yaml"),
+  path.join(os.homedir(), ".config", "doctl", "config.yaml"),
+  path.join(os.homedir(), "AppData", "Roaming", "doctl", "config.yaml"),
+];
+const configPath = configPaths.find((candidate) => fs.existsSync(candidate));
+if (!configPath) throw new Error("The doctl configuration is unavailable.");
+const config = load(fs.readFileSync(configPath, "utf8"));
 const token = config?.["auth-contexts"]?.[context];
 if (typeof token !== "string" || token.length < 20) throw new Error("Requested doctl context is unavailable.");
 

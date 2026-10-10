@@ -40,7 +40,12 @@ const pool = new pg.Pool({
 const now = () => performance.now();
 const round = (value) => Math.round(value * 10) / 10;
 const median = (values) => { const s = [...values].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; };
-let meter = null; // { queries, dbMs, dbRows, dbBytes }
+const percentile = (values, ratio) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  return sorted[Math.max(0, Math.ceil(sorted.length * ratio) - 1)];
+};
+let meter = null; // aggregate-only query and provider-read metrics for the active sample
 
 let client; let began = false;
 const READ_ONLY_STATEMENT = /^\s*(SELECT|WITH)\b/i;
@@ -61,7 +66,24 @@ const guardedPool = Object.freeze({
 });
 
 function buildService() {
-  const readers = Object.freeze(createReaders({ pool: guardedPool, ownerUserId: OWNER }));
+  const readers = Object.freeze(createReaders({
+    pool: guardedPool,
+    ownerUserId: OWNER,
+    onComplete: (event) => {
+      if (!meter) return;
+      meter.providerReadEvents += 1;
+      meter.sourcePayloadBytes += Number(event?.payloadBytes ?? 0);
+      meter.sourceRows += Number(event?.rowCount ?? 0);
+      meter.maximumPoolWaiting = Math.max(meter.maximumPoolWaiting, Number(event?.pool?.waitingCount ?? 0));
+      for (const collection of event?.collections ?? []) {
+        const prior = meter.sourceCollections[collection.collection] ?? { rows: 0, payloadBytes: 0 };
+        meter.sourceCollections[collection.collection] = {
+          rows: prior.rows + Number(collection.rows ?? 0),
+          payloadBytes: prior.payloadBytes + Number(collection.payloadBytes ?? 0),
+        };
+      }
+    },
+  }));
   return createNativeProductionContractService({
     authenticate: async () => ({ userId: OWNER, scopes: ["founder:read"], deviceId: "benchmark", sessionId: "benchmark" }),
     ownerUserId: OWNER,
@@ -72,7 +94,16 @@ function buildService() {
 }
 
 async function measureOnce(service, resource, input) {
-  meter = { queries: 0, dbMs: 0, dbRows: 0 };
+  meter = {
+    queries: 0,
+    dbMs: 0,
+    dbRows: 0,
+    providerReadEvents: 0,
+    sourcePayloadBytes: 0,
+    sourceRows: 0,
+    maximumPoolWaiting: 0,
+    sourceCollections: {},
+  };
   const startedAt = now();
   let envelope; let failure = null;
   try { envelope = await service.read({ request: null, resource, input }); }
@@ -96,13 +127,25 @@ async function bench(service, label, resource, input) {
   const cold = await measureOnce(service, resource, input);
   const warm = [];
   for (let index = 0; index < WARM_REPETITIONS; index += 1) warm.push((await measureOnce(service, resource, input)).sample);
+  const warmReadMs = warm.map((sample) => sample.readMs);
   const row = {
     label, resource,
-    coldMs: round(cold.sample.readMs), warmMedianMs: round(median(warm.map((s) => s.readMs))),
+    coldMs: round(cold.sample.readMs),
+    warmMedianMs: round(median(warmReadMs)),
+    warmP95Ms: round(percentile(warmReadMs, 0.95)),
+    warmP99Ms: round(percentile(warmReadMs, 0.99)),
+    warmMinMs: round(Math.min(...warmReadMs)),
+    warmMaxMs: round(Math.max(...warmReadMs)),
     warmDbMs: round(median(warm.map((s) => s.dbMs))),
     warmComputeMs: round(median(warm.map((s) => s.readMs - s.dbMs))),
     serializeMs: round(median(warm.map((s) => s.serializeMs))),
-    queries: cold.sample.queries, dbRows: cold.sample.dbRows, responseBytes: cold.sample.bytes,
+    queries: cold.sample.queries,
+    dbRows: cold.sample.dbRows,
+    sourceRows: cold.sample.sourceRows,
+    sourcePayloadBytes: cold.sample.sourcePayloadBytes,
+    maximumPoolWaiting: cold.sample.maximumPoolWaiting,
+    sourceCollections: cold.sample.sourceCollections,
+    responseBytes: cold.sample.bytes,
     failure: cold.sample.failure,
     dataHash: cold.sample.dataHash,
     stableAcrossRuns: warm.every((sample) => sample.dataHash === cold.sample.dataHash),

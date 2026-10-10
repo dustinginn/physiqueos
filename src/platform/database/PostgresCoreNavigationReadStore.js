@@ -34,6 +34,7 @@ export function createPostgresCoreNavigationReadStore({
       let queryCount = 0;
       let rowCount = 0;
       let payloadBytes = 0;
+      const collectionMetrics = new Map();
       let runtimeMetadata = null;
       const startedAt = performance.now();
       const readCollections = async (collections) => {
@@ -67,6 +68,13 @@ export function createPostgresCoreNavigationReadStore({
         for (const row of result.rows) {
           output[row.collection_name].push(Object.freeze(row.payload));
           if (row.runtime_metadata) runtimeMetadata = Object.freeze(row.runtime_metadata);
+        }
+        for (const [collection, records] of Object.entries(output)) {
+          const prior = collectionMetrics.get(collection) ?? { rows: 0, payloadBytes: 0 };
+          collectionMetrics.set(collection, {
+            rows: prior.rows + records.length,
+            payloadBytes: prior.payloadBytes + Buffer.byteLength(JSON.stringify(records)),
+          });
         }
         if (graduated) {
           const policyRecord = (output[HEALTHKIT_GRADUATION_CONFIGURATION_COLLECTION] ?? [])
@@ -103,6 +111,7 @@ export function createPostgresCoreNavigationReadStore({
           queryCount,
           rowCount,
           payloadBytes,
+          collections: [...collectionMetrics].map(([collection, metrics]) => ({ collection, ...metrics })),
           compatibilityRuntimeLoadCount: 0,
           elapsedMs: Math.round(performance.now() - startedAt),
           pool: {
@@ -167,7 +176,7 @@ function normalizeCollection(value) {
 }
 
 function canonicalEvidencePredicate(readModel) {
-  return `${graduationPolicyPredicate(readModel)}${evidenceTypePredicate(readModel)}`;
+  return `${graduationPolicyPredicate(readModel)}${evidenceTypePredicate(readModel)}${evidenceReviewStatusPredicate(readModel)}${confidenceHistoryPredicate(readModel)}`;
 }
 
 function graduationPolicyPredicate(readModel) {
@@ -185,7 +194,54 @@ function evidenceTypePredicate(readModel) {
     return `AND (collection_name<>'canonicalEvidenceObjects' OR
       COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')='activity_day')`;
   }
+  if (readModel === "core.navigation.log") {
+    return `AND (collection_name<>'canonicalEvidenceObjects' OR
+      COALESCE(payload#>>'{payload,evidence_type}',payload->>'evidence_type')=ANY(ARRAY['nutrition','activity_day','training']::text[]))`;
+  }
   return "";
+}
+
+function evidenceReviewStatusPredicate(readModel) {
+  if (readModel !== "core.navigation.log") return "";
+  return `AND (collection_name<>'evidenceReviews' OR
+    COALESCE(payload->>'status','')=ANY(ARRAY['pending','committing','commit_failed','partially_committed']::text[]))`;
+}
+
+function confidenceHistoryPredicate(readModel) {
+  if (!["core.navigation.home", "core.navigation.goals"].includes(readModel)) return "";
+  // These surfaces need the record selected by each current snapshot plus the
+  // newest two non-superseded user-facing publications per Goal. Keeping two
+  // preserves the read service's equal-chronology ambiguity detection without
+  // hydrating every historical assessment into a navigation request.
+  return `AND (collection_name<>'goalConfidenceHistory' OR record_id IN (
+    SELECT ranked.record_id FROM (
+      SELECT candidate.record_id,
+        row_number() OVER (PARTITION BY candidate.payload->>'goalId' ORDER BY
+          COALESCE(candidate.payload->>'persistedAt',candidate.payload#>>'{assessment,publicationTimestamp}',candidate.payload#>>'{assessment,sourceCutoff}','') DESC,
+          COALESCE(candidate.payload#>>'{assessment,sourceCutoff}',candidate.payload#>>'{assessment,evidenceCutoff}','') DESC,
+          COALESCE(candidate.payload->>'persistedAt','') DESC,
+          COALESCE(candidate.payload#>>'{assessment,id}',candidate.payload->>'assessmentId','') DESC) AS publication_rank
+      FROM physiqueos.canonical_confidence_records candidate
+      WHERE candidate.owner_user_id=$1 AND candidate.collection_name='goalConfidenceHistory'
+        AND COALESCE(candidate.payload->>'publisherType',candidate.payload#>>'{assessment,publisherType}','')<>'goal_initialization'
+        AND NOT EXISTS (
+          SELECT 1 FROM physiqueos.canonical_confidence_records replacement
+          WHERE replacement.owner_user_id=$1 AND replacement.collection_name='goalConfidenceHistory'
+            AND COALESCE(replacement.payload->>'publisherType',replacement.payload#>>'{assessment,publisherType}','')<>'goal_initialization'
+            AND replacement.payload#>>'{assessment,replacementLineage,replacesAssessmentId}'=
+              COALESCE(candidate.payload#>>'{assessment,id}',candidate.payload->>'assessmentId')
+        )
+    ) ranked WHERE ranked.publication_rank<=2
+    UNION
+    SELECT current_record.record_id
+    FROM physiqueos.canonical_confidence_records current_record
+    WHERE current_record.owner_user_id=$1 AND current_record.collection_name='goalConfidenceHistory'
+      AND COALESCE(current_record.payload->>'assessmentId',current_record.payload#>>'{assessment,id}') IN (
+        SELECT snapshot.payload->>'currentAssessmentId'
+        FROM physiqueos.canonical_confidence_records snapshot
+        WHERE snapshot.owner_user_id=$1 AND snapshot.collection_name='goalConfidenceSnapshots'
+      )
+  ))`;
 }
 
 function payloadExpression(readModel) {
@@ -195,6 +251,19 @@ function payloadExpression(readModel) {
   return `CASE
     WHEN collection_name='analyses' THEN ${analysisPayloadExpression()}
     WHEN collection_name='dailyBriefings' THEN ${briefingPayloadExpression()}
+    WHEN collection_name='goalConfidenceHistory' THEN ${confidenceHistoryPayloadExpression()}
+    ELSE payload END`;
+}
+
+function confidenceHistoryPayloadExpression() {
+  // V3 embeds large write-side authoring and audit graphs that Home and
+  // Goals never consume. Keep every canonical identity, validation,
+  // reproducibility, and presentation field while omitting only those
+  // known-heavy embedded graphs from this read projection.
+  return `CASE WHEN payload#>>'{assessment,schemaVersion}'='canonical_confidence_assessment_v3'
+    THEN payload || jsonb_build_object('assessment',(payload->'assessment') - ARRAY[
+      'strategicInterpretation','coachingState','confidenceProjection',
+      'narrativePlan','evidenceEligibility']::text[])
     ELSE payload END`;
 }
 
@@ -207,16 +276,40 @@ function analysisPayloadExpression() {
     'importedAt',payload->'importedAt',
     'evidenceTypes',payload->'evidenceTypes',
     'metadata',CASE WHEN payload#>'{metadata,structuredObservations}' IS NOT NULL
-      THEN jsonb_build_object('structuredObservations',payload#>'{metadata,structuredObservations}') END,
-    'structuredObservations',payload->'structuredObservations'
+      THEN jsonb_build_object('structuredObservations',${analysisObservationsExpression("payload#>'{metadata,structuredObservations}'")}) END,
+    'structuredObservations',CASE WHEN payload->'structuredObservations' IS NOT NULL
+      THEN ${analysisObservationsExpression("payload->'structuredObservations'")} END
   ))`;
 }
 
+function analysisObservationsExpression(source) {
+  return `(SELECT COALESCE(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+    'type',observation->'type',
+    'supportsGoal',observation->'supportsGoal',
+    'confidence',observation->'confidence',
+    'region',observation->'region'
+  ))),'[]'::jsonb) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(${source})='array' THEN ${source} ELSE '[]'::jsonb END) observation)`;
+}
+
 function briefingPayloadExpression() {
-  return `CASE WHEN payload->'briefing' IS NULL OR payload->'briefing'='null'::jsonb
-    THEN payload-'replacedBriefingHistory'-'replacementHistory'-'priorVersions'-'previousEntry'-'previousEntries'
-    ELSE (payload-'briefing'-'replacedBriefingHistory'-'replacementHistory'-'priorVersions'-'previousEntry'-'previousEntries') ||
-      jsonb_build_object('briefing',jsonb_strip_nulls(jsonb_build_object(
+  return `jsonb_strip_nulls(jsonb_build_object(
+    'id',payload->'id',
+    'userId',payload->'userId',
+    'artifactType',payload->'artifactType',
+    'cadence',payload->'cadence',
+    'generatedAt',payload->'generatedAt',
+    'createdAt',payload->'createdAt',
+    'updatedAt',payload->'updatedAt',
+    'deliveryDate',payload->'deliveryDate',
+    'eventDate',payload->'eventDate',
+    'evidenceDate',payload->'evidenceDate',
+    'preview',payload->'preview',
+    'status',payload->'status',
+    'evidenceWindow',payload->'evidenceWindow',
+    'lifecycle',payload->'lifecycle',
+    'trigger',payload->'trigger',
+    'briefing',CASE WHEN payload->'briefing' IS NULL OR payload->'briefing'='null'::jsonb THEN NULL ELSE
+      jsonb_strip_nulls(jsonb_build_object(
         'date',payload#>'{briefing,date}',
         'evidenceReconciliation',payload#>'{briefing,evidenceReconciliation}',
         'hero',payload#>'{briefing,hero}',
@@ -235,5 +328,6 @@ function briefingPayloadExpression() {
         )) END,
         'dexaEventNarrative',CASE WHEN payload#>'{briefing,dexaEventNarrative,hero}' IS NOT NULL
           THEN jsonb_build_object('hero',payload#>'{briefing,dexaEventNarrative,hero}') END
-      ))) END`;
+      )) END
+  ))`;
 }

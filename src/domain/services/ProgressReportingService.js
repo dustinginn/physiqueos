@@ -55,6 +55,7 @@ import {
   projectHealthKitStrengthWorkoutPresentationBySession,
 } from "./HealthKitWorkoutPresentationService.js";
 import { composeDailyActiveEnergyWithWorkouts } from "./HealthKitWorkoutService.js";
+import { canonicalWeightDate } from "../weight/canonicalWeight.js";
 
 const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
@@ -587,7 +588,7 @@ function buildWeightReport(
 ) {
   const values = weights.map((entry) => ({
     id: entry.id,
-    date: entry.measuredAt,
+    date: normalizedWeightDate(entry.measuredAt),
     value: entry.weight.value,
     unit: entry.weight.unit,
     revision: revisionOrNull(entry),
@@ -665,7 +666,7 @@ function rollingWeightAverage(points, requestedDays) {
 function weightPoint(entry) {
   return entry ? {
     id: entry.id,
-    date: entry.measuredAt,
+    date: normalizedWeightDate(entry.measuredAt),
     value: entry.weight.value,
     unit: entry.weight.unit,
     revision: revisionOrNull(entry),
@@ -678,9 +679,15 @@ function revisionOrNull(entry) {
 }
 
 function shiftIsoDate(value, days) {
-  const date = new Date(`${value}T00:00:00.000Z`);
+  const date = new Date(`${normalizedWeightDate(value)}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function normalizedWeightDate(value) {
+  const date = canonicalWeightDate(value);
+  if (!date) throw new Error("The canonical Weight date is invalid.");
+  return date;
 }
 
 export function createProviderWeightEvidenceReport({

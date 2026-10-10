@@ -789,6 +789,9 @@ function projectOperatingPlanStrategyDetail(protocol, detail) {
 function projectCollection(name, values, surface) {
   if (name === "analyses") return (values ?? []).map(projectAnalysis);
   if (name === "dailyBriefings") return (values ?? []).map(projectBriefing);
+  if (name === "goalConfidenceHistory" && ["home", "goals"].includes(surface)) {
+    return (values ?? []).map(projectConfidenceHistoryRecord);
+  }
   if (name === "canonicalEvidenceObjects") {
     if (["home", "goals"].includes(surface)) {
       return (values ?? []).filter((record) => evidenceType(record) === "training");
@@ -800,7 +803,23 @@ function projectCollection(name, values, surface) {
   return values;
 }
 
+function projectConfidenceHistoryRecord(record = {}) {
+  if (record.assessment?.schemaVersion !== "canonical_confidence_assessment_v3") return record;
+  const {
+    strategicInterpretation: _strategicInterpretation,
+    coachingState: _coachingState,
+    confidenceProjection: _confidenceProjection,
+    narrativePlan: _narrativePlan,
+    evidenceEligibility: _evidenceEligibility,
+    ...assessment
+  } = record.assessment;
+  return Object.freeze({ ...record, assessment: Object.freeze(assessment) });
+}
+
 function projectAnalysis(analysis = {}) {
+  const observations = projectAnalysisObservations(
+    analysis.metadata?.structuredObservations ?? analysis.structuredObservations
+  );
   const output = compactObject({
     id: analysis.id,
     createdAt: analysis.createdAt,
@@ -809,23 +828,43 @@ function projectAnalysis(analysis = {}) {
     importedAt: analysis.importedAt,
     evidenceTypes: analysis.evidenceTypes,
     metadata: analysis.metadata?.structuredObservations
-      ? { structuredObservations: analysis.metadata.structuredObservations }
+      ? { structuredObservations: observations }
       : undefined,
-    structuredObservations: analysis.structuredObservations,
+    structuredObservations: analysis.structuredObservations
+      ? observations
+      : undefined,
   });
   return Object.freeze(output);
 }
 
+function projectAnalysisObservations(observations = []) {
+  return observations.map((observation) => compactObject({
+    type: observation?.type,
+    supportsGoal: observation?.supportsGoal,
+    confidence: observation?.confidence,
+    region: observation?.region,
+  }));
+}
+
 function projectBriefing(artifact = {}) {
-  const {
-    briefing,
-    replacedBriefingHistory: _replacedBriefingHistory,
-    replacementHistory: _replacementHistory,
-    priorVersions: _priorVersions,
-    previousEntry: _previousEntry,
-    previousEntries: _previousEntries,
-    ...identity
-  } = artifact;
+  const briefing = artifact.briefing;
+  const identity = compactObject({
+    id: artifact.id,
+    userId: artifact.userId,
+    artifactType: artifact.artifactType,
+    cadence: artifact.cadence,
+    generatedAt: artifact.generatedAt,
+    createdAt: artifact.createdAt,
+    updatedAt: artifact.updatedAt,
+    deliveryDate: artifact.deliveryDate,
+    eventDate: artifact.eventDate,
+    evidenceDate: artifact.evidenceDate,
+    preview: artifact.preview,
+    status: artifact.status,
+    evidenceWindow: artifact.evidenceWindow,
+    lifecycle: artifact.lifecycle,
+    trigger: artifact.trigger,
+  });
   if (!briefing) return Object.freeze(identity);
   const photo = briefing.photoEventNarrative;
   const compactBriefing = compactObject({

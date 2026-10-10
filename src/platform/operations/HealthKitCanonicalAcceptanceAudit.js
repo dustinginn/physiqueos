@@ -30,6 +30,7 @@ export function summarizeHealthKitCanonicalAcceptance({
   const policy = resolveHealthKitCanonicalActivationPolicy(policyRecord);
   const inWindow = (date) => date >= startLocalDate && date <= endLocalDate;
   const windowObservations = observations.filter((record) => DAILY_TYPES[record.observationType] && inWindow(record.occurrenceDate));
+  const allWindowObservations = observations.filter((record) => inWindow(record.occurrenceDate));
   const byState = {};
   for (const record of windowObservations) {
     const key = `${record.observationType}|${record.ingestionPurpose}|${record.reconciliation?.state}|${record.reconciliation?.reason ?? ""}`;
@@ -80,6 +81,11 @@ export function summarizeHealthKitCanonicalAcceptance({
     const payload = record.payload ?? record;
     return inWindow(String(payload.observed_at ?? payload.date ?? "").slice(0, 10));
   });
+  const canonicalEvidenceInWindow = canonicalEvidenceObjects.filter((record) => {
+    const payload = record.payload ?? record;
+    return ["nutrition", "activity_day", "training"].includes(payload.evidence_type) &&
+      inWindow(String(payload.observed_at ?? payload.date ?? "").slice(0, 10));
+  });
   return {
     window: { startLocalDate, endLocalDate },
     policy: {
@@ -93,6 +99,19 @@ export function summarizeHealthKitCanonicalAcceptance({
       invalidReason: policy.invalidReason,
     },
     observationsByState: byState,
+    observationCoverage: summarizeCoverage(allWindowObservations, {
+      type: (record) => record.observationType ?? "unknown",
+      date: (record) => record.occurrenceDate,
+      source: (record) => [
+        record.source?.bundleIdentifier ?? "unknown_bundle",
+        record.source?.sourceName ?? "unknown_source",
+      ].join("|"),
+    }),
+    observationCoverageTotals: summarizeCoverage(allWindowObservations, {
+      type: (record) => record.observationType ?? "unknown",
+      date: (record) => record.occurrenceDate,
+      source: () => "all_sources",
+    }),
     canonicalDays: dayReports,
     duplicateCanonicalDays: [...perDomainDate].filter(([, count]) => count > 1).map(([key]) => key),
     strategic: {
@@ -103,5 +122,45 @@ export function summarizeHealthKitCanonicalAcceptance({
       healthKitDerivedRecordsInStrategicEvidence: healthKitEvidence.length,
       healthKitDerivedRecordsInStrategicEvidenceWithinWindow: healthKitEvidenceInWindow.length,
     },
+    canonicalEvidenceCoverage: summarizeCoverage(canonicalEvidenceInWindow, {
+      type: (record) => (record.payload ?? record).evidence_type ?? "unknown",
+      date: (record) => String((record.payload ?? record).observed_at ?? (record.payload ?? record).date ?? "").slice(0, 10),
+      source: (record) => {
+        const source = (record.payload ?? record).source ?? {};
+        return [source.integration ?? "no_integration", source.application ?? "unknown_application", source.modality ?? "unknown_modality"].join("|");
+      },
+    }),
+    canonicalEvidenceCoverageTotals: summarizeCoverage(canonicalEvidenceInWindow, {
+      type: (record) => (record.payload ?? record).evidence_type ?? "unknown",
+      date: (record) => String((record.payload ?? record).observed_at ?? (record.payload ?? record).date ?? "").slice(0, 10),
+      source: () => "all_sources",
+    }),
   };
+}
+
+function summarizeCoverage(records, { type, date, source }) {
+  const groups = new Map();
+  for (const record of records) {
+    const typeKey = String(type(record));
+    const dateKey = String(date(record));
+    const sourceKey = String(source(record));
+    const key = `${typeKey}\u0000${sourceKey}`;
+    const group = groups.get(key) ?? { type: typeKey, source: sourceKey, records: 0, dates: new Set() };
+    group.records += 1;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) group.dates.add(dateKey);
+    groups.set(key, group);
+  }
+  return [...groups.values()]
+    .map((group) => {
+      const dates = [...group.dates].sort();
+      return {
+        type: group.type,
+        source: group.source,
+        records: group.records,
+        distinctDays: dates.length,
+        firstLocalDate: dates[0] ?? null,
+        lastLocalDate: dates.at(-1) ?? null,
+      };
+    })
+    .sort((left, right) => left.type.localeCompare(right.type) || left.source.localeCompare(right.source));
 }

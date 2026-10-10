@@ -12,6 +12,7 @@ import { createYouProfileService } from "../../domain/services/YouProfileService
 import { resolveMorningWeighInSupport } from "../../domain/services/TrackingSupportService.js";
 import {
   CORE_NAVIGATION_COLLECTIONS,
+  createCompactRuntime,
   createCoreNavigationReadService,
 } from "./CoreNavigationReadService.js";
 import { registerRuntimeTrainingExercises } from "../../domain/models/trainingExerciseIdentity.js";
@@ -21,6 +22,42 @@ const NOW = new Date("2026-08-29T12:00:00-07:00");
 afterEach(() => registerRuntimeTrainingExercises([]));
 
 describe("provider-native core navigation reads", () => {
+  it("omits V3 authoring graphs from Home while retaining canonical and presentation fields", () => {
+    const record = {
+      id: "history-1",
+      assessment: {
+        schemaVersion: "canonical_confidence_assessment_v3",
+        id: "assessment-1",
+        assessmentId: "assessment-1",
+        currentPercentage: 72,
+        narrativePresentationV3: { whyConfidence: "Measured progress." },
+        reproducibility: { engineVersions: { narrative: "v3" } },
+        strategicInterpretation: { large: true },
+        coachingState: { large: true },
+        confidenceProjection: { large: true },
+        narrativePlan: { large: true },
+        evidenceEligibility: { large: true },
+      },
+    };
+
+    const runtime = createCompactRuntime({ goalConfidenceHistory: [record] }, "home");
+
+    expect(runtime.goalConfidenceHistory[0]).toMatchObject({
+      id: "history-1",
+      assessment: {
+        id: "assessment-1",
+        currentPercentage: 72,
+        narrativePresentationV3: { whyConfidence: "Measured progress." },
+        reproducibility: { engineVersions: { narrative: "v3" } },
+      },
+    });
+    expect(runtime.goalConfidenceHistory[0].assessment).not.toHaveProperty("strategicInterpretation");
+    expect(runtime.goalConfidenceHistory[0].assessment).not.toHaveProperty("coachingState");
+    expect(runtime.goalConfidenceHistory[0].assessment).not.toHaveProperty("confidenceProjection");
+    expect(runtime.goalConfidenceHistory[0].assessment).not.toHaveProperty("narrativePlan");
+    expect(runtime.goalConfidenceHistory[0].assessment).not.toHaveProperty("evidenceEligibility");
+  });
+
   it("keeps Home output equivalent to the existing domain composition", async () => {
     const { legacyRepositories, narrow, runtime } = services();
     expect(await narrow.getHome()).toEqual(

@@ -179,6 +179,39 @@ describe("Weight Weekly Averages honor the full selected Goal range", () => {
     expect(sumEntries(report)).toBe(weights.length);
   });
 
+  it("normalizes provider and legacy full-ISO measurements before rolling date arithmetic", () => {
+    const report = createProviderWeightEvidenceReport({
+      weights: [
+        weight("2026-10-07T07:00:00.000Z", 168.4),
+        weight("2026-10-08", 168.1),
+        weight("2026-10-09T14:32:11.123Z", 167.8),
+      ],
+      dateWindow: null,
+      summaryContextId: "all",
+    });
+
+    expect(report.chart.points.map((point) => point.date)).toEqual([
+      "2026-10-07",
+      "2026-10-08",
+      "2026-10-09",
+    ]);
+    expect(report.history.map((point) => point.date)).toEqual([
+      "2026-10-09",
+      "2026-10-08",
+      "2026-10-07",
+    ]);
+    expect(report.rollingAverages.threeDay).toEqual({
+      requestedDays: 3,
+      observationCount: 3,
+      startDate: "2026-10-07",
+      endDate: "2026-10-09",
+      value: 168.1,
+      unit: "lb",
+    });
+    expect(report.extrema.highest.date).toBe("2026-10-07");
+    expect(report.extrema.lowest.date).toBe("2026-10-09");
+  });
+
   it("keeps a week with a single observation and compares it to the preceding existing bucket", () => {
     const report = createProviderWeightEvidenceReport({
       weights: [
