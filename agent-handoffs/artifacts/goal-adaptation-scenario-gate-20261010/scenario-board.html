@@ -1,0 +1,1320 @@
+<title>Goal Adaptation Scenario Gate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
+<style>
+/* Layout: gate summary, filterable decision matrix, then one expandable drilldown per scenario. */
+:root { --bg:#E8ECE5; --surface:#FBFAF4; --soft:#EEF2ED; --fg:#102431; --fg2:#526970; --muted:#5D7279; --accent:#087E78; --wash:rgba(8,126,120,.09); --warn:#925500; --warnWash:rgba(201,130,32,.12); --bad:#B83D4B; --good:#16875F; --line:rgba(25,56,66,.17);
+  --display:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif; --body:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#061019; --surface:#0F1C2A; --soft:#132334; --fg:#F3F8FA; --fg2:#C3D2D9; --muted:#92A5AF; --accent:#3BD2CA; --wash:rgba(59,210,202,.1); --warn:#EFB84F; --warnWash:rgba(244,188,72,.12); --bad:#FF697A; --good:#55E39A; --line:rgba(157,179,189,.2); color-scheme:dark } }
+:root[data-theme="dark"] { --bg:#061019; --surface:#0F1C2A; --soft:#132334; --fg:#F3F8FA; --fg2:#C3D2D9; --muted:#92A5AF; --accent:#3BD2CA; --wash:rgba(59,210,202,.1); --warn:#EFB84F; --warnWash:rgba(244,188,72,.12); --bad:#FF697A; --good:#55E39A; --line:rgba(157,179,189,.2); color-scheme:dark }
+* { box-sizing:border-box } body { background:var(--bg); color:var(--fg); font-family:var(--body); -webkit-font-smoothing:antialiased }
+.wrap { max-width:1640px; margin:0 auto; padding-inline:clamp(16px,2.6vw,44px); padding-block:30px 72px }
+.kick { color:var(--accent); font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase }
+h1 { font-family:var(--display); font-size:clamp(28px,3.4vw,46px); letter-spacing:-.03em; margin:8px 0 10px; line-height:1.05 }
+h2 { font-family:var(--display); font-size:24px; letter-spacing:-.02em; margin:34px 0 12px }
+.lead { color:var(--fg2); font-size:16px; line-height:1.55; max-width:96ch; margin:0 }
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin:20px 0 4px }
+.stat { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px 16px } .stat b { font-family:var(--display); font-size:28px; display:block } .stat span { color:var(--muted); font-size:13px }
+.filters { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 10px; position:sticky; top:env(safe-area-inset-top,0px); background:var(--bg); padding-block:10px; z-index:5; border-bottom:1px solid var(--line) }
+.filters button { font:600 13px var(--body); border:1px solid var(--line); background:var(--surface); color:var(--fg2); border-radius:999px; padding:7px 13px; cursor:pointer }
+.filters button[aria-pressed="true"] { background:var(--wash); color:var(--accent); border-color:var(--accent) }
+.tablewrap { overflow-x:auto; border:1px solid var(--line); border-radius:16px; background:var(--surface) }
+table.matrix { width:100%; border-collapse:collapse; font-size:14px; min-width:1100px }
+.matrix th, .matrix td { text-align:left; vertical-align:top; padding:10px 12px; border-top:1px solid var(--line) } .matrix th { border-top:0; color:var(--muted); font-size:11px; letter-spacing:.1em; text-transform:uppercase }
+.matrix .title { max-width:420px; font-weight:600 } .sub { color:var(--muted); font-size:12.5px; font-weight:400; margin-top:3px }
+a.id, .id { font-family:var(--display); font-weight:800; color:var(--accent); text-decoration:none }
+.pill { display:inline-block; border-radius:999px; padding:3px 10px; font-size:12px; font-weight:700; border:1px solid var(--line); white-space:nowrap; color:var(--fg2) }
+.pill.pass { color:var(--good); border-color:currentColor } .pill.fail { color:var(--bad); border-color:currentColor } .pill.go { color:var(--warn); border-color:currentColor; background:var(--warnWash) } .pill.hold { color:var(--fg2) }
+.rung { font-weight:700 } .rung.go { color:var(--warn) } .rung.hold { color:var(--fg2) }
+details.card { background:var(--surface); border:1px solid var(--line); border-radius:18px; margin:12px 0; padding:0 18px; scroll-margin-top:72px }
+details.card summary { cursor:pointer; display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:14px 0; list-style:none } details.card summary::-webkit-details-marker { display:none }
+details.card summary .ct { flex:1; min-width:240px; font-weight:700 } details[open] summary { border-bottom:1px solid var(--line) }
+.situation { color:var(--fg2); line-height:1.5; margin:14px 0 }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); gap:16px }
+.grid section { background:var(--soft); border-radius:14px; padding:12px 14px; min-width:0 } h4 { margin:0 0 8px; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted) }
+.grid ul { margin:0; padding-left:18px; line-height:1.55; font-size:14px } .grid li { overflow-wrap:anywhere }
+table.ba, table.checks { width:100%; border-collapse:collapse; font-size:13.5px } .ba td, .ba th, .checks td, .checks th { border-top:1px solid var(--line); padding:6px 8px 6px 0; text-align:left; vertical-align:top } .ba th, .checks th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; border-top:0 }
+table.checks { margin:14px 0 16px } .checks td { overflow-wrap:anywhere }
+.copy { border-radius:12px; padding:10px 12px; margin:0 0 8px; font-size:14px; line-height:1.5 } .copy .tag { display:block; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px }
+.copy.real { background:var(--wash) } .copy.real .tag { color:var(--accent) } .copy.ill { border:1.5px dashed var(--warn) } .copy.ill .tag { color:var(--warn) }
+.notes { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr)); gap:16px } .notes div { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px 18px; font-size:14.5px; line-height:1.55 } .notes ul { margin:6px 0 0; padding-left:18px }
+[hidden] { display:none !important }
+</style>
+<div class="wrap">
+  <div class="kick">PhysiqueOS · Goal Intelligence · Phase 0/A scenario acceptance gate · dormant, not deployed</div>
+  <h1>Goal Adaptation Scenario Gate</h1>
+  <p class="lead">Every row below is produced by the <b>actual Phase A engine</b> (<code>goal_adaptation_shadow_v1 (Phase A, dormant)</code>) under <code>goal_adaptation_policy_v1</code> (draft thresholds, Founder review required). Founder rows reuse sanitized production assessments; all other rows are synthetic and labelled. Coaching text marked "Engine output" is generated by the engine; text marked "Illustrative" is accepted V2 design copy and is not produced by any engine yet.</p>
+  <div class="stats">
+    <div class="stat"><b>26/26</b><span>scenarios pass expected-vs-actual</span></div>
+    <div class="stat"><b>12</b><span>would open a proposal for user approval</span></div>
+    <div class="stat"><b>14</b><span>correctly no adaptation (coaching, watch, link-only, suppressed or nothing)</span></div>
+    <div class="stat"><b>0</b><span>automatic goal or phase changes (never allowed)</span></div>
+  </div>
+  <div class="filters" role="group" aria-label="Filter scenarios">
+    <button type="button" data-f="all" aria-pressed="true">All</button>
+    <button type="button" data-f="cat:mass_building" aria-pressed="false">Mass building</button><button type="button" data-f="cat:leaning" aria-pressed="false">Leaning</button><button type="button" data-f="cat:strength" aria-pressed="false">Strength</button><button type="button" data-f="cat:maintenance" aria-pressed="false">Maintenance</button>
+    <button type="button" data-f="outcome:proposal" aria-pressed="false">Proposal</button>
+    <button type="button" data-f="outcome:none" aria-pressed="false">No adaptation</button>
+  </div>
+  <div class="tablewrap"><table class="matrix">
+    <tr><th>ID</th><th>Scenario</th><th>Type</th><th>Evidence</th><th>Eligibility</th><th>Engine rung</th><th>Outcome</th><th>Result</th></tr>
+    
+  <tr data-cat="mass_building" data-outcome="proposal">
+    <td><a href="#s-F1" class="id">F1</a></td>
+    <td class="title">Founder, Oct 9 DEXA: about 71% of +10 lb, 22 days left, body fat above 8–9%<div class="sub">Founder (production, sanitized) · 2026-10-09 · dexa event briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung go">resolve constraint conflict</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-F2" class="id">F2</a></td>
+    <td class="title">Founder, Oct 7 Midweek: frozen 49-day runway corrected to 24 days<div class="sub">Founder (production, sanitized) · 2026-10-07 · midweek briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">pace unverified</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-F3" class="id">F3</a></td>
+    <td class="title">Founder, Oct 4 Weekly: pace not verified for 22 days<div class="sub">Founder (production, sanitized) · 2026-10-04 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">pace unverified</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-F4" class="id">F4</a></td>
+    <td class="title">Founder, Sep 20 Weekly: on track, nothing to change<div class="sub">Founder (production, sanitized) · 2026-09-20 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence insufficient data</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">none</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-M1" class="id">M1</a></td>
+    <td class="title">Healthy mass build on track with a recent scan<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">none</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-M2" class="id">M2</a></td>
+    <td class="title">First reading below the preferred range while building<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">below range watch</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="proposal">
+    <td><a href="#s-M3" class="id">M3</a></td>
+    <td class="title">Body fat below range for three weekly evaluations<div class="sub">Synthetic · 2026-03-22 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung go">below range review</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-M4" class="id">M4</a></td>
+    <td class="title">No DEXA ever, but weight, training and nutrition are well logged<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">none</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="proposal">
+    <td><a href="#s-M5" class="id">M5</a></td>
+    <td class="title">No DEXA, weight gain stalled for four weeks despite on-plan eating<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung go">strategy review</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="leaning" data-outcome="none">
+    <td><a href="#s-L1" class="id">L1</a></td>
+    <td class="title">Leaning plateau over 10 days (likely water or scale noise)<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Leaning</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">none</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="leaning" data-outcome="proposal">
+    <td><a href="#s-L2" class="id">L2</a></td>
+    <td class="title">Leaning plateau that has persisted for four weeks<div class="sub">Synthetic · 2026-03-31 · weekly briefing</div></td>
+    <td>Leaning</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung go">review timeline</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="leaning" data-outcome="proposal">
+    <td><a href="#s-L3" class="id">L3</a></td>
+    <td class="title">Overly aggressive cut: lean mass dropping in week 2<div class="sub">Synthetic · 2026-03-08 · dexa event briefing</div></td>
+    <td>Leaning</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible safety exception</td>
+    <td><span class="rung go">guardrail review</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="strength" data-outcome="proposal">
+    <td><a href="#s-S1" class="id">S1</a></td>
+    <td class="title">Strength plateau across five weeks of comparable sessions<div class="sub">Synthetic · 2026-03-08 · monthly briefing</div></td>
+    <td>Strength</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence not applicable</div></td>
+    <td>eligible</td>
+    <td><span class="rung go">strategy review</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="strength" data-outcome="none">
+    <td><a href="#s-S2" class="id">S2</a></td>
+    <td class="title">Strength progressing on comparable sessions<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Strength</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence not applicable</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">none</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="maintenance" data-outcome="proposal">
+    <td><a href="#s-MT1" class="id">MT1</a></td>
+    <td class="title">Maintenance drift: weight 2.5 lb above the 170–174 lb range<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Maintenance</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung go">guardrail review</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="maintenance" data-outcome="none">
+    <td><a href="#s-MT2" class="id">MT2</a></td>
+    <td class="title">Maintenance holding inside the range<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Maintenance</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">none</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-C1" class="id">C1</a></td>
+    <td class="title">New phase, day 12: still in calibration<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence adequate</div></td>
+    <td>calibrating</td>
+    <td><span class="rung hold">calibrating</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-E1" class="id">E1</a></td>
+    <td class="title">Insufficient evidence: few weigh-ins, and HealthKit nutrition sparse<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>insufficient<div class="sub">no scan · estimated · adherence insufficient data</div></td>
+    <td>insufficient evidence</td>
+    <td><span class="rung hold">evidence coaching</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-A1" class="id">A1</a></td>
+    <td class="title">Poor plan adherence with full data coverage, but on track and in range<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence consistent nonadherence</div></td>
+    <td>adherence coaching</td>
+    <td><span class="rung hold">adherence coaching</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="proposal">
+    <td><a href="#s-A2" class="id">A2</a></td>
+    <td class="title">Consistent overeating is pushing body fat above range<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence consistent nonadherence</div></td>
+    <td>eligible sustainability review</td>
+    <td><span class="rung go">sustainability review</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="proposal">
+    <td><a href="#s-G1" class="id">G1</a></td>
+    <td class="title">Conflicting choice: keep building with the firm 8–9% ceiling and keep Oct 31<div class="sub">Founder (production, sanitized) · 2026-10-09 · dexa event briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung go">resolve constraint conflict</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="leaning" data-outcome="proposal">
+    <td><a href="#s-T1" class="id">T1</a></td>
+    <td class="title">Time-limited leaning phase ends before the outcome<div class="sub">Synthetic · 2026-03-08 · weekly briefing</div></td>
+    <td>Leaning</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung go">phase time limit review</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="proposal">
+    <td><a href="#s-GA1" class="id">GA1</a></td>
+    <td class="title">Goal achieved<div class="sub">Synthetic · 2026-05-20 · dexa event briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">no scan · estimated · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung go">goal achieved</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-D1" class="id">D1</a></td>
+    <td class="title">User kept the plan; next Weekly has no material new evidence<div class="sub">Founder (production, sanitized) · 2026-10-11 · weekly briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">resolve constraint conflict</span></td>
+    <td><span class="pill hold">No adaptation</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="proposal">
+    <td><a href="#s-D2" class="id">D2</a></td>
+    <td class="title">User kept the plan; a new scan shows body fat breached<div class="sub">Synthetic · 2026-11-06 · dexa event briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible safety exception</td>
+    <td><span class="rung go">resolve constraint conflict</span></td>
+    <td><span class="pill go">Proposal</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  <tr data-cat="mass_building" data-outcome="none">
+    <td><a href="#s-P1" class="id">P1</a></td>
+    <td class="title">Photo Event without proven photo reliability<div class="sub">Founder (production, sanitized) · 2026-10-09 · photo event briefing</div></td>
+    <td>Mass building</td>
+    <td>sufficient<div class="sub">scan precision · adherence adequate</div></td>
+    <td>eligible</td>
+    <td><span class="rung hold">resolve constraint conflict</span></td>
+    <td><span class="pill">Link only</span></td>
+    <td><span class="pill pass">PASS</span></td>
+  </tr>
+  </table></div>
+  <h2>Scenario drilldowns</h2>
+  
+  <details class="card" id="s-F1" data-cat="mass_building" data-outcome="proposal">
+    <summary><span class="id">F1</span><span class="ct">Founder, Oct 9 DEXA: about 71% of +10 lb, 22 days left, body fat above 8–9%</span><span class="pill pass">PASS</span><span class="rung go">resolve constraint conflict</span></summary>
+    <p class="situation">Lean Mass Build phase day 55. The Oct 9 scan shows 7.1 of 10 lb gained, body fat above the chosen range (pressured), Goal Confidence 70% (from 80). Intake on HealthKit was within ±10% of 2,500 kcal on most days.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 55 (started 2026-08-15)</li>
+        <li>body_weight: 6.3/wk (needs 4) · manual</li><li>training_performance: 2.5/wk (needs 2) · manual</li><li>nutrition_intake: 6.5/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 3 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 22</li><li>Measured pace 0.0337/day vs needed 0.1318/day</li><li>Measured-basis ratio 0.26 → at risk</li><li>Projected-at-pace ratio 0.26 → at risk (finish ≈ 2027-01-04)</li>
+        <li>Guardrail: above by 0.5 · pressured · unsafe side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>resolve constraint conflict</b> · trigger originate optional · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>continue with guardrail monitoring<div class="sub">stored production V3 assessment</div></td><td>resolve constraint conflict</td></tr>
+        <tr><td>Schedule</td><td>at risk · 22 days</td><td>at risk · 22 days</td></tr>
+        <tr><td>Guardrail</td><td>pressured (symmetric)</td><td>pressured · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>Review your goal options. Body fat is above your 8–9% range, and at your recent pace 10 lb would take until about early January, after your Oct 31 date.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;resolve_constraint_conflict&quot;</td><td>&quot;resolve_constraint_conflict&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr><tr><td>scheduleState</td><td>&quot;at_risk&quot;</td><td>&quot;at_risk&quot;</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-F2" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">F2</span><span class="ct">Founder, Oct 7 Midweek: frozen 49-day runway corrected to 24 days</span><span class="pill pass">PASS</span><span class="rung hold">pace unverified</span></summary>
+    <p class="situation">The stored V3 outlook still said 49 days left (frozen at the Sep 12 scan). Body fat in range. Midweek may never originate a recommendation.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 53 (started 2026-08-15)</li>
+        <li>body_weight: 6.3/wk (needs 4) · manual</li><li>training_performance: 2.5/wk (needs 2) · manual</li><li>nutrition_intake: 6.5/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 2 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 24 (stored V3: 49)</li><li>Measured pace 0.1077/day vs needed 0.1552/day</li><li>Measured-basis ratio 0.69 → at risk</li><li>Projected-at-pace ratio 1.42 → ahead with reserve (finish ≈ 2026-10-17)</li>
+        <li>Guardrail: within by 0 · clear · none side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>pace unverified</b> · trigger link only · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>continue current strategy<div class="sub">stored production V3 assessment</div></td><td>pace unverified</td></tr>
+        <tr><td>Schedule</td><td>ahead with reserve · 49 days</td><td>ahead with reserve · 24 days</td></tr>
+        <tr><td>Guardrail</td><td>clear (symmetric)</td><td>clear · none side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;pace_unverified&quot;</td><td>&quot;pace_unverified&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>scheduleState</td><td>&quot;ahead_with_reserve&quot;</td><td>&quot;ahead_with_reserve&quot;</td><td>✓</td></tr><tr><td>measuredBasisState</td><td>&quot;at_risk&quot;</td><td>&quot;at_risk&quot;</td><td>✓</td></tr><tr><td>timeRemainingDays</td><td>24</td><td>24</td><td>✓</td></tr><tr><td>coachingCount</td><td>0</td><td>0</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-F3" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">F3</span><span class="ct">Founder, Oct 4 Weekly: pace not verified for 22 days</span><span class="pill pass">PASS</span><span class="rung hold">pace unverified</span></summary>
+    <p class="situation">No new outcome since Sep 12. At the last measured pace the goal would finish Oct 18, but that pace has not been re-measured.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 50 (started 2026-08-15)</li>
+        <li>body_weight: 6.3/wk (needs 4) · manual</li><li>training_performance: 2.5/wk (needs 2) · manual</li><li>nutrition_intake: 6.5/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 2 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 27 (stored V3: 49)</li><li>Measured pace 0.1065/day vs needed 0.1403/day</li><li>Measured-basis ratio 0.76 → at risk</li><li>Projected-at-pace ratio 1.38 → ahead with reserve (finish ≈ 2026-10-18)</li>
+        <li>Guardrail: within by 0 · clear · none side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>pace unverified</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>continue current strategy<div class="sub">stored production V3 assessment</div></td><td>pace unverified</td></tr>
+        <tr><td>Schedule</td><td>ahead with reserve · 49 days</td><td>ahead with reserve · 27 days</td></tr>
+        <tr><td>Guardrail</td><td>clear (symmetric)</td><td>clear · none side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="copy real"><span class="tag">Engine output · coachTake.intoNextWeek</span>27 days remain to your goal date. Keep your weigh-ins and training logs consistent so your pace can be checked.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;pace_unverified&quot;</td><td>&quot;pace_unverified&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>timeRemainingDays</td><td>27</td><td>27</td><td>✓</td></tr><tr><td>coachingCount</td><td>1</td><td>1</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-F4" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">F4</span><span class="ct">Founder, Sep 20 Weekly: on track, nothing to change</span><span class="pill pass">PASS</span><span class="rung hold">none</span></summary>
+    <p class="situation">Eight days after a strong Sep 12 scan. Body fat in range, pace ahead of the deadline.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 36 (started 2026-08-15)</li>
+        <li>body_weight: 6.8/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>daily_evidence: 7/wk (needs 5) · manual</li>
+        <li>Body-composition scans: 2 (adds precision)</li>
+        <li>Plan adherence: insufficient data</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 41 (stored V3: 49)</li><li>Measured pace 0.101/day vs needed 0.0993/day</li><li>Measured-basis ratio 1.02 → ahead with reserve</li><li>Projected-at-pace ratio 1.22 → ahead with reserve (finish ≈ 2026-10-23)</li>
+        <li>Guardrail: within by 0 · clear · none side</li>
+        <li>Eligibility: <b>eligible</b> (adherence not assessable missing data is not nonadherence)</li>
+        <li>Decision: <b>none</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>continue current strategy<div class="sub">stored production V3 assessment</div></td><td>none</td></tr>
+        <tr><td>Schedule</td><td>ahead with reserve · 49 days</td><td>ahead with reserve · 41 days</td></tr>
+        <tr><td>Guardrail</td><td>clear (symmetric)</td><td>clear · none side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;none&quot;</td><td>&quot;none&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>scheduleState</td><td>&quot;ahead_with_reserve&quot;</td><td>&quot;ahead_with_reserve&quot;</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-M1" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">M1</span><span class="ct">Healthy mass build on track with a recent scan</span><span class="pill pass">PASS</span><span class="rung hold">none</span></summary>
+    <p class="situation">Week 9 of a lean-mass phase, body fat 12.4% inside 11–14%, measured pace 30% ahead of what the deadline needs.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 2 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 84 (stored V3: 87)</li><li>Measured pace 0.052/day vs needed 0.0476/day</li><li>Measured-basis ratio 1.09 → ahead with reserve</li><li>Projected-at-pace ratio 1.13 → ahead with reserve (finish ≈ 2026-05-21)</li>
+        <li>Guardrail: within by 0 · clear · none side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>none</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>none</td></tr>
+        <tr><td>Schedule</td><td>ahead with reserve · 87 days</td><td>ahead with reserve · 84 days</td></tr>
+        <tr><td>Guardrail</td><td>clear (symmetric)</td><td>clear · none side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;none&quot;</td><td>&quot;none&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-M2" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">M2</span><span class="ct">First reading below the preferred range while building</span><span class="pill pass">PASS</span><span class="rung hold">below range watch</span></summary>
+    <p class="situation">Body fat 10.7% against a preferred 11–14% during a build. First time below range.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 1 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        <li>Prior guardrail positions: within, within</li>
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 84</li><li>Measured pace 0.05/day vs needed 0.0476/day</li><li>Measured-basis ratio 1.05 → ahead with reserve</li><li>Projected-at-pace ratio 1.09 → ahead with reserve (finish ≈ 2026-05-24)</li>
+        <li>Guardrail: below by 0.3 · watch · coaching side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>below range watch</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>below range watch</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>ahead with reserve · 84 days</td></tr>
+        <tr><td>Guardrail</td><td>watch (symmetric)</td><td>watch · coaching side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="copy real"><span class="tag">Engine output · coachTake.intoNextWeek</span>Body fat is a little below your preferred range. That isn't a problem on its own; keep fueling your training and we'll watch the trend.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;below_range_watch&quot;</td><td>&quot;below_range_watch&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>coachingCount</td><td>1</td><td>1</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-M3" data-cat="mass_building" data-outcome="proposal">
+    <summary><span class="id">M3</span><span class="ct">Body fat below range for three weekly evaluations</span><span class="pill pass">PASS</span><span class="rung go">below range review</span></summary>
+    <p class="situation">Same build, but body fat has stayed below 11% for three consecutive Weekly evaluations.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 77 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 1 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        <li>Prior guardrail positions: below, below</li>
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 70</li><li>Measured pace 0.05/day vs needed 0.0514/day</li><li>Measured-basis ratio 0.97 → at risk</li><li>Projected-at-pace ratio 1.01 → ahead with reserve (finish ≈ 2026-05-30)</li>
+        <li>Guardrail: below by 0.6 · watch · coaching side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>below range review</b> · trigger originate · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>below range review</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>ahead with reserve · 70 days</td></tr>
+        <tr><td>Guardrail</td><td>watch (symmetric)</td><td>watch · coaching side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>Body fat has stayed below your preferred range for three weeks. Review your options: eat a little more, or adjust the range.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;below_range_review&quot;</td><td>&quot;below_range_review&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-M4" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">M4</span><span class="ct">No DEXA ever, but weight, training and nutrition are well logged</span><span class="pill pass">PASS</span><span class="rung hold">none</span></summary>
+    <p class="situation">A user without body-composition scans. Weight 6 days/week, training 3 days/week, nutrition from HealthKit 6 days/week. Gain is on plan.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: adequate</li>
+        <li>Outcome trend: progressing for null days</li>
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: trajectory unavailable</li>
+        <li>Guardrail: not assessed</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>none</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>none</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable</td></tr>
+        <tr><td>Guardrail</td><td>— (symmetric)</td><td>—</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;none&quot;</td><td>&quot;none&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>coverage</td><td>&quot;sufficient&quot;</td><td>&quot;sufficient&quot;</td><td>✓</td></tr><tr><td>precision</td><td>&quot;estimated_without_body_composition_scan&quot;</td><td>&quot;estimated_without_body_composition_scan&quot;</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-M5" data-cat="mass_building" data-outcome="proposal">
+    <summary><span class="id">M5</span><span class="ct">No DEXA, weight gain stalled for four weeks despite on-plan eating</span><span class="pill pass">PASS</span><span class="rung go">strategy review</span></summary>
+    <p class="situation">Weight trend flat for 28 days with intake on target and training logged. No scan available.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: adequate</li>
+        <li>Outcome trend: stalled for 28 days</li>
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: trajectory unavailable</li>
+        <li>Guardrail: not assessed</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>strategy review</b> · trigger originate · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>strategy review</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable</td></tr>
+        <tr><td>Guardrail</td><td>— (symmetric)</td><td>—</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>Your weight hasn't moved in four weeks even though you've hit your targets. Review your plan: a small calorie increase is the usual next step.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;strategy_review&quot;</td><td>&quot;strategy_review&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr><tr><td>precision</td><td>&quot;estimated_without_body_composition_scan&quot;</td><td>&quot;estimated_without_body_composition_scan&quot;</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-L1" data-cat="leaning" data-outcome="none">
+    <summary><span class="id">L1</span><span class="ct">Leaning plateau over 10 days (likely water or scale noise)</span><span class="pill pass">PASS</span><span class="rung hold">none</span></summary>
+    <p class="situation">Weight flat for 10 days during a cut. The measured span is too short to call a stall.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: fat loss · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: pace not established measurement span too short</li>
+        <li>Guardrail: not assessed</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>none</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>none</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable · 53 days</td></tr>
+        <tr><td>Guardrail</td><td>— (symmetric)</td><td>—</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;none&quot;</td><td>&quot;none&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>scheduleState</td><td>&quot;not_measurable&quot;</td><td>&quot;not_measurable&quot;</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-L2" data-cat="leaning" data-outcome="proposal">
+    <summary><span class="id">L2</span><span class="ct">Leaning plateau that has persisted for four weeks</span><span class="pill pass">PASS</span><span class="rung go">review timeline</span></summary>
+    <p class="situation">Weight essentially flat for 28 days with good adherence; 4 lb remain and 30 days are left.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: fat loss · phase day 86 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 30</li><li>Measured pace 0.01/day vs needed 0.1333/day</li><li>Measured-basis ratio 0.07 → at risk</li><li>Projected-at-pace ratio 0.08 → at risk (finish ≈ 2027-05-04)</li>
+        <li>Guardrail: not assessed</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>review timeline</b> · trigger originate · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>review timeline</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>at risk · 30 days</td></tr>
+        <tr><td>Guardrail</td><td>— (symmetric)</td><td>—</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>Progress has stalled for four weeks and Apr 30 looks unlikely. Review your options.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;review_timeline&quot;</td><td>&quot;review_timeline&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr><tr><td>scheduleState</td><td>&quot;at_risk&quot;</td><td>&quot;at_risk&quot;</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-L3" data-cat="leaning" data-outcome="proposal">
+    <summary><span class="id">L3</span><span class="ct">Overly aggressive cut: lean mass dropping in week 2</span><span class="pill pass">PASS</span><span class="rung go">guardrail review</span></summary>
+    <p class="situation">Two weeks into a cut, a scan shows lean mass 1.6 lb below the floor the user set. Normally still calibrating, but this is a safety exception.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: fat loss · phase day 14 (started 2026-02-22)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 2 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 53</li><li>Measured pace 0.2/day vs needed 0.1132/day</li><li>Measured-basis ratio 1.77 → ahead with reserve</li><li>Projected-at-pace ratio 1.8 → ahead with reserve (finish ≈ 2026-04-06)</li>
+        <li>Guardrail: below by 1.6 · breached · unsafe side</li>
+        <li>Eligibility: <b>eligible safety exception</b></li>
+        <li>Decision: <b>guardrail review</b> · trigger originate optional · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>guardrail review</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>ahead with reserve · 53 days</td></tr>
+        <tr><td>Guardrail</td><td>breached (symmetric)</td><td>breached · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>You're losing lean mass faster than you planned. Review your options: slowing the cut usually protects it.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible_safety_exception&quot;</td><td>&quot;eligible_safety_exception&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;guardrail_review&quot;</td><td>&quot;guardrail_review&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-S1" data-cat="strength" data-outcome="proposal">
+    <summary><span class="id">S1</span><span class="ct">Strength plateau across five weeks of comparable sessions</span><span class="pill pass">PASS</span><span class="rung go">strategy review</span></summary>
+    <p class="situation">Top sets on comparable lifts unchanged for 35 days; training logged 3 days/week. No deadline.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: strength · phase day 63 (started 2026-01-04)</li>
+        <li>training_performance: 3/wk (needs 2) · manual</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: not applicable</li>
+        <li>Outcome trend: stalled for 35 days</li>
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: trajectory unavailable</li>
+        <li>Guardrail: not assessed</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>strategy review</b> · trigger originate · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>strategy review</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable</td></tr>
+        <tr><td>Guardrail</td><td>— (symmetric)</td><td>—</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>Your main lifts haven't moved in five weeks. Review your program: a short deload or a change of rep ranges usually restarts progress.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;strategy_review&quot;</td><td>&quot;strategy_review&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-S2" data-cat="strength" data-outcome="none">
+    <summary><span class="id">S2</span><span class="ct">Strength progressing on comparable sessions</span><span class="pill pass">PASS</span><span class="rung hold">none</span></summary>
+    <p class="situation">Comparable top sets up in each of the last four weeks.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: strength · phase day 63 (started 2026-01-04)</li>
+        <li>training_performance: 3/wk (needs 2) · manual</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: not applicable</li>
+        <li>Outcome trend: progressing for 28 days</li>
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: trajectory unavailable</li>
+        <li>Guardrail: not assessed</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>none</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>none</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable</td></tr>
+        <tr><td>Guardrail</td><td>— (symmetric)</td><td>—</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;none&quot;</td><td>&quot;none&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-MT1" data-cat="maintenance" data-outcome="proposal">
+    <summary><span class="id">MT1</span><span class="ct">Maintenance drift: weight 2.5 lb above the 170–174 lb range</span><span class="pill pass">PASS</span><span class="rung go">guardrail review</span></summary>
+    <p class="situation">Maintenance phase, morning-weight trend has drifted above the agreed range.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: maintenance · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 3) · manual</li><li>nutrition_intake: 6/wk (needs 4) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: trajectory unavailable</li>
+        <li>Guardrail: above by 2.5 · pressured · unsafe side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>guardrail review</b> · trigger originate · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>guardrail review</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable</td></tr>
+        <tr><td>Guardrail</td><td>pressured (symmetric)</td><td>pressured · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>Your weight has drifted above your maintenance range. Review your options: tighten intake for a couple of weeks, or widen the range.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;guardrail_review&quot;</td><td>&quot;guardrail_review&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-MT2" data-cat="maintenance" data-outcome="none">
+    <summary><span class="id">MT2</span><span class="ct">Maintenance holding inside the range</span><span class="pill pass">PASS</span><span class="rung hold">none</span></summary>
+    <p class="situation">Weight trend 172 lb inside 170–174 lb, logging consistent.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: maintenance · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 3) · manual</li><li>nutrition_intake: 6/wk (needs 4) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: trajectory unavailable</li>
+        <li>Guardrail: within by 0 · clear · none side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>none</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>none</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable</td></tr>
+        <tr><td>Guardrail</td><td>clear (symmetric)</td><td>clear · none side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible&quot;</td><td>&quot;eligible&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;none&quot;</td><td>&quot;none&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-C1" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">C1</span><span class="ct">New phase, day 12: still in calibration</span><span class="pill pass">PASS</span><span class="rung hold">calibrating</span></summary>
+    <p class="situation">A new build phase started 12 days ago. Body fat slightly above range (watch), pace not established.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 11 (started 2026-02-25)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: trajectory unavailable</li>
+        <li>Guardrail: above by 0.3 · watch · unsafe side</li>
+        <li>Eligibility: <b>calibrating</b> (initial calibration checkpoint not reached)</li>
+        <li>Decision: <b>calibrating</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>calibrating</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable</td></tr>
+        <tr><td>Guardrail</td><td>watch (symmetric)</td><td>watch · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;calibrating&quot;</td><td>&quot;calibrating&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;calibrating&quot;</td><td>&quot;calibrating&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-E1" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">E1</span><span class="ct">Insufficient evidence: few weigh-ins, and HealthKit nutrition sparse</span><span class="pill pass">PASS</span><span class="rung hold">evidence coaching</span></summary>
+    <p class="situation">Weight logged about 2 days/week (manual). HealthKit nutrition synced only about 2 days/week. Training logged.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 1.8/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake|daily_evidence: 1.8/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: insufficient data</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: trajectory unavailable</li>
+        <li>Guardrail: above by 0.9 · watch · unsafe side</li>
+        <li>Eligibility: <b>insufficient evidence</b> (evidence coverage insufficient)</li>
+        <li>Decision: <b>evidence coaching</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>evidence coaching</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable</td></tr>
+        <tr><td>Guardrail</td><td>watch (symmetric)</td><td>watch · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="copy real"><span class="tag">Engine output · coachTake.intoNextWeek</span>Log your morning weight on at least 4 days this week, before food or fluids.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;insufficient_evidence&quot;</td><td>&quot;insufficient_evidence&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;evidence_coaching&quot;</td><td>&quot;evidence_coaching&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>coachingDomains</td><td>[&quot;body_weight&quot;]</td><td>[&quot;body_weight&quot;]</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-A1" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">A1</span><span class="ct">Poor plan adherence with full data coverage, but on track and in range</span><span class="pill pass">PASS</span><span class="rung hold">adherence coaching</span></summary>
+    <p class="situation">Every day is logged; intake runs well above target on most days, yet body fat is in range and pace is fine.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: consistent nonadherence</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 84</li><li>Measured pace 0.06/day vs needed 0.0476/day</li><li>Measured-basis ratio 1.26 → ahead with reserve</li><li>Projected-at-pace ratio 1.3 → ahead with reserve (finish ≈ 2026-05-11)</li>
+        <li>Guardrail: within by 0 · clear · none side</li>
+        <li>Eligibility: <b>adherence coaching</b> (coach adherence before adapting the goal)</li>
+        <li>Decision: <b>adherence coaching</b> · trigger originate · no proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>adherence coaching</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>ahead with reserve · 84 days</td></tr>
+        <tr><td>Guardrail</td><td>clear (symmetric)</td><td>clear · none side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="copy real"><span class="tag">Engine output · coachTake.intoNextWeek</span>Most logged days ran above your calorie target. Aim to land within your target range on most days this week.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;adherence_coaching&quot;</td><td>&quot;adherence_coaching&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;adherence_coaching&quot;</td><td>&quot;adherence_coaching&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>coachingCount</td><td>1</td><td>1</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-A2" data-cat="mass_building" data-outcome="proposal">
+    <summary><span class="id">A2</span><span class="ct">Consistent overeating is pushing body fat above range</span><span class="pill pass">PASS</span><span class="rung go">sustainability review</span></summary>
+    <p class="situation">Intake above target on most days for two weeks and body fat pressured above 14%. The strategy itself may be unsustainable.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 63 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: consistent nonadherence</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 84</li><li>Measured pace 0.06/day vs needed 0.0476/day</li><li>Measured-basis ratio 1.26 → ahead with reserve</li><li>Projected-at-pace ratio 1.3 → ahead with reserve (finish ≈ 2026-05-11)</li>
+        <li>Guardrail: above by 1.8 · pressured · unsafe side</li>
+        <li>Eligibility: <b>eligible sustainability review</b> (consistent nonadherence with unsafe guardrail pressure)</li>
+        <li>Decision: <b>sustainability review</b> · trigger originate · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>sustainability review</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>ahead with reserve · 84 days</td></tr>
+        <tr><td>Guardrail</td><td>pressured (symmetric)</td><td>pressured · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>Eating above your target is pushing body fat up. Review your plan so it's one you can keep.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>eligibility</td><td>&quot;eligible_sustainability_review&quot;</td><td>&quot;eligible_sustainability_review&quot;</td><td>✓</td></tr><tr><td>rung</td><td>&quot;sustainability_review&quot;</td><td>&quot;sustainability_review&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-G1" data-cat="mass_building" data-outcome="proposal">
+    <summary><span class="id">G1</span><span class="ct">Conflicting choice: keep building with the firm 8–9% ceiling and keep Oct 31</span><span class="pill pass">PASS</span><span class="rung go">resolve constraint conflict</span></summary>
+    <p class="situation">Founder Oct 9 state. The user picks 'keep building', keeps 8–9% as a firm limit, and keeps Oct 31.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 55 (started 2026-08-15)</li>
+        <li>body_weight: 6.3/wk (needs 4) · manual</li><li>training_performance: 2.5/wk (needs 2) · manual</li><li>nutrition_intake: 6.5/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 3 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 22</li><li>Measured pace 0.0337/day vs needed 0.1318/day</li><li>Measured-basis ratio 0.26 → at risk</li><li>Projected-at-pace ratio 0.26 → at risk (finish ≈ 2027-01-04)</li>
+        <li>Guardrail: above by 0.5 · pressured · unsafe side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>resolve constraint conflict</b> · trigger originate optional · originates a proposal</li>
+        <li>Choice check (firm ceiling + keep date): rejected firm ceiling incompatible with continued building above it · warning deadline likely unachievable shown as at risk</li>
+        <li>Alternative (range 8–10%, keep date): valid · warning deadline likely unachievable shown as at risk</li>
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>continue with guardrail monitoring<div class="sub">stored production V3 assessment</div></td><td>resolve constraint conflict</td></tr>
+        <tr><td>Schedule</td><td>at risk · 22 days</td><td>at risk · 22 days</td></tr>
+        <tr><td>Guardrail</td><td>pressured (symmetric)</td><td>pressured · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>rung</td><td>&quot;resolve_constraint_conflict&quot;</td><td>&quot;resolve_constraint_conflict&quot;</td><td>✓</td></tr><tr><td>choiceValid</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>choiceErrors</td><td>[&quot;firm_ceiling_incompatible_with_continued_building_above_it&quot;]</td><td>[&quot;firm_ceiling_incompatible_with_continued_building_above_it&quot;]</td><td>✓</td></tr><tr><td>alternativeValid</td><td>true</td><td>true</td><td>✓</td></tr><tr><td>alternativeWarnings</td><td>[&quot;deadline_likely_unachievable_shown_as_at_risk&quot;]</td><td>[&quot;deadline_likely_unachievable_shown_as_at_risk&quot;]</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-T1" data-cat="leaning" data-outcome="proposal">
+    <summary><span class="id">T1</span><span class="ct">Time-limited leaning phase ends before the outcome</span><span class="pill pass">PASS</span><span class="rung go">phase time limit review</span></summary>
+    <p class="situation">A 4-week leaning phase reached its time limit; body fat came down but is not back in range.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 28 (started 2026-02-08)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        <li>Phase: temporary leaning, time limit reached true, outcome met false</li>
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Not measurable: trajectory unavailable</li>
+        <li>Guardrail: above by 0.4 · watch · unsafe side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>phase time limit review</b> · trigger originate · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>phase time limit review</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>not measurable</td></tr>
+        <tr><td>Guardrail</td><td>watch (symmetric)</td><td>watch · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>Your 4 weeks are up. Body fat came down but isn't back in range yet. The leaning phase continues until you decide.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>rung</td><td>&quot;phase_time_limit_review&quot;</td><td>&quot;phase_time_limit_review&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-GA1" data-cat="mass_building" data-outcome="proposal">
+    <summary><span class="id">GA1</span><span class="ct">Goal achieved</span><span class="pill pass">PASS</span><span class="rung go">goal achieved</span></summary>
+    <p class="situation">A scan confirms the lean-mass target was reached.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 136 (started 2026-01-04)</li>
+        <li>body_weight: 6/wk (needs 4) · manual</li><li>training_performance: 3/wk (needs 2) · manual</li><li>nutrition_intake: 6/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 0 (not required)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Target reached</li>
+        <li>Guardrail: within by 0 · clear · none side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>goal achieved</b> · trigger originate optional · originates a proposal</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>goal achieved</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>complete</td></tr>
+        <tr><td>Guardrail</td><td>clear (symmetric)</td><td>clear · none side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        <p class="copy ill"><span class="tag">Illustrative · design copy, not engine output</span>You reached your goal. What should come next? Nothing changes until you choose.</p>
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>rung</td><td>&quot;goal_achieved&quot;</td><td>&quot;goal_achieved&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr><tr><td>scheduleState</td><td>&quot;complete&quot;</td><td>&quot;complete&quot;</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-D1" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">D1</span><span class="ct">User kept the plan; next Weekly has no material new evidence</span><span class="pill pass">PASS</span><span class="rung hold">resolve constraint conflict</span></summary>
+    <p class="situation">After the Oct 9 recommendation the user chose 'Keep my current plan'. The Oct 11 Weekly has no new scan or guardrail change.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 57 (started 2026-08-15)</li>
+        <li>body_weight: 6.3/wk (needs 4) · manual</li><li>training_performance: 2.5/wk (needs 2) · manual</li><li>nutrition_intake: 6.5/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 3 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 20 (stored V3: 22)</li><li>Measured pace 0.0337/day vs needed 0.145/day</li><li>Measured-basis ratio 0.23 → at risk</li><li>Projected-at-pace ratio 0.26 → at risk (finish ≈ 2027-01-04)</li>
+        <li>Guardrail: above by 0.5 · pressured · unsafe side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>resolve constraint conflict</b> · trigger originate · no proposal · deferral: suppressed after keep plan no material change</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>resolve constraint conflict</td></tr>
+        <tr><td>Schedule</td><td>at risk · 22 days</td><td>at risk · 20 days</td></tr>
+        <tr><td>Guardrail</td><td>— (symmetric)</td><td>pressured · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>rung</td><td>&quot;resolve_constraint_conflict&quot;</td><td>&quot;resolve_constraint_conflict&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>deferralReason</td><td>&quot;suppressed_after_keep_plan_no_material_change&quot;</td><td>&quot;suppressed_after_keep_plan_no_material_change&quot;</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-D2" data-cat="mass_building" data-outcome="proposal">
+    <summary><span class="id">D2</span><span class="ct">User kept the plan; a new scan shows body fat breached</span><span class="pill pass">PASS</span><span class="rung go">resolve constraint conflict</span></summary>
+    <p class="situation">After keeping the plan, a Nov 6 scan shows body fat now breached (1.6 points above range). Material new evidence.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 83 (started 2026-08-15)</li>
+        <li>body_weight: 6.3/wk (needs 4) · manual</li><li>training_performance: 2.5/wk (needs 2) · manual</li><li>nutrition_intake: 6.5/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 3 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left -6</li><li>Measured pace 0.018/day vs needed —/day</li><li>Measured-basis ratio 0 → deadline passed</li><li>Projected-at-pace ratio 0 → deadline passed (finish ≈ 2027-03-20)</li>
+        <li>Guardrail: above by 1.6 · breached · unsafe side</li>
+        <li>Eligibility: <b>eligible safety exception</b></li>
+        <li>Decision: <b>resolve constraint conflict</b> · trigger originate optional · originates a proposal · deferral: material new evidence after keep plan</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>not run<div class="sub">no V3 evaluation in this synthetic scenario</div></td><td>resolve constraint conflict</td></tr>
+        <tr><td>Schedule</td><td>—</td><td>deadline passed · -6 days</td></tr>
+        <tr><td>Guardrail</td><td>— (symmetric)</td><td>breached · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>proposal for user approval</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>rung</td><td>&quot;resolve_constraint_conflict&quot;</td><td>&quot;resolve_constraint_conflict&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>true</td><td>true</td><td>✓</td></tr><tr><td>deferralReason</td><td>&quot;material_new_evidence_after_keep_plan&quot;</td><td>&quot;material_new_evidence_after_keep_plan&quot;</td><td>✓</td></tr><tr><td>scheduleState</td><td>&quot;deadline_passed&quot;</td><td>&quot;deadline_passed&quot;</td><td>✓</td></tr>
+    </table>
+  </details>
+  <details class="card" id="s-P1" data-cat="mass_building" data-outcome="none">
+    <summary><span class="id">P1</span><span class="ct">Photo Event without proven photo reliability</span><span class="pill pass">PASS</span><span class="rung hold">resolve constraint conflict</span></summary>
+    <p class="situation">Same evidence as Oct 9, but arriving with a Photo Event whose reliability has not been proven. It may link to the decision but not start one.</p>
+    <div class="grid">
+      <section><h4>Evidence and state</h4><ul>
+        <li>Goal type: lean mass gain · phase day 55 (started 2026-08-15)</li>
+        <li>body_weight: 6.3/wk (needs 4) · manual</li><li>training_performance: 2.5/wk (needs 2) · manual</li><li>nutrition_intake: 6.5/wk (needs 5) · healthkit</li>
+        <li>Body-composition scans: 3 (adds precision)</li>
+        <li>Plan adherence: adequate</li>
+        
+        
+        
+      </ul></section>
+      <section><h4>Engine reasoning (actual output)</h4><ul>
+        <li>Days left 22</li><li>Measured pace 0.0337/day vs needed 0.1318/day</li><li>Measured-basis ratio 0.26 → at risk</li><li>Projected-at-pace ratio 0.26 → at risk (finish ≈ 2027-01-04)</li>
+        <li>Guardrail: above by 0.5 · pressured · unsafe side</li>
+        <li>Eligibility: <b>eligible</b></li>
+        <li>Decision: <b>resolve constraint conflict</b> · trigger originate if reliable and corroborated · link only</li>
+        
+        
+      </ul></section>
+      <section><h4>Before (existing V3) vs after (Phase A)</h4><table class="ba">
+        <tr><th></th><th>Existing V3</th><th>Phase A shadow</th></tr>
+        <tr><td>Recommendation</td><td>continue with guardrail monitoring<div class="sub">stored production V3 assessment</div></td><td>resolve constraint conflict</td></tr>
+        <tr><td>Schedule</td><td>at risk · 22 days</td><td>at risk · 22 days</td></tr>
+        <tr><td>Guardrail</td><td>pressured (symmetric)</td><td>pressured · unsafe side</td></tr>
+        <tr><td>Adaptation path</td><td>none</td><td>no proposal</td></tr>
+      </table></section>
+      <section><h4>User-facing copy</h4>
+        <p class="sub">No coaching item from the engine for this case.</p>
+        
+      </section>
+    </div>
+    <table class="checks"><tr><th>Check</th><th>Expected</th><th>Actual</th><th></th></tr>
+      <tr><td>rung</td><td>&quot;resolve_constraint_conflict&quot;</td><td>&quot;resolve_constraint_conflict&quot;</td><td>✓</td></tr><tr><td>originatesProposal</td><td>false</td><td>false</td><td>✓</td></tr><tr><td>linkOnly</td><td>true</td><td>true</td><td>✓</td></tr>
+    </table>
+  </details>
+  <h2>Draft policy thresholds for Founder review</h2>
+  <div class="notes">
+    <div><b>Eligibility</b><ul>
+      <li>First calibration checkpoint 28 days (not a guarantee; safety exceptions bypass it)</li>
+      <li>Evidence window 28 days of complete weeks</li>
+      <li>Lean-mass build: weight ≥4/wk, training ≥2/wk, intake or daily evidence ≥5/wk; DEXA never required</li>
+      <li>Leaning: weight ≥4/wk plus intake, activity or daily evidence ≥5/wk · Maintenance: weight ≥3/wk plus ≥4/wk · Strength: comparable sessions ≥2/wk</li>
+      <li>HealthKit nutrition/activity/steps/workouts/sleep never prompted manually</li>
+    </ul></div>
+    <div><b>Adherence and decisions</b><ul>
+      <li>Adherence judged only on ≥10 measured days; intake ±10%, activity ±15%; adequate ≥70% of days; consistent = 2 off-plan weeks</li>
+      <li>Consistent nonadherence driving an unsafe guardrail or a stalled outcome → sustainability review (not ineligibility)</li>
+      <li>Pace needs ≥14 days of measurement; stalled/regressing ≥21 days → strategy review</li>
+      <li>Below range while building: watch, review after 3 weekly evaluations or a confirming scan</li>
+      <li>Safety exceptions: unsafe-side breach, weight change ≥1.5%/week, reported health concern</li>
+    </ul></div>
+    <div><b>Not exercisable until Phase B/C</b><ul>
+      <li>Ranked options with per-option timing ranges and the energy calibration (Phase B)</li>
+      <li>Persisted recommendations, revalidation on entry/approval, notification and Home priority delivery (Phase B)</li>
+      <li>Atomic approval: goal-contract revision, temporary phase, Operating Plan versions, Your Journey events (Phase C)</li>
+      <li>Narrative wiring of coaching into published Weekly/Monthly briefings, and all Native screens (Phase C/D)</li>
+    </ul></div>
+  </div>
+</div>
+<script>
+const buttons = [...document.querySelectorAll('.filters button')];
+buttons.forEach((b) => b.addEventListener('click', () => {
+  buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  const [kind, value] = b.dataset.f.split(':');
+  document.querySelectorAll('[data-cat]').forEach((el) => {
+    el.hidden = kind === 'cat' ? el.dataset.cat !== value : kind === 'outcome' ? el.dataset.outcome !== value : false;
+  });
+}));
+</script>

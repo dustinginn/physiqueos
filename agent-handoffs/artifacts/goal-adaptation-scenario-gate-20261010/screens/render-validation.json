@@ -1,0 +1,22 @@
+{
+  "desktop-1440-dark": {
+    "overflowX": 0,
+    "noAdaptationRowsAfterFilter": 14,
+    "errors": []
+  },
+  "desktop-1440-light": {
+    "overflowX": 0,
+    "noAdaptationRowsAfterFilter": 14,
+    "errors": []
+  },
+  "laptop-1280-dark": {
+    "overflowX": 0,
+    "noAdaptationRowsAfterFilter": 14,
+    "errors": []
+  },
+  "mobile-390-light": {
+    "overflowX": 0,
+    "noAdaptationRowsAfterFilter": 14,
+    "errors": []
+  }
+}

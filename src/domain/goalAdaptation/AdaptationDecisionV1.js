@@ -30,6 +30,10 @@ export const AdaptationRung = Object.freeze({
   BELOW_RANGE_WATCH: "below_range_watch",
   BELOW_RANGE_REVIEW: "below_range_review",
   SUSTAINABILITY_REVIEW: "sustainability_review",
+  GUARDRAIL_REVIEW: "guardrail_review",
+  STRATEGY_REVIEW: "strategy_review",
+  GOAL_ACHIEVED: "goal_achieved",
+  PHASE_TIME_LIMIT_REVIEW: "phase_time_limit_review",
 });
 
 const PROPOSAL_RUNGS = new Set([
@@ -37,6 +41,10 @@ const PROPOSAL_RUNGS = new Set([
   AdaptationRung.RESOLVE_CONSTRAINT_CONFLICT,
   AdaptationRung.BELOW_RANGE_REVIEW,
   AdaptationRung.SUSTAINABILITY_REVIEW,
+  AdaptationRung.GUARDRAIL_REVIEW,
+  AdaptationRung.STRATEGY_REVIEW,
+  AdaptationRung.GOAL_ACHIEVED,
+  AdaptationRung.PHASE_TIME_LIMIT_REVIEW,
 ]);
 
 export function assessAdaptationEligibility({
@@ -89,12 +97,16 @@ export function resolveAdaptationRung({
   confirmedByBodyCompositionEvidence = false,
   triggerFamily,
   photoEvidenceReliable = false,
+  goalAchievement = null,
+  phaseState = null,
+  outcomeTrend = null,
+  outcomeTrendDays = 0,
   policy = GOAL_ADAPTATION_POLICY_V1,
 }) {
   const trigger = policy.triggers[triggerFamily] ?? "link_only";
   const originates = trigger === "originate" || trigger === "originate_optional" ||
     (trigger === "originate_if_reliable_and_corroborated" && photoEvidenceReliable === true);
-  const rung = selectRung({ eligibility, schedule, guardrail, belowRangeHistory, confirmedByBodyCompositionEvidence, policy });
+  const rung = selectRung({ eligibility, schedule, guardrail, belowRangeHistory, confirmedByBodyCompositionEvidence, goalAchievement, phaseState, outcomeTrend, outcomeTrendDays, policy });
   const proposalRung = PROPOSAL_RUNGS.has(rung);
   return freeze({
     rung,
@@ -107,7 +119,11 @@ export function resolveAdaptationRung({
   });
 }
 
-function selectRung({ eligibility, schedule, guardrail, belowRangeHistory, confirmedByBodyCompositionEvidence, policy }) {
+function selectRung({ eligibility, schedule, guardrail, belowRangeHistory, confirmedByBodyCompositionEvidence, goalAchievement, phaseState, outcomeTrend, outcomeTrendDays, policy }) {
+  // A measured achievement and a time-limited phase reaching its limit always
+  // ask the user what comes next; neither completes or resumes anything.
+  if (["achieved", "exceeded"].includes(goalAchievement)) return AdaptationRung.GOAL_ACHIEVED;
+  if (phaseState?.timeLimitReached === true && phaseState.outcomeMet !== true) return AdaptationRung.PHASE_TIME_LIMIT_REVIEW;
   switch (eligibility?.status) {
     case EligibilityStatus.CALIBRATING: return AdaptationRung.CALIBRATING;
     case EligibilityStatus.INSUFFICIENT_EVIDENCE: return AdaptationRung.EVIDENCE_COACHING;
@@ -118,14 +134,47 @@ function selectRung({ eligibility, schedule, guardrail, belowRangeHistory, confi
   const atRisk = [ScheduleState.AT_RISK, ScheduleState.DEADLINE_PASSED].includes(schedule?.scheduleState);
   if (atRisk && guardrail?.unsafePressure) return AdaptationRung.RESOLVE_CONSTRAINT_CONFLICT;
   if (atRisk) return AdaptationRung.REVIEW_TIMELINE;
+  if (guardrail?.unsafePressure) return AdaptationRung.GUARDRAIL_REVIEW;
   if (guardrail?.position === "below" && guardrail.meaning === "coaching") {
     const recent = [...belowRangeHistory, "below"].slice(-policy.belowRange.persistenceWeeklyEvaluations);
     const persistent = recent.length >= policy.belowRange.persistenceWeeklyEvaluations && recent.every((item) => item === "below");
     return persistent || (policy.belowRange.orConfirmedByNextBodyCompositionEvidence && confirmedByBodyCompositionEvidence)
       ? AdaptationRung.BELOW_RANGE_REVIEW : AdaptationRung.BELOW_RANGE_WATCH;
   }
+  if (["stalled", "regressing"].includes(outcomeTrend) && outcomeTrendDays >= policy.outcome.sustainedTrendDays) return AdaptationRung.STRATEGY_REVIEW;
   if (schedule?.paceUnverified) return AdaptationRung.PACE_UNVERIFIED;
   return AdaptationRung.NONE;
+}
+
+// "Keep my current plan" / "Remind me with the Weekly": the same recommendation
+// resurfaces only when the evidence fingerprint changes materially.
+export function resolveDeferral({ priorRecommendation = null, currentEvidenceFingerprint, currentRung, triggerFamily, policy = GOAL_ADAPTATION_POLICY_V1 }) {
+  if (!priorRecommendation) return Object.freeze({ surface: true, reason: "no_prior_recommendation" });
+  const changed = priorRecommendation.evidenceFingerprint !== currentEvidenceFingerprint;
+  if (priorRecommendation.lifecycle === "kept_current_plan") {
+    return Object.freeze(changed && PROPOSAL_RUNGS.has(currentRung)
+      ? { surface: true, reason: "material_new_evidence_after_keep_plan" }
+      : { surface: false, reason: "suppressed_after_keep_plan_no_material_change" });
+  }
+  if (priorRecommendation.lifecycle === "snoozed_until_weekly") {
+    return Object.freeze(triggerFamily === "weekly_briefing" || changed
+      ? { surface: true, reason: "snooze_ended_at_weekly" }
+      : { surface: false, reason: "snoozed_until_weekly" });
+  }
+  if (priorRecommendation.lifecycle === "removed_from_home") return Object.freeze({ surface: true, reason: "still_open_in_goals_and_weekly_not_on_home", home: false });
+  return Object.freeze({ surface: !policy.deferral.resurfaceOnlyOnMaterialChange || changed, reason: changed ? "material_change" : "unchanged" });
+}
+
+// Validates a "keep building" choice against the current measurement. A firm
+// ceiling the user is already above cannot be kept while continuing to build;
+// keeping an unlikely deadline is allowed but never silently accepted.
+export function validateKeepBuildingChoice({ guardrail, keepFirmCeiling, revisedRange = null, keepDeadline, schedule }) {
+  const errors = [];
+  const warnings = [];
+  if (keepFirmCeiling && guardrail?.position === "above" && guardrail.meaning === "unsafe") errors.push("firm_ceiling_incompatible_with_continued_building_above_it");
+  if (revisedRange && revisedRange.lower != null && revisedRange.upper != null && revisedRange.lower > revisedRange.upper) errors.push("revised_range_invalid");
+  if (keepDeadline && [ScheduleState.AT_RISK, ScheduleState.DEADLINE_PASSED].includes(schedule?.scheduleState)) warnings.push("deadline_likely_unachievable_shown_as_at_risk");
+  return Object.freeze({ valid: errors.length === 0, errors, warnings, silentAcceptance: false });
 }
 
 const DOMAIN_COPY = Object.freeze({

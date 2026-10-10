@@ -1,0 +1,4957 @@
+{
+  "scenarioSetVersion": "goal_adaptation_scenarios_v1",
+  "policyVersion": "goal_adaptation_policy_v1",
+  "engine": "goal_adaptation_shadow_v1 (Phase A, dormant)",
+  "total": 26,
+  "passed": 26,
+  "failed": 0,
+  "proposalsOriginated": 12,
+  "noAdaptationOutcomes": 14,
+  "results": [
+    {
+      "id": "F1",
+      "title": "Founder, Oct 9 DEXA: about 71% of +10 lb, 22 days left, body fat above 8–9%",
+      "category": "mass_building",
+      "source": "founder_production_sanitized",
+      "situation": "Lean Mass Build phase day 55. The Oct 9 scan shows 7.1 of 10 lb gained, body fat above the chosen range (pressured), Goal Confidence 70% (from 80). Intake on HealthKit was within ±10% of 2,500 kcal on most days.",
+      "asOf": "2026-10-09",
+      "triggerFamily": "dexa_event_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-08-15",
+        "daysInPhase": 55,
+        "bodyCompositionScans": 3,
+        "coverage": [
+          "body_weight: 6.3/wk (needs 4) · manual",
+          "training_performance: 2.5/wk (needs 2) · manual",
+          "nutrition_intake: 6.5/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "at_risk",
+          "measuredBasisState": "at_risk",
+          "asOf": "2026-10-09",
+          "deadlineAt": "2026-10-31",
+          "timeRemainingDays": 22,
+          "measuredAt": "2026-10-09",
+          "elapsedSinceMeasurementDays": 0,
+          "remainingRequirement": 2.9,
+          "measuredRate": 0.0337,
+          "requiredRate": 0.1318,
+          "measuredBasisRatio": 0.2557,
+          "projectedAtPaceRatio": 0.2557,
+          "projectedCompletionDate": "2027-01-04",
+          "storedTimeRemainingDays": 22,
+          "storedScheduleState": "at_risk",
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise"
+          ]
+        },
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 0.5,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.3,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 2.5,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.5,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 55,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "resolve_constraint_conflict",
+          "triggerFamily": "dexa_event_briefing",
+          "trigger": "originate_optional",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": "continue_with_guardrail_monitoring",
+        "recommendationSource": "stored production V3 assessment",
+        "storedScheduleState": "at_risk",
+        "storedTimeRemainingDays": 22,
+        "v3GuardrailStatus": "pressured",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "resolve_constraint_conflict",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate_optional",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "at_risk",
+        "measuredBasisState": "at_risk",
+        "timeRemainingDays": 22,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 0.5,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "resolve_constraint_conflict",
+        "originatesProposal": true,
+        "scheduleState": "at_risk"
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "resolve_constraint_conflict",
+          "actual": "resolve_constraint_conflict",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        },
+        {
+          "key": "scheduleState",
+          "expected": "at_risk",
+          "actual": "at_risk",
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "Review your goal options. Body fat is above your 8–9% range, and at your recent pace 10 lb would take until about early January, after your Oct 31 date."
+    },
+    {
+      "id": "F2",
+      "title": "Founder, Oct 7 Midweek: frozen 49-day runway corrected to 24 days",
+      "category": "mass_building",
+      "source": "founder_production_sanitized",
+      "situation": "The stored V3 outlook still said 49 days left (frozen at the Sep 12 scan). Body fat in range. Midweek may never originate a recommendation.",
+      "asOf": "2026-10-07",
+      "triggerFamily": "midweek_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-08-15",
+        "daysInPhase": 53,
+        "bodyCompositionScans": 2,
+        "coverage": [
+          "body_weight: 6.3/wk (needs 4) · manual",
+          "training_performance: 2.5/wk (needs 2) · manual",
+          "nutrition_intake: 6.5/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "ahead_with_reserve",
+          "measuredBasisState": "at_risk",
+          "asOf": "2026-10-07",
+          "deadlineAt": "2026-10-31",
+          "timeRemainingDays": 24,
+          "measuredAt": "2026-09-12",
+          "elapsedSinceMeasurementDays": 25,
+          "remainingRequirement": 3.725,
+          "measuredRate": 0.1077,
+          "requiredRate": 0.1552,
+          "measuredBasisRatio": 0.6939,
+          "projectedAtPaceRatio": 1.4167,
+          "projectedCompletionDate": "2026-10-17",
+          "storedTimeRemainingDays": 49,
+          "storedScheduleState": "ahead_with_reserve",
+          "paceUnverified": true,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 1,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.3,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 2.5,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.5,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 53,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "pace_unverified",
+          "triggerFamily": "midweek_briefing",
+          "trigger": "link_only",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": "continue_current_strategy",
+        "recommendationSource": "stored production V3 assessment",
+        "storedScheduleState": "ahead_with_reserve",
+        "storedTimeRemainingDays": 49,
+        "v3GuardrailStatus": "clear",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "pace_unverified",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "link_only",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "at_risk",
+        "timeRemainingDays": 24,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 1,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "pace_unverified",
+        "originatesProposal": false,
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "at_risk",
+        "timeRemainingDays": 24,
+        "coachingCount": 0
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "pace_unverified",
+          "actual": "pace_unverified",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "scheduleState",
+          "expected": "ahead_with_reserve",
+          "actual": "ahead_with_reserve",
+          "pass": true
+        },
+        {
+          "key": "measuredBasisState",
+          "expected": "at_risk",
+          "actual": "at_risk",
+          "pass": true
+        },
+        {
+          "key": "timeRemainingDays",
+          "expected": 24,
+          "actual": 24,
+          "pass": true
+        },
+        {
+          "key": "coachingCount",
+          "expected": 0,
+          "actual": 0,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "F3",
+      "title": "Founder, Oct 4 Weekly: pace not verified for 22 days",
+      "category": "mass_building",
+      "source": "founder_production_sanitized",
+      "situation": "No new outcome since Sep 12. At the last measured pace the goal would finish Oct 18, but that pace has not been re-measured.",
+      "asOf": "2026-10-04",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-08-15",
+        "daysInPhase": 50,
+        "bodyCompositionScans": 2,
+        "coverage": [
+          "body_weight: 6.3/wk (needs 4) · manual",
+          "training_performance: 2.5/wk (needs 2) · manual",
+          "nutrition_intake: 6.5/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "ahead_with_reserve",
+          "measuredBasisState": "at_risk",
+          "asOf": "2026-10-04",
+          "deadlineAt": "2026-10-31",
+          "timeRemainingDays": 27,
+          "measuredAt": "2026-09-12",
+          "elapsedSinceMeasurementDays": 22,
+          "remainingRequirement": 3.789,
+          "measuredRate": 0.1065,
+          "requiredRate": 0.1403,
+          "measuredBasisRatio": 0.7589,
+          "projectedAtPaceRatio": 1.3773,
+          "projectedCompletionDate": "2026-10-18",
+          "storedTimeRemainingDays": 49,
+          "storedScheduleState": "ahead_with_reserve",
+          "paceUnverified": true,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 1,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.3,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 2.5,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.5,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 50,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "pace_unverified",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [
+            {
+              "kind": "pace_unverified",
+              "text": "27 days remain to your goal date. Keep your weigh-ins and training logs consistent so your pace can be checked.",
+              "placement": "coachTake.intoNextWeek"
+            }
+          ],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": "continue_current_strategy",
+        "recommendationSource": "stored production V3 assessment",
+        "storedScheduleState": "ahead_with_reserve",
+        "storedTimeRemainingDays": 49,
+        "v3GuardrailStatus": "clear",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "pace_unverified",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "at_risk",
+        "timeRemainingDays": 27,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 1,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [
+          {
+            "kind": "pace_unverified",
+            "text": "27 days remain to your goal date. Keep your weigh-ins and training logs consistent so your pace can be checked.",
+            "placement": "coachTake.intoNextWeek"
+          }
+        ],
+        "coachingCount": 1,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "pace_unverified",
+        "originatesProposal": false,
+        "timeRemainingDays": 27,
+        "coachingCount": 1
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "pace_unverified",
+          "actual": "pace_unverified",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "timeRemainingDays",
+          "expected": 27,
+          "actual": 27,
+          "pass": true
+        },
+        {
+          "key": "coachingCount",
+          "expected": 1,
+          "actual": 1,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "F4",
+      "title": "Founder, Sep 20 Weekly: on track, nothing to change",
+      "category": "mass_building",
+      "source": "founder_production_sanitized",
+      "situation": "Eight days after a strong Sep 12 scan. Body fat in range, pace ahead of the deadline.",
+      "asOf": "2026-09-20",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-08-15",
+        "daysInPhase": 36,
+        "bodyCompositionScans": 2,
+        "coverage": [
+          "body_weight: 6.8/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "daily_evidence: 7/wk (needs 5) · manual"
+        ],
+        "adherence": "insufficient_data",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "ahead_with_reserve",
+          "measuredBasisState": "ahead_with_reserve",
+          "asOf": "2026-09-20",
+          "deadlineAt": "2026-10-31",
+          "timeRemainingDays": 41,
+          "measuredAt": "2026-09-12",
+          "elapsedSinceMeasurementDays": 8,
+          "remainingRequirement": 4.07,
+          "measuredRate": 0.101,
+          "requiredRate": 0.0993,
+          "measuredBasisRatio": 1.0174,
+          "projectedAtPaceRatio": 1.216,
+          "projectedCompletionDate": "2026-10-23",
+          "storedTimeRemainingDays": 49,
+          "storedScheduleState": "ahead_with_reserve",
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 1,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.8,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 7,
+              "requiredDaysPerWeek": 5,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "daily_evidence"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "insufficient_data",
+          "share": null,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 36,
+          "reasons": [
+            "adherence_not_assessable_missing_data_is_not_nonadherence"
+          ]
+        },
+        "decision": {
+          "rung": "none",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": "continue_current_strategy",
+        "recommendationSource": "stored production V3 assessment",
+        "storedScheduleState": "ahead_with_reserve",
+        "storedTimeRemainingDays": 49,
+        "v3GuardrailStatus": "clear",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [
+          "adherence_not_assessable_missing_data_is_not_nonadherence"
+        ],
+        "rung": "none",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "ahead_with_reserve",
+        "timeRemainingDays": 41,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "insufficient_data",
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 1,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "none",
+        "originatesProposal": false,
+        "scheduleState": "ahead_with_reserve"
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "none",
+          "actual": "none",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "scheduleState",
+          "expected": "ahead_with_reserve",
+          "actual": "ahead_with_reserve",
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "M1",
+      "title": "Healthy mass build on track with a recent scan",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "Week 9 of a lean-mass phase, body fat 12.4% inside 11–14%, measured pace 30% ahead of what the deadline needs.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 2,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "ahead_with_reserve",
+          "measuredBasisState": "ahead_with_reserve",
+          "asOf": "2026-03-08",
+          "deadlineAt": "2026-05-31",
+          "timeRemainingDays": 84,
+          "measuredAt": "2026-03-05",
+          "elapsedSinceMeasurementDays": 3,
+          "remainingRequirement": 4,
+          "measuredRate": 0.052,
+          "requiredRate": 0.0476,
+          "measuredBasisRatio": 1.092,
+          "projectedAtPaceRatio": 1.131,
+          "projectedCompletionDate": "2026-05-21",
+          "storedTimeRemainingDays": 87,
+          "storedScheduleState": "ahead_with_reserve",
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 3,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 63,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "none",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": "ahead_with_reserve",
+        "storedTimeRemainingDays": 87,
+        "v3GuardrailStatus": "clear",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "none",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "ahead_with_reserve",
+        "timeRemainingDays": 84,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 3,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "none",
+        "originatesProposal": false
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "none",
+          "actual": "none",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "M2",
+      "title": "First reading below the preferred range while building",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "Body fat 10.7% against a preferred 11–14% during a build. First time below range.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 1,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [
+          "within",
+          "within"
+        ],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "ahead_with_reserve",
+          "measuredBasisState": "ahead_with_reserve",
+          "asOf": "2026-03-08",
+          "deadlineAt": "2026-05-31",
+          "timeRemainingDays": 84,
+          "measuredAt": "2026-03-05",
+          "elapsedSinceMeasurementDays": 3,
+          "remainingRequirement": 4,
+          "measuredRate": 0.05,
+          "requiredRate": 0.0476,
+          "measuredBasisRatio": 1.05,
+          "projectedAtPaceRatio": 1.0875,
+          "projectedCompletionDate": "2026-05-24",
+          "storedTimeRemainingDays": null,
+          "storedScheduleState": null,
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "watch",
+          "position": "below",
+          "deviation": 0.3,
+          "span": 3,
+          "meaning": "coaching",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 63,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "below_range_watch",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [
+            {
+              "kind": "below_range_watch",
+              "text": "Body fat is a little below your preferred range. That isn't a problem on its own; keep fueling your training and we'll watch the trend.",
+              "placement": "coachTake.intoNextWeek"
+            }
+          ],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "watch",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "below_range_watch",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "ahead_with_reserve",
+        "timeRemainingDays": 84,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "watch",
+          "position": "below",
+          "deviation": 0.3,
+          "span": 3,
+          "meaning": "coaching",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [
+          {
+            "kind": "below_range_watch",
+            "text": "Body fat is a little below your preferred range. That isn't a problem on its own; keep fueling your training and we'll watch the trend.",
+            "placement": "coachTake.intoNextWeek"
+          }
+        ],
+        "coachingCount": 1,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "below_range_watch",
+        "originatesProposal": false,
+        "coachingCount": 1
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "below_range_watch",
+          "actual": "below_range_watch",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "coachingCount",
+          "expected": 1,
+          "actual": 1,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "M3",
+      "title": "Body fat below range for three weekly evaluations",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "Same build, but body fat has stayed below 11% for three consecutive Weekly evaluations.",
+      "asOf": "2026-03-22",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 77,
+        "bodyCompositionScans": 1,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [
+          "below",
+          "below"
+        ],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "ahead_with_reserve",
+          "measuredBasisState": "at_risk",
+          "asOf": "2026-03-22",
+          "deadlineAt": "2026-05-31",
+          "timeRemainingDays": 70,
+          "measuredAt": "2026-03-19",
+          "elapsedSinceMeasurementDays": 3,
+          "remainingRequirement": 3.6,
+          "measuredRate": 0.05,
+          "requiredRate": 0.0514,
+          "measuredBasisRatio": 0.9722,
+          "projectedAtPaceRatio": 1.0139,
+          "projectedCompletionDate": "2026-05-30",
+          "storedTimeRemainingDays": null,
+          "storedScheduleState": null,
+          "paceUnverified": true,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "watch",
+          "position": "below",
+          "deviation": 0.6,
+          "span": 3,
+          "meaning": "coaching",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 77,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "below_range_review",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "watch",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "below_range_review",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "at_risk",
+        "timeRemainingDays": 70,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "watch",
+          "position": "below",
+          "deviation": 0.6,
+          "span": 3,
+          "meaning": "coaching",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "below_range_review",
+        "originatesProposal": true
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "below_range_review",
+          "actual": "below_range_review",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "Body fat has stayed below your preferred range for three weeks. Review your options: eat a little more, or adjust the range."
+    },
+    {
+      "id": "M4",
+      "title": "No DEXA ever, but weight, training and nutrition are well logged",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "A user without body-composition scans. Weight 6 days/week, training 3 days/week, nutrition from HealthKit 6 days/week. Gain is on plan.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": "progressing",
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "trajectory_unavailable",
+          "paceUnverified": false
+        },
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "lean_tissue_estimated_from_weight_performance_and_intake",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 63,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "none",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": null,
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "none",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": null,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "none",
+        "originatesProposal": false,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan"
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "none",
+          "actual": "none",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "coverage",
+          "expected": "sufficient",
+          "actual": "sufficient",
+          "pass": true
+        },
+        {
+          "key": "precision",
+          "expected": "estimated_without_body_composition_scan",
+          "actual": "estimated_without_body_composition_scan",
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "M5",
+      "title": "No DEXA, weight gain stalled for four weeks despite on-plan eating",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "Weight trend flat for 28 days with intake on target and training logged. No scan available.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": "stalled",
+        "outcomeTrendDays": 28,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "trajectory_unavailable",
+          "paceUnverified": false
+        },
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "lean_tissue_estimated_from_weight_performance_and_intake",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 63,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "strategy_review",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": null,
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "strategy_review",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": null,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "strategy_review",
+        "originatesProposal": true,
+        "precision": "estimated_without_body_composition_scan"
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "strategy_review",
+          "actual": "strategy_review",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        },
+        {
+          "key": "precision",
+          "expected": "estimated_without_body_composition_scan",
+          "actual": "estimated_without_body_composition_scan",
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "Your weight hasn't moved in four weeks even though you've hit your targets. Review your plan: a small calorie increase is the usual next step."
+    },
+    {
+      "id": "L1",
+      "title": "Leaning plateau over 10 days (likely water or scale noise)",
+      "category": "leaning",
+      "source": "synthetic",
+      "situation": "Weight flat for 10 days during a cut. The measured span is too short to call a stall.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "fat_loss",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "pace_not_established_measurement_span_too_short",
+          "paceUnverified": false,
+          "deadlineAt": "2026-04-30",
+          "timeRemainingDays": 53,
+          "measurementSpanDays": 10,
+          "minimumEvidenceSpanDays": 14
+        },
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coverage": {
+          "archetype": "fat_loss",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|activity_energy|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "fat_loss_estimated_from_weight_trend_and_energy_balance",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 63,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "none",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": null,
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "none",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": 53,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "none",
+        "originatesProposal": false,
+        "scheduleState": "not_measurable"
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "none",
+          "actual": "none",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "scheduleState",
+          "expected": "not_measurable",
+          "actual": "not_measurable",
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "L2",
+      "title": "Leaning plateau that has persisted for four weeks",
+      "category": "leaning",
+      "source": "synthetic",
+      "situation": "Weight essentially flat for 28 days with good adherence; 4 lb remain and 30 days are left.",
+      "asOf": "2026-03-31",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "fat_loss",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 86,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "at_risk",
+          "measuredBasisState": "at_risk",
+          "asOf": "2026-03-31",
+          "deadlineAt": "2026-04-30",
+          "timeRemainingDays": 30,
+          "measuredAt": "2026-03-30",
+          "elapsedSinceMeasurementDays": 1,
+          "remainingRequirement": 4,
+          "measuredRate": 0.01,
+          "requiredRate": 0.1333,
+          "measuredBasisRatio": 0.075,
+          "projectedAtPaceRatio": 0.0775,
+          "projectedCompletionDate": "2027-05-04",
+          "storedTimeRemainingDays": null,
+          "storedScheduleState": null,
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coverage": {
+          "archetype": "fat_loss",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|activity_energy|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "fat_loss_estimated_from_weight_trend_and_energy_balance",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 86,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "review_timeline",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": null,
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "review_timeline",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "at_risk",
+        "measuredBasisState": "at_risk",
+        "timeRemainingDays": 30,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "review_timeline",
+        "originatesProposal": true,
+        "scheduleState": "at_risk"
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "review_timeline",
+          "actual": "review_timeline",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        },
+        {
+          "key": "scheduleState",
+          "expected": "at_risk",
+          "actual": "at_risk",
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "Progress has stalled for four weeks and Apr 30 looks unlikely. Review your options."
+    },
+    {
+      "id": "L3",
+      "title": "Overly aggressive cut: lean mass dropping in week 2",
+      "category": "leaning",
+      "source": "synthetic",
+      "situation": "Two weeks into a cut, a scan shows lean mass 1.6 lb below the floor the user set. Normally still calibrating, but this is a safety exception.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "dexa_event_briefing",
+      "evidence": {
+        "goalType": "fat_loss",
+        "phaseStart": "2026-02-22",
+        "daysInPhase": 14,
+        "bodyCompositionScans": 2,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "ahead_with_reserve",
+          "measuredBasisState": "ahead_with_reserve",
+          "asOf": "2026-03-08",
+          "deadlineAt": "2026-04-30",
+          "timeRemainingDays": 53,
+          "measuredAt": "2026-03-07",
+          "elapsedSinceMeasurementDays": 1,
+          "remainingRequirement": 6,
+          "measuredRate": 0.2,
+          "requiredRate": 0.1132,
+          "measuredBasisRatio": 1.7667,
+          "projectedAtPaceRatio": 1.8,
+          "projectedCompletionDate": "2026-04-06",
+          "storedTimeRemainingDays": null,
+          "storedScheduleState": null,
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "breached",
+          "position": "below",
+          "deviation": 1.6,
+          "span": 849,
+          "meaning": "unsafe",
+          "severity": "breached",
+          "unsafePressure": true,
+          "unsafeBreach": true
+        },
+        "coverage": {
+          "archetype": "fat_loss",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|activity_energy|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible_safety_exception",
+          "daysInPhase": 14,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "guardrail_review",
+          "triggerFamily": "dexa_event_briefing",
+          "trigger": "originate_optional",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "breached",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible_safety_exception",
+        "eligibilityReasons": [],
+        "rung": "guardrail_review",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate_optional",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "ahead_with_reserve",
+        "timeRemainingDays": 53,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "breached",
+          "position": "below",
+          "deviation": 1.6,
+          "span": 849,
+          "meaning": "unsafe",
+          "severity": "breached",
+          "unsafePressure": true,
+          "unsafeBreach": true
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible_safety_exception",
+        "rung": "guardrail_review",
+        "originatesProposal": true
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible_safety_exception",
+          "actual": "eligible_safety_exception",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "guardrail_review",
+          "actual": "guardrail_review",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "You're losing lean mass faster than you planned. Review your options: slowing the cut usually protects it."
+    },
+    {
+      "id": "S1",
+      "title": "Strength plateau across five weeks of comparable sessions",
+      "category": "strength",
+      "source": "synthetic",
+      "situation": "Top sets on comparable lifts unchanged for 35 days; training logged 3 days/week. No deadline.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "monthly_briefing",
+      "evidence": {
+        "goalType": "strength",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "training_performance: 3/wk (needs 2) · manual"
+        ],
+        "adherence": "not_applicable",
+        "outcomeTrend": "stalled",
+        "outcomeTrendDays": 35,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "trajectory_unavailable",
+          "paceUnverified": false
+        },
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coverage": {
+          "archetype": "strength",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "strength_measured_by_comparable_sessions",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "not_applicable",
+          "share": null,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 63,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "strategy_review",
+          "triggerFamily": "monthly_briefing",
+          "trigger": "originate",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": null,
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "strategy_review",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": null,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "not_applicable",
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "strategy_review",
+        "originatesProposal": true
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "strategy_review",
+          "actual": "strategy_review",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "Your main lifts haven't moved in five weeks. Review your program: a short deload or a change of rep ranges usually restarts progress."
+    },
+    {
+      "id": "S2",
+      "title": "Strength progressing on comparable sessions",
+      "category": "strength",
+      "source": "synthetic",
+      "situation": "Comparable top sets up in each of the last four weeks.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "strength",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "training_performance: 3/wk (needs 2) · manual"
+        ],
+        "adherence": "not_applicable",
+        "outcomeTrend": "progressing",
+        "outcomeTrendDays": 28,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "trajectory_unavailable",
+          "paceUnverified": false
+        },
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coverage": {
+          "archetype": "strength",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "strength_measured_by_comparable_sessions",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "not_applicable",
+          "share": null,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 63,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "none",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": null,
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "none",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": null,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "not_applicable",
+        "guardrail": {
+          "status": "not_assessed",
+          "position": null,
+          "meaning": "none"
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "none",
+        "originatesProposal": false
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "none",
+          "actual": "none",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "MT1",
+      "title": "Maintenance drift: weight 2.5 lb above the 170–174 lb range",
+      "category": "maintenance",
+      "source": "synthetic",
+      "situation": "Maintenance phase, morning-weight trend has drifted above the agreed range.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "maintenance",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 3) · manual",
+          "nutrition_intake: 6/wk (needs 4) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "trajectory_unavailable",
+          "paceUnverified": false
+        },
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 2.5,
+          "span": 4,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "maintenance",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 3,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "composition_estimated_from_weight_stability",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 63,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "guardrail_review",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "pressured",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "guardrail_review",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": null,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 2.5,
+          "span": 4,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "guardrail_review",
+        "originatesProposal": true
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "guardrail_review",
+          "actual": "guardrail_review",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "Your weight has drifted above your maintenance range. Review your options: tighten intake for a couple of weeks, or widen the range."
+    },
+    {
+      "id": "MT2",
+      "title": "Maintenance holding inside the range",
+      "category": "maintenance",
+      "source": "synthetic",
+      "situation": "Weight trend 172 lb inside 170–174 lb, logging consistent.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "maintenance",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 3) · manual",
+          "nutrition_intake: 6/wk (needs 4) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "trajectory_unavailable",
+          "paceUnverified": false
+        },
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 4,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "maintenance",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 3,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "composition_estimated_from_weight_stability",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 63,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "none",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "clear",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "none",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": null,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 4,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible",
+        "rung": "none",
+        "originatesProposal": false
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible",
+          "actual": "eligible",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "none",
+          "actual": "none",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "C1",
+      "title": "New phase, day 12: still in calibration",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "A new build phase started 12 days ago. Body fat slightly above range (watch), pace not established.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-02-25",
+        "daysInPhase": 11,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "trajectory_unavailable",
+          "paceUnverified": false
+        },
+        "guardrail": {
+          "status": "watch",
+          "position": "above",
+          "deviation": 0.3,
+          "span": 3,
+          "meaning": "unsafe",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "lean_tissue_estimated_from_weight_performance_and_intake",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "calibrating",
+          "daysInPhase": 11,
+          "checkpointDate": "2026-03-25",
+          "reasons": [
+            "initial_calibration_checkpoint_not_reached"
+          ]
+        },
+        "decision": {
+          "rung": "calibrating",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "watch",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "calibrating",
+        "eligibilityReasons": [
+          "initial_calibration_checkpoint_not_reached"
+        ],
+        "rung": "calibrating",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": null,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "watch",
+          "position": "above",
+          "deviation": 0.3,
+          "span": 3,
+          "meaning": "unsafe",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "calibrating",
+        "rung": "calibrating",
+        "originatesProposal": false
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "calibrating",
+          "actual": "calibrating",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "calibrating",
+          "actual": "calibrating",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "E1",
+      "title": "Insufficient evidence: few weigh-ins, and HealthKit nutrition sparse",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "Weight logged about 2 days/week (manual). HealthKit nutrition synced only about 2 days/week. Training logged.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 1.8/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake|daily_evidence: 1.8/wk (needs 5) · healthkit"
+        ],
+        "adherence": "insufficient_data",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "trajectory_unavailable",
+          "paceUnverified": false
+        },
+        "guardrail": {
+          "status": "watch",
+          "position": "above",
+          "deviation": 0.9,
+          "span": 3,
+          "meaning": "unsafe",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "insufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "insufficient",
+              "observedDaysPerWeek": 1.8,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": "not_logged_often_enough",
+              "promptAllowed": true
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "insufficient",
+              "observedDaysPerWeek": 1.8,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": "no_data_synced",
+              "promptAllowed": false
+            }
+          ],
+          "missing": [
+            {
+              "domain": "body_weight",
+              "missingReason": "not_logged_often_enough",
+              "promptAllowed": true
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "missingReason": "no_data_synced",
+              "promptAllowed": false
+            }
+          ],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "lean_tissue_estimated_from_weight_performance_and_intake",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "insufficient_data",
+          "share": null,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "insufficient_evidence",
+          "daysInPhase": 63,
+          "reasons": [
+            "evidence_coverage_insufficient"
+          ],
+          "missing": [
+            {
+              "domain": "body_weight",
+              "missingReason": "not_logged_often_enough",
+              "promptAllowed": true
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "missingReason": "no_data_synced",
+              "promptAllowed": false
+            }
+          ]
+        },
+        "decision": {
+          "rung": "evidence_coaching",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [
+            {
+              "kind": "missing_evidence",
+              "domain": "body_weight",
+              "text": "Log your morning weight on at least 4 days this week, before food or fluids.",
+              "placement": "coachTake.intoNextWeek"
+            }
+          ],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "watch",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "insufficient_evidence",
+        "eligibilityReasons": [
+          "evidence_coverage_insufficient"
+        ],
+        "rung": "evidence_coaching",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": null,
+        "coverage": "insufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "insufficient_data",
+        "guardrail": {
+          "status": "watch",
+          "position": "above",
+          "deviation": 0.9,
+          "span": 3,
+          "meaning": "unsafe",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [
+          {
+            "kind": "missing_evidence",
+            "domain": "body_weight",
+            "text": "Log your morning weight on at least 4 days this week, before food or fluids.",
+            "placement": "coachTake.intoNextWeek"
+          }
+        ],
+        "coachingCount": 1,
+        "coachingDomains": [
+          "body_weight"
+        ],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "insufficient_evidence",
+        "rung": "evidence_coaching",
+        "originatesProposal": false,
+        "coachingDomains": [
+          "body_weight"
+        ]
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "insufficient_evidence",
+          "actual": "insufficient_evidence",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "evidence_coaching",
+          "actual": "evidence_coaching",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "coachingDomains",
+          "expected": [
+            "body_weight"
+          ],
+          "actual": [
+            "body_weight"
+          ],
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "A1",
+      "title": "Poor plan adherence with full data coverage, but on track and in range",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "Every day is logged; intake runs well above target on most days, yet body fat is in range and pace is fine.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "consistent_nonadherence",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "ahead_with_reserve",
+          "measuredBasisState": "ahead_with_reserve",
+          "asOf": "2026-03-08",
+          "deadlineAt": "2026-05-31",
+          "timeRemainingDays": 84,
+          "measuredAt": "2026-03-05",
+          "elapsedSinceMeasurementDays": 3,
+          "remainingRequirement": 4,
+          "measuredRate": 0.06,
+          "requiredRate": 0.0476,
+          "measuredBasisRatio": 1.26,
+          "projectedAtPaceRatio": 1.305,
+          "projectedCompletionDate": "2026-05-11",
+          "storedTimeRemainingDays": null,
+          "storedScheduleState": null,
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 3,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "lean_tissue_estimated_from_weight_performance_and_intake",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "consistent_nonadherence",
+          "share": 0.214,
+          "direction": "over",
+          "consecutiveOffPlanWeeks": 2
+        },
+        "eligibility": {
+          "status": "adherence_coaching",
+          "daysInPhase": 63,
+          "reasons": [
+            "coach_adherence_before_adapting_the_goal"
+          ],
+          "direction": "over"
+        },
+        "decision": {
+          "rung": "adherence_coaching",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [
+            {
+              "kind": "adherence",
+              "text": "Most logged days ran above your calorie target. Aim to land within your target range on most days this week.",
+              "placement": "coachTake.intoNextWeek"
+            }
+          ],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "clear",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "adherence_coaching",
+        "eligibilityReasons": [
+          "coach_adherence_before_adapting_the_goal"
+        ],
+        "rung": "adherence_coaching",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "ahead_with_reserve",
+        "timeRemainingDays": 84,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "consistent_nonadherence",
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 3,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [
+          {
+            "kind": "adherence",
+            "text": "Most logged days ran above your calorie target. Aim to land within your target range on most days this week.",
+            "placement": "coachTake.intoNextWeek"
+          }
+        ],
+        "coachingCount": 1,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "adherence_coaching",
+        "rung": "adherence_coaching",
+        "originatesProposal": false,
+        "coachingCount": 1
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "adherence_coaching",
+          "actual": "adherence_coaching",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "adherence_coaching",
+          "actual": "adherence_coaching",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "coachingCount",
+          "expected": 1,
+          "actual": 1,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "A2",
+      "title": "Consistent overeating is pushing body fat above range",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "Intake above target on most days for two weeks and body fat pressured above 14%. The strategy itself may be unsustainable.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 63,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "consistent_nonadherence",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "ahead_with_reserve",
+          "measuredBasisState": "ahead_with_reserve",
+          "asOf": "2026-03-08",
+          "deadlineAt": "2026-05-31",
+          "timeRemainingDays": 84,
+          "measuredAt": "2026-03-05",
+          "elapsedSinceMeasurementDays": 3,
+          "remainingRequirement": 4,
+          "measuredRate": 0.06,
+          "requiredRate": 0.0476,
+          "measuredBasisRatio": 1.26,
+          "projectedAtPaceRatio": 1.305,
+          "projectedCompletionDate": "2026-05-11",
+          "storedTimeRemainingDays": null,
+          "storedScheduleState": null,
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 1.8,
+          "span": 3,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "lean_tissue_estimated_from_weight_performance_and_intake",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "consistent_nonadherence",
+          "share": 0.214,
+          "direction": "over",
+          "consecutiveOffPlanWeeks": 2
+        },
+        "eligibility": {
+          "status": "eligible_sustainability_review",
+          "daysInPhase": 63,
+          "reasons": [
+            "consistent_nonadherence_with_unsafe_guardrail_pressure"
+          ]
+        },
+        "decision": {
+          "rung": "sustainability_review",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "pressured",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible_sustainability_review",
+        "eligibilityReasons": [
+          "consistent_nonadherence_with_unsafe_guardrail_pressure"
+        ],
+        "rung": "sustainability_review",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "ahead_with_reserve",
+        "measuredBasisState": "ahead_with_reserve",
+        "timeRemainingDays": 84,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "consistent_nonadherence",
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 1.8,
+          "span": 3,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "eligibility": "eligible_sustainability_review",
+        "rung": "sustainability_review",
+        "originatesProposal": true
+      },
+      "checks": [
+        {
+          "key": "eligibility",
+          "expected": "eligible_sustainability_review",
+          "actual": "eligible_sustainability_review",
+          "pass": true
+        },
+        {
+          "key": "rung",
+          "expected": "sustainability_review",
+          "actual": "sustainability_review",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "Eating above your target is pushing body fat up. Review your plan so it's one you can keep."
+    },
+    {
+      "id": "G1",
+      "title": "Conflicting choice: keep building with the firm 8–9% ceiling and keep Oct 31",
+      "category": "mass_building",
+      "source": "founder_production_sanitized",
+      "situation": "Founder Oct 9 state. The user picks 'keep building', keeps 8–9% as a firm limit, and keeps Oct 31.",
+      "asOf": "2026-10-09",
+      "triggerFamily": "dexa_event_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-08-15",
+        "daysInPhase": 55,
+        "bodyCompositionScans": 3,
+        "coverage": [
+          "body_weight: 6.3/wk (needs 4) · manual",
+          "training_performance: 2.5/wk (needs 2) · manual",
+          "nutrition_intake: 6.5/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "at_risk",
+          "measuredBasisState": "at_risk",
+          "asOf": "2026-10-09",
+          "deadlineAt": "2026-10-31",
+          "timeRemainingDays": 22,
+          "measuredAt": "2026-10-09",
+          "elapsedSinceMeasurementDays": 0,
+          "remainingRequirement": 2.9,
+          "measuredRate": 0.0337,
+          "requiredRate": 0.1318,
+          "measuredBasisRatio": 0.2557,
+          "projectedAtPaceRatio": 0.2557,
+          "projectedCompletionDate": "2027-01-04",
+          "storedTimeRemainingDays": 22,
+          "storedScheduleState": "at_risk",
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise"
+          ]
+        },
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 0.5,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.3,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 2.5,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.5,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 55,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "resolve_constraint_conflict",
+          "triggerFamily": "dexa_event_briefing",
+          "trigger": "originate_optional",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": {
+          "valid": false,
+          "errors": [
+            "firm_ceiling_incompatible_with_continued_building_above_it"
+          ],
+          "warnings": [
+            "deadline_likely_unachievable_shown_as_at_risk"
+          ],
+          "silentAcceptance": false
+        },
+        "alternativeChoice": {
+          "valid": true,
+          "errors": [],
+          "warnings": [
+            "deadline_likely_unachievable_shown_as_at_risk"
+          ],
+          "silentAcceptance": false
+        }
+      },
+      "before": {
+        "recommendation": "continue_with_guardrail_monitoring",
+        "recommendationSource": "stored production V3 assessment",
+        "storedScheduleState": "at_risk",
+        "storedTimeRemainingDays": 22,
+        "v3GuardrailStatus": "pressured",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "resolve_constraint_conflict",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate_optional",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "at_risk",
+        "measuredBasisState": "at_risk",
+        "timeRemainingDays": 22,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 0.5,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": false,
+        "choiceErrors": [
+          "firm_ceiling_incompatible_with_continued_building_above_it"
+        ],
+        "alternativeValid": true,
+        "alternativeWarnings": [
+          "deadline_likely_unachievable_shown_as_at_risk"
+        ]
+      },
+      "expected": {
+        "rung": "resolve_constraint_conflict",
+        "choiceValid": false,
+        "choiceErrors": [
+          "firm_ceiling_incompatible_with_continued_building_above_it"
+        ],
+        "alternativeValid": true,
+        "alternativeWarnings": [
+          "deadline_likely_unachievable_shown_as_at_risk"
+        ]
+      },
+      "checks": [
+        {
+          "key": "rung",
+          "expected": "resolve_constraint_conflict",
+          "actual": "resolve_constraint_conflict",
+          "pass": true
+        },
+        {
+          "key": "choiceValid",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "choiceErrors",
+          "expected": [
+            "firm_ceiling_incompatible_with_continued_building_above_it"
+          ],
+          "actual": [
+            "firm_ceiling_incompatible_with_continued_building_above_it"
+          ],
+          "pass": true
+        },
+        {
+          "key": "alternativeValid",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        },
+        {
+          "key": "alternativeWarnings",
+          "expected": [
+            "deadline_likely_unachievable_shown_as_at_risk"
+          ],
+          "actual": [
+            "deadline_likely_unachievable_shown_as_at_risk"
+          ],
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "T1",
+      "title": "Time-limited leaning phase ends before the outcome",
+      "category": "leaning",
+      "source": "synthetic",
+      "situation": "A 4-week leaning phase reached its time limit; body fat came down but is not back in range.",
+      "asOf": "2026-03-08",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-02-08",
+        "daysInPhase": 28,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": {
+          "type": "temporary_leaning",
+          "endRule": "first_of",
+          "timeLimitReached": true,
+          "outcomeMet": false
+        }
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "not_measurable",
+          "measuredBasisState": "not_measurable",
+          "asOf": "2026-03-08",
+          "reason": "trajectory_unavailable",
+          "paceUnverified": false
+        },
+        "guardrail": {
+          "status": "watch",
+          "position": "above",
+          "deviation": 0.4,
+          "span": 3,
+          "meaning": "unsafe",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "lean_tissue_estimated_from_weight_performance_and_intake",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 28,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "phase_time_limit_review",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "watch",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "phase_time_limit_review",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "not_measurable",
+        "measuredBasisState": "not_measurable",
+        "timeRemainingDays": null,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "watch",
+          "position": "above",
+          "deviation": 0.4,
+          "span": 3,
+          "meaning": "unsafe",
+          "severity": "watch",
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "rung": "phase_time_limit_review",
+        "originatesProposal": true
+      },
+      "checks": [
+        {
+          "key": "rung",
+          "expected": "phase_time_limit_review",
+          "actual": "phase_time_limit_review",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "Your 4 weeks are up. Body fat came down but isn't back in range yet. The leaning phase continues until you decide."
+    },
+    {
+      "id": "GA1",
+      "title": "Goal achieved",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "A scan confirms the lean-mass target was reached.",
+      "asOf": "2026-05-20",
+      "triggerFamily": "dexa_event_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-01-04",
+        "daysInPhase": 136,
+        "bodyCompositionScans": 0,
+        "coverage": [
+          "body_weight: 6/wk (needs 4) · manual",
+          "training_performance: 3/wk (needs 2) · manual",
+          "nutrition_intake: 6/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "complete",
+          "measuredBasisState": "complete",
+          "asOf": "2026-05-20",
+          "deadlineAt": "2026-05-31"
+        },
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 3,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 3,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "estimated_without_body_composition_scan",
+          "precisionNote": "lean_tissue_estimated_from_weight_performance_and_intake",
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 136,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "goal_achieved",
+          "triggerFamily": "dexa_event_briefing",
+          "trigger": "originate_optional",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": "clear",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "goal_achieved",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate_optional",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "complete",
+        "measuredBasisState": "complete",
+        "timeRemainingDays": null,
+        "coverage": "sufficient",
+        "precision": "estimated_without_body_composition_scan",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "clear",
+          "position": "within",
+          "deviation": 0,
+          "meaning": "none",
+          "severity": "clear",
+          "span": 3,
+          "unsafePressure": false,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "rung": "goal_achieved",
+        "originatesProposal": true,
+        "scheduleState": "complete"
+      },
+      "checks": [
+        {
+          "key": "rung",
+          "expected": "goal_achieved",
+          "actual": "goal_achieved",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        },
+        {
+          "key": "scheduleState",
+          "expected": "complete",
+          "actual": "complete",
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": "You reached your goal. What should come next? Nothing changes until you choose."
+    },
+    {
+      "id": "D1",
+      "title": "User kept the plan; next Weekly has no material new evidence",
+      "category": "mass_building",
+      "source": "founder_production_sanitized",
+      "situation": "After the Oct 9 recommendation the user chose 'Keep my current plan'. The Oct 11 Weekly has no new scan or guardrail change.",
+      "asOf": "2026-10-11",
+      "triggerFamily": "weekly_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-08-15",
+        "daysInPhase": 57,
+        "bodyCompositionScans": 3,
+        "coverage": [
+          "body_weight: 6.3/wk (needs 4) · manual",
+          "training_performance: 2.5/wk (needs 2) · manual",
+          "nutrition_intake: 6.5/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "at_risk",
+          "measuredBasisState": "at_risk",
+          "asOf": "2026-10-11",
+          "deadlineAt": "2026-10-31",
+          "timeRemainingDays": 20,
+          "measuredAt": "2026-10-09",
+          "elapsedSinceMeasurementDays": 2,
+          "remainingRequirement": 2.9,
+          "measuredRate": 0.0337,
+          "requiredRate": 0.145,
+          "measuredBasisRatio": 0.2324,
+          "projectedAtPaceRatio": 0.2557,
+          "projectedCompletionDate": "2027-01-04",
+          "storedTimeRemainingDays": 22,
+          "storedScheduleState": "at_risk",
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise",
+            "progress_since_last_measurement_is_unmeasured"
+          ]
+        },
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 0.5,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.3,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 2.5,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.5,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 57,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "resolve_constraint_conflict",
+          "triggerFamily": "weekly_briefing",
+          "trigger": "originate",
+          "originatesProposal": false,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": false,
+            "reason": "suppressed_after_keep_plan_no_material_change"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": "at_risk",
+        "storedTimeRemainingDays": 22,
+        "v3GuardrailStatus": null,
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "resolve_constraint_conflict",
+        "originatesProposal": false,
+        "linkOnly": false,
+        "trigger": "originate",
+        "deferralReason": "suppressed_after_keep_plan_no_material_change",
+        "scheduleState": "at_risk",
+        "measuredBasisState": "at_risk",
+        "timeRemainingDays": 20,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 0.5,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "rung": "resolve_constraint_conflict",
+        "originatesProposal": false,
+        "deferralReason": "suppressed_after_keep_plan_no_material_change"
+      },
+      "checks": [
+        {
+          "key": "rung",
+          "expected": "resolve_constraint_conflict",
+          "actual": "resolve_constraint_conflict",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "deferralReason",
+          "expected": "suppressed_after_keep_plan_no_material_change",
+          "actual": "suppressed_after_keep_plan_no_material_change",
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "D2",
+      "title": "User kept the plan; a new scan shows body fat breached",
+      "category": "mass_building",
+      "source": "synthetic",
+      "situation": "After keeping the plan, a Nov 6 scan shows body fat now breached (1.6 points above range). Material new evidence.",
+      "asOf": "2026-11-06",
+      "triggerFamily": "dexa_event_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-08-15",
+        "daysInPhase": 83,
+        "bodyCompositionScans": 3,
+        "coverage": [
+          "body_weight: 6.3/wk (needs 4) · manual",
+          "training_performance: 2.5/wk (needs 2) · manual",
+          "nutrition_intake: 6.5/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "deadline_passed",
+          "measuredBasisState": "deadline_passed",
+          "asOf": "2026-11-06",
+          "deadlineAt": "2026-10-31",
+          "timeRemainingDays": -6,
+          "measuredAt": "2026-11-06",
+          "elapsedSinceMeasurementDays": 0,
+          "remainingRequirement": 2.4,
+          "measuredRate": 0.018,
+          "requiredRate": null,
+          "measuredBasisRatio": 0,
+          "projectedAtPaceRatio": 0,
+          "projectedCompletionDate": "2027-03-20",
+          "storedTimeRemainingDays": null,
+          "storedScheduleState": null,
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise"
+          ]
+        },
+        "guardrail": {
+          "status": "breached",
+          "position": "above",
+          "deviation": 1.6,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "breached",
+          "unsafePressure": true,
+          "unsafeBreach": true
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.3,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 2.5,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.5,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible_safety_exception",
+          "daysInPhase": 83,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "resolve_constraint_conflict",
+          "triggerFamily": "dexa_event_briefing",
+          "trigger": "originate_optional",
+          "originatesProposal": true,
+          "linkOnly": false,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "material_new_evidence_after_keep_plan"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": null,
+        "recommendationSource": "no V3 evaluation in this synthetic scenario",
+        "storedScheduleState": null,
+        "storedTimeRemainingDays": null,
+        "v3GuardrailStatus": null,
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible_safety_exception",
+        "eligibilityReasons": [],
+        "rung": "resolve_constraint_conflict",
+        "originatesProposal": true,
+        "linkOnly": false,
+        "trigger": "originate_optional",
+        "deferralReason": "material_new_evidence_after_keep_plan",
+        "scheduleState": "deadline_passed",
+        "measuredBasisState": "deadline_passed",
+        "timeRemainingDays": -6,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "breached",
+          "position": "above",
+          "deviation": 1.6,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "breached",
+          "unsafePressure": true,
+          "unsafeBreach": true
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "rung": "resolve_constraint_conflict",
+        "originatesProposal": true,
+        "deferralReason": "material_new_evidence_after_keep_plan",
+        "scheduleState": "deadline_passed"
+      },
+      "checks": [
+        {
+          "key": "rung",
+          "expected": "resolve_constraint_conflict",
+          "actual": "resolve_constraint_conflict",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        },
+        {
+          "key": "deferralReason",
+          "expected": "material_new_evidence_after_keep_plan",
+          "actual": "material_new_evidence_after_keep_plan",
+          "pass": true
+        },
+        {
+          "key": "scheduleState",
+          "expected": "deadline_passed",
+          "actual": "deadline_passed",
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    },
+    {
+      "id": "P1",
+      "title": "Photo Event without proven photo reliability",
+      "category": "mass_building",
+      "source": "founder_production_sanitized",
+      "situation": "Same evidence as Oct 9, but arriving with a Photo Event whose reliability has not been proven. It may link to the decision but not start one.",
+      "asOf": "2026-10-09",
+      "triggerFamily": "photo_event_briefing",
+      "evidence": {
+        "goalType": "lean_mass_gain",
+        "phaseStart": "2026-08-15",
+        "daysInPhase": 55,
+        "bodyCompositionScans": 3,
+        "coverage": [
+          "body_weight: 6.3/wk (needs 4) · manual",
+          "training_performance: 2.5/wk (needs 2) · manual",
+          "nutrition_intake: 6.5/wk (needs 5) · healthkit"
+        ],
+        "adherence": "adequate",
+        "outcomeTrend": null,
+        "outcomeTrendDays": null,
+        "belowRangeHistory": [],
+        "phaseState": null
+      },
+      "engine": {
+        "schedule": {
+          "basis": "elapsed_runway_measured_pace_unchanged",
+          "scheduleState": "at_risk",
+          "measuredBasisState": "at_risk",
+          "asOf": "2026-10-09",
+          "deadlineAt": "2026-10-31",
+          "timeRemainingDays": 22,
+          "measuredAt": "2026-10-09",
+          "elapsedSinceMeasurementDays": 0,
+          "remainingRequirement": 2.9,
+          "measuredRate": 0.0337,
+          "requiredRate": 0.1318,
+          "measuredBasisRatio": 0.2557,
+          "projectedAtPaceRatio": 0.2557,
+          "projectedCompletionDate": "2027-01-04",
+          "storedTimeRemainingDays": 22,
+          "storedScheduleState": "at_risk",
+          "paceUnverified": false,
+          "uncertainty": [
+            "measured_pace_is_not_a_promise"
+          ]
+        },
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 0.5,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coverage": {
+          "archetype": "lean_mass_gain",
+          "status": "sufficient",
+          "domains": [
+            {
+              "domain": "body_weight",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.3,
+              "requiredDaysPerWeek": 4,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "training_performance",
+              "status": "sufficient",
+              "observedDaysPerWeek": 2.5,
+              "requiredDaysPerWeek": 2,
+              "source": "manual",
+              "missingReason": null,
+              "promptAllowed": false
+            },
+            {
+              "domain": "nutrition_intake|daily_evidence",
+              "status": "sufficient",
+              "observedDaysPerWeek": 6.5,
+              "requiredDaysPerWeek": 5,
+              "source": "healthkit",
+              "missingReason": null,
+              "promptAllowed": false,
+              "satisfiedBy": "nutrition_intake"
+            }
+          ],
+          "missing": [],
+          "precision": "measured_body_composition_available",
+          "precisionNote": null,
+          "bodyCompositionScanRequired": false,
+          "supportingPhotoSessions": 0
+        },
+        "adherence": {
+          "status": "adequate",
+          "share": 0.846,
+          "direction": null,
+          "consecutiveOffPlanWeeks": 0
+        },
+        "eligibility": {
+          "status": "eligible",
+          "daysInPhase": 55,
+          "reasons": []
+        },
+        "decision": {
+          "rung": "resolve_constraint_conflict",
+          "triggerFamily": "photo_event_briefing",
+          "trigger": "originate_if_reliable_and_corroborated",
+          "originatesProposal": false,
+          "linkOnly": true,
+          "automaticChangeAllowed": false,
+          "coaching": [],
+          "deferral": {
+            "surface": true,
+            "reason": "no_prior_recommendation"
+          }
+        },
+        "choice": null,
+        "alternativeChoice": null
+      },
+      "before": {
+        "recommendation": "continue_with_guardrail_monitoring",
+        "recommendationSource": "stored production V3 assessment",
+        "storedScheduleState": "at_risk",
+        "storedTimeRemainingDays": 22,
+        "v3GuardrailStatus": "pressured",
+        "adaptationPath": "none: V3 has no adaptation rungs, no evidence/adherence eligibility and no deferral lifecycle"
+      },
+      "actual": {
+        "eligibility": "eligible",
+        "eligibilityReasons": [],
+        "rung": "resolve_constraint_conflict",
+        "originatesProposal": false,
+        "linkOnly": true,
+        "trigger": "originate_if_reliable_and_corroborated",
+        "deferralReason": "no_prior_recommendation",
+        "scheduleState": "at_risk",
+        "measuredBasisState": "at_risk",
+        "timeRemainingDays": 22,
+        "coverage": "sufficient",
+        "precision": "measured_body_composition_available",
+        "adherence": "adequate",
+        "guardrail": {
+          "status": "pressured",
+          "position": "above",
+          "deviation": 0.5,
+          "span": 1,
+          "meaning": "unsafe",
+          "severity": "pressured",
+          "unsafePressure": true,
+          "unsafeBreach": false
+        },
+        "coaching": [],
+        "coachingCount": 0,
+        "coachingDomains": [],
+        "choiceValid": null,
+        "choiceErrors": null,
+        "alternativeValid": null,
+        "alternativeWarnings": null
+      },
+      "expected": {
+        "rung": "resolve_constraint_conflict",
+        "originatesProposal": false,
+        "linkOnly": true
+      },
+      "checks": [
+        {
+          "key": "rung",
+          "expected": "resolve_constraint_conflict",
+          "actual": "resolve_constraint_conflict",
+          "pass": true
+        },
+        {
+          "key": "originatesProposal",
+          "expected": false,
+          "actual": false,
+          "pass": true
+        },
+        {
+          "key": "linkOnly",
+          "expected": true,
+          "actual": true,
+          "pass": true
+        }
+      ],
+      "pass": true,
+      "illustrativeCopy": null
+    }
+  ]
+}

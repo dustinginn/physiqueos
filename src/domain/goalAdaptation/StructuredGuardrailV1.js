@@ -12,6 +12,7 @@ import { GOAL_ADAPTATION_POLICY_V1 } from "./GoalAdaptationPolicyV1.js";
 const METRIC_KEYS = Object.freeze({
   "body_composition.body_fat_percentage": "body_fat_percentage",
   "body_composition.lean_mass": "lean_mass",
+  "body_weight.morning_weight": "body_weight",
 });
 
 export function structureV3Guardrail(v3Guardrail, { archetype, policy = GOAL_ADAPTATION_POLICY_V1 } = {}) {
@@ -24,7 +25,7 @@ export function structureV3Guardrail(v3Guardrail, { archetype, policy = GOAL_ADA
     structured: createStructuredGuardrail({
       guardrailId: v3Guardrail.guardrailId,
       metric,
-      unit: metric === "body_fat_percentage" ? "%" : null,
+      unit: metric === "body_fat_percentage" ? "%" : ["lean_mass", "body_weight"].includes(metric) ? "lb" : null,
       lower: range.min,
       upper: range.max,
       lowerMeaning: directions.lower ?? GuardrailBoundMeaning.UNSAFE,

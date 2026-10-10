@@ -70,7 +70,7 @@ export const GOAL_ADAPTATION_POLICY_V1 = deepFreeze({
       precisionSources: ["body_composition_scan"],
       supportingSources: ["validated_progress_photos"],
       uncertaintyWithoutPrecision: "composition_estimated_from_weight_stability",
-      guardrailDirections: { body_fat_percentage: { upper: "unsafe", lower: "unsafe" } },
+      guardrailDirections: { body_fat_percentage: { upper: "unsafe", lower: "unsafe" }, body_weight: { upper: "unsafe", lower: "unsafe" } },
     },
     strength: {
       matches: ["strength", "performance", "powerlifting"],
@@ -126,6 +126,9 @@ export const GOAL_ADAPTATION_POLICY_V1 = deepFreeze({
   schedule: {
     // Measured pace stays evidence-only; elapsed time only reduces the runway.
     atRiskRatio: 1,
+    // A pace measured over a shorter span is treated as not yet established
+    // (for example a short plateau that may be water or scale noise).
+    minimumEvidenceSpanDays: 14,
     deadlinePassed: "deadline_passed",
   },
 
@@ -135,6 +138,18 @@ export const GOAL_ADAPTATION_POLICY_V1 = deepFreeze({
     dexa_event_briefing: "originate_optional",
     photo_event_briefing: "originate_if_reliable_and_corroborated",
     midweek_briefing: "link_only",
+  },
+
+  outcome: {
+    // A stalled or regressing outcome becomes a strategy review only once it
+    // has persisted this long with adequate coverage and adherence.
+    sustainedTrendDays: 21,
+  },
+
+  deferral: {
+    // After "keep my current plan" or "remind me", a recommendation resurfaces
+    // only when the evidence fingerprint changes materially.
+    resurfaceOnlyOnMaterialChange: true,
   },
 
   materiality: {

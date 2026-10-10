@@ -20,7 +20,7 @@ export const ScheduleState = Object.freeze({
   NOT_MEASURABLE: "not_measurable",
 });
 
-export function correctScheduleForElapsedTime(trajectory, { asOf, atRiskRatio = 1 } = {}) {
+export function correctScheduleForElapsedTime(trajectory, { asOf, atRiskRatio = 1, minimumEvidenceSpanDays = 0 } = {}) {
   requireDate(asOf, "asOf");
   if (!trajectory || trajectory.supported === false) return unavailable(asOf, "trajectory_unavailable");
   const deadlineAt = dateOnly(trajectory.deadlineAt);
@@ -34,6 +34,10 @@ export function correctScheduleForElapsedTime(trajectory, { asOf, atRiskRatio = 
   const daysFromMeasurement = measuredAt ? daysBetween(measuredAt, deadlineAt) : null;
   const elapsedSinceMeasurement = measuredAt ? Math.max(0, daysBetween(measuredAt, asOf)) : null;
   if (rate == null || forecastRemaining == null) return unavailable(asOf, "measured_pace_unavailable", { deadlineAt, timeRemainingDays: daysLeft });
+  const span = number(trajectory.intervalDays);
+  if (span != null && span < minimumEvidenceSpanDays) {
+    return unavailable(asOf, "pace_not_established_measurement_span_too_short", { deadlineAt, timeRemainingDays: daysLeft, measurementSpanDays: span, minimumEvidenceSpanDays });
+  }
 
   const projectedDays = rate > 0 ? forecastRemaining / rate : Infinity;
   const projectedCompletionDate = Number.isFinite(projectedDays) && measuredAt ? addDays(measuredAt, Math.ceil(projectedDays)) : null;
