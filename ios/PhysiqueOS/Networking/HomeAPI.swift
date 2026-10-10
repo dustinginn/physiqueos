@@ -73,6 +73,43 @@ struct FixtureHomeAPI: HomeAPI {
                 ),
             ])
         }
+        // Source-shaped layout stress for the adaptive priority grid. It uses
+        // decoded occurrences and changes presentation fields only; Release
+        // builds and the normal redesign fixture remain untouched.
+        if ProcessInfo.processInfo.arguments.contains("-physiqueos.home-priority-layout-stress"),
+           home.todaysFocus.count >= 3 {
+            var morning = home.todaysFocus[0]
+            morning.id = "review-morning-weight"
+            var supplement = home.todaysFocus[2]
+            supplement.id = "review-supplement"
+            supplement.executionItemId = "execution-fadogia"
+            supplement.title = "Fadogia"
+            supplement.subtitle = "Every other day"
+            var dexa = home.todaysFocus[1]
+            dexa.id = "dexa-appointment:2026-10-04:upload-results"
+            dexa.title = "Upload the scheduled DEXA results"
+            dexa.subtitle = "The scheduled scan time has passed"
+            dexa.metadata = "Attach the BodySpec PDF to reconcile this appointment."
+            dexa.changeLabel = "Results needed"
+            dexa.actionLabel = "Upload DEXA Results"
+            dexa.urgency = .available
+            dexa.continueActionDestination = .dexaUpload
+            dexa.notificationAction?.workflow = "dexa_evidence"
+            var foam = home.todaysFocus[2]
+            foam.id = "review-foam"
+            foam.subtitle = "7:15 PM"
+            var peptide = home.todaysFocus[2]
+            peptide.id = "review-peptide"
+            peptide.executionItemId = "execution-tesamorelin"
+            peptide.title = "Tesamorelin"
+            peptide.subtitle = "10:29 PM · 0.5 mg"
+            var tail = home.todaysFocus[2]
+            tail.id = "review-tail"
+            tail.executionItemId = "execution-evening-walk"
+            tail.title = "Evening Walk"
+            tail.subtitle = "After dinner"
+            home.todaysFocus = [morning, supplement, dexa, foam, peptide, tail]
+        }
 #endif
         return home
     }

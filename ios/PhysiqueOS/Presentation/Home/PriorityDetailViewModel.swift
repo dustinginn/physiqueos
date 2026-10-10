@@ -11,7 +11,7 @@ enum FoamRollingPriorityPilotLaunchConfiguration {
     static let appearanceKey = "physiqueos.priority-pilot.appearance"
     /// Overnight Lane A: the whole locked family through the same seam.
     /// foam (default) | generic | peptide | paused | supplement | morning |
-    /// morning-completed | photos | dexa | completed | skipped | setup |
+    /// morning-completed | photos | dexa | dexa-upload | completed | skipped | setup |
     /// failed | not-found.
     static let variantKey = "physiqueos.priority-pilot.variant"
 
@@ -188,18 +188,34 @@ enum PriorityFamilyReviewFixtures {
             o.actionLabel = "Upload Photos"
             o.continueActionDestination = .photoUpload
             return withSkip(o)
-        case "dexa":
-            var o = base("dexa-appointment", "DEXA tomorrow", "Tomorrow at 7:30 AM", sections: [
-                ("What", "DEXA tomorrow", "Your DEXA appointment remains scheduled. This priority does not complete the scan itself."),
-                ("When", "Saturday, August 15, 2026 · 7:30 AM", "Timing uses America/Los_Angeles."),
-                ("Preparation", "Saved preparation note", "Use the saved clinic instructions."),
-                ("Why it matters", "Body-composition calibration", "Confirmed DEXA evidence updates the body-composition record supporting your current strategy."),
-            ])
+        case "dexa", "dexa-upload":
+            let upload = variant == "dexa-upload"
+            var o = base(
+                "dexa-appointment:2026-08-15:\(upload ? "upload-results" : "day-before")",
+                upload ? "Upload DEXA results" : "DEXA tomorrow",
+                upload ? "Action needed" : "Tomorrow at 7:30 AM",
+                sections: upload ? [
+                    ("What", "Upload DEXA results", "The scheduled scan time has passed. Upload the BodySpec PDF; this reminder clears only after confirmed evidence is reconciled."),
+                    ("When", "Saturday, August 15, 2026 · 7:30 AM", "Timing uses America/Los_Angeles."),
+                    ("Why it matters", "Body-composition calibration", "Confirmed DEXA evidence updates the body-composition record supporting your current strategy."),
+                ] : [
+                    ("What", "DEXA tomorrow", "Your DEXA appointment remains scheduled. This priority does not complete the scan itself."),
+                    ("When", "Saturday, August 15, 2026 · 7:30 AM", "Timing uses America/Los_Angeles."),
+                    ("Preparation", "Saved preparation note", "Use the saved clinic instructions."),
+                    ("Why it matters", "Body-composition calibration", "Confirmed DEXA evidence updates the body-composition record supporting your current strategy."),
+                ]
+            )
             o.completable = false
             o.completionContext = nil
-            o.urgency = .upcoming
-            o.actionLabel = "View DEXA Appointment"
-            o.continueActionDestination = .operatingPlanDexaAppointment
+            o.urgency = upload ? .available : .upcoming
+            o.actionLabel = upload ? "Upload DEXA Results" : "View DEXA Appointment"
+            o.continueActionDestination = upload ? .dexaUpload : .operatingPlanDexaAppointment
+            o.notificationAction = .init(
+                classification: .specializedWorkflowRequired,
+                workflow: upload ? "dexa_evidence" : "dexa_appointment",
+                scheduledTime: "07:30",
+                completionCommand: nil
+            )
             return o
         case "completed":
             var o = foam

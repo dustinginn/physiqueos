@@ -38,6 +38,7 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
             ("morning-completed", ["priorityDetail.viewWeight"], ["priorityDetail.markComplete", "priorityDetail.markSkipped", "priorityDetail.logWeight"]),
             ("photos", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner", "priorityDetail.markSkipped"], ["priorityDetail.markComplete"]),
             ("dexa", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
+            ("dexa-upload", ["priorityDetail.evidenceAction", "priorityDetail.evidenceBanner"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
             ("completed", ["priorityDetail.completed"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
             ("skipped", ["priorityDetail.skipped"], ["priorityDetail.markComplete", "priorityDetail.markSkipped"]),
             ("setup", ["priorityDetail.reviewSupport"], ["priorityDetail.markComplete"]),
@@ -69,6 +70,30 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
             }
             XCTAssertFalse(app.tabBars.firstMatch.exists, "\(expectation.variant): no persistent tab bar")
         }
+    }
+
+    func testPostAppointmentDexaOpensTheExistingPDFIntakeWithoutManualDisposition() {
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.priority-pilot.enabled", "YES",
+            "-physiqueos.priority-pilot.appearance", "dark",
+            "-physiqueos.priority-pilot.variant", "dexa-upload",
+            "-physiqueos.evidence-review.production-intake",
+        ]
+        app.launch()
+
+        let upload = app.buttons["priorityDetail.evidenceAction"]
+        XCTAssertTrue(upload.waitForExistence(timeout: 8))
+        XCTAssertEqual(upload.label, "Upload DEXA Results")
+        XCTAssertFalse(app.buttons["priorityDetail.markComplete"].exists)
+        XCTAssertFalse(app.buttons["priorityDetail.markSkipped"].exists)
+        capture("build94-dexa-upload-priority-dark")
+
+        upload.tap()
+        XCTAssertTrue(app.staticTexts["DEXA Scan"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["productionEvidenceUpload.choosePDF"].exists)
+        XCTAssertFalse(app.buttons["priorityDetail.markComplete"].exists)
+        capture("build94-dexa-pdf-intake-dark")
     }
 
     // MARK: Overnight Lane A — daily capture, Confidence, Watch appearance
@@ -176,6 +201,42 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
             XCTAssertGreaterThan(foam.frame.minY, morning.frame.maxY, appearance)
             XCTAssertGreaterThan(foam.frame.width, morning.frame.width * 1.7, appearance)
             XCTAssertTrue(app.staticTexts["7:15 PM · Lower-body recovery and mobility"].exists)
+        }
+    }
+
+    func testHomeAdaptivePriorityRowsPromoteLongContentAndKeepShortPairs() {
+        for appearance in ["dark", "light"] {
+            app.terminate()
+            app.launchArguments = [
+                "-physiqueos.native.authority-selection.v1", "sandbox",
+                "-physiqueos.appearance-review.value", appearance,
+                "-physiqueos.appearance-review.route", "home",
+                "-physiqueos.redesign-review",
+                "-physiqueos.home-priority-layout-stress",
+            ]
+            app.launch()
+            XCTAssertTrue(app.staticTexts["4 weeks"].waitForExistence(timeout: 8))
+
+            let morning = app.descendants(matching: .any)["home.priority.review-morning-weight"]
+            let supplement = app.descendants(matching: .any)["home.priority.review-supplement"]
+            let dexa = app.descendants(matching: .any)["home.priority.dexa-appointment:2026-10-04:upload-results"]
+            let foam = app.descendants(matching: .any)["home.priority.review-foam"]
+            let peptide = app.descendants(matching: .any)["home.priority.review-peptide"]
+            let tail = app.descendants(matching: .any)["home.priority.review-tail"]
+            XCTAssertTrue(morning.waitForExistence(timeout: 8), appearance)
+            for element in [supplement, dexa, foam, peptide, tail] {
+                XCTAssertTrue(element.exists, appearance)
+            }
+            XCTAssertEqual(morning.frame.minY, supplement.frame.minY, accuracy: 2, appearance)
+            XCTAssertGreaterThan(dexa.frame.minY, morning.frame.maxY, appearance)
+            XCTAssertGreaterThan(dexa.frame.width, morning.frame.width * 1.7, appearance)
+            XCTAssertEqual(foam.frame.minY, peptide.frame.minY, accuracy: 2, appearance)
+            XCTAssertGreaterThan(tail.frame.minY, foam.frame.maxY, appearance)
+            XCTAssertEqual(tail.frame.width, dexa.frame.width, accuracy: 2, appearance)
+            XCTAssertTrue(app.staticTexts["Upload DEXA Results"].exists, appearance)
+
+            scrollFullyIntoView(dexa)
+            capture("build94-adaptive-priorities-\(appearance)")
         }
     }
 

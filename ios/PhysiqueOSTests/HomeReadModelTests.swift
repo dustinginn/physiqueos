@@ -31,6 +31,41 @@ final class HomeReadModelTests: XCTestCase {
         ))
     }
 
+    func testPriorityGridKeepsShortPairsAndPromotesOnlyContentHeavyRows() {
+        var shortA = Self.executionContextItem(title: "Foam Roll", time: "17:00", dose: nil)
+        var long = Self.executionContextItem(
+            title: "Upload the scheduled DEXA results",
+            time: nil,
+            dose: nil
+        )
+        long.actionLabel = "Upload DEXA Results"
+        var shortB = Self.executionContextItem(title: "Fadogia", time: "20:00", dose: nil)
+        var shortC = Self.executionContextItem(title: "Tesamorelin", time: "22:00", dose: nil)
+        var tail = Self.executionContextItem(title: "Morning Check-In", time: "06:00", dose: nil)
+        shortA.id = "a"; long.id = "long"; shortB.id = "b"; shortC.id = "c"; tail.id = "tail"
+
+        let rows = TodaysFocusGridLayout.rows(
+            items: [shortA, long, shortB, shortC, tail],
+            dynamicTypeSize: .large
+        )
+
+        XCTAssertEqual(rows.map(\.indices), [[0], [1], [2, 3], [4]])
+        XCTAssertTrue(TodaysFocusGridLayout.requiresFullWidth(long))
+        XCTAssertFalse(TodaysFocusGridLayout.requiresFullWidth(shortB))
+    }
+
+    func testPriorityGridUsesFullWidthForEveryAccessibilityRow() {
+        let items = [
+            Self.executionContextItem(title: "One", time: "08:00", dose: nil),
+            Self.executionContextItem(title: "Two", time: "09:00", dose: nil),
+            Self.executionContextItem(title: "Three", time: "10:00", dose: nil),
+        ]
+        XCTAssertEqual(
+            TodaysFocusGridLayout.rows(items: items, dynamicTypeSize: .accessibility1).map(\.indices),
+            [[0], [1], [2]]
+        )
+    }
+
     func testMorningRemovesOnlyInlineCompleteWhileKeepingNavigationAndProjectedSkip() {
         var morning = Self.executionContextItem(title: "Morning Weigh-In", time: "05:30", dose: nil)
         morning.id = "reminder_morning_weight"

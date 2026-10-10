@@ -12,17 +12,8 @@ struct TodaysFocusCardView: View {
     var onSkip: (PriorityOccurrence) -> Void = { _ in }
     var onSkipSessionItem: (String, PrioritySessionItem) -> Void = { _, _ in }
 
-    private var useSingleColumn: Bool {
-        TodaysFocusGridLayout.usesSingleColumn(
-            itemCount: items.count,
-            containsExpandedContent: items.contains { $0.actionLabel != nil || $0.sessionItems != nil },
-            dynamicTypeSize: dynamicTypeSize
-        )
-    }
-
-    private var density: FocusTileView.Density {
-        if useSingleColumn { return .expanded }
-        return items.count == 2 ? .balanced : .compact
+    private var rows: [TodaysFocusGridLayout.Row] {
+        TodaysFocusGridLayout.rows(items: items, dynamicTypeSize: dynamicTypeSize)
     }
 
     var body: some View {
@@ -37,38 +28,18 @@ struct TodaysFocusCardView: View {
                     .foregroundStyle(PhysiqueOSTheme.redesignPurple)
             }
             VStack(alignment: .leading, spacing: 10) {
-                if useSingleColumn {
-                    VStack(spacing: 8) {
-                        ForEach(items) { item in
-                            if let sessionItems = item.sessionItems {
-                                SessionPriorityCardView(
-                                    item: item, sessionItems: sessionItems,
-                                    skippingIDs: skippingIDs, onTap: onTap,
-                                    onSkip: { child in onSkipSessionItem(item.id, child) }
-                                )
-                                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
-                            } else {
-                                FocusTileView(
-                                    item: item, density: density, onTap: onTap,
-                                    onComplete: onComplete, onSkip: onSkip,
-                                    isCompleting: completingIDs.contains(item.id),
-                                    isSkipping: skippingIDs.contains(item.id)
-                                )
-                                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
-                            }
-                        }
-                    }
-                } else {
-                    Grid(horizontalSpacing: 8, verticalSpacing: 8) {
-                        ForEach(TodaysFocusGridLayout.rows(itemCount: items.count), id: \.lowerBound) { row in
-                            if row.count == 1, let index = row.first {
-                                focusTile(items[index])
-                                    .gridCellColumns(2)
-                            } else {
-                                GridRow {
-                                    ForEach(Array(row), id: \.self) { index in
-                                        focusTile(items[index])
-                                    }
+                Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                    ForEach(rows) { row in
+                        if row.indices.count == 1, let index = row.indices.first {
+                            priorityContent(items[index], density: .expanded)
+                                .gridCellColumns(2)
+                        } else {
+                            GridRow {
+                                ForEach(row.indices, id: \.self) { index in
+                                    priorityContent(
+                                        items[index],
+                                        density: items.count == 2 ? .balanced : .compact
+                                    )
                                 }
                             }
                         }
@@ -82,27 +53,84 @@ struct TodaysFocusCardView: View {
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(PhysiqueOSTheme.redesignRule))
     }
 
-    private func focusTile(_ item: PriorityOccurrence) -> some View {
-        FocusTileView(
-            item: item, density: density, onTap: onTap,
-            onComplete: onComplete, onSkip: onSkip,
-            isCompleting: completingIDs.contains(item.id),
-            isSkipping: skippingIDs.contains(item.id)
-        )
-        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+    @ViewBuilder
+    private func priorityContent(
+        _ item: PriorityOccurrence,
+        density: FocusTileView.Density
+    ) -> some View {
+        if let sessionItems = item.sessionItems {
+            SessionPriorityCardView(
+                item: item, sessionItems: sessionItems,
+                skippingIDs: skippingIDs, onTap: onTap,
+                onSkip: { child in onSkipSessionItem(item.id, child) }
+            )
+            .transition(.opacity.combined(with: .scale(scale: 0.92)))
+        } else {
+            FocusTileView(
+                item: item, density: density, onTap: onTap,
+                onComplete: onComplete, onSkip: onSkip,
+                isCompleting: completingIDs.contains(item.id),
+                isSkipping: skippingIDs.contains(item.id)
+            )
+            .transition(.opacity.combined(with: .scale(scale: 0.92)))
+        }
     }
 }
 
-/// Deterministic two-column packing for Home priorities. Every complete pair
-/// occupies a normal row; an odd final item gets the full two-column span.
-/// Accessibility Dynamic Type switches the whole set to the existing expanded
-/// single-column treatment instead of squeezing readable copy or controls.
+/// Deterministic content-aware packing for Home priorities. Short adjacent
+/// items share a row. A content-heavy item, grouped session, accessibility-size
+/// item, or unmatched tail gets the full two-column span without changing the
+/// canonical item order.
 enum TodaysFocusGridLayout {
+    struct Row: Identifiable, Equatable {
+        let indices: [Int]
+        var id: Int { indices[0] }
+    }
+
     static func rows(itemCount: Int) -> [Range<Int>] {
         guard itemCount > 0 else { return [] }
         return stride(from: 0, to: itemCount, by: 2).map {
             $0..<min($0 + 2, itemCount)
         }
+    }
+
+    static func rows(
+        items: [PriorityOccurrence],
+        dynamicTypeSize: DynamicTypeSize
+    ) -> [Row] {
+        guard !items.isEmpty else { return [] }
+        if dynamicTypeSize.isAccessibilitySize {
+            return items.indices.map { Row(indices: [$0]) }
+        }
+        var result: [Row] = []
+        var index = items.startIndex
+        while index < items.endIndex {
+            if requiresFullWidth(items[index]) {
+                result.append(Row(indices: [index]))
+                index += 1
+                continue
+            }
+            let next = index + 1
+            if next < items.endIndex, !requiresFullWidth(items[next]) {
+                result.append(Row(indices: [index, next]))
+                index += 2
+            } else {
+                result.append(Row(indices: [index]))
+                index += 1
+            }
+        }
+        return result
+    }
+
+    /// Content signals are deliberately presentation-only. Identity and copy
+    /// stay Server-owned; this merely avoids asking a half-width card to carry
+    /// a control/status chip or text that predictably wraps into a cramped tile.
+    static func requiresFullWidth(_ item: PriorityOccurrence) -> Bool {
+        if item.sessionItems != nil { return true }
+        if hasText(item.actionLabel) || hasText(item.changeLabel) { return true }
+        if textLength(item.title) > 24 { return true }
+        if textLength(item.subtitle) > 32 { return true }
+        return textLength(item.metadata) > 46
     }
 
     static func usesSingleColumn(
@@ -111,6 +139,14 @@ enum TodaysFocusGridLayout {
         dynamicTypeSize: DynamicTypeSize
     ) -> Bool {
         itemCount == 1 || containsExpandedContent || dynamicTypeSize.isAccessibilitySize
+    }
+
+    private static func hasText(_ value: String?) -> Bool {
+        textLength(value) > 0
+    }
+
+    private static func textLength(_ value: String?) -> Int {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0
     }
 }
 
