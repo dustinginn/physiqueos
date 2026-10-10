@@ -1074,6 +1074,23 @@ final class EvidenceIntakeReviewUITests: XCTestCase {
         XCTAssertTrue(element("evidenceReview.lifecycle").waitForExistence(timeout: 10))
         XCTAssertFalse(element("evidenceReview.confirm").exists)
     }
+
+    func testAcceptedProcessingRemainsNonActionableAtAccessibilitySizeInDarkAndMineral() {
+        for appearance in ["dark", "light"] {
+            launch("evidence:review=fixture-state-accepted", [
+                "-physiqueos.appearance-review.value", appearance,
+                "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge",
+            ])
+            let lifecycle = element("evidenceReview.lifecycle")
+            XCTAssertTrue(lifecycle.waitForExistence(timeout: 10), appearance)
+            XCTAssertFalse(element("evidenceReview.confirm").exists, appearance)
+            XCTAssertFalse(element("evidenceReview.dismiss").exists, appearance)
+            let back = element("evidenceReview.backToLog")
+            XCTAssertTrue(back.exists, appearance)
+            XCTAssertFalse(back.label.isEmpty, "The processing escape action must remain named for assistive technology.")
+            app.terminate()
+        }
+    }
 }
 
 /// Build 90 Founder-approved Energy + Recovery/Sleep redesign: journeys,
