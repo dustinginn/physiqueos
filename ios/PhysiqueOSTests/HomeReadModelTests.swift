@@ -197,7 +197,19 @@ final class HomeReadModelTests: XCTestCase {
         let model = try JSONDecoder().decode(HomeReadModel.self, from: Data(contentsOf: url))
         XCTAssertEqual(model.hero.confidence, 79)
         XCTAssertEqual(model.hero.primaryTimeline, "4 weeks to goal target")
-        XCTAssertEqual(model.briefingCards.count, 1)
+        XCTAssertEqual(model.briefingCards.count, 2)
+        XCTAssertEqual(model.briefingCards.map(\.id), [
+            "dexa_event_dexa-fixture-005",
+            "midweek_briefing_2026-09-06_2026-09-08",
+        ])
+        XCTAssertEqual(model.briefingCards.map(\.sectionLabel), ["Event Briefing", "Midweek Briefing"])
+        XCTAssertEqual(
+            model.briefingCards.map(\.destination),
+            [
+                .briefingDetail(briefingId: "dexa_event_dexa-fixture-005"),
+                .briefingDetail(briefingId: "midweek_briefing_2026-09-06_2026-09-08"),
+            ]
+        )
         XCTAssertEqual(model.todaysFocus.count, 3)
         guard case .phaseTrajectory(let trajectory) = try XCTUnwrap(model.goals.first).presentation else {
             return XCTFail("The locked Home review state must exercise the two-phase trajectory.")
@@ -212,6 +224,27 @@ final class HomeReadModelTests: XCTestCase {
         XCTAssertEqual(
             HomeJourneyTimingPresentation.phaseDetail(for: activePhase, remainingPeriod: "4 weeks"),
             "Aug 15 – Oct 31 · about 4 weeks remaining"
+        )
+    }
+
+    func testSecondaryBriefingEditorialRailKeepsApprovedGeometryAndAccessibleReadingOrder() throws {
+        XCTAssertEqual(HomeSecondaryBriefingLayout.cornerRadius, 18)
+        XCTAssertEqual(HomeSecondaryBriefingLayout.railWidth, 5)
+        XCTAssertEqual(HomeSecondaryBriefingLayout.arrowHitWidth, 44)
+        XCTAssertGreaterThanOrEqual(HomeSecondaryBriefingLayout.minimumHeight, 118)
+
+        let now = try XCTUnwrap(ISO8601DateFormatter.homeFixture.date(from: "2026-10-09T18:00:00.000Z"))
+        let card = HomeBriefingCard(
+            id: "midweek",
+            sectionLabel: "Midweek Briefing",
+            title: "Midweek Briefing Ready",
+            prompt: "Review the week so far.",
+            createdAt: "2026-10-07T14:00:00.000Z",
+            destination: .briefingDetail(briefingId: "midweek")
+        )
+        XCTAssertEqual(
+            BriefingCardView.accessibilityLabel(for: card, now: now),
+            "Midweek Briefing, Midweek Briefing Ready, Review the week so far., Oct 7"
         )
     }
 

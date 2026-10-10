@@ -25,12 +25,19 @@
     "destination": { "id": "check-in", "parameters": { "checkInType": "morning" } }
   },
   "briefingCards": [{
-    "id": "briefing-midweek-review",
-    "sectionLabel": "Latest Briefing",
-    "title": "Weekly Briefing Ready",
-    "prompt": "Keep executing consistently. Keep the current setup in place.",
-    "createdAt": "2026-09-23T14:00:00.000Z",
-    "destination": { "id": "briefing.detail", "parameters": { "briefingId": "briefing-midweek-review" } }
+    "id": "dexa_event_dexa-fixture-005",
+    "sectionLabel": "Event Briefing",
+    "title": "DEXA Analysis Ready",
+    "prompt": "Review composition changes and the next phase implications.",
+    "createdAt": "2026-10-09T14:00:00.000Z",
+    "destination": { "id": "briefing.detail", "parameters": { "briefingId": "dexa_event_dexa-fixture-005" } }
+  }, {
+    "id": "midweek_briefing_2026-09-06_2026-09-08",
+    "sectionLabel": "Midweek Briefing",
+    "title": "Midweek Briefing Ready",
+    "prompt": "Review the week so far.",
+    "createdAt": "2026-10-07T14:00:00.000Z",
+    "destination": { "id": "briefing.detail", "parameters": { "briefingId": "midweek_briefing_2026-09-06_2026-09-08" } }
   }],
   "goals": [{
     "id": "goal_fixture_build_lean_mass",

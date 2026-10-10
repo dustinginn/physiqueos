@@ -203,6 +203,63 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         XCTAssertEqual(tiles[1].frame.width, tiles[2].frame.width, accuracy: 2)
     }
 
+    func testHomeSecondaryBriefingEditorialRailDarkAndMineralLightNavigates() {
+        for appearance in ["dark", "light"] {
+            launchHomeParity(appearance: appearance)
+
+            let primary = app.buttons["home.latestBriefing"]
+            let secondary = app.buttons["home.briefing.midweek_briefing_2026-09-06_2026-09-08"]
+            XCTAssertTrue(primary.waitForExistence(timeout: 5), appearance)
+            XCTAssertTrue(secondary.waitForExistence(timeout: 5), appearance)
+            XCTAssertGreaterThan(secondary.frame.minY, primary.frame.maxY, "Secondary placement changed in \(appearance).")
+            XCTAssertGreaterThanOrEqual(secondary.frame.width, app.frame.width - 38, "Editorial Rail must remain full width.")
+            XCTAssertGreaterThanOrEqual(secondary.frame.height, 118)
+            XCTAssertTrue(secondary.label.contains("Midweek Briefing, Midweek Briefing Ready"))
+            XCTAssertTrue(secondary.label.contains("Review the week so far."))
+            XCTAssertTrue(secondary.label.contains("Oct 7"))
+
+            scrollFullyIntoView(secondary)
+            capture("home-secondary-editorial-rail-\(appearance)")
+
+            // Tap the teal-rail side, not just the text or arrow, proving the
+            // approved full-card interaction survives the visual redesign.
+            secondary.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
+            XCTAssertTrue(secondary.waitForNonExistence(timeout: 5), "The full Editorial Rail did not navigate in \(appearance).")
+            XCTAssertTrue(
+                app.staticTexts["Nothing here changes last week's plan."].waitForExistence(timeout: 8),
+                "Secondary card lost its Midweek destination in \(appearance)."
+            )
+        }
+    }
+
+    func testHomeSecondaryBriefingHandlesAccessibilityTypeLongCopyAndMultipleRails() {
+        app.terminate()
+        app.launchArguments = [
+            "-physiqueos.native.authority-selection.v1", "sandbox",
+            "-physiqueos.appearance-review.value", "dark",
+            "-physiqueos.appearance-review.route", "home",
+            "-physiqueos.redesign-review",
+            "-physiqueos.home-secondary-briefing-stress",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+        ]
+        app.launch()
+
+        let midweek = app.buttons["home.briefing.midweek_briefing_2026-09-06_2026-09-08"]
+        let longCopy = app.buttons["home.briefing.briefing-secondary-long-copy"]
+        let third = app.buttons["home.briefing.briefing-secondary-third"]
+        XCTAssertTrue(midweek.waitForExistence(timeout: 8))
+        XCTAssertTrue(longCopy.exists)
+        XCTAssertTrue(third.exists)
+        XCTAssertEqual(midweek.frame.width, longCopy.frame.width, accuracy: 2)
+        XCTAssertEqual(longCopy.frame.width, third.frame.width, accuracy: 2)
+        XCTAssertGreaterThan(longCopy.frame.height, midweek.frame.height, "Long text must expand the rail instead of truncating or crowding it.")
+        XCTAssertTrue(longCopy.label.contains("A longer briefing title that must wrap without truncation or crowding"))
+        XCTAssertTrue(longCopy.label.contains("Review the complete evidence window"))
+        XCTAssertGreaterThan(third.frame.minY, longCopy.frame.maxY, "Two-plus secondary cards must remain distinct ordered rails.")
+        scrollUntilHittable(longCopy)
+        XCTAssertTrue(longCopy.isHittable)
+    }
+
     func testAppearanceControlAppliesImmediateNonColorSelectionState() {
         app.launchArguments += [
             "-physiqueos.native.authority-selection.v1", "sandbox",
@@ -350,6 +407,25 @@ final class FoamRollingPriorityDetailUITests: XCTestCase {
         ]
         app.launch()
         XCTAssertTrue(app.staticTexts["4 weeks"].waitForExistence(timeout: 8))
+    }
+
+    private func scrollFullyIntoView(_ element: XCUIElement, attempts: Int = 10) {
+        let visibleTop = app.frame.minY + 56
+        let visibleBottom = app.frame.maxY - 96
+        for _ in 0..<attempts {
+            let frame = element.frame
+            if frame.minY >= visibleTop, frame.maxY <= visibleBottom, element.isHittable { return }
+            if frame.maxY > visibleBottom { app.swipeUp() } else { app.swipeDown() }
+        }
+        XCTFail("Element never became fully visible: \(element.identifier)")
+    }
+
+    private func scrollUntilHittable(_ element: XCUIElement, attempts: Int = 10) {
+        for _ in 0..<attempts {
+            if element.isHittable { return }
+            app.swipeUp()
+        }
+        XCTFail("Element never exposed a hittable region: \(element.identifier)")
     }
 
     private func assertCorrectedHomeParity() {

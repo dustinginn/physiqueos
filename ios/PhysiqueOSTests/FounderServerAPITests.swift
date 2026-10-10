@@ -1509,6 +1509,25 @@ final class FounderServerAPITests: XCTestCase {
         XCTAssertEqual(card.destination, .briefingDetail(briefingId: card.id))
     }
 
+    func testProductionHomePreservesEventFirstBriefingOrderAndEveryDestination() async throws {
+        let homeJSON = productionEnvelope(resource: "home", data: #"{"header":{"greeting":"Good morning","name":"Founder"},"hero":{"mode":"active","goalLabel":"Current Goal","headline":"On track","supportLine":"Canonical state"},"nextBestAction":{"title":"Review today","icon":"target","destination":{"id":"goal.detail","parameters":{"goalId":"goal-canonical"}}},"briefingCards":[{"id":"dexa-event-first","sectionLabel":"Event Briefing","title":"DEXA Analysis Ready","prompt":"Review composition changes.","createdAt":"2026-10-09T14:00:00.000Z","destination":{"id":"briefing.detail","parameters":{"briefingId":"scan-address"}}},{"id":"midweek-second","sectionLabel":"Midweek Briefing","title":"Midweek Briefing Ready","prompt":"Review the week so far.","createdAt":"2026-10-07T14:00:00.000Z","destination":{"id":"briefing.detail","parameters":{"briefingId":"midweek-second"}}}],"goals":[],"todaysFocus":[]}"#)
+        let transport = RoutedFounderTransport(
+            pairing: sessionJSON(access: "a", refresh: "r"),
+            byResource: ["home": homeJSON]
+        )
+        let native = ProductionNativeAPI(baseURL: testOrigin, credentialStore: MemoryCredentialStore(), transport: transport)
+        _ = try await native.pair(pairingCredential: String(repeating: "p", count: 43), displayName: "Founder iPhone")
+
+        let home = try await ProductionHomeAPI(api: native).fetchHome()
+        let cards = home.briefingCards
+        XCTAssertEqual(cards.map(\.id), ["dexa-event-first", "midweek-second"])
+        XCTAssertEqual(cards.map(\.sectionLabel), ["Event Briefing", "Midweek Briefing"])
+        XCTAssertEqual(cards.map(\.destination), [
+            .briefingDetail(briefingId: "dexa-event-first"),
+            .briefingDetail(briefingId: "midweek-second"),
+        ])
+    }
+
     func testProductionGoalsHandlesEmptyActiveStateAndPreservesCanonicalGoalPhaseIDs() async throws {
         let transport = SequencedFounderTransport([
             .json(200, sessionJSON(access: "a", refresh: "r")),

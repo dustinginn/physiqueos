@@ -47,6 +47,33 @@ struct FixtureHomeAPI: HomeAPI {
             throw FixtureError.resourceNotFound
         }
         let data = try Data(contentsOf: url)
-        return try JSONDecoder().decode(HomeReadModel.self, from: data)
+        var home = try JSONDecoder().decode(HomeReadModel.self, from: data)
+#if DEBUG
+        // Layout-only stress seam for focused UI coverage. The normal review
+        // fixture remains the exact two-briefing acceptance state; this adds
+        // long copy and multiple secondary rails without changing shipping
+        // data, ordering, or routing behavior.
+        if ProcessInfo.processInfo.arguments.contains("-physiqueos.home-secondary-briefing-stress") {
+            home.briefingCards.append(contentsOf: [
+                HomeBriefingCard(
+                    id: "briefing-secondary-long-copy",
+                    sectionLabel: "Weekly Briefing",
+                    title: "A longer briefing title that must wrap without truncation or crowding",
+                    prompt: "Review the complete evidence window before deciding whether the current training and nutrition plan should change.",
+                    createdAt: "2026-10-05T14:00:00.000Z",
+                    destination: .briefingDetail(briefingId: "weekly_briefing_2026-10-26_2026-11-01")
+                ),
+                HomeBriefingCard(
+                    id: "briefing-secondary-third",
+                    sectionLabel: "Monthly Briefing",
+                    title: "Monthly Briefing Ready",
+                    prompt: "Review the full month in context.",
+                    createdAt: "2026-10-01T14:00:00.000Z",
+                    destination: .briefingDetail(briefingId: "monthly_briefing_2026-10")
+                ),
+            ])
+        }
+#endif
+        return home
     }
 }
