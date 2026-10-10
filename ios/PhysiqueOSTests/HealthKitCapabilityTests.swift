@@ -144,6 +144,118 @@ final class HealthKitCapabilityTests: XCTestCase {
         XCTAssertEqual(coordinator.currentAvailability, .available)
     }
 
+    func testCompletedTypeSetIsDurableAcrossLaunchesAndBuilds() async {
+        let receipts = MemoryAuthorizationReceiptStore()
+        let firstService = MockHealthKitService(
+            deviceAvailability: .available,
+            requestRequirement: .shouldRequest
+        )
+        let first = coordinator(service: firstService, authorizationEnabled: true, receipts: receipts)
+
+        let firstOutcome = await first.requestAuthorization(for: .automaticRead)
+        XCTAssertEqual(firstOutcome, .completed)
+        XCTAssertEqual(firstService.authorizationCalls, 1)
+
+        let upgradedService = MockHealthKitService(
+            deviceAvailability: .available,
+            requestRequirement: .shouldRequest
+        )
+        let upgraded = coordinator(service: upgradedService, authorizationEnabled: true, receipts: receipts)
+        let upgradedOutcome = await upgraded.requestAuthorization(
+            for: .automaticRead,
+            reason: .foregroundSynchronization
+        )
+        XCTAssertEqual(upgradedOutcome, .completed)
+        XCTAssertEqual(upgradedService.requirementCalls, 0, "Same type set must not be re-preflighted after an update.")
+        XCTAssertEqual(upgradedService.authorizationCalls, 0)
+        XCTAssertEqual(receipts.events["covered_skip"], 1)
+    }
+
+    func testNewTypeExpandsTheReceiptAndMayPromptExactlyOnce() async throws {
+        let receipts = MemoryAuthorizationReceiptStore()
+        let originalService = MockHealthKitService(deviceAvailability: .available, requestRequirement: .shouldRequest)
+        _ = await coordinator(service: originalService, authorizationEnabled: true, receipts: receipts)
+            .requestAuthorization(for: .automaticRead)
+
+        var domains = HealthKitTypeRegistry.physiqueOSV1.readTypesByDomain
+        domains[.activity, default: []].insert(try XCTUnwrap(HKObjectType.categoryType(forIdentifier: .sleepAnalysis)))
+        let expandedRegistry = HealthKitTypeRegistry(
+            readTypesByDomain: domains,
+            writeTypesByDomain: HealthKitTypeRegistry.physiqueOSV1.writeTypesByDomain
+        )
+        let expandedService = MockHealthKitService(deviceAvailability: .available, requestRequirement: .shouldRequest)
+        let expanded = HealthKitAuthorizationCoordinator(
+            service: expandedService,
+            registry: expandedRegistry,
+            featureGate: HealthKitFeatureGate(enabledOperations: [.requestAuthorization]),
+            receipts: receipts
+        )
+
+        let expandedOutcome = await expanded.requestAuthorization(for: .automaticRead)
+        XCTAssertEqual(expandedOutcome, .completed)
+        XCTAssertEqual(expandedService.requirementCalls, 1)
+        XCTAssertEqual(expandedService.authorizationCalls, 1)
+        let repeatedExpandedOutcome = await expanded.requestAuthorization(for: .automaticRead)
+        XCTAssertEqual(repeatedExpandedOutcome, .completed)
+        XCTAssertEqual(expandedService.authorizationCalls, 1)
+    }
+
+    func testLegacyAutomaticSyncEvidenceAdoptsOnlyTheFrozenTypeSet() async throws {
+        let suite = "healthkit.authorization.legacy.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("owner-proof", forKey: "physiqueos.healthkit.automatic.owner-identity.v1")
+        let receipts = UserDefaultsHealthKitAuthorizationReceiptStore(
+            defaults: defaults,
+            key: "receipt",
+            build: "96"
+        )
+        let service = MockHealthKitService(deviceAvailability: .available, requestRequirement: .shouldRequest)
+        let adopted = HealthKitAuthorizationCoordinator(
+            service: service,
+            featureGate: HealthKitFeatureGate(enabledOperations: [.requestAuthorization]),
+            receipts: receipts
+        )
+
+        let adoptedOutcome = await adopted.requestAuthorization(for: .automaticRead)
+        XCTAssertEqual(adoptedOutcome, .completed)
+        XCTAssertEqual(service.requirementCalls, 0)
+        XCTAssertEqual(service.authorizationCalls, 0)
+        XCTAssertEqual(receipts.diagnostics.buildEventCounts["legacy_exact_set_adopted"], 1)
+
+        var domains = HealthKitTypeRegistry.physiqueOSV1.readTypesByDomain
+        domains[.activity, default: []].insert(try XCTUnwrap(HKObjectType.categoryType(forIdentifier: .sleepAnalysis)))
+        let expanded = HealthKitAuthorizationCoordinator(
+            service: service,
+            registry: HealthKitTypeRegistry(
+                readTypesByDomain: domains,
+                writeTypesByDomain: HealthKitTypeRegistry.physiqueOSV1.writeTypesByDomain
+            ),
+            featureGate: HealthKitFeatureGate(enabledOperations: [.requestAuthorization]),
+            receipts: receipts
+        )
+        let expandedOutcome = await expanded.requestAuthorization(for: .automaticRead)
+        XCTAssertEqual(expandedOutcome, .completed)
+        XCTAssertEqual(service.requirementCalls, 1)
+        XCTAssertEqual(service.authorizationCalls, 1)
+    }
+
+    func testCompletedDeniedOrPartialDecisionIsNotRepromptedAndPermissionChangeStaysUserControlled() async {
+        let receipts = MemoryAuthorizationReceiptStore()
+        let service = MockHealthKitService(deviceAvailability: .available, requestRequirement: .shouldRequest)
+        let coordinator = coordinator(service: service, authorizationEnabled: true, receipts: receipts)
+
+        let initialOutcome = await coordinator.requestAuthorization(for: .automaticRead)
+        XCTAssertEqual(initialOutcome, .completed)
+        // HealthKit does not disclose read denial/partial grants. A completed
+        // sheet is therefore durable even if Settings changes later.
+        service.requestRequirement = .shouldRequest
+        let repeatedOutcome = await coordinator.requestAuthorization(for: .automaticRead)
+        XCTAssertEqual(repeatedOutcome, .completed)
+        XCTAssertEqual(service.authorizationCalls, 1)
+        XCTAssertEqual(service.requirementCalls, 1)
+    }
+
     @MainActor
     func testBackgroundPreflightNeverPresentsRequiredConsent() async {
         let service = MockHealthKitService(
@@ -167,7 +279,8 @@ final class HealthKitCapabilityTests: XCTestCase {
         let service = SuspendingHealthKitService()
         let coordinator = HealthKitAuthorizationCoordinator(
             service: service,
-            featureGate: HealthKitFeatureGate(enabledOperations: [.requestAuthorization])
+            featureGate: HealthKitFeatureGate(enabledOperations: [.requestAuthorization]),
+            receipts: MemoryAuthorizationReceiptStore()
         )
 
         async let background = coordinator.requestAuthorization(
@@ -225,13 +338,15 @@ final class HealthKitCapabilityTests: XCTestCase {
 
     private func coordinator(
         service: MockHealthKitService,
-        authorizationEnabled: Bool = false
+        authorizationEnabled: Bool = false,
+        receipts: MemoryAuthorizationReceiptStore = MemoryAuthorizationReceiptStore()
     ) -> HealthKitAuthorizationCoordinator {
         HealthKitAuthorizationCoordinator(
             service: service,
             featureGate: authorizationEnabled
                 ? HealthKitFeatureGate(enabledOperations: [.requestAuthorization])
-                : .n0Disabled
+                : .n0Disabled,
+            receipts: receipts
         )
     }
 
@@ -241,6 +356,34 @@ final class HealthKitCapabilityTests: XCTestCase {
 
     private func categoryIdentifier(_ value: HKCategoryTypeIdentifier) throws -> String {
         try XCTUnwrap(HKObjectType.categoryType(forIdentifier: value)).identifier
+    }
+}
+
+private final class MemoryAuthorizationReceiptStore: HealthKitAuthorizationReceiptStoring {
+    private var handled: [HealthKitAuthorizationScope: (read: Set<String>, write: Set<String>)] = [:]
+    private(set) var events: [String: Int] = [:]
+
+    func covers(_ request: HealthKitAuthorizationRequest) -> Bool {
+        guard let receipt = handled[request.scope] else { return false }
+        return request.readTypeIdentifiers.isSubset(of: receipt.read)
+            && request.writeTypeIdentifiers.isSubset(of: receipt.write)
+    }
+
+    func recordHandled(_ request: HealthKitAuthorizationRequest) {
+        let prior = handled[request.scope] ?? ([], [])
+        handled[request.scope] = (
+            prior.read.union(request.readTypeIdentifiers),
+            prior.write.union(request.writeTypeIdentifiers)
+        )
+    }
+
+    func record(event: String, reason: HealthKitAuthorizationReason) { events[event, default: 0] += 1 }
+
+    var diagnostics: HealthKitAuthorizationDiagnostics {
+        HealthKitAuthorizationDiagnostics(
+            installationID: "install", sessionID: "session", build: "95",
+            sessionEventCounts: events, buildEventCounts: events, lastReason: nil
+        )
     }
 }
 

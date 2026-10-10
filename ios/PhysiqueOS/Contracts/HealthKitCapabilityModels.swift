@@ -83,6 +83,18 @@ enum HealthKitAuthorizationPresentation: Equatable, Sendable {
     case foreground
 }
 
+/// Privacy-safe provenance for an authorization decision. These values carry
+/// no Health data; they make it possible to distinguish lifecycle checks from
+/// explicit Founder actions when diagnosing a device-only permission sheet.
+enum HealthKitAuthorizationReason: String, Codable, Sendable {
+    case backgroundLaunch
+    case foregroundSynchronization
+    case manualSynchronization
+    case protectedDataRecovery
+    case sleepDiagnostic
+    case dexaWritebackEnable
+}
+
 enum HealthKitAuthorizationOutcome: Equatable, Sendable {
     case blockedByFeatureGate
     case unavailable(HealthKitAvailability)

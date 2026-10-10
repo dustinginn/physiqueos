@@ -699,7 +699,7 @@ final class WatchWorkoutFinishStateTests: XCTestCase {
 final class WatchHealthAuthorizationTests: XCTestCase {
     func testAnsweredScopePreflightsWithoutRawRequest() async throws {
         let service = WatchAuthorizationServiceFake(statuses: [.unnecessary])
-        let coordinator = WatchHealthAuthorizationCoordinator(service: service)
+        let coordinator = WatchHealthAuthorizationCoordinator(service: service, receipts: MemoryWatchAuthorizationReceipts())
 
         try await coordinator.ensureAuthorization(presentation: .automatic)
 
@@ -709,7 +709,7 @@ final class WatchHealthAuthorizationTests: XCTestCase {
 
     func testAutomaticStartNeverPresentsFirstTimeConsent() async {
         let service = WatchAuthorizationServiceFake(statuses: [.shouldRequest])
-        let coordinator = WatchHealthAuthorizationCoordinator(service: service)
+        let coordinator = WatchHealthAuthorizationCoordinator(service: service, receipts: MemoryWatchAuthorizationReceipts())
 
         do {
             try await coordinator.ensureAuthorization(presentation: .automatic)
@@ -722,7 +722,7 @@ final class WatchHealthAuthorizationTests: XCTestCase {
 
     func testDirectWatchActionMayPresentConsentAfterPreflight() async throws {
         let service = WatchAuthorizationServiceFake(statuses: [.shouldRequest])
-        let coordinator = WatchHealthAuthorizationCoordinator(service: service)
+        let coordinator = WatchHealthAuthorizationCoordinator(service: service, receipts: MemoryWatchAuthorizationReceipts())
 
         try await coordinator.ensureAuthorization(presentation: .direct)
 
@@ -732,7 +732,7 @@ final class WatchHealthAuthorizationTests: XCTestCase {
 
     func testUnknownStatusFailsClosedWithoutRawRequest() async {
         let service = WatchAuthorizationServiceFake(statuses: [.unknown])
-        let coordinator = WatchHealthAuthorizationCoordinator(service: service)
+        let coordinator = WatchHealthAuthorizationCoordinator(service: service, receipts: MemoryWatchAuthorizationReceipts())
 
         do {
             try await coordinator.ensureAuthorization(presentation: .direct)
@@ -742,16 +742,113 @@ final class WatchHealthAuthorizationTests: XCTestCase {
         }
         XCTAssertEqual(service.requestCalls, 0)
     }
+
+    func testCompletedWatchTypeSetSurvivesRelaunchAndBuildUpdate() async throws {
+        let receipts = MemoryWatchAuthorizationReceipts()
+        let firstService = WatchAuthorizationServiceFake(statuses: [.shouldRequest])
+        try await WatchHealthAuthorizationCoordinator(service: firstService, receipts: receipts)
+            .ensureAuthorization(presentation: .direct)
+        XCTAssertEqual(firstService.requestCalls, 1)
+
+        let relaunchedService = WatchAuthorizationServiceFake(statuses: [.shouldRequest])
+        try await WatchHealthAuthorizationCoordinator(service: relaunchedService, receipts: receipts)
+            .ensureAuthorization(presentation: .direct)
+        XCTAssertEqual(relaunchedService.statusCalls, 0)
+        XCTAssertEqual(relaunchedService.requestCalls, 0)
+        XCTAssertEqual(receipts.events["covered_skip"], 1)
+    }
+
+    func testGenuinelyNewWatchTypeMayPromptOnce() async throws {
+        let receipts = MemoryWatchAuthorizationReceipts()
+        let original = WatchAuthorizationServiceFake(statuses: [.shouldRequest])
+        try await WatchHealthAuthorizationCoordinator(service: original, receipts: receipts)
+            .ensureAuthorization(presentation: .direct)
+
+        let expanded = WatchAuthorizationServiceFake(
+            statuses: [.shouldRequest],
+            identifiers: .init(read: ["heart", "active", "basal", "respiratory"], share: ["workout"])
+        )
+        let coordinator = WatchHealthAuthorizationCoordinator(service: expanded, receipts: receipts)
+        try await coordinator.ensureAuthorization(presentation: .direct)
+        try await coordinator.ensureAuthorization(presentation: .direct)
+
+        XCTAssertEqual(expanded.statusCalls, 1)
+        XCTAssertEqual(expanded.requestCalls, 1)
+    }
+
+    func testLegacyExactSetIsAdoptedOnlyAfterARealShareDecision() async throws {
+        let service = WatchAuthorizationServiceFake(statuses: [.shouldRequest], legacyShareDecision: true)
+        let receipts = MemoryWatchAuthorizationReceipts()
+
+        try await WatchHealthAuthorizationCoordinator(service: service, receipts: receipts)
+            .ensureAuthorization(presentation: .direct)
+
+        XCTAssertEqual(service.statusCalls, 0)
+        XCTAssertEqual(service.requestCalls, 0)
+        XCTAssertEqual(receipts.events["legacy_exact_set_adopted"], 1)
+
+        let expanded = WatchAuthorizationServiceFake(
+            statuses: [.shouldRequest],
+            identifiers: .init(
+                read: WatchAuthorizationServiceFake.legacyIdentifiers.read.union(["new-type"]),
+                share: WatchAuthorizationServiceFake.legacyIdentifiers.share
+            ),
+            legacyShareDecision: true
+        )
+        try await WatchHealthAuthorizationCoordinator(service: expanded, receipts: receipts)
+            .ensureAuthorization(presentation: .direct)
+        XCTAssertEqual(expanded.requestCalls, 1)
+    }
+
+    func testConcurrentWatchAuthorizationRequestsCoalesceToOneSheet() async throws {
+        let service = SuspendingWatchAuthorizationService()
+        let coordinator = WatchHealthAuthorizationCoordinator(
+            service: service,
+            receipts: MemoryWatchAuthorizationReceipts()
+        )
+
+        async let first: Void = coordinator.ensureAuthorization(presentation: .direct)
+        while service.statusCalls == 0 { await Task.yield() }
+        async let second: Void = coordinator.ensureAuthorization(presentation: .direct)
+        service.releaseStatus()
+        try await first
+        try await second
+
+        XCTAssertEqual(service.statusCalls, 1)
+        XCTAssertEqual(service.requestCalls, 1)
+    }
 }
 
 @MainActor
 private final class WatchAuthorizationServiceFake: WatchHealthAuthorizationServicing {
+    static let legacyIdentifiers = WatchHealthAuthorizationTypeIdentifiers(
+        read: [
+            HKQuantityTypeIdentifier.heartRate.rawValue,
+            HKQuantityTypeIdentifier.activeEnergyBurned.rawValue,
+            HKQuantityTypeIdentifier.basalEnergyBurned.rawValue,
+        ],
+        share: [HKObjectType.workoutType().identifier]
+    )
+
     let isHealthDataAvailable = true
     private var statuses: [HKAuthorizationRequestStatus]
+    private let identifiers: WatchHealthAuthorizationTypeIdentifiers
+    private let legacyShareDecision: Bool
     private(set) var statusCalls = 0
     private(set) var requestCalls = 0
 
-    init(statuses: [HKAuthorizationRequestStatus]) { self.statuses = statuses }
+    init(
+        statuses: [HKAuthorizationRequestStatus],
+        identifiers: WatchHealthAuthorizationTypeIdentifiers = WatchAuthorizationServiceFake.legacyIdentifiers,
+        legacyShareDecision: Bool = false
+    ) {
+        self.statuses = statuses
+        self.identifiers = identifiers
+        self.legacyShareDecision = legacyShareDecision
+    }
+
+    func authorizationTypeIdentifiers() throws -> WatchHealthAuthorizationTypeIdentifiers { identifiers }
+    func hasDecidedLegacySharingAuthorization() throws -> Bool { legacyShareDecision }
 
     func requestStatus() async throws -> HKAuthorizationRequestStatus {
         statusCalls += 1
@@ -759,6 +856,55 @@ private final class WatchAuthorizationServiceFake: WatchHealthAuthorizationServi
     }
 
     func requestAuthorization() async throws { requestCalls += 1 }
+}
+
+@MainActor
+private final class SuspendingWatchAuthorizationService: WatchHealthAuthorizationServicing {
+    let isHealthDataAvailable = true
+    private(set) var statusCalls = 0
+    private(set) var requestCalls = 0
+    private var continuation: CheckedContinuation<HKAuthorizationRequestStatus, Never>?
+
+    func authorizationTypeIdentifiers() throws -> WatchHealthAuthorizationTypeIdentifiers {
+        WatchAuthorizationServiceFake.legacyIdentifiers
+    }
+
+    func hasDecidedLegacySharingAuthorization() throws -> Bool { false }
+
+    func requestStatus() async throws -> HKAuthorizationRequestStatus {
+        statusCalls += 1
+        return await withCheckedContinuation { continuation = $0 }
+    }
+
+    func releaseStatus() {
+        let pending = continuation
+        continuation = nil
+        pending?.resume(returning: .shouldRequest)
+    }
+
+    func requestAuthorization() async throws { requestCalls += 1 }
+}
+
+private final class MemoryWatchAuthorizationReceipts: WatchHealthAuthorizationReceiptStoring {
+    private var handled = WatchHealthAuthorizationTypeIdentifiers(read: [], share: [])
+    private(set) var events: [String: Int] = [:]
+
+    func covers(_ identifiers: WatchHealthAuthorizationTypeIdentifiers) -> Bool {
+        identifiers.read.isSubset(of: handled.read) && identifiers.share.isSubset(of: handled.share)
+    }
+
+    func recordHandled(_ identifiers: WatchHealthAuthorizationTypeIdentifiers) {
+        handled = .init(read: handled.read.union(identifiers.read), share: handled.share.union(identifiers.share))
+    }
+
+    func record(event: String, reason: String) { events[event, default: 0] += 1 }
+
+    var diagnostics: WatchHealthAuthorizationDiagnostics {
+        .init(
+            installationID: "watch-install", sessionID: "watch-session", build: "95",
+            sessionEventCounts: events, buildEventCounts: events, lastReason: nil
+        )
+    }
 }
 
 // MARK: - Build 86: Watch HealthKit start, truthful status, refresh lane

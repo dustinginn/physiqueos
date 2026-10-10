@@ -261,7 +261,7 @@ struct WatchPanelPage<Content: View, Actions: View>: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 .contentMargins(.horizontal, 0, for: .scrollContent)
-                .watchPanelBottomScrollEdgeEffectHidden()
+                .watchBottomScrollEdgeEffectHidden()
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("watch.panel.scroll")
             }
@@ -283,10 +283,11 @@ struct WatchPanelPage<Content: View, Actions: View>: View {
 }
 
 private extension View {
-    /// Hides only this ScrollView's bottom scroll edge effect (watchOS 26+);
-    /// no other watchOS affordance is touched.
+    /// Hides only the bottom scroll edge effect (watchOS 26+). Applied to the
+    /// overflow panel and the active vertical pager; page navigation, the
+    /// system clock, and the vertical page indicator remain intact.
     @ViewBuilder
-    func watchPanelBottomScrollEdgeEffectHidden() -> some View {
+    func watchBottomScrollEdgeEffectHidden() -> some View {
         if #available(watchOS 26.0, *) {
             scrollEdgeEffectHidden(true, for: .bottom)
         } else {
@@ -347,7 +348,7 @@ struct WatchPanelIcon: View {
 /// Full-width capsule actions: primary (filled), quiet (surface) and
 /// destructive (filled red, or quiet with red text). 38 pt tall, 15 pt / 760.
 struct WatchActionButton: View {
-    enum Style { case primary, warning, quiet, quietDestructive, destructive }
+    enum Style { case primary, workoutPrimary, warning, quiet, quietDestructive, destructive }
 
     let title: String
     var systemImage: String? = nil
@@ -383,6 +384,7 @@ struct WatchActionButton: View {
     private var background: Color {
         switch style {
         case .primary: return WatchPhysiqueOSTheme.purple
+        case .workoutPrimary: return WatchPhysiqueOSTheme.workoutPrimary
         case .warning: return WatchPhysiqueOSTheme.warning
         case .destructive: return WatchPhysiqueOSTheme.destructive
         case .quiet, .quietDestructive: return WatchPhysiqueOSTheme.surface
@@ -393,7 +395,7 @@ struct WatchActionButton: View {
         switch style {
         case .primary: return WatchPhysiqueOSTheme.onPrimary
         // Amber fill: the iPhone execution ink, legible in both appearances.
-        case .warning: return WatchPhysiqueOSTheme.onWorkoutPrimary
+        case .workoutPrimary, .warning: return WatchPhysiqueOSTheme.onWorkoutPrimary
         case .destructive: return .white
         case .quiet: return WatchPhysiqueOSTheme.text
         case .quietDestructive: return WatchPhysiqueOSTheme.destructive
@@ -658,6 +660,11 @@ struct WatchWorkoutVerticalPages: View {
                 .tag(Page.dailyTotals)
         }
         .tabViewStyle(.verticalPage)
+        // The Founder screenshot's thin bottom band is the watchOS 26 scroll
+        // edge effect from this vertical pager. Hide that effect only; unlike
+        // removing page style/indexing, this preserves Crown paging and the
+        // system-required vertical page affordance.
+        .watchBottomScrollEdgeEffectHidden()
     }
 }
 
@@ -675,7 +682,7 @@ struct WatchWorkoutStartView: View {
                     .padding(.top, 8)
             }
         } actions: {
-            WatchActionButton(title: "Start Workout", systemImage: "play.fill",
+            WatchActionButton(title: "Start Workout", systemImage: "play.fill", style: .workoutPrimary,
                               enabled: store.isStartWorkoutEnabled) {
                 store.startPreparedWorkout()
             }

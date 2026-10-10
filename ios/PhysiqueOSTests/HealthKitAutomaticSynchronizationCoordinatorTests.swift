@@ -545,7 +545,8 @@ private final class AutomaticAuthorizationMock: HealthKitCanaryAuthorizationCoor
 
     func requestAuthorization(
         for scope: HealthKitAuthorizationScope,
-        presentation: HealthKitAuthorizationPresentation
+        presentation: HealthKitAuthorizationPresentation,
+        reason: HealthKitAuthorizationReason
     ) async -> HealthKitAuthorizationOutcome {
         requestCount += 1
         requests.append((scope, presentation))

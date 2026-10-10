@@ -192,6 +192,7 @@ final class WatchPrimaryActionThemeUITests: XCTestCase {
 
     func testPrimaryWorkoutActionsRenderInBothAppearances() {
         let cases: [(String, String)] = [
+            ("start", "watch.start"),
             ("normal", "watch.execution.completeSet"),
             ("final-workout", "watch.execution.finishWorkout"),
             ("finish-confirmation", "watch.finishConfirmation.finish"),

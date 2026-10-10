@@ -2375,11 +2375,9 @@ struct TrainingWatchHandoffCard: View {
                 Button(action: primary) {
                     Text(primaryTitle)
                         .logText(LoggerType.execution14)
-                        // Paper reads near-white on Mineral's deep purple and
-                        // deep ink on Dark's light purple.
-                        .foregroundStyle(PhysiqueOSTheme.redesignPaper)
+                        .foregroundStyle(PhysiqueOSTheme.redesignOnExecution)
                         .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(PhysiqueOSTheme.redesignPurple, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(PhysiqueOSTheme.redesignAmber, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(.plain)

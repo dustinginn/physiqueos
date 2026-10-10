@@ -6,7 +6,8 @@ protocol HealthKitCanaryAuthorizationCoordinating: AnyObject {
     var currentAvailability: HealthKitAvailability { get }
     func requestAuthorization(
         for scope: HealthKitAuthorizationScope,
-        presentation: HealthKitAuthorizationPresentation
+        presentation: HealthKitAuthorizationPresentation,
+        reason: HealthKitAuthorizationReason
     ) async -> HealthKitAuthorizationOutcome
 }
 
@@ -219,7 +220,11 @@ final class HealthKitFounderCanaryCoordinator {
     @MainActor
     func requestAuthorization() async -> HealthKitAuthorizationOutcome {
         guard isEnabled else { return .blockedByFeatureGate }
-        let outcome = await authorization.requestAuthorization(for: .sleepRead, presentation: .foreground)
+        let outcome = await authorization.requestAuthorization(
+            for: .sleepRead,
+            presentation: .foreground,
+            reason: .sleepDiagnostic
+        )
         if outcome == .completed { authorizationWasExplicitlyRequested = true }
         return outcome
     }

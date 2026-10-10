@@ -288,7 +288,8 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         var outcome = HealthKitAutomaticBootstrapOutcome()
         let authorizationOutcome = await authorization.requestAuthorization(
             for: .automaticRead,
-            presentation: .prohibited
+            presentation: .prohibited,
+            reason: .backgroundLaunch
         )
         outcome.authorizationOutcome = authorizationOutcome
         guard authorizationOutcome == .completed else {
@@ -325,7 +326,8 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
                 outcome.sleepActive = true
                 let sleepAuthorization = await authorization.requestAuthorization(
                     for: .sleepRead,
-                    presentation: .prohibited
+                    presentation: .prohibited,
+                    reason: .backgroundLaunch
                 )
                 if sleepAuthorization == .completed {
                     await registerSleep(scope: scope, gate: sleepActivation, outcome: &outcome)
@@ -395,6 +397,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         ownerIdentity: String,
         deviceIdentity: String,
         allowsAuthorizationPrompt: Bool,
+        authorizationReason: HealthKitAuthorizationReason,
         outcome: inout HealthKitAutomaticBootstrapOutcome
     ) async {
         guard let sleepActivation else { return }
@@ -417,7 +420,8 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
         outcome.sleepActive = true
         let authorizationOutcome = await authorization.requestAuthorization(
             for: .sleepRead,
-            presentation: allowsAuthorizationPrompt ? .foreground : .prohibited
+            presentation: allowsAuthorizationPrompt ? .foreground : .prohibited,
+            reason: authorizationReason
         )
         guard authorizationOutcome == .completed else {
             outcome.streamErrors[.sleepAnalysis, default: []].append("authorization_not_available")
@@ -445,7 +449,10 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
 
     @MainActor
     @discardableResult
-    func bootstrap(allowsAuthorizationPrompt: Bool = true) async -> HealthKitAutomaticBootstrapOutcome {
+    func bootstrap(
+        allowsAuthorizationPrompt: Bool = true,
+        authorizationReason: HealthKitAuthorizationReason = .foregroundSynchronization
+    ) async -> HealthKitAutomaticBootstrapOutcome {
         foregroundAuthorizationRequested = foregroundAuthorizationRequested || allowsAuthorizationPrompt
         if let inFlightTask {
             let currentOrScheduledGeneration = max(activeGeneration, completedGeneration + 1)
@@ -461,7 +468,10 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
                 self.activeGeneration = self.completedGeneration + 1
                 let permitsPrompt = self.foregroundAuthorizationRequested
                 self.foregroundAuthorizationRequested = false
-                outcome = await self.runBootstrap(allowsAuthorizationPrompt: permitsPrompt)
+                outcome = await self.runBootstrap(
+                    allowsAuthorizationPrompt: permitsPrompt,
+                    authorizationReason: authorizationReason
+                )
                 self.completedGeneration = self.activeGeneration
             }
             // Clear before completing the task. This closes the narrow actor-
@@ -477,11 +487,15 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
     }
 
     @MainActor
-    private func runBootstrap(allowsAuthorizationPrompt: Bool) async -> HealthKitAutomaticBootstrapOutcome {
+    private func runBootstrap(
+        allowsAuthorizationPrompt: Bool,
+        authorizationReason: HealthKitAuthorizationReason
+    ) async -> HealthKitAutomaticBootstrapOutcome {
         var outcome = HealthKitAutomaticBootstrapOutcome()
         let authorizationOutcome = await authorization.requestAuthorization(
             for: .automaticRead,
-            presentation: allowsAuthorizationPrompt ? .foreground : .prohibited
+            presentation: allowsAuthorizationPrompt ? .foreground : .prohibited,
+            reason: authorizationReason
         )
         outcome.authorizationOutcome = authorizationOutcome
         guard authorizationOutcome == .completed else {
@@ -616,6 +630,7 @@ final class HealthKitAutomaticSynchronizationCoordinator: @unchecked Sendable {
             ownerIdentity: ownerIdentity,
             deviceIdentity: deviceIdentity,
             allowsAuthorizationPrompt: allowsAuthorizationPrompt,
+            authorizationReason: authorizationReason,
             outcome: &outcome
         )
         lastBootstrapOutcome = outcome

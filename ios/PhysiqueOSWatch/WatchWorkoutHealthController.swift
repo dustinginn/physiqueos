@@ -7,9 +7,110 @@ enum WatchHealthAuthorizationPresentation: Equatable {
     case direct
 }
 
+struct WatchHealthAuthorizationTypeIdentifiers: Equatable, Codable {
+    let read: Set<String>
+    let share: Set<String>
+}
+
+struct WatchHealthAuthorizationDiagnostics: Equatable {
+    let installationID: String
+    let sessionID: String
+    let build: String
+    let sessionEventCounts: [String: Int]
+    let buildEventCounts: [String: Int]
+    let lastReason: String?
+}
+
+protocol WatchHealthAuthorizationReceiptStoring: AnyObject {
+    func covers(_ identifiers: WatchHealthAuthorizationTypeIdentifiers) -> Bool
+    func recordHandled(_ identifiers: WatchHealthAuthorizationTypeIdentifiers)
+    func record(event: String, reason: String)
+    var diagnostics: WatchHealthAuthorizationDiagnostics { get }
+}
+
+/// The Watch is an independent HealthKit client. Its local receipt therefore
+/// lives in the Watch container and never relies on an iPhone authorization.
+/// Like the phone receipt, this records only a completed decision for a type
+/// set, not whether opaque read access was granted.
+final class UserDefaultsWatchHealthAuthorizationReceiptStore: WatchHealthAuthorizationReceiptStoring {
+    private struct State: Codable {
+        var installationID: String
+        var handled: WatchHealthAuthorizationTypeIdentifiers?
+        var buildEventCounts: [String: [String: Int]]
+        var lastReason: String?
+    }
+
+    private let defaults: UserDefaults
+    private let key: String
+    private let build: String
+    private let sessionID = UUID().uuidString
+    private var sessionEventCounts: [String: Int] = [:]
+    private var state: State
+
+    init(
+        defaults: UserDefaults = .standard,
+        key: String = "physiqueos.watch.healthkit.authorization-receipt.v2",
+        build: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+    ) {
+        self.defaults = defaults
+        self.key = key
+        self.build = build
+        if let data = defaults.data(forKey: key), let decoded = try? JSONDecoder().decode(State.self, from: data) {
+            state = decoded
+        } else {
+            state = State(installationID: UUID().uuidString, handled: nil, buildEventCounts: [:], lastReason: nil)
+        }
+    }
+
+    func covers(_ identifiers: WatchHealthAuthorizationTypeIdentifiers) -> Bool {
+        guard let handled = state.handled else { return false }
+        return identifiers.read.isSubset(of: handled.read) && identifiers.share.isSubset(of: handled.share)
+    }
+
+    func recordHandled(_ identifiers: WatchHealthAuthorizationTypeIdentifiers) {
+        let prior = state.handled ?? WatchHealthAuthorizationTypeIdentifiers(read: [], share: [])
+        state.handled = WatchHealthAuthorizationTypeIdentifiers(
+            read: prior.read.union(identifiers.read),
+            share: prior.share.union(identifiers.share)
+        )
+        persist()
+    }
+
+    func record(event: String, reason: String) {
+        sessionEventCounts[event, default: 0] += 1
+        sessionEventCounts["reason.\(reason)", default: 0] += 1
+        state.buildEventCounts[build, default: [:]][event, default: 0] += 1
+        state.buildEventCounts[build, default: [:]]["reason.\(reason)", default: 0] += 1
+        if state.buildEventCounts.count > 12 {
+            let removable = state.buildEventCounts.keys.filter { $0 != build }.sorted().prefix(state.buildEventCounts.count - 12)
+            removable.forEach { state.buildEventCounts.removeValue(forKey: $0) }
+        }
+        state.lastReason = reason
+        persist()
+    }
+
+    var diagnostics: WatchHealthAuthorizationDiagnostics {
+        WatchHealthAuthorizationDiagnostics(
+            installationID: state.installationID,
+            sessionID: sessionID,
+            build: build,
+            sessionEventCounts: sessionEventCounts,
+            buildEventCounts: state.buildEventCounts[build, default: [:]],
+            lastReason: state.lastReason
+        )
+    }
+
+    private func persist() {
+        guard let data = try? JSONEncoder().encode(state) else { return }
+        defaults.set(data, forKey: key)
+    }
+}
+
 @MainActor
 protocol WatchHealthAuthorizationServicing: AnyObject {
     var isHealthDataAvailable: Bool { get }
+    func authorizationTypeIdentifiers() throws -> WatchHealthAuthorizationTypeIdentifiers
+    func hasDecidedLegacySharingAuthorization() throws -> Bool
     func requestStatus() async throws -> HKAuthorizationRequestStatus
     func requestAuthorization() async throws
 }
@@ -21,6 +122,19 @@ final class SystemWatchHealthAuthorizationService: WatchHealthAuthorizationServi
     init(healthStore: HKHealthStore) { self.healthStore = healthStore }
 
     var isHealthDataAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
+
+    func authorizationTypeIdentifiers() throws -> WatchHealthAuthorizationTypeIdentifiers {
+        let types = try authorizationTypes()
+        return WatchHealthAuthorizationTypeIdentifiers(
+            read: Set(types.read.map(\.identifier)),
+            share: Set(types.share.map(\.identifier))
+        )
+    }
+
+    func hasDecidedLegacySharingAuthorization() throws -> Bool {
+        let types = try authorizationTypes()
+        return types.share.allSatisfy { healthStore.authorizationStatus(for: $0) != .notDetermined }
+    }
 
     func requestStatus() async throws -> HKAuthorizationRequestStatus {
         let types = try authorizationTypes()
@@ -57,6 +171,7 @@ enum WatchHealthAuthorizationError: Error, Equatable {
 @MainActor
 final class WatchHealthAuthorizationCoordinator {
     private let service: any WatchHealthAuthorizationServicing
+    private let receipts: any WatchHealthAuthorizationReceiptStoring
     private var inFlight: InFlight?
 
     private struct InFlight {
@@ -64,7 +179,15 @@ final class WatchHealthAuthorizationCoordinator {
         let task: Task<Result<Void, Error>, Never>
     }
 
-    init(service: any WatchHealthAuthorizationServicing) { self.service = service }
+    init(
+        service: any WatchHealthAuthorizationServicing,
+        receipts: (any WatchHealthAuthorizationReceiptStoring)? = nil
+    ) {
+        self.service = service
+        self.receipts = receipts ?? UserDefaultsWatchHealthAuthorizationReceiptStore()
+    }
+
+    var diagnostics: WatchHealthAuthorizationDiagnostics { receipts.diagnostics }
 
     func ensureAuthorization(presentation: WatchHealthAuthorizationPresentation) async throws {
         if let active = inFlight {
@@ -98,18 +221,53 @@ final class WatchHealthAuthorizationCoordinator {
 
     private func perform(presentation: WatchHealthAuthorizationPresentation) async throws {
         guard service.isHealthDataAvailable else { throw WatchHealthAuthorizationError.unavailable }
+        let identifiers = try service.authorizationTypeIdentifiers()
+        let reason = presentation == .automatic ? "automatic_workout_start" : "direct_workout_start"
+        if receipts.covers(identifiers) {
+            receipts.record(event: "covered_skip", reason: reason)
+            return
+        }
+        // The receipt was introduced after production users had already
+        // answered this sheet. A decided workout-share permission proves the
+        // legacy flow ran; adopt only the exact original set so a future read
+        // or share type remains a genuinely new request.
+        if identifiers == (try SystemWatchHealthAuthorizationService.legacyTypeIdentifiers()),
+           try service.hasDecidedLegacySharingAuthorization() {
+            receipts.recordHandled(identifiers)
+            receipts.record(event: "legacy_exact_set_adopted", reason: reason)
+            return
+        }
+        receipts.record(event: "status_check", reason: reason)
         switch try await service.requestStatus() {
         case .unnecessary:
+            receipts.recordHandled(identifiers)
+            receipts.record(event: "system_unnecessary", reason: reason)
             return
         case .shouldRequest where presentation == .automatic:
+            receipts.record(event: "prompt_deferred", reason: reason)
             throw WatchHealthAuthorizationError.requestRequiredOnWatch
         case .shouldRequest:
             try await service.requestAuthorization()
+            receipts.recordHandled(identifiers)
+            receipts.record(event: "authorization_completed", reason: reason)
         case .unknown:
             throw WatchHealthAuthorizationError.requestStatusUnknown
         @unknown default:
             throw WatchHealthAuthorizationError.requestStatusUnknown
         }
+    }
+}
+
+private extension SystemWatchHealthAuthorizationService {
+    static func legacyTypeIdentifiers() throws -> WatchHealthAuthorizationTypeIdentifiers {
+        guard let heartRate = HKObjectType.quantityType(forIdentifier: .heartRate),
+              let active = HKObjectType.quantityType(forIdentifier: .activeEnergyBurned),
+              let basal = HKObjectType.quantityType(forIdentifier: .basalEnergyBurned)
+        else { throw WatchHealthAuthorizationError.missingTypes }
+        return .init(
+            read: [heartRate.identifier, active.identifier, basal.identifier],
+            share: [HKObjectType.workoutType().identifier]
+        )
     }
 }
 

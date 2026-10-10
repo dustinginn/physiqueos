@@ -347,7 +347,8 @@ final class DEXAHealthKitWritebackCoordinator {
             guard let authorization else { throw DEXAHealthKitWritebackError.unauthorized }
             let outcome = await authorization.requestAuthorization(
                 for: .futureBodyMeasurementWrite,
-                presentation: .foreground
+                presentation: .foreground,
+                reason: .dexaWritebackEnable
             )
             guard outcome == .completed else { throw DEXAHealthKitWritebackError.unauthorized }
             preferences.isEnabled = true

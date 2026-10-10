@@ -498,7 +498,8 @@ private final class DEXAAuthorizationMock: HealthKitCanaryAuthorizationCoordinat
     private(set) var requests: [(HealthKitAuthorizationScope, HealthKitAuthorizationPresentation)] = []
     func requestAuthorization(
         for scope: HealthKitAuthorizationScope,
-        presentation: HealthKitAuthorizationPresentation
+        presentation: HealthKitAuthorizationPresentation,
+        reason: HealthKitAuthorizationReason
     ) async -> HealthKitAuthorizationOutcome {
         requests.append((scope, presentation))
         return .completed

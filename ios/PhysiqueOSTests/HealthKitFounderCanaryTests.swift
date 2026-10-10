@@ -413,7 +413,8 @@ private final class CanaryAuthorizationMock: HealthKitCanaryAuthorizationCoordin
 
     func requestAuthorization(
         for scope: HealthKitAuthorizationScope,
-        presentation: HealthKitAuthorizationPresentation
+        presentation: HealthKitAuthorizationPresentation,
+        reason: HealthKitAuthorizationReason
     ) async -> HealthKitAuthorizationOutcome {
         requestCount += 1
         requestedScopes.append(scope)

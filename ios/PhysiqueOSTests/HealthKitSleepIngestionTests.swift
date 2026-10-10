@@ -918,7 +918,8 @@ private final class SleepAuthorizationMock: HealthKitCanaryAuthorizationCoordina
     var currentAvailability: HealthKitAvailability = .available
     func requestAuthorization(
         for scope: HealthKitAuthorizationScope,
-        presentation: HealthKitAuthorizationPresentation
+        presentation: HealthKitAuthorizationPresentation,
+        reason: HealthKitAuthorizationReason
     ) async -> HealthKitAuthorizationOutcome { .completed }
 }
 

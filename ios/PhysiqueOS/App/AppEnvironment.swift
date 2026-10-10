@@ -885,7 +885,10 @@ final class AppEnvironment {
     @MainActor
     func recoverHealthKitAfterProtectedDataAvailable() async {
         guard nativeAuthority == .founderProduction else { return }
-        await healthKitAutomaticSynchronizationCoordinator.bootstrap(allowsAuthorizationPrompt: false)
+        await healthKitAutomaticSynchronizationCoordinator.bootstrap(
+            allowsAuthorizationPrompt: false,
+            authorizationReason: .protectedDataRecovery
+        )
     }
 
     func selectNativeAuthority(_ authority: NativeAPIEnvironment) {

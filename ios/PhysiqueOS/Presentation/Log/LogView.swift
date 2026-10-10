@@ -76,7 +76,9 @@ struct LogView: View {
             // Log's other data (reviews, weight) must still refresh either way.
             .refreshable {
                 if environment.nativeAuthority == .founderProduction {
-                    _ = await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap()
+                    _ = await environment.healthKitAutomaticSynchronizationCoordinator.bootstrap(
+                        authorizationReason: .manualSynchronization
+                    )
                     await environment.productionNativeAPI.invalidateReadResources(["evidence-review-queue", "weight"])
                 }
                 await viewModel?.load()
