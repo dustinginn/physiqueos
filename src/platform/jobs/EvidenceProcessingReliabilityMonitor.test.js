@@ -39,6 +39,7 @@ describe("evidence processing reliability monitor", () => {
       store: {
         inspect: vi.fn().mockResolvedValue({
           adoptionBoundary: persistedBoundary,
+          adoptionBoundaryStatus: "durable",
           reviews: [{
             reviewId: "created-before-restart",
             status: "committing",
@@ -73,6 +74,7 @@ describe("evidence processing reliability monitor", () => {
     const monitor = createEvidenceProcessingReliabilityMonitor({
       store: {
         inspect: vi.fn().mockResolvedValue({
+          adoptionBoundaryStatus: "durable",
           reviews: [
             { reviewId: "r1", status: "committing", claimStatus: "available", liveContinuationCount: 0, deadContinuationCount: 1, reviewAgeMs: 180_000, queueAgeMs: null, updatedAt: "2026-10-10T11:57:00Z" },
             { reviewId: "r2", status: "committing", claimStatus: "available", liveContinuationCount: 0, deadContinuationCount: 0, reviewAgeMs: 180_000, queueAgeMs: null, updatedAt: "2026-10-10T11:57:00Z" },
@@ -104,6 +106,7 @@ describe("evidence processing reliability monitor", () => {
     const monitor = createEvidenceProcessingReliabilityMonitor({
       store: {
         inspect: vi.fn().mockResolvedValue({
+          adoptionBoundaryStatus: "durable",
           reviews: [{
             reviewId: "historical", status: "committing", claimStatus: "available",
             liveContinuationCount: 0, deadContinuationCount: 1,
@@ -133,5 +136,45 @@ describe("evidence processing reliability monitor", () => {
       adoptedStaleReviewCount: 0,
       historicalStaleReviewCount: 1,
     }));
+  });
+
+  it("fails closed and alerts when the durable watermark is invalid", async () => {
+    const recover = vi.fn();
+    const processStartedAt = new Date("2026-10-10T11:00:00.000Z");
+    const monitor = createEvidenceProcessingReliabilityMonitor({
+      store: {
+        inspect: vi.fn().mockResolvedValue({
+          adoptionBoundary: null,
+          adoptionBoundaryStatus: "invalid",
+          reviews: [{
+            reviewId: "before-current-process", status: "committing", claimStatus: "available",
+            liveContinuationCount: 0, deadContinuationCount: 0,
+            reviewAgeMs: 30 * 60_000, queueAgeMs: null,
+            updatedAt: "2026-10-10T10:30:00.000Z",
+          }],
+          heartbeat: { workerId: "worker", ageMs: 1_000 },
+        }),
+        recover,
+      },
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      workerId: "worker",
+      buildId: "build",
+      now: () => now,
+      processStartedAt,
+      sampleMemory: () => ({ rss: 100 * 1024 * 1024 }),
+      sampleCpu: () => 1,
+    });
+
+    const result = await monitor.runOnce();
+
+    expect(result.alerts).toContain("EVIDENCE_ADOPTION_BOUNDARY_UNAVAILABLE");
+    expect(result.metrics).toMatchObject({
+      adoptionBoundary: processStartedAt.toISOString(),
+      adoptionBoundaryStatus: "invalid",
+      adoptionBoundaryDurable: false,
+      historicalStaleReviewCount: 1,
+      adoptedStaleReviewCount: 0,
+    });
+    expect(recover).not.toHaveBeenCalled();
   });
 });

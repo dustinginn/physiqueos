@@ -43,6 +43,8 @@ export function createEvidenceProcessingReliabilityMonitor({
         workerId,
         buildId,
         adoptionBoundary: adoptionBoundary.toISOString(),
+        adoptionBoundaryStatus: inspection.adoptionBoundaryStatus ?? "missing",
+        adoptionBoundaryDurable: inspection.adoptionBoundaryStatus === "durable",
         processStartedAt: processStartedAt.toISOString(),
         processUptimeSeconds: Math.max(0, Math.round((observedAt - processStartedAt) / 1000)),
         activeReviewCount: inspection.reviews.filter((review) => review.status === "committing").length,
@@ -138,6 +140,7 @@ export function resolveAdoptionBoundary({ persistedBuildBoundary, processStarted
 
 function alertCodes({ metrics, inspection, reviewAgeThresholdMs, queueAgeThresholdMs, heartbeatAgeThresholdMs }) {
   const result = [];
+  if (!metrics.adoptionBoundaryDurable) result.push("EVIDENCE_ADOPTION_BOUNDARY_UNAVAILABLE");
   if (metrics.staleReviewCount > 0 || metrics.maximumReviewAgeMs > reviewAgeThresholdMs) result.push("EVIDENCE_REVIEW_STALE");
   if (metrics.queuedTooLongCount > 0 || metrics.maximumQueueAgeMs > queueAgeThresholdMs) result.push("EVIDENCE_QUEUE_STALE");
   if (metrics.deadContinuationCount > 0) result.push("EVIDENCE_CONTINUATION_DEAD");

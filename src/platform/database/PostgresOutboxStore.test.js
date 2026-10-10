@@ -46,4 +46,32 @@ describe("Postgres outbox topic filtering", () => {
     expect(query.mock.calls[0][0]).toContain("claim_expires_at > $3");
     expect(query.mock.calls[1][0]).toContain("claim_expires_at > $3");
   });
+
+  it("owns an immutable build adoption watermark across same-build heartbeats", async () => {
+    const query = vi.fn(async () => ({ rows: [] }));
+    const store = createPostgresOutboxStore({ query });
+    const observedAt = new Date("2026-10-10T18:00:00.000Z");
+    await store.heartbeat({
+      workerId: "stable-worker",
+      buildId: "build-a",
+      status: "healthy",
+      observedAt,
+      details: { authority: "provider", buildAdoptedAt: "caller-must-not-own-this" },
+    });
+
+    const [sql, values] = query.mock.calls[0];
+    expect(sql).toContain("jsonb_build_object('buildAdoptedAt', $4::timestamptz)");
+    expect(sql).toContain("worker_heartbeats.build_id = EXCLUDED.build_id");
+    expect(sql).toContain("worker_heartbeats.details->'buildAdoptedAt'");
+    expect(values).toEqual(["stable-worker", "build-a", "healthy", observedAt, { authority: "provider" }]);
+  });
+
+  it("rejects non-object heartbeat details before PostgreSQL", async () => {
+    const query = vi.fn();
+    const store = createPostgresOutboxStore({ query });
+    await expect(store.heartbeat({
+      workerId: "worker", buildId: "build", status: "healthy", observedAt: new Date(), details: [],
+    })).rejects.toThrow(/must be an object/);
+    expect(query).not.toHaveBeenCalled();
+  });
 });

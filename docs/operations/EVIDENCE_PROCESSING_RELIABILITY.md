@@ -22,6 +22,7 @@ The provider worker emits `evidence.processing.reliability` every 30 seconds. It
 - review age exceeds two minutes;
 - continuation queue age exceeds two minutes;
 - any continuation is dead;
+- the immutable build-adoption watermark is missing, invalid, or ambiguous;
 - the latest worker heartbeat is older than 90 seconds;
 - RSS reaches 70% (warning) or 85% (critical) of the configured service limit;
 - process CPU reaches 85%.
@@ -38,7 +39,9 @@ Recovery releases the stale claim and inserts or revives the idempotent continua
 
 Automatic recovery applies only to reviews whose latest durable transition is at or after the current Server build's first persisted worker heartbeat. Stranded work inherited from an older build remains included in metrics and alerts, but the worker does not release its claim, revive its dead outbox message, or replay any continuation step. Historical work requires an explicit, separately authorized operator disposition.
 
-The first process of a build uses the earlier of its own start time and its first visible heartbeat; subsequent ticks and restarts use the earliest heartbeat retained for the same immutable build identity. Using the process start closes the short gap before the first heartbeat is persisted. The boundary therefore survives worker restarts without converting post-deployment failures into historical work. It is also fail-closed: a missing or invalid review `updatedAt` is historical/alert-only.
+On first activation of a build/worker pair, the heartbeat upsert writes `details.buildAdoptedAt` from that heartbeat's observation time. Later heartbeats from the same build preserve that value even though `observed_at` advances. A changed build identity gets a new watermark; a changed worker identity contributes another watermark, and the watchdog uses the earliest valid watermark for the current build. The query is capped at 64 worker rows.
+
+The monitor uses the earlier of the immutable persisted watermark and its process start time. Process start closes the short gap before the first heartbeat is persisted, while the immutable value preserves the deployment boundary across same-build restarts. If any current-build watermark is missing or invalid, or the bounded query cannot establish a unique complete result, the boundary is unavailable: the condition alerts and the current process start remains the conservative fallback. This is fail-closed for historical work. A missing or invalid review `updatedAt` is also historical/alert-only.
 
 ## Memory admission
 

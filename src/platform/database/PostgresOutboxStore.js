@@ -51,18 +51,40 @@ export function createPostgresOutboxStore({ query }) {
       ));
     },
     async heartbeat({ workerId, buildId, status, observedAt, details = null }) {
+      const safeDetails = normalizeHeartbeatDetails(details);
       return firstRow(await query(
         `INSERT INTO physiqueos.worker_heartbeats (worker_id, build_id, status, observed_at, details)
-         VALUES ($1, $2, $3, $4, $5)
+         VALUES ($1, $2, $3, $4,
+           COALESCE($5::jsonb, '{}'::jsonb) || jsonb_build_object('buildAdoptedAt', $4::timestamptz))
          ON CONFLICT (worker_id) DO UPDATE SET build_id = EXCLUDED.build_id, status = EXCLUDED.status,
-           observed_at = EXCLUDED.observed_at, details = EXCLUDED.details RETURNING *`,
-        [workerId, buildId, status, observedAt, details],
+           observed_at = EXCLUDED.observed_at,
+           details = CASE
+             WHEN physiqueos.worker_heartbeats.build_id = EXCLUDED.build_id
+               THEN COALESCE(EXCLUDED.details, '{}'::jsonb) || jsonb_build_object(
+                 'buildAdoptedAt', physiqueos.worker_heartbeats.details->'buildAdoptedAt'
+               )
+             ELSE EXCLUDED.details
+           END
+         RETURNING *`,
+        [workerId, buildId, status, observedAt, safeDetails],
       ));
     },
     async latestHeartbeat() {
       return firstRow(await query("SELECT * FROM physiqueos.worker_heartbeats ORDER BY observed_at DESC LIMIT 1"));
     },
   });
+}
+
+function normalizeHeartbeatDetails(details) {
+  if (details == null) return Object.freeze({});
+  if (typeof details !== "object" || Array.isArray(details)) {
+    throw new Error("Worker heartbeat details must be an object when supplied.");
+  }
+  // The store, not a caller, owns buildAdoptedAt. The SQL expression replaces
+  // any supplied value on first activation and preserves only the persisted
+  // value for later heartbeats of the same build.
+  const { buildAdoptedAt: _ignored, ...safe } = details;
+  return safe;
 }
 
 function normalizeAllowedTopics(allowedTopics) {

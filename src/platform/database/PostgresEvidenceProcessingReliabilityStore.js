@@ -3,6 +3,7 @@ import { executePostgresEvidenceReviewMutation } from "./PostgresFounderReposito
 import { EVIDENCE_REVIEW_CONTINUATION_TOPIC } from "../../domain/services/EvidenceReviewBackgroundContinuation.js";
 
 const MAX_INSPECTION_ROWS = 64;
+const MAX_BUILD_HEARTBEAT_ROWS = 64;
 
 export function createPostgresEvidenceProcessingReliabilityStore({
   pool,
@@ -40,9 +41,11 @@ export function createPostgresEvidenceProcessingReliabilityStore({
              FROM physiqueos.worker_heartbeats ORDER BY observed_at DESC LIMIT 1`,
         ),
         pool.query(
-          `SELECT min(observed_at) AS adopted_at
-             FROM physiqueos.worker_heartbeats WHERE build_id=$1`,
-          [buildId],
+          `SELECT details->>'buildAdoptedAt' AS build_adopted_at
+             FROM physiqueos.worker_heartbeats
+            WHERE build_id=$1
+            ORDER BY observed_at ASC LIMIT $2`,
+          [buildId, MAX_BUILD_HEARTBEAT_ROWS + 1],
         ),
       ]);
       const messagesByReview = groupBy(messagesResult.rows, (row) => String(row.review_id ?? ""));
@@ -70,9 +73,12 @@ export function createPostgresEvidenceProcessingReliabilityStore({
         });
       });
       const heartbeat = heartbeatResult.rows[0] ?? null;
+      const adoption = resolveImmutableBuildAdoption(adoptionResult.rows);
       return Object.freeze({
         observedAt: observedAt.toISOString(),
-        adoptionBoundary: adoptionResult.rows[0]?.adopted_at ?? null,
+        adoptionBoundary: adoption.boundary,
+        adoptionBoundaryStatus: adoption.status,
+        buildHeartbeatCount: adoption.count,
         reviews: Object.freeze(reviews),
         heartbeat: heartbeat ? Object.freeze({
           workerId: heartbeat.worker_id,
@@ -104,6 +110,24 @@ export function createPostgresEvidenceProcessingReliabilityStore({
   });
 }
 
+export function resolveImmutableBuildAdoption(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return Object.freeze({ boundary: null, status: "missing", count: 0 });
+  }
+  if (rows.length > MAX_BUILD_HEARTBEAT_ROWS) {
+    return Object.freeze({ boundary: null, status: "ambiguous", count: rows.length });
+  }
+  const timestamps = rows.map((row) => parseBuildAdoptedAt(row?.build_adopted_at));
+  if (timestamps.some((value) => value == null)) {
+    return Object.freeze({ boundary: null, status: "invalid", count: rows.length });
+  }
+  return Object.freeze({
+    boundary: new Date(Math.min(...timestamps)).toISOString(),
+    status: "durable",
+    count: rows.length,
+  });
+}
+
 function groupBy(items, key) {
   const result = new Map();
   for (const item of items) {
@@ -117,4 +141,11 @@ function groupBy(items, key) {
 function ageMs(now, value) {
   const timestamp = Date.parse(value instanceof Date ? value.toISOString() : String(value ?? ""));
   return Number.isFinite(timestamp) ? Math.max(0, now.getTime() - timestamp) : null;
+}
+
+function parseBuildAdoptedAt(value) {
+  if (typeof value !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
