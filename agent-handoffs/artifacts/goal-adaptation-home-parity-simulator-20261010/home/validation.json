@@ -28,18 +28,6 @@
         "guardrail": true
       },
       {
-        "h": 1002,
-        "rows": 2,
-        "ring": true,
-        "guardrail": true
-      },
-      {
-        "h": 1002,
-        "rows": 2,
-        "ring": true,
-        "guardrail": true
-      },
-      {
         "h": 1052,
         "rows": 2,
         "ring": true,
@@ -62,6 +50,32 @@
         "rows": 2,
         "ring": true,
         "guardrail": true
+      }
+    ],
+    "fit": [
+      {
+        "k": "h1",
+        "field": 495,
+        "baseField": 495,
+        "over": []
+      },
+      {
+        "k": "h2",
+        "field": 495,
+        "baseField": 495,
+        "over": []
+      },
+      {
+        "k": "h3",
+        "field": 475,
+        "baseField": 495,
+        "over": []
+      },
+      {
+        "k": "h4",
+        "field": 495,
+        "baseField": 495,
+        "over": []
       }
     ]
   },
@@ -94,18 +108,6 @@
         "guardrail": true
       },
       {
-        "h": 1006,
-        "rows": 2,
-        "ring": true,
-        "guardrail": true
-      },
-      {
-        "h": 1006,
-        "rows": 2,
-        "ring": true,
-        "guardrail": true
-      },
-      {
         "h": 1055,
         "rows": 2,
         "ring": true,
@@ -128,6 +130,32 @@
         "rows": 2,
         "ring": true,
         "guardrail": true
+      }
+    ],
+    "fit": [
+      {
+        "k": "h1",
+        "field": 495,
+        "baseField": 495,
+        "over": []
+      },
+      {
+        "k": "h2",
+        "field": 495,
+        "baseField": 495,
+        "over": []
+      },
+      {
+        "k": "h3",
+        "field": 475,
+        "baseField": 495,
+        "over": []
+      },
+      {
+        "k": "h4",
+        "field": 495,
+        "baseField": 495,
+        "over": []
       }
     ]
   }

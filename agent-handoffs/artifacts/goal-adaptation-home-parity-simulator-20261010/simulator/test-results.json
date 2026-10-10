@@ -155,6 +155,21 @@
     "info": ""
   },
   {
+    "name": "monthly briefing renders, no proposal",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "photo event never recommends",
+    "pass": true,
+    "info": ""
+  },
+  {
+    "name": "simulation label present",
+    "pass": true,
+    "info": ""
+  },
+  {
     "name": "no page errors",
     "pass": true,
     "info": ""

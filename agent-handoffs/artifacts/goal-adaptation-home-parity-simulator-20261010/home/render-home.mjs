@@ -14,7 +14,8 @@ for (const [name, w, h, scheme] of [['desktop-1600', 1600, 1000, 'dark'], ['mobi
   const overflowX = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   // per-phone checks: equal card structure across states, no clipped text in metrics
   const checks = await p.evaluate(() => [...document.querySelectorAll('.ph .hp')].map((hp) => ({ h: Math.round(hp.getBoundingClientRect().height / (parseFloat(getComputedStyle(hp).zoom) || 1)), rows: hp.querySelectorAll('[style*="gap:11px"]').length, ring: hp.innerText.includes('CONFIDENCE'), guardrail: hp.innerText.includes('GUARDRAIL') })));
-  res[name] = { overflowX, errors, checks };
+  const fit = await p.evaluate(() => window.__fit);
+  res[name] = { overflowX, errors, checks, fit };
   if (name === 'desktop-1600') await p.screenshot({ path: path.join(out, 'review-desktop.png') });
   await p.close();
 }
@@ -26,5 +27,5 @@ for (const k of ['baseline', 'h1', 'h2', 'h3', 'h4']) for (const th of ['dark', 
   await (await p.$('#solo .hp')).screenshot({ path: path.join(out, `${k}-${th === 'light' ? 'mineral' : 'dark'}.png`) });
 }
 fs.writeFileSync(path.join(root, 'home', 'validation.json'), JSON.stringify(res, null, 2));
-console.log(JSON.stringify({ d: res['desktop-1600'].overflowX, m: res['mobile-390'].overflowX, e: [res['desktop-1600'].errors, res['mobile-390'].errors], heights: res['desktop-1600'].checks.map((c) => c.h), ring: res['desktop-1600'].checks.every((c) => c.ring && c.guardrail) }));
+console.log(JSON.stringify(res['desktop-1600'].fit)); console.log(JSON.stringify({ d: res['desktop-1600'].overflowX, m: res['mobile-390'].overflowX, e: [res['desktop-1600'].errors, res['mobile-390'].errors], heights: res['desktop-1600'].checks.map((c) => c.h), ring: res['desktop-1600'].checks.every((c) => c.ring && c.guardrail) }));
 await b.close();

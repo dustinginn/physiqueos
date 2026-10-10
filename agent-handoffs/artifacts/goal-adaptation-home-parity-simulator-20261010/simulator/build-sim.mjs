@@ -17,6 +17,7 @@ body { margin:0; background:var(--pg); color:var(--pi); font-family:-apple-syste
 .intro { grid-column:1 / -1; }
 .intro h1 { font-size:clamp(26px,3.6vw,36px); margin:4px 0 6px; letter-spacing:-.02em; text-wrap:balance; }
 .intro p { color:var(--pi2); margin:0; font-size:14.5px; line-height:1.55; max-width:900px; }
+.simwarn { border:1.5px solid var(--pa); background:color-mix(in srgb,var(--pa) 10%,transparent); border-radius:12px; padding:10px 14px; font-size:14px; line-height:1.5; margin:6px 0 10px; max-width:900px; }
 .kick { color:var(--pt); font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
 .frame-wrap { position:sticky; top:12px; }
 #phone { width:402px; height:874px; min-height:0; padding:0; overflow:hidden; position:relative; }
@@ -42,6 +43,7 @@ body { margin:0; background:var(--pg); color:var(--pi); font-family:-apple-syste
 <div class="app">
   <div class="intro"><div class="kick">Goal Adaptation · interactive simulator · illustrative data only</div>
     <h1>Try adapting Build Lean Mass</h1>
+    <div class="simwarn"><b>Functional UX simulation, not the Native visual spec.</b> Screens approximate production visuals so the flow feels real. The released Build 95 Home and app components remain the visual source of truth.</div>
     <p>Start on Home, open the DEXA briefing, review Option B, set up a temporary leaning phase, adjust energy and your plan, approve, then advance simulated weeks to see Home, Goals and briefings respond. Every number is simulated; nothing connects to PhysiqueOS.</p></div>
   <div class="frame-wrap"><div id="phone" class="phone"></div><div class="crumb" id="crumb"></div></div>
   <aside id="panel" aria-label="Simulation controls"></aside>

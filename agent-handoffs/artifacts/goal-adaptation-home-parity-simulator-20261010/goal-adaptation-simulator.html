@@ -314,6 +314,7 @@ body { margin:0; background:var(--pg); color:var(--pi); font-family:-apple-syste
 .intro { grid-column:1 / -1; }
 .intro h1 { font-size:clamp(26px,3.6vw,36px); margin:4px 0 6px; letter-spacing:-.02em; text-wrap:balance; }
 .intro p { color:var(--pi2); margin:0; font-size:14.5px; line-height:1.55; max-width:900px; }
+.simwarn { border:1.5px solid var(--pa); background:color-mix(in srgb,var(--pa) 10%,transparent); border-radius:12px; padding:10px 14px; font-size:14px; line-height:1.5; margin:6px 0 10px; max-width:900px; }
 .kick { color:var(--pt); font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
 .frame-wrap { position:sticky; top:12px; }
 #phone { width:402px; height:874px; min-height:0; padding:0; overflow:hidden; position:relative; }
@@ -339,6 +340,7 @@ body { margin:0; background:var(--pg); color:var(--pi); font-family:-apple-syste
 <div class="app">
   <div class="intro"><div class="kick">Goal Adaptation · interactive simulator · illustrative data only</div>
     <h1>Try adapting Build Lean Mass</h1>
+    <div class="simwarn"><b>Functional UX simulation, not the Native visual spec.</b> Screens approximate production visuals so the flow feels real. The released Build 95 Home and app components remain the visual source of truth.</div>
     <p>Start on Home, open the DEXA briefing, review Option B, set up a temporary leaning phase, adjust energy and your plan, approve, then advance simulated weeks to see Home, Goals and briefings respond. Every number is simulated; nothing connects to PhysiqueOS.</p></div>
   <div class="frame-wrap"><div id="phone" class="phone"></div><div class="crumb" id="crumb"></div></div>
   <aside id="panel" aria-label="Simulation controls"></aside>
@@ -395,13 +397,13 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 function hpRing(t, value) {
   const size = 82, line = 6, r = (size - line) / 2, c = 2 * Math.PI * r;
   return `<div style="width:110px;height:110px;display:grid;place-items:center;flex:none" role="img" aria-label="Confidence ${value} percent">
-    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="position:absolute"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${t.ringTrack}" stroke-width="${line}"/><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${t.ringFill}" stroke-width="${line}" stroke-linecap="round" stroke-dasharray="${(value / 100) * c} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/></svg>
-    <div style="display:flex;flex-direction:column;align-items:center;gap:2px;width:${size * 0.82}px;position:relative"><span style="font-size:22px;font-weight:700;color:${t.ringText}">${value}%</span><span style="font-size:8px;font-weight:700;letter-spacing:.28px;color:${t.ringMuted}">CONFIDENCE</span></div></div>`;
+    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="grid-area:1/1;display:block"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${t.ringTrack}" stroke-width="${line}"/><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${t.ringFill}" stroke-width="${line}" stroke-linecap="round" stroke-dasharray="${(value / 100) * c} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/></svg>
+    <div style="grid-area:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:${size * 0.82}px"><span style="font-size:22px;line-height:1.2;font-weight:700;color:${t.ringText}">${value}%</span><span style="font-size:8px;line-height:1.2;font-weight:700;letter-spacing:.28px;color:${t.ringMuted}">CONFIDENCE</span></div></div>`;
 }
 function hpMetric(t, label, value, mark) {
   return `<div style="flex:1;min-width:0"><div style="height:1px;background:${t.metricRule};margin-bottom:9px"></div>
     <div style="font-size:9px;font-weight:700;letter-spacing:.6px;color:${t.fieldSecondary};white-space:nowrap;overflow:hidden">${label}</div>
-    <div style="font-size:14px;font-weight:800;color:${t.fieldInk};margin-top:4px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" ${mark ? `data-changed="1"` : ''}>${esc(value)}</div></div>`;
+    <div data-slot="metric:${label}" style="font-size:14px;font-weight:800;color:${t.fieldInk};margin-top:4px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(value)}</div></div>`;
 }
 function hpRow(t, row) {
   const active = row.status === 'active';
@@ -411,17 +413,17 @@ function hpRow(t, row) {
     <div style="width:24px;height:24px;border-radius:50%;background:${tint}2E;display:grid;place-items:center;flex:none"><i style="width:12px;height:12px;border-radius:50%;background:${tint};display:block"></i></div>
     <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
       <div style="font-size:10px;font-weight:700;letter-spacing:.4px;color:${tint}">PHASE${row.order} · ${statusLabel}</div>
-      <div style="font-size:15px;font-weight:800;color:${t.fieldInk}">${esc(row.name)}</div>
-      ${row.detail ? `<div style="font-size:12px;font-weight:600;color:${t.rowSecondary}">${esc(row.detail)}</div>` : ''}
-      ${active && row.label ? `<div style="font-size:12px;font-weight:800;color:${t.fieldInk};padding-top:2px">${esc(row.label)}</div>` : ''}
+      <div data-slot="row-name" style="font-size:15px;font-weight:800;color:${t.fieldInk}">${esc(row.name)}</div>
+      ${row.detail ? `<div data-slot="row-detail" style="font-size:12px;font-weight:600;color:${t.rowSecondary}">${esc(row.detail)}</div>` : ''}
+      ${active && row.label ? `<div data-slot="row-label" style="font-size:12px;font-weight:800;color:${t.fieldInk};padding-top:2px">${esc(row.label)}</div>` : ''}
     </div></div>`;
 }
 function hpGuardrail(t, g, dark) {
   return `<div style="width:304px;max-width:100%;margin-top:14px;padding:10px 12px;background:${t.guardBg};border-radius:12px;position:relative;overflow:hidden;display:flex;flex-direction:column;gap:4px">
     <span style="position:absolute;left:0;top:0;bottom:0;width:4px;background:${t.cyan}"></span>
     <div style="font-size:10px;font-weight:700;letter-spacing:.8px;color:${t.cyan}">GUARDRAIL</div>
-    <div style="font-size:14px;font-weight:800;color:${t.fieldInk}">${esc(g.title)}</div>
-    ${g.detail ? `<div style="font-size:12px;font-weight:500;color:${t.fieldSecondary}">${esc(g.detail)}</div>` : ''}</div>`;
+    <div data-slot="guardrail-title" style="font-size:14px;font-weight:800;color:${t.fieldInk}">${esc(g.title)}</div>
+    ${g.detail ? `<div data-slot="guardrail-detail" style="font-size:12px;font-weight:500;color:${t.fieldSecondary}">${esc(g.detail)}</div>` : ''}</div>`;
 }
 function hpField(t, s, dark) {
   return `<div data-act="openGoals" role="button" tabindex="0" aria-label="Open goal" style="cursor:pointer;padding:18px;position:relative;overflow:hidden;background:linear-gradient(135deg,${t.fieldStart},${t.fieldEnd})">
@@ -429,9 +431,9 @@ function hpField(t, s, dark) {
     <div style="display:flex;align-items:center;gap:14px;position:relative">
       <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
         <div style="font-size:11px;font-weight:700;letter-spacing:1.1px;color:${t.fieldSecondary}">TRAJECTORY</div>
-        <div style="font-size:24px;font-weight:800;color:${t.fieldInk};line-height:1.15">${esc(s.headline)}</div>
-        <div style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:${t.green};flex:none;display:block"></i><span style="font-size:13px;font-weight:700;color:${t.green}">${esc(s.timeline)}</span></div>
-        <div style="font-size:14px;font-weight:500;color:${t.fieldSecondary};line-height:1.3">${esc(s.support)}</div>
+        <div data-slot="headline" style="font-size:24px;font-weight:800;color:${t.fieldInk};line-height:1.15">${esc(s.headline)}</div>
+        <div style="display:flex;align-items:center;gap:6px"><i style="width:7px;height:7px;border-radius:50%;background:${t.green};flex:none;display:block"></i><span data-slot="timeline" style="font-size:13px;font-weight:700;color:${t.green}">${esc(s.timeline)}</span></div>
+        <div data-slot="support" style="font-size:14px;font-weight:500;color:${t.fieldSecondary};line-height:1.3">${esc(s.support)}</div>
       </div>
       ${hpRing(t, s.confidence)}
     </div>
@@ -440,7 +442,7 @@ function hpField(t, s, dark) {
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;position:relative">
       <div><span style="font-size:11px;font-weight:700;letter-spacing:1px;color:${t.purple};${dark ? 'background:#E9E2FF;padding:4px 8px;border-radius:5px;' : ''}">PRIMARY GOAL</span></div>
-      <div style="font-size:12px;font-weight:500;color:${t.fieldSecondary}">${esc(s.range)}</div>
+      <div data-slot="range" style="font-size:12px;font-weight:500;color:${t.fieldSecondary}">${esc(s.range)}</div>
       <div style="display:flex;flex-direction:column;gap:12px;position:relative">
         <div style="position:absolute;left:11px;top:8px;bottom:0;width:2px;background:linear-gradient(${t.amber}D1 0%,${t.amber}D1 43%,${t.green}D1 57%,${t.green}D1 100%)"></div>
         ${s.rows.map((r) => hpRow(t, r)).join('')}
@@ -512,9 +514,9 @@ HOME_STATES.h2 = {
 HOME_STATES.h3 = {
   ...HOME_STATES.baseline, label: 'H3 · Phase complete, choice pending',
   headline: 'Leaning complete', timeline: 'Back in range', support: 'Choose when to resume building.',
-  metrics: { targetDate: '—', remaining: '—', progress: '69%', destination: '10 lb' },
+  metrics: { targetDate: '—', remaining: '—', progress: '71%', destination: '10 lb' },
   range: 'Jul 18 – date set on resume',
-  rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: 'Ready to resume' }, { order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Body fat 8.7%' }],
+  rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: 'Ready to resume' }, { order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Back in 8–9%' }],
   guardrail: { title: 'Maintain approximately 8–9% body fat', detail: 'Within range' },
   briefing: { title: 'DEXA Analysis', date: 'Today' },
   priorities: [{ title: 'Choose your next phase', sub: 'Leaning complete', kind: 'decision', action: 'decide' }, { title: 'Morning Weigh-In', sub: 'Before food or fluids' }, { title: 'Foam Rolling', sub: 'Evening' }],
@@ -522,9 +524,9 @@ HOME_STATES.h3 = {
 HOME_STATES.h4 = {
   ...HOME_STATES.baseline, label: 'H4 · Building resumed',
   headline: 'Lean Mass Build', timeline: '14 weeks remaining', support: 'Add lean mass gradually while keeping body fat in range.',
-  metrics: { targetDate: 'Feb 20', remaining: '14 weeks', progress: '69%', destination: '10 lb' },
+  metrics: { targetDate: 'Feb 20', remaining: '14 weeks', progress: '71%', destination: '10 lb' },
   range: 'Jul 18 – Feb 20',
-  rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Oct 10 – Nov 7' }, { order: 4, status: 'active', name: 'Lean Mass Build', detail: 'Nov 9 – Feb 20 · about 14 weeks remaining', label: '6.9 of 10 lb gained' }],
+  rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Oct 10 – Nov 7' }, { order: 4, status: 'active', name: 'Lean Mass Build', detail: 'Nov 9 – Feb 20 · about 14 weeks remaining', label: '7.1 of 10 lb gained' }],
   guardrail: { title: 'Maintain approximately 8–9% body fat', detail: 'Within range' },
   briefing: { title: 'Weekly Briefing', date: 'Yesterday' },
 };
@@ -670,7 +672,7 @@ function homeState() {
     const inRange = bf() <= S.guardrail.max;
     return { ...base, headline: inRange ? 'Leaning complete' : 'Leaning time limit', timeline: inRange ? 'Back in range' : 'Review needed', support: inRange ? 'Choose when to resume building.' : 'Choose what happens next.',
       metrics: { targetDate: '—', remaining: '—', progress: pct, destination: '10 lb' }, range: 'Jul 18 – date set on resume',
-      rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: 'Ready to resume' }, { order: 3, status: 'completed', name: 'Leaning (temporary)', detail: `Body fat ${f1(bf())}%` }],
+      rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: 'Ready to resume' }, { order: 3, status: 'completed', name: 'Leaning (temporary)', detail: inRange ? 'Back in 8–9%' : `${dateLabel(S.phaseStartDay)} – ${dateLabel(S.day)}` }],
       guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: inRange ? 'Within range' : 'Above range' },
       briefing: { title: 'DEXA Analysis', date: dateLabel(S.day) },
       priorities: [...(S.decision.dismissed ? [] : [{ title: 'Choose your next phase', sub: inRange ? 'Leaning complete' : 'Time limit reached', kind: 'decision', action: 'openNext' }]), ...base.priorities] };
@@ -678,13 +680,13 @@ function homeState() {
   if (S.phase === 'maintaining') {
     return { ...base, headline: 'Maintain', timeline: 'Holding before building', support: 'Keep weight steady for a few weeks, then resume building.',
       metrics: { targetDate: '—', remaining: '—', progress: pct, destination: '10 lb' }, range: 'Jul 18 – date set on resume',
-      rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: `Body fat ${f1(bf())}%` }, { order: 4, status: 'active', name: 'Maintain', detail: `Since ${dateLabel(S.phaseStartDay)}`, label: 'Building resumes when you choose' }],
+      rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Back in 8–9%' }, { order: 4, status: 'active', name: 'Maintain', detail: `Since ${dateLabel(S.phaseStartDay)}`, label: 'Building resumes when you choose' }],
       guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: 'Within range' } };
   }
   // resumed
   return { ...base, headline: 'Lean Mass Build', timeline: '14 weeks remaining', support: 'Add lean mass gradually while keeping body fat in range.',
     metrics: { targetDate: S.goalDate, remaining: '14 weeks', progress: pct, destination: '10 lb' }, range: `Jul 18 – ${S.goalDate}`,
-    rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: `Body fat ${f1(S.completeBf ?? bf())}%` }, { order: 4, status: 'active', name: 'Lean Mass Build', detail: `${dateLabel(S.phaseStartDay)} – ${S.goalDate}`, label: `${f1(S.gained)} of 10 lb gained` }],
+    rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Back in 8–9%' }, { order: 4, status: 'active', name: 'Lean Mass Build', detail: `${dateLabel(S.phaseStartDay)} – ${S.goalDate}`, label: `${f1(S.gained)} of 10 lb gained` }],
     guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: bf() > S.guardrail.max ? 'Above range' : 'Within range' } };
 }
 
@@ -786,6 +788,18 @@ SCREENS.qcWhy = () => { const q = S.qc; return `${statusBar()}${sNav('Weekly', '
   <div class="kv"><span class="k">What that means</span><span class="v">Real balance ≈ ${sgn(Math.round((q.observed * 3300) / 7 / 10) * 10)}/day</span></div></div>
   <p class="t-sm ink2">Logs and wearables have margins of error; results show the real balance. We suggest a modest step, then watch for 3 weeks before suggesting anything else.</p></div>`; };
 
+SCREENS.monthly = () => { const leaning = S.phase === 'leaning'; return `${statusBar()}${sNav('Home', 'Monthly Briefing')}
+  <div class="content stack"><div class="row between"><span class="eyebrow">Monthly · ${dateLabel(S.day)}</span>${simTag}</div>
+  ${stubCards('Hero · Goal Milestone · Training · Energy · Recovery · New Baseline · What Changed · Defining Moments (layout unchanged)')}
+  ${coach('Coach’s Take', [['Coach’s Take', leaning ? 'This month moved from building to a planned leaning phase. Both serve the same Build Lean Mass goal: protect what you built, then keep building.' : S.phase === 'resumed' ? 'Building again after a short leaning phase. Body fat is in range, so this is a clean restart.' : 'Steady month toward Build Lean Mass.']])}
+  <div class="card"><span class="eyebrow">Month Ahead</span><div class="t-body strong" style="margin-top:6px">${leaning ? 'Finish leaning, then choose how to resume building.' : 'Keep the current plan.'}</div>
+  <p class="t-sm ink2" style="margin-top:4px">Phase and goal are tracked separately: the phase ends when you’re back in range; the goal date is set when building resumes.</p></div>
+  ${S.qc ? `<div class="card" style="padding:12px 16px" data-act="openWeekly" role="button" tabindex="0"><div class="row between"><div><div class="t-sm strong">A Quick Calibration is open</div><div class="t-xs muted">From your Weekly</div></div>${I.chev}</div></div>` : ''}</div>`; };
+SCREENS.photo = () => `${statusBar()}${sNav('Home', 'Photo Event')}
+  <div class="content stack"><div class="row between"><span class="eyebrow">Photo event · ${dateLabel(S.day)}</span>${simTag}</div>
+  ${stubCards('Hero · This Photo Session · What Visibly Changed · Interpretation (layout unchanged)')}
+  ${coach('Coach’s Insight', [['Coach’s Insight', S.phase === 'leaning' ? 'Your waist looks a little leaner, consistent with the leaning phase. Photos support the trend but don’t measure body fat, so a scan or your weigh-in trend decides when the phase is done.' : 'Photos look consistent with your recent trend.']])}
+  <p class="t-xs muted" style="text-align:center">Photos alone never trigger a recommendation.</p></div>`;
 SCREENS.midweek = () => `${statusBar()}${sNav('Home', 'Midweek Briefing')}
   <div class="content stack"><div class="row between"><span class="eyebrow">Midweek · ${dateLabel(S.day + 3)}</span>${simTag}</div>
   <div class="card" style="background:linear-gradient(160deg,var(--fieldStart),var(--fieldEnd));border:0"><div class="display h3">${S.phase === 'leaning' ? 'Leaning is moving as planned so far' : 'On plan so far this week'}</div>
@@ -1078,7 +1092,7 @@ const CONTROL = {
   reset: () => { S = initialState(); render(); },
 };
 function panel() {
-  const flow = [['home', 'Home'], ['goals', 'Goals'], ['briefing', 'Latest briefing'], ['midweek', 'Midweek']];
+  const flow = [['home', 'Home'], ['goals', 'Goals'], ['briefing', 'Latest briefing'], ['midweek', 'Midweek'], ['monthly', 'Monthly'], ['photo', 'Photo event']];
   return `<div class="pn-sec"><div class="pn-h">Simulated state</div>
     <div class="kvs"><span>Date</span><b>${dateLabel(S.day)}</b><span>Phase</span><b>${{ building: 'Lean Mass Build', leaning: 'Leaning (temporary)', leaningComplete: 'Leaning complete', resumed: 'Lean Mass Build (resumed)', maintaining: 'Maintain', keepBuilding: 'Lean Mass Build (new limits)' }[S.phase]}</b>
     <span>Body fat</span><b>${f1(bf())}%</b><span>Lean gained</span><b>${f1(S.gained)} of 10 lb</b><span>Plan</span><b>${sgn(S.plan.balance)} · eat ${fmt(S.plan.eat)} · goal ${fmt(S.plan.goal)}</b><span>Maintenance est.</span><b>${fmt(S.maintenanceEst)}</b><span>Version</span><b>v${S.versions[0].v}</b></div></div>

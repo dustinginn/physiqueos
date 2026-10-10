@@ -5,7 +5,7 @@
 
 ## Stage 1: corrected Home (`home/`)
 
-- **`home-parity-review.html`:** the review page (Claude artifact). Production baseline beside H1–H4, in Dark and Mineral Light, with a slot-parity table.
+- **`home-parity-review.html`:** the Home content review (Claude artifact). **Illustrative content only, not a visual specification.** It includes the content-slot matrix, the fit check and the diff-boundary audit. Build 95 SwiftUI remains the source of truth; native pixel parity is to be proven with snapshot tests at implementation.
 - **`home/home-render.js`:** source-faithful Home replica from Native Build 94 (`HomeJourneyFieldView.swift`, `ConfidenceRing.swift`, header, strip, priorities). It is shared with the simulator.
 - **`home/screens/`:** captures, plus `home/validation.json`.
 - **Rebuild:** `node home/build-home-review.mjs`.
@@ -13,7 +13,7 @@
 
 ## Stage 2: interactive simulator (`simulator/`)
 
-- **`goal-adaptation-simulator.html`:** the stateful simulator (Claude artifact).
+- **`goal-adaptation-simulator.html`:** the stateful simulator (Claude artifact). It is a functional UX simulation, not the Native visual spec.
 - **`simulator/sim.js`:** state, screens, actions and simulated evidence.
 - **Engine rules:**
   - 1:1 energy;
@@ -21,5 +21,5 @@
   - Quick Calibration after about 3 weeks of slower-than-planned progress;
   - honest lean-mass changes;
   - versions and undo.
-- **`simulator/test-sim.mjs`:** end-to-end click test; 34 checks in `test-results.json`, with screenshots in `simulator/screens/`.
+- **`simulator/test-sim.mjs`:** end-to-end click test; 37 checks in `test-results.json`, with screenshots in `simulator/screens/`.
 - **Rebuild:** `node simulator/build-sim.mjs`.

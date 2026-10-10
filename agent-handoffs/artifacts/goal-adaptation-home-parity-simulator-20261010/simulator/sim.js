@@ -138,7 +138,7 @@ function homeState() {
     const inRange = bf() <= S.guardrail.max;
     return { ...base, headline: inRange ? 'Leaning complete' : 'Leaning time limit', timeline: inRange ? 'Back in range' : 'Review needed', support: inRange ? 'Choose when to resume building.' : 'Choose what happens next.',
       metrics: { targetDate: '—', remaining: '—', progress: pct, destination: '10 lb' }, range: 'Jul 18 – date set on resume',
-      rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: 'Ready to resume' }, { order: 3, status: 'completed', name: 'Leaning (temporary)', detail: `Body fat ${f1(bf())}%` }],
+      rows: [{ order: 2, status: 'paused', name: 'Lean Mass Build', detail: 'Ready to resume' }, { order: 3, status: 'completed', name: 'Leaning (temporary)', detail: inRange ? 'Back in 8–9%' : `${dateLabel(S.phaseStartDay)} – ${dateLabel(S.day)}` }],
       guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: inRange ? 'Within range' : 'Above range' },
       briefing: { title: 'DEXA Analysis', date: dateLabel(S.day) },
       priorities: [...(S.decision.dismissed ? [] : [{ title: 'Choose your next phase', sub: inRange ? 'Leaning complete' : 'Time limit reached', kind: 'decision', action: 'openNext' }]), ...base.priorities] };
@@ -146,13 +146,13 @@ function homeState() {
   if (S.phase === 'maintaining') {
     return { ...base, headline: 'Maintain', timeline: 'Holding before building', support: 'Keep weight steady for a few weeks, then resume building.',
       metrics: { targetDate: '—', remaining: '—', progress: pct, destination: '10 lb' }, range: 'Jul 18 – date set on resume',
-      rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: `Body fat ${f1(bf())}%` }, { order: 4, status: 'active', name: 'Maintain', detail: `Since ${dateLabel(S.phaseStartDay)}`, label: 'Building resumes when you choose' }],
+      rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Back in 8–9%' }, { order: 4, status: 'active', name: 'Maintain', detail: `Since ${dateLabel(S.phaseStartDay)}`, label: 'Building resumes when you choose' }],
       guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: 'Within range' } };
   }
   // resumed
   return { ...base, headline: 'Lean Mass Build', timeline: '14 weeks remaining', support: 'Add lean mass gradually while keeping body fat in range.',
     metrics: { targetDate: S.goalDate, remaining: '14 weeks', progress: pct, destination: '10 lb' }, range: `Jul 18 – ${S.goalDate}`,
-    rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: `Body fat ${f1(S.completeBf ?? bf())}%` }, { order: 4, status: 'active', name: 'Lean Mass Build', detail: `${dateLabel(S.phaseStartDay)} – ${S.goalDate}`, label: `${f1(S.gained)} of 10 lb gained` }],
+    rows: [{ order: 3, status: 'completed', name: 'Leaning (temporary)', detail: 'Back in 8–9%' }, { order: 4, status: 'active', name: 'Lean Mass Build', detail: `${dateLabel(S.phaseStartDay)} – ${S.goalDate}`, label: `${f1(S.gained)} of 10 lb gained` }],
     guardrail: { title: `Maintain approximately ${S.guardrail.min}–${S.guardrail.max}% body fat`, detail: bf() > S.guardrail.max ? 'Above range' : 'Within range' } };
 }
 
@@ -254,6 +254,18 @@ SCREENS.qcWhy = () => { const q = S.qc; return `${statusBar()}${sNav('Weekly', '
   <div class="kv"><span class="k">What that means</span><span class="v">Real balance ≈ ${sgn(Math.round((q.observed * 3300) / 7 / 10) * 10)}/day</span></div></div>
   <p class="t-sm ink2">Logs and wearables have margins of error; results show the real balance. We suggest a modest step, then watch for 3 weeks before suggesting anything else.</p></div>`; };
 
+SCREENS.monthly = () => { const leaning = S.phase === 'leaning'; return `${statusBar()}${sNav('Home', 'Monthly Briefing')}
+  <div class="content stack"><div class="row between"><span class="eyebrow">Monthly · ${dateLabel(S.day)}</span>${simTag}</div>
+  ${stubCards('Hero · Goal Milestone · Training · Energy · Recovery · New Baseline · What Changed · Defining Moments (layout unchanged)')}
+  ${coach('Coach’s Take', [['Coach’s Take', leaning ? 'This month moved from building to a planned leaning phase. Both serve the same Build Lean Mass goal: protect what you built, then keep building.' : S.phase === 'resumed' ? 'Building again after a short leaning phase. Body fat is in range, so this is a clean restart.' : 'Steady month toward Build Lean Mass.']])}
+  <div class="card"><span class="eyebrow">Month Ahead</span><div class="t-body strong" style="margin-top:6px">${leaning ? 'Finish leaning, then choose how to resume building.' : 'Keep the current plan.'}</div>
+  <p class="t-sm ink2" style="margin-top:4px">Phase and goal are tracked separately: the phase ends when you’re back in range; the goal date is set when building resumes.</p></div>
+  ${S.qc ? `<div class="card" style="padding:12px 16px" data-act="openWeekly" role="button" tabindex="0"><div class="row between"><div><div class="t-sm strong">A Quick Calibration is open</div><div class="t-xs muted">From your Weekly</div></div>${I.chev}</div></div>` : ''}</div>`; };
+SCREENS.photo = () => `${statusBar()}${sNav('Home', 'Photo Event')}
+  <div class="content stack"><div class="row between"><span class="eyebrow">Photo event · ${dateLabel(S.day)}</span>${simTag}</div>
+  ${stubCards('Hero · This Photo Session · What Visibly Changed · Interpretation (layout unchanged)')}
+  ${coach('Coach’s Insight', [['Coach’s Insight', S.phase === 'leaning' ? 'Your waist looks a little leaner, consistent with the leaning phase. Photos support the trend but don’t measure body fat, so a scan or your weigh-in trend decides when the phase is done.' : 'Photos look consistent with your recent trend.']])}
+  <p class="t-xs muted" style="text-align:center">Photos alone never trigger a recommendation.</p></div>`;
 SCREENS.midweek = () => `${statusBar()}${sNav('Home', 'Midweek Briefing')}
   <div class="content stack"><div class="row between"><span class="eyebrow">Midweek · ${dateLabel(S.day + 3)}</span>${simTag}</div>
   <div class="card" style="background:linear-gradient(160deg,var(--fieldStart),var(--fieldEnd));border:0"><div class="display h3">${S.phase === 'leaning' ? 'Leaning is moving as planned so far' : 'On plan so far this week'}</div>
@@ -546,7 +558,7 @@ const CONTROL = {
   reset: () => { S = initialState(); render(); },
 };
 function panel() {
-  const flow = [['home', 'Home'], ['goals', 'Goals'], ['briefing', 'Latest briefing'], ['midweek', 'Midweek']];
+  const flow = [['home', 'Home'], ['goals', 'Goals'], ['briefing', 'Latest briefing'], ['midweek', 'Midweek'], ['monthly', 'Monthly'], ['photo', 'Photo event']];
   return `<div class="pn-sec"><div class="pn-h">Simulated state</div>
     <div class="kvs"><span>Date</span><b>${dateLabel(S.day)}</b><span>Phase</span><b>${{ building: 'Lean Mass Build', leaning: 'Leaning (temporary)', leaningComplete: 'Leaning complete', resumed: 'Lean Mass Build (resumed)', maintaining: 'Maintain', keepBuilding: 'Lean Mass Build (new limits)' }[S.phase]}</b>
     <span>Body fat</span><b>${f1(bf())}%</b><span>Lean gained</span><b>${f1(S.gained)} of 10 lb</b><span>Plan</span><b>${sgn(S.plan.balance)} · eat ${fmt(S.plan.eat)} · goal ${fmt(S.plan.goal)}</b><span>Maintenance est.</span><b>${fmt(S.maintenanceEst)}</b><span>Version</span><b>v${S.versions[0].v}</b></div></div>

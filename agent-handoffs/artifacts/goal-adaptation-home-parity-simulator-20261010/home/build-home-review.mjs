@@ -1,7 +1,7 @@
 import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const js = ['home-render.js', 'review.js'].map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n;\n');
-const html = `<title>Home Parity Review</title>
+const html = `<title>Home Content Review</title>
 <style>
 :root { --bg:#061019; --card:#0F1C2A; --ink:#EEF5F8; --ink2:#B6C6CE; --muted:#8399A3; --line:rgba(157,179,189,.18); --teal:#3BD2CA; --amber:#F4BC48; color-scheme:dark; }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg:#E3E8E1; --card:#FBFAF4; --ink:#102431; --ink2:#455D65; --muted:#5D7279; --line:rgba(25,56,66,.16); --teal:#087E78; --amber:#925500; color-scheme:light; } }
@@ -26,6 +26,8 @@ h2 { font-size:22px; margin:34px 0 8px; }
 .grid3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
 .panel { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px 18px; font-size:14px; line-height:1.55; color:var(--ink2); }
 .panel b { color:var(--ink); }
+.warnbox { border:1.5px solid var(--amber); background:color-mix(in srgb,var(--amber) 10%,transparent); border-radius:14px; padding:12px 16px; font-size:14.5px; line-height:1.55; max-width:1100px; margin:6px 0 12px; }
+.pt td.ok { color:var(--teal); font-weight:700; } .pt td.bad { color:#E5484D; font-weight:700; }
 .panel ul { margin:6px 0 0; padding-left:18px; }
 .tw { overflow-x:auto; border:1px solid var(--line); border-radius:14px; background:var(--card); }
 table.pt { border-collapse:collapse; font-size:12.5px; min-width:1100px; width:100%; }
@@ -41,21 +43,26 @@ table.pt { border-collapse:collapse; font-size:12.5px; min-width:1100px; width:1
 @media (max-width:720px) { .ph { width:300px; } .ph > .hp { zoom:.746; } }
 </style>
 <div class="wrap">
-  <div class="kick">Goal Adaptation · Home parity correction · for Founder review</div>
-  <h1>Home, matched to production</h1>
-  <p class="lead">The corrected Home states reuse the production Home exactly: header, goal field, 110pt confidence ring labelled CONFIDENCE, four fixed metrics, the connected left phase timeline, the 304pt guardrail box, the 104pt action and briefing strip, Today’s Priorities and the tab bar. Only the server-provided phase text changes. Values are simulated.</p>
+  <div class="kick">Goal Adaptation · Home content review · illustrative content only</div>
+  <h1>Home: content changes only</h1>
+  <div class="warnbox"><b>Not a visual specification.</b> These are browser recreations of the production Home, used only to review wording and phase states. The released Build 95 SwiftUI Home stays the source of truth for every pixel. Native pixel parity will be proven with snapshot tests against production when this is implemented.</div>
+  <p class="lead">Only the server-provided goal and phase text changes. Layout, the confidence ring, the connected phase timeline, typography, colours, card sizes and everything below the goal card stay exactly as released. Where new text would not fit, the wording is shortened.</p>
   <div class="bar" role="group" aria-label="Themes"><button data-show="both" aria-pressed="true">Dark + Mineral Light</button><button data-show="dark" aria-pressed="false">Dark</button><button data-show="light" aria-pressed="false">Mineral Light</button></div>
   <div id="compare"></div>
-  <h2>What was corrected from the V3 mockups</h2>
-  <div class="grid3">
-    <div class="panel"><b>Restored to production</b><ul><li>Connected left phase timeline (line and dots)</li><li>Ring label “CONFIDENCE”, 82pt ring in its 110pt frame</li><li>Metric labels Target date · Remaining · Progress · Destination, in their positions</li><li>“GUARDRAIL” box, same width and style</li><li>Greeting, briefing tile and priorities placement</li></ul></div>
-    <div class="panel"><b>Only phase text changes</b><ul><li>Two phase rows, as today, so the card doesn’t grow</li><li>Leaning shows as the active phase; Lean Mass Build shows as paused with progress kept</li><li>PROGRESS stays the goal’s progress during leaning; the phase target sits in the active row</li></ul></div>
-    <div class="panel"><b>Phase complete, simplified</b><ul><li>Three short lines: “Leaning complete”, “Back in range”, “Choose when to resume building.”</li><li>No result tables or long sentences on Home</li><li>The choice lives in one Today’s Priorities item; details are in Goals</li></ul></div>
-  </div>
-  <h2>Slot parity</h2>
-  <p class="note">Every slot exists today in <code>HomeJourneyFieldView.swift</code>. Highlighted cells are the only values that differ from the baseline. The production label format “PHASE2 · ACTIVE” (no space) is kept as it is today.</p>
+  <h2>Content-slot matrix</h2>
+  <p class="note">Every slot already exists in <code>HomeJourneyFieldView.swift</code>. Highlighted cells differ from production. The last column says what would have to change to show the content; none of it is visual.</p>
   <div id="parity"></div>
-  <p class="note">Needs server support (not built): a paused status rendered for the build phase, goal progress used for PROGRESS during a temporary phase, and the phase-decision priority item. The production values here are reconstructed from source with simulated numbers; your screenshots remain the visual authority.</p>
+  <h2>Fit check</h2>
+  <p class="note">Measured in this recreation against the production line counts for each slot. Web fonts differ slightly from SF Pro, so the native check comes later.</p>
+  <div id="fit"></div>
+  <h2>Diff boundary</h2>
+  <div id="regions"></div>
+  <h2>Data notes</h2>
+  <div class="grid3">
+    <div class="panel"><b>No invented measurements</b><ul><li>Body fat 9.7% is the Oct 9 DEXA value.</li><li>Progress stays at the last measured 7.1 of 10 lb (71%) until a new scan.</li><li>Leaning dates and the resumed goal date are example commitments, not measurements.</li></ul></div>
+    <div class="panel"><b>Phase lineage</b><ul><li>Phase 2 Lean Mass Build is paused, not replaced.</li><li>Leaning is Phase 3 (temporary).</li><li>Resumed building is shown as Phase 4 Lean Mass Build, linked to Phase 2. Reopening Phase 2 instead is an open question.</li></ul></div>
+    <div class="panel"><b>Corrected since the last review</b><ul><li>Confidence ring arc now centred with its label in the 110pt frame (the recreation had drawn the arc off-centre).</li><li>Removed the invented 8.7% and 6.9 lb values.</li></ul></div>
+  </div>
 </div>
 <div id="lb" hidden role="dialog" aria-label="Enlarged Home"><div class="stage"></div><div class="side"><div class="cap"></div><button class="close">Close (Esc)</button></div></div>
 <script>

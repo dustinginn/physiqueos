@@ -71,6 +71,9 @@ await act('date', 'Feb 15'); await act('openReview'); await act('approve'); s = 
 ok('keep-building path approves new range', s.phase === 'keepBuilding' && (await p.evaluate(() => S.guardrail.max)) === 11.5);
 await ctl('reset'); await act('openBriefing'); await act('notNow'); await act('notNowPick', 'remove'); ok('not now removes Home item', !(await text()).includes('Review goal options'));
 await ctl('theme', 'light'); await shot('12-home-mineral');
+await ctl('jump', 'monthly'); ok('monthly briefing renders, no proposal', (await text()).includes('Month Ahead'.toUpperCase()) || (await text()).includes('Month Ahead'));
+await ctl('jump', 'photo'); ok('photo event never recommends', (await text()).includes('never trigger a recommendation'));
+ok('simulation label present', (await p.evaluate(() => document.body.innerText)).includes('Functional UX simulation, not the Native visual spec'));
 ok('no page errors', errors.length === 0, errors.join(' | '));
 await p.close();
 // mobile viewport
