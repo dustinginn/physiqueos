@@ -6,6 +6,20 @@
 > release workflow (guarded TestFlight delivery VALID) may move them. Details, guard and prompt clause:
 > [`RELEASE_AUTHORITY.md`](RELEASE_AUTHORITY.md).
 
+## Standing completion rule — every coder session
+
+This is a **repository-level requirement** for every Claude, Codex, or successor coding-agent session, including newly created chats and isolated worktrees. Read this section from `origin/main` before beginning work; it does not depend on chat history or an individual inbox prompt.
+
+A task is **not complete** until all of the following are true:
+
+1. The work branch is pushed to `origin` with its exact commit SHA. Push all non-secret, reviewable artifacts needed to reproduce or inspect the result (screenshots, validation outputs, design source, and indexes), preserving earlier accepted baselines. For report-only tasks, there may be no separate work branch.
+2. A **new immutable, UTC-timestamped** completion report is published at `agent-handoffs/reports/YYYYMMDDTHHMMSSZ-<task>.md` on **`origin/main`**, not merely on the implementation branch, local disk, an artifact page, or in chat. Publish through the guarded additive report-only fast-forward procedure in `RELEASE_AUTHORITY.md`; never force-push. The report must include task identity, exact branch and SHA, tests/validation and results, artifacts/links, findings, blockers, Founder decisions needed, and explicit production/deployment/TestFlight/release-pointer status. Sanitization is mandatory.
+3. The agent verifies the report is retrievable from `origin/main`, then returns its **direct GitHub report URL and main publication commit SHA** in the final chat response.
+
+A report committed only to a candidate branch is **unpublished** for handoff purposes. If the main publication is blocked, report **HOLD / publication blocked**, provide the candidate branch report link, and do not claim task completion. A future chat must retry publication rather than assuming a previous session did it.
+
+`agent-handoffs/latest.json` and `latest.md` remain reserved for an accepted Native release after TestFlight VALID; ordinary reports must not touch them. This rule applies equally to investigations, audits, design work, implementation candidates, stabilization fixes, Server deployments, and Native releases. New coder sessions should load this protocol via `docs/CODEX.md` and the canonical handoff README before execution.
+
 ## Purpose
 
 Two directions, both through this repository, so the Founder never copy/pastes between agents:
