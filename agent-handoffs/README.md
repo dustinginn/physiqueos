@@ -20,6 +20,19 @@ A report committed only to a candidate branch is **unpublished** for handoff pur
 
 `agent-handoffs/latest.json` and `latest.md` remain reserved for an accepted Native release after TestFlight VALID; ordinary reports must not touch them. This rule applies equally to investigations, audits, design work, implementation candidates, stabilization fixes, Server deployments, and Native releases. New coder sessions should load this protocol via `docs/CODEX.md` and the canonical handoff README before execution.
 
+## Standing lightweight storage housekeeping — every coder session
+
+Every Claude, Codex, or successor agent session that creates local build/test/design artifacts must **clean up after itself** before declaring the task complete. This is a short, targeted closeout step, **not** a full-disk audit, lengthy cleanup project, or reason to delay every task.
+
+- **Preflight:** check actual available disk space before storage-intensive work and preserve the established **12 GiB hard free-space floor**. Serialize large Xcode/simulator builds when possible; stop or adjust safely if the floor is threatened.
+- **During and after work:** track temporary directories and disposable resources created by this task. On completion, promptly remove only verified, inactive, regenerable task-owned artifacts (temporary DerivedData and xcresult bundles after results are recorded, temporary simulators created for tests, disposable scratch, caches produced specifically for this task). Use the appropriate lifecycle tool; never broad wildcard deletion or `git worktree remove --force`.
+- **Preserve:** active worktrees and sessions (including other agents), all unpushed/untracked/ignored unique artifacts, source/design evidence not safely backed up, signed release archives and prior release archives, distribution/signing assets, credentials, approved production tooling, personal/health data, and protected iCloud references. A clean git status alone is insufficient proof a directory is disposable.
+- **Worktrees:** remove only completed, inactive, fully backed-up worktrees after verifying remote commit reachability and checking for unique ignored/untracked content; otherwise leave them for a later dedicated review. Never kill another agent's process.
+- **Report briefly:** record available GiB before and after storage-heavy work, what task-owned temporary resources were removed or retained, and any material residual storage risk in the task's standard completion report on `origin/main`.
+- **Escalation:** if storage remains tight, disk behavior is unexpected, or identifying safe deletions would require broad inspection, report a bounded cleanup recommendation and seek separate authorization. Do not turn routine task closeout into a long storage investigation.
+
+This standing housekeeping policy applies across coder chat turnover and complements the standing completion-report rule above. It does not authorize deletion of historical archives, active sessions, or unrelated user files.
+
 ## Purpose
 
 Two directions, both through this repository, so the Founder never copy/pastes between agents:
