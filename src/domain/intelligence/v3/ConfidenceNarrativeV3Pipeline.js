@@ -3,6 +3,7 @@ import { composeNarrativeV3 } from "./NarrativeV3CompositionService.js";
 import { createStrategicInterpretationV3 } from "./StrategicInterpretationV3Engine.js";
 import { selectStrategicallyEligibleEvidenceV3 } from "./EvidenceEligibilityV3.js";
 import { V3_SCHEMA, deepFreeze, semanticFingerprint } from "./V3Runtime.js";
+import { evaluateGoalAdaptationShadow, shadowInputsFromV3 } from "../../goalAdaptation/GoalAdaptationShadowEvaluator.js";
 
 export function runConfidenceNarrativeV3({
   goalContract,
@@ -14,6 +15,13 @@ export function runConfidenceNarrativeV3({
   evaluationContext,
   surface,
   briefingIntelligence = null,
+  // Goal Adaptation Phase A (dormant). Only the shadow dry-run and tests pass
+  // this; no production caller does, so published output is unchanged. When
+  // present, the post-projection adaptation ladder runs on this evaluation's
+  // own trajectory and guardrail findings and is returned beside (never
+  // inside) the semantic result: it does not alter the recommendation,
+  // Goal Confidence, narrative or the result id.
+  goalAdaptationShadow = null,
 }) {
   const eligibility = selectStrategicallyEligibleEvidenceV3({
     goalContract,
@@ -61,8 +69,13 @@ export function runConfidenceNarrativeV3({
       clientWiring: false,
     },
   };
+  const adaptation = goalAdaptationShadow ? evaluateGoalAdaptationShadow({
+    ...goalAdaptationShadow,
+    ...shadowInputsFromV3({ goalContract, interpretation: strategic.interpretation, confidence }),
+  }) : null;
   return deepFreeze({
     ...semantic,
     id: `confidence_narrative_v3_calibration|${semanticFingerprint(semantic).slice(7)}`,
+    ...(adaptation ? { goalAdaptationShadow: adaptation } : {}),
   });
 }
