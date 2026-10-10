@@ -15,6 +15,11 @@ Before proposing or reconstructing the PhysiqueOS backlog:
 
 Agent handoff reports describe implementation state. This backlog describes what still needs product attention.
 
+FOUNDER ACCEPTANCE UPDATE — 2026-10-09
+- Progress Photos flexible cadence (Every N Weeks / Months): Founder confirms COMPLETE and physically accepted. Remove from outstanding physical-acceptance lists. Earlier Build81 pending-acceptance wording below is historical and superseded.
+- DEXA → Apple Health prospective Oct 9 writeback: Founder confirms COMPLETE and physically accepted, including no duplicate or unintended Weight entries. Remove from outstanding physical-acceptance lists. Earlier prospective-policy acceptance-pending wording below is historical and superseded.
+- Do not reopen either item without a new Founder-reported regression.
+
 
 
 BUILD 94 — RELEASED TO TESTFLIGHT, PHYSICAL ACCEPTANCE PENDING (2026-10-09)
